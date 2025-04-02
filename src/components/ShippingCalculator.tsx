@@ -1,221 +1,219 @@
 
 import React, { useState } from 'react';
-import { Button } from "@/components/ui/button";
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, DollarSign, TrendingDown } from 'lucide-react';
-
-type ShippingOption = {
-  id: string;
-  name: string;
-  price: number;
-  deliveryTime: string;
-  description: string;
-};
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Ship, Package, ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const ShippingCalculator: React.FC = () => {
-  const [weight, setWeight] = useState<number>(1);
-  const [packageType, setPackageType] = useState<'parcel' | 'drum'>('parcel');
-  const [showResults, setShowResults] = useState(false);
-  const [isCalculating, setIsCalculating] = useState(false);
-  
-  const shippingOptions: ShippingOption[] = [
-    {
-      id: 'standard',
-      name: 'Standard Shipping',
-      price: packageType === 'drum' ? 260 : 50 * weight,
-      deliveryTime: '2-3 weeks',
-      description: 'Our most economical shipping option with standard tracking'
-    },
-    {
-      id: 'priority',
-      name: 'Priority Shipping',
-      price: packageType === 'drum' ? 350 : 75 * weight,
-      deliveryTime: '10-14 days',
-      description: 'Faster delivery with priority handling and tracking'
-    },
-    {
-      id: 'premium',
-      name: 'Premium Shipping',
-      price: packageType === 'drum' ? 450 : 100 * weight,
-      deliveryTime: '7-10 days',
-      description: 'Our fastest option with premium service and insurance included'
-    }
-  ];
+  const [activeTab, setActiveTab] = useState<string>("drum");
+  const [drumQuantity, setDrumQuantity] = useState<string>("1");
+  const [weight, setWeight] = useState<string>("1");
+  const [additionalServices, setAdditionalServices] = useState({
+    doorToDoor: false,
+    insurance: false
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsCalculating(true);
-    setShowResults(false);
-    
-    // Simulate API call
-    setTimeout(() => {
-      setIsCalculating(false);
-      setShowResults(true);
-    }, 1000);
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = e.target;
+    setAdditionalServices(prev => ({ ...prev, [name]: checked }));
   };
 
+  const calculatePrice = () => {
+    let basePrice = 0;
+    
+    // Calculate base price based on service type
+    if (activeTab === 'drum') {
+      const qty = parseInt(drumQuantity);
+      if (qty >= 5) {
+        basePrice = qty * 220;
+      } else if (qty >= 2) {
+        basePrice = qty * 250;
+      } else {
+        basePrice = 260;
+      }
+    } else if (activeTab === 'parcel') {
+      const weightNum = parseFloat(weight) || 1;
+      basePrice = weightNum * 50;
+    }
+    
+    // Add price for additional services
+    let additionalCost = 0;
+    if (additionalServices.doorToDoor) {
+      additionalCost += 25;
+    }
+    if (additionalServices.insurance) {
+      additionalCost += basePrice * 0.05; // 5% of base price
+    }
+    
+    return {
+      basePrice,
+      additionalCost,
+      totalPrice: basePrice + additionalCost
+    };
+  };
+
+  const priceDetails = calculatePrice();
+
   return (
-    <section className="py-16 bg-gray-50">
+    <section className="py-16 bg-gray-50 relative overflow-hidden">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-10">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Shipping Rate Calculator</h2>
+        <div className="text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Calculate Shipping Cost</h2>
           <p className="text-gray-600 max-w-2xl mx-auto">
-            Get an estimate for shipping your package from the UK to Zimbabwe based on weight and package type.
+            Get an instant estimate for your shipment from the UK to Zimbabwe.
           </p>
         </div>
-        
+
         <div className="max-w-4xl mx-auto">
-          <Card className="border-zim-green shadow-lg">
-            <CardHeader className="bg-zim-green/10">
-              <CardTitle className="flex items-center text-2xl">
-                <DollarSign className="mr-2 h-6 w-6 text-zim-green" /> 
-                Calculate Shipping Cost
-              </CardTitle>
+          <Card className="border-gray-200 overflow-hidden">
+            <CardHeader className="bg-gray-50 border-b">
+              <CardTitle className="text-2xl">Shipping Calculator</CardTitle>
             </CardHeader>
             <CardContent className="p-6">
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-8">
+                  <TabsTrigger value="drum" className="flex items-center gap-2">
+                    <Ship className="h-4 w-4" />
+                    Drum Shipping
+                  </TabsTrigger>
+                  <TabsTrigger value="parcel" className="flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Regular Parcel
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="drum" className="space-y-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Package Type
-                    </label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div 
-                        className={`border rounded-lg p-4 cursor-pointer transition-all ${
-                          packageType === 'parcel' 
-                            ? 'border-zim-green bg-zim-green/10 shadow-md' 
-                            : 'border-gray-200 hover:border-zim-green/50'
-                        }`}
-                        onClick={() => setPackageType('parcel')}
-                      >
-                        <div className="flex flex-col items-center">
-                          <Package className={`h-8 w-8 ${packageType === 'parcel' ? 'text-zim-green' : 'text-gray-400'}`} />
-                          <span className="mt-2 font-medium">Parcel</span>
-                          <span className="text-xs text-gray-500 mt-1">From £50 per kg</span>
-                        </div>
-                      </div>
-                      <div 
-                        className={`border rounded-lg p-4 cursor-pointer transition-all ${
-                          packageType === 'drum' 
-                            ? 'border-zim-green bg-zim-green/10 shadow-md' 
-                            : 'border-gray-200 hover:border-zim-green/50'
-                        }`}
-                        onClick={() => setPackageType('drum')}
-                      >
-                        <div className="flex flex-col items-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" 
-                            className={`h-8 w-8 ${packageType === 'drum' ? 'text-zim-green' : 'text-gray-400'}`}
-                            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10" />
-                            <path d="M12 2v20M2 12h20" />
-                          </svg>
-                          <span className="mt-2 font-medium">Drum (200L)</span>
-                          <span className="text-xs text-gray-500 mt-1">Fixed price £260</span>
-                        </div>
-                      </div>
-                    </div>
+                    <Label htmlFor="drumQuantity">Number of Drums</Label>
+                    <Select value={drumQuantity} onValueChange={setDrumQuantity}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select quantity" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+                          <SelectItem key={num} value={num.toString()}>
+                            {num} {num === 1 ? 'Drum' : 'Drums'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   
-                  {packageType === 'parcel' && (
-                    <div>
-                      <label htmlFor="weight" className="block text-sm font-medium text-gray-700 mb-1">
-                        Weight (kg)
-                      </label>
-                      <div className="flex">
-                        <button 
-                          type="button"
-                          className="bg-gray-200 text-gray-600 hover:bg-gray-300 px-3 py-2 rounded-l-md"
-                          onClick={() => setWeight(prev => Math.max(1, prev - 1))}
-                        >
-                          -
-                        </button>
-                        <input
-                          id="weight"
-                          type="number"
-                          min="1"
-                          value={weight}
-                          onChange={(e) => setWeight(parseInt(e.target.value) || 1)}
-                          className="w-full text-center px-3 py-2 border-y border-gray-300 focus:outline-none"
-                        />
-                        <button 
-                          type="button"
-                          className="bg-gray-200 text-gray-600 hover:bg-gray-300 px-3 py-2 rounded-r-md"
-                          onClick={() => setWeight(prev => prev + 1)}
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <Button 
-                  type="submit" 
-                  className="w-full md:w-auto bg-zim-green hover:bg-zim-green/90"
-                  disabled={isCalculating}
-                >
-                  {isCalculating ? (
-                    <div className="flex items-center">
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Calculating...
-                    </div>
-                  ) : (
-                    'Calculate Shipping Cost'
-                  )}
-                </Button>
-              </form>
-              
-              {showResults && (
-                <div className="mt-8 animate-fade-in">
-                  <h3 className="text-xl font-semibold mb-4">Shipping Options</h3>
-                  <div className="space-y-4">
-                    {shippingOptions.map((option) => (
-                      <div 
-                        key={option.id}
-                        className="border rounded-lg p-4 hover:shadow-md transition-all"
-                      >
-                        <div className="flex flex-col md:flex-row md:justify-between md:items-center">
-                          <div>
-                            <h4 className="font-semibold text-lg">{option.name}</h4>
-                            <p className="text-gray-600 text-sm mb-2">{option.description}</p>
-                            <div className="flex items-center text-sm text-gray-500">
-                              <span className="mr-4">Delivery: {option.deliveryTime}</span>
-                              {option.id === 'standard' && (
-                                <span className="flex items-center text-zim-green">
-                                  <TrendingDown className="h-4 w-4 mr-1" /> Best Value
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="mt-3 md:mt-0 flex flex-col md:items-end">
-                            <span className="text-2xl font-bold">£{option.price}</span>
-                            <Button 
-                              size="sm" 
-                              className="mt-2 bg-zim-green hover:bg-zim-green/90"
-                              onClick={() => window.location.href = "/book-shipment"}
-                            >
-                              Select
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="p-4 bg-gray-50 rounded-md text-sm">
+                    <div className="font-medium mb-2">Pricing Tiers:</div>
+                    <ul className="space-y-1 list-disc pl-5">
+                      <li>1 Drum: £260 each</li>
+                      <li>2-4 Drums: £250 each</li>
+                      <li>5+ Drums: £220 each</li>
+                    </ul>
+                    <p className="mt-2 text-gray-500">Each drum has a capacity of 200L</p>
                   </div>
-                  <div className="mt-4 p-4 bg-gray-50 rounded border border-gray-200 text-sm">
-                    <p className="text-gray-600">
-                      Note: These prices are estimates and may vary based on the exact dimensions, weight, and contents of your package. 
-                      Additional fees may apply for customs clearance.
+                </TabsContent>
+                
+                <TabsContent value="parcel" className="space-y-6">
+                  <div>
+                    <Label htmlFor="weight">Package Weight (kg)</Label>
+                    <Input 
+                      id="weight"
+                      type="number" 
+                      min="1"
+                      value={weight}
+                      onChange={(e) => setWeight(e.target.value)}
+                    />
+                  </div>
+                  
+                  <div className="p-4 bg-gray-50 rounded-md text-sm">
+                    <div className="font-medium mb-2">Regular Parcel Pricing:</div>
+                    <p>£50 per kg</p>
+                    <p className="mt-2 text-gray-500">
+                      Ideal for smaller packages and personal items
                     </p>
                   </div>
+                </TabsContent>
+                
+                <div className="mt-8">
+                  <p className="font-medium text-lg mb-3">Additional Services</p>
+                  <div className="space-y-4">
+                    <div className="flex items-start space-x-3 p-4 border rounded-md">
+                      <input
+                        type="checkbox"
+                        id="doorToDoor"
+                        name="doorToDoor"
+                        checked={additionalServices.doorToDoor}
+                        onChange={handleCheckboxChange}
+                        className="mt-1"
+                      />
+                      <div>
+                        <Label htmlFor="doorToDoor" className="cursor-pointer font-medium">
+                          Door-to-Door Delivery <span className="text-zim-green ml-2">£25</span>
+                        </Label>
+                        <p className="text-sm text-gray-500 mt-1">
+                          We pick up from your address and deliver directly to recipient
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start space-x-3 p-4 border rounded-md">
+                      <input
+                        type="checkbox"
+                        id="insurance"
+                        name="insurance"
+                        checked={additionalServices.insurance}
+                        onChange={handleCheckboxChange}
+                        className="mt-1"
+                      />
+                      <div>
+                        <Label htmlFor="insurance" className="cursor-pointer font-medium">
+                          Shipping Insurance <span className="text-zim-green ml-2">5% of shipment value</span>
+                        </Label>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Protect your items with our comprehensive insurance
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )}
+              </Tabs>
+              
+              <div className="mt-8 p-6 bg-gray-50 rounded-lg">
+                <div className="flex justify-between items-center pb-3 border-b">
+                  <span className="font-medium">Base Shipping Cost:</span>
+                  <span className="text-lg">£{priceDetails.basePrice.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center py-3 border-b">
+                  <span className="font-medium">Additional Services:</span>
+                  <span>£{priceDetails.additionalCost.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center pt-3 font-bold">
+                  <span>Total Estimated Cost:</span>
+                  <span className="text-2xl text-zim-green">£{priceDetails.totalPrice.toFixed(2)}</span>
+                </div>
+              </div>
+              
+              <div className="mt-8 text-center">
+                <Link to="/book-shipment">
+                  <Button className="bg-zim-green hover:bg-zim-green/90 text-lg px-8">
+                    Book Now <ArrowRight className="ml-2" />
+                  </Button>
+                </Link>
+                <p className="mt-4 text-sm text-gray-500">
+                  This is an estimate. Final pricing may vary based on specific shipping details.
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>
       </div>
+      
+      {/* Background decoration */}
+      <div className="absolute left-0 top-0 w-64 h-64 bg-zim-green/5 rounded-full -translate-x-1/2 -translate-y-1/2 z-0"></div>
+      <div className="absolute right-0 bottom-0 w-80 h-80 bg-zim-yellow/5 rounded-full translate-x-1/3 translate-y-1/3 z-0"></div>
     </section>
   );
 };
