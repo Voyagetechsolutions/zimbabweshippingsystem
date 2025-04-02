@@ -35,7 +35,8 @@ const BookShipment: React.FC = () => {
     packageWeight: '',
     packageDimensions: '',
     packageDescription: '',
-    specialInstructions: ''
+    specialInstructions: '',
+    shippingOption: 'standard'
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -69,6 +70,39 @@ const BookShipment: React.FC = () => {
         } 
       });
     }
+  };
+
+  const renderWeightField = () => {
+    if (formData.packageType === 'drum') {
+      return (
+        <div className="space-y-2">
+          <Label htmlFor="drumSize">Drum Size</Label>
+          <Input 
+            id="drumSize" 
+            value="200 Liters"
+            disabled
+            className="bg-gray-100"
+          />
+          <p className="text-sm text-gray-500">Standard 200L drum size</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-2">
+        <Label htmlFor="packageWeight">Estimated Weight (kg)</Label>
+        <Input 
+          id="packageWeight" 
+          name="packageWeight" 
+          type="number"
+          min="0.1"
+          step="0.1"
+          value={formData.packageWeight} 
+          onChange={handleChange} 
+          required={formData.packageType === 'parcel'}
+        />
+      </div>
+    );
   };
 
   return (
@@ -212,7 +246,7 @@ const BookShipment: React.FC = () => {
                           <SelectContent>
                             <SelectItem value="parcel">Parcel</SelectItem>
                             <SelectItem value="document">Document</SelectItem>
-                            <SelectItem value="drum">Drum (200L)</SelectItem>
+                            <SelectItem value="drum">Drum (200L) - £260</SelectItem>
                             <SelectItem value="furniture">Furniture</SelectItem>
                             <SelectItem value="electronics">Electronics</SelectItem>
                             <SelectItem value="other">Other</SelectItem>
@@ -220,30 +254,38 @@ const BookShipment: React.FC = () => {
                         </Select>
                       </div>
                       
+                      {renderWeightField()}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="shippingOption">Shipping Option</Label>
+                      <Select
+                        value={formData.shippingOption}
+                        onValueChange={(value) => handleSelectChange('shippingOption', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select shipping option" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="standard">Standard Shipping (2-3 weeks)</SelectItem>
+                          <SelectItem value="priority">Priority Shipping (10-14 days)</SelectItem>
+                          <SelectItem value="premium">Premium Shipping (7-10 days)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {formData.packageType !== 'drum' && (
                       <div className="space-y-2">
-                        <Label htmlFor="packageWeight">Estimated Weight (kg)</Label>
+                        <Label htmlFor="packageDimensions">Dimensions (LxWxH in cm, optional)</Label>
                         <Input 
-                          id="packageWeight" 
-                          name="packageWeight" 
-                          type="number"
-                          min="0.1"
-                          step="0.1"
-                          value={formData.packageWeight} 
+                          id="packageDimensions" 
+                          name="packageDimensions"
+                          placeholder="e.g., 30x20x15" 
+                          value={formData.packageDimensions} 
                           onChange={handleChange} 
                         />
                       </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="packageDimensions">Dimensions (LxWxH in cm, optional)</Label>
-                      <Input 
-                        id="packageDimensions" 
-                        name="packageDimensions"
-                        placeholder="e.g., 30x20x15" 
-                        value={formData.packageDimensions} 
-                        onChange={handleChange} 
-                      />
-                    </div>
+                    )}
                     
                     <div className="space-y-2">
                       <Label htmlFor="packageDescription">Package Description</Label>

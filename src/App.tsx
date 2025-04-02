@@ -16,6 +16,8 @@ import Track from "./pages/Track";
 import Account from "./pages/Account";
 import AdminDashboard from "./pages/AdminDashboard";
 import ShipmentDetails from "./pages/ShipmentDetails";
+import Services from "./pages/Services";
+import Contact from "./pages/Contact";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +48,8 @@ const App = () => (
             <Route path="/book-shipment" element={<BookShipment />} />
             <Route path="/shipment/:id" element={<ShipmentDetails />} />
             <Route path="/track" element={<Track />} />
+            <Route path="/services" element={<Services />} />
+            <Route path="/contact" element={<Contact />} />
             <Route path="/account" element={
               <RequireAuth>
                 <Account />

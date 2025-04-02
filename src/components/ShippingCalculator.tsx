@@ -91,6 +91,7 @@ const ShippingCalculator: React.FC = () => {
                         <div className="flex flex-col items-center">
                           <Package className={`h-8 w-8 ${packageType === 'parcel' ? 'text-zim-green' : 'text-gray-400'}`} />
                           <span className="mt-2 font-medium">Parcel</span>
+                          <span className="text-xs text-gray-500 mt-1">From £50 per kg</span>
                         </div>
                       </div>
                       <div 
@@ -108,7 +109,8 @@ const ShippingCalculator: React.FC = () => {
                             <circle cx="12" cy="12" r="10" />
                             <path d="M12 2v20M2 12h20" />
                           </svg>
-                          <span className="mt-2 font-medium">Drum</span>
+                          <span className="mt-2 font-medium">Drum (200L)</span>
+                          <span className="text-xs text-gray-500 mt-1">Fixed price £260</span>
                         </div>
                       </div>
                     </div>
@@ -193,6 +195,7 @@ const ShippingCalculator: React.FC = () => {
                             <Button 
                               size="sm" 
                               className="mt-2 bg-zim-green hover:bg-zim-green/90"
+                              onClick={() => window.location.href = "/book-shipment"}
                             >
                               Select
                             </Button>

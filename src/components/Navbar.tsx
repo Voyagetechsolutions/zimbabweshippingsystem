@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Menu, X, Ship, Package, Phone, User, LogIn, LogOut, Settings, Package2, BookOpen } from 'lucide-react';
+import { Menu, X, Ship, Package, Phone, User, LogIn, LogOut, Settings, Package2, BookOpen, Map } from 'lucide-react';
 import Logo from './Logo';
 import { useAuth } from '@/contexts/AuthContext';
 

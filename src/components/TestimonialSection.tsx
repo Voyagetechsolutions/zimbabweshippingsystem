@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -8,25 +9,25 @@ import { ChevronRight } from 'lucide-react';
 const TestimonialSection: React.FC = () => {
   const testimonials = [
     {
-      name: 'Sarah Johnson',
-      title: 'Marketing Manager',
-      company: 'Acme Corp',
-      image: '/lovable-uploads/sarah-johnson.jpg',
-      testimonial: "Zimbabwe Shipping has transformed our shipping process. Their reliability and speed are unmatched, making them an invaluable partner for our business.",
+      name: 'Tendai Moyo',
+      title: 'Business Owner',
+      company: 'Moyo Imports',
+      image: '/lovable-uploads/sarah-johnson.jpg', // Reusing existing images
+      testimonial: "Zimbabwe Shipping has been a lifeline for my business. Their reliable service allows me to receive stock from the UK consistently, which has helped my Harare shop thrive.",
     },
     {
-      name: 'David Lee',
-      title: 'CEO',
-      company: 'GlobalTech',
-      image: '/lovable-uploads/david-lee.jpg',
-      testimonial: "I've been consistently impressed with Zimbabwe Shipping's professionalism and customer service. They handle our shipments with care and always deliver on time.",
+      name: 'Tatenda Chigumira',
+      title: 'Doctor',
+      company: 'Parirenyatwa Hospital',
+      image: '/lovable-uploads/david-lee.jpg', // Reusing existing images
+      testimonial: "I regularly send medical supplies to my colleagues in Zimbabwe. This service has been crucial for getting important equipment delivered safely and on time.",
     },
     {
-      name: 'Emily Chen',
-      title: 'Sales Director',
-      company: 'Innovate Solutions',
-      image: '/lovable-uploads/emily-chen.jpg',
-      testimonial: "Thanks to Zimbabwe Shipping, we've been able to expand our reach in Zimbabwe. Their efficient and cost-effective services have greatly contributed to our growth.",
+      name: 'Nyasha Madzima',
+      title: 'Student',
+      company: 'University of Zimbabwe',
+      image: '/lovable-uploads/emily-chen.jpg', // Reusing existing images
+      testimonial: "As a student studying in the UK, I rely on Zimbabwe Shipping to send essentials to my family in Bulawayo. Their prices are fair and the service is always professional.",
     },
   ];
 
@@ -36,7 +37,7 @@ const TestimonialSection: React.FC = () => {
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">What Our Clients Say</h2>
           <p className="text-gray-600 max-w-2xl mx-auto">
-            Read why businesses trust us with their shipping needs from the UK to Zimbabwe.
+            Read why people trust us with their shipping needs from the UK to Zimbabwe.
           </p>
         </div>
 
