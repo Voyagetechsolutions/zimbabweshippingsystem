@@ -87,6 +87,11 @@ const CreateShipment = () => {
       // Generate a unique tracking number
       const trackingNumber = generateTrackingNumber();
       
+      // Convert Date object to ISO string for database storage
+      const estimatedDeliveryString = formData.estimatedDelivery 
+        ? formData.estimatedDelivery.toISOString() 
+        : null;
+      
       // Insert the shipment into the database
       const { error } = await supabase
         .from('shipments')
@@ -99,7 +104,7 @@ const CreateShipment = () => {
           weight: formData.weight ? parseFloat(formData.weight) : null,
           dimensions: formData.dimensions || null,
           carrier: formData.carrier,
-          estimated_delivery: formData.estimatedDelivery,
+          estimated_delivery: estimatedDeliveryString,
         });
 
       if (error) throw error;
