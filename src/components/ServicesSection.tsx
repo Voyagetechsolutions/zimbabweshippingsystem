@@ -18,7 +18,7 @@ const ServicesSection: React.FC = () => {
     {
       icon: <Truck className="h-10 w-10 text-zim-red" />,
       title: 'Door-to-Door Delivery',
-      description: 'We pick up from your UK address and deliver directly to your recipient's doorstep in Zimbabwe.',
+      description: 'We pick up from your UK address and deliver directly to your recipient\'s doorstep in Zimbabwe.',
     },
     {
       icon: <ShieldCheck className="h-10 w-10 text-zim-green" />,
@@ -28,7 +28,7 @@ const ServicesSection: React.FC = () => {
     {
       icon: <Globe className="h-10 w-10 text-zim-yellow" />,
       title: 'Real-time Tracking',
-      description: 'Stay informed with our advanced tracking system that provides real-time updates on your shipment's location.',
+      description: 'Stay informed with our advanced tracking system that provides real-time updates on your shipment\'s location.',
     },
     {
       icon: <DollarSign className="h-10 w-10 text-zim-red" />,
