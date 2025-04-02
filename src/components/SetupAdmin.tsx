@@ -67,11 +67,10 @@ export const SetupAdmin = () => {
         return;
       }
       
-      // Set the user as admin
+      // Set the user as admin using raw SQL through RPC
+      // This avoids type issues with the generated types
       const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ is_admin: true })
-        .eq('id', userData.id);
+        .rpc('make_admin', { user_email: email });
       
       if (updateError) throw updateError;
       

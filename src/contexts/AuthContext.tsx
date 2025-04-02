@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,18 +25,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Function to fetch admin status from the database
   const fetchAdminStatus = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('is_admin')
-        .eq('id', userId)
-        .single();
+      // Use the is_admin RPC function instead of directly querying
+      const { data, error } = await supabase.rpc('is_admin');
         
       if (error) {
         console.error('Error fetching admin status:', error);
         return false;
       }
       
-      return data?.is_admin || false;
+      return data || false;
     } catch (error) {
       console.error('Error checking admin status:', error);
       return false;
