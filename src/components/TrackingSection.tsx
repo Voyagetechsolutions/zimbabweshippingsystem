@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { Search, AlertCircle } from 'lucide-react';
+import { Search, AlertCircle, Package } from 'lucide-react';
 
 const TrackingSection: React.FC = () => {
   const [trackingNumber, setTrackingNumber] = useState('');
