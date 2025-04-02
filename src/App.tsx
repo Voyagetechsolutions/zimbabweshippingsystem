@@ -2,7 +2,7 @@
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -18,7 +18,16 @@ import ShipmentDetails from "./pages/ShipmentDetails";
 import Services from "./pages/Services";
 import Contact from "./pages/Contact";
 
-const queryClient = new QueryClient();
+// Configure the QueryClient with retry options
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1, // Retry failed queries only once
+      staleTime: 30000, // Consider data fresh for 30 seconds
+      cacheTime: 5 * 60 * 1000, // Cache for 5 minutes
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -58,6 +67,9 @@ const App = () => (
                 <AdminDashboard />
               </RequireAdmin>
             } />
+            {/* Redirect old URLs or potential misspellings to proper routes */}
+            <Route path="/admin-dashboard" element={<Navigate to="/admin" replace />} />
+            <Route path="/dashboard-admin" element={<Navigate to="/admin" replace />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -27,7 +27,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchAdminStatus = async (userId: string) => {
     try {
       // Use the is_admin RPC function instead of directly querying
-      const { data, error } = await supabase.rpc('is_admin');
+      // Adding a cache buster parameter to prevent caching issues
+      const { data, error } = await supabase.rpc('is_admin', {}, { 
+        headers: { 'Cache-Control': 'no-cache' } 
+      });
       
       if (error) {
         console.error('Error fetching admin status:', error);
@@ -44,9 +47,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
     
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
+    // Initial session check first to avoid delay
+    const initialSessionCheck = async () => {
+      try {
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        
         if (!mounted) return;
         
         setSession(currentSession);
@@ -58,6 +63,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (mounted) {
             setIsAdmin(isUserAdmin);
           }
+        }
+      } catch (error) {
+        console.error('Error during initial session check:', error);
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    initialSessionCheck();
+    
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, currentSession) => {
+        if (!mounted) return;
+        
+        console.log('Auth state changed:', event);
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+        
+        // Check admin status if user is logged in
+        if (currentSession?.user) {
+          // Small timeout to prevent race conditions with Supabase client
+          setTimeout(async () => {
+            if (!mounted) return;
+            const isUserAdmin = await fetchAdminStatus(currentSession.user.id);
+            if (mounted) {
+              setIsAdmin(isUserAdmin);
+            }
+          }, 100);
         } else {
           if (mounted) {
             setIsAdmin(false);
@@ -65,28 +101,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
     );
-
-    // Initial session check
-    const initialSessionCheck = async () => {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      
-      if (!mounted) return;
-      
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      
-      // Check admin status if user is logged in
-      if (currentSession?.user) {
-        const isUserAdmin = await fetchAdminStatus(currentSession.user.id);
-        if (mounted) {
-          setIsAdmin(isUserAdmin);
-        }
-      }
-      
-      setIsLoading(false);
-    };
-
-    initialSessionCheck();
 
     return () => {
       mounted = false;

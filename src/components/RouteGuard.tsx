@@ -1,8 +1,10 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate, useLocation } from 'react-router-dom';
+import React from 'react';
 
-export const RequireAuth = ({ children }: { children: JSX.Element }) => {
+// Use React.memo to prevent unnecessary re-renders
+export const RequireAuth = React.memo(({ children }: { children: JSX.Element }) => {
   const { user, isLoading } = useAuth();
   const location = useLocation();
 
@@ -21,9 +23,9 @@ export const RequireAuth = ({ children }: { children: JSX.Element }) => {
   }
 
   return children;
-};
+});
 
-export const RequireAdmin = ({ children }: { children: JSX.Element }) => {
+export const RequireAdmin = React.memo(({ children }: { children: JSX.Element }) => {
   const { user, isLoading, isAdmin } = useAuth();
   const location = useLocation();
 
@@ -41,14 +43,15 @@ export const RequireAdmin = ({ children }: { children: JSX.Element }) => {
   }
 
   if (!isAdmin) {
+    console.log('User is not an admin, redirecting to dashboard');
     // Redirect to dashboard if user is not an admin
     return <Navigate to="/dashboard" replace />;
   }
 
   return children;
-};
+});
 
-export const RedirectIfAuthenticated = ({ children }: { children: JSX.Element }) => {
+export const RedirectIfAuthenticated = React.memo(({ children }: { children: JSX.Element }) => {
   const { user, isLoading } = useAuth();
   const location = useLocation();
   
@@ -69,4 +72,4 @@ export const RedirectIfAuthenticated = ({ children }: { children: JSX.Element })
   }
 
   return children;
-};
+});
