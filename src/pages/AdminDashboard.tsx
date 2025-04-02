@@ -1,457 +1,453 @@
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
+  Card, CardContent, CardDescription, 
+  CardHeader, CardTitle, CardFooter 
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Badge } from "@/components/ui/badge";
+  Table, TableBody, TableCell, TableHead, 
+  TableHeader, TableRow 
+} from '@/components/ui/table';
 import { 
-  Package, 
-  Search,
-  X,
-  AlertTriangle,
-  ChevronLeft, 
-  ChevronRight,
-  Loader2,
-  RefreshCcw
+  Select, SelectContent, SelectItem, 
+  SelectTrigger, SelectValue 
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import {
+  Package, Truck, Users, Search, 
+  RefreshCcw, Filter, Eye, Edit
 } from 'lucide-react';
-import { useToast } from "@/hooks/use-toast";
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
 
-// Define shipment type based on database structure
-type Shipment = {
+// Status options for updating shipments
+const STATUS_OPTIONS = [
+  'Processing',
+  'In Transit',
+  'Out for Delivery',
+  'Delivered',
+  'Delayed',
+  'Returned',
+];
+
+// Define the shipment type
+interface Shipment {
   id: string;
   tracking_number: string;
   origin: string;
   destination: string;
   status: string;
-  user_id: string;
   carrier: string | null;
   weight: number | null;
   dimensions: string | null;
+  estimated_delivery: string | null;
   created_at: string;
   updated_at: string;
-  estimated_delivery: string | null;
-  user_email?: string;
-  user_name?: string;
+  user_id: string;
+}
+
+// Map status to badge color
+const getStatusBadgeClass = (status: string) => {
+  const statusLower = status.toLowerCase();
+  
+  switch (true) {
+    case statusLower.includes('processing'):
+      return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+    case statusLower.includes('transit'):
+      return 'bg-blue-100 text-blue-800 border-blue-300';
+    case statusLower.includes('out for delivery'):
+      return 'bg-purple-100 text-purple-800 border-purple-300';
+    case statusLower.includes('delivered'):
+      return 'bg-green-100 text-green-800 border-green-300';
+    case statusLower.includes('delayed'):
+      return 'bg-red-100 text-red-800 border-red-300';
+    case statusLower.includes('returned'):
+      return 'bg-gray-100 text-gray-800 border-gray-300';
+    default:
+      return 'bg-gray-100 text-gray-500';
+  }
 };
 
-// Define status options
-const statusOptions = [
-  { value: "Processing", label: "Processing" },
-  { value: "In Transit", label: "In Transit" },
-  { value: "Out for Delivery", label: "Out for Delivery" },
-  { value: "Delivered", label: "Delivered" },
-  { value: "Delayed", label: "Delayed" },
-  { value: "On Hold", label: "On Hold" }
-];
-
 const AdminDashboard = () => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [filteredShipments, setFilteredShipments] = useState<Shipment[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const itemsPerPage = 10;
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
+  const [newStatus, setNewStatus] = useState<string>('');
+  
+  // Stats
+  const [stats, setStats] = useState({
+    total: 0,
+    processing: 0,
+    inTransit: 0,
+    delivered: 0,
+  });
 
-  // Check if user is admin (for demo purposes, you can use a specific email or check a roles table)
   useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (!user) return;
-      
-      // In a real application, you would check against a roles table
-      // For this demo, we'll assume an admin email
-      setIsAdmin(true); // For demo, all authenticated users are admins
+    if (!isAdmin) {
+      toast({
+        title: "Unauthorized Access",
+        description: "You don't have permission to access this page.",
+        variant: "destructive",
+      });
+      navigate('/dashboard');
+      return;
+    }
 
-      if (isAdmin) {
-        fetchShipments();
-      } else {
-        setLoading(false);
-      }
-    };
-    
-    checkAdminStatus();
-  }, [user, isAdmin]);
+    fetchShipments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, navigate]);
 
   const fetchShipments = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      
-      // Fetch shipments with user profiles
+      // Fetch all shipments for admin view
       const { data, error } = await supabase
         .from('shipments')
-        .select(`
-          *,
-          profiles:user_id (
-            email,
-            full_name
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      
+
+      if (error) {
+        throw error;
+      }
+
       if (data) {
-        const formattedShipments: Shipment[] = data.map((shipment: any) => ({
-          ...shipment,
-          user_email: shipment.profiles?.email,
-          user_name: shipment.profiles?.full_name,
-        }));
+        setShipments(data as Shipment[]);
+        // Calculate stats
+        const totalCount = data.length;
+        const processingCount = data.filter(s => s.status.toLowerCase() === 'processing').length;
+        const inTransitCount = data.filter(s => s.status.toLowerCase() === 'in transit').length;
+        const deliveredCount = data.filter(s => s.status.toLowerCase() === 'delivered').length;
         
-        setShipments(formattedShipments);
-        applyFilters(formattedShipments, searchTerm, statusFilter);
+        setStats({
+          total: totalCount,
+          processing: processingCount,
+          inTransit: inTransitCount,
+          delivered: deliveredCount,
+        });
       }
     } catch (error: any) {
-      console.error('Error fetching shipments:', error);
       toast({
-        title: "Error",
-        description: "Failed to load shipments. Please try again.",
-        variant: "destructive",
+        title: 'Error fetching shipments',
+        description: error.message,
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const applyFilters = (
-    shipments: Shipment[], 
-    search: string, 
-    status: string
-  ) => {
-    let results = [...shipments];
+  const updateShipmentStatus = async () => {
+    if (!editingShipment || !newStatus) return;
     
-    if (search) {
-      const lowerSearch = search.toLowerCase();
-      results = results.filter(
-        shipment => 
-          shipment.tracking_number.toLowerCase().includes(lowerSearch) ||
-          shipment.origin.toLowerCase().includes(lowerSearch) ||
-          shipment.destination.toLowerCase().includes(lowerSearch) ||
-          (shipment.user_email && shipment.user_email.toLowerCase().includes(lowerSearch)) ||
-          (shipment.user_name && shipment.user_name.toLowerCase().includes(lowerSearch))
-      );
-    }
-    
-    if (status) {
-      results = results.filter(shipment => shipment.status === status);
-    }
-    
-    setFilteredShipments(results);
-    setTotalPages(Math.ceil(results.length / itemsPerPage));
-    setPage(1); // Reset to first page when filters change
-  };
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const searchValue = e.target.value;
-    setSearchTerm(searchValue);
-    applyFilters(shipments, searchValue, statusFilter);
-  };
-
-  const handleStatusFilterChange = (value: string) => {
-    setStatusFilter(value);
-    applyFilters(shipments, searchTerm, value);
-  };
-
-  const clearFilters = () => {
-    setSearchTerm('');
-    setStatusFilter('');
-    applyFilters(shipments, '', '');
-  };
-
-  const updateShipmentStatus = async (id: string, status: string) => {
     try {
-      setUpdatingStatus(id);
-      
       const { error } = await supabase
         .from('shipments')
-        .update({ 
-          status,
+        .update({
+          status: newStatus,
           updated_at: new Date().toISOString()
         })
-        .eq('id', id);
-      
+        .eq('id', editingShipment.id);
+
       if (error) throw error;
-      
-      // Update local state to reflect the change
-      const updatedShipments = shipments.map(shipment => 
-        shipment.id === id ? { ...shipment, status, updated_at: new Date().toISOString() } : shipment
-      );
-      
-      setShipments(updatedShipments);
-      applyFilters(updatedShipments, searchTerm, statusFilter);
-      
+
       toast({
-        title: "Status Updated",
-        description: `Shipment status updated to ${status}`,
+        title: 'Status Updated',
+        description: `Shipment ${editingShipment.tracking_number} status updated to ${newStatus}`,
       });
+
+      // Refresh shipments list
+      fetchShipments();
+      
+      // Reset editing state
+      setEditingShipment(null);
+      setNewStatus('');
+      
     } catch (error: any) {
-      console.error('Error updating status:', error);
       toast({
-        title: "Error",
-        description: "Failed to update shipment status. Please try again.",
-        variant: "destructive",
+        title: 'Error updating status',
+        description: error.message,
+        variant: 'destructive',
       });
-    } finally {
-      setUpdatingStatus(null);
     }
   };
 
-  // Get current page items
-  const currentShipments = filteredShipments.slice((page - 1) * itemsPerPage, page * itemsPerPage);
-
-  // Render status badge with appropriate color
-  const renderStatusBadge = (status: string) => {
-    const statusColors: { [key: string]: string } = {
-      "Processing": "bg-blue-100 text-blue-800",
-      "In Transit": "bg-yellow-100 text-yellow-800",
-      "Delivered": "bg-green-100 text-green-800",
-      "Delayed": "bg-red-100 text-red-800",
-      "Out for Delivery": "bg-purple-100 text-purple-800",
-      "On Hold": "bg-gray-100 text-gray-800"
-    };
+  // Filter shipments based on search and status filter
+  const filteredShipments = shipments.filter(shipment => {
+    const matchesSearch = 
+      searchQuery === '' ||
+      shipment.tracking_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      shipment.origin.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      shipment.destination.toLowerCase().includes(searchQuery.toLowerCase());
     
-    return (
-      <Badge className={`font-medium ${statusColors[status] || "bg-gray-100 text-gray-800"}`}>
-        {status}
-      </Badge>
-    );
-  };
-
-  if (!isAdmin) {
-    return (
-      <div className="container mx-auto px-4 py-16">
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <AlertTriangle className="h-16 w-16 text-yellow-500 mb-4" />
-            <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
-            <p className="text-gray-500 text-center mb-6">
-              You do not have permission to access the admin dashboard.
-            </p>
-            <Button 
-              onClick={() => window.history.back()}
-              variant="outline"
-            >
-              Go Back
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+    const matchesStatus = 
+      statusFilter === 'all' ||
+      shipment.status.toLowerCase() === statusFilter.toLowerCase();
+    
+    return matchesSearch && matchesStatus;
+  });
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <Card className="border-0 shadow-lg">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className="bg-zim-green/10 p-3 rounded-full">
-                <Package className="h-6 w-6 text-zim-green" />
+    <div className="min-h-screen flex flex-col">
+      <Navbar />
+      <main className="flex-grow py-8 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold mb-2">Admin Dashboard</h1>
+            <p className="text-gray-500">Manage all shipments and track their progress</p>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-500">Total Shipments</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center">
+                  <Package className="h-8 w-8 text-zim-green mr-3" />
+                  <div className="text-2xl font-bold">{stats.total}</div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-500">Processing</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center">
+                  <Package className="h-8 w-8 text-yellow-500 mr-3" />
+                  <div className="text-2xl font-bold">{stats.processing}</div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-500">In Transit</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center">
+                  <Truck className="h-8 w-8 text-blue-500 mr-3" />
+                  <div className="text-2xl font-bold">{stats.inTransit}</div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-500">Delivered</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center">
+                  <Package className="h-8 w-8 text-green-500 mr-3" />
+                  <div className="text-2xl font-bold">{stats.delivered}</div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filters and Search */}
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle className="text-xl">Shipments Management</CardTitle>
+              <CardDescription>View and manage all shipments</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="relative flex-grow">
+                  <Input
+                    placeholder="Search by tracking #, origin, or destination"
+                    className="pl-10"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                </div>
+                <div className="flex gap-4">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-[180px]">
+                      <div className="flex items-center">
+                        <Filter className="h-4 w-4 mr-2" />
+                        <SelectValue placeholder="Filter by status" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      {STATUS_OPTIONS.map((status) => (
+                        <SelectItem key={status.toLowerCase()} value={status.toLowerCase()}>
+                          {status}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button 
+                    variant="outline"
+                    onClick={fetchShipments}
+                    className="h-10 px-4"
+                  >
+                    <RefreshCcw className="h-4 w-4 mr-2" />
+                    Refresh
+                  </Button>
+                </div>
               </div>
-              <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-            </div>
-            
-            <Button 
-              onClick={fetchShipments}
-              variant="outline"
-              className="flex items-center"
-            >
-              <RefreshCcw className="mr-2 h-4 w-4" />
-              Refresh
-            </Button>
-          </div>
-          
-          <div className="mt-6 flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-              <Input
-                placeholder="Search by tracking #, origin, destination or customer..."
-                value={searchTerm}
-                onChange={handleSearchChange}
-                className="pl-10 w-full"
-              />
-              {searchTerm && (
-                <button 
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  onClick={() => {
-                    setSearchTerm('');
-                    applyFilters(shipments, '', statusFilter);
-                  }}
-                >
-                  <X size={16} />
-                </button>
-              )}
-            </div>
-            
-            <div className="md:w-64">
-              <Select 
-                value={statusFilter} 
-                onValueChange={handleStatusFilterChange}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All Statuses</SelectItem>
-                  {statusOptions.map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            {(searchTerm || statusFilter) && (
-              <Button 
-                variant="outline" 
-                onClick={clearFilters}
-                className="md:w-auto w-full"
-              >
-                Clear Filters
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        
-        <CardContent>
-          {loading ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-zim-green" />
-            </div>
-          ) : filteredShipments.length === 0 ? (
-            <div className="text-center py-12">
-              <Package className="mx-auto h-12 w-12 text-gray-400 mb-3" />
-              <h3 className="text-lg font-medium text-gray-900">No shipments found</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                {searchTerm || statusFilter 
-                  ? "Try adjusting your search or filters"
-                  : "No shipments have been created yet"}
-              </p>
-            </div>
-          ) : (
-            <div>
-              <div className="rounded-md border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tracking #</TableHead>
-                      <TableHead className="hidden md:table-cell">Customer</TableHead>
-                      <TableHead className="hidden md:table-cell">Origin</TableHead>
-                      <TableHead className="hidden md:table-cell">Destination</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="hidden md:table-cell">Date</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {currentShipments.map((shipment) => (
-                      <TableRow key={shipment.id}>
-                        <TableCell className="font-medium">
-                          {shipment.tracking_number}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          <div>
-                            {shipment.user_name || "Unknown"}
-                            {shipment.user_email && (
-                              <div className="text-xs text-gray-500">
-                                {shipment.user_email}
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">{shipment.origin}</TableCell>
-                        <TableCell className="hidden md:table-cell">{shipment.destination}</TableCell>
-                        <TableCell>{renderStatusBadge(shipment.status)}</TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {new Date(shipment.created_at).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          <Select 
-                            value={shipment.status} 
-                            onValueChange={(value) => updateShipmentStatus(shipment.id, value)}
-                            disabled={updatingStatus === shipment.id}
-                          >
-                            <SelectTrigger className="w-[140px]">
-                              {updatingStatus === shipment.id ? (
-                                <div className="flex items-center">
-                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                  Updating...
-                                </div>
-                              ) : (
-                                <SelectValue />
-                              )}
-                            </SelectTrigger>
-                            <SelectContent>
-                              {statusOptions.map(option => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
+            </CardContent>
+          </Card>
+
+          {/* Shipments Table */}
+          <Card>
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="flex justify-center items-center p-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
+                </div>
+              ) : filteredShipments.length === 0 ? (
+                <div className="text-center p-12">
+                  <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No shipments found</h3>
+                  <p className="text-gray-500">
+                    {searchQuery || statusFilter !== 'all' 
+                      ? "Try adjusting your filters" 
+                      : "There are no shipments in the system yet"}
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[120px]">Tracking #</TableHead>
+                        <TableHead>Origin</TableHead>
+                        <TableHead>Destination</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead>Est. Delivery</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between py-4">
-                  <div className="text-sm text-gray-500">
-                    Showing {(page - 1) * itemsPerPage + 1} to {Math.min(page * itemsPerPage, filteredShipments.length)} of {filteredShipments.length} shipments
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button 
-                      variant="outline" 
-                      size="icon"
-                      onClick={() => setPage(page => Math.max(1, page - 1))}
-                      disabled={page === 1}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <div className="text-sm font-medium">
-                      Page {page} of {totalPages}
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      size="icon"
-                      onClick={() => setPage(page => Math.min(totalPages, page + 1))}
-                      disabled={page === totalPages}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredShipments.map((shipment) => (
+                        <TableRow key={shipment.id}>
+                          <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
+                          <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
+                          <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
+                          <TableCell>
+                            <Badge className={getStatusBadgeClass(shipment.status)}>
+                              {shipment.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {format(new Date(shipment.created_at), 'MMM d, yyyy')}
+                          </TableCell>
+                          <TableCell>
+                            {shipment.estimated_delivery 
+                              ? format(new Date(shipment.estimated_delivery), 'MMM d, yyyy')
+                              : "Not specified"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end space-x-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => navigate(`/shipment/${shipment.id}`)}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingShipment(shipment);
+                                  setNewStatus(shipment.status);
+                                }}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               )}
+            </CardContent>
+            <CardFooter className="flex justify-between py-4">
+              <p className="text-sm text-gray-500">
+                Showing {filteredShipments.length} out of {shipments.length} shipments
+              </p>
+            </CardFooter>
+          </Card>
+          
+          {/* Edit Status Modal */}
+          {editingShipment && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 className="text-lg font-bold mb-4">Update Shipment Status</h3>
+                <div className="mb-4">
+                  <p className="text-sm text-gray-500 mb-1">Tracking Number</p>
+                  <p className="font-medium font-mono">{editingShipment.tracking_number}</p>
+                </div>
+                <div className="mb-6">
+                  <p className="text-sm text-gray-500 mb-1">Current Status</p>
+                  <Badge className={getStatusBadgeClass(editingShipment.status)}>
+                    {editingShipment.status}
+                  </Badge>
+                </div>
+                <div className="mb-6">
+                  <label className="block text-sm font-medium mb-2">New Status</label>
+                  <Select
+                    value={newStatus}
+                    onValueChange={setNewStatus}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_OPTIONS.map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {status}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex justify-end space-x-3">
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      setEditingShipment(null);
+                      setNewStatus('');
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    className="bg-zim-green hover:bg-zim-green/90"
+                    onClick={updateShipmentStatus}
+                  >
+                    Update Status
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </main>
+      <Footer />
     </div>
   );
 };
