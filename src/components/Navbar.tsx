@@ -1,15 +1,23 @@
 
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Menu, X, Ship, Package, Phone, User, LogIn } from 'lucide-react';
+import { Menu, X, Ship, Package, Phone, User, LogIn, LogOut } from 'lucide-react';
 import Logo from './Logo';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Navbar: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
   };
 
   const navLinks = [
@@ -44,14 +52,38 @@ const Navbar: React.FC = () => {
             </div>
 
             <div className="flex items-center space-x-4">
-              <Button variant="outline" className="border-zim-black flex items-center">
-                <LogIn className="mr-1 h-4 w-4" />
-                Sign In
-              </Button>
-              <Button className="bg-zim-green hover:bg-zim-green/90 flex items-center">
-                <User className="mr-1 h-4 w-4" />
-                Register
-              </Button>
+              {user ? (
+                <>
+                  <Link to="/dashboard">
+                    <Button variant="outline" className="border-zim-black flex items-center">
+                      <User className="mr-1 h-4 w-4" />
+                      Dashboard
+                    </Button>
+                  </Link>
+                  <Button 
+                    onClick={handleSignOut}
+                    className="bg-zim-green hover:bg-zim-green/90 flex items-center"
+                  >
+                    <LogOut className="mr-1 h-4 w-4" />
+                    Sign Out
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Link to="/auth">
+                    <Button variant="outline" className="border-zim-black flex items-center">
+                      <LogIn className="mr-1 h-4 w-4" />
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Link to="/auth">
+                    <Button className="bg-zim-green hover:bg-zim-green/90 flex items-center" onClick={() => navigate('/auth', { state: { signup: true } })}>
+                      <User className="mr-1 h-4 w-4" />
+                      Register
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
 
@@ -84,14 +116,44 @@ const Navbar: React.FC = () => {
               </Link>
             ))}
             <div className="py-3 space-y-3">
-              <Button variant="outline" className="w-full border-zim-black flex items-center justify-center">
-                <LogIn className="mr-1 h-4 w-4" />
-                Sign In
-              </Button>
-              <Button className="w-full bg-zim-green hover:bg-zim-green/90 flex items-center justify-center">
-                <User className="mr-1 h-4 w-4" />
-                Register
-              </Button>
+              {user ? (
+                <>
+                  <Link to="/dashboard" onClick={() => setIsMenuOpen(false)}>
+                    <Button variant="outline" className="w-full border-zim-black flex items-center justify-center">
+                      <User className="mr-1 h-4 w-4" />
+                      Dashboard
+                    </Button>
+                  </Link>
+                  <Button 
+                    className="w-full bg-zim-green hover:bg-zim-green/90 flex items-center justify-center"
+                    onClick={() => {
+                      handleSignOut();
+                      setIsMenuOpen(false);
+                    }}
+                  >
+                    <LogOut className="mr-1 h-4 w-4" />
+                    Sign Out
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Link to="/auth" onClick={() => setIsMenuOpen(false)}>
+                    <Button variant="outline" className="w-full border-zim-black flex items-center justify-center">
+                      <LogIn className="mr-1 h-4 w-4" />
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Link to="/auth" onClick={() => {
+                    navigate('/auth', { state: { signup: true } });
+                    setIsMenuOpen(false);
+                  }}>
+                    <Button className="w-full bg-zim-green hover:bg-zim-green/90 flex items-center justify-center">
+                      <User className="mr-1 h-4 w-4" />
+                      Register
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
