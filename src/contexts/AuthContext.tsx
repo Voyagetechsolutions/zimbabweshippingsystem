@@ -27,9 +27,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchAdminStatus = async (userId: string) => {
     try {
       // Use the is_admin RPC function instead of directly querying
-      // Adding a cache buster parameter to prevent caching issues
-      const { data, error } = await supabase.rpc('is_admin', {}, { 
-        headers: { 'Cache-Control': 'no-cache' } 
+      // Adding a timestamp parameter to prevent caching issues
+      const timestamp = new Date().getTime();
+      const { data, error } = await supabase.rpc('is_admin', { 
+        timestamp_param: timestamp 
       });
       
       if (error) {
