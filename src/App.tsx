@@ -10,6 +10,10 @@ import { AuthProvider } from "./contexts/AuthContext";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import { RequireAuth, RedirectIfAuthenticated } from "./components/RouteGuard";
+import CreateShipment from "./pages/CreateShipment";
+import Track from "./pages/Track";
+import Account from "./pages/Account";
+import AdminDashboard from "./pages/AdminDashboard";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +34,22 @@ const App = () => (
             <Route path="/dashboard" element={
               <RequireAuth>
                 <Dashboard />
+              </RequireAuth>
+            } />
+            <Route path="/create-shipment" element={
+              <RequireAuth>
+                <CreateShipment />
+              </RequireAuth>
+            } />
+            <Route path="/track" element={<Track />} />
+            <Route path="/account" element={
+              <RequireAuth>
+                <Account />
+              </RequireAuth>
+            } />
+            <Route path="/admin" element={
+              <RequireAuth>
+                <AdminDashboard />
               </RequireAuth>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

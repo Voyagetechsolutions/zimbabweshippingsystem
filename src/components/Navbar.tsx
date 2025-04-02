@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Menu, X, Ship, Package, Phone, User, LogIn, LogOut } from 'lucide-react';
+import { Menu, X, Ship, Package, Phone, User, LogIn, LogOut, Settings, Package2 } from 'lucide-react';
 import Logo from './Logo';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -54,19 +54,44 @@ const Navbar: React.FC = () => {
             <div className="flex items-center space-x-4">
               {user ? (
                 <>
-                  <Link to="/dashboard">
+                  <div className="group relative">
                     <Button variant="outline" className="border-zim-black flex items-center">
                       <User className="mr-1 h-4 w-4" />
-                      Dashboard
+                      My Account
+                    </Button>
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg overflow-hidden z-20 invisible group-hover:visible">
+                      <div className="py-2">
+                        <Link to="/dashboard" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                          <Package2 className="inline-block mr-2 h-4 w-4" />
+                          Dashboard
+                        </Link>
+                        <Link to="/account" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                          <Settings className="inline-block mr-2 h-4 w-4" />
+                          Account Settings
+                        </Link>
+                        {/* Admin link - in a real app, check for admin role */}
+                        <Link to="/admin" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                          <Package className="inline-block mr-2 h-4 w-4" />
+                          Admin Dashboard
+                        </Link>
+                        <button 
+                          onClick={handleSignOut}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          <LogOut className="inline-block mr-2 h-4 w-4" />
+                          Sign Out
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <Link to="/create-shipment">
+                    <Button 
+                      className="bg-zim-green hover:bg-zim-green/90 flex items-center"
+                    >
+                      <Package className="mr-1 h-4 w-4" />
+                      New Shipment
                     </Button>
                   </Link>
-                  <Button 
-                    onClick={handleSignOut}
-                    className="bg-zim-green hover:bg-zim-green/90 flex items-center"
-                  >
-                    <LogOut className="mr-1 h-4 w-4" />
-                    Sign Out
-                  </Button>
                 </>
               ) : (
                 <>
@@ -120,12 +145,30 @@ const Navbar: React.FC = () => {
                 <>
                   <Link to="/dashboard" onClick={() => setIsMenuOpen(false)}>
                     <Button variant="outline" className="w-full border-zim-black flex items-center justify-center">
-                      <User className="mr-1 h-4 w-4" />
+                      <Package2 className="mr-1 h-4 w-4" />
                       Dashboard
                     </Button>
                   </Link>
+                  <Link to="/account" onClick={() => setIsMenuOpen(false)}>
+                    <Button variant="outline" className="w-full border-zim-black flex items-center justify-center">
+                      <Settings className="mr-1 h-4 w-4" />
+                      Account Settings
+                    </Button>
+                  </Link>
+                  <Link to="/admin" onClick={() => setIsMenuOpen(false)}>
+                    <Button variant="outline" className="w-full border-zim-black flex items-center justify-center">
+                      <Package className="mr-1 h-4 w-4" />
+                      Admin Dashboard
+                    </Button>
+                  </Link>
+                  <Link to="/create-shipment" onClick={() => setIsMenuOpen(false)}>
+                    <Button className="w-full bg-zim-green hover:bg-zim-green/90 flex items-center justify-center">
+                      <Package className="mr-1 h-4 w-4" />
+                      New Shipment
+                    </Button>
+                  </Link>
                   <Button 
-                    className="w-full bg-zim-green hover:bg-zim-green/90 flex items-center justify-center"
+                    className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 flex items-center justify-center"
                     onClick={() => {
                       handleSignOut();
                       setIsMenuOpen(false);
