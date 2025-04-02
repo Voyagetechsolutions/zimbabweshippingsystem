@@ -87,6 +87,7 @@ const AdminDashboard = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
   const [newStatus, setNewStatus] = useState<string>('');
+  const [adminExists, setAdminExists] = useState<boolean | null>(null);
   
   // Stats
   const [stats, setStats] = useState({
@@ -96,18 +97,45 @@ const AdminDashboard = () => {
     delivered: 0,
   });
 
-  useEffect(() => {
-    if (!isAdmin) {
-      toast({
-        title: "Unauthorized Access",
-        description: "You don't have permission to access this page.",
-        variant: "destructive",
-      });
-      navigate('/dashboard');
-      return;
-    }
+  // Check if any admin exists
+  const checkIfAdminExists = async () => {
+    try {
+      const { data, error } = await supabase.rpc('is_admin');
+      
+      if (error) {
+        console.error('Error checking admin status:', error);
+        return;
+      }
 
-    fetchShipments();
+      if (data) {
+        // Current user is an admin
+        setAdminExists(true);
+      } else {
+        // Check if any admin exists in the system
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('is_admin', true)
+          .limit(1);
+
+        if (profilesError) {
+          console.error('Error checking if any admin exists:', profilesError);
+          return;
+        }
+
+        setAdminExists(profilesData && profilesData.length > 0);
+      }
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+    }
+  };
+
+  useEffect(() => {
+    checkIfAdminExists();
+    // Only fetch shipments if we're not showing the setup form
+    if (isAdmin || adminExists) {
+      fetchShipments();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, navigate]);
 
@@ -149,6 +177,21 @@ const AdminDashboard = () => {
       setLoading(false);
     }
   };
+
+  // If no admin exists in the system, show the setup form
+  if (adminExists === false) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-grow py-8 bg-gray-50">
+          <div className="container mx-auto px-4 max-w-md">
+            <SetupAdmin />
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   const updateShipmentStatus = async () => {
     if (!editingShipment || !newStatus) return;
