@@ -1,6 +1,5 @@
 
-import React from 'react';
-import { Helmet } from 'react-helmet';
+import React, { useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import BookingForm from '@/components/BookingForm';
@@ -8,13 +7,13 @@ import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const BookShipment = () => {
+  useEffect(() => {
+    // Update the document title when the component mounts
+    document.title = 'Book a Shipment | UK to Zimbabwe Shipping';
+  }, []);
+
   return (
     <>
-      <Helmet>
-        <title>Book a Shipment | UK to Zimbabwe Shipping</title>
-        <meta name="description" content="Book your shipment from UK to Zimbabwe. Select from our collection routes and areas for convenient pickup." />
-      </Helmet>
-      
       <Navbar />
       
       <main className="min-h-screen bg-gray-50 py-12 px-4">
