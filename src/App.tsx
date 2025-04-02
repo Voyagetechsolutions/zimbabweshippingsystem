@@ -8,7 +8,7 @@ import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
-import { RequireAuth, RedirectIfAuthenticated } from "./components/RouteGuard";
+import { RequireAuth, RedirectIfAuthenticated, RequireAdmin } from "./components/RouteGuard";
 import CreateShipment from "./pages/CreateShipment";
 import BookShipment from "./pages/BookShipment";
 import Track from "./pages/Track";
@@ -54,9 +54,9 @@ const App = () => (
               </RequireAuth>
             } />
             <Route path="/admin" element={
-              <RequireAuth>
+              <RequireAdmin>
                 <AdminDashboard />
-              </RequireAuth>
+              </RequireAdmin>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

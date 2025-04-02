@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import { SetupAdmin } from '@/components/SetupAdmin';
 
 // Status options for updating shipments
 const STATUS_OPTIONS = [

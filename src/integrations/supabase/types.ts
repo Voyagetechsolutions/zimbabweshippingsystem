@@ -16,6 +16,7 @@ export type Database = {
           email: string
           full_name: string | null
           id: string
+          is_admin: boolean | null
           updated_at: string
         }
         Insert: {
@@ -24,6 +25,7 @@ export type Database = {
           email: string
           full_name?: string | null
           id: string
+          is_admin?: boolean | null
           updated_at?: string
         }
         Update: {
@@ -32,6 +34,7 @@ export type Database = {
           email?: string
           full_name?: string | null
           id?: string
+          is_admin?: boolean | null
           updated_at?: string
         }
         Relationships: []
@@ -86,7 +89,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      make_admin: {
+        Args: {
+          user_email: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
