@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Menu, X, Ship, Package, Phone, User, LogIn, LogOut, Settings, Package2 } from 'lucide-react';
+import { Menu, X, Ship, Package, Phone, User, LogIn, LogOut, Settings, Package2, BookOpen } from 'lucide-react';
 import Logo from './Logo';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -22,6 +22,7 @@ const Navbar: React.FC = () => {
 
   const navLinks = [
     { name: "Services", href: "/services", icon: <Ship className="w-5 h-5" /> },
+    { name: "Book Your Shipment", href: "/book-shipment", icon: <BookOpen className="w-5 h-5" /> },
     { name: "Track Shipment", href: "/track", icon: <Package className="w-5 h-5" /> },
     { name: "Contact", href: "/contact", icon: <Phone className="w-5 h-5" /> },
   ];

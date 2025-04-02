@@ -11,6 +11,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import { RequireAuth, RedirectIfAuthenticated } from "./components/RouteGuard";
 import CreateShipment from "./pages/CreateShipment";
+import BookShipment from "./pages/BookShipment";
 import Track from "./pages/Track";
 import Account from "./pages/Account";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -42,6 +43,7 @@ const App = () => (
                 <CreateShipment />
               </RequireAuth>
             } />
+            <Route path="/book-shipment" element={<BookShipment />} />
             <Route path="/shipment/:id" element={<ShipmentDetails />} />
             <Route path="/track" element={<Track />} />
             <Route path="/account" element={

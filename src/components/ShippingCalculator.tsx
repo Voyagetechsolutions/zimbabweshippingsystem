@@ -27,8 +27,8 @@ const ShippingCalculator: React.FC = () => {
       description: 'Our most economical shipping option with standard tracking'
     },
     {
-      id: 'express',
-      name: 'Express Shipping',
+      id: 'priority',
+      name: 'Priority Shipping',
       price: packageType === 'drum' ? 350 : 75 * weight,
       deliveryTime: '10-14 days',
       description: 'Faster delivery with priority handling and tracking'
