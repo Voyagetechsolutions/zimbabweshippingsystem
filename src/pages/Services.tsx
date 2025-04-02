@@ -1,4 +1,3 @@
-
 import React from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -19,7 +18,7 @@ const Services = () => {
         'Ideal for bulk items and multiple goods',
         'Secure packaging and handling',
         'Full tracking capabilities',
-        'Delivered to recipient's doorstep'
+        'Delivered to recipient\'s doorstep'
       ]
     },
     {
