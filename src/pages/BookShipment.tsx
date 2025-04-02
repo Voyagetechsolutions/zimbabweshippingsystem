@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import WhatsAppButton from '@/components/WhatsAppButton';
@@ -13,6 +13,55 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Ship, Package, Truck, Calendar, MapPin, ChevronRight, Info } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+// Collection routes and areas with pickup dates
+const collectionRoutes = {
+  "CARDIFF ROUTE": {
+    date: "21st of April",
+    areas: ["CARDIFF", "GLOUCESTER", "BRISTOL", "SWINDON", "BATH", "SALISBURY"]
+  },
+  "BOURNEMOUTH ROUTE": {
+    date: "22nd of April",
+    areas: ["SOUTHAMPTON", "OXFORD", "HAMPHIRE", "READING", "GUILFORD", "PORTSMOUTH"]
+  },
+  "BIRMINGHAM ROUTE": {
+    date: "24th of April",
+    areas: ["WOLVEHAMPTON", "COVENTRY", "WARWICK", "DUDLEY", "WALSALL", "RUGBY"]
+  },
+  "LONDON ROUTE": {
+    date: "19th of April",
+    areas: ["CENTRAL LONDON", "HEATHROW", "EAST LONDON", "ROMFORD", "ALL AREAS INSIDE M25"]
+  },
+  "LEEDS ROUTE": {
+    date: "17th of April",
+    areas: ["WAKEFIELD", "HALIFAX", "DONCASTER", "SHEFFIELD", "HUDDERSFIELD", "YORK"]
+  },
+  "NOTTINGHAM ROUTE": {
+    date: "18th of April",
+    areas: ["LIECESTER", "DERBY", "PETERSBOROUGH", "CORBY", "MARKET HARB"]
+  },
+  "MANCHESTER ROUTE": {
+    date: "26th of April",
+    areas: ["LIVERPOOL", "STOKE ON TRENT", "BOLTON", "WARRINGTON", "OLDHAM", "SHREWBURY"]
+  },
+  "BRIGHTON ROUTE": {
+    date: "28th of April",
+    areas: ["HIGH COMBE", "SLOUGH", "VRAWLEY", "LANCING", "EASTBOURNE", "CANTEBURY"]
+  },
+  "SOUTHEND ROUTE": {
+    date: "29th of April",
+    areas: ["NORWICH", "IPSWICH", "COLCHESTER", "BRAINTREE", "CAMBRIDGE", "BASILDON"]
+  },
+  "NORTHAMPTON ROUTE": {
+    date: "16th of April",
+    areas: ["KETTERING", "BEDFORD", "MILTON KEYNES", "BANBURY", "AYLESBURY", "LUTON"]
+  },
+  "SCOTLAND ROUTE": {
+    date: "To be confirmed",
+    areas: ["GLASSGOW", "EDINBURGH", "NECASTLE", "MIDDLESBROUGH", "PRESTON", "CARLLSLE"]
+  }
+};
 
 const BookShipment = () => {
   const { toast } = useToast();
@@ -21,6 +70,8 @@ const BookShipment = () => {
     fullName: '',
     email: '',
     phone: '',
+    route: '',
+    area: '',
     pickupAddress: '',
     deliveryAddress: '',
     preferredDate: '',
@@ -32,6 +83,30 @@ const BookShipment = () => {
     insurance: false,
     doorToDoor: false,
   });
+
+  const [availableAreas, setAvailableAreas] = useState<string[]>([]);
+  const [pickupDate, setPickupDate] = useState<string>('');
+
+  useEffect(() => {
+    // Reset area when route changes
+    if (formData.route) {
+      setAvailableAreas(collectionRoutes[formData.route as keyof typeof collectionRoutes].areas);
+      setFormData(prev => ({ ...prev, area: '' }));
+      setPickupDate('');
+    } else {
+      setAvailableAreas([]);
+    }
+  }, [formData.route]);
+
+  useEffect(() => {
+    // Set pickup date when both route and area are selected
+    if (formData.route && formData.area) {
+      const date = collectionRoutes[formData.route as keyof typeof collectionRoutes].date;
+      setPickupDate(date);
+      // Update the form's preferred date field
+      setFormData(prev => ({ ...prev, preferredDate: date }));
+    }
+  }, [formData.route, formData.area]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -71,6 +146,8 @@ const BookShipment = () => {
       fullName: '',
       email: '',
       phone: '',
+      route: '',
+      area: '',
       pickupAddress: '',
       deliveryAddress: '',
       preferredDate: '',
@@ -82,6 +159,7 @@ const BookShipment = () => {
       insurance: false,
       doorToDoor: false,
     });
+    setPickupDate('');
   };
 
   const calculatePrice = () => {
@@ -145,6 +223,7 @@ const BookShipment = () => {
                       </TabsTrigger>
                     </TabsList>
                     
+                    {/* Drum and Parcel Tabs */}
                     <TabsContent value="drum" className="space-y-4 mt-4">
                       <div>
                         <Label htmlFor="drumQuantity">Number of Drums</Label>
@@ -208,7 +287,70 @@ const BookShipment = () => {
                       </div>
                     </TabsContent>
                   </Tabs>
+
+                  {/* Collection Route Selection */}
+                  <div className="p-4 bg-yellow-50 rounded-md border border-yellow-200">
+                    <h3 className="text-lg font-medium mb-2 flex items-center">
+                      <Calendar className="mr-2 h-5 w-5 text-yellow-600" />
+                      Collection Schedule
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Select your route and area to see the scheduled pickup date for April 2024.
+                    </p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="route">Collection Route</Label>
+                        <Select 
+                          value={formData.route} 
+                          onValueChange={(value) => handleSelectChange('route', value)}
+                        >
+                          <SelectTrigger id="route">
+                            <SelectValue placeholder="Select collection route" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.keys(collectionRoutes).map(route => (
+                              <SelectItem key={route} value={route}>
+                                {route}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="area">Area</Label>
+                        <Select 
+                          value={formData.area} 
+                          onValueChange={(value) => handleSelectChange('area', value)}
+                          disabled={!formData.route}
+                        >
+                          <SelectTrigger id="area">
+                            <SelectValue placeholder={formData.route ? "Select your area" : "Select route first"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableAreas.map(area => (
+                              <SelectItem key={area} value={area}>
+                                {area}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {pickupDate && (
+                      <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                        <p className="flex items-center text-green-800">
+                          <Calendar className="h-4 w-4 mr-2 text-green-600" />
+                          <span className="font-medium">Collection Date:</span>
+                          <span className="ml-2">{pickupDate}</span>
+                        </p>
+                      </div>
+                    )}
+                  </div>
                   
+                  {/* Contact Information */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="fullName">Full Name</Label>
@@ -255,12 +397,15 @@ const BookShipment = () => {
                     <Textarea 
                       id="pickupAddress"
                       name="pickupAddress"
-                      placeholder="Where should we collect the package from?" 
+                      placeholder="Detailed address for pickup (include house number, street, postcode)" 
                       value={formData.pickupAddress}
                       onChange={handleInputChange}
                       required
                       className="mt-1"
                     />
+                    <p className="text-sm text-gray-500 mt-1">
+                      Make sure this address is within your selected area.
+                    </p>
                   </div>
                   
                   <div>
@@ -276,18 +421,7 @@ const BookShipment = () => {
                     />
                   </div>
                   
-                  <div>
-                    <Label htmlFor="preferredDate">Preferred Pickup Date</Label>
-                    <Input 
-                      id="preferredDate"
-                      name="preferredDate"
-                      type="date" 
-                      value={formData.preferredDate}
-                      onChange={handleInputChange}
-                      className="mt-1"
-                    />
-                  </div>
-                  
+                  {/* Additional Services */}
                   <div>
                     <p className="font-medium mb-3">Additional Services</p>
                     <div className="space-y-4">
@@ -359,6 +493,27 @@ const BookShipment = () => {
                       </div>
                     )}
                     
+                    {formData.route && (
+                      <div>
+                        <p className="text-gray-500">Collection Route:</p>
+                        <p className="font-medium">{formData.route}</p>
+                      </div>
+                    )}
+                    
+                    {formData.area && (
+                      <div>
+                        <p className="text-gray-500">Area:</p>
+                        <p className="font-medium">{formData.area}</p>
+                      </div>
+                    )}
+                    
+                    {pickupDate && (
+                      <div>
+                        <p className="text-gray-500">Collection Date:</p>
+                        <p className="font-medium text-green-700">{pickupDate}</p>
+                      </div>
+                    )}
+                    
                     <div className="pt-4 border-t">
                       <p className="text-gray-500">Estimated Base Price:</p>
                       <p className="font-bold text-xl text-zim-green">{calculatePrice()}</p>
@@ -380,7 +535,7 @@ const BookShipment = () => {
                         </li>
                         <li className="flex">
                           <span className="font-medium text-zim-green mr-2">3.</span> 
-                          Arrange pickup of your items
+                          Collect your items on the scheduled date
                         </li>
                         <li className="flex">
                           <span className="font-medium text-zim-green mr-2">4.</span> 
