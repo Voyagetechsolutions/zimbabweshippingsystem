@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -19,7 +18,11 @@ import {
 } from '@/data/collectionSchedule';
 import { Package, Truck } from 'lucide-react';
 
-const BookingForm = () => {
+interface BookingFormProps {
+  onSubmitComplete?: (data: any, shipmentId: string, amount: number) => void;
+}
+
+const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -49,14 +52,12 @@ const BookingForm = () => {
   const [pickupDate, setPickupDate] = useState<string>('');
   const routes = getRouteNames();
 
-  // Update available areas when route changes
   React.useEffect(() => {
     if (formData.selectedRoute) {
       const areas = getAreasByRoute(formData.selectedRoute);
       setAvailableAreas(areas);
       setPickupDate(getDateByRoute(formData.selectedRoute));
       
-      // Reset selected area when route changes
       setFormData(prev => ({ ...prev, selectedArea: '' }));
     } else {
       setAvailableAreas([]);
@@ -82,12 +83,10 @@ const BookingForm = () => {
     const numbers = '0123456789';
     let tracking = '';
     
-    // Generate 4 random letters
     for (let i = 0; i < 4; i++) {
       tracking += letters.charAt(Math.floor(Math.random() * letters.length));
     }
     
-    // Generate 4 random numbers
     for (let i = 0; i < 4; i++) {
       tracking += numbers.charAt(Math.floor(Math.random() * numbers.length));
     }
@@ -98,7 +97,6 @@ const BookingForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate form
     if (!formData.termsAccepted) {
       toast({
         variant: "destructive",
@@ -129,28 +127,22 @@ const BookingForm = () => {
     setIsSubmitting(true);
 
     try {
-      // Generate a unique tracking number
       const trackingNumber = generateTrackingNumber();
       
-      // Calculate weight based on shipment type
       let weightValue = null;
       if (formData.shipmentType === 'drum') {
-        // Approximate weight for a drum (based on selected quantity)
-        weightValue = parseInt(formData.drumQuantity) * 25; // Assuming average drum weight is 25kg
+        weightValue = parseInt(formData.drumQuantity) * 25;
       } else if (formData.shipmentType === 'parcel' && formData.weight) {
         weightValue = parseFloat(formData.weight);
       }
       
-      // Construct full names and addresses
       const fullName = `${formData.firstName} ${formData.lastName}`.trim();
       const origin = `${formData.pickupAddress}, ${formData.pickupPostcode}`;
       const destination = `${formData.deliveryAddress}, ${formData.deliveryCity}, Zimbabwe`;
 
-      // Calculate estimated delivery date (2 weeks from pickup date)
       const twoWeeksFromNow = new Date();
       twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
 
-      // Additional metadata to store
       const metaData = {
         shipment_type: formData.shipmentType,
         drum_quantity: formData.shipmentType === 'drum' ? parseInt(formData.drumQuantity) : null,
@@ -165,11 +157,24 @@ const BookingForm = () => {
         special_instructions: formData.specialInstructions || null
       };
       
-      // Insert the shipment into the database
-      const { error } = await supabase
+      let amount = 0;
+      if (formData.shipmentType === 'drum') {
+        const quantity = parseInt(formData.drumQuantity);
+        if (quantity === 1) {
+          amount = 260;
+        } else if (quantity >= 2 && quantity <= 4) {
+          amount = quantity * 250;
+        } else if (quantity >= 5) {
+          amount = quantity * 220;
+        }
+      } else if (formData.shipmentType === 'parcel' && formData.weight) {
+        amount = parseFloat(formData.weight) * 50;
+      }
+      
+      const { data, error } = await supabase
         .from('shipments')
         .insert({
-          user_id: user?.id || null, // If the user is logged in, associate with their account
+          user_id: user?.id || null,
           tracking_number: trackingNumber,
           origin: origin,
           destination: destination,
@@ -179,20 +184,25 @@ const BookingForm = () => {
           carrier: 'ZimExpress',
           estimated_delivery: twoWeeksFromNow.toISOString(),
           metadata: metaData
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
       
-      toast({
-        title: "Booking Confirmed",
-        description: `Your shipment has been booked with tracking number: ${trackingNumber}`,
-      });
-      
-      // Redirect to tracking page or dashboard
-      if (user) {
-        navigate('/dashboard');
+      if (onSubmitComplete) {
+        onSubmitComplete(formData, data.id, amount);
       } else {
-        navigate('/track');
+        toast({
+          title: "Booking Confirmed",
+          description: `Your shipment has been booked with tracking number: ${trackingNumber}`,
+        });
+        
+        if (user) {
+          navigate('/dashboard');
+        } else {
+          navigate('/track');
+        }
       }
     } catch (error: any) {
       toast({
