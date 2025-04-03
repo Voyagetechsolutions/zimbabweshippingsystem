@@ -17,7 +17,11 @@ import {
   LogOut,
   User,
   ShieldCheck,
-  Bell
+  Bell,
+  Package,
+  Phone,
+  Search,
+  MapPin
 } from "lucide-react";
 import { Button } from "@/components/ui/button"
 import NotificationsPanel from '@/components/NotificationsPanel';
@@ -55,16 +59,31 @@ const Navbar = () => {
               <div className="absolute top-full right-0 bg-white shadow-md rounded-md p-4 w-48 z-50">
                 {user ? (
                   <>
-                    <Link to="/dashboard" className="block py-2 hover:bg-gray-100 rounded-md">Dashboard</Link>
-                    <Link to="/account" className="block py-2 hover:bg-gray-100 rounded-md">Account</Link>
+                    <Link to="/dashboard" className="flex items-center py-2 hover:bg-gray-100 rounded-md">
+                      <LayoutDashboard className="mr-2 h-4 w-4" />
+                      Dashboard
+                    </Link>
+                    <Link to="/account" className="flex items-center py-2 hover:bg-gray-100 rounded-md">
+                      <User className="mr-2 h-4 w-4" />
+                      Account
+                    </Link>
                     {isAdmin && (
-                      <Link to="/admin" className="block py-2 hover:bg-gray-100 rounded-md">Admin</Link>
+                      <Link to="/admin" className="flex items-center py-2 hover:bg-gray-100 rounded-md">
+                        <ShieldCheck className="mr-2 h-4 w-4" />
+                        Admin
+                      </Link>
                     )}
-                    <button onClick={handleLogout} className="block py-2 hover:bg-gray-100 rounded-md w-full text-left">Logout</button>
+                    <button onClick={handleLogout} className="flex items-center py-2 hover:bg-gray-100 rounded-md w-full text-left">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Logout
+                    </button>
                   </>
                 ) : (
                   <>
-                    <Link to="/auth" className="block py-2 hover:bg-gray-100 rounded-md">Login/Register</Link>
+                    <Link to="/auth" className="flex items-center py-2 hover:bg-gray-100 rounded-md">
+                      <User className="mr-2 h-4 w-4" />
+                      Login/Register
+                    </Link>
                   </>
                 )}
               </div>
@@ -73,13 +92,23 @@ const Navbar = () => {
         ) : (
           // Desktop Menu
           <div className="flex items-center space-x-6">
-            <Link to="/services" className="hover:text-gray-600">Services</Link>
-            <Link to="/contact" className="hover:text-gray-600">Contact</Link>
-            <Link to="/track" className="hover:text-gray-600">Track</Link>
+            <Link to="/services" className="flex items-center hover:text-gray-600">
+              <Package className="mr-1 h-4 w-4" />
+              Services
+            </Link>
+            <Link to="/contact" className="flex items-center hover:text-gray-600">
+              <Phone className="mr-1 h-4 w-4" />
+              Contact
+            </Link>
+            <Link to="/track" className="flex items-center hover:text-gray-600">
+              <Search className="mr-1 h-4 w-4" />
+              Track
+            </Link>
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative">
+                    <User className="mr-2 h-4 w-4" />
                     {user?.email}
                   </Button>
                 </DropdownMenuTrigger>
@@ -104,6 +133,12 @@ const Navbar = () => {
                       Notifications
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/address-book" className="cursor-pointer">
+                      <MapPin className="mr-2 h-4 w-4" />
+                      Address Book
+                    </Link>
+                  </DropdownMenuItem>
                   {isAdmin && (
                     <DropdownMenuItem asChild>
                       <Link to="/admin" className="cursor-pointer">
@@ -120,7 +155,8 @@ const Navbar = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Link to="/auth" className="bg-zim-green text-white px-4 py-2 rounded-md hover:bg-zim-green/90">
+              <Link to="/auth" className="flex items-center bg-zim-green text-white px-4 py-2 rounded-md hover:bg-zim-green/90">
+                <User className="mr-2 h-4 w-4" />
                 Login/Register
               </Link>
             )}
