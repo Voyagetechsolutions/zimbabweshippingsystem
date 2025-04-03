@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,13 +20,15 @@ import {
   SelectTrigger, SelectValue 
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Package, Truck, Users, Search, 
-  RefreshCcw, Filter, Eye, Edit
+  RefreshCcw, Filter, Eye, Edit, User
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { SetupAdmin } from '@/components/SetupAdmin';
+import UserManagement from '@/components/admin/UserManagement';
 
 // Status options for updating shipments
 const STATUS_OPTIONS = [
@@ -88,6 +91,7 @@ const AdminDashboard = () => {
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
   const [newStatus, setNewStatus] = useState<string>('');
   const [adminExists, setAdminExists] = useState<boolean | null>(null);
+  const [activeTab, setActiveTab] = useState('overview');
   
   // Stats
   const [stats, setStats] = useState({
@@ -254,159 +258,118 @@ const AdminDashboard = () => {
         <div className="container mx-auto px-4">
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-2">Admin Dashboard</h1>
-            <p className="text-gray-500">Manage all shipments and track their progress</p>
+            <p className="text-gray-500">Manage all aspects of your shipping operation</p>
           </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Total Shipments</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <Package className="h-8 w-8 text-zim-green mr-3" />
-                  <div className="text-2xl font-bold">{stats.total}</div>
-                </div>
-              </CardContent>
-            </Card>
+          
+          {/* Admin Dashboard Tabs */}
+          <Tabs 
+            defaultValue="overview" 
+            value={activeTab} 
+            onValueChange={setActiveTab}
+            className="mb-8"
+          >
+            <TabsList className="grid grid-cols-3 w-[400px]">
+              <TabsTrigger value="overview" className="flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                <span>Overview</span>
+              </TabsTrigger>
+              <TabsTrigger value="shipments" className="flex items-center gap-2">
+                <Truck className="h-4 w-4" />
+                <span>Shipments</span>
+              </TabsTrigger>
+              <TabsTrigger value="users" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                <span>Users</span>
+              </TabsTrigger>
+            </TabsList>
             
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Processing</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <Package className="h-8 w-8 text-yellow-500 mr-3" />
-                  <div className="text-2xl font-bold">{stats.processing}</div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">In Transit</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <Truck className="h-8 w-8 text-blue-500 mr-3" />
-                  <div className="text-2xl font-bold">{stats.inTransit}</div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Delivered</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <Package className="h-8 w-8 text-green-500 mr-3" />
-                  <div className="text-2xl font-bold">{stats.delivered}</div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Filters and Search */}
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle className="text-xl">Shipments Management</CardTitle>
-              <CardDescription>View and manage all shipments</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="relative flex-grow">
-                  <Input
-                    placeholder="Search by tracking #, origin, or destination"
-                    className="pl-10"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                  <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                </div>
-                <div className="flex gap-4">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[180px]">
-                      <div className="flex items-center">
-                        <Filter className="h-4 w-4 mr-2" />
-                        <SelectValue placeholder="Filter by status" />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      {STATUS_OPTIONS.map((status) => (
-                        <SelectItem key={status.toLowerCase()} value={status.toLowerCase()}>
-                          {status}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button 
-                    variant="outline"
-                    onClick={fetchShipments}
-                    className="h-10 px-4"
-                  >
-                    <RefreshCcw className="h-4 w-4 mr-2" />
-                    Refresh
-                  </Button>
-                </div>
+            {/* Overview Tab */}
+            <TabsContent value="overview">
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-500">Total Shipments</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center">
+                      <Package className="h-8 w-8 text-zim-green mr-3" />
+                      <div className="text-2xl font-bold">{stats.total}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-500">Processing</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center">
+                      <Package className="h-8 w-8 text-yellow-500 mr-3" />
+                      <div className="text-2xl font-bold">{stats.processing}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-500">In Transit</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center">
+                      <Truck className="h-8 w-8 text-blue-500 mr-3" />
+                      <div className="text-2xl font-bold">{stats.inTransit}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-500">Delivered</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center">
+                      <Package className="h-8 w-8 text-green-500 mr-3" />
+                      <div className="text-2xl font-bold">{stats.delivered}</div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Shipments Table */}
-          <Card>
-            <CardContent className="p-0">
-              {loading ? (
-                <div className="flex justify-center items-center p-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
-                </div>
-              ) : filteredShipments.length === 0 ? (
-                <div className="text-center p-12">
-                  <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No shipments found</h3>
-                  <p className="text-gray-500">
-                    {searchQuery || statusFilter !== 'all' 
-                      ? "Try adjusting your filters" 
-                      : "There are no shipments in the system yet"}
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[120px]">Tracking #</TableHead>
-                        <TableHead>Origin</TableHead>
-                        <TableHead>Destination</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead>Est. Delivery</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredShipments.map((shipment) => (
-                        <TableRow key={shipment.id}>
-                          <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
-                          <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
-                          <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
-                          <TableCell>
-                            <Badge className={getStatusBadgeClass(shipment.status)}>
-                              {shipment.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {format(new Date(shipment.created_at), 'MMM d, yyyy')}
-                          </TableCell>
-                          <TableCell>
-                            {shipment.estimated_delivery 
-                              ? format(new Date(shipment.estimated_delivery), 'MMM d, yyyy')
-                              : "Not specified"}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end space-x-2">
+              
+              {/* Recent Shipments Preview */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-xl">Recent Shipments</CardTitle>
+                  <CardDescription>Quick overview of the latest shipments</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[120px]">Tracking #</TableHead>
+                          <TableHead>Origin</TableHead>
+                          <TableHead>Destination</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead className="text-right">View</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {shipments.slice(0, 5).map((shipment) => (
+                          <TableRow key={shipment.id}>
+                            <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
+                            <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
+                            <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
+                            <TableCell>
+                              <Badge className={getStatusBadgeClass(shipment.status)}>
+                                {shipment.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {format(new Date(shipment.created_at), 'MMM d, yyyy')}
+                            </TableCell>
+                            <TableCell className="text-right">
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -414,31 +377,161 @@ const AdminDashboard = () => {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setEditingShipment(shipment);
-                                  setNewStatus(shipment.status);
-                                }}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-            <CardFooter className="flex justify-between py-4">
-              <p className="text-sm text-gray-500">
-                Showing {filteredShipments.length} out of {shipments.length} shipments
-              </p>
-            </CardFooter>
-          </Card>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button variant="outline" onClick={() => setActiveTab('shipments')} className="w-full">
+                    View All Shipments
+                  </Button>
+                </CardFooter>
+              </Card>
+            </TabsContent>
+            
+            {/* Shipments Tab */}
+            <TabsContent value="shipments">
+              {/* Filters and Search */}
+              <Card className="mb-8">
+                <CardHeader>
+                  <CardTitle className="text-xl">Shipments Management</CardTitle>
+                  <CardDescription>View and manage all shipments</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <div className="relative flex-grow">
+                      <Input
+                        placeholder="Search by tracking #, origin, or destination"
+                        className="pl-10"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                      <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                    </div>
+                    <div className="flex gap-4">
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="w-[180px]">
+                          <div className="flex items-center">
+                            <Filter className="h-4 w-4 mr-2" />
+                            <SelectValue placeholder="Filter by status" />
+                          </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Statuses</SelectItem>
+                          {STATUS_OPTIONS.map((status) => (
+                            <SelectItem key={status.toLowerCase()} value={status.toLowerCase()}>
+                              {status}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button 
+                        variant="outline"
+                        onClick={fetchShipments}
+                        className="h-10 px-4"
+                      >
+                        <RefreshCcw className="h-4 w-4 mr-2" />
+                        Refresh
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Shipments Table */}
+              <Card>
+                <CardContent className="p-0">
+                  {loading ? (
+                    <div className="flex justify-center items-center p-12">
+                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
+                    </div>
+                  ) : filteredShipments.length === 0 ? (
+                    <div className="text-center p-12">
+                      <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                      <h3 className="text-lg font-medium mb-2">No shipments found</h3>
+                      <p className="text-gray-500">
+                        {searchQuery || statusFilter !== 'all' 
+                          ? "Try adjusting your filters" 
+                          : "There are no shipments in the system yet"}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[120px]">Tracking #</TableHead>
+                            <TableHead>Origin</TableHead>
+                            <TableHead>Destination</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Created</TableHead>
+                            <TableHead>Est. Delivery</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredShipments.map((shipment) => (
+                            <TableRow key={shipment.id}>
+                              <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
+                              <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
+                              <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
+                              <TableCell>
+                                <Badge className={getStatusBadgeClass(shipment.status)}>
+                                  {shipment.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {format(new Date(shipment.created_at), 'MMM d, yyyy')}
+                              </TableCell>
+                              <TableCell>
+                                {shipment.estimated_delivery 
+                                  ? format(new Date(shipment.estimated_delivery), 'MMM d, yyyy')
+                                  : "Not specified"}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end space-x-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => navigate(`/shipment/${shipment.id}`)}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditingShipment(shipment);
+                                      setNewStatus(shipment.status);
+                                    }}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+                <CardFooter className="flex justify-between py-4">
+                  <p className="text-sm text-gray-500">
+                    Showing {filteredShipments.length} out of {shipments.length} shipments
+                  </p>
+                </CardFooter>
+              </Card>
+            </TabsContent>
+            
+            {/* Users Tab */}
+            <TabsContent value="users">
+              <UserManagement />
+            </TabsContent>
+          </Tabs>
           
           {/* Edit Status Modal */}
           {editingShipment && (
