@@ -21,7 +21,10 @@ import {
   Package,
   Phone,
   Search,
-  MapPin
+  MapPin,
+  Truck,
+  LogIn,
+  UserPlus
 } from "lucide-react";
 import { Button } from "@/components/ui/button"
 import NotificationsPanel from '@/components/NotificationsPanel';
@@ -57,6 +60,10 @@ const Navbar = () => {
 
             {isMenuOpen && (
               <div className="absolute top-full right-0 bg-white shadow-md rounded-md p-4 w-48 z-50">
+                <Link to="/book-shipment" className="flex items-center py-2 hover:bg-gray-100 rounded-md">
+                  <Truck className="mr-2 h-4 w-4" />
+                  Book Shipment
+                </Link>
                 {user ? (
                   <>
                     <Link to="/dashboard" className="flex items-center py-2 hover:bg-gray-100 rounded-md">
@@ -81,8 +88,12 @@ const Navbar = () => {
                 ) : (
                   <>
                     <Link to="/auth" className="flex items-center py-2 hover:bg-gray-100 rounded-md">
-                      <User className="mr-2 h-4 w-4" />
-                      Login/Register
+                      <LogIn className="mr-2 h-4 w-4" />
+                      Sign In
+                    </Link>
+                    <Link to="/auth" state={{ signup: true }} className="flex items-center py-2 hover:bg-gray-100 rounded-md">
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Register
                     </Link>
                   </>
                 )}
@@ -92,6 +103,10 @@ const Navbar = () => {
         ) : (
           // Desktop Menu
           <div className="flex items-center space-x-6">
+            <Link to="/book-shipment" className="flex items-center hover:text-gray-600">
+              <Truck className="mr-1 h-4 w-4" />
+              Book Shipment
+            </Link>
             <Link to="/services" className="flex items-center hover:text-gray-600">
               <Package className="mr-1 h-4 w-4" />
               Services
@@ -155,10 +170,16 @@ const Navbar = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Link to="/auth" className="flex items-center bg-zim-green text-white px-4 py-2 rounded-md hover:bg-zim-green/90">
-                <User className="mr-2 h-4 w-4" />
-                Login/Register
-              </Link>
+              <div className="flex items-center space-x-2">
+                <Link to="/auth" className="flex items-center text-zim-green hover:text-zim-green/90">
+                  <LogIn className="mr-1 h-4 w-4" />
+                  Sign In
+                </Link>
+                <Link to="/auth" state={{ signup: true }} className="flex items-center bg-zim-green text-white px-4 py-2 rounded-md hover:bg-zim-green/90">
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Register
+                </Link>
+              </div>
             )}
           </div>
         )}
