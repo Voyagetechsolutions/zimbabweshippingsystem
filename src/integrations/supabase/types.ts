@@ -47,6 +47,7 @@ export type Database = {
           dimensions: string | null
           estimated_delivery: string | null
           id: string
+          metadata: Json | null
           origin: string
           status: string
           tracking_number: string
@@ -61,6 +62,7 @@ export type Database = {
           dimensions?: string | null
           estimated_delivery?: string | null
           id?: string
+          metadata?: Json | null
           origin: string
           status: string
           tracking_number: string
@@ -75,6 +77,7 @@ export type Database = {
           dimensions?: string | null
           estimated_delivery?: string | null
           id?: string
+          metadata?: Json | null
           origin?: string
           status?: string
           tracking_number?: string

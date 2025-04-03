@@ -200,6 +200,7 @@ const BookingForm = () => {
         description: error.message || "An error occurred while processing your booking.",
         variant: "destructive",
       });
+      console.error("Booking error:", error);
     } finally {
       setIsSubmitting(false);
     }
