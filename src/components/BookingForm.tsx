@@ -539,7 +539,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 Processing...
               </span>
             ) : (
-              "Complete Booking"
+              "Proceed to Payment"
             )}
           </Button>
           
