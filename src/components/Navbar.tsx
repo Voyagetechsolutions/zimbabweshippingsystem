@@ -20,7 +20,7 @@ import {
   Bell
 } from "lucide-react";
 import { Button } from "@/components/ui/button"
-import logo from '@/assets/zim-logo.svg';
+import Logo from '@/components/Logo';
 import NotificationsPanel from '@/components/NotificationsPanel';
 
 const Navbar = () => {
@@ -38,8 +38,7 @@ const Navbar = () => {
     <nav className="bg-white shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         <Link to="/" className="flex items-center">
-          <img src={logo} alt="ZIM Integrated Shipping Services Ltd." className="h-8 mr-2" />
-          <span className="font-bold text-xl">ZIM Clone</span>
+          <Logo className="h-8" />
         </Link>
 
         {isMobile ? (
