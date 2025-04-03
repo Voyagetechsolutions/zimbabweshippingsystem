@@ -23,12 +23,21 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Package, Truck, Users, Search, 
-  RefreshCcw, Filter, Eye, Edit, User
+  RefreshCcw, Filter, Eye, Edit, User,
+  Settings, Activity, ShieldCheck, LifeBuoy,
+  FileText, BarChart3, Layers
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { SetupAdmin } from '@/components/SetupAdmin';
 import UserManagement from '@/components/admin/UserManagement';
+import AnalyticsReports from '@/components/admin/AnalyticsReports';
+import SettingsManagement from '@/components/admin/SettingsManagement';
+import RoleManagement from '@/components/admin/RoleManagement';
+import BulkOperations from '@/components/admin/BulkOperations';
+import AuditLogs from '@/components/admin/AuditLogs';
+import SupportTickets from '@/components/admin/SupportTickets';
+import ContentManagement from '@/components/admin/ContentManagement';
 
 // Status options for updating shipments
 const STATUS_OPTIONS = [
@@ -268,18 +277,38 @@ const AdminDashboard = () => {
             onValueChange={setActiveTab}
             className="mb-8"
           >
-            <TabsList className="grid grid-cols-3 w-[400px]">
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-2">
               <TabsTrigger value="overview" className="flex items-center gap-2">
-                <Package className="h-4 w-4" />
-                <span>Overview</span>
+                <Activity className="h-4 w-4" />
+                <span className="hidden sm:inline">Overview</span>
               </TabsTrigger>
               <TabsTrigger value="shipments" className="flex items-center gap-2">
-                <Truck className="h-4 w-4" />
-                <span>Shipments</span>
+                <Package className="h-4 w-4" />
+                <span className="hidden sm:inline">Shipments</span>
               </TabsTrigger>
               <TabsTrigger value="users" className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                <span>Users</span>
+                <User className="h-4 w-4" />
+                <span className="hidden sm:inline">Users</span>
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden sm:inline">Analytics</span>
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                <span className="hidden sm:inline">Settings</span>
+              </TabsTrigger>
+              <TabsTrigger value="roles" className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4" />
+                <span className="hidden sm:inline">Roles</span>
+              </TabsTrigger>
+              <TabsTrigger value="bulk" className="flex items-center gap-2">
+                <Layers className="h-4 w-4" />
+                <span className="hidden sm:inline">Bulk</span>
+              </TabsTrigger>
+              <TabsTrigger value="more" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                <span className="hidden sm:inline">More</span>
               </TabsTrigger>
             </TabsList>
             
@@ -530,6 +559,58 @@ const AdminDashboard = () => {
             {/* Users Tab */}
             <TabsContent value="users">
               <UserManagement />
+            </TabsContent>
+
+            {/* Analytics Tab */}
+            <TabsContent value="analytics">
+              <AnalyticsReports />
+            </TabsContent>
+
+            {/* Settings Tab */}
+            <TabsContent value="settings">
+              <SettingsManagement />
+            </TabsContent>
+
+            {/* Roles Tab */}
+            <TabsContent value="roles">
+              <RoleManagement />
+            </TabsContent>
+
+            {/* Bulk Operations Tab */}
+            <TabsContent value="bulk">
+              <BulkOperations />
+            </TabsContent>
+
+            {/* More Tab - with nested tabs */}
+            <TabsContent value="more">
+              <Tabs defaultValue="audit">
+                <TabsList className="mb-6">
+                  <TabsTrigger value="audit" className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    <span>Audit Logs</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="support" className="flex items-center gap-2">
+                    <LifeBuoy className="h-4 w-4" />
+                    <span>Support Tickets</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="content" className="flex items-center gap-2">
+                    <Layers className="h-4 w-4" />
+                    <span>Content</span>
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="audit">
+                  <AuditLogs />
+                </TabsContent>
+                
+                <TabsContent value="support">
+                  <SupportTickets />
+                </TabsContent>
+                
+                <TabsContent value="content">
+                  <ContentManagement />
+                </TabsContent>
+              </Tabs>
             </TabsContent>
           </Tabs>
           
