@@ -79,7 +79,7 @@ const Dashboard = () => {
         }
 
         if (data) {
-          setShipments(data as Shipment[]);
+          setShipments(data as unknown as Shipment[]);
         }
       } catch (error: any) {
         toast({
@@ -110,7 +110,9 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar>
-        <NotificationsPanel />
+        <div>
+          <NotificationsPanel />
+        </div>
       </Navbar>
       <main className="flex-grow container mx-auto px-4 py-8">
         <div className="grid gap-6">

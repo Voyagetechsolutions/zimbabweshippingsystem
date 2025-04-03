@@ -43,7 +43,7 @@ const CommunicationPreferences: React.FC<CommunicationPreferencesProps> = ({ onU
         if (error) throw error;
 
         if (data && data.communication_preferences) {
-          setPreferences(data.communication_preferences as Preferences);
+          setPreferences(data.communication_preferences as unknown as Preferences);
         }
       } catch (error: any) {
         console.error('Error fetching communication preferences:', error.message);

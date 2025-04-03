@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,6 +13,7 @@ import { ArrowLeft, Package, MapPin, Scale, Calendar, Truck, Clock, Package2 } f
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import WhatsAppButton from '@/components/WhatsAppButton';
+import ShipmentActions from '@/components/ShipmentActions';
 
 interface Shipment {
   id: string;
@@ -25,6 +27,8 @@ interface Shipment {
   estimated_delivery: string | null;
   created_at: string;
   updated_at: string;
+  can_modify: boolean | null;
+  can_cancel: boolean | null;
 }
 
 const getStatusColor = (status: string): string => {
