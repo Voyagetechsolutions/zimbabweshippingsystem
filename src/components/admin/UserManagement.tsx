@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -59,15 +60,13 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
-interface User {
+interface Profile {
   id: string;
   email: string;
+  full_name: string | null;
+  is_admin: boolean;
+  avatar_url?: string | null;
   created_at: string;
-  profile?: {
-    full_name: string;
-    is_admin: boolean;
-    avatar_url?: string;
-  };
 }
 
 const userFormSchema = z.object({
@@ -79,11 +78,11 @@ const userFormSchema = z.object({
 type UserFormValues = z.infer<typeof userFormSchema>;
 
 const UserManagement = () => {
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editingUser, setEditingUser] = useState<Profile | null>(null);
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const { toast } = useToast();
 
@@ -104,8 +103,8 @@ const UserManagement = () => {
     if (editingUser) {
       form.reset({
         email: editingUser.email || '',
-        full_name: editingUser.profile?.full_name || '',
-        is_admin: editingUser.profile?.is_admin || false,
+        full_name: editingUser.full_name || '',
+        is_admin: editingUser.is_admin || false,
       });
     } else if (isCreatingUser) {
       form.reset({
@@ -119,32 +118,15 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
-      
-      if (authError) throw authError;
-      
-      if (authUsers?.users) {
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('*');
+      // Fetch users from the profiles table instead of auth.admin.listUsers
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*');
           
-        if (profilesError) throw profilesError;
+      if (profilesError) throw profilesError;
 
-        const usersWithProfiles = authUsers.users.map(user => {
-          const profile = profiles?.find(p => p.id === user.id);
-          return {
-            id: user.id,
-            email: user.email,
-            created_at: user.created_at,
-            profile: profile ? {
-              full_name: profile.full_name,
-              is_admin: profile.is_admin,
-              avatar_url: profile.avatar_url,
-            } : undefined
-          };
-        });
-
-        setUsers(usersWithProfiles);
+      if (profiles) {
+        setUsers(profiles as Profile[]);
       }
     } catch (error: any) {
       console.error('Error fetching users:', error);
@@ -164,7 +146,7 @@ const UserManagement = () => {
     setIsDialogOpen(true);
   };
 
-  const openEditUserDialog = (user: User) => {
+  const openEditUserDialog = (user: Profile) => {
     setEditingUser(user);
     setIsCreatingUser(false);
     setIsDialogOpen(true);
@@ -229,7 +211,7 @@ const UserManagement = () => {
 
       if (profileError) throw profileError;
 
-      const currentAdminStatus = editingUser.profile?.is_admin || false;
+      const currentAdminStatus = editingUser.is_admin || false;
       
       if (values.is_admin !== currentAdminStatus) {
         if (values.is_admin) {
@@ -266,8 +248,8 @@ const UserManagement = () => {
   };
 
   const filteredUsers = users.filter(user => 
-    user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.profile?.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
+    user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    user.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -335,17 +317,17 @@ const UserManagement = () => {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-700">
-                            {user.profile?.full_name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
+                            {user.full_name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
                           </div>
                           <div>
-                            <p className="font-medium">{user.profile?.full_name || "Unnamed User"}</p>
+                            <p className="font-medium">{user.full_name || "Unnamed User"}</p>
                             <p className="text-xs text-gray-500">ID: {user.id.substring(0, 8)}</p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>
-                        {user.profile?.is_admin ? (
+                        {user.is_admin ? (
                           <Badge className="bg-red-100 text-red-800 border-red-300">
                             <ShieldCheck className="mr-1 h-3 w-3" />
                             Admin
@@ -398,7 +380,7 @@ const UserManagement = () => {
             <DialogDescription>
               {isCreatingUser 
                 ? 'Add a new user to the system.' 
-                : `Update ${editingUser?.profile?.full_name || editingUser?.email}'s details.`}
+                : `Update ${editingUser?.full_name || editingUser?.email}'s details.`}
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
