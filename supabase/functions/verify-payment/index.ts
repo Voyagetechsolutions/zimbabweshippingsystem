@@ -65,6 +65,7 @@ serve(async (req) => {
     
     // Verify Stripe payment
     if (session_id) {
+      console.log("Verifying Stripe payment:", session_id);
       const session = await stripe.checkout.sessions.retrieve(session_id);
       
       if (session.payment_status !== 'paid') {
@@ -79,6 +80,8 @@ serve(async (req) => {
         transaction_id: session.payment_intent as string,
         status: 'completed'
       };
+      
+      console.log("Stripe payment verified:", paymentInfo);
     }
     // Verify PayPal payment (simplified, would need more robust validation in production)
     else if (payment_intent) {
@@ -106,6 +109,8 @@ serve(async (req) => {
     
     if (shipmentError) throw shipmentError;
     
+    console.log("Retrieved shipment data:", shipmentData.id);
+    
     // Create payment record
     const { data: paymentData, error: paymentError } = await supabaseClient
       .from('payments')
@@ -121,7 +126,12 @@ serve(async (req) => {
       .select('id')
       .single();
     
-    if (paymentError) throw paymentError;
+    if (paymentError) {
+      console.error("Error creating payment record:", paymentError);
+      throw paymentError;
+    }
+    
+    console.log("Created payment record:", paymentData.id);
     
     // Extract sender and recipient details from shipment metadata
     const metadata = shipmentData.metadata || {};
@@ -161,7 +171,12 @@ serve(async (req) => {
       .select('id')
       .single();
     
-    if (receiptError) throw receiptError;
+    if (receiptError) {
+      console.error("Error creating receipt record:", receiptError);
+      throw receiptError;
+    }
+    
+    console.log("Created receipt record:", receiptData.id);
 
     // Update shipment status to paid
     const { error: updateError } = await supabaseClient
@@ -169,7 +184,12 @@ serve(async (req) => {
       .update({ status: 'Paid' })
       .eq('id', paymentInfo.shipment_id);
     
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.error("Error updating shipment status:", updateError);
+      throw updateError;
+    }
+    
+    console.log("Updated shipment status to Paid");
 
     return new Response(
       JSON.stringify({

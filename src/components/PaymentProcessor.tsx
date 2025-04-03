@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,7 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CreditCard, AlertCircle } from 'lucide-react';
+import { Loader2, CreditCard, AlertCircle, Bug } from 'lucide-react';
 
 interface PaymentProcessorProps {
   bookingData: any;
@@ -38,10 +37,9 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
     setError(null);
     
     try {
-      // Get session from the Stripe edge function
       const { data: sessionData, error: sessionError } = await supabase.functions.invoke('create-payment', {
         body: {
-          amount: totalAmount * 100, // Convert to cents for Stripe
+          amount: totalAmount * 100,
           bookingData,
           paymentMethod: 'stripe'
         }
@@ -49,7 +47,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       
       if (sessionError) throw new Error(sessionError.message);
       
-      // Redirect to the Stripe Checkout page
       window.location.href = sessionData.url;
       
     } catch (err: any) {
@@ -69,7 +66,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
     setError(null);
     
     try {
-      // Get session from the PayPal edge function
       const { data: sessionData, error: sessionError } = await supabase.functions.invoke('create-paypal-payment', {
         body: {
           amount: totalAmount,
@@ -80,7 +76,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       
       if (sessionError) throw new Error(sessionError.message);
       
-      // Redirect to PayPal
       window.location.href = sessionData.url;
       
     } catch (err: any) {
@@ -100,7 +95,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
     setError(null);
     
     try {
-      // Handle manual/offline payment
       const { data: paymentData, error: paymentError } = await supabase.from('payments').insert({
         amount: totalAmount,
         payment_method: 'offline',
@@ -112,10 +106,8 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       
       if (paymentError) throw paymentError;
       
-      // Generate receipt
       const receiptNumber = `RCT-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
       
-      // Use tableFrom helper to cast the table name to a known type
       const { data: receiptData, error: receiptError } = await supabase.from(tableFrom('receipts')).insert({
         payment_id: paymentData.id,
         shipment_id: bookingData.shipment_id,
@@ -131,7 +123,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       
       if (receiptError) throw receiptError;
       
-      // Call the onPaymentComplete callback with payment and receipt IDs
       onPaymentComplete(paymentData.id, receiptData.id);
       
     } catch (err: any) {
@@ -142,6 +133,59 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         variant: "destructive",
         title: "Payment Error",
         description: err.message || 'An error occurred during payment processing',
+      });
+    }
+  };
+
+  const handleDebugPayment = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const { data: paymentData, error: paymentError } = await supabase.from('payments').insert({
+        amount: totalAmount,
+        payment_method: 'test',
+        payment_status: 'completed',
+        shipment_id: bookingData.shipment_id,
+        user_id: bookingData.user_id || null,
+        currency: 'GBP',
+        transaction_id: `test-${Date.now()}`
+      }).select('id').single();
+      
+      if (paymentError) throw paymentError;
+      
+      const receiptNumber = `TEST-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      
+      const { data: receiptData, error: receiptError } = await supabase.from(tableFrom('receipts')).insert({
+        payment_id: paymentData.id,
+        shipment_id: bookingData.shipment_id,
+        receipt_number: receiptNumber,
+        payment_method: 'test',
+        amount: totalAmount,
+        currency: 'GBP',
+        sender_details: bookingData.senderDetails,
+        recipient_details: bookingData.recipientDetails,
+        shipment_details: bookingData.shipmentDetails,
+        status: 'issued'
+      }).select('id').single();
+      
+      if (receiptError) throw receiptError;
+      
+      await supabase
+        .from('shipments')
+        .update({ status: 'Paid' })
+        .eq('id', bookingData.shipment_id);
+      
+      onPaymentComplete(paymentData.id, receiptData.id);
+      
+    } catch (err: any) {
+      console.error('Debug payment error:', err);
+      setError('Failed to process test payment. Please try again.');
+      setLoading(false);
+      toast({
+        variant: "destructive",
+        title: "Test Payment Error",
+        description: err.message || 'An error occurred during test payment processing',
       });
     }
   };
@@ -208,6 +252,21 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
               <div>
                 <p className="font-medium">Pay Later</p>
                 <p className="text-sm text-gray-500">You'll receive a payment invoice</p>
+              </div>
+            </div>
+            <div className="text-lg font-semibold">£{totalAmount.toFixed(2)}</div>
+          </button>
+          
+          <button 
+            onClick={handleDebugPayment}
+            disabled={loading}
+            className="w-full flex items-center justify-between p-4 border border-amber-200 bg-amber-50 rounded-md hover:bg-amber-100 transition-colors"
+          >
+            <div className="flex items-center">
+              <Bug className="h-5 w-5 mr-3 text-amber-600" />
+              <div>
+                <p className="font-medium">Test Payment (Skip Payment Flow)</p>
+                <p className="text-sm text-amber-700">For testing receipt page only</p>
               </div>
             </div>
             <div className="text-lg font-semibold">£{totalAmount.toFixed(2)}</div>
