@@ -1,7 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { AuditLog, castTo } from '@/types/admin';
 import {
   Card,
   CardContent,
@@ -51,19 +51,6 @@ import {
 } from "lucide-react";
 import { format } from 'date-fns';
 
-interface AuditLog {
-  id: string;
-  user_id: string;
-  action: string;
-  entity_type: string;
-  entity_id: string | null;
-  details: any | null;
-  ip_address: string | null;
-  created_at: string;
-  user_email?: string;
-  user_name?: string;
-}
-
 const AuditLogs = () => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,18 +66,16 @@ const AuditLogs = () => {
   const fetchAuditLogs = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('audit_logs')
+      const { data, error } = await (supabase
+        .from('audit_logs' as any)
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }) as any);
 
       if (error) throw error;
       
       if (data) {
-        // Get user information for each log
         const logsWithUsers = await Promise.all(
-          data.map(async (log) => {
-            // Fetch user profile information
+          data.map(async (log: any) => {
             const { data: profileData } = await supabase
               .from('profiles')
               .select('email, full_name')
@@ -105,7 +90,7 @@ const AuditLogs = () => {
           })
         );
         
-        setLogs(logsWithUsers as AuditLog[]);
+        setLogs(castTo<AuditLog[]>(logsWithUsers));
       }
     } catch (error: any) {
       console.error('Error fetching audit logs:', error);
@@ -119,7 +104,6 @@ const AuditLogs = () => {
     }
   };
 
-  // Get unique actions and entities for filters
   const getUniqueActions = () => {
     const actions = new Set(logs.map(log => log.action));
     return Array.from(actions);
@@ -130,7 +114,6 @@ const AuditLogs = () => {
     return Array.from(entities);
   };
 
-  // Get icon for action type
   const getActionIcon = (action: string) => {
     switch (action.toLowerCase()) {
       case 'create':
@@ -152,7 +135,6 @@ const AuditLogs = () => {
     }
   };
 
-  // Get color for action type
   const getActionColor = (action: string) => {
     switch (action.toLowerCase()) {
       case 'create':
@@ -174,7 +156,6 @@ const AuditLogs = () => {
     }
   };
 
-  // Format JSON for display
   const formatJSON = (json: any) => {
     if (!json) return 'No details';
     if (typeof json === 'string') {
@@ -187,7 +168,6 @@ const AuditLogs = () => {
     return JSON.stringify(json, null, 2);
   };
 
-  // Filter logs
   const filteredLogs = logs.filter(log => {
     const matchesSearch = 
       searchQuery === '' ||

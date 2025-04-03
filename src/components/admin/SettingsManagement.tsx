@@ -1,117 +1,120 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { SystemSetting, castTo } from '@/types/admin';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Mail, Bell, DollarSign, AlertTriangle, RefreshCcw } from "lucide-react";
+import {
+  Settings,
+  Search,
+  RefreshCcw,
+  Edit,
+  Trash2,
+  Plus,
+} from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
-interface SystemSetting {
-  id: string;
+interface EditingFormValues {
   key: string;
-  value: any;
-  created_at: string;
-  updated_at: string;
+  value: string;
 }
 
-const emailTemplateSchema = z.object({
-  welcome: z.string().min(1, "Welcome email template is required"),
-  password_reset: z.string().min(1, "Password reset email template is required"),
+const formSchema = z.object({
+  key: z
+    .string()
+    .min(2, "Key must be at least 2 characters")
+    .regex(/^[a-z0-9_]+$/, "Key must contain only lowercase letters, numbers, and underscores"),
+  value: z.string().min(1, "Value is required"),
 });
 
-const shippingRatesSchema = z.object({
-  standard: z.coerce.number().positive("Standard rate must be positive"),
-  express: z.coerce.number().positive("Express rate must be positive"),
-  overnight: z.coerce.number().positive("Overnight rate must be positive"),
-});
-
-const notificationsSchema = z.object({
-  maintenance: z.boolean(),
-  maintenance_message: z.string().optional(),
-});
-
+// SettingsManagement component
 const SettingsManagement = () => {
   const [settings, setSettings] = useState<SystemSetting[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('email');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
+  const [editingSetting, setEditingSetting] = useState<SystemSetting | null>(null);
+  const [isCreatingSetting, setIsCreatingSetting] = useState<boolean>(false);
   const { toast } = useToast();
-
-  const emailForm = useForm<z.infer<typeof emailTemplateSchema>>({
-    resolver: zodResolver(emailTemplateSchema),
+  
+  const form = useForm<EditingFormValues>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
-      welcome: '',
-      password_reset: '',
-    },
-  });
-
-  const shippingForm = useForm<z.infer<typeof shippingRatesSchema>>({
-    resolver: zodResolver(shippingRatesSchema),
-    defaultValues: {
-      standard: 5.99,
-      express: 15.99,
-      overnight: 29.99,
-    },
-  });
-
-  const notificationsForm = useForm<z.infer<typeof notificationsSchema>>({
-    resolver: zodResolver(notificationsSchema),
-    defaultValues: {
-      maintenance: false,
-      maintenance_message: '',
+      key: '',
+      value: '',
     },
   });
 
   useEffect(() => {
     fetchSettings();
   }, []);
-
+  
   useEffect(() => {
-    if (settings.length > 0) {
-      populateFormsWithSettings();
+    if (editingSetting) {
+      form.reset({
+        key: editingSetting.key,
+        value: JSON.stringify(editingSetting.value, null, 2)
+      });
+    } else if (isCreatingSetting) {
+      form.reset({
+        key: '',
+        value: '{}'
+      });
     }
-  }, [settings]);
+  }, [editingSetting, isCreatingSetting, form]);
 
   const fetchSettings = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('system_settings')
-        .select('*');
+      const { data, error } = await (supabase
+        .from('system_settings' as any)
+        .select('*')
+        .order('key', { ascending: true }) as any);
 
       if (error) throw error;
       
       if (data) {
-        console.log("Fetched settings:", data);
-        setSettings(data as SystemSetting[]);
+        setSettings(castTo<SystemSetting[]>(data));
       }
     } catch (error: any) {
       console.error('Error fetching settings:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load system settings',
+        description: 'Failed to load settings',
         variant: 'destructive',
       });
     } finally {
@@ -119,148 +122,143 @@ const SettingsManagement = () => {
     }
   };
 
-  const populateFormsWithSettings = () => {
-    // Find email templates
-    const emailTemplates = settings.find(s => s.key === 'email_templates');
-    if (emailTemplates && emailTemplates.value) {
-      emailForm.reset(emailTemplates.value);
-    }
-
-    // Find shipping rates
-    const shippingRates = settings.find(s => s.key === 'shipping_rates');
-    if (shippingRates && shippingRates.value) {
-      shippingForm.reset(shippingRates.value);
-    }
-
-    // Find system notifications
-    const systemNotifications = settings.find(s => s.key === 'system_notifications');
-    if (systemNotifications && systemNotifications.value) {
-      notificationsForm.reset(systemNotifications.value);
-    }
+  const closeDialog = () => {
+    setIsDialogOpen(false);
+    setEditingSetting(null);
+    setIsCreatingSetting(false);
+    form.reset();
   };
 
-  const saveEmailSettings = async (data: z.infer<typeof emailTemplateSchema>) => {
+  const openEditDialog = (setting: SystemSetting) => {
+    setEditingSetting(setting);
+    setIsCreatingSetting(false);
+    setIsDialogOpen(true);
+  };
+
+  const openCreateDialog = () => {
+    setIsCreatingSetting(true);
+    setEditingSetting(null);
+    setIsDialogOpen(true);
+  };
+
+  const handleSaveSetting = async (values: EditingFormValues) => {
+    let parsedValue: any;
+    
     try {
-      const emailTemplates = settings.find(s => s.key === 'email_templates');
-      
-      if (emailTemplates) {
-        const { error } = await supabase
-          .from('system_settings')
-          .update({ 
-            value: data,
+      parsedValue = JSON.parse(values.value);
+    } catch (error) {
+      form.setError('value', {
+        type: 'manual',
+        message: 'Invalid JSON format'
+      });
+      return;
+    }
+    
+    try {
+      if (isCreatingSetting) {
+        // Check if key already exists
+        const { data } = await (supabase
+          .from('system_settings' as any)
+          .select('id')
+          .eq('key', values.key) as any);
+          
+        if (data && data.length > 0) {
+          form.setError('key', {
+            type: 'manual',
+            message: 'This key already exists'
+          });
+          return;
+        }
+        
+        const { error } = await (supabase
+          .from('system_settings' as any)
+          .insert({
+            key: values.key,
+            value: parsedValue,
+          }) as any);
+          
+        if (error) throw error;
+        
+        toast({
+          title: 'Setting Created',
+          description: 'The setting has been added successfully',
+        });
+      } else if (editingSetting) {
+        const { error } = await (supabase
+          .from('system_settings' as any)
+          .update({
+            value: parsedValue,
             updated_at: new Date().toISOString()
           })
-          .eq('key', 'email_templates');
+          .eq('id', editingSetting.id) as any);
           
         if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('system_settings')
-          .insert({
-            key: 'email_templates',
-            value: data
-          });
-          
-        if (error) throw error;
+        
+        toast({
+          title: 'Setting Updated',
+          description: 'The setting has been updated successfully',
+        });
       }
       
-      toast({
-        title: 'Settings Saved',
-        description: 'Email templates have been updated successfully',
-      });
-      
-      fetchSettings(); // Refresh settings
+      closeDialog();
+      fetchSettings();
     } catch (error: any) {
-      console.error('Error saving email templates:', error);
+      console.error('Error saving setting:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save email templates',
+        description: error.message || 'Failed to save setting',
         variant: 'destructive',
       });
     }
   };
 
-  const saveShippingSettings = async (data: z.infer<typeof shippingRatesSchema>) => {
+  const handleDeleteSetting = async (setting: SystemSetting) => {
+    // Prevent deletion of core settings
+    const protectedSettings = ['email_templates', 'shipping_rates', 'system_notifications'];
+    if (protectedSettings.includes(setting.key)) {
+      toast({
+        title: 'Cannot Delete',
+        description: 'This is a core system setting and cannot be deleted',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     try {
-      const shippingRates = settings.find(s => s.key === 'shipping_rates');
-      
-      if (shippingRates) {
-        const { error } = await supabase
-          .from('system_settings')
-          .update({ 
-            value: data,
-            updated_at: new Date().toISOString()
-          })
-          .eq('key', 'shipping_rates');
-          
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('system_settings')
-          .insert({
-            key: 'shipping_rates',
-            value: data
-          });
-          
-        if (error) throw error;
-      }
+      const { error } = await (supabase
+        .from('system_settings' as any)
+        .delete()
+        .eq('id', setting.id) as any);
+        
+      if (error) throw error;
       
       toast({
-        title: 'Settings Saved',
-        description: 'Shipping rates have been updated successfully',
+        title: 'Setting Deleted',
+        description: 'The setting has been deleted successfully',
       });
       
-      fetchSettings(); // Refresh settings
+      fetchSettings();
     } catch (error: any) {
-      console.error('Error saving shipping rates:', error);
+      console.error('Error deleting setting:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save shipping rates',
+        description: error.message || 'Failed to delete setting',
         variant: 'destructive',
       });
     }
   };
 
-  const saveNotificationSettings = async (data: z.infer<typeof notificationsSchema>) => {
+  const formatValue = (value: any): string => {
     try {
-      const systemNotifications = settings.find(s => s.key === 'system_notifications');
-      
-      if (systemNotifications) {
-        const { error } = await supabase
-          .from('system_settings')
-          .update({ 
-            value: data,
-            updated_at: new Date().toISOString()
-          })
-          .eq('key', 'system_notifications');
-          
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('system_settings')
-          .insert({
-            key: 'system_notifications',
-            value: data
-          });
-          
-        if (error) throw error;
-      }
-      
-      toast({
-        title: 'Settings Saved',
-        description: 'System notifications have been updated successfully',
-      });
-      
-      fetchSettings(); // Refresh settings
-    } catch (error: any) {
-      console.error('Error saving system notifications:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to save system notifications',
-        variant: 'destructive',
-      });
+      return JSON.stringify(value, null, 2);
+    } catch (e) {
+      return typeof value === 'string' ? value : 'Invalid format';
     }
   };
+
+  const filteredSettings = settings.filter(setting => 
+    setting.key.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div>
@@ -269,247 +267,166 @@ const SettingsManagement = () => {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-xl">System Settings</CardTitle>
-              <CardDescription>Configure application settings</CardDescription>
+              <CardDescription>Manage application configuration</CardDescription>
             </div>
             <Button 
-              variant="outline" 
-              onClick={fetchSettings} 
-              disabled={loading}
+              onClick={openCreateDialog}
+              className="bg-zim-green hover:bg-zim-green/90"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Setting
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center mb-4 gap-4">
+            <div className="relative flex-grow">
+              <Input
+                placeholder="Search settings..."
+                className="pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+            </div>
+            <Button 
+              variant="outline"
+              onClick={fetchSettings}
+              className="h-10 px-4"
             >
               <RefreshCcw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
           </div>
-        </CardHeader>
-        <CardContent>
+
           {loading ? (
             <div className="flex justify-center items-center p-12">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
             </div>
+          ) : filteredSettings.length === 0 ? (
+            <div className="text-center p-12">
+              <Settings className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium mb-2">No settings found</h3>
+              <p className="text-gray-500">
+                {searchQuery ? "Try adjusting your search" : "There are no settings in the system yet"}
+              </p>
+            </div>
           ) : (
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="mb-6">
-                <TabsTrigger value="email" className="flex items-center gap-2">
-                  <Mail className="h-4 w-4" />
-                  <span>Email Templates</span>
-                </TabsTrigger>
-                <TabsTrigger value="shipping" className="flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />
-                  <span>Shipping Rates</span>
-                </TabsTrigger>
-                <TabsTrigger value="notifications" className="flex items-center gap-2">
-                  <Bell className="h-4 w-4" />
-                  <span>System Notifications</span>
-                </TabsTrigger>
-              </TabsList>
-              
-              {/* Email Templates Tab */}
-              <TabsContent value="email">
-                <Form {...emailForm}>
-                  <form onSubmit={emailForm.handleSubmit(saveEmailSettings)} className="space-y-6">
-                    <FormField
-                      control={emailForm.control}
-                      name="welcome"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Welcome Email Template</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="Enter the welcome email template"
-                              className="min-h-[150px]"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            This template is used when new users sign up.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={emailForm.control}
-                      name="password_reset"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Password Reset Template</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="Enter the password reset email template"
-                              className="min-h-[150px]"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            This template is used when users request a password reset.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <Button 
-                      type="submit" 
-                      className="bg-zim-green hover:bg-zim-green/90"
-                      disabled={emailForm.formState.isSubmitting}
-                    >
-                      Save Email Templates
-                    </Button>
-                  </form>
-                </Form>
-              </TabsContent>
-              
-              {/* Shipping Rates Tab */}
-              <TabsContent value="shipping">
-                <Form {...shippingForm}>
-                  <form onSubmit={shippingForm.handleSubmit(saveShippingSettings)} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <FormField
-                        control={shippingForm.control}
-                        name="standard"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Standard Shipping Rate ($)</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="5.99"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormDescription>
-                              Base rate for standard shipping.
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={shippingForm.control}
-                        name="express"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Express Shipping Rate ($)</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="15.99"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormDescription>
-                              Base rate for express shipping.
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={shippingForm.control}
-                        name="overnight"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Overnight Shipping Rate ($)</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="29.99"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormDescription>
-                              Base rate for overnight shipping.
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    
-                    <Button 
-                      type="submit" 
-                      className="bg-zim-green hover:bg-zim-green/90"
-                      disabled={shippingForm.formState.isSubmitting}
-                    >
-                      Save Shipping Rates
-                    </Button>
-                  </form>
-                </Form>
-              </TabsContent>
-              
-              {/* System Notifications Tab */}
-              <TabsContent value="notifications">
-                <Form {...notificationsForm}>
-                  <form onSubmit={notificationsForm.handleSubmit(saveNotificationSettings)} className="space-y-6">
-                    <FormField
-                      control={notificationsForm.control}
-                      name="maintenance"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                          <div className="space-y-0.5">
-                            <FormLabel className="text-base">
-                              <div className="flex items-center">
-                                <AlertTriangle className="mr-2 h-4 w-4 text-yellow-500" />
-                                Maintenance Mode
-                              </div>
-                            </FormLabel>
-                            <FormDescription>
-                              Enable maintenance mode to notify users about system maintenance.
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    
-                    {notificationsForm.watch("maintenance") && (
-                      <FormField
-                        control={notificationsForm.control}
-                        name="maintenance_message"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Maintenance Message</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                placeholder="Enter maintenance message to display to users"
-                                className="min-h-[100px]"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormDescription>
-                              This message will be displayed to users during maintenance mode.
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
-                    
-                    <Button 
-                      type="submit" 
-                      className="bg-zim-green hover:bg-zim-green/90"
-                      disabled={notificationsForm.formState.isSubmitting}
-                    >
-                      Save Notification Settings
-                    </Button>
-                  </form>
-                </Form>
-              </TabsContent>
-            </Tabs>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Key</TableHead>
+                    <TableHead>Value</TableHead>
+                    <TableHead>Last Modified</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredSettings.map((setting) => (
+                    <TableRow key={setting.id}>
+                      <TableCell className="font-medium">
+                        {setting.key}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs max-w-sm truncate">
+                        {formatValue(setting.value).length > 100 
+                          ? formatValue(setting.value).substring(0, 100) + '...' 
+                          : formatValue(setting.value)}
+                      </TableCell>
+                      <TableCell>
+                        {new Date(setting.updated_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditDialog(setting)}
+                          >
+                            <Edit className="h-4 w-4" />
+                            <span className="sr-only">Edit</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteSetting(setting)}
+                            disabled={['email_templates', 'shipping_rates', 'system_notifications'].includes(setting.key)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Delete</span>
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle>
+              {isCreatingSetting ? 'Add New Setting' : 'Edit Setting'}
+            </DialogTitle>
+            <DialogDescription>
+              {isCreatingSetting 
+                ? 'Create a new application setting.' 
+                : `Update the value for "${editingSetting?.key}".`}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSaveSetting)} className="space-y-6">
+              {isCreatingSetting && (
+                <FormField
+                  control={form.control}
+                  name="key"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Setting Key</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          placeholder="e.g. notification_settings"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+              <FormField
+                control={form.control}
+                name="value"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Value (JSON format)</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        {...field}
+                        rows={10} 
+                        className="font-mono text-sm"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button variant="outline" type="button" onClick={closeDialog}>
+                  Cancel
+                </Button>
+                <Button className="bg-zim-green hover:bg-zim-green/90" type="submit">
+                  {isCreatingSetting ? 'Create Setting' : 'Save Changes'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

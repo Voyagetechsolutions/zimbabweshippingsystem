@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { castTo } from '@/types/admin';
 
 export interface AuditLogData {
   action: string;
@@ -33,14 +34,18 @@ export async function addAuditLog(data: AuditLogData) {
       throw new Error('User not authenticated');
     }
     
-    const { error } = await supabase.from('audit_logs').insert({
-      user_id: user.id,
-      action: data.action,
-      entity_type: data.entity_type,
-      entity_id: data.entity_id || null,
-      details: data.details || null,
-      ip_address: ipAddress
-    });
+    // Use type assertion with 'as any' to bypass TypeScript checking for Supabase tables
+    // that are not in the generated types
+    const { error } = await (supabase
+      .from('audit_logs' as any)
+      .insert({
+        user_id: user.id,
+        action: data.action,
+        entity_type: data.entity_type,
+        entity_id: data.entity_id || null,
+        details: data.details || null,
+        ip_address: ipAddress
+      }) as any);
     
     if (error) {
       console.error('Error adding audit log:', error);

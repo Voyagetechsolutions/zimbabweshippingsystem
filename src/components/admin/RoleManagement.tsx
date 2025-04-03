@@ -1,7 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Role, castTo } from '@/types/admin';
 import {
   Card,
   CardContent,
@@ -52,19 +52,6 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-
-interface Role {
-  id: string;
-  name: string;
-  permissions: {
-    [key: string]: boolean | {
-      [action: string]: boolean;
-    };
-  };
-  description: string | null;
-  created_at: string;
-  updated_at: string;
-}
 
 const roleFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -172,15 +159,15 @@ const RoleManagement = () => {
   const fetchRoles = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('user_roles')
+      const { data, error } = await (supabase
+        .from('user_roles' as any)
         .select('*')
-        .order('name', { ascending: true });
+        .order('name', { ascending: true }) as any);
 
       if (error) throw error;
       
       if (data) {
-        setRoles(data as Role[]);
+        setRoles(castTo<Role[]>(data));
       }
     } catch (error: any) {
       console.error('Error fetching roles:', error);
@@ -219,13 +206,13 @@ const RoleManagement = () => {
 
   const handleCreateRole = async (values: z.infer<typeof roleFormSchema>) => {
     try {
-      const { error } = await supabase
-        .from('user_roles')
+      const { error } = await (supabase
+        .from('user_roles' as any)
         .insert({
           name: values.name,
           description: values.description || null,
           permissions: values.permissions
-        });
+        }) as any);
 
       if (error) throw error;
       
@@ -250,15 +237,15 @@ const RoleManagement = () => {
     if (!editingRole) return;
     
     try {
-      const { error } = await supabase
-        .from('user_roles')
+      const { error } = await (supabase
+        .from('user_roles' as any)
         .update({
           name: values.name,
           description: values.description || null,
           permissions: values.permissions,
           updated_at: new Date().toISOString()
         })
-        .eq('id', editingRole.id);
+        .eq('id', editingRole.id) as any);
 
       if (error) throw error;
       
@@ -291,10 +278,10 @@ const RoleManagement = () => {
     }
     
     try {
-      const { error } = await supabase
-        .from('user_roles')
+      const { error } = await (supabase
+        .from('user_roles' as any)
         .delete()
-        .eq('id', role.id);
+        .eq('id', role.id) as any);
 
       if (error) throw error;
       
@@ -524,7 +511,6 @@ const RoleManagement = () => {
         </CardContent>
       </Card>
 
-      {/* Create/Edit Role Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
@@ -588,7 +574,6 @@ const RoleManagement = () => {
         </DialogContent>
       </Dialog>
 
-      {/* View Permissions Dialog */}
       <Dialog open={!!viewingPermissions} onOpenChange={(open) => !open && setViewingPermissions(null)}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
