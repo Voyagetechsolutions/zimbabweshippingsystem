@@ -70,7 +70,7 @@ const CommunicationPreferences: React.FC<CommunicationPreferencesProps> = ({ onU
       const { error } = await supabase
         .from('profiles')
         .update({
-          communication_preferences: preferences,
+          communication_preferences: preferences as any,
           updated_at: new Date().toISOString(),
         })
         .eq('id', user.id);

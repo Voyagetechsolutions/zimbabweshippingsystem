@@ -110,9 +110,7 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar>
-        <div>
-          <NotificationsPanel />
-        </div>
+        <NotificationsPanel />
       </Navbar>
       <main className="flex-grow container mx-auto px-4 py-8">
         <div className="grid gap-6">
