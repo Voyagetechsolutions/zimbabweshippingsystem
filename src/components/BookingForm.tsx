@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   getRouteNames, 
   getAreasByRoute, 
@@ -18,6 +21,10 @@ import { Package, Truck } from 'lucide-react';
 
 const BookingForm = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -43,7 +50,7 @@ const BookingForm = () => {
   const routes = getRouteNames();
 
   // Update available areas when route changes
-  useEffect(() => {
+  React.useEffect(() => {
     if (formData.selectedRoute) {
       const areas = getAreasByRoute(formData.selectedRoute);
       setAvailableAreas(areas);
@@ -70,7 +77,25 @@ const BookingForm = () => {
     setFormData(prev => ({ ...prev, termsAccepted: checked }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const generateTrackingNumber = () => {
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const numbers = '0123456789';
+    let tracking = '';
+    
+    // Generate 4 random letters
+    for (let i = 0; i < 4; i++) {
+      tracking += letters.charAt(Math.floor(Math.random() * letters.length));
+    }
+    
+    // Generate 4 random numbers
+    for (let i = 0; i < 4; i++) {
+      tracking += numbers.charAt(Math.floor(Math.random() * numbers.length));
+    }
+    
+    return tracking;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validate form
@@ -92,14 +117,92 @@ const BookingForm = () => {
       return;
     }
     
-    // Submit form
-    toast({
-      title: "Booking Submitted",
-      description: "Your shipment booking has been received successfully.",
-    });
-    
-    // For demo purposes only: log the submission
-    console.log("Form submitted:", formData);
+    if (!formData.pickupAddress || !formData.deliveryAddress) {
+      toast({
+        variant: "destructive",
+        title: "Missing information",
+        description: "Please fill in both pickup and delivery address fields.",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Generate a unique tracking number
+      const trackingNumber = generateTrackingNumber();
+      
+      // Calculate weight based on shipment type
+      let weightValue = null;
+      if (formData.shipmentType === 'drum') {
+        // Approximate weight for a drum (based on selected quantity)
+        weightValue = parseInt(formData.drumQuantity) * 25; // Assuming average drum weight is 25kg
+      } else if (formData.shipmentType === 'parcel' && formData.weight) {
+        weightValue = parseFloat(formData.weight);
+      }
+      
+      // Construct full names and addresses
+      const fullName = `${formData.firstName} ${formData.lastName}`.trim();
+      const origin = `${formData.pickupAddress}, ${formData.pickupPostcode}`;
+      const destination = `${formData.deliveryAddress}, ${formData.deliveryCity}, Zimbabwe`;
+
+      // Calculate estimated delivery date (2 weeks from pickup date)
+      const twoWeeksFromNow = new Date();
+      twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
+
+      // Additional metadata to store
+      const metaData = {
+        shipment_type: formData.shipmentType,
+        drum_quantity: formData.shipmentType === 'drum' ? parseInt(formData.drumQuantity) : null,
+        pickup_route: formData.selectedRoute,
+        pickup_area: formData.selectedArea,
+        pickup_date: pickupDate,
+        sender_name: fullName,
+        sender_email: formData.email,
+        sender_phone: formData.phone,
+        recipient_name: formData.recipientName,
+        recipient_phone: formData.recipientPhone,
+        special_instructions: formData.specialInstructions || null
+      };
+      
+      // Insert the shipment into the database
+      const { error } = await supabase
+        .from('shipments')
+        .insert({
+          user_id: user?.id || null, // If the user is logged in, associate with their account
+          tracking_number: trackingNumber,
+          origin: origin,
+          destination: destination,
+          status: 'Booking Confirmed',
+          weight: weightValue,
+          dimensions: formData.shipmentType === 'drum' ? '200L Drum' : null,
+          carrier: 'ZimExpress',
+          estimated_delivery: twoWeeksFromNow.toISOString(),
+          metadata: metaData
+        });
+
+      if (error) throw error;
+      
+      toast({
+        title: "Booking Confirmed",
+        description: `Your shipment has been booked with tracking number: ${trackingNumber}`,
+      });
+      
+      // Redirect to tracking page or dashboard
+      if (user) {
+        navigate('/dashboard');
+      } else {
+        navigate('/track');
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error processing booking",
+        description: error.message || "An error occurred while processing your booking.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -411,8 +514,22 @@ const BookingForm = () => {
             </Label>
           </div>
           
-          <Button type="submit" className="w-full bg-zim-green hover:bg-zim-green/90">
-            Complete Booking
+          <Button 
+            type="submit" 
+            className="w-full bg-zim-green hover:bg-zim-green/90"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <span className="flex items-center">
+                <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processing...
+              </span>
+            ) : (
+              "Complete Booking"
+            )}
           </Button>
           
           <p className="text-xs text-center text-muted-foreground mt-4">
