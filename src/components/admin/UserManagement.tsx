@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -118,7 +117,13 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      // Make sure we're selecting all profiles without any filters
+      console.log("Fetching all profiles");
+      
+      // First check if current user is admin (this helps with debugging)
+      const { data: isAdminData } = await supabase.rpc('is_admin');
+      console.log("Current user is admin:", isAdminData);
+      
+      // Now fetch all profiles
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*');
@@ -130,6 +135,7 @@ const UserManagement = () => {
 
       if (profiles) {
         console.log("Fetched profiles count:", profiles.length);
+        console.log("Profiles data:", profiles);
         setUsers(profiles as Profile[]);
       } else {
         console.log("No profiles returned from query");
