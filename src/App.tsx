@@ -17,6 +17,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import ShipmentDetails from "./pages/ShipmentDetails";
 import Services from "./pages/Services";
 import Contact from "./pages/Contact";
+import AddressBook from "./pages/AddressBook";
 
 // Configure the QueryClient with retry options
 const queryClient = new QueryClient({
@@ -60,6 +61,11 @@ const App = () => (
             <Route path="/account" element={
               <RequireAuth>
                 <Account />
+              </RequireAuth>
+            } />
+            <Route path="/address-book" element={
+              <RequireAuth>
+                <AddressBook />
               </RequireAuth>
             } />
             <Route path="/admin" element={

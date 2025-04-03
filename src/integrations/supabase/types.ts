@@ -9,6 +9,54 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      addresses: {
+        Row: {
+          address_name: string
+          city: string
+          country: string
+          created_at: string
+          id: string
+          is_default: boolean | null
+          phone_number: string | null
+          postal_code: string | null
+          recipient_name: string
+          state: string | null
+          street_address: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address_name: string
+          city: string
+          country: string
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          phone_number?: string | null
+          postal_code?: string | null
+          recipient_name: string
+          state?: string | null
+          street_address: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address_name?: string
+          city?: string
+          country?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          phone_number?: string | null
+          postal_code?: string | null
+          recipient_name?: string
+          state?: string | null
+          street_address?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

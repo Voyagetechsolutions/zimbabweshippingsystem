@@ -1,7 +1,8 @@
+
 import React, { useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Menu, X, Ship, Package, Phone, User, LogIn, LogOut, Settings, Package2, BookOpen, Map } from 'lucide-react';
+import { Menu, X, Ship, Package, Phone, User, LogIn, LogOut, Settings, Package2, BookOpen, Map, MapPin } from 'lucide-react';
 import Logo from './Logo';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -74,6 +75,14 @@ const Navbar: React.FC = () => {
                         >
                           <Package2 className="inline-block mr-2 h-4 w-4" />
                           Dashboard
+                        </Link>
+                        <Link 
+                          to="/address-book" 
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={handleMenuItemClick}
+                        >
+                          <MapPin className="inline-block mr-2 h-4 w-4" />
+                          Address Book
                         </Link>
                         <Link 
                           to="/account" 
@@ -168,6 +177,12 @@ const Navbar: React.FC = () => {
                     <Button variant="outline" className="w-full border-zim-black flex items-center justify-center">
                       <Package2 className="mr-1 h-4 w-4" />
                       Dashboard
+                    </Button>
+                  </Link>
+                  <Link to="/address-book" onClick={handleMenuItemClick}>
+                    <Button variant="outline" className="w-full border-zim-black flex items-center justify-center">
+                      <MapPin className="mr-1 h-4 w-4" />
+                      Address Book
                     </Button>
                   </Link>
                   <Link to="/account" onClick={handleMenuItemClick}>

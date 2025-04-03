@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -176,12 +177,16 @@ const Dashboard = () => {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Button onClick={() => navigate('/create-shipment')} className="bg-zim-green hover:bg-zim-green/90">
                 Create New Shipment
               </Button>
               <Button variant="outline" onClick={() => navigate('/track')}>
                 Track a Shipment
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/address-book')}>
+                <MapPin className="mr-1 h-4 w-4" />
+                Manage Addresses
               </Button>
             </CardContent>
           </Card>
