@@ -203,6 +203,66 @@ export type Database = {
         }
         Relationships: []
       }
+      receipts: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          payment_id: string
+          payment_method: string
+          receipt_number: string
+          recipient_details: Json
+          sender_details: Json
+          shipment_details: Json
+          shipment_id: string
+          status: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          id?: string
+          payment_id: string
+          payment_method: string
+          receipt_number: string
+          recipient_details: Json
+          sender_details: Json
+          shipment_details: Json
+          shipment_id: string
+          status?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          payment_id?: string
+          payment_method?: string
+          receipt_number?: string
+          recipient_details?: Json
+          sender_details?: Json
+          shipment_details?: Json
+          shipment_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receipts_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shipments: {
         Row: {
           can_cancel: boolean | null
