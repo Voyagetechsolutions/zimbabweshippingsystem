@@ -20,7 +20,6 @@ import {
   Bell
 } from "lucide-react";
 import { Button } from "@/components/ui/button"
-import Logo from '@/components/Logo';
 import NotificationsPanel from '@/components/NotificationsPanel';
 
 const Navbar = () => {
@@ -38,7 +37,11 @@ const Navbar = () => {
     <nav className="bg-white shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         <Link to="/" className="flex items-center">
-          <Logo className="h-8" />
+          <img src="/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png" alt="Zimbabwe Shipping" className="h-8 mr-2" />
+          <div>
+            <h1 className="text-xl font-bold text-zim-black">Zimbabwe Shipping</h1>
+            <p className="text-xs text-zim-black/70">UK to Zimbabwe Express</p>
+          </div>
         </Link>
 
         {isMobile ? (
