@@ -118,15 +118,22 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      // Fetch users from the profiles table instead of auth.admin.listUsers
+      // Make sure we're selecting all profiles without any filters
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*');
           
-      if (profilesError) throw profilesError;
+      if (profilesError) {
+        console.error("Error fetching profiles:", profilesError);
+        throw profilesError;
+      }
 
       if (profiles) {
+        console.log("Fetched profiles count:", profiles.length);
         setUsers(profiles as Profile[]);
+      } else {
+        console.log("No profiles returned from query");
+        setUsers([]);
       }
     } catch (error: any) {
       console.error('Error fetching users:', error);
