@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -142,20 +143,56 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
     setError(null);
     
     try {
+      // First try to create the shipment if it doesn't exist (this is just for the debug mode)
+      if (!bookingData.shipment_id) {
+        toast({
+          title: "Missing shipment ID",
+          description: "Creating a test shipment for you first",
+        });
+        
+        // Create a test shipment
+        const { data: shipmentData, error: shipmentError } = await supabase.from('shipments').insert({
+          origin: bookingData.senderDetails?.address || 'Test Origin Address',
+          destination: bookingData.recipientDetails?.address || 'Test Destination Address',
+          status: 'Booked',
+          user_id: bookingData.user_id || (await supabase.auth.getUser()).data.user?.id || null,
+          tracking_number: `TEST-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+          metadata: {
+            sender_name: bookingData.senderDetails?.name || 'Test Sender',
+            sender_email: bookingData.senderDetails?.email || 'test@example.com',
+            sender_phone: bookingData.senderDetails?.phone || '+1234567890',
+            recipient_name: bookingData.recipientDetails?.name || 'Test Recipient',
+            recipient_phone: bookingData.recipientDetails?.phone || '+1234567890',
+            shipment_type: bookingData.shipmentDetails?.type || 'parcel',
+            drum_quantity: bookingData.shipmentDetails?.quantity || 1,
+          },
+          weight: bookingData.shipmentDetails?.weight || 10,
+        }).select('id').single();
+        
+        if (shipmentError) throw shipmentError;
+        
+        bookingData.shipment_id = shipmentData.id;
+      }
+
+      // Now create the test payment
       const { data: paymentData, error: paymentError } = await supabase.from('payments').insert({
         amount: totalAmount,
         payment_method: 'test',
         payment_status: 'completed',
         shipment_id: bookingData.shipment_id,
-        user_id: bookingData.user_id || null,
+        user_id: bookingData.user_id || (await supabase.auth.getUser()).data.user?.id || null,
         currency: 'GBP',
         transaction_id: `test-${Date.now()}`
       }).select('id').single();
       
-      if (paymentError) throw paymentError;
+      if (paymentError) {
+        console.error('Payment error details:', paymentError);
+        throw new Error(`Payment creation failed: ${paymentError.message}`);
+      }
       
       const receiptNumber = `TEST-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
       
+      // Create a receipt for the test payment
       const { data: receiptData, error: receiptError } = await supabase.from(tableFrom('receipts')).insert({
         payment_id: paymentData.id,
         shipment_id: bookingData.shipment_id,
@@ -163,14 +200,33 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         payment_method: 'test',
         amount: totalAmount,
         currency: 'GBP',
-        sender_details: bookingData.senderDetails,
-        recipient_details: bookingData.recipientDetails,
-        shipment_details: bookingData.shipmentDetails,
+        sender_details: bookingData.senderDetails || {
+          name: 'Test Sender',
+          email: 'test@example.com',
+          phone: '+1234567890',
+          address: 'Test Origin Address'
+        },
+        recipient_details: bookingData.recipientDetails || {
+          name: 'Test Recipient',
+          phone: '+1234567890',
+          address: 'Test Destination Address'
+        },
+        shipment_details: bookingData.shipmentDetails || {
+          tracking_number: `TEST-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+          type: 'parcel',
+          quantity: 1,
+          weight: 10,
+          services: []
+        },
         status: 'issued'
       }).select('id').single();
       
-      if (receiptError) throw receiptError;
+      if (receiptError) {
+        console.error('Receipt error details:', receiptError);
+        throw new Error(`Receipt creation failed: ${receiptError.message}`);
+      }
       
+      // Update the shipment status to Paid
       await supabase
         .from('shipments')
         .update({ status: 'Paid' })
@@ -180,7 +236,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       
     } catch (err: any) {
       console.error('Debug payment error:', err);
-      setError('Failed to process test payment. Please try again.');
+      setError(`Failed to process test payment: ${err.message}`);
       setLoading(false);
       toast({
         variant: "destructive",

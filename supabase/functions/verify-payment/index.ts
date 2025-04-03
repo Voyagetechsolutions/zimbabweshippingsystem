@@ -27,16 +27,21 @@ serve(async (req) => {
 
   try {
     const { session_id, payment_intent, payment_id } = await req.json();
+    console.log("Received payment verification request:", { session_id, payment_intent, payment_id });
     
     // If we already have a payment_id and have processed it, return that receipt
     if (payment_id) {
+      console.log("Looking up existing payment:", payment_id);
       const { data: paymentData, error: paymentError } = await supabaseClient
         .from('payments')
         .select('shipment_id, id')
         .eq('id', payment_id)
         .single();
       
-      if (paymentError) throw paymentError;
+      if (paymentError) {
+        console.error("Error looking up payment:", paymentError);
+        throw paymentError;
+      }
       
       // Look up the receipt for this payment
       const { data: receiptData, error: receiptError } = await supabaseClient
@@ -45,7 +50,10 @@ serve(async (req) => {
         .eq('payment_id', payment_id)
         .single();
       
-      if (receiptError) throw receiptError;
+      if (receiptError) {
+        console.error("Error looking up receipt:", receiptError);
+        throw receiptError;
+      }
       
       return new Response(
         JSON.stringify({
@@ -69,6 +77,7 @@ serve(async (req) => {
       const session = await stripe.checkout.sessions.retrieve(session_id);
       
       if (session.payment_status !== 'paid') {
+        console.error("Payment not completed:", session.payment_status);
         throw new Error('Payment not completed');
       }
       
@@ -85,6 +94,7 @@ serve(async (req) => {
     }
     // Verify PayPal payment (simplified, would need more robust validation in production)
     else if (payment_intent) {
+      console.log("Verifying PayPal payment:", payment_intent);
       // In a real implementation, you would validate with the PayPal API
       // This is simplified for the example
       paymentInfo = {
@@ -96,116 +106,143 @@ serve(async (req) => {
         status: 'completed'
       };
       paymentMethod = 'paypal';
+      console.log("PayPal payment info:", paymentInfo);
     } else {
+      console.error("No payment identifier provided");
       throw new Error('No payment identifier provided');
     }
     
-    // Get the shipment details
-    const { data: shipmentData, error: shipmentError } = await supabaseClient
-      .from('shipments')
-      .select('*')
-      .eq('id', paymentInfo.shipment_id)
-      .single();
-    
-    if (shipmentError) throw shipmentError;
-    
-    console.log("Retrieved shipment data:", shipmentData.id);
-    
-    // Create payment record
-    const { data: paymentData, error: paymentError } = await supabaseClient
-      .from('payments')
-      .insert({
-        amount: paymentInfo.amount,
-        currency: paymentInfo.currency,
-        shipment_id: paymentInfo.shipment_id,
-        payment_method: paymentInfo.payment_method,
-        payment_status: paymentInfo.status,
-        transaction_id: paymentInfo.transaction_id,
-        user_id: shipmentData.user_id
-      })
-      .select('id')
-      .single();
-    
-    if (paymentError) {
-      console.error("Error creating payment record:", paymentError);
-      throw paymentError;
-    }
-    
-    console.log("Created payment record:", paymentData.id);
-    
-    // Extract sender and recipient details from shipment metadata
-    const metadata = shipmentData.metadata || {};
-    
-    // Generate receipt number
-    const receiptNumber = `R-${Date.now().toString().substring(7)}`;
-    
-    // Create receipt record
-    const { data: receiptData, error: receiptError } = await supabaseClient
-      .from('receipts')
-      .insert({
-        shipment_id: paymentInfo.shipment_id,
-        payment_id: paymentData.id,
-        receipt_number: receiptNumber,
-        payment_method: paymentMethod,
-        amount: paymentInfo.amount,
-        currency: paymentInfo.currency,
-        sender_details: {
-          name: metadata.sender_name,
-          email: metadata.sender_email,
-          phone: metadata.sender_phone,
-          address: shipmentData.origin
-        },
-        recipient_details: {
-          name: metadata.recipient_name,
-          phone: metadata.recipient_phone,
-          address: shipmentData.destination
-        },
-        shipment_details: {
-          tracking_number: shipmentData.tracking_number,
-          type: metadata.shipment_type,
-          quantity: metadata.drum_quantity,
-          weight: shipmentData.weight,
-          services: []
-        }
-      })
-      .select('id')
-      .single();
-    
-    if (receiptError) {
-      console.error("Error creating receipt record:", receiptError);
-      throw receiptError;
-    }
-    
-    console.log("Created receipt record:", receiptData.id);
-
-    // Update shipment status to paid
-    const { error: updateError } = await supabaseClient
-      .from('shipments')
-      .update({ status: 'Paid' })
-      .eq('id', paymentInfo.shipment_id);
-    
-    if (updateError) {
-      console.error("Error updating shipment status:", updateError);
-      throw updateError;
-    }
-    
-    console.log("Updated shipment status to Paid");
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        paymentId: paymentData.id,
-        receiptId: receiptData.id
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
+    try {
+      // Get the shipment details
+      console.log("Looking up shipment:", paymentInfo.shipment_id);
+      const { data: shipmentData, error: shipmentError } = await supabaseClient
+        .from('shipments')
+        .select('*')
+        .eq('id', paymentInfo.shipment_id)
+        .single();
+      
+      if (shipmentError) {
+        console.error("Error looking up shipment:", shipmentError);
+        throw shipmentError;
       }
-    );
+      
+      console.log("Retrieved shipment data:", shipmentData.id);
+      
+      // Create payment record with admin rights using service role
+      console.log("Creating payment record for shipment:", shipmentData.id);
+      const { data: paymentData, error: paymentError } = await supabaseClient
+        .from('payments')
+        .insert({
+          amount: paymentInfo.amount,
+          currency: paymentInfo.currency,
+          shipment_id: paymentInfo.shipment_id,
+          payment_method: paymentInfo.payment_method,
+          payment_status: paymentInfo.status,
+          transaction_id: paymentInfo.transaction_id,
+          user_id: shipmentData.user_id
+        })
+        .select('id')
+        .single();
+      
+      if (paymentError) {
+        console.error("Error creating payment record:", paymentError);
+        throw paymentError;
+      }
+      
+      console.log("Created payment record:", paymentData.id);
+      
+      // Extract sender and recipient details from shipment metadata
+      const metadata = shipmentData.metadata || {};
+      
+      // Generate receipt number
+      const receiptNumber = `R-${Date.now().toString().substring(7)}`;
+      
+      // Create receipt record with admin rights using service role
+      console.log("Creating receipt record for payment:", paymentData.id);
+      const { data: receiptData, error: receiptError } = await supabaseClient
+        .from('receipts')
+        .insert({
+          shipment_id: paymentInfo.shipment_id,
+          payment_id: paymentData.id,
+          receipt_number: receiptNumber,
+          payment_method: paymentMethod,
+          amount: paymentInfo.amount,
+          currency: paymentInfo.currency,
+          sender_details: {
+            name: metadata.sender_name,
+            email: metadata.sender_email,
+            phone: metadata.sender_phone,
+            address: shipmentData.origin
+          },
+          recipient_details: {
+            name: metadata.recipient_name,
+            phone: metadata.recipient_phone,
+            address: shipmentData.destination
+          },
+          shipment_details: {
+            tracking_number: shipmentData.tracking_number,
+            type: metadata.shipment_type,
+            quantity: metadata.drum_quantity,
+            weight: shipmentData.weight,
+            services: []
+          }
+        })
+        .select('id')
+        .single();
+      
+      if (receiptError) {
+        console.error("Error creating receipt record:", receiptError);
+        throw receiptError;
+      }
+      
+      console.log("Created receipt record:", receiptData.id);
+
+      // Update shipment status to paid
+      console.log("Updating shipment status to Paid");
+      const { error: updateError } = await supabaseClient
+        .from('shipments')
+        .update({ status: 'Paid' })
+        .eq('id', paymentInfo.shipment_id);
+      
+      if (updateError) {
+        console.error("Error updating shipment status:", updateError);
+        throw updateError;
+      }
+      
+      console.log("Updated shipment status to Paid");
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          paymentId: paymentData.id,
+          receiptId: receiptData.id
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        }
+      );
+    } catch (dbError) {
+      console.error("Database operation failed:", dbError);
+      return new Response(
+        JSON.stringify({ 
+          error: "Database operation failed", 
+          details: dbError.message,
+          code: "DB_ERROR"
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        }
+      );
+    }
   } catch (error) {
     console.error("Error verifying payment:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        code: "GENERAL_ERROR" 
+      }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
