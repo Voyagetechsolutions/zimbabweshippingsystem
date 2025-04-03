@@ -13,9 +13,10 @@ const Account = () => {
   
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar>
+      <Navbar />
+      <div className="absolute top-4 right-20 z-10">
         <NotificationsPanel />
-      </Navbar>
+      </div>
       <main className="flex-grow container mx-auto py-8 px-4">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl font-bold mb-6">Account Settings</h1>

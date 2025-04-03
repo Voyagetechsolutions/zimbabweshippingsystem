@@ -109,9 +109,10 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar>
+      <Navbar />
+      <div className="absolute top-4 right-20 z-10">
         <NotificationsPanel />
-      </Navbar>
+      </div>
       <main className="flex-grow container mx-auto px-4 py-8">
         <div className="grid gap-6">
           <Card>
