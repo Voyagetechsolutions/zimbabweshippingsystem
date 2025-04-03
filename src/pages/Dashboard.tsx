@@ -14,6 +14,9 @@ import { Package, Truck, MapPin, Calendar, Eye } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import WhatsAppButton from '@/components/WhatsAppButton';
+import NotificationsPanel from '@/components/NotificationsPanel';
+import PaymentHistorySection from '@/components/PaymentHistorySection';
+import ShipmentActions from '@/components/ShipmentActions';
 
 interface Shipment {
   id: string;
@@ -27,6 +30,8 @@ interface Shipment {
   estimated_delivery: string | null;
   created_at: string;
   updated_at: string;
+  can_modify: boolean | null;
+  can_cancel: boolean | null;
 }
 
 const getStatusBadgeClass = (status: string) => {
@@ -39,6 +44,8 @@ const getStatusBadgeClass = (status: string) => {
       return 'bg-blue-100 text-blue-800 border-blue-300';
     case statusLower.includes('delivered'):
       return 'bg-green-100 text-green-800 border-green-300';
+    case statusLower.includes('cancelled'):
+      return 'bg-red-100 text-red-800 border-red-300';
     case statusLower.includes('delayed'):
       return 'bg-red-100 text-red-800 border-red-300';
     default:
@@ -53,6 +60,7 @@ const Dashboard = () => {
 
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     const fetchShipments = async () => {
@@ -85,7 +93,11 @@ const Dashboard = () => {
     };
 
     fetchShipments();
-  }, [user, toast]);
+  }, [user, toast, refreshTrigger]);
+
+  const handleRefresh = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
 
   if (loading) {
     return (
@@ -97,7 +109,9 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar />
+      <Navbar>
+        <NotificationsPanel />
+      </Navbar>
       <main className="flex-grow container mx-auto px-4 py-8">
         <div className="grid gap-6">
           <Card>
@@ -133,19 +147,19 @@ const Dashboard = () => {
                     </TableHeader>
                     <TableBody>
                       {shipments.map((shipment) => (
-                        <tr key={shipment.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-2 border-b font-mono">{shipment.tracking_number}</td>
-                          <td className="px-4 py-2 border-b">{shipment.origin}</td>
-                          <td className="px-4 py-2 border-b">{shipment.destination}</td>
-                          <td className="px-4 py-2 border-b">
+                        <TableRow key={shipment.id} className="hover:bg-gray-50">
+                          <TableCell className="px-4 py-2 border-b font-mono">{shipment.tracking_number}</TableCell>
+                          <TableCell className="px-4 py-2 border-b">{shipment.origin}</TableCell>
+                          <TableCell className="px-4 py-2 border-b">{shipment.destination}</TableCell>
+                          <TableCell className="px-4 py-2 border-b">
                             <Badge className={getStatusBadgeClass(shipment.status)}>
                               {shipment.status}
                             </Badge>
-                          </td>
-                          <td className="px-4 py-2 border-b">
+                          </TableCell>
+                          <TableCell className="px-4 py-2 border-b">
                             {shipment.estimated_delivery && format(new Date(shipment.estimated_delivery), 'MMM d, yyyy')}
-                          </td>
-                          <td className="px-4 py-2 border-b">
+                          </TableCell>
+                          <TableCell className="px-4 py-2 border-b flex justify-end gap-2">
                             <Button 
                               variant="ghost" 
                               size="sm" 
@@ -155,8 +169,16 @@ const Dashboard = () => {
                               <Eye className="h-4 w-4 mr-1" />
                               View
                             </Button>
-                          </td>
-                        </tr>
+                            {(shipment.can_modify || shipment.can_cancel) && (
+                              <ShipmentActions 
+                                shipmentId={shipment.id}
+                                canModify={shipment.can_modify}
+                                canCancel={shipment.can_cancel}
+                                onActionComplete={handleRefresh}
+                              />
+                            )}
+                          </TableCell>
+                        </TableRow>
                       ))}
                     </TableBody>
                   </Table>
@@ -164,6 +186,8 @@ const Dashboard = () => {
               )}
             </CardContent>
           </Card>
+          
+          <PaymentHistorySection />
           
           <Card>
             <CardHeader>

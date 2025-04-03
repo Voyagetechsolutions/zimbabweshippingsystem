@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,7 +13,6 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import WhatsAppButton from '@/components/WhatsAppButton';
 
-// Define the shipment type based on our Supabase schema
 interface Shipment {
   id: string;
   tracking_number: string;
@@ -29,7 +27,6 @@ interface Shipment {
   updated_at: string;
 }
 
-// Get status color based on shipment status
 const getStatusColor = (status: string): string => {
   switch (status.toLowerCase()) {
     case 'processing':
@@ -45,7 +42,6 @@ const getStatusColor = (status: string): string => {
   }
 };
 
-// Get status icon based on shipment status
 const getStatusIcon = (status: string) => {
   switch (status.toLowerCase()) {
     case 'processing':
@@ -68,6 +64,7 @@ const ShipmentDetails = () => {
   const { toast } = useToast();
   const [shipment, setShipment] = useState<Shipment | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     const fetchShipmentDetails = async () => {
@@ -105,9 +102,12 @@ const ShipmentDetails = () => {
     };
 
     fetchShipmentDetails();
-  }, [id, toast]);
+  }, [id, toast, refreshTrigger]);
 
-  // Timeline steps based on status
+  const handleRefresh = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
+
   const getTimelineSteps = (status: string) => {
     const allSteps = [
       { name: 'Processing', completed: false },
@@ -196,14 +196,27 @@ const ShipmentDetails = () => {
                   Tracking #: <span className="font-mono ml-2">{shipment.tracking_number}</span>
                 </p>
               </div>
-              <Badge 
-                className={`mt-2 md:mt-0 text-sm py-1 px-3 ${getStatusColor(shipment.status)}`}
-              >
-                <span className="flex items-center">
-                  {getStatusIcon(shipment.status)}
-                  <span className="ml-1">{shipment.status}</span>
-                </span>
-              </Badge>
+              <div className="mt-2 md:mt-0 flex items-center space-x-2">
+                <Badge 
+                  className={`py-1 px-3 ${getStatusColor(shipment.status)}`}
+                >
+                  <span className="flex items-center">
+                    {getStatusIcon(shipment.status)}
+                    <span className="ml-1">{shipment.status}</span>
+                  </span>
+                </Badge>
+                
+                {(shipment.status.toLowerCase() !== 'delivered' && 
+                  shipment.status.toLowerCase() !== 'cancelled') && 
+                  (shipment.can_modify || shipment.can_cancel) && (
+                  <ShipmentActions 
+                    shipmentId={shipment.id}
+                    canModify={shipment.can_modify}
+                    canCancel={shipment.can_cancel}
+                    onActionComplete={handleRefresh}
+                  />
+                )}
+              </div>
             </div>
           </div>
 
@@ -249,7 +262,7 @@ const ShipmentDetails = () => {
             </CardContent>
           </Card>
 
-          {/* Shipment Details */}
+          {/* Shipment Information */}
           <Card className="mb-6">
             <CardHeader>
               <h2 className="text-xl font-bold flex items-center">

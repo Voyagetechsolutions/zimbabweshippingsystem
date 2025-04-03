@@ -57,9 +57,90 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          related_id: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          related_id?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          related_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          payment_method: string
+          payment_status: string
+          receipt_url: string | null
+          shipment_id: string | null
+          transaction_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          id?: string
+          payment_method: string
+          payment_status: string
+          receipt_url?: string | null
+          shipment_id?: string | null
+          transaction_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          payment_method?: string
+          payment_status?: string
+          receipt_url?: string | null
+          shipment_id?: string | null
+          transaction_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
+          communication_preferences: Json | null
           created_at: string
           email: string
           full_name: string | null
@@ -69,6 +150,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          communication_preferences?: Json | null
           created_at?: string
           email: string
           full_name?: string | null
@@ -78,6 +160,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          communication_preferences?: Json | null
           created_at?: string
           email?: string
           full_name?: string | null
@@ -89,6 +172,8 @@ export type Database = {
       }
       shipments: {
         Row: {
+          can_cancel: boolean | null
+          can_modify: boolean | null
           carrier: string | null
           created_at: string
           destination: string
@@ -104,6 +189,8 @@ export type Database = {
           weight: number | null
         }
         Insert: {
+          can_cancel?: boolean | null
+          can_modify?: boolean | null
           carrier?: string | null
           created_at?: string
           destination: string
@@ -119,6 +206,8 @@ export type Database = {
           weight?: number | null
         }
         Update: {
+          can_cancel?: boolean | null
+          can_modify?: boolean | null
           carrier?: string | null
           created_at?: string
           destination?: string
