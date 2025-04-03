@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -52,6 +51,7 @@ interface Shipment {
   created_at: string;
   updated_at: string;
   user_id: string;
+  metadata: any | null;
 }
 
 // Map status to badge color
@@ -142,6 +142,7 @@ const AdminDashboard = () => {
   const fetchShipments = async () => {
     setLoading(true);
     try {
+      console.log("Admin: Fetching all shipments");
       // Fetch all shipments for admin view
       const { data, error } = await supabase
         .from('shipments')
@@ -149,10 +150,12 @@ const AdminDashboard = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
+        console.error("Error fetching shipments:", error);
         throw error;
       }
 
       if (data) {
+        console.log("Admin: Fetched shipments count:", data.length);
         setShipments(data as Shipment[]);
         // Calculate stats
         const totalCount = data.length;
@@ -168,6 +171,7 @@ const AdminDashboard = () => {
         });
       }
     } catch (error: any) {
+      console.error("Error in fetchShipments:", error);
       toast({
         title: 'Error fetching shipments',
         description: error.message,

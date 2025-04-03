@@ -29,6 +29,8 @@ export const RequireAdmin = React.memo(({ children }: { children: JSX.Element })
   const { user, isLoading, isAdmin } = useAuth();
   const location = useLocation();
 
+  console.log("RequireAdmin check:", { user: !!user, isAdmin, isLoading });
+
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -38,6 +40,7 @@ export const RequireAdmin = React.memo(({ children }: { children: JSX.Element })
   }
 
   if (!user) {
+    console.log('User is not authenticated, redirecting to auth');
     // Redirect to login if not authenticated
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
@@ -48,6 +51,7 @@ export const RequireAdmin = React.memo(({ children }: { children: JSX.Element })
     return <Navigate to="/dashboard" replace />;
   }
 
+  console.log('User is admin, allowing access to admin page');
   return children;
 });
 
