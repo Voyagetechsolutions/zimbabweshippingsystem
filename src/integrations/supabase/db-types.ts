@@ -10,6 +10,22 @@ export interface Tables {
   shipments: Database['public']['Tables']['shipments']['Row'];
   profiles: Database['public']['Tables']['profiles']['Row'];
   
+  // Add the receipts table
+  receipts: {
+    id: string;
+    shipment_id: string;
+    payment_id: string;
+    receipt_number: string;
+    created_at: string;
+    payment_method: string;
+    amount: number;
+    currency: string;
+    sender_details: Json;
+    recipient_details: Json;
+    shipment_details: Json;
+    status: string;
+  };
+  
   // New tables that aren't in the generated types yet
   audit_logs: {
     id: string;

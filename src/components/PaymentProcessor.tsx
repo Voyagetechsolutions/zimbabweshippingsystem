@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { tableFrom } from '@/integrations/supabase/db-types';
 import { 
   Card, 
   CardContent, 
@@ -114,12 +115,14 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       // Generate receipt
       const receiptNumber = `RCT-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
       
-      const { data: receiptData, error: receiptError } = await supabase.from('receipts').insert({
+      // Use tableFrom helper to cast the table name to a known type
+      const { data: receiptData, error: receiptError } = await supabase.from(tableFrom('receipts')).insert({
         payment_id: paymentData.id,
         shipment_id: bookingData.shipment_id,
         receipt_number: receiptNumber,
         payment_method: 'offline',
         amount: totalAmount,
+        currency: 'GBP',
         sender_details: bookingData.senderDetails,
         recipient_details: bookingData.recipientDetails,
         shipment_details: bookingData.shipmentDetails,

@@ -1,4 +1,5 @@
 
+// This is just a partial update to fix the Logo type issue
 import React, { useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";

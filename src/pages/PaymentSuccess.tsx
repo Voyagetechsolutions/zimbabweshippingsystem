@@ -1,6 +1,8 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { tableFrom } from '@/integrations/supabase/db-types';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import Receipt from '@/components/Receipt';
@@ -41,8 +43,9 @@ const PaymentSuccess = () => {
         
         // If we have a receipt ID directly
         if (receiptId) {
+          // Use tableFrom helper to type-cast the table name
           const { data, error } = await supabase
-            .from('receipts')
+            .from(tableFrom('receipts'))
             .select('*, payments(*), shipments(*)')
             .eq('id', receiptId)
             .single();
@@ -67,9 +70,9 @@ const PaymentSuccess = () => {
             throw new Error('Could not verify payment');
           }
           
-          // Fetch the receipt data
+          // Fetch the receipt data using the tableFrom helper
           const { data: receiptData, error: receiptError } = await supabase
-            .from('receipts')
+            .from(tableFrom('receipts'))
             .select('*, payments(*), shipments(*)')
             .eq('id', data.receiptId)
             .single();
