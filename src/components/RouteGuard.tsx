@@ -2,11 +2,13 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate, useLocation } from 'react-router-dom';
 import React from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 // Use React.memo to prevent unnecessary re-renders
 export const RequireAuth = React.memo(({ children }: { children: JSX.Element }) => {
   const { user, isLoading } = useAuth();
   const location = useLocation();
+  const { toast } = useToast();
 
   if (isLoading) {
     // Show loading state if auth is still being checked
@@ -18,6 +20,12 @@ export const RequireAuth = React.memo(({ children }: { children: JSX.Element }) 
   }
 
   if (!user) {
+    // Show toast when redirecting to login
+    toast({
+      title: "Authentication required",
+      description: "Please sign in to access this page",
+    });
+    
     // Redirect to login if not authenticated
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
@@ -28,8 +36,7 @@ export const RequireAuth = React.memo(({ children }: { children: JSX.Element }) 
 export const RequireAdmin = React.memo(({ children }: { children: JSX.Element }) => {
   const { user, isLoading, isAdmin } = useAuth();
   const location = useLocation();
-
-  console.log("RequireAdmin check:", { user: !!user, isAdmin, isLoading });
+  const { toast } = useToast();
 
   if (isLoading) {
     return (
@@ -40,18 +47,24 @@ export const RequireAdmin = React.memo(({ children }: { children: JSX.Element })
   }
 
   if (!user) {
-    console.log('User is not authenticated, redirecting to auth');
+    toast({
+      title: "Authentication required",
+      description: "Please sign in to access admin area",
+    });
     // Redirect to login if not authenticated
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
   if (!isAdmin) {
-    console.log('User is not an admin, redirecting to dashboard');
+    toast({
+      title: "Access denied",
+      description: "You don't have permission to access the admin area",
+      variant: "destructive",
+    });
     // Redirect to dashboard if user is not an admin
     return <Navigate to="/dashboard" replace />;
   }
 
-  console.log('User is admin, allowing access to admin page');
   return children;
 });
 
