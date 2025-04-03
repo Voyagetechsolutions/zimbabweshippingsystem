@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -32,6 +31,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import {
   Select,
@@ -59,7 +59,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
-// Define the user type
 interface User {
   id: string;
   email: string;
@@ -71,7 +70,6 @@ interface User {
   };
 }
 
-// Form schema for user creation/editing
 const userFormSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   full_name: z.string().min(2, "Name must be at least 2 characters"),
@@ -102,7 +100,6 @@ const UserManagement = () => {
     fetchUsers();
   }, []);
 
-  // Reset form when editing different user
   useEffect(() => {
     if (editingUser) {
       form.reset({
@@ -122,20 +119,17 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      // Fetch users
       const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
       
       if (authError) throw authError;
       
       if (authUsers?.users) {
-        // Fetch profiles to get additional user information
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
           .select('*');
           
         if (profilesError) throw profilesError;
 
-        // Combine auth users with their profiles
         const usersWithProfiles = authUsers.users.map(user => {
           const profile = profiles?.find(p => p.id === user.id);
           return {
@@ -185,11 +179,9 @@ const UserManagement = () => {
 
   const handleCreateUser = async (values: UserFormValues) => {
     try {
-      // In a real app, this would use an admin API or edge function
-      // For now, we'll use the make_admin RPC function for admin status
       const { error: signUpError } = await supabase.auth.signUp({
         email: values.email,
-        password: 'temporaryPassword123!', // In production, you'd generate this or send an invite
+        password: 'temporaryPassword123!',
         options: {
           data: {
             full_name: values.full_name,
@@ -199,7 +191,6 @@ const UserManagement = () => {
 
       if (signUpError) throw signUpError;
       
-      // If admin, set admin status
       if (values.is_admin) {
         const { error: adminError } = await supabase.rpc('make_admin', {
           user_email: values.email
@@ -214,7 +205,7 @@ const UserManagement = () => {
       });
       
       closeDialog();
-      fetchUsers(); // Refresh the list
+      fetchUsers();
     } catch (error: any) {
       toast({
         title: 'Error creating user',
@@ -228,7 +219,6 @@ const UserManagement = () => {
     if (!editingUser) return;
     
     try {
-      // Update profile information
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
@@ -239,7 +229,6 @@ const UserManagement = () => {
 
       if (profileError) throw profileError;
 
-      // Handle admin status separately using RPC function
       const currentAdminStatus = editingUser.profile?.is_admin || false;
       
       if (values.is_admin !== currentAdminStatus) {
@@ -250,8 +239,6 @@ const UserManagement = () => {
           
           if (adminError) throw adminError;
         }
-        // Note: We don't have a remove_admin function in this example
-        // In a real app, you'd implement one
       }
 
       toast({
@@ -260,7 +247,7 @@ const UserManagement = () => {
       });
       
       closeDialog();
-      fetchUsers(); // Refresh the list
+      fetchUsers();
     } catch (error: any) {
       toast({
         title: 'Error updating user',
@@ -278,7 +265,6 @@ const UserManagement = () => {
     }
   };
 
-  // Filter users based on search
   const filteredUsers = users.filter(user => 
     user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.profile?.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -286,7 +272,6 @@ const UserManagement = () => {
 
   return (
     <div>
-      {/* Users Management Card */}
       <Card className="mb-8">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -301,7 +286,6 @@ const UserManagement = () => {
           </div>
         </CardHeader>
         <CardContent>
-          {/* Search and Filter Bar */}
           <div className="flex items-center mb-4 gap-4">
             <div className="relative flex-grow">
               <Input
@@ -322,7 +306,6 @@ const UserManagement = () => {
             </Button>
           </div>
 
-          {/* Users Table */}
           {loading ? (
             <div className="flex justify-center items-center p-12">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
@@ -388,7 +371,6 @@ const UserManagement = () => {
                             variant="ghost"
                             size="icon"
                             onClick={() => {
-                              // In a real app, this would send a password reset email
                               toast({
                                 title: 'Password reset email sent',
                                 description: `A password reset email has been sent to ${user.email}`,
@@ -409,7 +391,6 @@ const UserManagement = () => {
         </CardContent>
       </Card>
 
-      {/* Create/Edit User Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -431,7 +412,7 @@ const UserManagement = () => {
                     <FormControl>
                       <Input 
                         {...field} 
-                        disabled={!isCreatingUser} // Only allow email editing for new users
+                        disabled={!isCreatingUser}
                         placeholder="user@example.com" 
                       />
                     </FormControl>
