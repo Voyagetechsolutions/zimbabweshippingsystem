@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Bell, CheckCircle, CreditCard, Truck, AlertCircle, X } from 'lucide-react';
+import { Bell, CheckCircle, CreditCard, Truck, AlertCircle, X, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
+import { Link } from 'react-router-dom';
 
 interface Notification {
   id: string;
@@ -35,16 +36,17 @@ const NotificationsPanel = () => {
 
   const fetchNotifications = async () => {
     try {
-      const { data, error } = await (supabase
-        .from('notifications' as any)
+      const { data, error } = await supabase
+        .from('notifications')
         .select('*')
         .eq('user_id', user?.id)
-        .order('created_at', { ascending: false }) as any);
+        .order('created_at', { ascending: false })
+        .limit(5);
 
       if (error) throw error;
 
       if (data) {
-        setNotifications(data);
+        setNotifications(data as unknown as Notification[]);
         setUnreadCount(data.filter((n: Notification) => !n.is_read).length);
       }
     } catch (error: any) {
@@ -54,10 +56,10 @@ const NotificationsPanel = () => {
 
   const markAsRead = async (id: string) => {
     try {
-      const { error } = await (supabase
-        .from('notifications' as any)
+      const { error } = await supabase
+        .from('notifications')
         .update({ is_read: true })
-        .eq('id', id) as any);
+        .eq('id', id);
 
       if (error) throw error;
 
@@ -75,11 +77,11 @@ const NotificationsPanel = () => {
 
   const markAllAsRead = async () => {
     try {
-      const { error } = await (supabase
-        .from('notifications' as any)
+      const { error } = await supabase
+        .from('notifications')
         .update({ is_read: true })
         .eq('user_id', user?.id)
-        .eq('is_read', false) as any);
+        .eq('is_read', false);
 
       if (error) throw error;
 
@@ -144,7 +146,7 @@ const NotificationsPanel = () => {
         </SheetHeader>
         
         <div className="mt-4">
-          <ScrollArea className="h-[80vh]">
+          <ScrollArea className="h-[75vh]">
             {notifications.length > 0 ? (
               <div className="space-y-4 pr-4">
                 {notifications.map((notification) => (
@@ -187,6 +189,15 @@ const NotificationsPanel = () => {
                     </div>
                   </div>
                 ))}
+
+                <div className="pt-4 pb-2">
+                  <Button variant="ghost" asChild className="w-full flex justify-center items-center">
+                    <Link to="/notifications" onClick={() => setIsOpen(false)}>
+                      <span>View all notifications</span>
+                      <ExternalLink className="ml-2 h-3 w-3" />
+                    </Link>
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="text-center py-12">

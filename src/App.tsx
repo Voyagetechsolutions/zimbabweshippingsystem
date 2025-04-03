@@ -18,6 +18,7 @@ import ShipmentDetails from "./pages/ShipmentDetails";
 import Services from "./pages/Services";
 import Contact from "./pages/Contact";
 import AddressBook from "./pages/AddressBook";
+import Notifications from "./pages/Notifications";
 
 // Configure the QueryClient with retry options
 const queryClient = new QueryClient({
@@ -66,6 +67,11 @@ const App = () => (
             <Route path="/address-book" element={
               <RequireAuth>
                 <AddressBook />
+              </RequireAuth>
+            } />
+            <Route path="/notifications" element={
+              <RequireAuth>
+                <Notifications />
               </RequireAuth>
             } />
             <Route path="/admin" element={

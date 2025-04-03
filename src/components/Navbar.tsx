@@ -1,246 +1,133 @@
-
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Button } from "@/components/ui/button";
-import { Menu, X, Ship, Package, Phone, User, LogIn, LogOut, Settings, Package2, BookOpen, Map, MapPin } from 'lucide-react';
-import Logo from './Logo';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMobile } from '@/hooks/use-mobile';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  LayoutDashboard,
+  Menu,
+  LogOut,
+  User,
+  ShieldCheck,
+  Bell
+} from "lucide-react";
+import { Button } from "@/components/ui/button"
+import logo from '@/assets/zim-logo.svg';
+import NotificationsPanel from '@/components/NotificationsPanel';
 
-const Navbar: React.FC = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, isAdmin, signOut } = useAuth();
+const Navbar = () => {
+  const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
-
-  const toggleMenu = useCallback(() => {
-    setIsMenuOpen(prev => !prev);
-  }, []);
-
-  const handleSignOut = useCallback(async () => {
-    await signOut();
+  const isMobile = useMobile();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  
+  const handleLogout = async () => {
+    await logout();
     navigate('/');
-  }, [signOut, navigate]);
+  };
 
-  const handleMenuItemClick = useCallback(() => {
-    if (isMenuOpen) {
-      setIsMenuOpen(false);
-    }
-  }, [isMenuOpen]);
-
-  const navLinks = [
-    { name: "Services", href: "/services", icon: <Ship className="w-5 h-5" /> },
-    { name: "Book Your Shipment", href: "/book-shipment", icon: <BookOpen className="w-5 h-5" /> },
-    { name: "Track Shipment", href: "/track", icon: <Package className="w-5 h-5" /> },
-    { name: "Contact", href: "/contact", icon: <Phone className="w-5 h-5" /> },
-  ];
+  const isAdmin = user?.is_admin === true;
 
   return (
-    <nav className="bg-white shadow-md w-full z-50 sticky top-0">
-      <div className="container mx-auto px-4 py-3">
-        <div className="flex justify-between items-center">
-          <div>
-            <Link to="/">
-              <Logo />
-            </Link>
-          </div>
+    <nav className="bg-white shadow-md sticky top-0 z-50">
+      <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+        <Link to="/" className="flex items-center">
+          <img src={logo} alt="ZIM Integrated Shipping Services Ltd." className="h-8 mr-2" />
+          <span className="font-bold text-xl">ZIM Clone</span>
+        </Link>
 
-          <div className="hidden md:flex items-center space-x-8">
-            <div className="flex space-x-6">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.name}
-                  to={link.href}
-                  className="flex items-center text-sm text-gray-700 hover:text-zim-green font-medium py-2 transition duration-150 ease-in-out"
-                  onClick={handleMenuItemClick}
-                >
-                  {link.icon}
-                  <span className="ml-1">{link.name}</span>
-                </Link>
-              ))}
-            </div>
+        {isMobile ? (
+          // Mobile Menu
+          <>
+            <Button variant="ghost" size="icon" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+              <Menu className="h-6 w-6" />
+            </Button>
 
-            <div className="flex items-center space-x-4">
-              {user ? (
-                <>
-                  <div className="group relative">
-                    <Button variant="outline" className="border-zim-black flex items-center">
-                      <User className="mr-1 h-4 w-4" />
-                      My Account
-                    </Button>
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg overflow-hidden z-20 invisible group-hover:visible">
-                      <div className="py-2">
-                        <Link 
-                          to="/dashboard" 
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={handleMenuItemClick}
-                        >
-                          <Package2 className="inline-block mr-2 h-4 w-4" />
-                          Dashboard
-                        </Link>
-                        <Link 
-                          to="/address-book" 
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={handleMenuItemClick}
-                        >
-                          <MapPin className="inline-block mr-2 h-4 w-4" />
-                          Address Book
-                        </Link>
-                        <Link 
-                          to="/account" 
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={handleMenuItemClick}
-                        >
-                          <Settings className="inline-block mr-2 h-4 w-4" />
-                          Account Settings
-                        </Link>
-                        {isAdmin && (
-                          <Link 
-                            to="/admin" 
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                            onClick={handleMenuItemClick}
-                          >
-                            <Package className="inline-block mr-2 h-4 w-4" />
-                            Admin Dashboard
-                          </Link>
-                        )}
-                        <button 
-                          onClick={handleSignOut}
-                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                          <LogOut className="inline-block mr-2 h-4 w-4" />
-                          Sign Out
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  <Link to="/create-shipment">
-                    <Button 
-                      className="bg-zim-green hover:bg-zim-green/90 flex items-center"
-                      onClick={handleMenuItemClick}
-                    >
-                      <Package className="mr-1 h-4 w-4" />
-                      New Shipment
-                    </Button>
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <Link to="/auth" onClick={handleMenuItemClick}>
-                    <Button variant="outline" className="border-zim-black flex items-center">
-                      <LogIn className="mr-1 h-4 w-4" />
-                      Sign In
-                    </Button>
-                  </Link>
-                  <Link to="/auth" onClick={() => { 
-                    navigate('/auth', { state: { signup: true } }); 
-                    handleMenuItemClick();
-                  }}>
-                    <Button className="bg-zim-green hover:bg-zim-green/90 flex items-center">
-                      <User className="mr-1 h-4 w-4" />
-                      Register
-                    </Button>
-                  </Link>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="flex md:hidden">
-            <button
-              onClick={toggleMenu}
-              className="text-gray-700 hover:text-zim-green focus:outline-none"
-              aria-label="Toggle menu"
-            >
-              {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {isMenuOpen && (
-        <div className="md:hidden bg-white shadow-lg py-2">
-          <div className="container mx-auto px-4 flex flex-col space-y-3">
-            {navLinks.map((link) => (
-              <Link
-                key={link.name}
-                to={link.href}
-                className="flex items-center text-gray-700 hover:text-zim-green font-medium py-2"
-                onClick={handleMenuItemClick}
-              >
-                <span className="mr-3">{link.icon}</span>
-                {link.name}
-              </Link>
-            ))}
-            <div className="py-3 space-y-3">
-              {user ? (
-                <>
-                  <Link to="/dashboard" onClick={handleMenuItemClick}>
-                    <Button variant="outline" className="w-full border-zim-black flex items-center justify-center">
-                      <Package2 className="mr-1 h-4 w-4" />
-                      Dashboard
-                    </Button>
-                  </Link>
-                  <Link to="/address-book" onClick={handleMenuItemClick}>
-                    <Button variant="outline" className="w-full border-zim-black flex items-center justify-center">
-                      <MapPin className="mr-1 h-4 w-4" />
-                      Address Book
-                    </Button>
-                  </Link>
-                  <Link to="/account" onClick={handleMenuItemClick}>
-                    <Button variant="outline" className="w-full border-zim-black flex items-center justify-center">
-                      <Settings className="mr-1 h-4 w-4" />
-                      Account Settings
-                    </Button>
-                  </Link>
-                  {isAdmin && (
-                    <Link to="/admin" onClick={handleMenuItemClick}>
-                      <Button variant="outline" className="w-full border-zim-black flex items-center justify-center">
-                        <Package className="mr-1 h-4 w-4" />
-                        Admin Dashboard
-                      </Button>
-                    </Link>
-                  )}
-                  <Link to="/create-shipment" onClick={handleMenuItemClick}>
-                    <Button className="w-full bg-zim-green hover:bg-zim-green/90 flex items-center justify-center">
-                      <Package className="mr-1 h-4 w-4" />
-                      New Shipment
-                    </Button>
-                  </Link>
-                  <Button 
-                    className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 flex items-center justify-center"
-                    onClick={() => {
-                      handleSignOut();
-                      handleMenuItemClick();
-                    }}
-                  >
-                    <LogOut className="mr-1 h-4 w-4" />
-                    Sign Out
+            {isMenuOpen && (
+              <div className="absolute top-full right-0 bg-white shadow-md rounded-md p-4 w-48 z-50">
+                {isAuthenticated ? (
+                  <>
+                    <Link to="/dashboard" className="block py-2 hover:bg-gray-100 rounded-md">Dashboard</Link>
+                    <Link to="/account" className="block py-2 hover:bg-gray-100 rounded-md">Account</Link>
+                    {isAdmin && (
+                      <Link to="/admin" className="block py-2 hover:bg-gray-100 rounded-md">Admin</Link>
+                    )}
+                    <button onClick={handleLogout} className="block py-2 hover:bg-gray-100 rounded-md w-full text-left">Logout</button>
+                  </>
+                ) : (
+                  <>
+                    <Link to="/auth" className="block py-2 hover:bg-gray-100 rounded-md">Login/Register</Link>
+                  </>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          // Desktop Menu
+          <div className="flex items-center space-x-6">
+            <Link to="/services" className="hover:text-gray-600">Services</Link>
+            <Link to="/contact" className="hover:text-gray-600">Contact</Link>
+            <Link to="/track" className="hover:text-gray-600">Track</Link>
+            {isAuthenticated ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative">
+                    {user?.email}
                   </Button>
-                </>
-              ) : (
-                <>
-                  <Link to="/auth" onClick={handleMenuItemClick}>
-                    <Button variant="outline" className="w-full border-zim-black flex items-center justify-center">
-                      <LogIn className="mr-1 h-4 w-4" />
-                      Sign In
-                    </Button>
-                  </Link>
-                  <Link to="/auth" onClick={() => {
-                    navigate('/auth', { state: { signup: true } });
-                    handleMenuItemClick();
-                  }}>
-                    <Button className="w-full bg-zim-green hover:bg-zim-green/90 flex items-center justify-center">
-                      <User className="mr-1 h-4 w-4" />
-                      Register
-                    </Button>
-                  </Link>
-                </>
-              )}
-            </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link to="/dashboard" className="cursor-pointer">
+                      <LayoutDashboard className="mr-2 h-4 w-4" />
+                      Dashboard
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/account" className="cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      Account Settings
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/notifications" className="cursor-pointer">
+                      <Bell className="mr-2 h-4 w-4" />
+                      Notifications
+                    </Link>
+                  </DropdownMenuItem>
+                  {isAdmin && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin" className="cursor-pointer">
+                        <ShieldCheck className="mr-2 h-4 w-4" />
+                        Admin Dashboard
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Link to="/auth" className="bg-zim-green text-white px-4 py-2 rounded-md hover:bg-zim-green/90">
+                Login/Register
+              </Link>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </nav>
   );
 };
 
-export default React.memo(Navbar);
+export default Navbar;
