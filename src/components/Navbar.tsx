@@ -1,7 +1,8 @@
+
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMobile } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,17 +24,15 @@ import logo from '@/assets/zim-logo.svg';
 import NotificationsPanel from '@/components/NotificationsPanel';
 
 const Navbar = () => {
-  const { isAuthenticated, user, logout } = useAuth();
+  const { user, session, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
-  const isMobile = useMobile();
+  const isMobile = useIsMobile();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   const handleLogout = async () => {
-    await logout();
+    await signOut();
     navigate('/');
   };
-
-  const isAdmin = user?.is_admin === true;
 
   return (
     <nav className="bg-white shadow-md sticky top-0 z-50">
@@ -52,7 +51,7 @@ const Navbar = () => {
 
             {isMenuOpen && (
               <div className="absolute top-full right-0 bg-white shadow-md rounded-md p-4 w-48 z-50">
-                {isAuthenticated ? (
+                {user ? (
                   <>
                     <Link to="/dashboard" className="block py-2 hover:bg-gray-100 rounded-md">Dashboard</Link>
                     <Link to="/account" className="block py-2 hover:bg-gray-100 rounded-md">Account</Link>
@@ -75,7 +74,7 @@ const Navbar = () => {
             <Link to="/services" className="hover:text-gray-600">Services</Link>
             <Link to="/contact" className="hover:text-gray-600">Contact</Link>
             <Link to="/track" className="hover:text-gray-600">Track</Link>
-            {isAuthenticated ? (
+            {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative">
