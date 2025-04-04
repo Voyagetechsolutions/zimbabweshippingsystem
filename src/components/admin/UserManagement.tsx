@@ -1,6 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useRole, UserRoleType } from '@/contexts/RoleContext';
 import {
   Card,
   CardContent,
@@ -54,6 +56,7 @@ import {
   UserCheck,
   ShieldCheck,
   Mail,
+  Shield,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -64,6 +67,7 @@ interface Profile {
   email: string;
   full_name: string | null;
   is_admin: boolean;
+  role?: UserRoleType | null;
   avatar_url?: string | null;
   created_at: string;
 }
@@ -72,6 +76,7 @@ const userFormSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   full_name: z.string().min(2, "Name must be at least 2 characters"),
   is_admin: z.boolean().default(false),
+  role: z.string().optional(),
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -83,7 +88,11 @@ const UserManagement = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
   const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [roleAssignDialogOpen, setRoleAssignDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+  const [selectedRole, setSelectedRole] = useState<UserRoleType>('customer');
   const { toast } = useToast();
+  const { setUserRole } = useRole();
 
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
@@ -91,6 +100,7 @@ const UserManagement = () => {
       email: '',
       full_name: '',
       is_admin: false,
+      role: 'customer',
     },
   });
 
@@ -104,12 +114,14 @@ const UserManagement = () => {
         email: editingUser.email || '',
         full_name: editingUser.full_name || '',
         is_admin: editingUser.is_admin || false,
+        role: editingUser.role || 'customer',
       });
     } else if (isCreatingUser) {
       form.reset({
         email: '',
         full_name: '',
         is_admin: false,
+        role: 'customer',
       });
     }
   }, [editingUser, isCreatingUser, form]);
@@ -165,11 +177,46 @@ const UserManagement = () => {
     setIsDialogOpen(true);
   };
 
+  const openRoleAssignDialog = (user: Profile) => {
+    setSelectedUser(user);
+    setSelectedRole(user.role || 'customer');
+    setRoleAssignDialogOpen(true);
+  };
+
   const closeDialog = () => {
     setIsDialogOpen(false);
     setEditingUser(null);
     setIsCreatingUser(false);
     form.reset();
+  };
+
+  const closeRoleAssignDialog = () => {
+    setRoleAssignDialogOpen(false);
+    setSelectedUser(null);
+    setSelectedRole('customer');
+  };
+
+  const handleAssignRole = async () => {
+    if (!selectedUser || !selectedRole) return;
+    
+    try {
+      const success = await setUserRole(selectedUser.id, selectedRole);
+      
+      if (success) {
+        toast({
+          title: 'Role Updated',
+          description: `User ${selectedUser.full_name || selectedUser.email} is now a ${selectedRole}`,
+        });
+        closeRoleAssignDialog();
+        fetchUsers(); // Refresh the user list
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error updating role',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleCreateUser = async (values: UserFormValues) => {
@@ -192,6 +239,22 @@ const UserManagement = () => {
         });
         
         if (adminError) throw adminError;
+      }
+
+      // Assign role if specified
+      if (values.role && values.role !== 'customer') {
+        // Wait for the user to be created in the database
+        setTimeout(async () => {
+          const { data: userData } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('email', values.email)
+            .single();
+            
+          if (userData) {
+            await setUserRole(userData.id, values.role as UserRoleType);
+          }
+        }, 2000); // Give it a moment for the trigger to create the profile
       }
 
       toast({
@@ -236,6 +299,11 @@ const UserManagement = () => {
         }
       }
 
+      // Update role if changed
+      if (values.role && values.role !== editingUser.role) {
+        await setUserRole(editingUser.id, values.role as UserRoleType);
+      }
+
       toast({
         title: 'User updated',
         description: 'The user has been updated successfully',
@@ -264,6 +332,35 @@ const UserManagement = () => {
     user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Display the user's role or default to 'customer'
+  const getUserRoleBadge = (user: Profile) => {
+    const role = user.role || 'customer';
+    
+    // Style badges based on role
+    const getBadgeStyle = (role: string) => {
+      switch(role) {
+        case 'admin':
+          return "bg-red-100 text-red-800 border-red-300";
+        case 'logistics':
+          return "bg-orange-100 text-orange-800 border-orange-300";
+        case 'driver':
+          return "bg-green-100 text-green-800 border-green-300";  
+        case 'support':
+          return "bg-purple-100 text-purple-800 border-purple-300";
+        case 'customer':
+        default:
+          return "bg-blue-100 text-blue-800 border-blue-300";
+      }
+    };
+
+    return (
+      <Badge className={getBadgeStyle(role)}>
+        {role === 'admin' ? <ShieldCheck className="mr-1 h-3 w-3" /> : <UserCheck className="mr-1 h-3 w-3" />}
+        {role.charAt(0).toUpperCase() + role.slice(1)}
+      </Badge>
+    );
+  };
 
   return (
     <div>
@@ -320,6 +417,7 @@ const UserManagement = () => {
                   <TableRow>
                     <TableHead>User</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead>Admin</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -346,11 +444,13 @@ const UserManagement = () => {
                             Admin
                           </Badge>
                         ) : (
-                          <Badge className="bg-blue-100 text-blue-800 border-blue-300">
-                            <UserCheck className="mr-1 h-3 w-3" />
-                            Standard User
+                          <Badge variant="outline" className="text-gray-500">
+                            No
                           </Badge>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        {getUserRoleBadge(user)}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end space-x-2">
@@ -358,9 +458,19 @@ const UserManagement = () => {
                             variant="ghost"
                             size="icon"
                             onClick={() => openEditUserDialog(user)}
+                            title="Edit User"
                           >
                             <Edit className="h-4 w-4" />
                             <span className="sr-only">Edit</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openRoleAssignDialog(user)}
+                            title="Assign Role"
+                          >
+                            <Shield className="h-4 w-4" />
+                            <span className="sr-only">Assign Role</span>
                           </Button>
                           <Button
                             variant="ghost"
@@ -371,6 +481,7 @@ const UserManagement = () => {
                                 description: `A password reset email has been sent to ${user.email}`,
                               });
                             }}
+                            title="Reset Password"
                           >
                             <Mail className="h-4 w-4" />
                             <span className="sr-only">Reset password</span>
@@ -386,6 +497,7 @@ const UserManagement = () => {
         </CardContent>
       </Card>
 
+      {/* Edit User Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -451,6 +563,37 @@ const UserManagement = () => {
                 )}
               />
               
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>User Role</FormLabel>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="customer">Customer</SelectItem>
+                        <SelectItem value="driver">Driver</SelectItem>
+                        <SelectItem value="support">Support</SelectItem>
+                        <SelectItem value="logistics">Logistics</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      This determines what features the user can access
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
               <DialogFooter>
                 <Button variant="outline" type="button" onClick={closeDialog}>
                   Cancel
@@ -461,6 +604,56 @@ const UserManagement = () => {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Role Assignment Dialog */}
+      <Dialog open={roleAssignDialogOpen} onOpenChange={setRoleAssignDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Assign Role</DialogTitle>
+            <DialogDescription>
+              Change the role for {selectedUser?.full_name || selectedUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="mb-4">
+              <h4 className="text-sm font-medium mb-2">Current Role</h4>
+              <Badge className="text-sm">
+                {selectedUser?.role || 'customer'}
+              </Badge>
+            </div>
+            
+            <div className="mb-4">
+              <label className="text-sm font-medium mb-2 block">New Role</label>
+              <Select
+                value={selectedRole}
+                onValueChange={(value) => setSelectedRole(value as UserRoleType)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="customer">Customer</SelectItem>
+                  <SelectItem value="driver">Driver</SelectItem>
+                  <SelectItem value="support">Support</SelectItem>
+                  <SelectItem value="logistics">Logistics</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-gray-500 mt-1">
+                Each role has different permissions and access levels
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeRoleAssignDialog}>
+              Cancel
+            </Button>
+            <Button className="bg-zim-green hover:bg-zim-green/90" onClick={handleAssignRole}>
+              Assign Role
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
