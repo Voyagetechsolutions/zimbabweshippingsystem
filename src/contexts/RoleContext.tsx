@@ -45,19 +45,19 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // If the column doesn't exist yet, set default role
           if (error.message.includes("column 'role' does not exist")) {
             console.log('Role column not found, setting default role');
-            setRole('customer'); // Default role
+            setRole('customer' as UserRoleType); // Default role
           } else {
-            setRole('customer'); // Default fallback for other errors
+            setRole('customer' as UserRoleType); // Default fallback for other errors
           }
         } else if (data && data.role) {
           setRole(data.role as UserRoleType);
         } else {
           // If no role found, default to customer
-          setRole('customer');
+          setRole('customer' as UserRoleType);
         }
       } catch (error) {
         console.error('Error in fetchUserRole:', error);
-        setRole('customer'); // Default role
+        setRole('customer' as UserRoleType); // Default role
       } finally {
         setIsLoading(false);
       }

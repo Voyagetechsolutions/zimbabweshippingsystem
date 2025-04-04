@@ -20,13 +20,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ShieldAlert } from "lucide-react";
-import { useRole, UserRole } from '@/contexts/RoleContext';
+import { useRole, UserRoleType } from '@/contexts/RoleContext';
 import { useToast } from '@/hooks/use-toast';
 
 const RoleElevationDialog = () => {
   const [open, setOpen] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
-  const [selectedRole, setSelectedRole] = useState<UserRole>('admin');
+  const [selectedRole, setSelectedRole] = useState<UserRoleType>('admin');
   const { role, elevateToAdmin } = useRole();
   const { toast } = useToast();
 
@@ -69,7 +69,7 @@ const RoleElevationDialog = () => {
             <Label htmlFor="role">Role</Label>
             <Select
               value={selectedRole}
-              onValueChange={(value) => setSelectedRole(value as UserRole)}
+              onValueChange={(value) => setSelectedRole(value as UserRoleType)}
               disabled // In this implementation, we only allow elevation to admin
             >
               <SelectTrigger>

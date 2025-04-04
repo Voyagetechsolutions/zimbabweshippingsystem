@@ -1,13 +1,13 @@
 
 import { useAuth } from '@/contexts/AuthContext';
-import { useRole, UserRole } from '@/contexts/RoleContext';
+import { useRole, UserRoleType } from '@/contexts/RoleContext';
 import { Navigate, useLocation } from 'react-router-dom';
 import React from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 interface RequireAuthProps {
   children: JSX.Element;
-  requiredRole?: UserRole;
+  requiredRole?: UserRoleType;
 }
 
 // Use React.memo to prevent unnecessary re-renders
@@ -89,7 +89,7 @@ export const RequireAdmin = React.memo(({ children }: { children: JSX.Element })
   return children;
 });
 
-export const RequireRole = React.memo(({ children, requiredRole }: { children: JSX.Element, requiredRole: UserRole }) => {
+export const RequireRole = React.memo(({ children, requiredRole }: { children: JSX.Element, requiredRole: UserRoleType }) => {
   return <RequireAuth requiredRole={requiredRole}>{children}</RequireAuth>;
 });
 
