@@ -16,6 +16,7 @@ export interface Notification {
   type: NotificationType;
   is_read: boolean;
   created_at: string;
+  user_id: string;
   related_id?: string;
   priority?: NotificationPriority;
   action_url?: string;

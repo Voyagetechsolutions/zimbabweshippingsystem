@@ -1,96 +1,72 @@
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { Review } from '@/types/reviews';
 import { useToast } from '@/hooks/use-toast';
 import ReviewForm from './ReviewForm';
 import ReviewsList from './ReviewsList';
-import { 
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription 
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Review, ReviewFormData } from '@/types/reviews';
+import { tableFrom } from '@/integrations/supabase/db-types';
 
-interface ReviewsSectionProps {
-  shipmentId?: string;
-}
-
-const ReviewsSection: React.FC<ReviewsSectionProps> = ({ shipmentId }) => {
+const ReviewsSection: React.FC = () => {
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [userReview, setUserReview] = useState<Review | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [selectedReview, setSelectedReview] = useState<Review | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (shipmentId || user) {
-      fetchReviews();
-    }
-  }, [shipmentId, user]);
+    fetchReviews();
+  }, []);
 
   const fetchReviews = async () => {
-    setLoading(true);
     try {
-      let query = supabase
-        .from('reviews')
-        .select('*, profiles:user_id(full_name, email)')
-      
-      // If shipmentId is provided, only get reviews for that shipment
-      if (shipmentId) {
-        query = query.eq('shipment_id', shipmentId);
-      } else if (user) {
-        // Otherwise, get recent reviews (limit to 50 for performance)
-        query = query.limit(50);
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false });
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from(tableFrom('reviews'))
+        .select(`
+          id,
+          user_id,
+          shipment_id,
+          rating,
+          comment,
+          created_at,
+          profiles:user_id(id, full_name, email)
+        `)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
       if (data) {
-        const mappedReviews: Review[] = data.map(item => ({
+        const formattedReviews: Review[] = data.map(item => ({
           id: item.id,
-          user_id: item.user_id,
-          shipment_id: item.shipment_id,
+          userId: item.user_id,
+          shipmentId: item.shipment_id,
           rating: item.rating,
-          comment: item.comment,
-          created_at: item.created_at,
-          user_name: item.profiles?.full_name,
-          user_email: item.profiles?.email
+          comment: item.comment || '',
+          createdAt: item.created_at,
+          userName: item.profiles?.full_name || 'Anonymous',
+          userEmail: item.profiles?.email || '',
         }));
-
-        setReviews(mappedReviews);
         
-        // Check if current user has a review
-        if (user) {
-          const currentUserReview = mappedReviews.find(review => review.user_id === user.id);
-          if (currentUserReview) {
-            setUserReview(currentUserReview);
-          } else {
-            setUserReview(null);
-          }
-        }
+        setReviews(formattedReviews);
       }
     } catch (error: any) {
       console.error('Error fetching reviews:', error.message);
       toast({
-        title: 'Error fetching reviews',
-        description: error.message,
+        title: 'Error',
+        description: 'Failed to load reviews',
         variant: 'destructive',
       });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const handleSubmitReview = async (data: ReviewFormData) => {
+  const handleCreateReview = async (rating: number, comment: string, shipmentId?: string) => {
     if (!user) {
       toast({
-        title: 'Authentication required',
+        title: 'Authentication Required',
         description: 'Please log in to submit a review',
         variant: 'destructive',
       });
@@ -98,156 +74,119 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ shipmentId }) => {
     }
 
     try {
-      if (isEditMode && userReview) {
-        // Update existing review
-        const { error } = await supabase
-          .from('reviews')
-          .update({
-            rating: data.rating,
-            comment: data.comment
-          })
-          .eq('id', userReview.id);
-
-        if (error) throw error;
-
-        toast({
-          title: 'Review updated',
-          description: 'Your review has been updated successfully',
-        });
-      } else {
-        // Create new review
-        const { error } = await supabase
-          .from('reviews')
-          .insert([{
-            user_id: user.id,
-            rating: data.rating,
-            comment: data.comment,
-            shipment_id: shipmentId || null
-          }]);
-
-        if (error) throw error;
-
-        toast({
-          title: 'Review submitted',
-          description: 'Thank you for your feedback!',
-        });
-      }
-
-      setIsDialogOpen(false);
-      fetchReviews();
-    } catch (error: any) {
-      console.error('Error submitting review:', error.message);
-      toast({
-        title: 'Error submitting review',
-        description: error.message,
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleEditReview = (review: Review) => {
-    setIsEditMode(true);
-    setUserReview(review);
-    setIsDialogOpen(true);
-  };
-
-  const handleDeleteReview = async (reviewId: string) => {
-    try {
       const { error } = await supabase
-        .from('reviews')
-        .delete()
-        .eq('id', reviewId);
+        .from(tableFrom('reviews'))
+        .insert({
+          user_id: user.id,
+          rating,
+          comment,
+          shipment_id: shipmentId || null
+        });
 
       if (error) throw error;
 
       toast({
-        title: 'Review deleted',
-        description: 'Your review has been deleted successfully',
+        title: 'Review Submitted',
+        description: 'Thank you for your feedback!',
       });
-
+      
       fetchReviews();
     } catch (error: any) {
-      console.error('Error deleting review:', error.message);
+      console.error('Error creating review:', error.message);
       toast({
-        title: 'Error deleting review',
+        title: 'Error',
         description: error.message,
         variant: 'destructive',
       });
     }
   };
 
-  // Check if current user can manage a review
-  const canManageReview = (reviewUserId: string) => {
-    return user && (reviewUserId === user.id);
+  const handleUpdateReview = async (id: string, rating: number, comment: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from(tableFrom('reviews'))
+        .update({ rating, comment })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Review Updated',
+        description: 'Your review has been updated successfully',
+      });
+      
+      setSelectedReview(null);
+      fetchReviews();
+    } catch (error: any) {
+      console.error('Error updating review:', error.message);
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteReview = async (id: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from(tableFrom('reviews'))
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Review Deleted',
+        description: 'Your review has been deleted successfully',
+      });
+      
+      fetchReviews();
+    } catch (error: any) {
+      console.error('Error deleting review:', error.message);
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
-    <div>
-      <Card className="mb-6">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-xl">Customer Reviews</CardTitle>
-              <CardDescription>
-                {shipmentId 
-                  ? 'Reviews for this shipment'
-                  : 'What our customers are saying about our services'}
-              </CardDescription>
-            </div>
-            {user && (
-              <Button 
-                onClick={() => {
-                  setIsEditMode(!!userReview);
-                  setIsDialogOpen(true);
-                }} 
-                className="bg-zim-green hover:bg-zim-green/90"
-              >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                {userReview ? 'Edit Your Review' : 'Write a Review'}
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex justify-center items-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
-            </div>
-          ) : (
-            <ReviewsList 
-              reviews={reviews} 
-              onEdit={handleEditReview} 
-              onDelete={handleDeleteReview}
-              canManageReview={canManageReview}
-            />
-          )}
-        </CardContent>
-      </Card>
-
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>
-              {isEditMode ? 'Update Your Review' : 'Write a Review'}
-            </DialogTitle>
-            <DialogDescription>
-              {shipmentId 
-                ? 'Share your experience with this shipment' 
-                : 'Share your experience with our services'}
-            </DialogDescription>
-          </DialogHeader>
-          <ReviewForm 
-            onSubmit={handleSubmitReview}
-            shipment_id={shipmentId}
-            initialData={userReview ? {
-              rating: userReview.rating,
-              comment: userReview.comment || '',
-              shipment_id: userReview.shipment_id || undefined
-            } : undefined}
-            isUpdate={isEditMode}
+    <div className="container mx-auto py-8">
+      <h2 className="text-2xl font-bold mb-6">Customer Reviews</h2>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2">
+          <ReviewsList 
+            reviews={reviews} 
+            isLoading={isLoading} 
+            onEdit={setSelectedReview}
+            onDelete={handleDeleteReview}
+            currentUserId={user?.id}
           />
-        </DialogContent>
-      </Dialog>
+        </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <h3 className="text-xl font-semibold mb-4">
+            {selectedReview ? 'Edit Your Review' : 'Share Your Experience'}
+          </h3>
+          <ReviewForm 
+            initialRating={selectedReview?.rating || 0}
+            initialComment={selectedReview?.comment || ''}
+            onSubmit={selectedReview 
+              ? (rating, comment) => handleUpdateReview(selectedReview.id, rating, comment)
+              : handleCreateReview
+            }
+            onCancel={selectedReview ? () => setSelectedReview(null) : undefined}
+            isEdit={!!selectedReview}
+          />
+        </div>
+      </div>
     </div>
   );
 };
