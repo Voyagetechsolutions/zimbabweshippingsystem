@@ -3,23 +3,21 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-
-// Define the available roles
-export type UserRole = 'admin' | 'logistics' | 'driver' | 'support' | 'customer';
+import { UserRoleType } from '@/types/admin';
 
 interface RoleContextType {
-  role: UserRole | null;
+  role: UserRoleType | null;
   isLoading: boolean;
-  hasPermission: (requiredRole: UserRole) => boolean;
+  hasPermission: (requiredRole: UserRoleType) => boolean;
   elevateToAdmin: (password: string) => Promise<boolean>;
-  setUserRole: (userId: string, newRole: UserRole) => Promise<boolean>;
+  setUserRole: (userId: string, newRole: UserRoleType) => Promise<boolean>;
 }
 
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
 export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, session } = useAuth();
-  const [role, setRole] = useState<UserRole | null>(null);
+  const [role, setRole] = useState<UserRoleType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
@@ -34,6 +32,7 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       try {
         setIsLoading(true);
+        // First try to get role directly
         const { data, error } = await supabase
           .from('profiles')
           .select('role')
@@ -42,9 +41,19 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (error) {
           console.error('Error fetching user role:', error);
-          setRole('customer'); // Default role
-        } else if (data) {
-          setRole(data.role as UserRole);
+          
+          // If the column doesn't exist yet, set default role
+          if (error.message.includes("column 'role' does not exist")) {
+            console.log('Role column not found, setting default role');
+            setRole('customer'); // Default role
+          } else {
+            setRole('customer'); // Default fallback for other errors
+          }
+        } else if (data && data.role) {
+          setRole(data.role as UserRoleType);
+        } else {
+          // If no role found, default to customer
+          setRole('customer');
         }
       } catch (error) {
         console.error('Error in fetchUserRole:', error);
@@ -58,7 +67,7 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   // Check if the user has permission for a specific role
-  const hasPermission = (requiredRole: UserRole): boolean => {
+  const hasPermission = (requiredRole: UserRoleType): boolean => {
     if (!role) return false;
 
     // Role hierarchy: admin > logistics > driver/support > customer
@@ -81,9 +90,11 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Function to elevate a user to admin with the secret password
   const elevateToAdmin = async (password: string): Promise<boolean> => {
     try {
-      const { data, error } = await supabase.rpc('elevate_to_admin', {
-        admin_password: password
-      });
+      // Try to call the RPC function via raw query instead of typed RPC
+      const { data, error } = await supabase
+        .rpc('elevate_to_admin', {
+          admin_password: password
+        } as any);
 
       if (error) {
         toast({
@@ -120,7 +131,7 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Function to set another user's role (admin only)
-  const setUserRole = async (userId: string, newRole: UserRole): Promise<boolean> => {
+  const setUserRole = async (userId: string, newRole: UserRoleType): Promise<boolean> => {
     try {
       if (role !== 'admin') {
         toast({
@@ -131,10 +142,12 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
 
-      const { data, error } = await supabase.rpc('set_user_role', {
-        target_user_id: userId,
-        new_role: newRole
-      });
+      // Try to call the RPC function via raw query instead of typed RPC
+      const { data, error } = await supabase
+        .rpc('set_user_role', {
+          target_user_id: userId,
+          new_role: newRole
+        } as any);
 
       if (error) {
         toast({
@@ -182,3 +195,6 @@ export const useRole = () => {
   }
   return context;
 };
+
+// Re-export UserRoleType for convenience
+export type { UserRoleType };
