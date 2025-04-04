@@ -111,8 +111,8 @@ const TaskManagement: React.FC = () => {
         .from(tableFrom('support_tickets'))
         .select(`
           *,
-          assignee:profiles!fk_support_tickets_assigned_to(id, full_name),
-          creator:profiles!fk_support_tickets_user_id(id, full_name)
+          assignee:profiles!assigned_to(id, full_name),
+          creator:profiles!user_id(id, full_name)
         `)
         .order('created_at', { ascending: false });
 
@@ -180,7 +180,6 @@ const TaskManagement: React.FC = () => {
 
     try {
       if (selectedTask) {
-        // Update existing task
         const { error } = await supabase
           .from('support_tickets')
           .update({
@@ -199,7 +198,6 @@ const TaskManagement: React.FC = () => {
           description: 'Task has been updated successfully',
         });
       } else {
-        // Create new task
         const { error } = await supabase
           .from('support_tickets')
           .insert({
@@ -321,7 +319,6 @@ const TaskManagement: React.FC = () => {
     if (!user) return;
     
     try {
-      // Example of creating bulk tasks - this would typically come from a form
       const taskList = [
         {
           subject: 'Contact shipping partners',
@@ -487,7 +484,6 @@ const TaskManagement: React.FC = () => {
         </div>
       )}
 
-      {/* Task Form Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
@@ -645,7 +641,6 @@ const TaskManagement: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>

@@ -31,7 +31,7 @@ const ReviewsSection: React.FC = () => {
           rating,
           comment,
           created_at,
-          user:profiles!fk_reviews_user_id(id, full_name, email)
+          profiles(id, full_name, email)
         `)
         .order('created_at', { ascending: false });
 
@@ -45,8 +45,8 @@ const ReviewsSection: React.FC = () => {
           rating: item.rating,
           comment: item.comment || '',
           createdAt: item.created_at,
-          userName: item.user?.full_name || 'Anonymous',
-          userEmail: item.user?.email || '',
+          userName: item.profiles?.full_name || 'Anonymous',
+          userEmail: item.profiles?.email || '',
         }));
         
         setReviews(formattedReviews);
