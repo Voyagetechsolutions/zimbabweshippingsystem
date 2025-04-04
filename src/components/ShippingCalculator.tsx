@@ -9,15 +9,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Ship, Package, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useShipping } from '@/contexts/ShippingContext';
 
 const ShippingCalculator: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>("drum");
   const [drumQuantity, setDrumQuantity] = useState<string>("1");
   const [weight, setWeight] = useState<string>("1");
   const [additionalServices, setAdditionalServices] = useState({
-    doorToDoor: false,
-    insurance: false
+    doorToDoor: false
   });
+  const { formatPrice } = useShipping();
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, checked } = e.target;
@@ -47,9 +48,6 @@ const ShippingCalculator: React.FC = () => {
     if (additionalServices.doorToDoor) {
       additionalCost += 25;
     }
-    if (additionalServices.insurance) {
-      additionalCost += basePrice * 0.05; // 5% of base price
-    }
     
     return {
       basePrice,
@@ -61,19 +59,19 @@ const ShippingCalculator: React.FC = () => {
   const priceDetails = calculatePrice();
 
   return (
-    <section className="py-16 bg-gray-50 relative overflow-hidden">
+    <section className="py-16 bg-gray-50 dark:bg-gray-900 relative overflow-hidden">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Calculate Shipping Cost</h2>
-          <p className="text-gray-600 max-w-2xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4 dark:text-white">Calculate Shipping Cost</h2>
+          <p className="text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
             Get an instant estimate for your shipment from the UK to Zimbabwe.
           </p>
         </div>
 
         <div className="max-w-4xl mx-auto">
-          <Card className="border-gray-200 overflow-hidden">
-            <CardHeader className="bg-gray-50 border-b">
-              <CardTitle className="text-2xl">Shipping Calculator</CardTitle>
+          <Card className="border-gray-200 dark:border-gray-700 overflow-hidden dark:bg-gray-800">
+            <CardHeader className="bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700">
+              <CardTitle className="text-2xl dark:text-white">Shipping Calculator</CardTitle>
             </CardHeader>
             <CardContent className="p-6">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -105,42 +103,43 @@ const ShippingCalculator: React.FC = () => {
                     </Select>
                   </div>
                   
-                  <div className="p-4 bg-gray-50 rounded-md text-sm">
-                    <div className="font-medium mb-2">Pricing Tiers:</div>
-                    <ul className="space-y-1 list-disc pl-5">
-                      <li>1 Drum: £260 each</li>
-                      <li>2-4 Drums: £250 each</li>
-                      <li>5+ Drums: £220 each</li>
+                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-md text-sm">
+                    <div className="font-medium mb-2 dark:text-white">Pricing Tiers:</div>
+                    <ul className="space-y-1 list-disc pl-5 dark:text-gray-200">
+                      <li>1 Drum: {formatPrice(260)} each</li>
+                      <li>2-4 Drums: {formatPrice(250)} each</li>
+                      <li>5+ Drums: {formatPrice(220)} each</li>
                     </ul>
-                    <p className="mt-2 text-gray-500">Each drum has a capacity of 200L</p>
+                    <p className="mt-2 text-gray-500 dark:text-gray-300">Each drum has a capacity of 220L</p>
                   </div>
                 </TabsContent>
                 
                 <TabsContent value="parcel" className="space-y-6">
                   <div>
-                    <Label htmlFor="weight">Package Weight (kg)</Label>
+                    <Label htmlFor="weight" className="dark:text-white">Package Weight (kg)</Label>
                     <Input 
                       id="weight"
                       type="number" 
                       min="1"
                       value={weight}
                       onChange={(e) => setWeight(e.target.value)}
+                      className="dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                     />
                   </div>
                   
-                  <div className="p-4 bg-gray-50 rounded-md text-sm">
-                    <div className="font-medium mb-2">Regular Parcel Pricing:</div>
-                    <p>£50 per kg</p>
-                    <p className="mt-2 text-gray-500">
+                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-md text-sm">
+                    <div className="font-medium mb-2 dark:text-white">Regular Parcel Pricing:</div>
+                    <p className="dark:text-gray-200">{formatPrice(50)} per kg</p>
+                    <p className="mt-2 text-gray-500 dark:text-gray-300">
                       Ideal for smaller packages and personal items
                     </p>
                   </div>
                 </TabsContent>
                 
                 <div className="mt-8">
-                  <p className="font-medium text-lg mb-3">Additional Services</p>
+                  <p className="font-medium text-lg mb-3 dark:text-white">Additional Services</p>
                   <div className="space-y-4">
-                    <div className="flex items-start space-x-3 p-4 border rounded-md">
+                    <div className="flex items-start space-x-3 p-4 border rounded-md dark:border-gray-700">
                       <input
                         type="checkbox"
                         id="doorToDoor"
@@ -150,30 +149,11 @@ const ShippingCalculator: React.FC = () => {
                         className="mt-1"
                       />
                       <div>
-                        <Label htmlFor="doorToDoor" className="cursor-pointer font-medium">
-                          Door-to-Door Delivery <span className="text-zim-green ml-2">£25</span>
+                        <Label htmlFor="doorToDoor" className="cursor-pointer font-medium dark:text-white">
+                          Door-to-Door Delivery <span className="text-zim-green dark:text-zim-yellow ml-2">{formatPrice(25)}</span>
                         </Label>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                           We pick up from your address and deliver directly to recipient
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-start space-x-3 p-4 border rounded-md">
-                      <input
-                        type="checkbox"
-                        id="insurance"
-                        name="insurance"
-                        checked={additionalServices.insurance}
-                        onChange={handleCheckboxChange}
-                        className="mt-1"
-                      />
-                      <div>
-                        <Label htmlFor="insurance" className="cursor-pointer font-medium">
-                          Shipping Insurance <span className="text-zim-green ml-2">5% of shipment value</span>
-                        </Label>
-                        <p className="text-sm text-gray-500 mt-1">
-                          Protect your items with our comprehensive insurance
                         </p>
                       </div>
                     </div>
@@ -181,18 +161,18 @@ const ShippingCalculator: React.FC = () => {
                 </div>
               </Tabs>
               
-              <div className="mt-8 p-6 bg-gray-50 rounded-lg">
-                <div className="flex justify-between items-center pb-3 border-b">
-                  <span className="font-medium">Base Shipping Cost:</span>
-                  <span className="text-lg">£{priceDetails.basePrice.toFixed(2)}</span>
+              <div className="mt-8 p-6 bg-gray-50 dark:bg-gray-800 rounded-lg border dark:border-gray-700">
+                <div className="flex justify-between items-center pb-3 border-b dark:border-gray-700">
+                  <span className="font-medium dark:text-white">Base Shipping Cost:</span>
+                  <span className="text-lg dark:text-white">{formatPrice(priceDetails.basePrice)}</span>
                 </div>
-                <div className="flex justify-between items-center py-3 border-b">
-                  <span className="font-medium">Additional Services:</span>
-                  <span>£{priceDetails.additionalCost.toFixed(2)}</span>
+                <div className="flex justify-between items-center py-3 border-b dark:border-gray-700">
+                  <span className="font-medium dark:text-white">Additional Services:</span>
+                  <span className="dark:text-white">{formatPrice(priceDetails.additionalCost)}</span>
                 </div>
                 <div className="flex justify-between items-center pt-3 font-bold">
-                  <span>Total Estimated Cost:</span>
-                  <span className="text-2xl text-zim-green">£{priceDetails.totalPrice.toFixed(2)}</span>
+                  <span className="dark:text-white">Total Estimated Cost:</span>
+                  <span className="text-2xl text-zim-green dark:text-zim-yellow">{formatPrice(priceDetails.totalPrice)}</span>
                 </div>
               </div>
               
@@ -202,7 +182,7 @@ const ShippingCalculator: React.FC = () => {
                     Book Now <ArrowRight className="ml-2" />
                   </Button>
                 </Link>
-                <p className="mt-4 text-sm text-gray-500">
+                <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
                   This is an estimate. Final pricing may vary based on specific shipping details.
                 </p>
               </div>
@@ -212,8 +192,8 @@ const ShippingCalculator: React.FC = () => {
       </div>
       
       {/* Background decoration */}
-      <div className="absolute left-0 top-0 w-64 h-64 bg-zim-green/5 rounded-full -translate-x-1/2 -translate-y-1/2 z-0"></div>
-      <div className="absolute right-0 bottom-0 w-80 h-80 bg-zim-yellow/5 rounded-full translate-x-1/3 translate-y-1/3 z-0"></div>
+      <div className="absolute left-0 top-0 w-64 h-64 bg-zim-green/5 dark:bg-zim-green/10 rounded-full -translate-x-1/2 -translate-y-1/2 z-0"></div>
+      <div className="absolute right-0 bottom-0 w-80 h-80 bg-zim-yellow/5 dark:bg-zim-yellow/10 rounded-full translate-x-1/3 translate-y-1/3 z-0"></div>
     </section>
   );
 };

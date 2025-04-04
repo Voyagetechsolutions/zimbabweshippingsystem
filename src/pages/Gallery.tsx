@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -16,7 +17,6 @@ import {
 } from 'lucide-react';
 import { GalleryImage, GalleryCategory } from '@/types/gallery';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { callRpcFunction } from '@/utils/supabaseUtils';
 
 const GalleryPage = () => {
@@ -224,7 +224,7 @@ const GalleryPage = () => {
                 
                 {isLoading ? (
                   <div className="h-96 flex items-center justify-center">
-                    <Loader2 className="h-12 w-12 animate-spin text-zim-green" />
+                    <Loader2 className="h-12 w-12 animate-spin text-zim-green dark:text-zim-yellow" />
                   </div>
                 ) : (
                   Object.keys(fallbackImages).map((category) => (

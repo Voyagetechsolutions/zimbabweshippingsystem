@@ -27,6 +27,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { formatPrice } = useShipping();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -55,7 +56,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
 
   React.useEffect(() => {
     const loadData = async () => {
-      // Sync collection schedules with database before getting route data
       await syncSchedulesWithDatabase();
       
       if (formData.selectedRoute) {
@@ -178,6 +178,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       } else if (formData.shipmentType === 'parcel' && formData.weight) {
         amount = parseFloat(formData.weight) * 50;
       }
+      
+      amount += 25;
       
       const { data, error } = await supabase
         .from('shipments')
@@ -431,29 +433,29 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       </Card>
       
       {/* Shipment Details */}
-      <Card>
+      <Card className="dark:bg-gray-800 dark:border-gray-700">
         <CardHeader>
-          <CardTitle>Shipment Details</CardTitle>
-          <CardDescription>Provide information about your shipment</CardDescription>
+          <CardTitle className="dark:text-white">Shipment Details</CardTitle>
+          <CardDescription className="dark:text-gray-300">Provide information about your shipment</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-3">
-            <Label>Shipment Type</Label>
+            <Label className="dark:text-white">Shipment Type</Label>
             <RadioGroup 
               value={formData.shipmentType} 
               onValueChange={(value) => handleSelectChange('shipmentType', value)}
               className="flex flex-col space-y-1"
             >
-              <div className="flex items-center space-x-3 rounded-md border p-4">
+              <div className="flex items-center space-x-3 rounded-md border p-4 dark:border-gray-700">
                 <RadioGroupItem value="drum" id="drum" />
-                <Label htmlFor="drum" className="flex flex-1 items-center gap-2 font-normal">
+                <Label htmlFor="drum" className="flex flex-1 items-center gap-2 font-normal dark:text-white">
                   <Package className="h-5 w-5" />
-                  <span>Drum Shipping (200L capacity)</span>
+                  <span>Drum Shipping (220L capacity)</span>
                 </Label>
               </div>
-              <div className="flex items-center space-x-3 rounded-md border p-4">
+              <div className="flex items-center space-x-3 rounded-md border p-4 dark:border-gray-700">
                 <RadioGroupItem value="parcel" id="parcel" />
-                <Label htmlFor="parcel" className="flex flex-1 items-center gap-2 font-normal">
+                <Label htmlFor="parcel" className="flex flex-1 items-center gap-2 font-normal dark:text-white">
                   <Package className="h-5 w-5" />
                   <span>Regular Parcel</span>
                 </Label>
@@ -463,29 +465,32 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
           
           {formData.shipmentType === 'drum' ? (
             <div className="space-y-2">
-              <Label htmlFor="drumQuantity">Number of Drums</Label>
+              <Label htmlFor="drumQuantity" className="dark:text-white">Number of Drums</Label>
               <Select
                 value={formData.drumQuantity}
                 onValueChange={(value) => handleSelectChange('drumQuantity', value)}
               >
-                <SelectTrigger id="drumQuantity">
+                <SelectTrigger id="drumQuantity" className="dark:bg-gray-700 dark:border-gray-600 dark:text-white">
                   <SelectValue placeholder="Select quantity" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="dark:bg-gray-800 dark:border-gray-700">
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-                    <SelectItem key={num} value={num.toString()}>
+                    <SelectItem key={num} value={num.toString()} className="dark:text-white dark:focus:bg-gray-700">
                       {num} {num === 1 ? 'Drum' : 'Drums'}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-sm text-muted-foreground mt-1">
-                Pricing: 1 Drum: £260 | 2-4 Drums: £250 each | 5+ Drums: £220 each
+              <p className="text-sm text-muted-foreground dark:text-gray-400 mt-1">
+                Pricing: 1 Drum: {formatPrice(260)} | 2-4 Drums: {formatPrice(250)} each | 5+ Drums: {formatPrice(220)} each
+              </p>
+              <p className="text-sm text-muted-foreground dark:text-gray-400 mt-1">
+                Door-to-door delivery: {formatPrice(25)}
               </p>
             </div>
           ) : (
             <div className="space-y-2">
-              <Label htmlFor="weight">Package Weight (kg)</Label>
+              <Label htmlFor="weight" className="dark:text-white">Package Weight (kg)</Label>
               <Input 
                 id="weight"
                 name="weight"
@@ -495,15 +500,19 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 onChange={handleInputChange}
                 required={formData.shipmentType === 'parcel'}
                 placeholder="Enter weight in kg"
+                className="dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               />
-              <p className="text-sm text-muted-foreground mt-1">
-                Regular parcel pricing: £50 per kg
+              <p className="text-sm text-muted-foreground dark:text-gray-400 mt-1">
+                Regular parcel pricing: {formatPrice(50)} per kg
+              </p>
+              <p className="text-sm text-muted-foreground dark:text-gray-400 mt-1">
+                Door-to-door delivery: {formatPrice(25)}
               </p>
             </div>
           )}
           
           <div className="space-y-2">
-            <Label htmlFor="specialInstructions">Special Instructions (Optional)</Label>
+            <Label htmlFor="specialInstructions" className="dark:text-white">Special Instructions (Optional)</Label>
             <Textarea
               id="specialInstructions"
               name="specialInstructions"
@@ -511,13 +520,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               onChange={handleInputChange}
               placeholder="Enter any special instructions or notes"
               rows={3}
+              className="dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             />
           </div>
         </CardContent>
       </Card>
       
       {/* Terms and Submit */}
-      <Card>
+      <Card className="dark:bg-gray-800 dark:border-gray-700">
         <CardContent className="pt-6">
           <div className="flex items-start space-x-3 mb-6">
             <Checkbox 
@@ -527,7 +537,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             />
             <Label 
               htmlFor="termsAccepted" 
-              className="text-sm font-normal leading-relaxed"
+              className="text-sm font-normal leading-relaxed dark:text-white"
             >
               I agree to the Terms and Conditions, including acceptance of the shipping rates, collection schedule, and delivery policies.
             </Label>
@@ -551,7 +561,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             )}
           </Button>
           
-          <p className="text-xs text-center text-muted-foreground mt-4">
+          <p className="text-xs text-center text-muted-foreground dark:text-gray-400 mt-4">
             By submitting this form, you consent to our processing of your information in accordance with our Privacy Policy.
           </p>
         </CardContent>

@@ -1,115 +1,152 @@
 
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
-import { AuthProvider } from "./contexts/AuthContext";
-import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import { RequireAuth, RedirectIfAuthenticated, RequireAdmin } from "./components/RouteGuard";
-import CreateShipment from "./pages/CreateShipment";
-import BookShipment from "./pages/BookShipment";
-import PaymentSuccess from "./pages/PaymentSuccess";
-import Track from "./pages/Track";
-import Account from "./pages/Account";
-import AdminDashboard from "./pages/AdminDashboard";
-import ShipmentDetails from "./pages/ShipmentDetails";
-import Services from "./pages/Services";
-import Contact from "./pages/Contact";
-import AddressBook from "./pages/AddressBook";
-import Notifications from "./pages/Notifications";
-import Reviews from "./pages/Reviews";
-import TaskManagement from "./pages/TaskManagement";
-import Pricing from "./pages/Pricing";
-import Gallery from "./pages/Gallery";
-import GalleryAdmin from "./pages/GalleryAdmin";
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import './App.css';
 
-// Configure the QueryClient with retry options
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1, // Retry failed queries only once
-      staleTime: 30000, // Consider data fresh for 30 seconds
-      gcTime: 5 * 60 * 1000, // Cache for 5 minutes (formerly cacheTime)
-    },
-  },
-});
+// Pages
+import Index from './pages/Index';
+import Auth from './pages/Auth';
+import Services from './pages/Services';
+import Pricing from './pages/Pricing';
+import Gallery from './pages/Gallery';
+import Contact from './pages/Contact';
+import Track from './pages/Track';
+import BookShipment from './pages/BookShipment';
+import PaymentSuccess from './pages/PaymentSuccess';
+import Dashboard from './pages/Dashboard';
+import ShipmentDetails from './pages/ShipmentDetails';
+import NotFound from './pages/NotFound';
+import Account from './pages/Account';
+import AddressBook from './pages/AddressBook';
+import Notifications from './pages/Notifications';
+import AdminDashboard from './pages/AdminDashboard';
+import GalleryAdmin from './pages/GalleryAdmin';
+import Reviews from './pages/Reviews';
+import CreateShipment from './pages/CreateShipment';
+import TaskManagement from './pages/TaskManagement';
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={
-              <RedirectIfAuthenticated>
-                <Auth />
-              </RedirectIfAuthenticated>
-            } />
-            <Route path="/dashboard" element={
-              <RequireAuth>
-                <Dashboard />
-              </RequireAuth>
-            } />
-            <Route path="/create-shipment" element={
-              <RequireAuth>
-                <CreateShipment />
-              </RequireAuth>
-            } />
-            <Route path="/book-shipment" element={<BookShipment />} />
-            <Route path="/payment-success" element={<PaymentSuccess />} />
-            <Route path="/shipment/:id" element={<ShipmentDetails />} />
-            <Route path="/track" element={<Track />} />
-            <Route path="/services" element={<Services />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/gallery" element={<Gallery />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/account" element={
-              <RequireAuth>
-                <Account />
-              </RequireAuth>
-            } />
-            <Route path="/address-book" element={
-              <RequireAuth>
-                <AddressBook />
-              </RequireAuth>
-            } />
-            <Route path="/notifications" element={
-              <RequireAuth>
-                <Notifications />
-              </RequireAuth>
-            } />
-            <Route path="/reviews" element={<Reviews />} />
-            <Route path="/tasks" element={
-              <RequireAdmin>
-                <TaskManagement />
-              </RequireAdmin>
-            } />
-            <Route path="/admin" element={
-              <RequireAdmin>
-                <AdminDashboard />
-              </RequireAdmin>
-            } />
-            <Route path="/admin/gallery" element={
-              <RequireAdmin>
-                <GalleryAdmin />
-              </RequireAdmin>
-            } />
-            {/* Redirect old URLs or potential misspellings to proper routes */}
-            <Route path="/admin-dashboard" element={<Navigate to="/admin" replace />} />
-            <Route path="/dashboard-admin" element={<Navigate to="/admin" replace />} />
-            <Route path="/task-management" element={<Navigate to="/tasks" replace />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-);
+// Components
+import RouteGuard from './components/RouteGuard';
+import { Toaster } from './components/ui/toaster';
+import WhatsAppButton from './components/WhatsAppButton';
+
+// Contexts
+import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { ShippingProvider } from './contexts/ShippingContext';
+
+// Initialize React Query client
+const queryClient = new QueryClient();
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <ThemeProvider>
+          <ShippingProvider>
+            <Router>
+              <Routes>
+                {/* Public routes */}
+                <Route path="/" element={<Index />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/services" element={<Services />} />
+                <Route path="/pricing" element={<Pricing />} />
+                <Route path="/gallery" element={<Gallery />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/track" element={<Track />} />
+                <Route path="/book-shipment" element={<BookShipment />} />
+                <Route path="/payment-success" element={<PaymentSuccess />} />
+                <Route path="/reviews" element={<Reviews />} />
+
+                {/* Protected routes */}
+                <Route
+                  path="/dashboard"
+                  element={
+                    <RouteGuard>
+                      <Dashboard />
+                    </RouteGuard>
+                  }
+                />
+                <Route
+                  path="/shipment/:id"
+                  element={
+                    <RouteGuard>
+                      <ShipmentDetails />
+                    </RouteGuard>
+                  }
+                />
+                <Route
+                  path="/account"
+                  element={
+                    <RouteGuard>
+                      <Account />
+                    </RouteGuard>
+                  }
+                />
+                <Route
+                  path="/address-book"
+                  element={
+                    <RouteGuard>
+                      <AddressBook />
+                    </RouteGuard>
+                  }
+                />
+                <Route
+                  path="/notifications"
+                  element={
+                    <RouteGuard>
+                      <Notifications />
+                    </RouteGuard>
+                  }
+                />
+                <Route
+                  path="/create-shipment"
+                  element={
+                    <RouteGuard>
+                      <CreateShipment />
+                    </RouteGuard>
+                  }
+                />
+                <Route
+                  path="/task-management"
+                  element={
+                    <RouteGuard>
+                      <TaskManagement />
+                    </RouteGuard>
+                  }
+                />
+
+                {/* Admin routes */}
+                <Route
+                  path="/admin"
+                  element={
+                    <RouteGuard requireAdmin>
+                      <AdminDashboard />
+                    </RouteGuard>
+                  }
+                />
+                <Route
+                  path="/admin/gallery"
+                  element={
+                    <RouteGuard requireAdmin>
+                      <GalleryAdmin />
+                    </RouteGuard>
+                  }
+                />
+
+                {/* Catch-all route */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+              
+              <WhatsAppButton />
+              <Toaster />
+            </Router>
+          </ShippingProvider>
+        </ThemeProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+}
 
 export default App;
