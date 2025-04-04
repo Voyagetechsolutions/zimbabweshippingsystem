@@ -8,12 +8,14 @@ import Footer from '@/components/Footer';
 import Receipt from '@/components/Receipt';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { CheckCircle2, Loader2, ArrowRight } from 'lucide-react';
 
 const PaymentSuccess = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   
   const [loading, setLoading] = useState(true);
   const [receiptData, setReceiptData] = useState<any>(null);
@@ -103,45 +105,45 @@ const PaymentSuccess = () => {
     <>
       <Navbar />
       
-      <main className="min-h-screen bg-gray-50 py-12 px-4">
+      <main className="min-h-screen bg-gray-50 py-8 px-4 md:py-12">
         <div className="container mx-auto max-w-5xl">
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-16">
-              <Loader2 className="h-12 w-12 animate-spin text-zim-green mb-4" />
-              <h2 className="text-2xl font-semibold">Loading Receipt...</h2>
-              <p className="text-gray-500 mt-2">Please wait while we retrieve your payment information</p>
+            <div className="flex flex-col items-center justify-center py-10 md:py-16">
+              <Loader2 className="h-10 w-10 md:h-12 md:w-12 animate-spin text-zim-green mb-4" />
+              <h2 className="text-xl md:text-2xl font-semibold">Loading Receipt...</h2>
+              <p className="text-gray-500 mt-2 text-center">Please wait while we retrieve your payment information</p>
             </div>
           ) : error ? (
-            <div className="text-center py-16">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-                <h2 className="text-2xl font-semibold text-red-700">Payment Verification Error</h2>
-                <p className="text-gray-700 mt-2 mb-6">{error}</p>
+            <div className="text-center py-10 md:py-16">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 md:p-6">
+                <h2 className="text-xl md:text-2xl font-semibold text-red-700">Payment Verification Error</h2>
+                <p className="text-gray-700 mt-2 mb-4 md:mb-6">{error}</p>
                 <Button onClick={() => navigate('/dashboard')}>Go to Dashboard</Button>
               </div>
             </div>
           ) : (
             <>
-              <div className="flex justify-center mb-8">
-                <div className="bg-green-50 border border-green-200 rounded-full p-3">
-                  <CheckCircle2 className="h-12 w-12 text-green-500" />
+              <div className="flex justify-center mb-6 md:mb-8">
+                <div className="bg-green-50 border border-green-200 rounded-full p-2 md:p-3">
+                  <CheckCircle2 className="h-8 w-8 md:h-12 md:w-12 text-green-500" />
                 </div>
               </div>
               
-              <div className="text-center mb-10">
-                <h1 className="text-3xl md:text-4xl font-bold mb-2">Payment Successful!</h1>
-                <p className="text-gray-600 max-w-2xl mx-auto">
+              <div className="text-center mb-6 md:mb-10">
+                <h1 className="text-2xl md:text-4xl font-bold mb-2">Payment Successful!</h1>
+                <p className="text-gray-600 max-w-2xl mx-auto text-sm md:text-base">
                   Thank you for your payment. Your shipment has been confirmed and is being processed.
                 </p>
               </div>
               
               {receiptData && <Receipt receipt={receiptData} shipment={shipmentData} />}
               
-              <div className="flex justify-center mt-8">
+              <div className="flex justify-center mt-6 md:mt-8">
                 <Button 
-                  className="bg-zim-green hover:bg-zim-green/90"
+                  className="bg-zim-green hover:bg-zim-green/90 w-full md:w-auto"
                   onClick={() => navigate('/dashboard')}
                 >
-                  Go to Dashboard
+                  {isMobile ? 'Dashboard' : 'Go to Dashboard'}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>

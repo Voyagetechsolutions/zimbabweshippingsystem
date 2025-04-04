@@ -1,9 +1,9 @@
 
-// This is just a partial update to fix the Logo type issue
 import React, { useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Download, Printer, Mail } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { formatDate } from '@/utils/formatters';
@@ -31,6 +31,7 @@ interface ReceiptProps {
 const Receipt: React.FC<ReceiptProps> = ({ receipt, shipment }) => {
   const { toast } = useToast();
   const receiptRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
   
   const handlePrint = () => {
     const content = receiptRef.current;
@@ -179,113 +180,132 @@ const Receipt: React.FC<ReceiptProps> = ({ receipt, shipment }) => {
   };
 
   return (
-    <div className="container mx-auto p-4 max-w-4xl">
-      <Card className="border-0 shadow-lg">
-        <div className="p-6" ref={receiptRef}>
-          <div className="flex justify-between items-center pb-6 border-b mb-6">
+    <div className="container mx-auto px-2 sm:px-4 max-w-4xl">
+      <Card className="border-0 shadow-lg overflow-hidden">
+        <div className="p-3 sm:p-6" ref={receiptRef}>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center pb-4 sm:pb-6 border-b mb-4 sm:mb-6 gap-3">
             <div className="flex items-center">
-              <div className="mr-4">
-                <Logo size="medium" />
+              <div className="mr-3 hidden sm:block">
+                <Logo size={isMobile ? "small" : "medium"} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-zim-green">UK to Zimbabwe Shipping</h1>
-                <p className="text-gray-600">123 Ship Street, London, UK</p>
+                <h1 className="text-lg sm:text-2xl font-bold text-zim-green">UK to Zimbabwe Shipping</h1>
+                <p className="text-gray-600 text-xs sm:text-sm">123 Ship Street, London, UK</p>
               </div>
             </div>
-            <div className="text-right">
-              <h2 className="text-xl font-bold">RECEIPT</h2>
-              <p className="text-gray-600"># {receipt.receipt_number}</p>
-              <p className="text-gray-600">Date: {formatDate(receipt.created_at)}</p>
+            <div className="text-left sm:text-right mt-2 sm:mt-0">
+              <h2 className="text-lg sm:text-xl font-bold">RECEIPT</h2>
+              <p className="text-gray-600 text-xs sm:text-sm"># {receipt.receipt_number}</p>
+              <p className="text-gray-600 text-xs sm:text-sm">Date: {formatDate(receipt.created_at)}</p>
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div className="border rounded-md p-4">
-              <h3 className="font-bold mb-2">From</h3>
-              <p>{receipt.sender_details.name}</p>
-              <p>{receipt.sender_details.address}</p>
-              <p>{receipt.sender_details.phone}</p>
-              <p>{receipt.sender_details.email}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
+            <div className="border rounded-md p-3 sm:p-4">
+              <h3 className="font-bold text-sm mb-1 sm:mb-2">From</h3>
+              <p className="text-sm">{receipt.sender_details.name}</p>
+              <p className="text-sm">{receipt.sender_details.address}</p>
+              <p className="text-sm">{receipt.sender_details.phone}</p>
+              <p className="text-sm">{receipt.sender_details.email}</p>
             </div>
             
-            <div className="border rounded-md p-4">
-              <h3 className="font-bold mb-2">To</h3>
-              <p>{receipt.recipient_details.name}</p>
-              <p>{receipt.recipient_details.address}</p>
-              <p>{receipt.recipient_details.phone}</p>
+            <div className="border rounded-md p-3 sm:p-4">
+              <h3 className="font-bold text-sm mb-1 sm:mb-2">To</h3>
+              <p className="text-sm">{receipt.recipient_details.name}</p>
+              <p className="text-sm">{receipt.recipient_details.address}</p>
+              <p className="text-sm">{receipt.recipient_details.phone}</p>
             </div>
           </div>
           
-          <div className="mb-6">
-            <h3 className="font-bold mb-2">Shipment Details</h3>
-            <div className="border rounded-md overflow-hidden">
-              <table className="w-full">
+          <div className="mb-4 sm:mb-6">
+            <h3 className="font-bold text-sm mb-1 sm:mb-2">Shipment Details</h3>
+            <div className="border rounded-md overflow-x-auto">
+              <table className="w-full min-w-[400px]">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="text-left p-3">Tracking Number</th>
-                    <th className="text-left p-3">Description</th>
-                    <th className="text-left p-3">Status</th>
+                    <th className="text-left p-2 sm:p-3 text-xs sm:text-sm">Tracking Number</th>
+                    <th className="text-left p-2 sm:p-3 text-xs sm:text-sm">Description</th>
+                    <th className="text-left p-2 sm:p-3 text-xs sm:text-sm">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr className="border-t">
-                    <td className="p-3">{shipment?.tracking_number || receipt.shipment_details.tracking_number}</td>
-                    <td className="p-3">
+                    <td className="p-2 sm:p-3 text-xs sm:text-sm break-all sm:break-normal">{shipment?.tracking_number || receipt.shipment_details.tracking_number}</td>
+                    <td className="p-2 sm:p-3 text-xs sm:text-sm">
                       {receipt.shipment_details.type === 'drum'
                         ? `${receipt.shipment_details.quantity} x 200L Drums`
                         : `Parcel (${receipt.shipment_details.weight}kg)`
                       }
                     </td>
-                    <td className="p-3">{shipment?.status || receipt.status}</td>
+                    <td className="p-2 sm:p-3 text-xs sm:text-sm">{shipment?.status || receipt.status}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
           </div>
           
-          <div className="mb-6">
-            <div className="flex justify-between py-3 border-b">
+          <div className="mb-4 sm:mb-6">
+            <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
               <span className="font-medium">Shipping Cost</span>
               <span>£{(receipt.amount * 0.9).toFixed(2)}</span>
             </div>
             
             {receipt.shipment_details.services && receipt.shipment_details.services.length > 0 && (
-              <div className="flex justify-between py-3 border-b">
+              <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
                 <span className="font-medium">Additional Services</span>
                 <span>£{(receipt.amount * 0.1).toFixed(2)}</span>
               </div>
             )}
             
-            <div className="flex justify-between py-4 font-bold text-lg">
+            <div className="flex justify-between py-3 sm:py-4 font-bold text-base sm:text-lg">
               <span>Total</span>
               <span>£{receipt.amount.toFixed(2)}</span>
             </div>
             
-            <div className="border rounded-md p-3 bg-gray-50 mt-2">
-              <p className="font-medium">Payment Method: {receipt.payment_method === 'stripe' ? 'Credit Card' : receipt.payment_method === 'paypal' ? 'PayPal' : 'Pay Later'}</p>
-              <p className="text-sm text-gray-600 mt-1">Payment Status: {receipt.status === 'issued' ? 'Paid' : 'Pending'}</p>
+            <div className="border rounded-md p-2 sm:p-3 bg-gray-50 mt-2">
+              <p className="font-medium text-sm">Payment Method: {receipt.payment_method === 'stripe' ? 'Credit Card' : receipt.payment_method === 'paypal' ? 'PayPal' : 'Pay Later'}</p>
+              <p className="text-xs sm:text-sm text-gray-600 mt-1">Payment Status: {receipt.status === 'issued' ? 'Paid' : 'Pending'}</p>
             </div>
           </div>
           
-          <div className="text-center text-gray-500 text-sm mt-12 pt-4 border-t">
+          <div className="text-center text-gray-500 text-xs sm:text-sm mt-8 sm:mt-12 pt-3 sm:pt-4 border-t">
             <p>Thank you for choosing UK to Zimbabwe Shipping</p>
             <p>For any inquiries, please contact us at support@ukzimshipping.com</p>
           </div>
         </div>
         
-        <div className="bg-gray-50 p-4 flex flex-wrap justify-end gap-3">
-          <Button variant="outline" size="sm" className="flex items-center" onClick={handlePrint}>
-            <Printer className="mr-2 h-4 w-4" />
-            Print
-          </Button>
-          <Button variant="outline" size="sm" className="flex items-center" onClick={handleDownload}>
-            <Download className="mr-2 h-4 w-4" />
-            Download
-          </Button>
-          <Button variant="outline" size="sm" className="flex items-center" onClick={handleEmail}>
-            <Mail className="mr-2 h-4 w-4" />
-            Email
-          </Button>
+        <div className="bg-gray-50 p-3 sm:p-4 flex flex-wrap justify-center sm:justify-end gap-2 sm:gap-3">
+          {isMobile ? (
+            <>
+              <Button variant="outline" size="sm" className="flex items-center text-xs" onClick={handlePrint}>
+                <Printer className="mr-1 h-3 w-3" />
+                Print
+              </Button>
+              <Button variant="outline" size="sm" className="flex items-center text-xs" onClick={handleDownload}>
+                <Download className="mr-1 h-3 w-3" />
+                Download
+              </Button>
+              <Button variant="outline" size="sm" className="flex items-center text-xs" onClick={handleEmail}>
+                <Mail className="mr-1 h-3 w-3" />
+                Email
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" size="sm" className="flex items-center" onClick={handlePrint}>
+                <Printer className="mr-2 h-4 w-4" />
+                Print
+              </Button>
+              <Button variant="outline" size="sm" className="flex items-center" onClick={handleDownload}>
+                <Download className="mr-2 h-4 w-4" />
+                Download
+              </Button>
+              <Button variant="outline" size="sm" className="flex items-center" onClick={handleEmail}>
+                <Mail className="mr-2 h-4 w-4" />
+                Email
+              </Button>
+            </>
+          )}
         </div>
       </Card>
     </div>
