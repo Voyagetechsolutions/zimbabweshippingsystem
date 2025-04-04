@@ -52,7 +52,7 @@ const ReviewsList: React.FC<ReviewsListProps> = ({
   };
 
   const sortedReviews = [...reviews].sort((a, b) => 
-    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 
   if (reviews.length === 0) {
@@ -76,13 +76,13 @@ const ReviewsList: React.FC<ReviewsListProps> = ({
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <div className={`w-10 h-10 ${getBgColor(review.user_id)} rounded-full flex items-center justify-center mr-3 text-gray-700`}>
-                  {getInitials(review.user_name)}
+                <div className={`w-10 h-10 ${getBgColor(review.userId)} rounded-full flex items-center justify-center mr-3 text-gray-700`}>
+                  {getInitials(review.userName)}
                 </div>
                 <div>
-                  <CardTitle className="text-base">{review.user_name || 'Anonymous User'}</CardTitle>
+                  <CardTitle className="text-base">{review.userName || 'Anonymous User'}</CardTitle>
                   <div className="text-sm text-gray-500">
-                    {format(parseISO(review.created_at), 'MMMM d, yyyy')}
+                    {format(parseISO(review.createdAt), 'MMMM d, yyyy')}
                   </div>
                 </div>
               </div>
@@ -92,7 +92,7 @@ const ReviewsList: React.FC<ReviewsListProps> = ({
           <CardContent>
             <p className="text-gray-700">{review.comment}</p>
           </CardContent>
-          {canManageReview(review.user_id) && (
+          {canManageReview(review.userId) && (
             <CardFooter className="pt-0 flex justify-end space-x-2">
               {onEdit && (
                 <Button 

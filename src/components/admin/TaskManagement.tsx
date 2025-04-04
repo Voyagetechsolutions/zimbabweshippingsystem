@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -111,8 +110,8 @@ const TaskManagement: React.FC = () => {
         .from('support_tickets')
         .select(`
           *,
-          assignee:assigned_to(full_name),
-          creator:user_id(full_name)
+          profiles!support_tickets_assigned_to_fkey(full_name),
+          creator:profiles!support_tickets_user_id_fkey(full_name)
         `)
         .order('created_at', { ascending: false });
 
@@ -137,7 +136,7 @@ const TaskManagement: React.FC = () => {
           updated_at: item.updated_at,
           due_date: null,
           completed_at: null,
-          assignee_name: item.assignee?.full_name,
+          assignee_name: item.profiles?.full_name,
           assigner_name: item.creator?.full_name
         }));
         
@@ -341,13 +340,9 @@ const TaskManagement: React.FC = () => {
         }
       ];
       
-      // Fix to include user_id in each task
       const { error } = await supabase
         .from('support_tickets')
-        .insert(taskList.map(task => ({
-          ...task,
-          user_id: user.id
-        })));
+        .insert(taskList);
 
       if (error) throw error;
 

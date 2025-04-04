@@ -20,19 +20,19 @@ import { ReviewFormData } from '@/types/reviews';
 const reviewSchema = z.object({
   rating: z.number().min(1, 'Please select a rating').max(5),
   comment: z.string().min(5, 'Review comment must be at least 5 characters').max(500, 'Review comment cannot exceed 500 characters'),
-  shipment_id: z.string().optional().nullable(),
+  shipmentId: z.string().optional().nullable(),
 });
 
 interface ReviewFormProps {
   onSubmit: (data: ReviewFormData) => Promise<void>;
-  shipment_id?: string;
+  shipmentId?: string;
   initialData?: ReviewFormData;
   isUpdate?: boolean;
 }
 
 export const ReviewForm: React.FC<ReviewFormProps> = ({ 
   onSubmit, 
-  shipment_id,
+  shipmentId,
   initialData,
   isUpdate = false
 }) => {
@@ -41,7 +41,7 @@ export const ReviewForm: React.FC<ReviewFormProps> = ({
     defaultValues: initialData || {
       rating: 0,
       comment: '',
-      shipment_id: shipment_id || null
+      shipmentId: shipmentId || undefined
     }
   });
 
@@ -51,7 +51,7 @@ export const ReviewForm: React.FC<ReviewFormProps> = ({
     try {
       await onSubmit({
         ...data,
-        shipment_id: shipment_id || data.shipment_id
+        shipmentId: shipmentId || data.shipmentId
       });
       form.reset();
     } catch (error) {

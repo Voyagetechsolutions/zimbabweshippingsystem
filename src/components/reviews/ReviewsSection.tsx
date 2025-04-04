@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Review } from '@/types/reviews';
+import { Review, ReviewFormData } from '@/types/reviews';
 import { useToast } from '@/hooks/use-toast';
 import ReviewForm from './ReviewForm';
 import ReviewsList from './ReviewsList';
@@ -31,7 +31,7 @@ const ReviewsSection: React.FC = () => {
           rating,
           comment,
           created_at,
-          profiles:user_id(id, full_name, email)
+          profiles(id, full_name, email)
         `)
         .order('created_at', { ascending: false });
 
@@ -63,7 +63,7 @@ const ReviewsSection: React.FC = () => {
     }
   };
 
-  const handleCreateReview = async (rating: number, comment: string, shipmentId?: string) => {
+  const handleCreateReview = async (formData: ReviewFormData) => {
     if (!user) {
       toast({
         title: 'Authentication Required',
@@ -78,9 +78,9 @@ const ReviewsSection: React.FC = () => {
         .from(tableFrom('reviews'))
         .insert({
           user_id: user.id,
-          rating,
-          comment,
-          shipment_id: shipmentId || null
+          rating: formData.rating,
+          comment: formData.comment,
+          shipment_id: formData.shipmentId || null
         });
 
       if (error) throw error;
@@ -101,14 +101,17 @@ const ReviewsSection: React.FC = () => {
     }
   };
 
-  const handleUpdateReview = async (id: string, rating: number, comment: string) => {
-    if (!user) return;
+  const handleUpdateReview = async (formData: ReviewFormData) => {
+    if (!user || !selectedReview) return;
 
     try {
       const { error } = await supabase
         .from(tableFrom('reviews'))
-        .update({ rating, comment })
-        .eq('id', id);
+        .update({ 
+          rating: formData.rating, 
+          comment: formData.comment 
+        })
+        .eq('id', selectedReview.id);
 
       if (error) throw error;
 
@@ -163,11 +166,10 @@ const ReviewsSection: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
           <ReviewsList 
-            reviews={reviews} 
-            isLoading={isLoading} 
+            reviews={reviews}
             onEdit={setSelectedReview}
             onDelete={handleDeleteReview}
-            currentUserId={user?.id}
+            canManageReview={(reviewUserId) => user?.id === reviewUserId}
           />
         </div>
         
@@ -176,14 +178,12 @@ const ReviewsSection: React.FC = () => {
             {selectedReview ? 'Edit Your Review' : 'Share Your Experience'}
           </h3>
           <ReviewForm 
-            initialRating={selectedReview?.rating || 0}
-            initialComment={selectedReview?.comment || ''}
+            initialData={selectedReview || undefined}
             onSubmit={selectedReview 
-              ? (rating, comment) => handleUpdateReview(selectedReview.id, rating, comment)
+              ? handleUpdateReview
               : handleCreateReview
             }
-            onCancel={selectedReview ? () => setSelectedReview(null) : undefined}
-            isEdit={!!selectedReview}
+            isUpdate={!!selectedReview}
           />
         </div>
       </div>
