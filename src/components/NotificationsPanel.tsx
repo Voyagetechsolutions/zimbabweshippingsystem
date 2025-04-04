@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Bell, CheckCircle, CreditCard, Truck, AlertCircle, X, ExternalLink } from 'lucide-react';
+import { Bell, CheckCircle, CreditCard, Truck, AlertCircle, X, ExternalLink, Tag, Clock, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
@@ -10,21 +10,14 @@ import { format } from 'date-fns';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Link } from 'react-router-dom';
-
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  type: string;
-  is_read: boolean;
-  created_at: string;
-  related_id: string | null;
-}
+import { Notification, NotificationType } from '@/types/notifications';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const NotificationsPanel = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<NotificationType | 'all'>('all');
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -41,7 +34,7 @@ const NotificationsPanel = () => {
         .select('*')
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(30);
 
       if (error) throw error;
 
@@ -105,18 +98,43 @@ const NotificationsPanel = () => {
     }
   };
 
-  const getNotificationIcon = (type: string) => {
-    switch (type.toLowerCase()) {
+  const getNotificationIcon = (type: NotificationType) => {
+    switch (type) {
       case 'shipment_update':
         return <Truck className="h-4 w-4" />;
       case 'payment':
         return <CreditCard className="h-4 w-4" />;
       case 'system':
         return <AlertCircle className="h-4 w-4" />;
+      case 'task':
+        return <Clock className="h-4 w-4" />;
+      case 'review':
+        return <Star className="h-4 w-4" />;
       default:
         return <Bell className="h-4 w-4" />;
     }
   };
+
+  const getNotificationColor = (type: NotificationType) => {
+    switch (type) {
+      case 'shipment_update':
+        return 'bg-blue-100 text-blue-700';
+      case 'payment':
+        return 'bg-green-100 text-green-700';
+      case 'system':
+        return 'bg-orange-100 text-orange-700';
+      case 'task':
+        return 'bg-purple-100 text-purple-700';
+      case 'review':
+        return 'bg-yellow-100 text-yellow-700';
+      default:
+        return 'bg-gray-100 text-gray-700';
+    }
+  };
+
+  const filteredNotifications = activeTab === 'all' 
+    ? notifications 
+    : notifications.filter(n => n.type === activeTab);
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -146,24 +164,29 @@ const NotificationsPanel = () => {
         </SheetHeader>
         
         <div className="mt-4">
-          <ScrollArea className="h-[75vh]">
-            {notifications.length > 0 ? (
+          <Tabs defaultValue="all" value={activeTab} onValueChange={(value) => setActiveTab(value as any)}>
+            <TabsList className="grid grid-cols-6 mb-4">
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="shipment_update">Shipments</TabsTrigger>
+              <TabsTrigger value="payment">Payments</TabsTrigger>
+              <TabsTrigger value="task">Tasks</TabsTrigger>
+              <TabsTrigger value="review">Reviews</TabsTrigger>
+              <TabsTrigger value="system">System</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          
+          <ScrollArea className="h-[68vh]">
+            {filteredNotifications.length > 0 ? (
               <div className="space-y-4 pr-4">
-                {notifications.map((notification) => (
+                {filteredNotifications.map((notification) => (
                   <div
                     key={notification.id}
                     className={`flex items-start p-3 rounded-md ${
                       !notification.is_read ? 'bg-gray-50 dark:bg-gray-800' : 'bg-transparent'
                     }`}
                   >
-                    <div className={`p-2 rounded-full mr-3 ${
-                      notification.type === 'shipment_update'
-                        ? 'bg-blue-100 text-blue-700'
-                        : notification.type === 'payment'
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-orange-100 text-orange-700'
-                    }`}>
-                      {getNotificationIcon(notification.type)}
+                    <div className={`p-2 rounded-full mr-3 ${getNotificationColor(notification.type)}`}>
+                      {getNotificationIcon(notification.type as NotificationType)}
                     </div>
                     <div className="flex-1">
                       <div className="flex justify-between items-start">
@@ -183,8 +206,18 @@ const NotificationsPanel = () => {
                       <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
                         {notification.message}
                       </p>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {format(new Date(notification.created_at), 'MMM d, h:mmaaa')}
+                      <div className="flex justify-between items-center mt-2">
+                        <div className="text-xs text-gray-500">
+                          {format(new Date(notification.created_at), 'MMM d, h:mmaaa')}
+                        </div>
+                        {notification.action_url && (
+                          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" asChild>
+                            <Link to={notification.action_url}>
+                              View Details
+                              <ExternalLink className="ml-1 h-3 w-3" />
+                            </Link>
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>

@@ -1,108 +1,107 @@
 
 import React from 'react';
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Edit, Trash2, Star, StarOff } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-
-export interface Address {
-  id: string;
-  address_name: string;
-  recipient_name: string;
-  street_address: string;
-  city: string;
-  state: string | null;
-  postal_code: string | null;
-  country: string;
-  phone_number: string | null;
-  is_default: boolean | null;
-}
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Edit2, Trash2, MapPin, CheckCircle } from 'lucide-react';
+import { Address } from '@/types/address';
 
 interface AddressCardProps {
   address: Address;
-  onEdit: (address: Address) => void;
-  onDelete: (id: string) => void;
-  onSetDefault: (id: string) => void;
+  onEdit?: (address: Address) => void;
+  onDelete?: (addressId: string) => void;
+  onSetDefault?: (addressId: string) => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onSelect?: (address: Address) => void;
 }
 
 const AddressCard: React.FC<AddressCardProps> = ({
   address,
   onEdit,
   onDelete,
-  onSetDefault
+  onSetDefault,
+  selectable = false,
+  selected = false,
+  onSelect
 }) => {
-  const { toast } = useToast();
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onDelete) onDelete(address.id);
+  };
 
-  const handleDelete = () => {
-    if (window.confirm("Are you sure you want to delete this address?")) {
-      onDelete(address.id);
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onEdit) onEdit(address);
+  };
+
+  const handleSetDefault = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onSetDefault) onSetDefault(address.id);
+  };
+
+  const handleCardClick = () => {
+    if (selectable && onSelect) {
+      onSelect(address);
     }
   };
 
-  const handleSetDefault = () => {
-    onSetDefault(address.id);
-    toast({
-      title: "Default address updated",
-      description: `${address.address_name} is now your default address`,
-    });
-  };
-
   return (
-    <Card className={`relative ${address.is_default ? 'border-zim-green' : ''}`}>
+    <Card 
+      className={`relative overflow-hidden ${selectable ? 'cursor-pointer' : ''} 
+      ${selected ? 'ring-2 ring-zim-green border-zim-green' : ''} 
+      hover:shadow-md transition-all`}
+      onClick={handleCardClick}
+    >
       {address.is_default && (
-        <div className="absolute top-2 right-2 bg-zim-green text-white text-xs px-2 py-1 rounded-full">
-          Default
+        <div className="absolute top-0 right-0">
+          <Badge className="bg-zim-green text-white rounded-none rounded-bl-md">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Default
+          </Badge>
         </div>
       )}
-      <CardContent className="p-5">
-        <div className="flex justify-between items-start">
+      <CardContent className="pt-6">
+        <div className="flex items-start mb-3">
+          <MapPin className="h-5 w-5 text-zim-green mr-2 mt-0.5" />
           <div>
-            <h3 className="font-bold text-lg">{address.address_name}</h3>
-            <p className="text-sm text-gray-500 mt-1">{address.recipient_name}</p>
+            <h3 className="font-medium mb-1">{address.address_name}</h3>
+            <p className="text-gray-800">{address.recipient_name}</p>
           </div>
         </div>
-        
-        <div className="mt-3 space-y-1 text-sm">
+        <div className="text-sm text-gray-600 ml-7">
           <p>{address.street_address}</p>
-          <p>{address.city}{address.state ? `, ${address.state}` : ''} {address.postal_code || ''}</p>
+          <p>
+            {address.city}
+            {address.state ? `, ${address.state}` : ''}
+            {address.postal_code ? ` ${address.postal_code}` : ''}
+          </p>
           <p>{address.country}</p>
-          {address.phone_number && <p className="mt-2">📞 {address.phone_number}</p>}
+          {address.phone_number && <p className="mt-1">📞 {address.phone_number}</p>}
         </div>
-        
-        <div className="mt-4 flex space-x-2 justify-end">
-          {!address.is_default && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleSetDefault}
-              className="flex items-center"
-            >
-              <Star className="h-4 w-4 mr-1" />
-              Set Default
-            </Button>
-          )}
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => onEdit(address)}
-            className="flex items-center"
-          >
-            <Edit className="h-4 w-4 mr-1" />
+      </CardContent>
+      <CardFooter className="border-t pt-3 flex justify-end space-x-2">
+        {!address.is_default && onSetDefault && (
+          <Button variant="ghost" size="sm" onClick={handleSetDefault}>
+            Set as Default
+          </Button>
+        )}
+        {onEdit && (
+          <Button variant="outline" size="sm" onClick={handleEdit}>
+            <Edit2 className="h-4 w-4 mr-1" />
             Edit
           </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleDelete}
-            className="flex items-center text-red-500 hover:text-red-700"
-          >
+        )}
+        {onDelete && (
+          <Button variant="outline" size="sm" className="text-red-600" onClick={handleDelete}>
             <Trash2 className="h-4 w-4 mr-1" />
             Delete
           </Button>
-        </div>
-      </CardContent>
+        )}
+      </CardFooter>
     </Card>
   );
 };
 
 export default AddressCard;
+export type { Address };

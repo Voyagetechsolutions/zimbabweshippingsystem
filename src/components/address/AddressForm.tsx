@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -14,93 +14,78 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Address } from './AddressCard';
-import { Loader2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Address, AddressFormData } from '@/types/address';
 
-// Define form schema with Zod
 const addressSchema = z.object({
-  address_name: z.string().min(1, 'Address name is required'),
-  recipient_name: z.string().min(1, 'Recipient name is required'),
-  street_address: z.string().min(1, 'Street address is required'),
-  city: z.string().min(1, 'City is required'),
-  state: z.string().optional().nullable(),
-  postal_code: z.string().optional().nullable(),
-  country: z.string().min(1, 'Country is required'),
-  phone_number: z.string().optional().nullable(),
-  is_default: z.boolean().optional().default(false),
+  address_name: z.string().min(1, 'Required'),
+  recipient_name: z.string().min(1, 'Required'),
+  street_address: z.string().min(3, 'Please enter a valid address'),
+  city: z.string().min(1, 'Required'),
+  state: z.string().nullable(),
+  postal_code: z.string().nullable(),
+  country: z.string().min(1, 'Required'),
+  phone_number: z.string().nullable(),
+  is_default: z.boolean().default(false),
 });
-
-type AddressFormValues = z.infer<typeof addressSchema>;
 
 interface AddressFormProps {
   address?: Address;
-  onSubmit: (values: AddressFormValues, addressId?: string) => Promise<void>;
-  onCancel: () => void;
+  onSubmit: (data: AddressFormData, addressId?: string) => Promise<void>;
+  onCancel?: () => void;
 }
 
-const AddressForm: React.FC<AddressFormProps> = ({ address, onSubmit, onCancel }) => {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
+const countries = [
+  'United Kingdom', 'Zimbabwe', 'South Africa', 'United States', 
+  'Canada', 'Australia', 'New Zealand', 'France', 'Germany', 
+  'Spain', 'Italy', 'Portugal', 'Netherlands', 'Belgium'
+];
 
-  // Create form with validation schema
-  const form = useForm<AddressFormValues>({
+const AddressForm: React.FC<AddressFormProps> = ({ address, onSubmit, onCancel }) => {
+  const form = useForm<AddressFormData>({
     resolver: zodResolver(addressSchema),
-    defaultValues: {
+    defaultValues: address ? {
+      address_name: address.address_name,
+      recipient_name: address.recipient_name,
+      street_address: address.street_address,
+      city: address.city,
+      state: address.state,
+      postal_code: address.postal_code,
+      country: address.country,
+      phone_number: address.phone_number,
+      is_default: address.is_default,
+    } : {
       address_name: '',
       recipient_name: '',
       street_address: '',
       city: '',
-      state: null,
-      postal_code: null,
-      country: '',
-      phone_number: null,
+      state: '',
+      postal_code: '',
+      country: 'United Kingdom',
+      phone_number: '',
       is_default: false,
-    },
+    }
   });
 
-  // Set form values if editing an existing address
-  useEffect(() => {
-    if (address) {
-      form.reset({
-        address_name: address.address_name,
-        recipient_name: address.recipient_name,
-        street_address: address.street_address,
-        city: address.city,
-        state: address.state,
-        postal_code: address.postal_code,
-        country: address.country,
-        phone_number: address.phone_number,
-        is_default: address.is_default || false,
-      });
-    }
-  }, [address, form]);
-
-  // Handle form submission
-  const handleSubmit = async (values: AddressFormValues) => {
+  const handleSubmitAddress = async (data: AddressFormData) => {
     try {
-      setIsSubmitting(true);
-      await onSubmit(values, address?.id);
-      toast({
-        title: address ? "Address updated" : "Address added",
-        description: address ? "Your address has been updated successfully" : "Your address has been added to your address book",
-      });
+      await onSubmit(data, address?.id);
     } catch (error) {
-      console.error('Error saving address:', error);
-      toast({
-        title: "Error",
-        description: "There was an error saving your address. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
+      // Error will be handled by the parent component
+      console.error('Error in address form submission:', error);
     }
   };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 py-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <form onSubmit={form.handleSubmit(handleSubmitAddress)} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
             name="address_name"
@@ -108,12 +93,13 @@ const AddressForm: React.FC<AddressFormProps> = ({ address, onSubmit, onCancel }
               <FormItem>
                 <FormLabel>Address Name</FormLabel>
                 <FormControl>
-                  <Input placeholder="E.g., Home, Office" {...field} />
+                  <Input placeholder="e.g. Home, Work, etc." {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
+          
           <FormField
             control={form.control}
             name="recipient_name"
@@ -136,14 +122,14 @@ const AddressForm: React.FC<AddressFormProps> = ({ address, onSubmit, onCancel }
             <FormItem>
               <FormLabel>Street Address</FormLabel>
               <FormControl>
-                <Input placeholder="Street address" {...field} />
+                <Input placeholder="Street address, house number, etc." {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
             name="city"
@@ -157,14 +143,15 @@ const AddressForm: React.FC<AddressFormProps> = ({ address, onSubmit, onCancel }
               </FormItem>
             )}
           />
+          
           <FormField
             control={form.control}
             name="state"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>State/Province</FormLabel>
+                <FormLabel>State / Province</FormLabel>
                 <FormControl>
-                  <Input placeholder="State or Province (optional)" {...field} value={field.value || ''} />
+                  <Input placeholder="State or province (optional)" {...field} value={field.value || ''} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -172,7 +159,7 @@ const AddressForm: React.FC<AddressFormProps> = ({ address, onSubmit, onCancel }
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
             name="postal_code"
@@ -180,21 +167,36 @@ const AddressForm: React.FC<AddressFormProps> = ({ address, onSubmit, onCancel }
               <FormItem>
                 <FormLabel>Postal Code</FormLabel>
                 <FormControl>
-                  <Input placeholder="Postal code (optional)" {...field} value={field.value || ''} />
+                  <Input placeholder="Postal or ZIP code (optional)" {...field} value={field.value || ''} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
+          
           <FormField
             control={form.control}
             name="country"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Country</FormLabel>
-                <FormControl>
-                  <Input placeholder="Country" {...field} />
-                </FormControl>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a country" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {countries.map((country) => (
+                      <SelectItem key={country} value={country}>
+                        {country}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
@@ -206,9 +208,14 @@ const AddressForm: React.FC<AddressFormProps> = ({ address, onSubmit, onCancel }
           name="phone_number"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Phone Number (Optional)</FormLabel>
+              <FormLabel>Phone Number</FormLabel>
               <FormControl>
-                <Input placeholder="Phone number for delivery" {...field} value={field.value || ''} />
+                <Input 
+                  type="tel" 
+                  placeholder="Phone number (optional)" 
+                  {...field} 
+                  value={field.value || ''} 
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -219,31 +226,32 @@ const AddressForm: React.FC<AddressFormProps> = ({ address, onSubmit, onCancel }
           control={form.control}
           name="is_default"
           render={({ field }) => (
-            <FormItem className="flex flex-row items-start space-x-3 space-y-0 py-2">
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
               <FormControl>
-                <Checkbox 
-                  checked={field.value} 
-                  onCheckedChange={field.onChange} 
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
                 />
               </FormControl>
-              <div className="leading-none">
-                <FormLabel>Set as default address</FormLabel>
+              <div className="space-y-1 leading-none">
+                <FormLabel>
+                  Set as default address
+                </FormLabel>
+                <p className="text-sm text-gray-500">
+                  This address will be selected by default for shipping
+                </p>
               </div>
             </FormItem>
           )}
         />
 
-        <div className="flex justify-end space-x-4">
-          <Button 
-            type="button" 
-            variant="outline" 
-            onClick={onCancel}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        <div className="flex justify-end space-x-4 pt-2">
+          {onCancel && (
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+          )}
+          <Button type="submit" className="bg-zim-green hover:bg-zim-green/90">
             {address ? 'Update Address' : 'Save Address'}
           </Button>
         </div>

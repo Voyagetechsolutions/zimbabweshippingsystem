@@ -20,6 +20,8 @@ import Services from "./pages/Services";
 import Contact from "./pages/Contact";
 import AddressBook from "./pages/AddressBook";
 import Notifications from "./pages/Notifications";
+import Reviews from "./pages/Reviews";
+import TaskManagement from "./pages/TaskManagement";
 
 // Configure the QueryClient with retry options
 const queryClient = new QueryClient({
@@ -76,6 +78,12 @@ const App = () => (
                 <Notifications />
               </RequireAuth>
             } />
+            <Route path="/reviews" element={<Reviews />} />
+            <Route path="/tasks" element={
+              <RequireAdmin>
+                <TaskManagement />
+              </RequireAdmin>
+            } />
             <Route path="/admin" element={
               <RequireAdmin>
                 <AdminDashboard />
@@ -84,6 +92,7 @@ const App = () => (
             {/* Redirect old URLs or potential misspellings to proper routes */}
             <Route path="/admin-dashboard" element={<Navigate to="/admin" replace />} />
             <Route path="/dashboard-admin" element={<Navigate to="/admin" replace />} />
+            <Route path="/task-management" element={<Navigate to="/tasks" replace />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
