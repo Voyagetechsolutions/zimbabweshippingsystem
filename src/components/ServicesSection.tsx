@@ -1,12 +1,45 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, Ship, Package, Truck, Globe, DollarSign } from 'lucide-react';
+import { ChevronRight, Ship, Package, Truck, Globe, DollarSign, Drum } from 'lucide-react';
+import { formatCurrency } from '@/utils/formatters';
+
+interface PriceDisplayProps {
+  price: number;
+  label: string;
+  type: string;
+  description: string;
+  buttonText?: string;
+  popular?: boolean;
+}
+
+const PriceDisplay: React.FC<PriceDisplayProps> = ({ price, label, type, description, buttonText = "Book Now", popular = false }) => {
+  return (
+    <div className="relative">
+      <div className="absolute -inset-1 rounded-lg bg-gradient-to-tr from-zim-green/20 to-zim-yellow/20 opacity-50 blur-sm"></div>
+      <div className={`bg-white rounded-lg shadow-lg overflow-hidden relative border-2 ${popular ? 'border-zim-red' : 'border-zim-yellow'}`}>
+        <div className="absolute top-0 right-0">
+          <div className={`${popular ? 'bg-zim-red' : 'bg-zim-yellow'} text-white px-4 py-1 font-semibold text-sm transform rotate-45 translate-x-6 -translate-y-1`}>
+            {type}
+          </div>
+        </div>
+        <div className="p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-2">{label}</h3>
+          <p className="text-gray-600 mb-4">{description}</p>
+          <div className="text-3xl font-bold text-zim-green mb-4">£{price}<span className="text-lg text-gray-500 font-normal">/drum</span></div>
+          <Button className={`w-full ${popular ? 'bg-zim-red hover:bg-zim-red/90' : 'bg-zim-green hover:bg-zim-green/90'}`}>
+            {buttonText}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const ServicesSection: React.FC = () => {
   const services = [
     {
-      icon: <Ship className="h-10 w-10 text-zim-green" />,
+      icon: <Drum className="h-10 w-10 text-zim-green" />,
       title: 'Drum Shipping',
       description: 'Our specialized drum shipping service offers the most cost-effective way to send large quantities of goods to Zimbabwe.',
     },
@@ -61,6 +94,34 @@ const ServicesSection: React.FC = () => {
               <div className="h-1 zim-gradient-horizontal"></div>
             </div>
           ))}
+        </div>
+
+        <div className="mt-16 mb-8 text-center">
+          <h3 className="text-2xl font-bold mb-8">Drum Shipping Options</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <PriceDisplay 
+              price={260} 
+              label="Single Drum" 
+              type="Standard" 
+              description="Basic shipping option" 
+              buttonText="Book Now"
+            />
+            <PriceDisplay 
+              price={250} 
+              label="Multiple Drums" 
+              type="Value" 
+              description="For 2-4 drums" 
+              buttonText="Book Now"
+            />
+            <PriceDisplay 
+              price={220} 
+              label="Bulk Drums" 
+              type="Popular" 
+              description="For 5+ drums" 
+              buttonText="Book Now & Save"
+              popular={true}
+            />
+          </div>
         </div>
 
         <div className="mt-16 text-center">

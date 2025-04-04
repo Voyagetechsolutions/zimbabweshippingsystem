@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -29,13 +29,53 @@ import {
 import { Button } from "@/components/ui/button"
 import NotificationsPanel from '@/components/NotificationsPanel';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { formatCurrency } from '@/utils/formatters';
+import { useToast } from '@/hooks/use-toast';
+
+interface CurrencyOption {
+  value: string;
+  symbol: string;
+  name: string;
+  rate: number; // Exchange rate relative to GBP
+}
+
+const currencyOptions: CurrencyOption[] = [
+  { value: 'GBP', symbol: '£', name: 'GBP', rate: 1 },
+  { value: 'USD', symbol: '$', name: 'USD', rate: 1.28 },
+  { value: 'EUR', symbol: '€', name: 'EUR', rate: 1.17 },
+  { value: 'ZWL', symbol: 'ZWL', name: 'ZWL', rate: 8240 }
+];
+
+// Create a context for currency
+export const CurrencyContext = React.createContext<{
+  currency: CurrencyOption;
+  setCurrency: (currency: CurrencyOption) => void;
+}>({
+  currency: currencyOptions[0],
+  setCurrency: () => {}
+});
+
+// Provider component for currency context
+export const CurrencyProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
+  const [currency, setCurrency] = useState<CurrencyOption>(currencyOptions[0]);
+  
+  return (
+    <CurrencyContext.Provider value={{ currency, setCurrency }}>
+      {children}
+    </CurrencyContext.Provider>
+  );
+};
+
+// Hook for using currency context
+export const useCurrency = () => React.useContext(CurrencyContext);
 
 const Navbar = () => {
   const { user, session, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [currency, setCurrency] = useState('GBP');
+  const { currency, setCurrency } = useCurrency();
+  const { toast } = useToast();
   
   const handleLogout = async () => {
     await signOut();
@@ -43,8 +83,16 @@ const Navbar = () => {
   };
 
   const handleCurrencyChange = (value: string) => {
-    setCurrency(value);
-    // In real app, this would update a context or state manager to apply currency across app
+    const newCurrency = currencyOptions.find(c => c.value === value) || currencyOptions[0];
+    setCurrency(newCurrency);
+    
+    // Display toast notification
+    toast({
+      title: "Currency updated",
+      description: `Prices are now displayed in ${newCurrency.name}`,
+    });
+    
+    // In a real app, this would trigger a context update to refresh all price displays
   };
 
   return (
@@ -69,15 +117,16 @@ const Navbar = () => {
               <div className="absolute top-full right-0 bg-white shadow-md rounded-md p-4 w-48 z-50">
                 <div className="mb-4 pb-2 border-b">
                   <p className="text-sm font-medium mb-2">Currency</p>
-                  <Select value={currency} onValueChange={handleCurrencyChange}>
+                  <Select value={currency.value} onValueChange={handleCurrencyChange}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Currency" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="GBP">£ GBP</SelectItem>
-                      <SelectItem value="USD">$ USD</SelectItem>
-                      <SelectItem value="EUR">€ EUR</SelectItem>
-                      <SelectItem value="ZWL">ZWL</SelectItem>
+                      {currencyOptions.map(option => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.symbol} {option.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -126,15 +175,16 @@ const Navbar = () => {
           <div className="flex items-center space-x-6">
             <div className="flex items-center space-x-2">
               <DollarSign className="h-4 w-4" />
-              <Select value={currency} onValueChange={handleCurrencyChange}>
+              <Select value={currency.value} onValueChange={handleCurrencyChange}>
                 <SelectTrigger className="w-[100px] border-none shadow-none px-0">
                   <SelectValue placeholder="Currency" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="GBP">£ GBP</SelectItem>
-                  <SelectItem value="USD">$ USD</SelectItem>
-                  <SelectItem value="EUR">€ EUR</SelectItem>
-                  <SelectItem value="ZWL">ZWL</SelectItem>
+                  {currencyOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.symbol} {option.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

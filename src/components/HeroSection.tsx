@@ -3,6 +3,7 @@ import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Package, ArrowRight, Truck } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import Logo from '@/components/Logo';
 
 const HeroSection: React.FC = () => {
   return (
@@ -12,6 +13,13 @@ const HeroSection: React.FC = () => {
         <div className="flex flex-col md:flex-row items-center justify-between">
           <div className="md:w-1/2 mb-10 md:mb-0">
             <div className="max-w-lg">
+              <div className="mb-8 relative">
+                <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-zim-green/30 via-zim-yellow/30 to-zim-red/30 opacity-70 blur-md animate-pulse"></div>
+                <div className="relative bg-white/80 backdrop-blur-sm rounded-xl p-4">
+                  <Logo size="large" className="mx-auto md:mx-0" />
+                </div>
+              </div>
+              
               <h1 className="text-4xl md:text-5xl font-bold text-gray-800 mb-4">
                 UK to Zimbabwe <span className="text-zim-green">Shipping</span> Made Simple
               </h1>
@@ -57,7 +65,7 @@ const HeroSection: React.FC = () => {
                   </div>
                   <div className="text-sm">
                     <p className="font-medium">Best Prices</p>
-                    <p className="text-gray-500 text-xs">Starting from £220</p>
+                    <p className="text-gray-500 text-xs">Starting from £150</p>
                   </div>
                 </div>
               </div>

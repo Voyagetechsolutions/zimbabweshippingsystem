@@ -1,6 +1,6 @@
 
 import React from 'react';
-import Navbar from '@/components/Navbar';
+import Navbar, { CurrencyProvider } from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import HeroSection from '@/components/HeroSection';
 import ServicesSection from '@/components/ServicesSection';
@@ -11,18 +11,20 @@ import WhatsAppButton from '@/components/WhatsAppButton';
 
 const Index = () => {
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar />
-      <main className="flex-grow">
-        <HeroSection />
-        <ServicesSection />
-        <TrackingSection />
-        <TestimonialSection />
-        <CallToAction />
-      </main>
-      <Footer />
-      <WhatsAppButton />
-    </div>
+    <CurrencyProvider>
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-grow">
+          <HeroSection />
+          <ServicesSection />
+          <TrackingSection />
+          <TestimonialSection />
+          <CallToAction />
+        </main>
+        <Footer />
+        <WhatsAppButton />
+      </div>
+    </CurrencyProvider>
   );
 };
 
