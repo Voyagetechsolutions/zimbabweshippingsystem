@@ -2,6 +2,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Package, ArrowRight, Truck } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const HeroSection: React.FC = () => {
   return (
@@ -18,12 +19,16 @@ const HeroSection: React.FC = () => {
                 Fast, reliable, and affordable shipping services for all your packages. From personal items to commercial cargo.
               </p>
               <div className="space-y-4 md:space-y-0 md:space-x-4 md:flex">
-                <Button className="w-full md:w-auto bg-zim-green hover:bg-zim-green/90 text-white flex items-center justify-center text-lg">
-                  <Package className="mr-2" /> Book Shipment
-                </Button>
-                <Button variant="outline" className="w-full md:w-auto border-zim-black text-zim-black hover:bg-zim-black hover:text-white flex items-center justify-center text-lg">
-                  Track Package <ArrowRight className="ml-2" />
-                </Button>
+                <Link to="/book-shipment">
+                  <Button className="w-full md:w-auto bg-zim-green hover:bg-zim-green/90 text-white flex items-center justify-center text-lg">
+                    <Package className="mr-2" /> Book Shipment
+                  </Button>
+                </Link>
+                <Link to="/track">
+                  <Button variant="outline" className="w-full md:w-auto border-zim-black text-zim-black hover:bg-zim-black hover:text-white flex items-center justify-center text-lg">
+                    Track Package <ArrowRight className="ml-2" />
+                  </Button>
+                </Link>
               </div>
               <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="flex items-center bg-white p-3 rounded-md shadow-sm border">
@@ -52,7 +57,7 @@ const HeroSection: React.FC = () => {
                   </div>
                   <div className="text-sm">
                     <p className="font-medium">Best Prices</p>
-                    <p className="text-gray-500 text-xs">Starting from £260</p>
+                    <p className="text-gray-500 text-xs">Starting from £150</p>
                   </div>
                 </div>
               </div>
@@ -70,21 +75,23 @@ const HeroSection: React.FC = () => {
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <span className="text-gray-700">1 Drum</span>
-                      <span className="font-semibold">£260</span>
+                      <span className="font-semibold">£150</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-700">2-4 Drums</span>
-                      <span className="font-semibold">£250 each</span>
+                      <span className="font-semibold">£145 each</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-700">5+ Drums</span>
-                      <span className="font-semibold">£220 each</span>
+                      <span className="font-semibold">£140 each</span>
                     </div>
                   </div>
                   <div className="mt-4 pt-4 border-t flex justify-center">
-                    <Button className="w-full bg-zim-red hover:bg-zim-red/90">
-                      Book Now & Save
-                    </Button>
+                    <Link to="/book-shipment">
+                      <Button className="w-full bg-zim-red hover:bg-zim-red/90">
+                        Book Now & Save
+                      </Button>
+                    </Link>
                   </div>
                 </div>
                 {/* Zimbabwe flag stripe decoration */}

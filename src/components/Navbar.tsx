@@ -19,25 +19,32 @@ import {
   ShieldCheck,
   Bell,
   Package,
-  Phone,
   Search,
   MapPin,
   Truck,
   LogIn,
-  UserPlus
+  UserPlus,
+  DollarSign
 } from "lucide-react";
 import { Button } from "@/components/ui/button"
 import NotificationsPanel from '@/components/NotificationsPanel';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Navbar = () => {
   const { user, session, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [currency, setCurrency] = useState('GBP');
   
   const handleLogout = async () => {
     await signOut();
     navigate('/');
+  };
+
+  const handleCurrencyChange = (value: string) => {
+    setCurrency(value);
+    // In real app, this would update a context or state manager to apply currency across app
   };
 
   return (
@@ -60,6 +67,20 @@ const Navbar = () => {
 
             {isMenuOpen && (
               <div className="absolute top-full right-0 bg-white shadow-md rounded-md p-4 w-48 z-50">
+                <div className="mb-4 pb-2 border-b">
+                  <p className="text-sm font-medium mb-2">Currency</p>
+                  <Select value={currency} onValueChange={handleCurrencyChange}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="GBP">£ GBP</SelectItem>
+                      <SelectItem value="USD">$ USD</SelectItem>
+                      <SelectItem value="EUR">€ EUR</SelectItem>
+                      <SelectItem value="ZWL">ZWL</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Link to="/book-shipment" className="flex items-center py-2 hover:bg-gray-100 rounded-md">
                   <Truck className="mr-2 h-4 w-4" />
                   Book Shipment
@@ -103,6 +124,20 @@ const Navbar = () => {
         ) : (
           // Desktop Menu
           <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-2">
+              <DollarSign className="h-4 w-4" />
+              <Select value={currency} onValueChange={handleCurrencyChange}>
+                <SelectTrigger className="w-[100px] border-none shadow-none px-0">
+                  <SelectValue placeholder="Currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GBP">£ GBP</SelectItem>
+                  <SelectItem value="USD">$ USD</SelectItem>
+                  <SelectItem value="EUR">€ EUR</SelectItem>
+                  <SelectItem value="ZWL">ZWL</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Link to="/book-shipment" className="flex items-center hover:text-gray-600">
               <Truck className="mr-1 h-4 w-4" />
               Book Shipment
@@ -112,7 +147,7 @@ const Navbar = () => {
               Services
             </Link>
             <Link to="/contact" className="flex items-center hover:text-gray-600">
-              <Phone className="mr-1 h-4 w-4" />
+              <Search className="mr-1 h-4 w-4" />
               Contact
             </Link>
             <Link to="/track" className="flex items-center hover:text-gray-600">

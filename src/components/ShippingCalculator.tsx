@@ -4,25 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Ship, Package, ArrowRight } from 'lucide-react';
+import { Ship, Package, ArrowRight, Box } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const ShippingCalculator: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>("drum");
   const [drumQuantity, setDrumQuantity] = useState<string>("1");
   const [weight, setWeight] = useState<string>("1");
-  const [additionalServices, setAdditionalServices] = useState({
-    doorToDoor: false,
-    insurance: false
-  });
-
-  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, checked } = e.target;
-    setAdditionalServices(prev => ({ ...prev, [name]: checked }));
-  };
+  const [containerType, setContainerType] = useState<string>("20ft");
 
   const calculatePrice = () => {
     let basePrice = 0;
@@ -31,30 +22,26 @@ const ShippingCalculator: React.FC = () => {
     if (activeTab === 'drum') {
       const qty = parseInt(drumQuantity);
       if (qty >= 5) {
-        basePrice = qty * 220;
+        basePrice = qty * 140;
       } else if (qty >= 2) {
-        basePrice = qty * 250;
+        basePrice = qty * 145;
       } else {
-        basePrice = 260;
+        basePrice = 150;
       }
     } else if (activeTab === 'parcel') {
       const weightNum = parseFloat(weight) || 1;
       basePrice = weightNum * 50;
-    }
-    
-    // Add price for additional services
-    let additionalCost = 0;
-    if (additionalServices.doorToDoor) {
-      additionalCost += 25;
-    }
-    if (additionalServices.insurance) {
-      additionalCost += basePrice * 0.05; // 5% of base price
+    } else if (activeTab === 'container') {
+      if (containerType === '20ft') {
+        basePrice = 3000;
+      } else {
+        basePrice = 5500;
+      }
     }
     
     return {
       basePrice,
-      additionalCost,
-      totalPrice: basePrice + additionalCost
+      totalPrice: basePrice
     };
   };
 
@@ -77,10 +64,14 @@ const ShippingCalculator: React.FC = () => {
             </CardHeader>
             <CardContent className="p-6">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-8">
+                <TabsList className="grid w-full grid-cols-3 mb-8">
                   <TabsTrigger value="drum" className="flex items-center gap-2">
                     <Ship className="h-4 w-4" />
                     Drum Shipping
+                  </TabsTrigger>
+                  <TabsTrigger value="container" className="flex items-center gap-2">
+                    <Box className="h-4 w-4" />
+                    Container
                   </TabsTrigger>
                   <TabsTrigger value="parcel" className="flex items-center gap-2">
                     <Package className="h-4 w-4" />
@@ -108,11 +99,37 @@ const ShippingCalculator: React.FC = () => {
                   <div className="p-4 bg-gray-50 rounded-md text-sm">
                     <div className="font-medium mb-2">Pricing Tiers:</div>
                     <ul className="space-y-1 list-disc pl-5">
-                      <li>1 Drum: £260 each</li>
-                      <li>2-4 Drums: £250 each</li>
-                      <li>5+ Drums: £220 each</li>
+                      <li>1 Drum: £150 each</li>
+                      <li>2-4 Drums: £145 each</li>
+                      <li>5+ Drums: £140 each</li>
                     </ul>
                     <p className="mt-2 text-gray-500">Each drum has a capacity of 200L</p>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="container" className="space-y-6">
+                  <div>
+                    <Label htmlFor="containerType">Container Size</Label>
+                    <Select value={containerType} onValueChange={setContainerType}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select container size" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="20ft">20ft Container</SelectItem>
+                        <SelectItem value="40ft">40ft Container</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="p-4 bg-gray-50 rounded-md text-sm">
+                    <div className="font-medium mb-2">Container Pricing:</div>
+                    <ul className="space-y-1 list-disc pl-5">
+                      <li>20ft Container: £3,000</li>
+                      <li>40ft Container: £5,500</li>
+                    </ul>
+                    <p className="mt-2 text-gray-500">
+                      Ideal for businesses and large volume shipments
+                    </p>
                   </div>
                 </TabsContent>
                 
@@ -136,61 +153,10 @@ const ShippingCalculator: React.FC = () => {
                     </p>
                   </div>
                 </TabsContent>
-                
-                <div className="mt-8">
-                  <p className="font-medium text-lg mb-3">Additional Services</p>
-                  <div className="space-y-4">
-                    <div className="flex items-start space-x-3 p-4 border rounded-md">
-                      <input
-                        type="checkbox"
-                        id="doorToDoor"
-                        name="doorToDoor"
-                        checked={additionalServices.doorToDoor}
-                        onChange={handleCheckboxChange}
-                        className="mt-1"
-                      />
-                      <div>
-                        <Label htmlFor="doorToDoor" className="cursor-pointer font-medium">
-                          Door-to-Door Delivery <span className="text-zim-green ml-2">£25</span>
-                        </Label>
-                        <p className="text-sm text-gray-500 mt-1">
-                          We pick up from your address and deliver directly to recipient
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-start space-x-3 p-4 border rounded-md">
-                      <input
-                        type="checkbox"
-                        id="insurance"
-                        name="insurance"
-                        checked={additionalServices.insurance}
-                        onChange={handleCheckboxChange}
-                        className="mt-1"
-                      />
-                      <div>
-                        <Label htmlFor="insurance" className="cursor-pointer font-medium">
-                          Shipping Insurance <span className="text-zim-green ml-2">5% of shipment value</span>
-                        </Label>
-                        <p className="text-sm text-gray-500 mt-1">
-                          Protect your items with our comprehensive insurance
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </Tabs>
               
               <div className="mt-8 p-6 bg-gray-50 rounded-lg">
-                <div className="flex justify-between items-center pb-3 border-b">
-                  <span className="font-medium">Base Shipping Cost:</span>
-                  <span className="text-lg">£{priceDetails.basePrice.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between items-center py-3 border-b">
-                  <span className="font-medium">Additional Services:</span>
-                  <span>£{priceDetails.additionalCost.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between items-center pt-3 font-bold">
+                <div className="flex justify-between items-center py-3 font-bold">
                   <span>Total Estimated Cost:</span>
                   <span className="text-2xl text-zim-green">£{priceDetails.totalPrice.toFixed(2)}</span>
                 </div>
