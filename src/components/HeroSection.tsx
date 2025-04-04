@@ -73,37 +73,18 @@ const HeroSection: React.FC = () => {
           </div>
           <div className="order-1 lg:order-2 flex justify-center">
             <div className="relative">
-              <div className="absolute -inset-4 rounded-full bg-gradient-to-tr from-zim-green via-zim-yellow to-zim-red opacity-50 blur-xl animate-float"></div>
-              <div className="zim-border bg-white overflow-hidden relative z-10 rounded-lg shadow-xl transform rotate-2 hover:rotate-0 transition-transform duration-500">
-                <div className="flex flex-col p-6">
-                  <div className="border-b pb-4 mb-4">
-                    <h3 className="text-xl font-bold text-gray-800">Drum Shipping Special Offer</h3>
-                    <p className="text-gray-600">Our most popular service</p>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">1 Drum</span>
-                      <span className="font-semibold">£260</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">2-4 Drums</span>
-                      <span className="font-semibold">£250 each</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">5+ Drums</span>
-                      <span className="font-semibold">£220 each</span>
-                    </div>
-                  </div>
-                  <div className="mt-4 pt-4 border-t flex justify-center">
-                    <Link to="/book-shipment">
-                      <Button className="w-full bg-zim-red hover:bg-zim-red/90">
-                        Book Now & Save
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-                {/* Zimbabwe flag stripe decoration */}
-                <div className="absolute bottom-0 left-0 right-0 h-2 zim-gradient-horizontal"></div>
+              {/* Multi-layered glow effect around the logo */}
+              <div className="absolute -inset-4 rounded-full bg-gradient-to-tr from-zim-green via-zim-yellow to-zim-red opacity-50 blur-xl animate-pulse"></div>
+              <div className="absolute -inset-6 rounded-full bg-zim-yellow/30 opacity-40 blur-2xl animate-pulse animate-delay-200"></div>
+              <div className="absolute -inset-8 rounded-full bg-zim-green/20 opacity-30 blur-3xl animate-pulse animate-delay-500"></div>
+              
+              {/* Logo with subtle hover animation */}
+              <div className="relative z-10 transform transition-all duration-500 hover:scale-105">
+                <img 
+                  src="/lovable-uploads/9916a41e-7a43-42af-b9b0-e92e37521652.png" 
+                  alt="Zimbabwe Shipping" 
+                  className="w-64 h-64 md:w-80 md:h-80 object-contain"
+                />
               </div>
             </div>
           </div>
