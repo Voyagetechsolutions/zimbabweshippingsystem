@@ -27,7 +27,7 @@ import CreateShipment from './pages/CreateShipment';
 import TaskManagement from './pages/TaskManagement';
 
 // Components
-import RouteGuard from './components/RouteGuard';
+import { RequireAuth, RequireAdmin, RedirectIfAuthenticated } from './components/RouteGuard';
 import { Toaster } from './components/ui/toaster';
 import WhatsAppButton from './components/WhatsAppButton';
 
@@ -49,7 +49,7 @@ function App() {
               <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<Index />} />
-                <Route path="/auth" element={<Auth />} />
+                <Route path="/auth" element={<RedirectIfAuthenticated><Auth /></RedirectIfAuthenticated>} />
                 <Route path="/services" element={<Services />} />
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/gallery" element={<Gallery />} />
@@ -63,57 +63,57 @@ function App() {
                 <Route
                   path="/dashboard"
                   element={
-                    <RouteGuard>
+                    <RequireAuth>
                       <Dashboard />
-                    </RouteGuard>
+                    </RequireAuth>
                   }
                 />
                 <Route
                   path="/shipment/:id"
                   element={
-                    <RouteGuard>
+                    <RequireAuth>
                       <ShipmentDetails />
-                    </RouteGuard>
+                    </RequireAuth>
                   }
                 />
                 <Route
                   path="/account"
                   element={
-                    <RouteGuard>
+                    <RequireAuth>
                       <Account />
-                    </RouteGuard>
+                    </RequireAuth>
                   }
                 />
                 <Route
                   path="/address-book"
                   element={
-                    <RouteGuard>
+                    <RequireAuth>
                       <AddressBook />
-                    </RouteGuard>
+                    </RequireAuth>
                   }
                 />
                 <Route
                   path="/notifications"
                   element={
-                    <RouteGuard>
+                    <RequireAuth>
                       <Notifications />
-                    </RouteGuard>
+                    </RequireAuth>
                   }
                 />
                 <Route
                   path="/create-shipment"
                   element={
-                    <RouteGuard>
+                    <RequireAuth>
                       <CreateShipment />
-                    </RouteGuard>
+                    </RequireAuth>
                   }
                 />
                 <Route
                   path="/task-management"
                   element={
-                    <RouteGuard>
+                    <RequireAuth>
                       <TaskManagement />
-                    </RouteGuard>
+                    </RequireAuth>
                   }
                 />
 
@@ -121,17 +121,17 @@ function App() {
                 <Route
                   path="/admin"
                   element={
-                    <RouteGuard requireAdmin>
+                    <RequireAdmin>
                       <AdminDashboard />
-                    </RouteGuard>
+                    </RequireAdmin>
                   }
                 />
                 <Route
                   path="/admin/gallery"
                   element={
-                    <RouteGuard requireAdmin>
+                    <RequireAdmin>
                       <GalleryAdmin />
-                    </RouteGuard>
+                    </RequireAdmin>
                   }
                 />
 
