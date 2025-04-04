@@ -4,7 +4,8 @@ export type NotificationType =
   | 'payment' 
   | 'system' 
   | 'task' 
-  | 'review';
+  | 'review'
+  | string; // Add string to allow for any string values from the database
 
 export type NotificationPriority = 'low' | 'normal' | 'high';
 

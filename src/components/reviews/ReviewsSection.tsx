@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,7 +38,6 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ shipmentId }) => {
       let query = supabase
         .from('reviews')
         .select('*, profiles:user_id(full_name, email)')
-        .order('created_at', { ascending: false });
       
       // If shipmentId is provided, only get reviews for that shipment
       if (shipmentId) {
@@ -47,13 +47,18 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ shipmentId }) => {
         query = query.limit(50);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
 
       if (data) {
-        const mappedReviews = data.map(item => ({
-          ...item,
+        const mappedReviews: Review[] = data.map(item => ({
+          id: item.id,
+          user_id: item.user_id,
+          shipment_id: item.shipment_id,
+          rating: item.rating,
+          comment: item.comment,
+          created_at: item.created_at,
           user_name: item.profiles?.full_name,
           user_email: item.profiles?.email
         }));

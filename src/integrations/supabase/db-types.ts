@@ -26,6 +26,16 @@ export interface Tables {
     status: string;
   };
   
+  // Add the reviews table we just created
+  reviews: {
+    id: string;
+    user_id: string;
+    shipment_id: string | null;
+    rating: number;
+    comment: string | null;
+    created_at: string;
+  };
+  
   // New tables that aren't in the generated types yet
   audit_logs: {
     id: string;
