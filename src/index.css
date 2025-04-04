@@ -122,8 +122,16 @@
   background-repeat: repeat;
 }
 
+.dark-navy-bg {
+  background-color: #111827;
+}
+
 .logo-shadow {
   filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.2));
+}
+
+.logo-glow {
+  filter: drop-shadow(0 0 15px rgba(252, 209, 22, 0.7));
 }
 
 /* Custom animations */
