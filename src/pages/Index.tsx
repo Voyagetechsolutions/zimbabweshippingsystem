@@ -6,7 +6,7 @@ import HeroSection from '@/components/HeroSection';
 import ServicesSection from '@/components/ServicesSection';
 import TrackingSection from '@/components/TrackingSection';
 import ShippingCalculator from '@/components/ShippingCalculator';
-import TestimonialSection from '@/components/TestimonialSection';
+import PricingSection from '@/components/PricingSection';
 import CallToAction from '@/components/CallToAction';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import ReviewsSection from '@/components/reviews/ReviewsSection';
@@ -19,6 +19,7 @@ const Index = () => {
         <HeroSection />
         <ServicesSection />
         <TrackingSection />
+        <PricingSection />
         <ShippingCalculator />
         <section className="py-16 bg-gray-50">
           <div className="container mx-auto px-4">
