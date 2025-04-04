@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,7 +18,6 @@ import {
 import { GalleryImage, GalleryCategory } from '@/types/gallery';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { tableFrom } from '@/integrations/supabase/db-types';
 
 const GalleryPage = () => {
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -28,13 +28,16 @@ const GalleryPage = () => {
   const { data: galleryImages, isLoading, error } = useQuery({
     queryKey: ['galleryImages'],
     queryFn: async () => {
+      // Use RPC function instead of direct table access
       const { data, error } = await supabase
-        .from(tableFrom('gallery'))
-        .select('*')
-        .order('created_at', { ascending: false });
+        .rpc('get_gallery_images')
+        .then(response => {
+          if (response.error) throw response.error;
+          return response;
+        });
       
       if (error) throw error;
-      return data as unknown as GalleryImage[];
+      return (data || []) as GalleryImage[];
     }
   });
 

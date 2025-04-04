@@ -5,7 +5,8 @@ export interface GalleryImage {
   alt: string;
   caption: string;
   category: GalleryCategory;
-  createdAt?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export type GalleryCategory = 'facilities' | 'shipments' | 'team' | 'customers';

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -56,13 +55,16 @@ const GalleryManagement = () => {
   const { data: galleryImages, isLoading } = useQuery({
     queryKey: ['adminGalleryImages'],
     queryFn: async () => {
+      // Use raw SQL query to get around type limitations until Supabase types are regenerated
       const { data, error } = await supabase
-        .from(tableFrom('gallery'))
-        .select('*')
-        .order('created_at', { ascending: false });
+        .rpc('get_gallery_images')
+        .then(response => {
+          if (response.error) throw response.error;
+          return response;
+        });
       
       if (error) throw error;
-      return data as unknown as GalleryImage[];
+      return (data || []) as GalleryImage[];
     }
   });
 
@@ -91,19 +93,22 @@ const GalleryManagement = () => {
         .from('public')
         .getPublicUrl(filePath);
 
-      // 3. Save the image metadata to the database
+      // 3. Save the image metadata to the database using rpc
       const { data, error: insertError } = await supabase
-        .from(tableFrom('gallery'))
-        .insert([{
-          ...newImage, 
-          src: publicURL.publicUrl,
-          created_at: new Date().toISOString()
-        }])
-        .select();
+        .rpc('insert_gallery_image', {
+          p_src: publicURL.publicUrl,
+          p_alt: newImage.alt || '',
+          p_caption: newImage.caption || '',
+          p_category: newImage.category || 'facilities'
+        })
+        .then(response => {
+          if (response.error) throw response.error;
+          return response;
+        });
 
       if (insertError) throw insertError;
       
-      return data[0] as unknown as GalleryImage;
+      return data as unknown as GalleryImage;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminGalleryImages'] });
@@ -149,11 +154,13 @@ const GalleryManagement = () => {
         // Continue anyway to delete the database record
       }
 
-      // 3. Delete the database record
+      // 3. Delete the database record using rpc
       const { error: dbError } = await supabase
-        .from(tableFrom('gallery'))
-        .delete()
-        .eq('id', imageId);
+        .rpc('delete_gallery_image', { p_id: imageId })
+        .then(response => {
+          if (response.error) throw response.error;
+          return response;
+        });
 
       if (dbError) throw dbError;
 
