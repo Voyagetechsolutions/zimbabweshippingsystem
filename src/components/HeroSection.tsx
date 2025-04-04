@@ -57,45 +57,75 @@ const HeroSection: React.FC = () => {
                   </div>
                   <div className="text-sm">
                     <p className="font-medium">Best Prices</p>
-                    <p className="text-gray-500 text-xs">Starting from £150</p>
+                    <p className="text-gray-500 text-xs">Starting from £220</p>
                   </div>
                 </div>
               </div>
             </div>
           </div>
           <div className="md:w-1/2 flex justify-center">
-            <div className="relative">
-              <div className="absolute -inset-4 rounded-full bg-gradient-to-tr from-zim-green via-zim-yellow to-zim-red opacity-50 blur-xl animate-float"></div>
-              <div className="zim-border bg-white overflow-hidden relative z-10 rounded-lg shadow-xl transform rotate-2 hover:rotate-0 transition-transform duration-500">
-                <div className="flex flex-col p-6">
-                  <div className="border-b pb-4 mb-4">
-                    <h3 className="text-xl font-bold text-gray-800">Drum Shipping Special Offer</h3>
-                    <p className="text-gray-600">Our most popular service</p>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">1 Drum</span>
-                      <span className="font-semibold">£150</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">2-4 Drums</span>
-                      <span className="font-semibold">£145 each</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">5+ Drums</span>
-                      <span className="font-semibold">£140 each</span>
+            <div className="grid grid-cols-1 gap-4 w-full max-w-md">
+              <div className="relative">
+                <div className="absolute -inset-1 rounded-lg bg-gradient-to-tr from-zim-green/20 to-zim-yellow/20 opacity-50 blur-sm"></div>
+                <div className="bg-white rounded-lg shadow-lg overflow-hidden relative border-2 border-zim-yellow">
+                  <div className="absolute top-0 right-0">
+                    <div className="bg-zim-yellow text-white px-4 py-1 font-semibold text-sm transform rotate-45 translate-x-6 -translate-y-1">
+                      Standard
                     </div>
                   </div>
-                  <div className="mt-4 pt-4 border-t flex justify-center">
-                    <Link to="/book-shipment">
+                  <div className="p-6">
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">Single Drum</h3>
+                    <p className="text-gray-600 mb-4">Basic shipping option</p>
+                    <div className="text-3xl font-bold text-zim-green mb-4">£260<span className="text-lg text-gray-500 font-normal">/drum</span></div>
+                    <ul className="space-y-2 mb-6">
+                      <li className="flex items-center text-gray-700">
+                        <svg className="h-5 w-5 text-zim-green mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        200L capacity per drum
+                      </li>
+                      <li className="flex items-center text-gray-700">
+                        <svg className="h-5 w-5 text-zim-green mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        2-3 weeks delivery time
+                      </li>
+                    </ul>
+                    <Link to="/book-shipment" className="block">
+                      <Button className="w-full bg-zim-green hover:bg-zim-green/90">
+                        Book Now
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
+              <div className="relative">
+                <div className="absolute -inset-1 rounded-lg bg-gradient-to-tr from-zim-green/30 to-zim-red/30 opacity-70 blur-sm"></div>
+                <div className="bg-white rounded-lg shadow-lg overflow-hidden relative border-2 border-zim-red">
+                  <div className="absolute top-0 right-0">
+                    <div className="bg-zim-red text-white px-4 py-1 font-semibold text-sm transform rotate-45 translate-x-6 -translate-y-1">
+                      Popular
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">Multiple Drums</h3>
+                    <p className="text-gray-600 mb-4">Best value option</p>
+                    <div className="mb-4">
+                      <div className="text-3xl font-bold text-zim-green">£250<span className="text-lg text-gray-500 font-normal">/drum</span></div>
+                      <p className="text-sm text-gray-600">2-4 drums</p>
+                    </div>
+                    <div className="mb-6">
+                      <div className="text-3xl font-bold text-zim-green">£220<span className="text-lg text-gray-500 font-normal">/drum</span></div>
+                      <p className="text-sm text-gray-600">5+ drums</p>
+                    </div>
+                    <Link to="/book-shipment" className="block">
                       <Button className="w-full bg-zim-red hover:bg-zim-red/90">
                         Book Now & Save
                       </Button>
                     </Link>
                   </div>
                 </div>
-                {/* Zimbabwe flag stripe decoration */}
-                <div className="absolute bottom-0 left-0 right-0 h-2 zim-gradient-horizontal"></div>
               </div>
             </div>
           </div>

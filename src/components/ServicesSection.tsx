@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, Ship, Package, Truck, Globe, DollarSign, Box } from 'lucide-react';
+import { ChevronRight, Ship, Package, Truck, Globe, DollarSign } from 'lucide-react';
 
 const ServicesSection: React.FC = () => {
   const services = [
@@ -9,11 +9,6 @@ const ServicesSection: React.FC = () => {
       icon: <Ship className="h-10 w-10 text-zim-green" />,
       title: 'Drum Shipping',
       description: 'Our specialized drum shipping service offers the most cost-effective way to send large quantities of goods to Zimbabwe.',
-    },
-    {
-      icon: <Box className="h-10 w-10 text-zim-green" />,
-      title: 'Container Shipping',
-      description: 'Full container shipping options for businesses and large volume personal effects, with 20ft and 40ft containers available.',
     },
     {
       icon: <Package className="h-10 w-10 text-zim-yellow" />,
