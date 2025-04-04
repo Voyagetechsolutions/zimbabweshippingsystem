@@ -22,6 +22,9 @@ import AddressBook from "./pages/AddressBook";
 import Notifications from "./pages/Notifications";
 import Reviews from "./pages/Reviews";
 import TaskManagement from "./pages/TaskManagement";
+import Pricing from "./pages/Pricing";
+import Gallery from "./pages/Gallery";
+import GalleryAdmin from "./pages/GalleryAdmin";
 
 // Configure the QueryClient with retry options
 const queryClient = new QueryClient({
@@ -62,6 +65,8 @@ const App = () => (
             <Route path="/shipment/:id" element={<ShipmentDetails />} />
             <Route path="/track" element={<Track />} />
             <Route path="/services" element={<Services />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/gallery" element={<Gallery />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/account" element={
               <RequireAuth>
@@ -87,6 +92,11 @@ const App = () => (
             <Route path="/admin" element={
               <RequireAdmin>
                 <AdminDashboard />
+              </RequireAdmin>
+            } />
+            <Route path="/admin/gallery" element={
+              <RequireAdmin>
+                <GalleryAdmin />
               </RequireAdmin>
             } />
             {/* Redirect old URLs or potential misspellings to proper routes */}

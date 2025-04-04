@@ -24,7 +24,9 @@ import {
   MapPin,
   Truck,
   LogIn,
-  UserPlus
+  UserPlus,
+  DollarSign,
+  Image
 } from "lucide-react";
 import { Button } from "@/components/ui/button"
 import NotificationsPanel from '@/components/NotificationsPanel';
@@ -63,6 +65,26 @@ const Navbar = () => {
                 <Link to="/book-shipment" className="flex items-center py-2 hover:bg-gray-100 rounded-md">
                   <Truck className="mr-2 h-4 w-4" />
                   Book Shipment
+                </Link>
+                <Link to="/services" className="flex items-center py-2 hover:bg-gray-100 rounded-md">
+                  <Package className="mr-2 h-4 w-4" />
+                  Services
+                </Link>
+                <Link to="/pricing" className="flex items-center py-2 hover:bg-gray-100 rounded-md">
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  Pricing
+                </Link>
+                <Link to="/gallery" className="flex items-center py-2 hover:bg-gray-100 rounded-md">
+                  <Image className="mr-2 h-4 w-4" />
+                  Gallery
+                </Link>
+                <Link to="/contact" className="flex items-center py-2 hover:bg-gray-100 rounded-md">
+                  <Phone className="mr-2 h-4 w-4" />
+                  Contact
+                </Link>
+                <Link to="/track" className="flex items-center py-2 hover:bg-gray-100 rounded-md">
+                  <Search className="mr-2 h-4 w-4" />
+                  Track
                 </Link>
                 {user ? (
                   <>
@@ -111,6 +133,14 @@ const Navbar = () => {
               <Package className="mr-1 h-4 w-4" />
               Services
             </Link>
+            <Link to="/pricing" className="flex items-center hover:text-gray-600">
+              <DollarSign className="mr-1 h-4 w-4" />
+              Pricing
+            </Link>
+            <Link to="/gallery" className="flex items-center hover:text-gray-600">
+              <Image className="mr-1 h-4 w-4" />
+              Gallery
+            </Link>
             <Link to="/contact" className="flex items-center hover:text-gray-600">
               <Phone className="mr-1 h-4 w-4" />
               Contact
@@ -155,12 +185,22 @@ const Navbar = () => {
                     </Link>
                   </DropdownMenuItem>
                   {isAdmin && (
-                    <DropdownMenuItem asChild>
-                      <Link to="/admin" className="cursor-pointer">
-                        <ShieldCheck className="mr-2 h-4 w-4" />
-                        Admin Dashboard
-                      </Link>
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel>Administration</DropdownMenuLabel>
+                      <DropdownMenuItem asChild>
+                        <Link to="/admin" className="cursor-pointer">
+                          <ShieldCheck className="mr-2 h-4 w-4" />
+                          Admin Dashboard
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link to="/admin/gallery" className="cursor-pointer">
+                          <Image className="mr-2 h-4 w-4" />
+                          Gallery Management
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
                   )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
