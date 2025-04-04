@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, X, ChevronDown, LogOut, User, Shield, Settings, Package, Bell } from 'lucide-react';
+import { Menu, X, ChevronDown, LogOut, User, Shield, Settings, Package, Bell, Truck, DollarSign, Image, Search, Phone, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/contexts/RoleContext';
@@ -63,40 +63,46 @@ const Navbar = () => {
             <div className="hidden md:block ml-10">
               <div className="flex items-baseline space-x-4">
                 <Link
-                  to="/"
-                  className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium"
-                >
-                  Home
-                </Link>
-                <Link
                   to="/services"
-                  className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+                  className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium flex items-center"
                 >
-                  Services
+                  <FileText className="mr-1 h-4 w-4" />
+                  <span>Services</span>
                 </Link>
                 <Link
                   to="/pricing"
-                  className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+                  className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium flex items-center"
                 >
-                  Pricing
+                  <DollarSign className="mr-1 h-4 w-4" />
+                  <span>Pricing</span>
                 </Link>
                 <Link
                   to="/gallery"
-                  className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+                  className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium flex items-center"
                 >
-                  Gallery
+                  <Image className="mr-1 h-4 w-4" />
+                  <span>Gallery</span>
                 </Link>
                 <Link
                   to="/track"
-                  className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+                  className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium flex items-center"
                 >
-                  Track
+                  <Search className="mr-1 h-4 w-4" />
+                  <span>Track</span>
                 </Link>
                 <Link
                   to="/contact"
-                  className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+                  className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium flex items-center"
                 >
-                  Contact
+                  <Phone className="mr-1 h-4 w-4" />
+                  <span>Contact</span>
+                </Link>
+                <Link
+                  to="/book-shipment"
+                  className="bg-red-600 text-white hover:bg-red-700 px-3 py-2 rounded-md text-sm font-medium flex items-center"
+                >
+                  <Truck className="mr-1 h-4 w-4" />
+                  <span>Book Shipment</span>
                 </Link>
               </div>
             </div>
@@ -223,46 +229,52 @@ const Navbar = () => {
       <div className={`md:hidden ${isOpen ? 'block' : 'hidden'}`}>
         <div className="px-2 pt-2 pb-3 space-y-1">
           <Link
-            to="/"
-            className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium"
-            onClick={toggleMenu}
-          >
-            Home
-          </Link>
-          <Link
             to="/services"
-            className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium"
+            className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center"
             onClick={toggleMenu}
           >
-            Services
+            <FileText className="mr-2 h-4 w-4" />
+            <span>Services</span>
           </Link>
           <Link
             to="/pricing"
-            className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium"
+            className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center"
             onClick={toggleMenu}
           >
-            Pricing
+            <DollarSign className="mr-2 h-4 w-4" />
+            <span>Pricing</span>
           </Link>
           <Link
             to="/gallery"
-            className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium"
+            className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center"
             onClick={toggleMenu}
           >
-            Gallery
+            <Image className="mr-2 h-4 w-4" />
+            <span>Gallery</span>
           </Link>
           <Link
             to="/track"
-            className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium"
+            className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center"
             onClick={toggleMenu}
           >
-            Track
+            <Search className="mr-2 h-4 w-4" />
+            <span>Track</span>
           </Link>
           <Link
             to="/contact"
-            className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium"
+            className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center"
             onClick={toggleMenu}
           >
-            Contact
+            <Phone className="mr-2 h-4 w-4" />
+            <span>Contact</span>
+          </Link>
+          <Link
+            to="/book-shipment"
+            className="bg-red-600 text-white hover:bg-red-700 block px-3 py-2 rounded-md text-base font-medium flex items-center"
+            onClick={toggleMenu}
+          >
+            <Truck className="mr-2 h-4 w-4" />
+            <span>Book Shipment</span>
           </Link>
           <div className="mt-4">
             <CurrencySwitcher />
