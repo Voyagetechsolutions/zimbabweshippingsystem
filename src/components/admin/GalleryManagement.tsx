@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,6 +27,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { GalleryImage, GalleryCategory } from '@/types/gallery';
 import { useToast } from '@/hooks/use-toast';
 import { Trash2, Upload, Edit, Loader2, Image as ImageIcon, Plus } from 'lucide-react';
+import { callRpcFunction } from '@/utils/supabaseUtils';
 
 const galleryCategories = [
   { value: 'facilities', label: 'Facilities' },
@@ -51,24 +51,16 @@ const GalleryManagement = () => {
     category: 'facilities',
   });
 
-  // Fetch all gallery images
   const { data: galleryImages, isLoading } = useQuery({
     queryKey: ['adminGalleryImages'],
     queryFn: async () => {
-      // Use RPC function to get around type limitations until Supabase types are regenerated
-      const { data, error } = await supabase
-        .rpc('get_gallery_images')
-        .then(response => {
-          if (response.error) throw response.error;
-          return response;
-        });
+      const { data, error } = await callRpcFunction<GalleryImage[]>('get_gallery_images');
       
       if (error) throw error;
-      return (data || []) as GalleryImage[];
+      return data || [];
     }
   });
 
-  // Add new image mutation
   const addImageMutation = useMutation({
     mutationFn: async (newImage: Partial<GalleryImage>) => {
       if (!uploadedFile) {
@@ -77,7 +69,6 @@ const GalleryManagement = () => {
 
       setIsUploading(true);
 
-      // 1. Upload the file to storage
       const fileExt = uploadedFile.name.split('.').pop();
       const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
       const filePath = `gallery/${fileName}`;
@@ -88,27 +79,20 @@ const GalleryManagement = () => {
 
       if (uploadError) throw uploadError;
 
-      // 2. Get the public URL
       const { data: publicURL } = supabase.storage
         .from('public')
         .getPublicUrl(filePath);
 
-      // 3. Save the image metadata to the database using rpc
-      const { data, error: insertError } = await supabase
-        .rpc('insert_gallery_image', {
-          p_src: publicURL.publicUrl,
-          p_alt: newImage.alt || '',
-          p_caption: newImage.caption || '',
-          p_category: newImage.category || 'facilities'
-        })
-        .then(response => {
-          if (response.error) throw response.error;
-          return response;
-        });
+      const { data, error: insertError } = await callRpcFunction<GalleryImage>('insert_gallery_image', {
+        p_src: publicURL.publicUrl,
+        p_alt: newImage.alt || '',
+        p_caption: newImage.caption || '',
+        p_category: newImage.category || 'facilities'
+      });
 
       if (insertError) throw insertError;
       
-      return data as unknown as GalleryImage;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminGalleryImages'] });
@@ -133,34 +117,26 @@ const GalleryManagement = () => {
     }
   });
 
-  // Delete image mutation
   const deleteImageMutation = useMutation({
     mutationFn: async (imageId: string) => {
       const imageToDelete = galleryImages?.find(img => img.id === imageId);
       if (!imageToDelete) throw new Error('Image not found');
 
-      // 1. Get the filename from the URL
       const fileUrl = imageToDelete.src;
       const fileName = fileUrl.split('/').pop();
       const filePath = `gallery/${fileName}`;
 
-      // 2. Delete the image from storage
       const { error: storageError } = await supabase.storage
         .from('public')
         .remove([filePath]);
 
       if (storageError) {
         console.warn('Error deleting file from storage:', storageError);
-        // Continue anyway to delete the database record
       }
 
-      // 3. Delete the database record using rpc
-      const { error: dbError } = await supabase
-        .rpc('delete_gallery_image', { p_id: imageId })
-        .then(response => {
-          if (response.error) throw response.error;
-          return response;
-        });
+      const { error: dbError } = await callRpcFunction<boolean>('delete_gallery_image', { 
+        p_id: imageId 
+      });
 
       if (dbError) throw dbError;
 
@@ -190,7 +166,6 @@ const GalleryManagement = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file is an image
     if (!file.type.startsWith('image/')) {
       toast({
         title: "Invalid file",
@@ -200,7 +175,6 @@ const GalleryManagement = () => {
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast({
         title: "File too large",
@@ -212,7 +186,6 @@ const GalleryManagement = () => {
 
     setUploadedFile(file);
 
-    // Create preview
     const reader = new FileReader();
     reader.onloadend = () => {
       setFilePreview(reader.result as string);
@@ -344,7 +317,6 @@ const GalleryManagement = () => {
         </Tabs>
       )}
 
-      {/* Add Image Dialog */}
       <AlertDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
@@ -442,7 +414,6 @@ const GalleryManagement = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -468,7 +439,6 @@ const GalleryManagement = () => {
   );
 };
 
-// Gallery Image Card Component
 interface GalleryImageCardProps {
   image: GalleryImage;
   onDelete: () => void;
