@@ -49,7 +49,8 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } else {
             setRole('customer' as UserRoleType); // Default fallback for other errors
           }
-        } else if (data && data.role) {
+        } else if (data && 'role' in data) {
+          // Check if 'role' property exists in data
           setRole(data.role as UserRoleType);
         } else {
           // If no role found, default to customer
@@ -90,11 +91,11 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Function to elevate a user to admin with the secret password
   const elevateToAdmin = async (password: string): Promise<boolean> => {
     try {
-      // Try to call the RPC function via raw query instead of typed RPC
+      // Use type assertion to bypass TypeScript type checking for RPC functions
       const { data, error } = await supabase
         .rpc('elevate_to_admin', {
           admin_password: password
-        } as any);
+        }) as any;
 
       if (error) {
         toast({
@@ -142,12 +143,12 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
 
-      // Try to call the RPC function via raw query instead of typed RPC
+      // Use type assertion to bypass TypeScript type checking for RPC functions
       const { data, error } = await supabase
         .rpc('set_user_role', {
           target_user_id: userId,
           new_role: newRole
-        } as any);
+        }) as any;
 
       if (error) {
         toast({
