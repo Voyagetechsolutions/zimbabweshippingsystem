@@ -14,7 +14,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   getRouteNames, 
   getAreasByRoute, 
-  getDateByRoute 
+  getDateByRoute,
+  syncSchedulesWithDatabase
 } from '@/data/collectionSchedule';
 import { Package, Truck } from 'lucide-react';
 

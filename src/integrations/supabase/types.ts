@@ -90,6 +90,33 @@ export type Database = {
         }
         Relationships: []
       }
+      collection_schedules: {
+        Row: {
+          areas: string[]
+          created_at: string
+          id: string
+          pickup_date: string
+          route: string
+          updated_at: string
+        }
+        Insert: {
+          areas?: string[]
+          created_at?: string
+          id?: string
+          pickup_date: string
+          route: string
+          updated_at?: string
+        }
+        Update: {
+          areas?: string[]
+          created_at?: string
+          id?: string
+          pickup_date?: string
+          route?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
