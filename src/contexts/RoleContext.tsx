@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { UserRoleType } from '@/types/admin';
+import { callRpcFunction } from '@/utils/supabaseUtils';
 
 interface RoleContextType {
   role: UserRoleType | null;
@@ -91,11 +92,10 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Function to elevate a user to admin with the secret password
   const elevateToAdmin = async (password: string): Promise<boolean> => {
     try {
-      // Use type assertion to bypass TypeScript type checking for RPC functions
-      const { data, error } = await supabase
-        .rpc('elevate_to_admin', {
-          admin_password: password
-        }) as any;
+      // Use callRpcFunction utility instead of direct supabase.rpc call
+      const { data, error } = await callRpcFunction('elevate_to_admin', {
+        admin_password: password
+      });
 
       if (error) {
         toast({
@@ -143,12 +143,11 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
 
-      // Use type assertion to bypass TypeScript type checking for RPC functions
-      const { data, error } = await supabase
-        .rpc('set_user_role', {
-          target_user_id: userId,
-          new_role: newRole
-        }) as any;
+      // Use callRpcFunction utility instead of direct supabase.rpc call
+      const { data, error } = await callRpcFunction('set_user_role', {
+        target_user_id: userId,
+        new_role: newRole
+      });
 
       if (error) {
         toast({
