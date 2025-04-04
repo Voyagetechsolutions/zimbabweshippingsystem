@@ -28,6 +28,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { GalleryImage, GalleryCategory } from '@/types/gallery';
 import { useToast } from '@/hooks/use-toast';
 import { Trash2, Upload, Edit, Loader2, Image as ImageIcon, Plus } from 'lucide-react';
+import { tableFrom } from '@/integrations/supabase/db-types';
 
 const galleryCategories = [
   { value: 'facilities', label: 'Facilities' },
@@ -56,12 +57,12 @@ const GalleryManagement = () => {
     queryKey: ['adminGalleryImages'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('gallery')
+        .from(tableFrom('gallery'))
         .select('*')
-        .order('createdAt', { ascending: false });
+        .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return data as GalleryImage[];
+      return data as unknown as GalleryImage[];
     }
   });
 
@@ -92,17 +93,17 @@ const GalleryManagement = () => {
 
       // 3. Save the image metadata to the database
       const { data, error: insertError } = await supabase
-        .from('gallery')
+        .from(tableFrom('gallery'))
         .insert([{
           ...newImage, 
           src: publicURL.publicUrl,
-          createdAt: new Date().toISOString()
+          created_at: new Date().toISOString()
         }])
         .select();
 
       if (insertError) throw insertError;
       
-      return data[0];
+      return data[0] as unknown as GalleryImage;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminGalleryImages'] });
@@ -150,7 +151,7 @@ const GalleryManagement = () => {
 
       // 3. Delete the database record
       const { error: dbError } = await supabase
-        .from('gallery')
+        .from(tableFrom('gallery'))
         .delete()
         .eq('id', imageId);
 

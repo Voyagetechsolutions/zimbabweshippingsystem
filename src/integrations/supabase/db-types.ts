@@ -36,6 +36,17 @@ export interface Tables {
     created_at: string;
   };
   
+  // Add the gallery table we just created
+  gallery: {
+    id: string;
+    src: string;
+    alt: string;
+    caption: string;
+    category: string;
+    created_at: string;
+    updated_at: string;
+  };
+  
   // New tables that aren't in the generated types yet
   audit_logs: {
     id: string;

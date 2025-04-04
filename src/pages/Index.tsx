@@ -12,7 +12,7 @@ import WhatsAppButton from '@/components/WhatsAppButton';
 import ReviewsSection from '@/components/reviews/ReviewsSection';
 import { Button } from "@/components/ui/button";
 import { Link } from 'react-router-dom';
-import { Image, Clock, ArrowRight } from 'lucide-react';
+import { Image, Clock, ArrowRight, Truck } from 'lucide-react';
 
 const Index = () => {
   return (

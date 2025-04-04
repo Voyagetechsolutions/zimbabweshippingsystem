@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -18,6 +17,7 @@ import {
 import { GalleryImage, GalleryCategory } from '@/types/gallery';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { tableFrom } from '@/integrations/supabase/db-types';
 
 const GalleryPage = () => {
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -29,12 +29,12 @@ const GalleryPage = () => {
     queryKey: ['galleryImages'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('gallery')
+        .from(tableFrom('gallery'))
         .select('*')
-        .order('createdAt', { ascending: false });
+        .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return data as GalleryImage[];
+      return data as unknown as GalleryImage[];
     }
   });
 
