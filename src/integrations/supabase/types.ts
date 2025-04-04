@@ -560,6 +560,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_gallery_image: {
+        Args: {
+          p_id: string
+        }
+        Returns: boolean
+      }
+      get_gallery_images: {
+        Args: Record<PropertyKey, never>
+        Returns: Json[]
+      }
+      insert_gallery_image: {
+        Args: {
+          p_src: string
+          p_alt: string
+          p_caption: string
+          p_category: string
+        }
+        Returns: Json
+      }
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean

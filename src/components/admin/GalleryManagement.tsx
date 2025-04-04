@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,7 +28,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { GalleryImage, GalleryCategory } from '@/types/gallery';
 import { useToast } from '@/hooks/use-toast';
 import { Trash2, Upload, Edit, Loader2, Image as ImageIcon, Plus } from 'lucide-react';
-import { tableFrom } from '@/integrations/supabase/db-types';
 
 const galleryCategories = [
   { value: 'facilities', label: 'Facilities' },
@@ -55,7 +55,7 @@ const GalleryManagement = () => {
   const { data: galleryImages, isLoading } = useQuery({
     queryKey: ['adminGalleryImages'],
     queryFn: async () => {
-      // Use raw SQL query to get around type limitations until Supabase types are regenerated
+      // Use RPC function to get around type limitations until Supabase types are regenerated
       const { data, error } = await supabase
         .rpc('get_gallery_images')
         .then(response => {
@@ -508,7 +508,7 @@ const GalleryImageCard: React.FC<GalleryImageCardProps> = ({ image, onDelete }) 
         <CardDescription>{image.caption}</CardDescription>
       </CardContent>
       <CardFooter className="text-xs text-gray-500">
-        {image.createdAt && new Date(image.createdAt).toLocaleDateString()}
+        {image.created_at && new Date(image.created_at).toLocaleDateString()}
       </CardFooter>
     </Card>
   );
