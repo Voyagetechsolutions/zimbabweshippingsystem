@@ -1,17 +1,18 @@
+
 import React from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from 'react-router-dom';
-import { ChevronRight, Ship, Package, Truck, ShieldCheck, Globe, DollarSign } from 'lucide-react';
+import { ChevronRight, Ship, Package, Truck as TruckIcon, ClipboardCheck, DollarSign, Clock } from 'lucide-react';
 
 const Services = () => {
   const services = [
     {
-      icon: <Ship className="h-10 w-10 text-zim-green" />,
-      title: 'Drum Shipping',
-      description: 'Our specialized drum shipping service offers the most cost-effective way to send large quantities of goods to Zimbabwe.',
+      icon: <Ship className="h-12 w-12 text-zim-green" />,
+      title: "Drum Shipping",
+      description: "Ship your belongings in secure drums. Ideal for sending multiple items to Zimbabwe.",
       price: '£260 per 200L drum',
       deliveryTime: '2-3 weeks',
       features: [
@@ -22,9 +23,9 @@ const Services = () => {
       ]
     },
     {
-      icon: <Package className="h-10 w-10 text-zim-yellow" />,
-      title: 'Regular Parcels',
-      description: 'Send packages of any size with our flexible parcel shipping options, with competitive rates based on weight.',
+      icon: <Package className="h-12 w-12 text-zim-yellow" />,
+      title: "Parcel Delivery",
+      description: "Fast and reliable parcel delivery service with full tracking and insurance options.",
       price: 'From £50 per kg',
       deliveryTime: '10-14 days',
       features: [
@@ -35,9 +36,9 @@ const Services = () => {
       ]
     },
     {
-      icon: <Truck className="h-10 w-10 text-zim-red" />,
-      title: 'Door-to-Door Delivery',
-      description: 'We pick up from your UK address and deliver directly to your recipient\'s doorstep in Zimbabwe.',
+      icon: <TruckIcon className="h-12 w-12 text-zim-red" />,
+      title: "Door-to-Door Delivery",
+      description: "We pick up from your UK address and deliver directly to your recipient's address in Zimbabwe.",
       price: 'Add £25 to any shipping method',
       deliveryTime: 'Based on shipping method',
       features: [
@@ -48,44 +49,44 @@ const Services = () => {
       ]
     },
     {
-      icon: <ShieldCheck className="h-10 w-10 text-zim-green" />,
-      title: 'Insurance Coverage',
-      description: 'Protect your valuable items with our comprehensive shipping insurance for peace of mind.',
-      price: '5% of declared value',
-      deliveryTime: 'N/A',
-      features: [
-        'Coverage against damage',
-        'Protection against loss',
-        'Simple claims process',
-        'Up to £5,000 coverage per shipment'
-      ]
-    },
-    {
-      icon: <Globe className="h-10 w-10 text-zim-yellow" />,
-      title: 'Real-time Tracking',
-      description: 'Stay informed with our advanced tracking system that provides real-time updates on your shipment\'s location.',
+      icon: <ClipboardCheck className="h-12 w-12 text-zim-black" />,
+      title: "Customs Clearance",
+      description: "We handle all customs paperwork and clearance to ensure smooth delivery of your shipments.",
       price: 'Included with all shipments',
       deliveryTime: 'N/A',
       features: [
-        'SMS notifications',
-        'Email updates',
-        'Online tracking portal',
-        'Customer service support'
+        'Expert handling of documentation',
+        'Duty and tax calculation',
+        'Compliance with regulations',
+        'Avoid customs delays'
       ]
     },
     {
-      icon: <DollarSign className="h-10 w-10 text-zim-red" />,
-      title: 'Flexible Payment Options',
-      description: 'Multiple payment methods available including credit cards, PayPal, and mobile payment solutions.',
-      price: 'No additional fees',
+      icon: <DollarSign className="h-12 w-12 text-zim-green" />,
+      title: "Competitive Pricing",
+      description: "Affordable rates with volume discounts available for multiple drum shipments.",
+      price: 'Volume discounts available',
       deliveryTime: 'N/A',
       features: [
-        'Secure payment processing',
-        'Multiple currency options',
-        'Payment plans available',
+        'Transparent pricing structure',
+        'No hidden fees',
+        'Multiple payment options',
         'Business accounts welcome'
       ]
     },
+    {
+      icon: <Clock className="h-12 w-12 text-zim-yellow" />,
+      title: "Express Shipping",
+      description: "Expedited shipping options available for time-sensitive deliveries.",
+      price: 'From £80 per kg',
+      deliveryTime: '5-7 days',
+      features: [
+        'Priority handling',
+        'Expedited customs clearance',
+        'SMS delivery notifications',
+        'Available for all package sizes'
+      ]
+    }
   ];
 
   return (
@@ -98,24 +99,29 @@ const Services = () => {
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
               We offer a comprehensive range of shipping solutions tailored for sending items from the UK to Zimbabwe.
             </p>
+            <div className="flex justify-center mt-6">
+              <div className="h-1 w-20 bg-zim-green rounded-full mx-1"></div>
+              <div className="h-1 w-20 bg-zim-yellow rounded-full mx-1"></div>
+              <div className="h-1 w-20 bg-zim-red rounded-full mx-1"></div>
+            </div>
           </div>
         </div>
 
-        <section className="py-16">
+        <section className="py-16 bg-gray-50">
           <div className="container mx-auto px-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {services.map((service, index) => (
-                <Card key={index} className="h-full flex flex-col">
-                  <CardHeader>
-                    <div className="flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
-                      {service.icon}
-                    </div>
-                    <CardTitle className="text-xl">{service.title}</CardTitle>
-                    <CardDescription>
+                <Card key={index} className="h-full flex flex-col border-none shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-r from-zim-green/5 via-zim-yellow/5 to-zim-red/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <CardHeader className="pb-2 relative z-10">
+                    <div className="mb-4 transform group-hover:scale-110 transition-transform duration-300">{service.icon}</div>
+                    <CardTitle className="text-xl font-bold">{service.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-grow relative z-10">
+                    <CardDescription className="text-base text-gray-600 mb-4">
                       {service.description}
                     </CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex-grow">
+                    
                     <div className="mb-4">
                       <div className="flex justify-between mb-2">
                         <span className="font-medium">Price:</span>
@@ -139,13 +145,14 @@ const Services = () => {
                       </ul>
                     </div>
                   </CardContent>
-                  <div className="p-4 mt-auto">
+                  <div className="p-4 mt-auto relative z-10">
                     <Link to="/book-shipment">
                       <Button className="w-full bg-zim-green hover:bg-zim-green/90 flex items-center justify-between">
                         Book This Service <ChevronRight className="h-4 w-4" />
                       </Button>
                     </Link>
                   </div>
+                  <div className="h-1 w-full zim-gradient-horizontal transition-all duration-300 group-hover:h-2"></div>
                 </Card>
               ))}
             </div>
