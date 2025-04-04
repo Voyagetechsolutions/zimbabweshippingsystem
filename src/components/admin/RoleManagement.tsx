@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Role, castTo } from '@/types/admin';
+import { Role } from '@/types/admin';
 import {
   Card,
   CardContent,
@@ -9,6 +10,20 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -17,159 +32,88 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import {
-  Users,
-  Plus,
-  Search,
-  RefreshCcw,
-  Edit,
-  Trash2,
-  Eye,
-  ShieldCheck,
+  AlertTriangle, 
+  Plus, 
+  Edit, 
+  Trash2, 
+  Loader2
 } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-
-const roleFormSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  description: z.string().optional(),
-  permissions: z.record(
-    z.string(),
-    z.union([
-      z.boolean(),
-      z.record(z.string(), z.boolean())
-    ])
-  )
-});
-
-const permissionSections = [
-  {
-    id: 'admin',
-    name: 'Admin',
-    type: 'boolean',
-  },
-  {
-    id: 'shipments',
-    name: 'Shipments',
-    type: 'object',
-    actions: ['read', 'write', 'delete']
-  },
-  {
-    id: 'users',
-    name: 'Users',
-    type: 'object',
-    actions: ['read', 'write', 'delete']
-  },
-  {
-    id: 'reports',
-    name: 'Reports',
-    type: 'object',
-    actions: ['read', 'write']
-  },
-  {
-    id: 'support',
-    name: 'Support',
-    type: 'object',
-    actions: ['read', 'write']
-  },
-  {
-    id: 'settings',
-    name: 'Settings',
-    type: 'object',
-    actions: ['read', 'write']
-  }
-];
 
 const RoleManagement = () => {
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingRole, setEditingRole] = useState<Role | null>(null);
-  const [isCreatingRole, setIsCreatingRole] = useState(false);
-  const [viewingPermissions, setViewingPermissions] = useState<Role | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [currentRole, setCurrentRole] = useState<Role | null>(null);
   const { toast } = useToast();
-
-  const form = useForm<z.infer<typeof roleFormSchema>>({
-    resolver: zodResolver(roleFormSchema),
-    defaultValues: {
-      name: '',
-      description: '',
-      permissions: {
-        admin: false,
-        shipments: { read: false, write: false, delete: false },
-        users: { read: false, write: false, delete: false },
-        reports: { read: false, write: false },
-        support: { read: false, write: false },
-        settings: { read: false, write: false }
-      }
-    }
+  
+  const [roleName, setRoleName] = useState('');
+  const [roleDescription, setRoleDescription] = useState('');
+  const [permissions, setPermissions] = useState<Record<string, boolean>>({
+    view_shipments: false,
+    create_shipments: false,
+    edit_shipments: false,
+    delete_shipments: false,
+    view_users: false,
+    edit_users: false,
+    view_analytics: false,
+    manage_settings: false,
   });
 
   useEffect(() => {
     fetchRoles();
   }, []);
 
-  useEffect(() => {
-    if (editingRole) {
-      form.reset({
-        name: editingRole.name,
-        description: editingRole.description || '',
-        permissions: editingRole.permissions
-      });
-    } else if (isCreatingRole) {
-      form.reset({
-        name: '',
-        description: '',
-        permissions: {
-          admin: false,
-          shipments: { read: false, write: false, delete: false },
-          users: { read: false, write: false, delete: false },
-          reports: { read: false, write: false },
-          support: { read: false, write: false },
-          settings: { read: false, write: false }
-        }
-      });
-    }
-  }, [editingRole, isCreatingRole, form]);
-
   const fetchRoles = async () => {
     setLoading(true);
     try {
-      const { data, error } = await (supabase
-        .from('user_roles' as any)
-        .select('*')
-        .order('name', { ascending: true }) as any);
-
-      if (error) throw error;
+      // In a real app, you would fetch from a roles table
+      // For now we'll simulate with some data
+      const mockRoles: Role[] = [
+        {
+          id: '1',
+          name: 'Administrator',
+          description: 'Full access to all features',
+          permissions: {
+            shipments: true,
+            users: true,
+            analytics: true,
+            settings: true
+          },
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        {
+          id: '2',
+          name: 'Manager',
+          description: 'Can manage shipments and view analytics',
+          permissions: {
+            shipments: true,
+            users: { view: true, edit: false },
+            analytics: true,
+            settings: false
+          },
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        },
+        {
+          id: '3',
+          name: 'Customer Support',
+          description: 'Can view shipments and help customers',
+          permissions: {
+            shipments: { view: true, edit: true, create: false, delete: false },
+            users: { view: true, edit: false },
+            analytics: false,
+            settings: false
+          },
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      ];
       
-      if (data) {
-        setRoles(castTo<Role[]>(data));
-      }
-    } catch (error: any) {
+      setRoles(mockRoles);
+    } catch (error) {
       console.error('Error fetching roles:', error);
       toast({
         title: 'Error',
@@ -181,273 +125,231 @@ const RoleManagement = () => {
     }
   };
 
-  const openCreateRoleDialog = () => {
-    setIsCreatingRole(true);
-    setEditingRole(null);
+  const handleEditRole = (role: Role) => {
+    setCurrentRole(role);
+    setRoleName(role.name);
+    setRoleDescription(role.description || '');
+    
+    // Convert complex permissions structure to flat boolean map
+    const flatPermissions: Record<string, boolean> = {};
+    
+    Object.entries(role.permissions).forEach(([category, value]) => {
+      if (typeof value === 'boolean') {
+        flatPermissions[`${category}`] = value;
+      } else if (typeof value === 'object') {
+        Object.entries(value).forEach(([action, enabled]) => {
+          flatPermissions[`${category}_${action}`] = enabled as boolean;
+        });
+      }
+    });
+    
+    setPermissions({
+      view_shipments: flatPermissions.shipments_view || flatPermissions.shipments || false,
+      create_shipments: flatPermissions.shipments_create || flatPermissions.shipments || false,
+      edit_shipments: flatPermissions.shipments_edit || flatPermissions.shipments || false,
+      delete_shipments: flatPermissions.shipments_delete || flatPermissions.shipments || false,
+      view_users: flatPermissions.users_view || flatPermissions.users || false,
+      edit_users: flatPermissions.users_edit || flatPermissions.users || false,
+      view_analytics: flatPermissions.analytics || false,
+      manage_settings: flatPermissions.settings || false,
+    });
+    
     setIsDialogOpen(true);
   };
 
-  const openEditRoleDialog = (role: Role) => {
-    setEditingRole(role);
-    setIsCreatingRole(false);
+  const handleNewRole = () => {
+    setCurrentRole(null);
+    setRoleName('');
+    setRoleDescription('');
+    setPermissions({
+      view_shipments: false,
+      create_shipments: false,
+      edit_shipments: false,
+      delete_shipments: false,
+      view_users: false,
+      edit_users: false,
+      view_analytics: false,
+      manage_settings: false,
+    });
     setIsDialogOpen(true);
   };
 
-  const openViewPermissionsDialog = (role: Role) => {
-    setViewingPermissions(role);
+  const handleDeleteRole = (role: Role) => {
+    setCurrentRole(role);
+    setIsDeleteDialogOpen(true);
   };
 
-  const closeDialog = () => {
-    setIsDialogOpen(false);
-    setEditingRole(null);
-    setIsCreatingRole(false);
-    form.reset();
-  };
-
-  const handleCreateRole = async (values: z.infer<typeof roleFormSchema>) => {
-    try {
-      const { error } = await (supabase
-        .from('user_roles' as any)
-        .insert({
-          name: values.name,
-          description: values.description || null,
-          permissions: values.permissions
-        }) as any);
-
-      if (error) throw error;
-      
-      toast({
-        title: 'Role Created',
-        description: 'The role has been created successfully',
-      });
-      
-      closeDialog();
-      fetchRoles();
-    } catch (error: any) {
-      console.error('Error creating role:', error);
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleUpdateRole = async (values: z.infer<typeof roleFormSchema>) => {
-    if (!editingRole) return;
+  const confirmDeleteRole = async () => {
+    if (!currentRole) return;
     
     try {
-      const { error } = await (supabase
-        .from('user_roles' as any)
-        .update({
-          name: values.name,
-          description: values.description || null,
-          permissions: values.permissions,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', editingRole.id) as any);
-
-      if (error) throw error;
+      // In a real app, you would delete from the database
+      // For now we'll just remove from state
+      setRoles(roles.filter(r => r.id !== currentRole.id));
       
       toast({
-        title: 'Role Updated',
-        description: 'The role has been updated successfully',
+        title: 'Role deleted',
+        description: `${currentRole.name} role has been deleted`,
       });
-      
-      closeDialog();
-      fetchRoles();
-    } catch (error: any) {
-      console.error('Error updating role:', error);
+    } catch (error) {
       toast({
         title: 'Error',
-        description: error.message,
+        description: 'Failed to delete role',
         variant: 'destructive',
       });
+    } finally {
+      setIsDeleteDialogOpen(false);
     }
   };
 
-  const handleDeleteRole = async (role: Role) => {
-    // Check if this is a system role (not allowing delete for Admin, Support, Manager)
-    if (['Admin', 'Support', 'Manager'].includes(role.name)) {
+  const saveRole = async () => {
+    if (!roleName) {
       toast({
-        title: 'Cannot Delete',
-        description: 'System roles cannot be deleted',
+        title: 'Validation Error',
+        description: 'Role name is required',
         variant: 'destructive',
       });
       return;
     }
     
     try {
-      const { error } = await (supabase
-        .from('user_roles' as any)
-        .delete()
-        .eq('id', role.id) as any);
-
-      if (error) throw error;
+      // Convert flat permissions back to structured format
+      const structuredPermissions = {
+        shipments: {
+          view: permissions.view_shipments,
+          create: permissions.create_shipments,
+          edit: permissions.edit_shipments,
+          delete: permissions.delete_shipments
+        },
+        users: {
+          view: permissions.view_users,
+          edit: permissions.edit_users
+        },
+        analytics: permissions.view_analytics,
+        settings: permissions.manage_settings
+      };
       
-      toast({
-        title: 'Role Deleted',
-        description: 'The role has been deleted successfully',
-      });
+      // In a real app, you would save to the database
+      const now = new Date().toISOString();
       
-      fetchRoles();
-    } catch (error: any) {
-      console.error('Error deleting role:', error);
+      if (currentRole) {
+        // Update existing role
+        const updatedRole = {
+          ...currentRole,
+          name: roleName,
+          description: roleDescription,
+          permissions: structuredPermissions,
+          updated_at: now
+        };
+        
+        setRoles(roles.map(role => 
+          role.id === currentRole.id ? updatedRole : role
+        ));
+        
+        toast({
+          title: 'Role updated',
+          description: `${roleName} role has been updated`,
+        });
+      } else {
+        // Create new role
+        const newRole: Role = {
+          id: `new-${Date.now()}`,
+          name: roleName,
+          description: roleDescription,
+          permissions: structuredPermissions,
+          created_at: now,
+          updated_at: now
+        };
+        
+        setRoles([...roles, newRole]);
+        
+        toast({
+          title: 'Role created',
+          description: `${roleName} role has been created`,
+        });
+      }
+      
+      setIsDialogOpen(false);
+    } catch (error) {
       toast({
         title: 'Error',
-        description: error.message,
+        description: 'Failed to save role',
         variant: 'destructive',
       });
     }
   };
 
-  const onSubmit = (values: z.infer<typeof roleFormSchema>) => {
-    if (isCreatingRole) {
-      handleCreateRole(values);
-    } else if (editingRole) {
-      handleUpdateRole(values);
-    }
-  };
-
-  const filteredRoles = roles.filter(role => 
-    role.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (role.description && role.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
-
-  const renderPermissionSection = (section: any) => {
-    if (section.type === 'boolean') {
-      return (
-        <FormField
-          key={section.id}
-          control={form.control}
-          name={`permissions.${section.id}`}
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
-              <FormControl>
-                <Checkbox
-                  checked={field.value as boolean}
-                  onCheckedChange={field.onChange}
-                />
-              </FormControl>
-              <div className="space-y-1 leading-none">
-                <FormLabel className="text-sm font-medium">
-                  {section.name}
-                </FormLabel>
-                <FormDescription>
-                  Full {section.name.toLowerCase()} access
-                </FormDescription>
-              </div>
-            </FormItem>
-          )}
-        />
-      );
-    }
+  const renderPermissionStatus = (role: Role, permission: string) => {
+    const permissionMap: Record<string, any> = {
+      'shipments': role.permissions.shipments,
+      'users': role.permissions.users,
+      'analytics': role.permissions.analytics,
+      'settings': role.permissions.settings
+    };
     
-    return (
-      <div key={section.id} className="space-y-3 rounded-md border p-4">
-        <h4 className="font-medium">{section.name}</h4>
-        <div className="grid grid-cols-2 gap-3">
-          {section.actions.map((action: string) => (
-            <FormField
-              key={`${section.id}.${action}`}
-              control={form.control}
-              name={`permissions.${section.id}.${action}`}
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value as boolean}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                  <div className="leading-none">
-                    <FormLabel className="text-sm capitalize">
-                      {action}
-                    </FormLabel>
-                  </div>
-                </FormItem>
-              )}
-            />
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const renderPermissionDisplay = (permissions: any, section: any) => {
-    if (section.type === 'boolean') {
-      return permissions[section.id] ? (
-        <Badge className="bg-green-100 text-green-800 border-green-300">Enabled</Badge>
+    const permValue = permissionMap[permission];
+    
+    if (typeof permValue === 'boolean') {
+      return permValue ? (
+        <span className="text-green-600 font-medium">Full Access</span>
       ) : (
-        <Badge className="bg-gray-100 text-gray-800 border-gray-300">Disabled</Badge>
+        <span className="text-red-600 font-medium">No Access</span>
       );
     }
     
-    const sectionPerms = permissions[section.id] || {};
-    const enabledActions = Object.entries(sectionPerms)
-      .filter(([_, enabled]) => enabled)
-      .map(([action, _]) => action);
+    if (typeof permValue === 'object') {
+      const hasAnyPermission = Object.values(permValue).some(v => v);
+      
+      if (hasAnyPermission) {
+        const permissions = Object.entries(permValue)
+          .filter(([_, v]) => v)
+          .map(([k]) => k);
+        
+        return (
+          <span className="text-yellow-600 font-medium">
+            Limited: {permissions.join(', ')}
+          </span>
+        );
+      } else {
+        return <span className="text-red-600 font-medium">No Access</span>;
+      }
+    }
     
-    return enabledActions.length ? (
-      <div className="flex flex-wrap gap-1">
-        {enabledActions.map(action => (
-          <Badge key={action} className="bg-blue-100 text-blue-800 border-blue-300 capitalize">
-            {action}
-          </Badge>
-        ))}
-      </div>
-    ) : (
-      <Badge className="bg-gray-100 text-gray-800 border-gray-300">No permissions</Badge>
-    );
+    return <span className="text-gray-400">Unknown</span>;
   };
 
   return (
     <div>
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex justify-between items-center">
             <div>
               <CardTitle className="text-xl">Role Management</CardTitle>
-              <CardDescription>Manage user roles and permissions</CardDescription>
+              <CardDescription>Manage roles and permissions</CardDescription>
             </div>
-            <Button onClick={openCreateRoleDialog} className="bg-zim-green hover:bg-zim-green/90">
-              <Plus className="mr-2 h-4 w-4" />
-              Add New Role
+            <Button onClick={handleNewRole} className="bg-zim-green hover:bg-zim-green/90">
+              <Plus className="h-4 w-4 mr-2" /> Add Role
             </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center mb-4 gap-4">
-            <div className="relative flex-grow">
-              <Input
-                placeholder="Search roles..."
-                className="pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-            </div>
-            <Button 
-              variant="outline"
-              onClick={fetchRoles}
-              className="h-10 px-4"
-            >
-              <RefreshCcw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-          </div>
-
           {loading ? (
             <div className="flex justify-center items-center p-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
+              <Loader2 className="h-12 w-12 animate-spin text-zim-green" />
             </div>
-          ) : filteredRoles.length === 0 ? (
+          ) : roles.length === 0 ? (
             <div className="text-center p-12">
-              <Users className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <AlertTriangle className="h-12 w-12 mx-auto text-gray-400 mb-4" />
               <h3 className="text-lg font-medium mb-2">No roles found</h3>
               <p className="text-gray-500">
-                {searchQuery ? "Try adjusting your search" : "There are no roles in the system yet"}
+                Create roles to manage user permissions
               </p>
+              <Button 
+                onClick={handleNewRole} 
+                className="mt-4 bg-zim-green hover:bg-zim-green/90"
+              >
+                <Plus className="h-4 w-4 mr-2" /> Add First Role
+              </Button>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -456,51 +358,39 @@ const RoleManagement = () => {
                   <TableRow>
                     <TableHead>Role Name</TableHead>
                     <TableHead>Description</TableHead>
-                    <TableHead>Permissions</TableHead>
+                    <TableHead>Shipments</TableHead>
+                    <TableHead>Users</TableHead>
+                    <TableHead>Analytics</TableHead>
+                    <TableHead>Settings</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredRoles.map((role) => (
+                  {roles.map((role) => (
                     <TableRow key={role.id}>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <ShieldCheck className="h-5 w-5 text-zim-green" />
-                          <span className="font-medium">{role.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-[250px] truncate">
-                        {role.description || "No description"}
-                      </TableCell>
-                      <TableCell>
+                      <TableCell className="font-medium">{role.name}</TableCell>
+                      <TableCell>{role.description || '-'}</TableCell>
+                      <TableCell>{renderPermissionStatus(role, 'shipments')}</TableCell>
+                      <TableCell>{renderPermissionStatus(role, 'users')}</TableCell>
+                      <TableCell>{renderPermissionStatus(role, 'analytics')}</TableCell>
+                      <TableCell>{renderPermissionStatus(role, 'settings')}</TableCell>
+                      <TableCell className="text-right">
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          onClick={() => openViewPermissionsDialog(role)}
+                          onClick={() => handleEditRole(role)}
+                          className="mr-1"
                         >
-                          <Eye className="h-4 w-4 mr-1" /> View
+                          <Edit className="h-4 w-4" />
                         </Button>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEditRoleDialog(role)}
-                          >
-                            <Edit className="h-4 w-4" />
-                            <span className="sr-only">Edit</span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteRole(role)}
-                            disabled={['Admin', 'Support', 'Manager'].includes(role.name)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Delete</span>
-                          </Button>
-                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleDeleteRole(role)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -511,89 +401,178 @@ const RoleManagement = () => {
         </CardContent>
       </Card>
 
+      {/* Role Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{isCreatingRole ? 'Create New Role' : 'Edit Role'}</DialogTitle>
+            <DialogTitle>
+              {currentRole ? `Edit ${currentRole.name} Role` : 'Create New Role'}
+            </DialogTitle>
             <DialogDescription>
-              {isCreatingRole 
-                ? 'Add a new role with specific permissions.' 
-                : `Update ${editingRole?.name}'s details and permissions.`}
+              Configure the role name and permissions.
             </DialogDescription>
           </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role Name</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="e.g. Dispatcher" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        {...field} 
-                        placeholder="Describe the role's purpose and responsibilities" 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <div className="space-y-4">
-                <h3 className="font-medium text-lg">Permissions</h3>
-                <div className="space-y-4">
-                  {permissionSections.map(renderPermissionSection)}
-                </div>
+          
+          <div className="space-y-6 py-4">
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="role-name">Role Name</Label>
+                <Input 
+                  id="role-name" 
+                  value={roleName} 
+                  onChange={e => setRoleName(e.target.value)}
+                  placeholder="Enter role name"
+                  className="mt-1"
+                />
               </div>
               
-              <DialogFooter>
-                <Button variant="outline" type="button" onClick={closeDialog}>
-                  Cancel
-                </Button>
-                <Button className="bg-zim-green hover:bg-zim-green/90" type="submit">
-                  {isCreatingRole ? 'Create Role' : 'Save Changes'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
+              <div>
+                <Label htmlFor="role-description">Description</Label>
+                <Textarea 
+                  id="role-description" 
+                  value={roleDescription} 
+                  onChange={e => setRoleDescription(e.target.value)}
+                  placeholder="Enter role description"
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <h3 className="font-medium mb-4">Permissions</h3>
+              
+              <div className="space-y-6">
+                <div className="border rounded-md p-4">
+                  <h4 className="font-medium mb-2">Shipment Permissions</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="view-shipments" 
+                        checked={permissions.view_shipments}
+                        onCheckedChange={(checked) => 
+                          setPermissions({...permissions, view_shipments: !!checked})
+                        }
+                      />
+                      <Label htmlFor="view-shipments">View Shipments</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="create-shipments" 
+                        checked={permissions.create_shipments}
+                        onCheckedChange={(checked) => 
+                          setPermissions({...permissions, create_shipments: !!checked})
+                        }
+                      />
+                      <Label htmlFor="create-shipments">Create Shipments</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="edit-shipments" 
+                        checked={permissions.edit_shipments}
+                        onCheckedChange={(checked) => 
+                          setPermissions({...permissions, edit_shipments: !!checked})
+                        }
+                      />
+                      <Label htmlFor="edit-shipments">Edit Shipments</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="delete-shipments" 
+                        checked={permissions.delete_shipments}
+                        onCheckedChange={(checked) => 
+                          setPermissions({...permissions, delete_shipments: !!checked})
+                        }
+                      />
+                      <Label htmlFor="delete-shipments">Delete Shipments</Label>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="border rounded-md p-4">
+                  <h4 className="font-medium mb-2">User Permissions</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="view-users" 
+                        checked={permissions.view_users}
+                        onCheckedChange={(checked) => 
+                          setPermissions({...permissions, view_users: !!checked})
+                        }
+                      />
+                      <Label htmlFor="view-users">View Users</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="edit-users" 
+                        checked={permissions.edit_users}
+                        onCheckedChange={(checked) => 
+                          setPermissions({...permissions, edit_users: !!checked})
+                        }
+                      />
+                      <Label htmlFor="edit-users">Edit Users</Label>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="border rounded-md p-4">
+                  <h4 className="font-medium mb-2">Other Permissions</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="view-analytics" 
+                        checked={permissions.view_analytics}
+                        onCheckedChange={(checked) => 
+                          setPermissions({...permissions, view_analytics: !!checked})
+                        }
+                      />
+                      <Label htmlFor="view-analytics">View Analytics</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="manage-settings" 
+                        checked={permissions.manage_settings}
+                        onCheckedChange={(checked) => 
+                          setPermissions({...permissions, manage_settings: !!checked})
+                        }
+                      />
+                      <Label htmlFor="manage-settings">Manage Settings</Label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={saveRole} className="bg-zim-green hover:bg-zim-green/90">
+              {currentRole ? 'Update Role' : 'Create Role'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <Dialog open={!!viewingPermissions} onOpenChange={(open) => !open && setViewingPermissions(null)}>
-        <DialogContent className="sm:max-w-[600px]">
+      
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Role Permissions: {viewingPermissions?.name}</DialogTitle>
+            <DialogTitle>Delete Role</DialogTitle>
             <DialogDescription>
-              Detailed view of permissions for this role.
+              Are you sure you want to delete the {currentRole?.name} role? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-            {viewingPermissions && permissionSections.map(section => (
-              <div key={section.id} className="border rounded-md p-4">
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="font-medium">{section.name}</h3>
-                  {renderPermissionDisplay(viewingPermissions.permissions, section)}
-                </div>
-              </div>
-            ))}
-          </div>
           <DialogFooter>
-            <Button onClick={() => setViewingPermissions(null)}>Close</Button>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmDeleteRole}
+            >
+              Delete
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

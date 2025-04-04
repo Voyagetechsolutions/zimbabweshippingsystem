@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { SystemSetting, castTo } from '@/types/admin';
+import { SystemSetting } from '@/types/admin';
 import {
   Card,
   CardContent,
@@ -9,112 +10,100 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
 import {
-  Settings,
-  Search,
-  RefreshCcw,
-  Edit,
-  Trash2,
-  Plus,
-} from "lucide-react";
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Switch } from "@/components/ui/switch";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { Loader2, Save, Settings } from "lucide-react";
 
-interface EditingFormValues {
-  key: string;
-  value: string;
-}
-
-const formSchema = z.object({
-  key: z
-    .string()
-    .min(2, "Key must be at least 2 characters")
-    .regex(/^[a-z0-9_]+$/, "Key must contain only lowercase letters, numbers, and underscores"),
-  value: z.string().min(1, "Value is required"),
+// Validation schema for settings form
+const settingsFormSchema = z.object({
+  company_name: z.string().min(1, "Company name is required"),
+  support_email: z.string().email("Must be a valid email"),
+  maintenance_mode: z.boolean().default(false),
+  max_file_size: z.coerce.number().min(1, "Must be greater than 0"),
+  tracking_enabled: z.boolean().default(true),
+  base_shipping_rate: z.coerce.number().min(0, "Must be 0 or greater"),
+  weight_price_factor: z.coerce.number().min(0, "Must be 0 or greater"),
 });
 
-// SettingsManagement component
 const SettingsManagement = () => {
-  const [settings, setSettings] = useState<SystemSetting[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
-  const [editingSetting, setEditingSetting] = useState<SystemSetting | null>(null);
-  const [isCreatingSetting, setIsCreatingSetting] = useState<boolean>(false);
+  const [saving, setSaving] = useState(false);
   const { toast } = useToast();
   
-  const form = useForm<EditingFormValues>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<z.infer<typeof settingsFormSchema>>({
+    resolver: zodResolver(settingsFormSchema),
     defaultValues: {
-      key: '',
-      value: '',
-    },
+      company_name: "Zimbabwe Shipping",
+      support_email: "support@zimbabweshipping.com",
+      maintenance_mode: false,
+      max_file_size: 10,
+      tracking_enabled: true,
+      base_shipping_rate: 20,
+      weight_price_factor: 0.5,
+    }
   });
 
   useEffect(() => {
     fetchSettings();
   }, []);
-  
-  useEffect(() => {
-    if (editingSetting) {
-      form.reset({
-        key: editingSetting.key,
-        value: JSON.stringify(editingSetting.value, null, 2)
-      });
-    } else if (isCreatingSetting) {
-      form.reset({
-        key: '',
-        value: '{}'
-      });
-    }
-  }, [editingSetting, isCreatingSetting, form]);
 
   const fetchSettings = async () => {
     setLoading(true);
     try {
-      const { data, error } = await (supabase
-        .from('system_settings' as any)
-        .select('*')
-        .order('key', { ascending: true }) as any);
-
+      // Fetch all settings from the system_settings table
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('*');
+      
       if (error) throw error;
       
-      if (data) {
-        setSettings(castTo<SystemSetting[]>(data));
+      if (data && data.length > 0) {
+        const settingsMap: Record<string, any> = {};
+        
+        // Process the settings into a map of key to value
+        data.forEach((setting: SystemSetting) => {
+          if (typeof setting.value === 'object' && setting.value !== null) {
+            settingsMap[setting.key] = setting.value as any;
+          } else {
+            settingsMap[setting.key] = setting.value;
+          }
+        });
+        
+        // Update the form with values from the database
+        form.reset({
+          company_name: settingsMap.company_name || "Zimbabwe Shipping",
+          support_email: settingsMap.support_email || "support@zimbabweshipping.com",
+          maintenance_mode: settingsMap.maintenance_mode || false,
+          max_file_size: settingsMap.max_file_size || 10,
+          tracking_enabled: settingsMap.tracking_enabled || true,
+          base_shipping_rate: settingsMap.base_shipping_rate || 20,
+          weight_price_factor: settingsMap.weight_price_factor || 0.5,
+        });
       }
     } catch (error: any) {
       console.error('Error fetching settings:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load settings',
+        description: 'Failed to load system settings',
         variant: 'destructive',
       });
     } finally {
@@ -122,311 +111,245 @@ const SettingsManagement = () => {
     }
   };
 
-  const closeDialog = () => {
-    setIsDialogOpen(false);
-    setEditingSetting(null);
-    setIsCreatingSetting(false);
-    form.reset();
-  };
-
-  const openEditDialog = (setting: SystemSetting) => {
-    setEditingSetting(setting);
-    setIsCreatingSetting(false);
-    setIsDialogOpen(true);
-  };
-
-  const openCreateDialog = () => {
-    setIsCreatingSetting(true);
-    setEditingSetting(null);
-    setIsDialogOpen(true);
-  };
-
-  const handleSaveSetting = async (values: EditingFormValues) => {
-    let parsedValue: any;
-    
+  const onSubmit = async (values: z.infer<typeof settingsFormSchema>) => {
+    setSaving(true);
     try {
-      parsedValue = JSON.parse(values.value);
-    } catch (error) {
-      form.setError('value', {
-        type: 'manual',
-        message: 'Invalid JSON format'
-      });
-      return;
-    }
-    
-    try {
-      if (isCreatingSetting) {
-        // Check if key already exists
-        const { data } = await (supabase
-          .from('system_settings' as any)
-          .select('id')
-          .eq('key', values.key) as any);
-          
-        if (data && data.length > 0) {
-          form.setError('key', {
-            type: 'manual',
-            message: 'This key already exists'
+      // Convert the form values to an array of upsert operations
+      const updates = Object.entries(values).map(([key, value]) => ({
+        key,
+        value,
+        updated_at: new Date().toISOString(),
+      }));
+      
+      // Perform the upsert operation
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('system_settings')
+          .upsert({
+            key: update.key,
+            value: update.value,
+            updated_at: update.updated_at
+          }, {
+            onConflict: 'key'
           });
-          return;
-        }
         
-        const { error } = await (supabase
-          .from('system_settings' as any)
-          .insert({
-            key: values.key,
-            value: parsedValue,
-          }) as any);
-          
         if (error) throw error;
-        
-        toast({
-          title: 'Setting Created',
-          description: 'The setting has been added successfully',
-        });
-      } else if (editingSetting) {
-        const { error } = await (supabase
-          .from('system_settings' as any)
-          .update({
-            value: parsedValue,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', editingSetting.id) as any);
-          
-        if (error) throw error;
-        
-        toast({
-          title: 'Setting Updated',
-          description: 'The setting has been updated successfully',
-        });
       }
       
-      closeDialog();
-      fetchSettings();
+      toast({
+        title: 'Settings saved',
+        description: 'System settings have been updated successfully',
+      });
     } catch (error: any) {
-      console.error('Error saving setting:', error);
+      console.error('Error saving settings:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to save setting',
+        description: 'Failed to save system settings',
         variant: 'destructive',
       });
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDeleteSetting = async (setting: SystemSetting) => {
-    // Prevent deletion of core settings
-    const protectedSettings = ['email_templates', 'shipping_rates', 'system_notifications'];
-    if (protectedSettings.includes(setting.key)) {
-      toast({
-        title: 'Cannot Delete',
-        description: 'This is a core system setting and cannot be deleted',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    try {
-      const { error } = await (supabase
-        .from('system_settings' as any)
-        .delete()
-        .eq('id', setting.id) as any);
-        
-      if (error) throw error;
-      
-      toast({
-        title: 'Setting Deleted',
-        description: 'The setting has been deleted successfully',
-      });
-      
-      fetchSettings();
-    } catch (error: any) {
-      console.error('Error deleting setting:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to delete setting',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const formatValue = (value: any): string => {
-    try {
-      return JSON.stringify(value, null, 2);
-    } catch (e) {
-      return typeof value === 'string' ? value : 'Invalid format';
-    }
-  };
-
-  const filteredSettings = settings.filter(setting => 
-    setting.key.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center p-16">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
-    <div>
+    <div className="space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
             <div>
-              <CardTitle className="text-xl">System Settings</CardTitle>
-              <CardDescription>Manage application configuration</CardDescription>
+              <CardTitle>System Settings</CardTitle>
+              <CardDescription>Configure application settings</CardDescription>
             </div>
-            <Button 
-              onClick={openCreateDialog}
-              className="bg-zim-green hover:bg-zim-green/90"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Setting
-            </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center mb-4 gap-4">
-            <div className="relative flex-grow">
-              <Input
-                placeholder="Search settings..."
-                className="pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-            </div>
-            <Button 
-              variant="outline"
-              onClick={fetchSettings}
-              className="h-10 px-4"
-            >
-              <RefreshCcw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-          </div>
-
-          {loading ? (
-            <div className="flex justify-center items-center p-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
-            </div>
-          ) : filteredSettings.length === 0 ? (
-            <div className="text-center p-12">
-              <Settings className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium mb-2">No settings found</h3>
-              <p className="text-gray-500">
-                {searchQuery ? "Try adjusting your search" : "There are no settings in the system yet"}
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Key</TableHead>
-                    <TableHead>Value</TableHead>
-                    <TableHead>Last Modified</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredSettings.map((setting) => (
-                    <TableRow key={setting.id}>
-                      <TableCell className="font-medium">
-                        {setting.key}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs max-w-sm truncate">
-                        {formatValue(setting.value).length > 100 
-                          ? formatValue(setting.value).substring(0, 100) + '...' 
-                          : formatValue(setting.value)}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(setting.updated_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditDialog(setting)}
-                          >
-                            <Edit className="h-4 w-4" />
-                            <span className="sr-only">Edit</span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteSetting(setting)}
-                            disabled={['email_templates', 'shipping_rates', 'system_notifications'].includes(setting.key)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Delete</span>
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[550px]">
-          <DialogHeader>
-            <DialogTitle>
-              {isCreatingSetting ? 'Add New Setting' : 'Edit Setting'}
-            </DialogTitle>
-            <DialogDescription>
-              {isCreatingSetting 
-                ? 'Create a new application setting.' 
-                : `Update the value for "${editingSetting?.key}".`}
-            </DialogDescription>
-          </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSaveSetting)} className="space-y-6">
-              {isCreatingSetting && (
-                <FormField
-                  control={form.control}
-                  name="key"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Setting Key</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          placeholder="e.g. notification_settings"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <Accordion type="single" collapsible className="w-full" defaultValue="general">
+                <AccordionItem value="general">
+                  <AccordionTrigger className="text-lg font-medium">
+                    General Settings
+                  </AccordionTrigger>
+                  <AccordionContent className="space-y-4 pt-4">
+                    <FormField
+                      control={form.control}
+                      name="company_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Company Name</FormLabel>
+                          <FormControl>
+                            <Input {...field} />
+                          </FormControl>
+                          <FormDescription>
+                            This will appear in emails, receipts and the website header
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="support_email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Support Email</FormLabel>
+                          <FormControl>
+                            <Input {...field} type="email" />
+                          </FormControl>
+                          <FormDescription>
+                            Customer support emails will be sent to this address
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="maintenance_mode"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-base">
+                              Maintenance Mode
+                            </FormLabel>
+                            <FormDescription>
+                              When enabled, the site will show a maintenance page to all non-admin users
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+                
+                <AccordionItem value="shipping">
+                  <AccordionTrigger className="text-lg font-medium">
+                    Shipping Settings
+                  </AccordionTrigger>
+                  <AccordionContent className="space-y-4 pt-4">
+                    <FormField
+                      control={form.control}
+                      name="base_shipping_rate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Base Shipping Rate (£)</FormLabel>
+                          <FormControl>
+                            <Input {...field} type="number" min="0" step="0.01" />
+                          </FormControl>
+                          <FormDescription>
+                            Base rate applied to all shipments before weight calculations
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="weight_price_factor"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Weight Price Factor (£ per kg)</FormLabel>
+                          <FormControl>
+                            <Input {...field} type="number" min="0" step="0.01" />
+                          </FormControl>
+                          <FormDescription>
+                            Amount to multiply by weight (in kg) to calculate additional cost
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="tracking_enabled"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-base">
+                              Enable Shipment Tracking
+                            </FormLabel>
+                            <FormDescription>
+                              Allow customers to track their shipments with tracking numbers
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+                
+                <AccordionItem value="upload">
+                  <AccordionTrigger className="text-lg font-medium">
+                    Upload Settings
+                  </AccordionTrigger>
+                  <AccordionContent className="space-y-4 pt-4">
+                    <FormField
+                      control={form.control}
+                      name="max_file_size"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Max File Size (MB)</FormLabel>
+                          <FormControl>
+                            <Input {...field} type="number" min="1" />
+                          </FormControl>
+                          <FormDescription>
+                            Maximum size for file uploads in megabytes
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+              
+              <div className="flex justify-end">
+                <Button type="submit" disabled={saving} className="bg-zim-green hover:bg-zim-green/90">
+                  {saving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save Settings
+                    </>
                   )}
-                />
-              )}
-              <FormField
-                control={form.control}
-                name="value"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Value (JSON format)</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        {...field}
-                        rows={10} 
-                        className="font-mono text-sm"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <DialogFooter>
-                <Button variant="outline" type="button" onClick={closeDialog}>
-                  Cancel
                 </Button>
-                <Button className="bg-zim-green hover:bg-zim-green/90" type="submit">
-                  {isCreatingSetting ? 'Create Setting' : 'Save Changes'}
-                </Button>
-              </DialogFooter>
+              </div>
             </form>
           </Form>
-        </DialogContent>
-      </Dialog>
+        </CardContent>
+      </Card>
     </div>
   );
 };
