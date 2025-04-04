@@ -46,6 +46,7 @@ import * as z from 'zod';
 import { format, isValid, parseISO } from 'date-fns';
 import { CalendarIcon, Edit, Trash2 } from 'lucide-react';
 import { Task, TaskFormData, TaskPriority, TaskStatus } from '@/types/tasks';
+import { tableFrom } from '@/integrations/supabase/db-types';
 
 const taskFormSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100),
@@ -107,11 +108,11 @@ const TaskManagement: React.FC = () => {
     setLoadingTasks(true);
     try {
       let query = supabase
-        .from('support_tickets')
+        .from(tableFrom('support_tickets'))
         .select(`
           *,
-          profiles!support_tickets_assigned_to_fkey(full_name),
-          creator:profiles!support_tickets_user_id_fkey(full_name)
+          assignee:profiles!fk_support_tickets_assigned_to(id, full_name),
+          creator:profiles!fk_support_tickets_user_id(id, full_name)
         `)
         .order('created_at', { ascending: false });
 
@@ -136,7 +137,7 @@ const TaskManagement: React.FC = () => {
           updated_at: item.updated_at,
           due_date: null,
           completed_at: null,
-          assignee_name: item.profiles?.full_name,
+          assignee_name: item.assignee?.full_name,
           assigner_name: item.creator?.full_name
         }));
         
