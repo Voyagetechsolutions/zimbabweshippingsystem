@@ -23,8 +23,8 @@ export default {
 				// Zimbabwe flag colors
 				zim: {
 					green: '#008C45',
-					yellow: '#FCD116',
-					red: '#CE1126',
+					yellow: '#FFCB05',
+					red: '#DE3831',
 					black: '#000000',
 					white: '#FFFFFF',
 				},
