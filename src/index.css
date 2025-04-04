@@ -14,27 +14,27 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 142 100% 27.5%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 0 72% 47%;  /* Zimbabwe red */
+    --primary-foreground: 0 0% 98%;
 
-    --secondary: 45 100% 51%;
+    --secondary: 51 91% 85%;  /* Zimbabwe yellow */
     --secondary-foreground: 222.2 47.4% 11.2%;
 
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 358 75% 53%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 120 70% 27%;  /* Zimbabwe green */
+    --accent-foreground: 0 0% 98%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 142 100% 27.5%;
+    --ring: 222.2 84% 4.9%;
 
     --radius: 0.5rem;
-
+    
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
@@ -55,24 +55,24 @@
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 142 100% 27.5%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 0 72% 47%;  /* Zimbabwe red */
+    --primary-foreground: 0 0% 98%;
 
-    --secondary: 45 100% 51%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 51 91% 85%;  /* Zimbabwe yellow */
+    --secondary-foreground: 222.2 47.4% 11.2%;
 
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 358 75% 53%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 120 70% 27%;  /* Zimbabwe green */
+    --accent-foreground: 0 0% 98%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 142 100% 27.5%;
+    --ring: 212.7 26.8% 83.9%;
     
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
@@ -109,11 +109,21 @@
   .card-shimmer {
     @apply relative overflow-hidden bg-gradient-to-r from-transparent via-white/20 to-transparent bg-[length:1000px_100%] animate-shimmer;
   }
+}
 
-  .hero-pattern {
-    background-color: #ffffff;
-    background-image: url("data:image/svg+xml,%3Csvg width='100' height='20' viewBox='0 0 100 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M21.184 20c.357-.13.72-.264 1.088-.402l1.768-.661C33.64 15.347 39.647 14 50 14c10.271 0 15.362 1.222 24.629 4.928.955.383 1.869.74 2.75 1.072h6.225c-2.51-.73-5.139-1.691-8.233-2.928C65.888 13.278 60.562 12 50 12c-10.626 0-16.855 1.397-26.66 5.063l-1.767.662c-2.475.923-4.66 1.674-6.724 2.275h6.335zm0-20C13.258 2.892 8.077 4 0 4V2c5.744 0 9.951-.574 14.85-2h6.334zM77.38 0C85.239 2.966 90.502 4 100 4V2c-6.842 0-11.386-.542-16.396-2h-6.225zM0 14c8.44 0 13.718-1.21 22.272-4.402l1.768-.661C33.64 5.347 39.647 4 50 4c10.271 0 15.362 1.222 24.629 4.928C84.112 12.722 89.438 14 100 14v-2c-10.271 0-15.362-1.222-24.629-4.928C65.888 3.278 60.562 2 50 2 39.374 2 33.145 3.397 23.34 7.063l-1.767.662C13.223 10.84 8.163 12 0 12v2z' fill='%23008C45' fill-opacity='0.06' fill-rule='evenodd'/%3E%3C/svg%3E");
-  }
+.hero-pattern {
+  background-color: #ffffff;
+  background-image: linear-gradient(135deg, rgba(0, 140, 69, 0.1) 25%, transparent 25%),
+                   linear-gradient(225deg, rgba(0, 140, 69, 0.1) 25%, transparent 25%),
+                   linear-gradient(45deg, rgba(252, 209, 22, 0.1) 25%, transparent 25%),
+                   linear-gradient(315deg, rgba(252, 209, 22, 0.1) 25%, transparent 25%);
+  background-position: 10px 0, 10px 0, 0 0, 0 0;
+  background-size: 20px 20px;
+  background-repeat: repeat;
+}
+
+.logo-shadow {
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.2));
 }
 
 /* Custom animations */

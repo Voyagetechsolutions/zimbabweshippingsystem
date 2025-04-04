@@ -1,8 +1,8 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, Ship, Package, Truck, Globe, DollarSign, Drum } from 'lucide-react';
-import { formatCurrency } from '@/utils/formatters';
+import { ChevronRight, Package, Truck, Globe, DollarSign, Drum } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface PriceDisplayProps {
   price: number;
@@ -27,9 +27,11 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({ price, label, type, descrip
           <h3 className="text-xl font-bold text-gray-800 mb-2">{label}</h3>
           <p className="text-gray-600 mb-4">{description}</p>
           <div className="text-3xl font-bold text-zim-green mb-4">£{price}<span className="text-lg text-gray-500 font-normal">/drum</span></div>
-          <Button className={`w-full ${popular ? 'bg-zim-red hover:bg-zim-red/90' : 'bg-zim-green hover:bg-zim-green/90'}`}>
-            {buttonText}
-          </Button>
+          <Link to="/book-shipment">
+            <Button className={`w-full ${popular ? 'bg-zim-red hover:bg-zim-red/90' : 'bg-zim-green hover:bg-zim-green/90'}`}>
+              {buttonText}
+            </Button>
+          </Link>
         </div>
       </div>
     </div>
@@ -125,9 +127,11 @@ const ServicesSection: React.FC = () => {
         </div>
 
         <div className="mt-16 text-center">
-          <Button className="bg-zim-green hover:bg-zim-green/90 text-lg px-8">
-            View All Services
-          </Button>
+          <Link to="/services">
+            <Button className="bg-zim-green hover:bg-zim-green/90 text-lg px-8">
+              View All Services
+            </Button>
+          </Link>
         </div>
       </div>
     </section>
