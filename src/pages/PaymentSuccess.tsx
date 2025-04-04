@@ -134,6 +134,9 @@ const PaymentSuccess = () => {
                 <p className="text-gray-600 max-w-2xl mx-auto text-sm md:text-base">
                   Thank you for your payment. Your shipment has been confirmed and is being processed.
                 </p>
+                <p className="text-gray-600 mt-2 text-sm md:text-base">
+                  You can print, download or email your receipt below.
+                </p>
               </div>
               
               {receiptData && <Receipt receipt={receiptData} shipment={shipmentData} />}

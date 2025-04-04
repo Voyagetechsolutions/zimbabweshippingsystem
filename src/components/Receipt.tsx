@@ -7,6 +7,8 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Download, Printer, Mail } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { formatDate } from '@/utils/formatters';
+import { supabase } from '@/integrations/supabase/client';
+import html2pdf from 'html2pdf.js';
 
 interface ReceiptProps {
   receipt: {
@@ -138,36 +140,79 @@ const Receipt: React.FC<ReceiptProps> = ({ receipt, shipment }) => {
     printWindow.document.close();
   };
   
-  const handleDownload = () => {
-    // This would typically use a library like html2pdf or jsPDF
-    // For this implementation, we'll use a simple approach
+  const handleDownload = async () => {
+    const content = receiptRef.current;
+    if (!content) return;
+    
     toast({
-      title: "Download Started",
-      description: "Your receipt is being downloaded as a PDF",
+      title: "Preparing Download",
+      description: "Your receipt is being prepared for download...",
     });
+    
+    try {
+      const options = {
+        margin: 10,
+        filename: `receipt-${receipt.receipt_number}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      
+      // Wait for PDF to be generated and downloaded
+      await html2pdf().from(content).set(options).save();
+      
+      toast({
+        title: "Download Complete",
+        description: "Your receipt has been downloaded successfully",
+      });
+    } catch (error) {
+      console.error("Download error:", error);
+      toast({
+        title: "Download Failed",
+        description: "There was a problem downloading your receipt. Please try again later.",
+        variant: "destructive",
+      });
+    }
   };
   
   const handleEmail = async () => {
     toast({
       title: "Sending Email",
-      description: "Your receipt is being emailed to you",
+      description: "Your receipt is being emailed...",
     });
     
     try {
-      // This would be implemented with an edge function
-      const response = await fetch('/api/email-receipt', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ receiptId: receipt.receipt_number }),
+      // Get the user's email from sender_details or fall back to a prompt
+      let email = receipt.sender_details?.email;
+      
+      if (!email) {
+        // If email is not available in receipt, prompt the user
+        const userEmail = window.prompt("Please enter your email address to receive the receipt:");
+        if (!userEmail) {
+          toast({
+            title: "Email Cancelled",
+            description: "Email sending was cancelled.",
+          });
+          return;
+        }
+        email = userEmail;
+      }
+      
+      // Call the Supabase Edge Function to send the email
+      const { data, error } = await supabase.functions.invoke('email-receipt', {
+        body: { 
+          receiptId: receipt.receipt_number,
+          email: email,
+          receiptData: receipt,
+          shipmentData: shipment
+        }
       });
       
-      if (!response.ok) throw new Error('Failed to send email');
+      if (error) throw new Error(error.message || 'Failed to send email');
       
       toast({
         title: "Email Sent",
-        description: "Your receipt has been emailed successfully",
+        description: `Your receipt has been emailed to ${email}`,
       });
     } catch (error) {
       console.error("Email error:", error);
