@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -8,10 +8,19 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -20,381 +29,839 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Upload,
-  Download,
   FileText,
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
-  Terminal,
+  Download,
+  Search,
+  RefreshCcw,
+  Package,
+  User,
+  AlertTriangle,
+  Check,
 } from "lucide-react";
+import { format } from 'date-fns';
+
+interface Shipment {
+  id: string;
+  tracking_number: string;
+  origin: string;
+  destination: string;
+  status: string;
+  user_id: string;
+  created_at: string;
+  selected?: boolean;
+}
+
+interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string | null;
+  is_admin: boolean;
+  created_at: string;
+  selected?: boolean;
+}
 
 const BulkOperations = () => {
-  const [selectedOperation, setSelectedOperation] = useState<string>("import");
-  const [selectedEntity, setSelectedEntity] = useState<string>("shipments");
-  const [selectedFormat, setSelectedFormat] = useState<string>("csv");
-  const [file, setFile] = useState<File | null>(null);
-  const [processing, setProcessing] = useState(false);
-  const [result, setResult] = useState<{
-    success: boolean;
-    message: string;
-    details?: string[];
-    count?: number;
-  } | null>(null);
+  // Tabs state
+  const [activeTab, setActiveTab] = useState('shipments');
   
+  // Shipments state
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [filteredShipments, setFilteredShipments] = useState<Shipment[]>([]);
+  const [shipmentsSearchQuery, setShipmentsSearchQuery] = useState('');
+  const [shipmentsStatusFilter, setShipmentsStatusFilter] = useState<string>('all');
+  const [selectedShipmentStatus, setSelectedShipmentStatus] = useState<string>('');
+  const [allShipmentsSelected, setAllShipmentsSelected] = useState(false);
+  const [hasSelectedShipments, setHasSelectedShipments] = useState(false);
+  const [isStatusUpdateDialogOpen, setIsStatusUpdateDialogOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  
+  // Users state
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<UserProfile[]>([]);
+  const [usersSearchQuery, setUsersSearchQuery] = useState('');
+  const [allUsersSelected, setAllUsersSelected] = useState(false);
+  const [hasSelectedUsers, setHasSelectedUsers] = useState(false);
+  const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<string>('');
+  
+  // Common state
+  const [loading, setLoading] = useState(true);
+  const [processingResult, setProcessingResult] = useState<{
+    success: number;
+    failed: number;
+    message: string;
+  } | null>(null);
+  const [showResult, setShowResult] = useState(false);
   const { toast } = useToast();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-      setResult(null);
+  useEffect(() => {
+    if (activeTab === 'shipments') {
+      fetchShipments();
+    } else if (activeTab === 'users') {
+      fetchUsers();
+    }
+  }, [activeTab]);
+
+  // Filter shipments when search or status filter changes
+  useEffect(() => {
+    filterShipments();
+  }, [shipmentsSearchQuery, shipmentsStatusFilter, shipments]);
+
+  // Filter users when search changes
+  useEffect(() => {
+    filterUsers();
+  }, [usersSearchQuery, users]);
+
+  // Update hasSelectedShipments when selections change
+  useEffect(() => {
+    setHasSelectedShipments(
+      filteredShipments.some(shipment => shipment.selected)
+    );
+  }, [filteredShipments]);
+
+  // Update hasSelectedUsers when selections change
+  useEffect(() => {
+    setHasSelectedUsers(
+      filteredUsers.some(user => user.selected)
+    );
+  }, [filteredUsers]);
+
+  const fetchShipments = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('shipments')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      if (data) {
+        const shipmentsWithSelection = data.map(shipment => ({
+          ...shipment,
+          selected: false
+        }));
+        setShipments(shipmentsWithSelection);
+      }
+    } catch (error: any) {
+      console.error('Error fetching shipments:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load shipments',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSubmit = async () => {
-    if (selectedOperation === "import" && !file) {
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      if (data) {
+        const usersWithSelection = data.map(user => ({
+          ...user,
+          selected: false
+        }));
+        setUsers(usersWithSelection);
+      }
+    } catch (error: any) {
+      console.error('Error fetching users:', error);
       toast({
-        title: "No file selected",
-        description: "Please select a file to import",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to load users',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filterShipments = () => {
+    let filtered = [...shipments];
+    
+    // Apply search filter
+    if (shipmentsSearchQuery) {
+      const searchLower = shipmentsSearchQuery.toLowerCase();
+      filtered = filtered.filter(
+        shipment =>
+          shipment.tracking_number.toLowerCase().includes(searchLower) ||
+          shipment.origin.toLowerCase().includes(searchLower) ||
+          shipment.destination.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    // Apply status filter
+    if (shipmentsStatusFilter !== 'all') {
+      filtered = filtered.filter(
+        shipment => shipment.status.toLowerCase() === shipmentsStatusFilter.toLowerCase()
+      );
+    }
+    
+    setFilteredShipments(filtered);
+    
+    // Update "select all" checkbox state
+    setAllShipmentsSelected(
+      filtered.length > 0 && filtered.every(shipment => shipment.selected)
+    );
+  };
+
+  const filterUsers = () => {
+    let filtered = [...users];
+    
+    // Apply search filter
+    if (usersSearchQuery) {
+      const searchLower = usersSearchQuery.toLowerCase();
+      filtered = filtered.filter(
+        user =>
+          (user.email && user.email.toLowerCase().includes(searchLower)) ||
+          (user.full_name && user.full_name.toLowerCase().includes(searchLower))
+      );
+    }
+    
+    setFilteredUsers(filtered);
+    
+    // Update "select all" checkbox state
+    setAllUsersSelected(
+      filtered.length > 0 && filtered.every(user => user.selected)
+    );
+  };
+
+  const toggleSelectAllShipments = () => {
+    const newSelectedState = !allShipmentsSelected;
+    
+    // Update filtered shipments selection state
+    const updatedFilteredShipments = filteredShipments.map(shipment => ({
+      ...shipment,
+      selected: newSelectedState
+    }));
+    
+    // Update all shipments, maintaining selection state for filtered shipments
+    const updatedShipments = shipments.map(shipment => {
+      const filteredShipment = updatedFilteredShipments.find(fs => fs.id === shipment.id);
+      return filteredShipment || shipment;
+    });
+    
+    setShipments(updatedShipments);
+    setFilteredShipments(updatedFilteredShipments);
+    setAllShipmentsSelected(newSelectedState);
+  };
+
+  const toggleSelectAllUsers = () => {
+    const newSelectedState = !allUsersSelected;
+    
+    // Update filtered users selection state
+    const updatedFilteredUsers = filteredUsers.map(user => ({
+      ...user,
+      selected: newSelectedState
+    }));
+    
+    // Update all users, maintaining selection state for filtered users
+    const updatedUsers = users.map(user => {
+      const filteredUser = updatedFilteredUsers.find(fu => fu.id === user.id);
+      return filteredUser || user;
+    });
+    
+    setUsers(updatedUsers);
+    setFilteredUsers(updatedFilteredUsers);
+    setAllUsersSelected(newSelectedState);
+  };
+
+  const toggleShipmentSelection = (id: string) => {
+    // Update shipments array
+    const updatedShipments = shipments.map(shipment => 
+      shipment.id === id ? { ...shipment, selected: !shipment.selected } : shipment
+    );
+    
+    setShipments(updatedShipments);
+    
+    // Update filtered shipments array
+    const updatedFilteredShipments = filteredShipments.map(shipment => 
+      shipment.id === id ? { ...shipment, selected: !shipment.selected } : shipment
+    );
+    
+    setFilteredShipments(updatedFilteredShipments);
+    
+    // Update "select all" checkbox state
+    setAllShipmentsSelected(
+      updatedFilteredShipments.length > 0 && 
+      updatedFilteredShipments.every(shipment => shipment.selected)
+    );
+  };
+
+  const toggleUserSelection = (id: string) => {
+    // Update users array
+    const updatedUsers = users.map(user => 
+      user.id === id ? { ...user, selected: !user.selected } : user
+    );
+    
+    setUsers(updatedUsers);
+    
+    // Update filtered users array
+    const updatedFilteredUsers = filteredUsers.map(user => 
+      user.id === id ? { ...user, selected: !user.selected } : user
+    );
+    
+    setFilteredUsers(updatedFilteredUsers);
+    
+    // Update "select all" checkbox state
+    setAllUsersSelected(
+      updatedFilteredUsers.length > 0 && 
+      updatedFilteredUsers.every(user => user.selected)
+    );
+  };
+
+  // Bulk update shipment statuses
+  const bulkUpdateShipmentStatus = async () => {
+    setIsProcessing(true);
+    const selectedShipmentIds = shipments
+      .filter(shipment => shipment.selected)
+      .map(shipment => shipment.id);
+    
+    if (selectedShipmentIds.length === 0 || !selectedShipmentStatus) {
+      setIsProcessing(false);
+      return;
+    }
+    
+    try {
+      let successCount = 0;
+      let failedCount = 0;
+      
+      // Update shipments one by one (Supabase doesn't support bulk updates with filters)
+      for (const shipmentId of selectedShipmentIds) {
+        const { error } = await supabase
+          .from('shipments')
+          .update({
+            status: selectedShipmentStatus,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', shipmentId);
+        
+        if (error) {
+          console.error(`Error updating shipment ${shipmentId}:`, error);
+          failedCount++;
+        } else {
+          successCount++;
+        }
+      }
+      
+      // Update local state
+      const updatedShipments = shipments.map(shipment => 
+        shipment.selected ? { ...shipment, status: selectedShipmentStatus, selected: false } : shipment
+      );
+      
+      setShipments(updatedShipments);
+      
+      // Set processing result
+      setProcessingResult({
+        success: successCount,
+        failed: failedCount,
+        message: `Successfully updated ${successCount} shipments to status "${selectedShipmentStatus}"${
+          failedCount > 0 ? `. Failed to update ${failedCount} shipments.` : ''
+        }`
+      });
+      
+      setShowResult(true);
+      setIsStatusUpdateDialogOpen(false);
+      
+      toast({
+        title: 'Status Updated',
+        description: `Updated ${successCount} shipments to "${selectedShipmentStatus}"`,
+      });
+      
+      // Reset selected state
+      setTimeout(() => {
+        setShowResult(false);
+        setProcessingResult(null);
+      }, 5000);
+    } catch (error: any) {
+      console.error('Error in bulk update:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update shipments',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Get status badge class
+  const getStatusBadgeClass = (status: string) => {
+    const statusLower = status.toLowerCase();
+    
+    switch (true) {
+      case statusLower.includes('processing'):
+        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case statusLower.includes('transit'):
+        return 'bg-blue-100 text-blue-800 border-blue-300';
+      case statusLower.includes('out for delivery'):
+        return 'bg-purple-100 text-purple-800 border-purple-300';
+      case statusLower.includes('delivered'):
+        return 'bg-green-100 text-green-800 border-green-300';
+      case statusLower.includes('delayed'):
+        return 'bg-red-100 text-red-800 border-red-300';
+      case statusLower.includes('returned'):
+        return 'bg-gray-100 text-gray-800 border-gray-300';
+      default:
+        return 'bg-gray-100 text-gray-500';
+    }
+  };
+
+  // Export selected shipments as CSV
+  const exportShipmentsCSV = () => {
+    const selectedShipmentData = shipments
+      .filter(shipment => shipment.selected);
+    
+    if (selectedShipmentData.length === 0) {
+      toast({
+        title: 'No shipments selected',
+        description: 'Please select shipments to export',
+        variant: 'destructive',
       });
       return;
     }
-
-    setProcessing(true);
-    setResult(null);
-
-    try {
-      if (selectedOperation === "import") {
-        // Simulate processing
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // In a real app, you would process the file and send it to an API
-        setResult({
-          success: true,
-          message: `Successfully imported data from ${file?.name}`,
-          count: Math.floor(Math.random() * 100) + 1,
-          details: [
-            "All records processed successfully",
-            "Updated existing records where needed",
-            "No duplicates were found"
-          ]
-        });
-      } else if (selectedOperation === "export") {
-        // Simulate processing
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // In a real app, you would generate and download the export file
-        setResult({
-          success: true,
-          message: `Successfully prepared ${selectedEntity} export`,
-          count: Math.floor(Math.random() * 500) + 50,
-          details: [
-            `${selectedEntity} data exported to ${selectedFormat.toUpperCase()} format`,
-            "Ready for download"
-          ]
-        });
-      }
-    } catch (error) {
-      console.error("Bulk operation error:", error);
-      setResult({
-        success: false,
-        message: "An error occurred during processing",
-        details: ["Check the format of your import file", "Make sure you have the correct permissions"]
-      });
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const downloadExport = () => {
-    // In a real app, this would download the actual file
-    // For now, simulate download by showing a success message
+    
+    // Create CSV content
+    const headers = ['Tracking Number', 'Origin', 'Destination', 'Status', 'Created At'];
+    const csvRows = [headers];
+    
+    selectedShipmentData.forEach(shipment => {
+      csvRows.push([
+        shipment.tracking_number,
+        shipment.origin,
+        shipment.destination,
+        shipment.status,
+        format(new Date(shipment.created_at), 'yyyy-MM-dd HH:mm:ss')
+      ]);
+    });
+    
+    const csvContent = csvRows
+      .map(row => row.map(cell => `"${cell}"`).join(','))
+      .join('\n');
+    
+    // Create download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `shipments_export_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
     toast({
-      title: "Download started",
-      description: `${selectedEntity}.${selectedFormat} is being downloaded`,
+      title: 'Export Complete',
+      description: `Exported ${selectedShipmentData.length} shipments to CSV`,
     });
   };
 
-  const resetForm = () => {
-    setFile(null);
-    setResult(null);
+  // Export selected users as CSV
+  const exportUsersCSV = () => {
+    const selectedUserData = users
+      .filter(user => user.selected);
+    
+    if (selectedUserData.length === 0) {
+      toast({
+        title: 'No users selected',
+        description: 'Please select users to export',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Create CSV content
+    const headers = ['Email', 'Full Name', 'Admin', 'Created At'];
+    const csvRows = [headers];
+    
+    selectedUserData.forEach(user => {
+      csvRows.push([
+        user.email,
+        user.full_name || '',
+        user.is_admin ? 'Yes' : 'No',
+        format(new Date(user.created_at), 'yyyy-MM-dd HH:mm:ss')
+      ]);
+    });
+    
+    const csvContent = csvRows
+      .map(row => row.map(cell => `"${cell}"`).join(','))
+      .join('\n');
+    
+    // Create download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `users_export_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({
+      title: 'Export Complete',
+      description: `Exported ${selectedUserData.length} users to CSV`,
+    });
   };
 
   return (
     <div>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl">Bulk Operations</CardTitle>
-          <CardDescription>
-            Import and export data in bulk
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="import" onValueChange={value => {
-            setSelectedOperation(value);
-            resetForm();
-          }}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="import" className="flex items-center gap-2">
-                <Upload className="h-4 w-4" />
-                <span>Import</span>
-              </TabsTrigger>
-              <TabsTrigger value="export" className="flex items-center gap-2">
-                <Download className="h-4 w-4" />
-                <span>Export</span>
-              </TabsTrigger>
-            </TabsList>
-            
-            <div className="mt-6">
-              <div className="mb-4">
-                <Label htmlFor="entity-type">Select Data Type</Label>
-                <Select
-                  value={selectedEntity}
-                  onValueChange={setSelectedEntity}
-                >
-                  <SelectTrigger id="entity-type" className="mt-1">
-                    <SelectValue placeholder="Select data type" />
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-6">
+          <TabsTrigger value="shipments" className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            <span>Shipments</span>
+          </TabsTrigger>
+          <TabsTrigger value="users" className="flex items-center gap-2">
+            <User className="h-4 w-4" />
+            <span>Users</span>
+          </TabsTrigger>
+        </TabsList>
+        
+        {/* Shipments Tab */}
+        <TabsContent value="shipments">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-xl">Bulk Shipment Operations</CardTitle>
+                  <CardDescription>Manage multiple shipments at once</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchShipments}
+                    disabled={loading}
+                  >
+                    <RefreshCcw className="mr-2 h-4 w-4" />
+                    Refresh
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={exportShipmentsCSV}
+                    disabled={!hasSelectedShipments}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Export Selected
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col md:flex-row gap-4 mb-4">
+                <div className="relative flex-grow">
+                  <Input
+                    placeholder="Search shipments..."
+                    className="pl-10"
+                    value={shipmentsSearchQuery}
+                    onChange={(e) => setShipmentsSearchQuery(e.target.value)}
+                  />
+                  <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                </div>
+                <Select value={shipmentsStatusFilter} onValueChange={setShipmentsStatusFilter}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter by status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="shipments">Shipments</SelectItem>
-                    <SelectItem value="users">Users</SelectItem>
-                    <SelectItem value="payments">Payments</SelectItem>
-                    <SelectItem value="addresses">Addresses</SelectItem>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="processing">Processing</SelectItem>
+                    <SelectItem value="in transit">In Transit</SelectItem>
+                    <SelectItem value="out for delivery">Out for Delivery</SelectItem>
+                    <SelectItem value="delivered">Delivered</SelectItem>
+                    <SelectItem value="delayed">Delayed</SelectItem>
+                    <SelectItem value="returned">Returned</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               
-              <div className="mb-4">
-                <Label htmlFor="format">File Format</Label>
-                <Select
-                  value={selectedFormat}
-                  onValueChange={setSelectedFormat}
+              {loading ? (
+                <div className="flex justify-center items-center p-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
+                </div>
+              ) : filteredShipments.length === 0 ? (
+                <div className="text-center p-12">
+                  <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No shipments found</h3>
+                  <p className="text-gray-500">
+                    {shipmentsSearchQuery || shipmentsStatusFilter !== 'all'
+                      ? "Try adjusting your filters"
+                      : "There are no shipments in the system"}
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]">
+                          <Checkbox 
+                            checked={allShipmentsSelected}
+                            onCheckedChange={toggleSelectAllShipments}
+                          />
+                        </TableHead>
+                        <TableHead>Tracking #</TableHead>
+                        <TableHead>Origin</TableHead>
+                        <TableHead>Destination</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Created</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredShipments.map((shipment) => (
+                        <TableRow key={shipment.id}>
+                          <TableCell>
+                            <Checkbox 
+                              checked={shipment.selected}
+                              onCheckedChange={() => toggleShipmentSelection(shipment.id)}
+                            />
+                          </TableCell>
+                          <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
+                          <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
+                          <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
+                          <TableCell>
+                            <Badge className={getStatusBadgeClass(shipment.status)}>
+                              {shipment.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {format(new Date(shipment.created_at), 'MMM d, yyyy')}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+            <CardFooter className="flex justify-between py-4 border-t">
+              <div className="text-sm text-gray-500">
+                {hasSelectedShipments 
+                  ? `${shipments.filter(s => s.selected).length} shipments selected`
+                  : `0 shipments selected`
+                }
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  className="bg-zim-green hover:bg-zim-green/90"
+                  disabled={!hasSelectedShipments}
+                  onClick={() => setIsStatusUpdateDialogOpen(true)}
                 >
-                  <SelectTrigger id="format" className="mt-1">
-                    <SelectValue placeholder="Select file format" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="csv">CSV</SelectItem>
-                    <SelectItem value="json">JSON</SelectItem>
-                    <SelectItem value="xlsx">Excel (XLSX)</SelectItem>
-                  </SelectContent>
-                </Select>
+                  Update Status
+                </Button>
               </div>
-              
-              <TabsContent value="import" className="mt-0">
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="file-upload">Upload File</Label>
-                    <div className="mt-1 flex items-center gap-2">
-                      <Input
-                        id="file-upload"
-                        type="file"
-                        accept={
-                          selectedFormat === "csv" ? ".csv" :
-                          selectedFormat === "json" ? ".json" :
-                          ".xlsx"
-                        }
-                        onChange={handleFileChange}
-                      />
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="outline">
-                            <FileText className="h-4 w-4 mr-2" />
-                            Template
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Download Template</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Use our template files to ensure your import data is formatted correctly.
-                              Choose the template for {selectedEntity} in {selectedFormat.toUpperCase()} format.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction>
-                              Download Template
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                    {file && (
-                      <p className="text-sm text-muted-foreground mt-2">
-                        Selected file: {file.name} ({Math.round(file.size / 1024)} KB)
-                      </p>
-                    )}
-                  </div>
-                  
-                  <div className="pt-2">
-                    <Button 
-                      onClick={handleSubmit}
-                      className="bg-zim-green hover:bg-zim-green/90"
-                      disabled={!file || processing}
-                    >
-                      {processing ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="h-4 w-4 mr-2" />
-                          Import Data
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="export" className="mt-0">
-                <div className="space-y-6">
-                  <div className="border rounded-md p-4">
-                    <h3 className="text-sm font-medium mb-2">Export Options</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Select which data to include in your export.
-                    </p>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <Card className="shadow-none border">
-                        <CardContent className="p-3">
-                          <Label className="flex items-center space-x-2">
-                            <Input type="checkbox" className="w-4 h-4" defaultChecked />
-                            <span>Include archived items</span>
-                          </Label>
-                        </CardContent>
-                      </Card>
-                      
-                      <Card className="shadow-none border">
-                        <CardContent className="p-3">
-                          <Label className="flex items-center space-x-2">
-                            <Input type="checkbox" className="w-4 h-4" defaultChecked />
-                            <span>Include metadata</span>
-                          </Label>
-                        </CardContent>
-                      </Card>
-                      
-                      <Card className="shadow-none border">
-                        <CardContent className="p-3">
-                          <Label className="flex items-center space-x-2">
-                            <Input type="checkbox" className="w-4 h-4" defaultChecked />
-                            <span>Include timestamps</span>
-                          </Label>
-                        </CardContent>
-                      </Card>
-                      
-                      <Card className="shadow-none border">
-                        <CardContent className="p-3">
-                          <Label className="flex items-center space-x-2">
-                            <Input type="checkbox" className="w-4 h-4" />
-                            <span>Raw data only</span>
-                          </Label>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  </div>
-                  
-                  <div className="pt-2">
-                    <Button 
-                      onClick={handleSubmit}
-                      className="bg-zim-green hover:bg-zim-green/90"
-                      disabled={processing}
-                    >
-                      {processing ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Preparing...
-                        </>
-                      ) : (
-                        <>
-                          <Download className="h-4 w-4 mr-2" />
-                          Generate Export
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </TabsContent>
-            </div>
-            
-            {/* Results Section */}
-            {result && (
-              <div className={`mt-8 border rounded-lg p-5 ${
-                result.success 
-                  ? 'bg-green-50 border-green-200' 
-                  : 'bg-red-50 border-red-200'
-              }`}>
-                <div className="flex items-start">
-                  {result.success ? (
-                    <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 mr-3" />
-                  ) : (
-                    <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 mr-3" />
-                  )}
-                  <div>
-                    <h3 className={`font-medium ${
-                      result.success ? 'text-green-700' : 'text-red-700'
-                    }`}>
-                      {result.message}
-                    </h3>
-                    
-                    {result.count && (
-                      <p className="text-sm mt-1">
-                        {result.count} records processed
-                      </p>
-                    )}
-                    
-                    {result.details && result.details.length > 0 && (
-                      <ul className="mt-3 space-y-1 text-sm">
-                        {result.details.map((detail, i) => (
-                          <li key={i} className="flex items-center">
-                            <span className="mr-2">•</span> {detail}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    
-                    <div className="mt-4 flex gap-3">
-                      {result.success && selectedOperation === "export" && (
-                        <Button 
-                          onClick={downloadExport}
-                          className="bg-zim-green hover:bg-zim-green/90"
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Download File
-                        </Button>
-                      )}
-                      
-                      <Button variant="outline" onClick={resetForm}>
-                        Reset
-                      </Button>
-                    </div>
-                  </div>
+            </CardFooter>
+          </Card>
+          
+          {/* Status Update Dialog */}
+          <Dialog open={isStatusUpdateDialogOpen} onOpenChange={setIsStatusUpdateDialogOpen}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Update Shipment Status</DialogTitle>
+                <DialogDescription>
+                  Change the status for {shipments.filter(s => s.selected).length} selected shipments.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                <div className="mb-4">
+                  <label className="text-sm font-medium mb-1 block">New Status</label>
+                  <Select
+                    value={selectedShipmentStatus}
+                    onValueChange={setSelectedShipmentStatus}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Processing">Processing</SelectItem>
+                      <SelectItem value="In Transit">In Transit</SelectItem>
+                      <SelectItem value="Out for Delivery">Out for Delivery</SelectItem>
+                      <SelectItem value="Delivered">Delivered</SelectItem>
+                      <SelectItem value="Delayed">Delayed</SelectItem>
+                      <SelectItem value="Returned">Returned</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsStatusUpdateDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  className="bg-zim-green hover:bg-zim-green/90"
+                  onClick={bulkUpdateShipmentStatus}
+                  disabled={isProcessing || !selectedShipmentStatus}
+                >
+                  {isProcessing ? 'Processing...' : 'Update Status'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+        
+        {/* Users Tab */}
+        <TabsContent value="users">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-xl">Bulk User Operations</CardTitle>
+                  <CardDescription>Manage multiple users at once</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchUsers}
+                    disabled={loading}
+                  >
+                    <RefreshCcw className="mr-2 h-4 w-4" />
+                    Refresh
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={exportUsersCSV}
+                    disabled={!hasSelectedUsers}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Export Selected
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col md:flex-row gap-4 mb-4">
+                <div className="relative flex-grow">
+                  <Input
+                    placeholder="Search users..."
+                    className="pl-10"
+                    value={usersSearchQuery}
+                    onChange={(e) => setUsersSearchQuery(e.target.value)}
+                  />
+                  <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                </div>
+              </div>
+              
+              {loading ? (
+                <div className="flex justify-center items-center p-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
+                </div>
+              ) : filteredUsers.length === 0 ? (
+                <div className="text-center p-12">
+                  <User className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No users found</h3>
+                  <p className="text-gray-500">
+                    {usersSearchQuery
+                      ? "Try adjusting your search"
+                      : "There are no users in the system"}
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]">
+                          <Checkbox 
+                            checked={allUsersSelected}
+                            onCheckedChange={toggleSelectAllUsers}
+                          />
+                        </TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Joined</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredUsers.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell>
+                            <Checkbox 
+                              checked={user.selected}
+                              onCheckedChange={() => toggleUserSelection(user.id)}
+                            />
+                          </TableCell>
+                          <TableCell>{user.full_name || 'Unknown'}</TableCell>
+                          <TableCell>{user.email}</TableCell>
+                          <TableCell>
+                            <Badge className={user.is_admin 
+                              ? "bg-red-100 text-red-800 border-red-300" 
+                              : "bg-blue-100 text-blue-800 border-blue-300"
+                            }>
+                              {user.is_admin ? 'Admin' : 'User'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {format(new Date(user.created_at), 'MMM d, yyyy')}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+            <CardFooter className="flex justify-between py-4 border-t">
+              <div className="text-sm text-gray-500">
+                {hasSelectedUsers
+                  ? `${users.filter(u => u.selected).length} users selected`
+                  : `0 users selected`
+                }
+              </div>
+              <div className="flex gap-2">
+                {/* Add user bulk operations here */}
+                <Button
+                  className="bg-zim-green hover:bg-zim-green/90"
+                  disabled={!hasSelectedUsers}
+                >
+                  Send Email
+                </Button>
+              </div>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+      </Tabs>
+      
+      {/* Processing Result Notification */}
+      {showResult && processingResult && (
+        <div className="fixed bottom-4 right-4 max-w-md bg-white shadow-lg rounded-md p-4 border">
+          <div className="flex items-start gap-3">
+            {processingResult.failed === 0 ? (
+              <Check className="h-5 w-5 text-green-600 mt-0.5" />
+            ) : (
+              <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
             )}
-          </Tabs>
-        </CardContent>
-      </Card>
+            <div>
+              <p className="font-medium text-gray-900">{
+                processingResult.failed === 0 ? 'Success!' : 'Partial Success'
+              }</p>
+              <p className="text-gray-600">{processingResult.message}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
