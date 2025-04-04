@@ -31,7 +31,8 @@ import {
   addRoute,
   removeRoute,
   addAreaToRoute,
-  removeAreaFromRoute
+  removeAreaFromRoute,
+  syncSchedulesWithDatabase
 } from '@/data/collectionSchedule';
 
 const CollectionScheduleManagement: React.FC = () => {
@@ -43,15 +44,33 @@ const CollectionScheduleManagement: React.FC = () => {
   const [newRouteAreas, setNewRouteAreas] = useState('');
   const [newArea, setNewArea] = useState('');
   const [addingNewRoute, setAddingNewRoute] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
-  // Load schedules
+  // Load schedules from database
   useEffect(() => {
-    setSchedules([...collectionSchedules]);
-  }, []);
+    const loadSchedules = async () => {
+      setIsLoading(true);
+      try {
+        await syncSchedulesWithDatabase();
+        setSchedules([...collectionSchedules]);
+      } catch (error) {
+        console.error('Failed to load collection schedules:', error);
+        toast({
+          title: "Error Loading Schedules",
+          description: "Unable to load collection schedules. Please try again later.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadSchedules();
+  }, [toast]);
 
   // Handle date selection for a route
-  const handleDateSelect = (route: string, date: Date | undefined) => {
+  const handleDateSelect = async (route: string, date: Date | undefined) => {
     if (!date) return;
     
     // Format date as "1st of April", "2nd of April", etc.
@@ -60,17 +79,34 @@ const CollectionScheduleManagement: React.FC = () => {
     const month = date.toLocaleString('default', { month: 'long' });
     const formattedDate = `${day}${suffix} of ${month}`;
     
-    // Update the date in our collection
-    if (updateRouteDate(route, formattedDate)) {
-      // Update local state
-      setSchedules([...collectionSchedules]);
-      setEditingRoute(null);
-      setSelectedDate(undefined);
+    setIsLoading(true);
+    
+    try {
+      // Update the date in our collection and database
+      const success = await updateRouteDate(route, formattedDate);
       
+      if (success) {
+        // Update local state
+        setSchedules([...collectionSchedules]);
+        setEditingRoute(null);
+        setSelectedDate(undefined);
+        
+        toast({
+          title: "Date Updated",
+          description: `The collection date for ${route} has been updated to ${formattedDate}.`,
+        });
+      } else {
+        throw new Error("Failed to update date");
+      }
+    } catch (error) {
+      console.error('Error updating date:', error);
       toast({
-        title: "Date Updated",
-        description: `The collection date for ${route} has been updated to ${formattedDate}.`,
+        title: "Error Updating Date",
+        description: "An error occurred while updating the collection date.",
+        variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -124,7 +160,7 @@ const CollectionScheduleManagement: React.FC = () => {
   };
 
   // Add a new route
-  const handleAddRoute = () => {
+  const handleAddRoute = async () => {
     if (!newRouteName || !newRouteDate) {
       toast({
         title: "Missing Information",
@@ -155,41 +191,71 @@ const CollectionScheduleManagement: React.FC = () => {
       return;
     }
     
-    // Add the new route
-    if (addRoute(newRouteName.toUpperCase(), formattedDate, areas)) {
-      setSchedules([...collectionSchedules]);
-      setAddingNewRoute(false);
-      setNewRouteName('');
-      setNewRouteDate(undefined);
-      setNewRouteAreas('');
+    setIsLoading(true);
+    
+    try {
+      // Add the new route to the database
+      const success = await addRoute(newRouteName.toUpperCase(), formattedDate, areas);
       
-      toast({
-        title: "Route Added",
-        description: `The route ${newRouteName.toUpperCase()} has been added successfully.`,
-      });
-    } else {
+      if (success) {
+        setSchedules([...collectionSchedules]);
+        setAddingNewRoute(false);
+        setNewRouteName('');
+        setNewRouteDate(undefined);
+        setNewRouteAreas('');
+        
+        toast({
+          title: "Route Added",
+          description: `The route ${newRouteName.toUpperCase()} has been added successfully.`,
+        });
+      } else {
+        throw new Error("A route with this name already exists");
+      }
+    } catch (error) {
+      console.error('Error adding route:', error);
       toast({
         title: "Error",
-        description: "A route with this name already exists.",
+        description: error instanceof Error ? error.message : "An error occurred while adding the route.",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   // Remove a route
-  const handleRemoveRoute = (route: string) => {
-    if (removeRoute(route)) {
-      setSchedules([...collectionSchedules]);
+  const handleRemoveRoute = async (route: string) => {
+    if (isLoading) return;
+    
+    setIsLoading(true);
+    
+    try {
+      const success = await removeRoute(route);
+      
+      if (success) {
+        setSchedules([...collectionSchedules]);
+        toast({
+          title: "Route Removed",
+          description: `The route ${route} has been removed.`,
+        });
+      } else {
+        throw new Error("Failed to remove route");
+      }
+    } catch (error) {
+      console.error('Error removing route:', error);
       toast({
-        title: "Route Removed",
-        description: `The route ${route} has been removed.`,
+        title: "Error Removing Route",
+        description: "An error occurred while removing the route.",
+        variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   // Add an area to a route
-  const handleAddArea = (route: string) => {
-    if (!newArea) {
+  const handleAddArea = async (route: string) => {
+    if (!newArea || isLoading) {
       toast({
         title: "Missing Area Name",
         description: "Please enter an area name.",
@@ -198,30 +264,60 @@ const CollectionScheduleManagement: React.FC = () => {
       return;
     }
     
-    if (addAreaToRoute(route, newArea.toUpperCase())) {
-      setSchedules([...collectionSchedules]);
-      setNewArea('');
-      toast({
-        title: "Area Added",
-        description: `${newArea.toUpperCase()} has been added to ${route}.`,
-      });
-    } else {
+    setIsLoading(true);
+    
+    try {
+      const success = await addAreaToRoute(route, newArea.toUpperCase());
+      
+      if (success) {
+        setSchedules([...collectionSchedules]);
+        setNewArea('');
+        toast({
+          title: "Area Added",
+          description: `${newArea.toUpperCase()} has been added to ${route}.`,
+        });
+      } else {
+        throw new Error("Could not add area to route");
+      }
+    } catch (error) {
+      console.error('Error adding area:', error);
       toast({
         title: "Error",
-        description: `Could not add area to ${route}.`,
+        description: error instanceof Error ? error.message : "An error occurred while adding the area.",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   // Remove an area from a route
-  const handleRemoveArea = (route: string, area: string) => {
-    if (removeAreaFromRoute(route, area)) {
-      setSchedules([...collectionSchedules]);
+  const handleRemoveArea = async (route: string, area: string) => {
+    if (isLoading) return;
+    
+    setIsLoading(true);
+    
+    try {
+      const success = await removeAreaFromRoute(route, area);
+      
+      if (success) {
+        setSchedules([...collectionSchedules]);
+        toast({
+          title: "Area Removed",
+          description: `${area} has been removed from ${route}.`,
+        });
+      } else {
+        throw new Error("Failed to remove area from route");
+      }
+    } catch (error) {
+      console.error('Error removing area:', error);
       toast({
-        title: "Area Removed",
-        description: `${area} has been removed from ${route}.`,
+        title: "Error Removing Area",
+        description: "An error occurred while removing the area from the route.",
+        variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -229,11 +325,22 @@ const CollectionScheduleManagement: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Collection Schedule Management</h2>
-        <Button onClick={() => setAddingNewRoute(true)} className="bg-zim-green hover:bg-zim-green/90">
+        <Button 
+          onClick={() => setAddingNewRoute(true)} 
+          className="bg-zim-green hover:bg-zim-green/90"
+          disabled={isLoading}
+        >
           <Plus className="h-4 w-4 mr-2" />
           Add New Route
         </Button>
       </div>
+
+      {/* Loading state */}
+      {isLoading && (
+        <div className="flex justify-center py-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
+        </div>
+      )}
 
       {/* Add new route form */}
       {addingNewRoute && (
@@ -272,6 +379,7 @@ const CollectionScheduleManagement: React.FC = () => {
                       selected={newRouteDate}
                       onSelect={setNewRouteDate}
                       initialFocus
+                      className="pointer-events-auto"
                     />
                   </PopoverContent>
                 </Popover>
@@ -299,10 +407,15 @@ const CollectionScheduleManagement: React.FC = () => {
                 setNewRouteDate(undefined);
                 setNewRouteAreas('');
               }}
+              disabled={isLoading}
             >
               Cancel
             </Button>
-            <Button onClick={handleAddRoute} className="bg-zim-green hover:bg-zim-green/90">
+            <Button 
+              onClick={handleAddRoute} 
+              className="bg-zim-green hover:bg-zim-green/90"
+              disabled={isLoading}
+            >
               Add Route
             </Button>
           </CardFooter>
@@ -342,6 +455,7 @@ const CollectionScheduleManagement: React.FC = () => {
                           selected={selectedDate}
                           onSelect={(date) => handleDateSelect(schedule.route, date)}
                           initialFocus
+                          className="pointer-events-auto"
                         />
                       </PopoverContent>
                     </Popover>
@@ -359,6 +473,7 @@ const CollectionScheduleManagement: React.FC = () => {
                         <button
                           onClick={() => handleRemoveArea(schedule.route, area)}
                           className="ml-1 text-gray-500 hover:text-red-500"
+                          disabled={isLoading}
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -370,12 +485,14 @@ const CollectionScheduleManagement: React.FC = () => {
                         onChange={(e) => setNewArea(e.target.value)}
                         placeholder="Add area"
                         className="h-8 text-sm mr-2 w-32"
+                        disabled={isLoading}
                       />
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => handleAddArea(schedule.route)}
                         className="h-8 px-2"
+                        disabled={isLoading}
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
@@ -389,6 +506,7 @@ const CollectionScheduleManagement: React.FC = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => setEditingRoute(null)}
+                        disabled={isLoading}
                       >
                         <X className="h-4 w-4" />
                       </Button>
@@ -397,6 +515,7 @@ const CollectionScheduleManagement: React.FC = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleEditRoute(schedule.route)}
+                        disabled={isLoading}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -406,6 +525,7 @@ const CollectionScheduleManagement: React.FC = () => {
                       size="sm"
                       onClick={() => handleRemoveRoute(schedule.route)}
                       className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                      disabled={isLoading}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

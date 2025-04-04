@@ -53,16 +53,23 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const routes = getRouteNames();
 
   React.useEffect(() => {
-    if (formData.selectedRoute) {
-      const areas = getAreasByRoute(formData.selectedRoute);
-      setAvailableAreas(areas);
-      setPickupDate(getDateByRoute(formData.selectedRoute));
+    const loadData = async () => {
+      // Sync collection schedules with database before getting route data
+      await syncSchedulesWithDatabase();
       
-      setFormData(prev => ({ ...prev, selectedArea: '' }));
-    } else {
-      setAvailableAreas([]);
-      setPickupDate('');
-    }
+      if (formData.selectedRoute) {
+        const areas = getAreasByRoute(formData.selectedRoute);
+        setAvailableAreas(areas);
+        setPickupDate(getDateByRoute(formData.selectedRoute));
+        
+        setFormData(prev => ({ ...prev, selectedArea: '' }));
+      } else {
+        setAvailableAreas([]);
+        setPickupDate('');
+      }
+    };
+    
+    loadData();
   }, [formData.selectedRoute]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
