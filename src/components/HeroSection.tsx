@@ -1,15 +1,17 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Package, ArrowRight, Truck } from 'lucide-react';
+import { ArrowRight, Truck, Package, Shield, MapPin } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import Logo from './Logo';
 
 const HeroSection: React.FC = () => {
   return (
-    <div className="relative hero-pattern">
+    <div className="relative overflow-hidden bg-white dark:bg-gray-900 hero-pattern">
       <div className="absolute inset-0 bg-gradient-to-r from-zim-green/10 to-zim-red/10"></div>
       <div className="container mx-auto px-4 py-16 md:py-24 relative z-10">
-        <div className="flex flex-col md:flex-row items-center justify-between">
-          <div className="md:w-1/2 mb-10 md:mb-0">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <div className="order-2 lg:order-1">
             <div className="max-w-lg">
               <h1 className="text-4xl md:text-5xl font-bold text-gray-800 mb-4">
                 UK to Zimbabwe <span className="text-zim-green">Shipping</span> Made Simple
@@ -18,14 +20,18 @@ const HeroSection: React.FC = () => {
                 Fast, reliable, and affordable shipping services for all your packages. From personal items to commercial cargo.
               </p>
               <div className="space-y-4 md:space-y-0 md:space-x-4 md:flex">
-                <Button className="w-full md:w-auto bg-zim-green hover:bg-zim-green/90 text-white flex items-center justify-center text-lg">
-                  <Package className="mr-2" /> Book Shipment
-                </Button>
-                <Button variant="outline" className="w-full md:w-auto border-zim-black text-zim-black hover:bg-zim-black hover:text-white flex items-center justify-center text-lg">
-                  Track Package <ArrowRight className="ml-2" />
-                </Button>
+                <Link to="/book-shipment">
+                  <Button className="w-full md:w-auto bg-zim-red hover:bg-zim-red/90 text-white flex items-center justify-center text-lg py-3 px-8">
+                    Book Your Shipment <ArrowRight className="ml-2" />
+                  </Button>
+                </Link>
+                <Link to="/track">
+                  <Button variant="outline" className="w-full md:w-auto border-zim-black text-zim-black hover:bg-zim-black hover:text-white flex items-center justify-center text-lg py-3 px-8">
+                    Track Shipment
+                  </Button>
+                </Link>
               </div>
-              <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="mt-8 grid grid-cols-2 gap-4">
                 <div className="flex items-center bg-white p-3 rounded-md shadow-sm border">
                   <div className="bg-zim-green/10 p-2 rounded-full mr-3">
                     <Truck className="h-5 w-5 text-zim-green" />
@@ -46,19 +52,26 @@ const HeroSection: React.FC = () => {
                 </div>
                 <div className="flex items-center bg-white p-3 rounded-md shadow-sm border">
                   <div className="bg-zim-red/10 p-2 rounded-full mr-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-zim-red">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0 1 15.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 0 1 3 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 0 0-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 0 1-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 0 0 3 15h-.75M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm3 0h.008v.008H18V10.5Zm-12 0h.008v.008H6V10.5Z" />
-                    </svg>
+                    <Shield className="h-5 w-5 text-zim-red" />
                   </div>
                   <div className="text-sm">
-                    <p className="font-medium">Best Prices</p>
-                    <p className="text-gray-500 text-xs">Starting from £260</p>
+                    <p className="font-medium">Insurance Options</p>
+                    <p className="text-gray-500 text-xs">Coverage up to £1000</p>
+                  </div>
+                </div>
+                <div className="flex items-center bg-white p-3 rounded-md shadow-sm border">
+                  <div className="bg-zim-black/10 p-2 rounded-full mr-3">
+                    <MapPin className="h-5 w-5 text-zim-black" />
+                  </div>
+                  <div className="text-sm">
+                    <p className="font-medium">Real-time Tracking</p>
+                    <p className="text-gray-500 text-xs">Know where your package is</p>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-          <div className="md:w-1/2 flex justify-center">
+          <div className="order-1 lg:order-2 flex justify-center">
             <div className="relative">
               <div className="absolute -inset-4 rounded-full bg-gradient-to-tr from-zim-green via-zim-yellow to-zim-red opacity-50 blur-xl animate-float"></div>
               <div className="zim-border bg-white overflow-hidden relative z-10 rounded-lg shadow-xl transform rotate-2 hover:rotate-0 transition-transform duration-500">
@@ -82,9 +95,11 @@ const HeroSection: React.FC = () => {
                     </div>
                   </div>
                   <div className="mt-4 pt-4 border-t flex justify-center">
-                    <Button className="w-full bg-zim-red hover:bg-zim-red/90">
-                      Book Now & Save
-                    </Button>
+                    <Link to="/book-shipment">
+                      <Button className="w-full bg-zim-red hover:bg-zim-red/90">
+                        Book Now & Save
+                      </Button>
+                    </Link>
                   </div>
                 </div>
                 {/* Zimbabwe flag stripe decoration */}
