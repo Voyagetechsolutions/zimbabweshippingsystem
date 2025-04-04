@@ -87,7 +87,7 @@ const SupportTickets = () => {
       priority: 'medium',
       assigned_to: null,
       created_at: new Date(Date.now() - 86400000 * 2).toISOString(), // 2 days ago
-      updated_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+      updated_at: new Date(Date.now() - 86400000 * 2).toISOString()
     },
     {
       id: '2',
@@ -100,7 +100,7 @@ const SupportTickets = () => {
       priority: 'high',
       assigned_to: 'admin-user',
       created_at: new Date(Date.now() - 86400000 * 5).toISOString(), // 5 days ago
-      updated_at: new Date(Date.now() - 86400000 * 1).toISOString(), // 1 day ago
+      updated_at: new Date(Date.now() - 86400000 * 1).toISOString() // 1 day ago
     },
     {
       id: '3',
@@ -113,8 +113,8 @@ const SupportTickets = () => {
       priority: 'low',
       assigned_to: 'admin-user',
       created_at: new Date(Date.now() - 86400000 * 10).toISOString(), // 10 days ago
-      updated_at: new Date(Date.now() - 86400000 * 7).toISOString(), // 7 days ago
-    },
+      updated_at: new Date(Date.now() - 86400000 * 7).toISOString() // 7 days ago
+    }
   ];
   
   // Mock ticket responses
@@ -127,7 +127,7 @@ const SupportTickets = () => {
       user_name: 'Admin User',
       message: 'Hi Sarah, thank you for your interest in our bulk shipping rates. For 10 packages per month, we can offer a 15% discount on our standard rates. Would you like me to prepare a detailed quote?',
       is_staff_response: true,
-      created_at: new Date(Date.now() - 86400000 * 3).toISOString(), // 3 days ago
+      created_at: new Date(Date.now() - 86400000 * 3).toISOString() // 3 days ago
     },
     {
       id: 'r2',
@@ -137,7 +137,7 @@ const SupportTickets = () => {
       user_name: 'Sarah Johnson',
       message: 'Yes please, that would be very helpful. The packages would typically weigh between 2-5kg each.',
       is_staff_response: false,
-      created_at: new Date(Date.now() - 86400000 * 2).toISOString(), // 2 days ago
+      created_at: new Date(Date.now() - 86400000 * 2).toISOString() // 2 days ago
     },
     {
       id: 'r3',
@@ -147,7 +147,7 @@ const SupportTickets = () => {
       user_name: 'Admin User',
       message: 'Thank you for the additional information. I've prepared a detailed quote and will email it to you shortly. Is there anything specific you'd like me to include in the quote?',
       is_staff_response: true,
-      created_at: new Date(Date.now() - 86400000 * 1).toISOString(), // 1 day ago
+      created_at: new Date(Date.now() - 86400000 * 1).toISOString() // 1 day ago
     },
     {
       id: 'r4',
@@ -157,7 +157,7 @@ const SupportTickets = () => {
       user_name: 'Admin User',
       message: 'Hello Michael, I've reviewed your invoice and confirm that there was an error in the weight calculation. I've issued a corrected invoice and processed a refund for the difference. You should receive the refund within 3-5 business days. Please let me know if you have any other questions.',
       is_staff_response: true,
-      created_at: new Date(Date.now() - 86400000 * 8).toISOString(), // 8 days ago
+      created_at: new Date(Date.now() - 86400000 * 8).toISOString() // 8 days ago
     },
     {
       id: 'r5',
@@ -167,8 +167,8 @@ const SupportTickets = () => {
       user_name: 'Michael Brown',
       message: 'Thank you for resolving this quickly. I appreciate the help!',
       is_staff_response: false,
-      created_at: new Date(Date.now() - 86400000 * 7).toISOString(), // 7 days ago
-    },
+      created_at: new Date(Date.now() - 86400000 * 7).toISOString() // 7 days ago
+    }
   ];
 
   useEffect(() => {
