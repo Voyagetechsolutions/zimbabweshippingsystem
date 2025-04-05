@@ -93,7 +93,7 @@ const RoleElevationDialog = () => {
               onChange={(e) => setAdminPassword(e.target.value)}
             />
             <p className="text-xs text-gray-500">
-              For testing, use the password: "Kulpalope101"
+              For testing, use the password: "zimbabwe-shipping-admin"
             </p>
           </div>
         </div>

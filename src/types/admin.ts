@@ -1,4 +1,3 @@
-
 export interface Role {
   id: string;
   name: string;
@@ -92,3 +91,6 @@ export interface Permissions {
     write?: boolean;
   };
 }
+
+// Add ShipmentStatus type for LogisticsDashboard
+export type ShipmentStatus = 'pending' | 'processing' | 'in_transit' | 'delivered' | 'cancelled';

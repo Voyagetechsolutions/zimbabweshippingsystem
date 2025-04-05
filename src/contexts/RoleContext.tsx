@@ -36,7 +36,7 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Use the isAdmin flag from AuthContext
         if (isAdmin) {
-          setRole('admin' as UserRoleType);
+          setRole('admin');
           setIsLoading(false);
           return;
         }
@@ -54,20 +54,20 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // If the column doesn't exist yet, set default role
           if (error.message.includes("column 'role' does not exist")) {
             console.log('Role column not found, setting default role');
-            setRole('customer' as UserRoleType); // Default role
+            setRole('customer'); // Default role
           } else {
-            setRole('customer' as UserRoleType); // Default fallback for other errors
+            setRole('customer'); // Default fallback for other errors
           }
         } else if (data && 'role' in data) {
           // Check if 'role' property exists in data
           setRole(data.role as UserRoleType);
         } else {
           // If no role found, default to customer
-          setRole('customer' as UserRoleType);
+          setRole('customer');
         }
       } catch (error) {
         console.error('Error in fetchUserRole:', error);
-        setRole('customer' as UserRoleType); // Default role
+        setRole('customer'); // Default role
       } finally {
         setIsLoading(false);
       }
@@ -88,11 +88,11 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
       case 'admin':
         return role === 'admin';
       case 'logistics':
-        return role === 'admin' || role === 'logistics';
+        return ['admin', 'logistics'].includes(role);
       case 'driver':
-        return role === 'admin' || role === 'logistics' || role === 'driver';
+        return ['admin', 'logistics', 'driver'].includes(role);
       case 'support':
-        return role === 'admin' || role === 'logistics' || role === 'support';
+        return ['admin', 'logistics', 'support'].includes(role);
       case 'customer':
         return true; // Everyone has customer access
       default:
@@ -103,7 +103,7 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Function to elevate a user to admin with the secret password
   const elevateToAdmin = async (password: string): Promise<boolean> => {
     try {
-      // Use a simplified approach for now - direct table update
+      // Use the elevate_to_admin RPC function we just created
       const { data, error } = await supabase.rpc('elevate_to_admin', {
         admin_password: password
       });

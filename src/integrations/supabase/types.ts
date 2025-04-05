@@ -206,6 +206,7 @@ export type Database = {
           full_name: string | null
           id: string
           is_admin: boolean | null
+          role: string | null
           updated_at: string
         }
         Insert: {
@@ -216,6 +217,7 @@ export type Database = {
           full_name?: string | null
           id: string
           is_admin?: boolean | null
+          role?: string | null
           updated_at?: string
         }
         Update: {
@@ -226,6 +228,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_admin?: boolean | null
+          role?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -563,6 +566,12 @@ export type Database = {
       delete_gallery_image: {
         Args: {
           p_id: string
+        }
+        Returns: boolean
+      }
+      elevate_to_admin: {
+        Args: {
+          admin_password: string
         }
         Returns: boolean
       }
