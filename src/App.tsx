@@ -25,6 +25,7 @@ import GalleryAdmin from './pages/GalleryAdmin';
 import Reviews from './pages/Reviews';
 import CreateShipment from './pages/CreateShipment';
 import TaskManagement from './pages/TaskManagement';
+import Support from './pages/Support';
 
 // Components
 import { RequireAuth, RequireAdmin, RedirectIfAuthenticated, RequireRole } from './components/RouteGuard';
@@ -38,7 +39,14 @@ import { ShippingProvider } from './contexts/ShippingContext';
 import { RoleProvider } from './contexts/RoleContext';
 
 // Initialize React Query client
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      refetchOnWindowFocus: false,
+    }
+  }
+});
 
 function App() {
   return (
@@ -60,6 +68,7 @@ function App() {
                   <Route path="/book-shipment" element={<BookShipment />} />
                   <Route path="/payment-success" element={<PaymentSuccess />} />
                   <Route path="/reviews" element={<Reviews />} />
+                  <Route path="/support" element={<Support />} />
 
                   {/* Protected routes - any authenticated user */}
                   <Route

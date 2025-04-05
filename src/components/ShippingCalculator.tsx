@@ -78,7 +78,7 @@ const ShippingCalculator: React.FC = () => {
         </div>
 
         <div className="max-w-4xl mx-auto">
-          <Card className="border-gray-200 dark:border-gray-700 overflow-hidden dark:bg-gray-800">
+          <Card className="border-gray-200 dark:border-gray-700 overflow-hidden dark:bg-gray-800 shadow-lg">
             <CardHeader className="bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700">
               <CardTitle className="text-2xl dark:text-white">Shipping Calculator</CardTitle>
             </CardHeader>
@@ -123,7 +123,7 @@ const ShippingCalculator: React.FC = () => {
                       <SelectContent>
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
                           <SelectItem key={num} value={num.toString()}>
-                            {num} {num === 1 ? 'Drum' : 'Drums'}
+                            {num}
                           </SelectItem>
                         ))}
                       </SelectContent>

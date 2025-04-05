@@ -1,99 +1,132 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Phone, Mail, Instagram, Facebook, Twitter } from 'lucide-react';
-import Logo from './Logo';
 import { Button } from '@/components/ui/button';
+import Logo from './Logo';
+import { Facebook, Twitter, Instagram, Mail, Phone, MapPin } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="bg-gray-900 text-white pt-12 pb-6">
+    <footer className="bg-gray-900 text-white pt-16 pb-8">
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
-          {/* Brand */}
-          <div className="space-y-4">
-            <Logo className="!text-white" />
-            <p className="text-sm text-gray-300 mt-4">
-              The most reliable and affordable shipping service from UK to Zimbabwe. We deliver your packages with care and efficiency.
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 pb-8">
+          <div className="md:col-span-1">
+            <Logo variant="light" />
+            <p className="mt-4 text-gray-400 max-w-xs">
+              Connecting Zimbabwe to the UK with reliable shipping solutions since 2020.
             </p>
-            <div className="flex space-x-4">
-              <a href="#" className="text-gray-300 hover:text-zim-yellow">
+            <div className="flex space-x-4 mt-6">
+              <a href="#" className="text-gray-400 hover:text-white transition-colors">
                 <Facebook size={20} />
               </a>
-              <a href="#" className="text-gray-300 hover:text-zim-yellow">
-                <Instagram size={20} />
-              </a>
-              <a href="#" className="text-gray-300 hover:text-zim-yellow">
+              <a href="#" className="text-gray-400 hover:text-white transition-colors">
                 <Twitter size={20} />
               </a>
+              <a href="#" className="text-gray-400 hover:text-white transition-colors">
+                <Instagram size={20} />
+              </a>
             </div>
           </div>
-
-          {/* Quick Links */}
+          
           <div>
-            <h3 className="text-lg font-semibold mb-4 text-zim-yellow">Quick Links</h3>
+            <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
             <ul className="space-y-2">
               <li>
-                <Link to="/" className="text-sm text-gray-300 hover:text-white transition">Home</Link>
+                <Link to="/" className="text-gray-400 hover:text-white transition-colors">Home</Link>
               </li>
               <li>
-                <Link to="/services" className="text-sm text-gray-300 hover:text-white transition">Our Services</Link>
+                <Link to="/services" className="text-gray-400 hover:text-white transition-colors">Services</Link>
               </li>
               <li>
-                <Link to="/track" className="text-sm text-gray-300 hover:text-white transition">Track Shipment</Link>
+                <Link to="/pricing" className="text-gray-400 hover:text-white transition-colors">Pricing</Link>
               </li>
               <li>
-                <Link to="/contact" className="text-sm text-gray-300 hover:text-white transition">Contact Us</Link>
+                <Link to="/track" className="text-gray-400 hover:text-white transition-colors">Track Shipment</Link>
               </li>
               <li>
-                <Link to="/about" className="text-sm text-gray-300 hover:text-white transition">About Us</Link>
+                <Link to="/contact" className="text-gray-400 hover:text-white transition-colors">Contact</Link>
               </li>
             </ul>
           </div>
-
-          {/* Contact Info */}
+          
           <div>
-            <h3 className="text-lg font-semibold mb-4 text-zim-yellow">Contact Us</h3>
+            <h3 className="text-lg font-semibold mb-4">Customer Service</h3>
+            <ul className="space-y-2">
+              <li>
+                <Link to="/book-shipment" className="text-gray-400 hover:text-white transition-colors">Book a Shipment</Link>
+              </li>
+              <li>
+                <Link to="/gallery" className="text-gray-400 hover:text-white transition-colors">Gallery</Link>
+              </li>
+              <li>
+                <Link to="/reviews" className="text-gray-400 hover:text-white transition-colors">Reviews</Link>
+              </li>
+              <li>
+                <Link to="/dashboard" className="text-gray-400 hover:text-white transition-colors">My Account</Link>
+              </li>
+              <li>
+                <Link to="/auth" className="text-gray-400 hover:text-white transition-colors">Login / Register</Link>
+              </li>
+            </ul>
+          </div>
+          
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Contact Us</h3>
             <ul className="space-y-3">
               <li className="flex items-start">
-                <MapPin className="w-5 h-5 mr-2 text-zim-yellow" />
-                <span className="text-sm text-gray-300">123 Shipping Lane, London, UK</span>
+                <MapPin className="h-5 w-5 text-zim-green mr-2 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-gray-300">UK Office:</p>
+                  <p className="text-gray-400">
+                    Unit 5, Enterprise Way<br />
+                    Northampton Business Park<br />
+                    Northampton, NN3 6QL<br />
+                    United Kingdom
+                  </p>
+                </div>
               </li>
-              <li className="flex items-center">
-                <Phone className="w-5 h-5 mr-2 text-zim-yellow" />
-                <a href="tel:+447584100552" className="text-sm text-gray-300 hover:text-white">+44 7584 100552</a>
+              <li className="flex">
+                <MapPin className="h-5 w-5 text-zim-yellow mr-2 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-gray-300">Zimbabwe Office:</p>
+                  <p className="text-gray-400">
+                    45 Samora Machel Avenue<br />
+                    Harare, Zimbabwe
+                  </p>
+                </div>
               </li>
-              <li className="flex items-center">
-                <Mail className="w-5 h-5 mr-2 text-zim-yellow" />
-                <a href="mailto:info@zimbabweshipping.com" className="text-sm text-gray-300 hover:text-white">info@zimbabweshipping.com</a>
+              <li className="flex">
+                <Phone className="h-5 w-5 text-zim-green mr-2 flex-shrink-0" />
+                <span className="text-gray-400">+44 7123 456789 (UK)</span>
+              </li>
+              <li className="flex">
+                <Phone className="h-5 w-5 text-zim-yellow mr-2 flex-shrink-0" />
+                <span className="text-gray-400">+263 771 234567 (Zimbabwe)</span>
+              </li>
+              <li className="flex">
+                <Mail className="h-5 w-5 text-zim-green mr-2 flex-shrink-0" />
+                <span className="text-gray-400">info@zimshipping.com</span>
               </li>
             </ul>
           </div>
-
-          {/* Newsletter */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4 text-zim-yellow">Newsletter</h3>
-            <p className="text-sm text-gray-300 mb-4">Subscribe to our newsletter for updates and promotions.</p>
-            <div className="flex flex-col space-y-3">
-              <input
-                type="email"
-                placeholder="Your email address"
-                className="px-4 py-2 rounded bg-gray-800 text-white text-sm border border-gray-700 focus:outline-none focus:border-zim-yellow"
-              />
-              <Button className="bg-zim-yellow hover:bg-zim-yellow/90 text-black">
-                Subscribe
-              </Button>
-            </div>
-          </div>
         </div>
-
-        {/* Bottom Footer */}
-        <div className="border-t border-gray-800 pt-6 mt-6 text-center">
-          <p className="text-sm text-gray-400">
-            © {currentYear} Zimbabwe Shipping. All rights reserved.
+        
+        <div className="pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center">
+          <p className="text-gray-500 text-sm">
+            &copy; {currentYear} UK to Zimbabwe Shipping. All rights reserved.
           </p>
+          <div className="flex items-center space-x-4 mt-4 md:mt-0">
+            <Link to="/privacy">
+              <span className="text-gray-500 hover:text-gray-400 text-sm">Privacy Policy</span>
+            </Link>
+            <Link to="/terms">
+              <span className="text-gray-500 hover:text-gray-400 text-sm">Terms of Service</span>
+            </Link>
+            <ThemeToggle />
+          </div>
         </div>
       </div>
     </footer>

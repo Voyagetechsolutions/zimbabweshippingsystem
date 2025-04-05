@@ -9,10 +9,16 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { 
+  getRouteNames, 
+  getAreasByRoute, 
+  getDateByRoute 
+} from '@/data/collectionSchedule';
 
 const DriverDashboard = () => {
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [collections, setCollections] = useState<any[]>([]);
+  const [schedules, setSchedules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     assigned: 0,
@@ -25,12 +31,62 @@ const DriverDashboard = () => {
   useEffect(() => {
     if (user) {
       fetchDriverTasks();
+      fetchSchedules();
     }
   }, [user]);
+
+  const fetchSchedules = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('collection_schedules')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      if (data) {
+        setSchedules(data);
+      }
+    } catch (error: any) {
+      console.error('Error fetching collection schedules:', error);
+      toast({
+        title: 'Error fetching schedules',
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const getTodayCollection = () => {
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0 is Sunday, 1 is Monday, etc.
+    
+    if (dayOfWeek === 1) { // Monday
+      return {
+        route: "Northampton Route",
+        areas: getAreasByRoute("Northampton Route"),
+        date: getDateByRoute("Northampton Route")
+      };
+    } else if (dayOfWeek === 4) { // Thursday
+      return {
+        route: "London Route",
+        areas: getAreasByRoute("London Route"),
+        date: getDateByRoute("London Route")
+      };
+    }
+    
+    return null;
+  };
+  
+  const todayCollection = getTodayCollection();
 
   const fetchDriverTasks = async () => {
     try {
       setLoading(true);
+      
+      // Get collections for today based on the schedule
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
       
       const { data, error } = await supabase
         .from('shipments')
@@ -51,7 +107,20 @@ const DriverDashboard = () => {
           item.destination?.toLowerCase().includes('zimbabwe')
         );
         
-        setCollections(collectionsData);
+        // If we have today's collection route, filter for only those areas
+        if (todayCollection) {
+          const todayAreas = todayCollection.areas;
+          const todayCollections = collectionsData.filter(item => {
+            const metadata = item.metadata || {};
+            const pickupArea = metadata.pickup_area || '';
+            return todayAreas.includes(pickupArea);
+          });
+          
+          setCollections(todayCollections);
+        } else {
+          setCollections(collectionsData);
+        }
+        
         setDeliveries(deliveriesData);
         
         setStats({
@@ -125,11 +194,34 @@ const DriverDashboard = () => {
         </Card>
       </div>
 
+      {todayCollection && (
+        <Card className="bg-blue-50 border-blue-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center">
+              <Calendar className="mr-2 h-5 w-5 text-blue-600" />
+              Today's Collection Route: {todayCollection.route}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-600 mb-2">
+              Date: {todayCollection.date}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {todayCollection.areas.map((area: string, index: number) => (
+                <Badge key={index} variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
+                  {area}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs defaultValue="collections">
-        <TabsList>
-          <TabsTrigger value="collections">UK Collections</TabsTrigger>
-          <TabsTrigger value="deliveries">Zimbabwe Deliveries</TabsTrigger>
-          <TabsTrigger value="schedule">Schedule</TabsTrigger>
+        <TabsList className="grid w-full md:w-auto md:inline-flex grid-cols-3 md:grid-cols-none h-auto md:h-10">
+          <TabsTrigger value="collections" className="py-2">UK Collections</TabsTrigger>
+          <TabsTrigger value="deliveries" className="py-2">Zimbabwe Deliveries</TabsTrigger>
+          <TabsTrigger value="schedule" className="py-2">Schedule</TabsTrigger>
         </TabsList>
         
         <TabsContent value="collections" className="space-y-4">
@@ -144,27 +236,31 @@ const DriverDashboard = () => {
                 </div>
               ) : collections.length > 0 ? (
                 <div className="space-y-4">
-                  {collections.slice(0, 5).map((item, index) => (
-                    <div key={item.id} className="flex items-center justify-between p-4 border rounded-md">
-                      <div className="flex items-center">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100 mr-3">
-                          <MapPin className="h-5 w-5 text-blue-600" />
+                  {collections.slice(0, 5).map((item, index) => {
+                    const metadata = item.metadata || {};
+                    return (
+                      <div key={item.id} className="flex items-center justify-between p-4 border rounded-md">
+                        <div className="flex items-center">
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100 mr-3">
+                            <MapPin className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-medium">{item.tracking_number}</h3>
+                            <p className="text-sm text-gray-500">{item.origin}</p>
+                            <p className="text-xs text-gray-400">{metadata.pickup_area}</p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="font-medium">{item.tracking_number}</h3>
-                          <p className="text-sm text-gray-500">{item.origin}</p>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                            {index === 0 ? 'In Progress' : 'Pending'}
+                          </Badge>
+                          <Button size="sm" variant={index === 0 ? "default" : "outline"}>
+                            {index === 0 ? 'Complete' : 'Start'}
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                          {index === 0 ? 'In Progress' : 'Pending'}
-                        </Badge>
-                        <Button size="sm" variant={index === 0 ? "default" : "outline"}>
-                          {index === 0 ? 'Complete' : 'Start'}
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-center py-4 text-gray-500">No collections assigned for today</p>
@@ -185,27 +281,36 @@ const DriverDashboard = () => {
                 </div>
               ) : deliveries.length > 0 ? (
                 <div className="space-y-4">
-                  {deliveries.slice(0, 5).map((item, index) => (
-                    <div key={item.id} className="flex items-center justify-between p-4 border rounded-md">
-                      <div className="flex items-center">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-green-100 mr-3">
-                          <LocateFixed className="h-5 w-5 text-green-600" />
+                  {deliveries.slice(0, 5).map((item, index) => {
+                    const metadata = item.metadata || {};
+                    return (
+                      <div key={item.id} className="flex items-center justify-between p-4 border rounded-md">
+                        <div className="flex items-center">
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-green-100 mr-3">
+                            <LocateFixed className="h-5 w-5 text-green-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-medium">{item.tracking_number}</h3>
+                            <p className="text-sm text-gray-500">{item.destination}</p>
+                            <p className="text-xs text-gray-400">
+                              {metadata.recipient_name && `Recipient: ${metadata.recipient_name}`}
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              {metadata.recipient_phone && `Phone: ${metadata.recipient_phone}`}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="font-medium">{item.tracking_number}</h3>
-                          <p className="text-sm text-gray-500">{item.destination}</p>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                            {index === 0 ? 'In Progress' : 'Pending'}
+                          </Badge>
+                          <Button size="sm" variant={index === 0 ? "default" : "outline"}>
+                            {index === 0 ? 'Complete' : 'Start'}
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                          {index === 0 ? 'In Progress' : 'Pending'}
-                        </Badge>
-                        <Button size="sm" variant={index === 0 ? "default" : "outline"}>
-                          {index === 0 ? 'Complete' : 'Start'}
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-center py-4 text-gray-500">No deliveries assigned for today</p>
@@ -226,44 +331,75 @@ const DriverDashboard = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="flex items-center p-4 border rounded-md">
-                    <div className="w-12 h-12 rounded-full flex items-center justify-center bg-blue-100 mr-4">
-                      <Calendar className="h-6 w-6 text-blue-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium">Monday</h3>
-                      <p className="text-sm text-gray-500">Northampton Area Collections</p>
-                    </div>
-                    <Button variant="outline" size="sm" className="ml-auto">
-                      View Route
-                    </Button>
-                  </div>
+                  {schedules.length > 0 ? (
+                    schedules.map((schedule) => (
+                      <div key={schedule.id} className="flex items-center p-4 border rounded-md">
+                        <div className="w-12 h-12 rounded-full flex items-center justify-center bg-blue-100 mr-4">
+                          <Calendar className="h-6 w-6 text-blue-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium">{schedule.route}</h3>
+                          <p className="text-sm text-gray-500">{schedule.pickup_date}</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {(schedule.areas || []).slice(0, 3).map((area: string, index: number) => (
+                              <Badge key={index} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                                {area}
+                              </Badge>
+                            ))}
+                            {(schedule.areas || []).length > 3 && (
+                              <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200 text-xs">
+                                +{(schedule.areas || []).length - 3} more
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <Button variant="outline" size="sm" className="ml-auto">
+                          View Details
+                        </Button>
+                      </div>
+                    ))
+                  ) : (
+                    <>
+                      <div className="flex items-center p-4 border rounded-md">
+                        <div className="w-12 h-12 rounded-full flex items-center justify-center bg-blue-100 mr-4">
+                          <Calendar className="h-6 w-6 text-blue-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium">Monday</h3>
+                          <p className="text-sm text-gray-500">Northampton Area Collections</p>
+                        </div>
+                        <Button variant="outline" size="sm" className="ml-auto">
+                          View Route
+                        </Button>
+                      </div>
 
-                  <div className="flex items-center p-4 border rounded-md">
-                    <div className="w-12 h-12 rounded-full flex items-center justify-center bg-purple-100 mr-4">
-                      <Calendar className="h-6 w-6 text-purple-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium">Thursday</h3>
-                      <p className="text-sm text-gray-500">London Area Collections</p>
-                    </div>
-                    <Button variant="outline" size="sm" className="ml-auto">
-                      View Route
-                    </Button>
-                  </div>
+                      <div className="flex items-center p-4 border rounded-md">
+                        <div className="w-12 h-12 rounded-full flex items-center justify-center bg-purple-100 mr-4">
+                          <Calendar className="h-6 w-6 text-purple-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium">Thursday</h3>
+                          <p className="text-sm text-gray-500">London Area Collections</p>
+                        </div>
+                        <Button variant="outline" size="sm" className="ml-auto">
+                          View Route
+                        </Button>
+                      </div>
 
-                  <div className="flex items-center p-4 border rounded-md">
-                    <div className="w-12 h-12 rounded-full flex items-center justify-center bg-green-100 mr-4">
-                      <Calendar className="h-6 w-6 text-green-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium">Friday</h3>
-                      <p className="text-sm text-gray-500">Warehouse Loading/Dispatch</p>
-                    </div>
-                    <Button variant="outline" size="sm" className="ml-auto">
-                      View Details
-                    </Button>
-                  </div>
+                      <div className="flex items-center p-4 border rounded-md">
+                        <div className="w-12 h-12 rounded-full flex items-center justify-center bg-green-100 mr-4">
+                          <Calendar className="h-6 w-6 text-green-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium">Friday</h3>
+                          <p className="text-sm text-gray-500">Warehouse Loading/Dispatch</p>
+                        </div>
+                        <Button variant="outline" size="sm" className="ml-auto">
+                          View Details
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </CardContent>

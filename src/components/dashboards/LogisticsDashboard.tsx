@@ -140,9 +140,9 @@ const LogisticsDashboard = () => {
       </div>
 
       <Tabs defaultValue="shipments">
-        <TabsList>
-          <TabsTrigger value="shipments">Recent Shipments</TabsTrigger>
-          <TabsTrigger value="schedule">Collection Schedule</TabsTrigger>
+        <TabsList className="grid w-full md:w-auto md:inline-flex grid-cols-2 md:grid-cols-none h-auto md:h-10">
+          <TabsTrigger value="shipments" className="py-2">Recent Shipments</TabsTrigger>
+          <TabsTrigger value="schedule" className="py-2">Collection Schedule</TabsTrigger>
         </TabsList>
         <TabsContent value="shipments" className="space-y-4">
           <Card>
