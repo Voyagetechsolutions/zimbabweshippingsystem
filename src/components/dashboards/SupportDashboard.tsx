@@ -1,187 +1,262 @@
 
-import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { 
-  MessageSquare, LifeBuoy, FileText, AlertCircle, User,
-  MessagesSquare, Clock, Search
-} from 'lucide-react';
+import { MessageSquare, Users, Clock, Bell, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const SupportDashboard = () => {
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    open: 0,
+    closed: 0,
+    highPriority: 0,
+    responseRate: 90, // Example percentage
+  });
+
+  useEffect(() => {
+    const fetchSupportTickets = async () => {
+      try {
+        setLoading(true);
+        
+        // In a real application, this would fetch from the support_tickets table
+        // For this demo, we'll create mock data
+        const mockTickets = Array.from({ length: 8 }, (_, i) => ({
+          id: `ticket-${i + 1}`,
+          subject: `Support Request #${i + 1}`,
+          message: `This is a sample support ticket message #${i + 1}`,
+          status: i < 5 ? 'Open' : 'Closed',
+          priority: i % 3 === 0 ? 'High' : i % 3 === 1 ? 'Medium' : 'Low',
+          created_at: new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString(),
+          user_id: `user-${i % 4 + 1}`,
+          user_email: `user${i % 4 + 1}@example.com`,
+        }));
+        
+        setTickets(mockTickets);
+        
+        // Compute stats
+        const openCount = mockTickets.filter(t => t.status === 'Open').length;
+        const highPriorityCount = mockTickets.filter(t => t.priority === 'High').length;
+        
+        setStats({
+          open: openCount,
+          closed: mockTickets.length - openCount,
+          highPriority: highPriorityCount,
+          responseRate: 90, // Example percentage
+        });
+      } catch (error) {
+        console.error('Error fetching support tickets:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSupportTickets();
+  }, []);
+
+  const getPriorityBadge = (priority: string) => {
+    switch (priority) {
+      case 'High':
+        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">High</Badge>;
+      case 'Medium':
+        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Medium</Badge>;
+      case 'Low':
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Low</Badge>;
+      default:
+        return <Badge variant="outline">{priority}</Badge>;
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Open':
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Open</Badge>;
+      case 'Closed':
+        return <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">Closed</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="space-y-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Active Chats</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Open Tickets
+            </CardTitle>
+            <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="flex items-center">
-              <MessageSquare className="h-8 w-8 text-blue-500 mr-3" />
-              <div className="text-2xl font-bold">3</div>
+            <div className="text-2xl font-bold">{stats.open}</div>
+            <p className="text-xs text-muted-foreground">
+              {stats.highPriority} high priority
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Response Rate
+            </CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.responseRate}%</div>
+            <div className="mt-4">
+              <Progress value={stats.responseRate} className="h-2" />
+              <p className="text-xs text-muted-foreground mt-1">
+                Average first response: 2.5 hours
+              </p>
             </div>
           </CardContent>
         </Card>
-        
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Open Tickets</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Resolved Tickets
+            </CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="flex items-center">
-              <LifeBuoy className="h-8 w-8 text-yellow-500 mr-3" />
-              <div className="text-2xl font-bold">12</div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Unresolved Complaints</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center">
-              <AlertCircle className="h-8 w-8 text-red-500 mr-3" />
-              <div className="text-2xl font-bold">5</div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Avg. Response Time</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center">
-              <Clock className="h-8 w-8 text-green-500 mr-3" />
-              <div className="text-2xl font-bold">4m</div>
-            </div>
+            <div className="text-2xl font-bold">{stats.closed}</div>
+            <p className="text-xs text-muted-foreground">
+              in the last 7 days
+            </p>
           </CardContent>
         </Card>
       </div>
-      
-      <Tabs defaultValue="chats" className="mb-8">
-        <TabsList className="grid w-full grid-cols-1 md:grid-cols-4 gap-2">
-          <TabsTrigger value="chats" className="flex items-center gap-2">
-            <MessagesSquare className="h-4 w-4" />
-            <span>Chats</span>
-          </TabsTrigger>
-          <TabsTrigger value="tickets" className="flex items-center gap-2">
-            <LifeBuoy className="h-4 w-4" />
-            <span>Tickets</span>
-          </TabsTrigger>
-          <TabsTrigger value="complaints" className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4" />
-            <span>Complaints</span>
-          </TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center gap-2">
-            <User className="h-4 w-4" />
-            <span>User Search</span>
-          </TabsTrigger>
+
+      <Tabs defaultValue="open">
+        <TabsList>
+          <TabsTrigger value="open">Open Tickets</TabsTrigger>
+          <TabsTrigger value="assigned">Assigned To Me</TabsTrigger>
+          <TabsTrigger value="resolved">Recently Resolved</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="chats">
+        <TabsContent value="open" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Communication Center</CardTitle>
-              <CardDescription>Manage customer chats and messages</CardDescription>
+              <CardTitle>Open Support Tickets</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col md:flex-row gap-6">
-                <div className="md:w-1/3">
-                  <div className="font-medium mb-2">Active Conversations</div>
-                  <div className="space-y-2">
-                    <div className="border rounded-lg p-3 bg-blue-50 border-blue-200">
-                      <div className="flex items-center justify-between">
-                        <div className="font-medium">John Smith</div>
-                        <Badge className="bg-green-100 text-green-800">Active</Badge>
-                      </div>
-                      <div className="text-sm text-gray-500 mt-1">Tracking issue with ABC123</div>
-                    </div>
-                    
-                    <div className="border rounded-lg p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="font-medium">Sarah Johnson</div>
-                        <Badge className="bg-gray-100 text-gray-800">Idle</Badge>
-                      </div>
-                      <div className="text-sm text-gray-500 mt-1">Inquiring about shipping rates</div>
-                    </div>
-                    
-                    <div className="border rounded-lg p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="font-medium">Mike Brown</div>
-                        <Badge className="bg-amber-100 text-amber-800">Waiting</Badge>
-                      </div>
-                      <div className="text-sm text-gray-500 mt-1">Delivery delay concern</div>
-                    </div>
-                  </div>
+              {loading ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
                 </div>
-                
-                <div className="md:w-2/3 border rounded-lg p-4">
-                  <div className="text-center p-12">
-                    <MessagesSquare className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                    <h3 className="text-lg font-medium mb-2">Select a conversation</h3>
-                    <p className="text-gray-500 mb-4">Choose a chat from the list to start messaging</p>
-                    <Button variant="outline">
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      Start New Chat
-                    </Button>
-                  </div>
+              ) : tickets.filter(t => t.status === 'Open').length > 0 ? (
+                <div className="space-y-4">
+                  {tickets.filter(t => t.status === 'Open').map((ticket, index) => (
+                    <div key={index} className="flex items-center justify-between p-4 border rounded-md">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100 mr-3">
+                          <Users className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium">{ticket.subject}</h3>
+                          <p className="text-sm text-gray-500">{ticket.user_email}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {getPriorityBadge(ticket.priority)}
+                        <Button size="sm" variant="outline">
+                          Respond
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
+              ) : (
+                <p className="text-center py-4 text-gray-500">No open tickets at the moment</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
         
-        <TabsContent value="tickets">
+        <TabsContent value="assigned">
           <Card>
             <CardHeader>
-              <CardTitle>Ticket Management</CardTitle>
-              <CardDescription>Handle support tickets and issues</CardDescription>
+              <CardTitle>Tickets Assigned To Me</CardTitle>
             </CardHeader>
             <CardContent>
-              <p>Ticket management interface will go here.</p>
+              {loading ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {tickets.filter(t => t.status === 'Open').slice(0, 3).map((ticket, index) => (
+                    <div key={index} className="flex items-center justify-between p-4 border rounded-md">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-green-100 mr-3">
+                          <MessageSquare className="h-5 w-5 text-green-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium">{ticket.subject}</h3>
+                          <div className="flex items-center">
+                            <Clock className="h-3 w-3 text-gray-400 mr-1" />
+                            <p className="text-xs text-gray-500">Awaiting your response</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {getPriorityBadge(ticket.priority)}
+                        <Button size="sm">
+                          Respond
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {tickets.filter(t => t.status === 'Open').length <= 3 && (
+                    <p className="text-center py-2 text-gray-500">All assigned tickets are shown above</p>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
         
-        <TabsContent value="complaints">
+        <TabsContent value="resolved">
           <Card>
             <CardHeader>
-              <CardTitle>Complaint Resolution</CardTitle>
-              <CardDescription>Address and resolve customer complaints</CardDescription>
+              <CardTitle>Recently Resolved Tickets</CardTitle>
             </CardHeader>
             <CardContent>
-              <p>Complaint resolution interface will go here.</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="users">
-          <Card>
-            <CardHeader>
-              <CardTitle>User Search</CardTitle>
-              <CardDescription>Find customer information quickly</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col gap-6">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                  <input 
-                    type="text" 
-                    placeholder="Search by name, email, or tracking number" 
-                    className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:border-zim-green focus:outline-none focus:ring-1 focus:ring-zim-green"
-                  />
+              {loading ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
                 </div>
-                
-                <div className="text-center p-8">
-                  <User className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Search for a user</h3>
-                  <p className="text-gray-500">Enter a search term to find users</p>
+              ) : tickets.filter(t => t.status === 'Closed').length > 0 ? (
+                <div className="space-y-4">
+                  {tickets.filter(t => t.status === 'Closed').map((ticket, index) => (
+                    <div key={index} className="flex items-center justify-between p-4 border rounded-md">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100 mr-3">
+                          <CheckCircle2 className="h-5 w-5 text-gray-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium">{ticket.subject}</h3>
+                          <p className="text-sm text-gray-500">{ticket.user_email}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {getStatusBadge(ticket.status)}
+                        <Button size="sm" variant="outline">
+                          View
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
+              ) : (
+                <p className="text-center py-4 text-gray-500">No resolved tickets yet</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

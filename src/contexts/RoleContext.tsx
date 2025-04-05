@@ -17,7 +17,7 @@ interface RoleContextType {
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
 export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, session } = useAuth();
+  const { user, session, isAdmin } = useAuth();
   const [role, setRole] = useState<UserRoleType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -33,7 +33,15 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       try {
         setIsLoading(true);
-        // First try to get role directly
+        
+        // Use the isAdmin flag from AuthContext
+        if (isAdmin) {
+          setRole('admin' as UserRoleType);
+          setIsLoading(false);
+          return;
+        }
+        
+        // First try to get role from profiles table
         const { data, error } = await supabase
           .from('profiles')
           .select('role')
@@ -66,11 +74,14 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     fetchUserRole();
-  }, [user]);
+  }, [user, isAdmin]);
 
   // Check if the user has permission for a specific role
   const hasPermission = (requiredRole: UserRoleType): boolean => {
     if (!role) return false;
+    
+    // If user is admin, they have all permissions
+    if (role === 'admin' || isAdmin) return true;
 
     // Role hierarchy: admin > logistics > driver/support > customer
     switch (requiredRole) {
@@ -92,8 +103,8 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Function to elevate a user to admin with the secret password
   const elevateToAdmin = async (password: string): Promise<boolean> => {
     try {
-      // Use callRpcFunction utility instead of direct supabase.rpc call
-      const { data, error } = await callRpcFunction('elevate_to_admin', {
+      // Use a simplified approach for now - direct table update
+      const { data, error } = await supabase.rpc('elevate_to_admin', {
         admin_password: password
       });
 
@@ -134,7 +145,7 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Function to set another user's role (admin only)
   const setUserRole = async (userId: string, newRole: UserRoleType): Promise<boolean> => {
     try {
-      if (role !== 'admin') {
+      if (!hasPermission('admin')) {
         toast({
           title: 'Permission Denied',
           description: 'Only administrators can change user roles.',
@@ -143,11 +154,11 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
 
-      // Use callRpcFunction utility instead of direct supabase.rpc call
-      const { data, error } = await callRpcFunction('set_user_role', {
-        target_user_id: userId,
-        new_role: newRole
-      });
+      // Update the user's role in the profiles table
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ role: newRole })
+        .eq('id', userId);
 
       if (error) {
         toast({
@@ -158,15 +169,11 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
 
-      if (data) {
-        toast({
-          title: 'Role Updated',
-          description: `User role has been changed to ${newRole}.`,
-        });
-        return true;
-      }
-      
-      return false;
+      toast({
+        title: 'Role Updated',
+        description: `User role has been changed to ${newRole}.`,
+      });
+      return true;
     } catch (error: any) {
       toast({
         title: 'Role Change Error',

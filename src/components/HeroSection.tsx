@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Truck, Package, Shield, MapPin } from 'lucide-react';
+import { ArrowRight, Truck, Package, MapPin } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Logo from './Logo';
 
@@ -37,8 +37,8 @@ const HeroSection: React.FC = () => {
                     <Truck className="h-5 w-5 text-zim-green" />
                   </div>
                   <div className="text-sm">
-                    <p className="font-medium">Fast Delivery</p>
-                    <p className="text-gray-500 text-xs">2-3 weeks transit time</p>
+                    <p className="font-medium">Delivery Time</p>
+                    <p className="text-gray-500 text-xs">4-6 weeks transit time</p>
                   </div>
                 </div>
                 <div className="flex items-center bg-white p-3 rounded-md shadow-sm border">
@@ -52,20 +52,20 @@ const HeroSection: React.FC = () => {
                 </div>
                 <div className="flex items-center bg-white p-3 rounded-md shadow-sm border">
                   <div className="bg-zim-red/10 p-2 rounded-full mr-3">
-                    <Shield className="h-5 w-5 text-zim-red" />
+                    <MapPin className="h-5 w-5 text-zim-red" />
                   </div>
                   <div className="text-sm">
-                    <p className="font-medium">Insurance Options</p>
-                    <p className="text-gray-500 text-xs">Coverage up to £1000</p>
+                    <p className="font-medium">Best Prices</p>
+                    <p className="text-gray-500 text-xs">Starting from £150</p>
                   </div>
                 </div>
                 <div className="flex items-center bg-white p-3 rounded-md shadow-sm border">
                   <div className="bg-zim-black/10 p-2 rounded-full mr-3">
-                    <MapPin className="h-5 w-5 text-zim-black" />
+                    <Truck className="h-5 w-5 text-zim-black" />
                   </div>
                   <div className="text-sm">
-                    <p className="font-medium">Real-time Tracking</p>
-                    <p className="text-gray-500 text-xs">Know where your package is</p>
+                    <p className="font-medium">Volume Based</p>
+                    <p className="text-gray-500 text-xs">Pricing by volume, not weight</p>
                   </div>
                 </div>
               </div>

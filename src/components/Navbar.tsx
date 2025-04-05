@@ -17,12 +17,14 @@ import {
 import ThemeToggle from '@/components/ThemeToggle';
 import CurrencySwitcher from '@/components/CurrencySwitcher';
 import Logo from '@/components/Logo';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { user, signOut, isAdmin } = useAuth();
   const { role } = useRole();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const toggleMenu = () => {
     setIsOpen(!isOpen);
@@ -60,8 +62,8 @@ const Navbar = () => {
             <Link to="/" className="flex-shrink-0">
               <Logo />
             </Link>
-            <div className="hidden md:block ml-10">
-              <div className="flex items-baseline space-x-4">
+            <div className="hidden md:block ml-6">
+              <div className="flex items-baseline space-x-3">
                 <Link
                   to="/services"
                   className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium flex items-center"
