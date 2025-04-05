@@ -103,7 +103,8 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Function to elevate a user to admin with the secret password
   const elevateToAdmin = async (password: string): Promise<boolean> => {
     try {
-      // Use the elevate_to_admin RPC function we just created
+      // Use the elevate_to_admin RPC function
+      // Using the raw supabase.rpc method
       const { data, error } = await supabase.rpc('elevate_to_admin', {
         admin_password: password
       });
