@@ -112,7 +112,10 @@ const DriverDashboard = () => {
           const todayAreas = todayCollection.areas;
           const todayCollections = collectionsData.filter(item => {
             const metadata = item.metadata || {};
-            const pickupArea = metadata.pickup_area || '';
+            // Fix: Safely access pickup_area from metadata
+            const pickupArea = typeof metadata === 'object' && metadata !== null 
+              ? (metadata as Record<string, any>).pickup_area || ''
+              : '';
             return todayAreas.includes(pickupArea);
           });
           
@@ -237,7 +240,12 @@ const DriverDashboard = () => {
               ) : collections.length > 0 ? (
                 <div className="space-y-4">
                   {collections.slice(0, 5).map((item, index) => {
+                    // Fix: Safely access metadata properties
                     const metadata = item.metadata || {};
+                    const pickupArea = typeof metadata === 'object' && metadata !== null 
+                      ? (metadata as Record<string, any>).pickup_area || ''
+                      : '';
+                    
                     return (
                       <div key={item.id} className="flex items-center justify-between p-4 border rounded-md">
                         <div className="flex items-center">
@@ -247,7 +255,7 @@ const DriverDashboard = () => {
                           <div>
                             <h3 className="font-medium">{item.tracking_number}</h3>
                             <p className="text-sm text-gray-500">{item.origin}</p>
-                            <p className="text-xs text-gray-400">{metadata.pickup_area}</p>
+                            <p className="text-xs text-gray-400">{pickupArea}</p>
                           </div>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -282,7 +290,15 @@ const DriverDashboard = () => {
               ) : deliveries.length > 0 ? (
                 <div className="space-y-4">
                   {deliveries.slice(0, 5).map((item, index) => {
+                    // Fix: Safely access metadata properties
                     const metadata = item.metadata || {};
+                    const recipientName = typeof metadata === 'object' && metadata !== null 
+                      ? (metadata as Record<string, any>).recipient_name || ''
+                      : '';
+                    const recipientPhone = typeof metadata === 'object' && metadata !== null 
+                      ? (metadata as Record<string, any>).recipient_phone || ''
+                      : '';
+                    
                     return (
                       <div key={item.id} className="flex items-center justify-between p-4 border rounded-md">
                         <div className="flex items-center">
@@ -293,10 +309,10 @@ const DriverDashboard = () => {
                             <h3 className="font-medium">{item.tracking_number}</h3>
                             <p className="text-sm text-gray-500">{item.destination}</p>
                             <p className="text-xs text-gray-400">
-                              {metadata.recipient_name && `Recipient: ${metadata.recipient_name}`}
+                              {recipientName && `Recipient: ${recipientName}`}
                             </p>
                             <p className="text-xs text-gray-400">
-                              {metadata.recipient_phone && `Phone: ${metadata.recipient_phone}`}
+                              {recipientPhone && `Phone: ${recipientPhone}`}
                             </p>
                           </div>
                         </div>
