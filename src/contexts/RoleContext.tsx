@@ -88,11 +88,11 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
       case 'admin':
         return role === 'admin';
       case 'logistics':
-        return ['admin', 'logistics'].includes(role as string);
+        return ['admin', 'logistics'].includes(role as UserRoleType);
       case 'driver':
-        return ['admin', 'logistics', 'driver'].includes(role as string);
+        return ['admin', 'logistics', 'driver'].includes(role as UserRoleType);
       case 'support':
-        return ['admin', 'logistics', 'support'].includes(role as string);
+        return ['admin', 'logistics', 'support'].includes(role as UserRoleType);
       case 'customer':
         return true; // Everyone has customer access
       default:
