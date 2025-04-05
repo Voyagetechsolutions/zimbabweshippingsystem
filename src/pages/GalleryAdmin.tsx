@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -16,6 +17,7 @@ import { Json } from '@/integrations/supabase/types';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { callRpcFunction } from '@/utils/supabaseUtils';
 
 const GalleryAdmin = () => {
   const [images, setImages] = useState<GalleryImage[]>([]);
@@ -43,7 +45,8 @@ const GalleryAdmin = () => {
     try {
       setIsLoading(true);
       
-      const { data, error } = await supabase.rpc('get_gallery_images');
+      // Use the RPC function instead of directly accessing the gallery table
+      const { data, error } = await callRpcFunction('get_gallery_images');
       
       if (error) {
         throw error;
@@ -102,26 +105,30 @@ const GalleryAdmin = () => {
     setIsDialogOpen(true);
   };
 
-  const handleDeleteImage = async (id: number) => {
+  const handleDeleteImage = async (id: string) => {
     const confirmDelete = window.confirm("Are you sure you want to delete this image?");
     if (!confirmDelete) return;
 
     try {
       setIsLoading(true);
-      const { error } = await supabase
-        .from('gallery')
-        .delete()
-        .eq('id', id);
+      // Use the RPC function to delete the image
+      const { data, error } = await callRpcFunction('delete_gallery_image', { p_id: id });
 
       if (error) {
         throw error;
       }
 
-      setImages(prevImages => prevImages.filter(image => image.id !== id));
-      toast({
-        title: 'Success',
-        description: 'Image deleted successfully.',
-      });
+      // Check if the deletion was successful
+      if (data) {
+        // Remove the deleted image from the state
+        setImages(prevImages => prevImages.filter(image => image.id !== id));
+        toast({
+          title: 'Success',
+          description: 'Image deleted successfully.',
+        });
+      } else {
+        throw new Error('Failed to delete image');
+      }
     } catch (error: any) {
       console.error('Error deleting image:', error);
       toast({
@@ -140,48 +147,41 @@ const GalleryAdmin = () => {
 
     try {
       if (isEditing && selectedImage) {
-        // Update existing image
-        const { error } = await supabase
-          .from('gallery')
-          .update({
-            src: formData.src,
-            alt: formData.alt,
-            caption: formData.caption,
-            category: formData.category,
-          })
-          .eq('id', selectedImage.id);
+        // For editing, we need to use a direct approach since there's no RPC for updating
+        // This is where we might need to handle things differently in the future
+        const { data: updatedData, error: updateError } = await callRpcFunction('update_gallery_image', {
+          p_id: selectedImage.id,
+          p_src: formData.src,
+          p_alt: formData.alt,
+          p_caption: formData.caption,
+          p_category: formData.category
+        });
 
-        if (error) {
-          throw error;
+        if (updateError) {
+          throw updateError;
         }
 
-        setImages(prevImages =>
-          prevImages.map(image =>
-            image.id === selectedImage.id ? { ...image, ...formData } : image
-          )
-        );
+        // Refresh the gallery images
+        await fetchGalleryImages();
+        
         toast({
           title: 'Success',
           description: 'Image updated successfully.',
         });
       } else {
-        // Create new image
-        const { data, error } = await supabase
-          .from('gallery')
-          .insert([
-            {
-              src: formData.src,
-              alt: formData.alt,
-              caption: formData.caption,
-              category: formData.category,
-            },
-          ]);
+        // For insertion, use the insert_gallery_image RPC function
+        const { data: newImage, error: insertError } = await callRpcFunction('insert_gallery_image', {
+          p_src: formData.src,
+          p_alt: formData.alt,
+          p_caption: formData.caption,
+          p_category: formData.category
+        });
 
-        if (error) {
-          throw error;
+        if (insertError) {
+          throw insertError;
         }
 
-        // Fetch the updated gallery images to reflect the changes
+        // Refresh the gallery images
         await fetchGalleryImages();
 
         toast({
@@ -231,7 +231,8 @@ const GalleryAdmin = () => {
         throw error;
       }
 
-      const imageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${data.Key}`;
+      // Construct the public URL for the uploaded file
+      const imageUrl = `https://oncsaunsqtekwwbzvvyh.supabase.co/storage/v1/object/public/images/${filePath}`;
       setFormData(prev => ({ ...prev, src: imageUrl }));
       toast({
         title: 'Success',
@@ -319,13 +320,13 @@ const GalleryAdmin = () => {
                         <Button size="icon" variant="ghost" onClick={() => handleEditImage(image)}>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
-                        <Button size="icon" variant="destructive" onClick={() => handleDeleteImage(image.id)}>
+                        <Button size="icon" variant="destructive" onClick={() => handleDeleteImage(image.id || '')}>
                           <Trash className="h-4 w-4" />
                         </Button>
                       </div>
                       <div className="mt-2">
                         <p className="text-gray-800 font-medium">{image.caption}</p>
-                        <Badge className="mt-1">{image.category}</Badge>
+                        <Badge variant="secondary" className="mt-1">{image.category}</Badge>
                       </div>
                     </div>
                   ))}
@@ -418,7 +419,7 @@ const GalleryAdmin = () => {
                   <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map(category => (
+                  {categories.filter(cat => cat.value !== 'all').map(category => (
                     <SelectItem key={category.value} value={category.value}>
                       {category.label}
                     </SelectItem>

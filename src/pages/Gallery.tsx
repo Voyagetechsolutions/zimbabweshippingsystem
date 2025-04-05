@@ -2,12 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { GalleryImage, GalleryCategory } from '@/types/gallery';
 import { useToast } from '@/hooks/use-toast';
 import { Image as ImageIcon, Loader } from 'lucide-react';
-import { Json } from '@/integrations/supabase/types';
+import { callRpcFunction } from '@/utils/supabaseUtils';
 
 const Gallery = () => {
   const [images, setImages] = useState<GalleryImage[]>([]);
@@ -22,7 +21,7 @@ const Gallery = () => {
   const fetchGalleryImages = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.rpc('get_gallery_images');
+      const { data, error } = await callRpcFunction('get_gallery_images');
       
       if (error) {
         throw error;
