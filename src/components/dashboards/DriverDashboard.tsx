@@ -2,142 +2,66 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Truck, MapPin, Calendar, Clock, Package, LocateFixed } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
+import {
+  TruckIcon, CheckCircle2, MapPin, Calendar, Clock, Phone, User, Package,
+  Truck, AlertTriangle, ArrowRightCircle, Filter
+} from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { 
-  getRouteNames, 
-  getAreasByRoute, 
-  getDateByRoute 
-} from '@/data/collectionSchedule';
 
 const DriverDashboard = () => {
-  const [deliveries, setDeliveries] = useState<any[]>([]);
-  const [collections, setCollections] = useState<any[]>([]);
-  const [schedules, setSchedules] = useState<any[]>([]);
+  const [activeDeliveries, setActiveDeliveries] = useState<any[]>([]);
+  const [completedDeliveries, setCompletedDeliveries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    assigned: 0,
-    completed: 0,
-    pending: 0
-  });
+  const [collectionSchedules, setCollectionSchedules] = useState<any[]>([]);
   const { toast } = useToast();
-  const { user } = useAuth();
   const isMobile = useIsMobile();
 
   useEffect(() => {
-    if (user) {
-      fetchDriverTasks();
-      fetchSchedules();
-    }
-  }, [user]);
+    fetchDriverData();
+  }, []);
 
-  const fetchSchedules = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('collection_schedules')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      
-      if (data) {
-        setSchedules(data);
-      }
-    } catch (error: any) {
-      console.error('Error fetching collection schedules:', error);
-      toast({
-        title: 'Error fetching schedules',
-        description: error.message,
-        variant: 'destructive'
-      });
-    }
-  };
-
-  const getTodayCollection = () => {
-    const today = new Date();
-    const dayOfWeek = today.getDay(); // 0 is Sunday, 1 is Monday, etc.
-    
-    if (dayOfWeek === 1) { // Monday
-      return {
-        route: "Northampton Route",
-        areas: getAreasByRoute("Northampton Route"),
-        date: getDateByRoute("Northampton Route")
-      };
-    } else if (dayOfWeek === 4) { // Thursday
-      return {
-        route: "London Route",
-        areas: getAreasByRoute("London Route"),
-        date: getDateByRoute("London Route")
-      };
-    }
-    
-    return null;
-  };
-  
-  const todayCollection = getTodayCollection();
-
-  const fetchDriverTasks = async () => {
+  const fetchDriverData = async () => {
     try {
       setLoading(true);
       
-      // Get collections for today based on the schedule
-      const today = new Date();
-      const todayStr = today.toISOString().split('T')[0];
-      
-      const { data, error } = await supabase
+      // Fetch active deliveries
+      const { data: activeData, error: activeError } = await supabase
         .from('shipments')
         .select('*')
-        .in('status', ['Booked', 'Paid', 'In Transit'])
+        .in('status', ['Ready for Pickup', 'In Transit', 'Out for Delivery'])
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (activeError) throw activeError;
+      setActiveDeliveries(activeData || []);
       
-      if (data) {
-        // Filter into collections (UK) and deliveries (international)
-        const collectionsData = data.filter(item => 
-          item.origin?.toLowerCase().includes('uk') || 
-          item.origin?.toLowerCase().includes('united kingdom')
-        );
-        
-        const deliveriesData = data.filter(item => 
-          item.destination?.toLowerCase().includes('zimbabwe')
-        );
-        
-        // If we have today's collection route, filter for only those areas
-        if (todayCollection) {
-          const todayAreas = todayCollection.areas;
-          const todayCollections = collectionsData.filter(item => {
-            const metadata = item.metadata || {};
-            // Fix: Safely access pickup_area from metadata
-            const pickupArea = typeof metadata === 'object' && metadata !== null 
-              ? (metadata as Record<string, any>).pickup_area || ''
-              : '';
-            return todayAreas.includes(pickupArea);
-          });
-          
-          setCollections(todayCollections);
-        } else {
-          setCollections(collectionsData);
-        }
-        
-        setDeliveries(deliveriesData);
-        
-        setStats({
-          assigned: data.length,
-          completed: data.filter(item => item.status === 'Delivered').length,
-          pending: data.filter(item => item.status !== 'Delivered').length
-        });
-      }
+      // Fetch completed deliveries
+      const { data: completedData, error: completedError } = await supabase
+        .from('shipments')
+        .select('*')
+        .eq('status', 'Delivered')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (completedError) throw completedError;
+      setCompletedDeliveries(completedData || []);
+
+      // Fetch collection schedules
+      const { data: scheduleData, error: scheduleError } = await supabase
+        .from('collection_schedules')
+        .select('*')
+        .order('pickup_date', { ascending: true });
+
+      if (scheduleError) throw scheduleError;
+      setCollectionSchedules(scheduleData || []);
+      
     } catch (error: any) {
-      console.error('Error fetching driver tasks:', error);
+      console.error('Error fetching driver data:', error.message);
       toast({
-        title: 'Error fetching tasks',
+        title: 'Error loading data',
         description: error.message,
         variant: 'destructive'
       });
@@ -146,290 +70,317 @@ const DriverDashboard = () => {
     }
   };
 
-  // Progress for today's tasks
-  const todayProgress = Math.round((stats.completed / (stats.assigned || 1)) * 100);
+  const handleUpdateStatus = async (id: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('shipments')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      toast({
+        title: 'Status Updated',
+        description: `Shipment status updated to ${newStatus}`,
+      });
+      
+      fetchDriverData(); // Refresh data
+      
+    } catch (error: any) {
+      toast({
+        title: 'Error updating status',
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const getDeliveryAddress = (shipment: any) => {
+    if (shipment.metadata && typeof shipment.metadata === 'object') {
+      const pickup_area = shipment.metadata.pickup_area;
+      return pickup_area ? pickup_area : shipment.destination;
+    }
+    return shipment.destination;
+  };
+
+  const getRecipientInfo = (shipment: any) => {
+    if (shipment.metadata && typeof shipment.metadata === 'object') {
+      const name = shipment.metadata.recipient_name;
+      const phone = shipment.metadata.recipient_phone;
+      
+      if (name && phone) {
+        return { name, phone };
+      }
+    }
+    return { name: 'Not specified', phone: 'Not specified' };
+  };
+
+  const formatDate = (dateString: string) => {
+    const options: Intl.DateTimeFormatOptions = { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric'
+    };
+    return new Date(dateString).toLocaleDateString(undefined, options);
+  };
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Today's Tasks
+          <CardHeader className={`flex flex-row items-center justify-between pb-2 ${isMobile ? 'space-y-0' : ''}`}>
+            <CardTitle className="text-sm font-medium text-gray-500">
+              Pending Collections
             </CardTitle>
-            <Truck className="h-4 w-4 text-muted-foreground" />
+            <Package className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.assigned}</div>
-            <div className="mt-4">
-              <Progress value={todayProgress} className="h-2" />
-              <p className="text-xs text-muted-foreground mt-1">
-                {todayProgress}% completed
-              </p>
-            </div>
+            <div className="text-2xl font-bold">{activeDeliveries.filter(d => d.status === 'Ready for Pickup').length}</div>
+            <p className="text-xs text-gray-500">Packages to collect</p>
           </CardContent>
         </Card>
+        
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Completed Today
+          <CardHeader className={`flex flex-row items-center justify-between pb-2 ${isMobile ? 'space-y-0' : ''}`}>
+            <CardTitle className="text-sm font-medium text-gray-500">
+              In Transit
             </CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+            <Truck className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.completed}</div>
-            <p className="text-xs text-muted-foreground">
-              Out of {stats.assigned} assigned tasks
-            </p>
+            <div className="text-2xl font-bold">{activeDeliveries.filter(d => d.status === 'In Transit').length}</div>
+            <p className="text-xs text-gray-500">Packages in transit</p>
           </CardContent>
         </Card>
-        <Card className="sm:col-span-2 lg:col-span-1">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Pending Tasks
+        
+        <Card>
+          <CardHeader className={`flex flex-row items-center justify-between pb-2 ${isMobile ? 'space-y-0' : ''}`}>
+            <CardTitle className="text-sm font-medium text-gray-500">
+              Completed
             </CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <CheckCircle2 className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.pending}</div>
-            <p className="text-xs text-muted-foreground">
-              Tasks yet to be completed
-            </p>
+            <div className="text-2xl font-bold">{completedDeliveries.length}</div>
+            <p className="text-xs text-gray-500">Recently delivered</p>
           </CardContent>
         </Card>
       </div>
-
-      {todayCollection && (
-        <Card className="bg-blue-50 border-blue-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center text-sm md:text-base">
-              <Calendar className="mr-2 h-5 w-5 text-blue-600" />
-              Today's Collection Route: {todayCollection.route}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-600 mb-2">
-              Date: {todayCollection.date}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {todayCollection.areas.map((area: string, index: number) => (
-                <Badge key={index} variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 text-xs">
-                  {area}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <Tabs defaultValue="collections" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 h-auto mb-4">
-          <TabsTrigger value="collections" className="py-2 text-xs md:text-sm">UK Collections</TabsTrigger>
-          <TabsTrigger value="deliveries" className="py-2 text-xs md:text-sm">Zimbabwe Deliveries</TabsTrigger>
-          <TabsTrigger value="schedule" className="py-2 text-xs md:text-sm">Schedule</TabsTrigger>
+      
+      <Tabs defaultValue="uk-collections" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 mb-4">
+          <TabsTrigger value="uk-collections">UK Collections</TabsTrigger>
+          <TabsTrigger value="zim-deliveries">Zimbabwe Deliveries</TabsTrigger>
+          <TabsTrigger value="schedules">Schedules</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="collections" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base md:text-lg">Today's Collections (UK)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
-                </div>
-              ) : collections.length > 0 ? (
-                <div className="space-y-4">
-                  {collections.slice(0, 5).map((item, index) => {
-                    // Fix: Safely access metadata properties
-                    const metadata = item.metadata || {};
-                    const pickupArea = typeof metadata === 'object' && metadata !== null 
-                      ? (metadata as Record<string, any>).pickup_area || ''
-                      : '';
-                    
-                    return (
-                      <div key={item.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 md:p-4 border rounded-md">
-                        <div className="flex items-center mb-3 sm:mb-0">
-                          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100 mr-3 flex-shrink-0">
-                            <MapPin className="h-5 w-5 text-blue-600" />
-                          </div>
-                          <div className="min-w-0">
-                            <h3 className="font-medium text-sm md:text-base truncate">{item.tracking_number}</h3>
-                            <p className="text-xs md:text-sm text-gray-500 truncate">{item.origin}</p>
-                            <p className="text-xs text-gray-400 truncate">{pickupArea}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2 ml-13 sm:ml-0">
-                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs whitespace-nowrap">
-                            {index === 0 ? 'In Progress' : 'Pending'}
-                          </Badge>
-                          <Button size="sm" variant={index === 0 ? "default" : "outline"} className="text-xs whitespace-nowrap">
-                            {index === 0 ? 'Complete' : 'Start'}
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-center py-4 text-gray-500 text-sm">No collections assigned for today</p>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="deliveries" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base md:text-lg">Today's Deliveries (Zimbabwe)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
-                </div>
-              ) : deliveries.length > 0 ? (
-                <div className="space-y-4">
-                  {deliveries.slice(0, 5).map((item, index) => {
-                    // Fix: Safely access metadata properties
-                    const metadata = item.metadata || {};
-                    const recipientName = typeof metadata === 'object' && metadata !== null 
-                      ? (metadata as Record<string, any>).recipient_name || ''
-                      : '';
-                    const recipientPhone = typeof metadata === 'object' && metadata !== null 
-                      ? (metadata as Record<string, any>).recipient_phone || ''
-                      : '';
-                    
-                    return (
-                      <div key={item.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 md:p-4 border rounded-md">
-                        <div className="flex items-center mb-3 sm:mb-0">
-                          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-green-100 mr-3 flex-shrink-0">
-                            <LocateFixed className="h-5 w-5 text-green-600" />
-                          </div>
-                          <div className="min-w-0">
-                            <h3 className="font-medium text-sm md:text-base truncate">{item.tracking_number}</h3>
-                            <p className="text-xs md:text-sm text-gray-500 truncate">{item.destination}</p>
-                            {recipientName && (
-                              <p className="text-xs text-gray-400 truncate">Recipient: {recipientName}</p>
-                            )}
-                            {recipientPhone && (
-                              <p className="text-xs text-gray-400 truncate">Phone: {recipientPhone}</p>
-                            )}
+        <TabsContent value="uk-collections" className="space-y-4">
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-md">
+            <div className="flex items-start">
+              <AlertTriangle className="h-5 w-5 text-yellow-500 mr-2 mt-0.5" />
+              <div>
+                <h3 className="font-medium text-yellow-800">Collection Instructions</h3>
+                <p className="text-sm text-yellow-700">
+                  Call the customer at least 30 minutes before arrival. Verify all package details upon collection.
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
+            </div>
+          ) : activeDeliveries.filter(d => d.status === 'Ready for Pickup').length > 0 ? (
+            <div className="space-y-4">
+              {activeDeliveries
+                .filter(d => d.status === 'Ready for Pickup')
+                .map((shipment) => {
+                  const recipientInfo = getRecipientInfo(shipment);
+                  return (
+                    <Card key={shipment.id} className="overflow-hidden">
+                      <CardContent className="p-0">
+                        <div className="p-4 border-b">
+                          <div className="flex justify-between flex-wrap gap-2">
+                            <div>
+                              <h3 className="font-medium text-base md:text-lg flex items-center">
+                                <Package className="h-4 w-4 mr-2 text-zim-green" />
+                                Collection #{shipment.tracking_number}
+                              </h3>
+                              <div className="flex items-center mt-1 text-sm text-gray-500">
+                                <MapPin className="h-3 w-3 mr-1" />
+                                <span className="truncate max-w-[180px] md:max-w-none">{getDeliveryAddress(shipment)}</span>
+                              </div>
+                            </div>
+                            <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">
+                              Ready for Pickup
+                            </Badge>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2 ml-13 sm:ml-0">
-                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs whitespace-nowrap">
-                            {index === 0 ? 'In Progress' : 'Pending'}
-                          </Badge>
-                          <Button size="sm" variant={index === 0 ? "default" : "outline"} className="text-xs whitespace-nowrap">
-                            {index === 0 ? 'Complete' : 'Start'}
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-center py-4 text-gray-500 text-sm">No deliveries assigned for today</p>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="schedule">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base md:text-lg">Weekly Schedule</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {schedules.length > 0 ? (
-                    schedules.map((schedule) => (
-                      <div key={schedule.id} className="flex flex-col sm:flex-row items-start sm:items-center p-3 md:p-4 border rounded-md">
-                        <div className="flex items-center mb-3 sm:mb-0">
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center bg-blue-100 mr-4 flex-shrink-0">
-                            <Calendar className="h-6 w-6 text-blue-600" />
-                          </div>
-                          <div className="min-w-0">
-                            <h3 className="font-medium text-sm md:text-base">{schedule.route}</h3>
-                            <p className="text-xs md:text-sm text-gray-500">{schedule.pickup_date}</p>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {(schedule.areas || []).slice(0, 3).map((area: string, index: number) => (
-                                <Badge key={index} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
-                                  {area}
-                                </Badge>
-                              ))}
-                              {(schedule.areas || []).length > 3 && (
-                                <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200 text-xs">
-                                  +{(schedule.areas || []).length - 3} more
-                                </Badge>
-                              )}
+                        <div className="p-4 bg-gray-50">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <div className="flex items-center mb-2">
+                                <User className="h-4 w-4 text-gray-500 mr-2" />
+                                <span className="text-sm text-gray-700">{recipientInfo.name}</span>
+                              </div>
+                              <div className="flex items-center">
+                                <Phone className="h-4 w-4 text-gray-500 mr-2" />
+                                <span className="text-sm text-gray-700">{recipientInfo.phone}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-end justify-start md:justify-end mt-4 md:mt-0">
+                              <Button 
+                                onClick={() => handleUpdateStatus(shipment.id, 'In Transit')}
+                                className="bg-zim-green hover:bg-zim-green/90 flex w-full md:w-auto justify-center"
+                              >
+                                <CheckCircle2 className="h-4 w-4 mr-2" />
+                                <span>Mark as Collected</span>
+                              </Button>
                             </div>
                           </div>
                         </div>
-                        <Button variant="outline" size="sm" className="text-xs md:text-sm ml-0 sm:ml-auto mt-2 sm:mt-0">
-                          View Details
-                        </Button>
-                      </div>
-                    ))
-                  ) : (
-                    <>
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center p-3 md:p-4 border rounded-md">
-                        <div className="flex items-center mb-3 sm:mb-0">
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center bg-blue-100 mr-4 flex-shrink-0">
-                            <Calendar className="h-6 w-6 text-blue-600" />
-                          </div>
-                          <div>
-                            <h3 className="font-medium text-sm md:text-base">Monday</h3>
-                            <p className="text-xs md:text-sm text-gray-500">Northampton Area Collections</p>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+            </div>
+          ) : (
+            <div className="text-center py-10 bg-gray-50 rounded-lg">
+              <Package className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+              <h3 className="text-lg font-medium text-gray-500 mb-1">No collections pending</h3>
+              <p className="text-sm text-gray-500">
+                There are no packages ready for collection at the moment.
+              </p>
+            </div>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="zim-deliveries" className="space-y-4">
+          <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-md">
+            <div className="flex items-start">
+              <Truck className="h-5 w-5 text-blue-500 mr-2 mt-0.5" />
+              <div>
+                <h3 className="font-medium text-blue-800">Delivery Instructions</h3>
+                <p className="text-sm text-blue-700">
+                  Take photos of all delivered packages as proof of delivery. Get recipient signatures when possible.
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
+            </div>
+          ) : activeDeliveries.filter(d => d.status === 'Out for Delivery').length > 0 ? (
+            <div className="space-y-4">
+              {activeDeliveries
+                .filter(d => d.status === 'Out for Delivery')
+                .map((shipment) => {
+                  const recipientInfo = getRecipientInfo(shipment);
+                  return (
+                    <Card key={shipment.id} className="overflow-hidden">
+                      <CardContent className="p-0">
+                        <div className="p-4 border-b">
+                          <div className="flex justify-between flex-wrap gap-2">
+                            <div>
+                              <h3 className="font-medium text-base md:text-lg flex items-center">
+                                <Truck className="h-4 w-4 mr-2 text-blue-500" />
+                                Delivery #{shipment.tracking_number}
+                              </h3>
+                              <div className="flex items-center mt-1 text-sm text-gray-500">
+                                <MapPin className="h-3 w-3 mr-1" />
+                                <span className="truncate max-w-[180px] md:max-w-none">{getDeliveryAddress(shipment)}</span>
+                              </div>
+                            </div>
+                            <Badge className="bg-blue-100 text-blue-800 border-blue-300">
+                              Out for Delivery
+                            </Badge>
                           </div>
                         </div>
-                        <Button variant="outline" size="sm" className="text-xs md:text-sm ml-0 sm:ml-auto mt-2 sm:mt-0">
-                          View Route
-                        </Button>
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center p-3 md:p-4 border rounded-md">
-                        <div className="flex items-center mb-3 sm:mb-0">
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center bg-purple-100 mr-4 flex-shrink-0">
-                            <Calendar className="h-6 w-6 text-purple-600" />
-                          </div>
-                          <div>
-                            <h3 className="font-medium text-sm md:text-base">Thursday</h3>
-                            <p className="text-xs md:text-sm text-gray-500">London Area Collections</p>
-                          </div>
-                        </div>
-                        <Button variant="outline" size="sm" className="text-xs md:text-sm ml-0 sm:ml-auto mt-2 sm:mt-0">
-                          View Route
-                        </Button>
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center p-3 md:p-4 border rounded-md">
-                        <div className="flex items-center mb-3 sm:mb-0">
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center bg-green-100 mr-4 flex-shrink-0">
-                            <Calendar className="h-6 w-6 text-green-600" />
-                          </div>
-                          <div>
-                            <h3 className="font-medium text-sm md:text-base">Friday</h3>
-                            <p className="text-xs md:text-sm text-gray-500">Warehouse Loading/Dispatch</p>
+                        <div className="p-4 bg-gray-50">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <div className="flex items-center mb-2">
+                                <User className="h-4 w-4 text-gray-500 mr-2" />
+                                <span className="text-sm text-gray-700">{recipientInfo.name}</span>
+                              </div>
+                              <div className="flex items-center">
+                                <Phone className="h-4 w-4 text-gray-500 mr-2" />
+                                <span className="text-sm text-gray-700">{recipientInfo.phone}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-end justify-start md:justify-end mt-4 md:mt-0">
+                              <Button 
+                                onClick={() => handleUpdateStatus(shipment.id, 'Delivered')}
+                                className="bg-zim-green hover:bg-zim-green/90 flex w-full md:w-auto justify-center"
+                              >
+                                <CheckCircle2 className="h-4 w-4 mr-2" />
+                                <span>Mark as Delivered</span>
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                        <Button variant="outline" size="sm" className="text-xs md:text-sm ml-0 sm:ml-auto mt-2 sm:mt-0">
-                          View Details
-                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+            </div>
+          ) : (
+            <div className="text-center py-10 bg-gray-50 rounded-lg">
+              <Truck className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+              <h3 className="text-lg font-medium text-gray-500 mb-1">No deliveries pending</h3>
+              <p className="text-sm text-gray-500">
+                There are no packages to be delivered at the moment.
+              </p>
+            </div>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="schedules" className="space-y-4">
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
+            </div>
+          ) : collectionSchedules.length > 0 ? (
+            <div className="space-y-4">
+              {collectionSchedules.map((schedule, index) => (
+                <Card key={index} className="overflow-hidden">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <h3 className="font-medium text-base md:text-lg mb-1">{schedule.route}</h3>
+                        <div className="flex items-center text-sm text-gray-500 mb-2">
+                          <Calendar className="h-4 w-4 mr-1" />
+                          <span>{schedule.pickup_date}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {Array.isArray(schedule.areas) && schedule.areas.map((area: string, idx: number) => (
+                            <Badge key={idx} variant="outline" className="bg-gray-100">
+                              {area}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                      <Button variant="outline" className="flex items-center mt-2 md:mt-0 w-full md:w-auto justify-center">
+                        <ArrowRightCircle className="h-4 w-4 mr-2" />
+                        <span>View Route</span>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-10 bg-gray-50 rounded-lg">
+              <Calendar className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+              <h3 className="text-lg font-medium text-gray-500 mb-1">No schedules available</h3>
+              <p className="text-sm text-gray-500">
+                There are no collection schedules at the moment.
+              </p>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

@@ -15,7 +15,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import ThemeToggle from '@/components/ThemeToggle';
-import CurrencySwitcher from '@/components/CurrencySwitcher';
 import Logo from '@/components/Logo';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -111,7 +110,6 @@ const Navbar = () => {
           </div>
           <div className="hidden md:flex items-center space-x-4">
             <ThemeToggle />
-            <CurrencySwitcher />
             
             {user ? (
               <DropdownMenu>
@@ -278,9 +276,6 @@ const Navbar = () => {
             <Truck className="mr-2 h-4 w-4" />
             <span>Book Shipment</span>
           </Link>
-          <div className="mt-4">
-            <CurrencySwitcher />
-          </div>
         </div>
       </div>
     </nav>

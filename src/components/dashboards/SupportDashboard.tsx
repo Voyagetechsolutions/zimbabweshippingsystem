@@ -3,11 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquare, Users, Clock, Bell, CheckCircle2, AlertCircle } from 'lucide-react';
+import { MessageSquare, Users, Clock, Bell, CheckCircle2, AlertCircle, User, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 const SupportDashboard = () => {
   const [tickets, setTickets] = useState<any[]>([]);
@@ -28,12 +29,20 @@ const SupportDashboard = () => {
     try {
       setLoading(true);
       
+      // Log to check if this function is being called
+      console.log('Fetching support tickets...');
+      
       const { data, error } = await supabase
         .from('support_tickets')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error in query:', error);
+        throw error;
+      }
+
+      console.log('Fetched tickets:', data);
 
       if (data) {
         setTickets(data);
@@ -85,9 +94,17 @@ const SupportDashboard = () => {
     }
   };
 
+  const formatDate = (dateString: string) => {
+    try {
+      return format(new Date(dateString), 'MMM d, yyyy • h:mm a');
+    } catch (e) {
+      return dateString;
+    }
+  };
+
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
@@ -136,7 +153,7 @@ const SupportDashboard = () => {
       </div>
 
       <Tabs defaultValue="open">
-        <TabsList>
+        <TabsList className="mb-4">
           <TabsTrigger value="open">Open Tickets</TabsTrigger>
           <TabsTrigger value="assigned">Assigned To Me</TabsTrigger>
           <TabsTrigger value="resolved">Recently Resolved</TabsTrigger>
@@ -155,17 +172,27 @@ const SupportDashboard = () => {
               ) : tickets.filter(t => t.status === 'Open').length > 0 ? (
                 <div className="space-y-4">
                   {tickets.filter(t => t.status === 'Open').map((ticket) => (
-                    <div key={ticket.id} className="flex items-center justify-between p-4 border rounded-md">
-                      <div className="flex items-center">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100 mr-3">
+                    <div key={ticket.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-md">
+                      <div className="flex items-start mb-3 md:mb-0">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100 mr-3 flex-shrink-0">
                           <Users className="h-5 w-5 text-blue-600" />
                         </div>
                         <div>
                           <h3 className="font-medium">{ticket.subject}</h3>
-                          <p className="text-sm text-gray-500">{ticket.user_id}</p>
+                          <p className="text-sm text-gray-500 mt-1">{ticket.message.substring(0, 100)}...</p>
+                          <div className="flex flex-wrap items-center mt-2 gap-2">
+                            <div className="flex items-center text-xs text-gray-500">
+                              <User className="h-3 w-3 mr-1" />
+                              <span>{ticket.user_id?.substring(0, 8) || 'Anonymous'}</span>
+                            </div>
+                            <div className="flex items-center text-xs text-gray-500">
+                              <Clock className="h-3 w-3 mr-1" />
+                              <span>{formatDate(ticket.created_at)}</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         {getPriorityBadge(ticket.priority)}
                         <Button size="sm" variant="outline">
                           Respond
@@ -175,7 +202,13 @@ const SupportDashboard = () => {
                   ))}
                 </div>
               ) : (
-                <p className="text-center py-4 text-gray-500">No open tickets at the moment</p>
+                <div className="text-center py-10 bg-gray-50 rounded-lg">
+                  <MessageSquare className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+                  <h3 className="text-lg font-medium text-gray-500 mb-1">No open tickets</h3>
+                  <p className="text-sm text-gray-500">
+                    There are no open support tickets at the moment.
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -194,20 +227,21 @@ const SupportDashboard = () => {
               ) : (
                 <div className="space-y-4">
                   {tickets.filter(t => t.status === 'Open').slice(0, 3).map((ticket) => (
-                    <div key={ticket.id} className="flex items-center justify-between p-4 border rounded-md">
-                      <div className="flex items-center">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-green-100 mr-3">
+                    <div key={ticket.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-md">
+                      <div className="flex items-start mb-3 md:mb-0">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-green-100 mr-3 flex-shrink-0">
                           <MessageSquare className="h-5 w-5 text-green-600" />
                         </div>
                         <div>
                           <h3 className="font-medium">{ticket.subject}</h3>
-                          <div className="flex items-center">
+                          <p className="text-sm text-gray-500 mt-1">{ticket.message.substring(0, 100)}...</p>
+                          <div className="flex items-center mt-2">
                             <Clock className="h-3 w-3 text-gray-400 mr-1" />
                             <p className="text-xs text-gray-500">Awaiting your response</p>
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         {getPriorityBadge(ticket.priority)}
                         <Button size="sm">
                           Respond
@@ -216,8 +250,14 @@ const SupportDashboard = () => {
                     </div>
                   ))}
                   
-                  {tickets.filter(t => t.status === 'Open').length <= 3 && (
-                    <p className="text-center py-2 text-gray-500">All assigned tickets are shown above</p>
+                  {tickets.filter(t => t.status === 'Open').length <= 0 && (
+                    <div className="text-center py-10 bg-gray-50 rounded-lg">
+                      <MessageSquare className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+                      <h3 className="text-lg font-medium text-gray-500 mb-1">No assigned tickets</h3>
+                      <p className="text-sm text-gray-500">
+                        You have no tickets assigned to you at the moment.
+                      </p>
+                    </div>
                   )}
                 </div>
               )}
@@ -238,17 +278,21 @@ const SupportDashboard = () => {
               ) : tickets.filter(t => t.status === 'Closed').length > 0 ? (
                 <div className="space-y-4">
                   {tickets.filter(t => t.status === 'Closed').map((ticket) => (
-                    <div key={ticket.id} className="flex items-center justify-between p-4 border rounded-md">
-                      <div className="flex items-center">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100 mr-3">
+                    <div key={ticket.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-md">
+                      <div className="flex items-start mb-3 md:mb-0">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100 mr-3 flex-shrink-0">
                           <CheckCircle2 className="h-5 w-5 text-gray-600" />
                         </div>
                         <div>
                           <h3 className="font-medium">{ticket.subject}</h3>
-                          <p className="text-sm text-gray-500">{ticket.user_id}</p>
+                          <p className="text-sm text-gray-500 mt-1">{ticket.message.substring(0, 100)}...</p>
+                          <div className="flex items-center mt-2">
+                            <Clock className="h-3 w-3 text-gray-400 mr-1" />
+                            <p className="text-xs text-gray-500">{formatDate(ticket.updated_at)}</p>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         {getStatusBadge(ticket.status)}
                         <Button size="sm" variant="outline">
                           View
@@ -258,7 +302,13 @@ const SupportDashboard = () => {
                   ))}
                 </div>
               ) : (
-                <p className="text-center py-4 text-gray-500">No resolved tickets yet</p>
+                <div className="text-center py-10 bg-gray-50 rounded-lg">
+                  <CheckCircle2 className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+                  <h3 className="text-lg font-medium text-gray-500 mb-1">No resolved tickets</h3>
+                  <p className="text-sm text-gray-500">
+                    There are no resolved tickets yet.
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>
