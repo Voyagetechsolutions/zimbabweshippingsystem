@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -76,15 +77,15 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     switch (requiredRole) {
       case 'admin':
-        return role === 'admin';
+        return false; // Only admin roles can access admin features
       case 'logistics':
-        return ['admin', 'logistics'].includes(role as UserRoleType);
+        return role === 'logistics';
       case 'driver':
-        return ['admin', 'logistics', 'driver'].includes(role as UserRoleType);
+        return role === 'logistics' || role === 'driver';
       case 'support':
-        return ['admin', 'logistics', 'support'].includes(role as UserRoleType);
+        return role === 'logistics' || role === 'support';
       case 'customer':
-        return true;
+        return true; // Everyone has customer access
       default:
         return false;
     }
