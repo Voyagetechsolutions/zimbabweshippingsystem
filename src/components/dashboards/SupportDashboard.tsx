@@ -17,7 +17,8 @@ const SupportDashboard = () => {
     open: 0,
     closed: 0,
     highPriority: 0,
-    responseRate: 90, // Example percentage
+    responseRate: 0,
+    averageResponseTime: "N/A",
   });
   const { toast } = useToast();
 
@@ -49,13 +50,22 @@ const SupportDashboard = () => {
         
         // Compute stats
         const openCount = data.filter(t => t.status === 'Open').length;
+        const closedCount = data.filter(t => t.status === 'Closed').length;
         const highPriorityCount = data.filter(t => t.priority === 'High').length;
+        
+        // Calculate response rate - the percentage of tickets that received a response
+        const hasResponsesCount = await countTicketsWithResponses();
+        const responseRate = data.length > 0 ? Math.round((hasResponsesCount / data.length) * 100) : 0;
+        
+        // Calculate average response time
+        const averageTime = await calculateAverageResponseTime();
         
         setStats({
           open: openCount,
-          closed: data.length - openCount,
+          closed: closedCount,
           highPriority: highPriorityCount,
-          responseRate: 90, // Default percentage until we have more data
+          responseRate: responseRate,
+          averageResponseTime: averageTime || "N/A",
         });
       }
     } catch (error: any) {
@@ -67,6 +77,61 @@ const SupportDashboard = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+  
+  const countTicketsWithResponses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('ticket_responses')
+        .select('ticket_id', { count: 'exact', head: true })
+        .is('is_staff_response', true);
+        
+      if (error) throw error;
+      
+      return data?.length || 0;
+    } catch (error) {
+      console.error('Error counting tickets with responses:', error);
+      return 0;
+    }
+  };
+  
+  const calculateAverageResponseTime = async () => {
+    try {
+      // This is a simplified calculation and would be more accurate with timestamps in the database
+      const { data: tickets, error: ticketsError } = await supabase
+        .from('support_tickets')
+        .select('id, created_at, updated_at')
+        .not('status', 'eq', 'Open');
+        
+      if (ticketsError) throw ticketsError;
+      
+      if (!tickets || tickets.length === 0) return "N/A";
+      
+      let totalHours = 0;
+      let countedTickets = 0;
+      
+      tickets.forEach(ticket => {
+        if (ticket.created_at && ticket.updated_at) {
+          const created = new Date(ticket.created_at);
+          const updated = new Date(ticket.updated_at);
+          const diffHours = (updated.getTime() - created.getTime()) / (1000 * 60 * 60);
+          
+          if (diffHours > 0) {
+            totalHours += diffHours;
+            countedTickets++;
+          }
+        }
+      });
+      
+      if (countedTickets === 0) return "N/A";
+      
+      const average = totalHours / countedTickets;
+      return average.toFixed(1) + " hours";
+      
+    } catch (error) {
+      console.error('Error calculating average response time:', error);
+      return "N/A";
     }
   };
 
@@ -131,7 +196,7 @@ const SupportDashboard = () => {
             <div className="mt-4">
               <Progress value={stats.responseRate} className="h-2" />
               <p className="text-xs text-muted-foreground mt-1">
-                Average first response: 2.5 hours
+                Average first response: {stats.averageResponseTime}
               </p>
             </div>
           </CardContent>
@@ -224,41 +289,41 @@ const SupportDashboard = () => {
                 <div className="flex justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
                 </div>
-              ) : (
+              ) : tickets.filter(t => t.status === 'Open' && t.assigned_to === 'current-user-id').length > 0 ? (
                 <div className="space-y-4">
-                  {tickets.filter(t => t.status === 'Open').slice(0, 3).map((ticket) => (
-                    <div key={ticket.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-md">
-                      <div className="flex items-start mb-3 md:mb-0">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-green-100 mr-3 flex-shrink-0">
-                          <MessageSquare className="h-5 w-5 text-green-600" />
-                        </div>
-                        <div>
-                          <h3 className="font-medium">{ticket.subject}</h3>
-                          <p className="text-sm text-gray-500 mt-1">{ticket.message.substring(0, 100)}...</p>
-                          <div className="flex items-center mt-2">
-                            <Clock className="h-3 w-3 text-gray-400 mr-1" />
-                            <p className="text-xs text-gray-500">Awaiting your response</p>
+                  {tickets
+                    .filter(t => t.status === 'Open' && t.assigned_to === 'current-user-id')
+                    .map((ticket) => (
+                      <div key={ticket.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-md">
+                        <div className="flex items-start mb-3 md:mb-0">
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-green-100 mr-3 flex-shrink-0">
+                            <MessageSquare className="h-5 w-5 text-green-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-medium">{ticket.subject}</h3>
+                            <p className="text-sm text-gray-500 mt-1">{ticket.message.substring(0, 100)}...</p>
+                            <div className="flex items-center mt-2">
+                              <Clock className="h-3 w-3 text-gray-400 mr-1" />
+                              <p className="text-xs text-gray-500">Awaiting your response</p>
+                            </div>
                           </div>
                         </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {getPriorityBadge(ticket.priority)}
+                          <Button size="sm">
+                            Respond
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {getPriorityBadge(ticket.priority)}
-                        <Button size="sm">
-                          Respond
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {tickets.filter(t => t.status === 'Open').length <= 0 && (
-                    <div className="text-center py-10 bg-gray-50 rounded-lg">
-                      <MessageSquare className="h-12 w-12 mx-auto text-gray-300 mb-3" />
-                      <h3 className="text-lg font-medium text-gray-500 mb-1">No assigned tickets</h3>
-                      <p className="text-sm text-gray-500">
-                        You have no tickets assigned to you at the moment.
-                      </p>
-                    </div>
-                  )}
+                    ))}
+                </div>
+              ) : (
+                <div className="text-center py-10 bg-gray-50 rounded-lg">
+                  <MessageSquare className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+                  <h3 className="text-lg font-medium text-gray-500 mb-1">No assigned tickets</h3>
+                  <p className="text-sm text-gray-500">
+                    You have no tickets assigned to you at the moment.
+                  </p>
                 </div>
               )}
             </CardContent>

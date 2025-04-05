@@ -85,16 +85,6 @@ const Footer: React.FC = () => {
                   </p>
                 </div>
               </li>
-              <li className="flex items-start">
-                <MapPin className="h-5 w-5 text-zim-yellow mr-2 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-gray-300">Zimbabwe Office:</p>
-                  <p className="text-gray-400">
-                    45 Samora Machel Avenue<br />
-                    Harare, Zimbabwe
-                  </p>
-                </div>
-              </li>
               <li className="flex">
                 <Phone className="h-5 w-5 text-zim-green mr-2 flex-shrink-0" />
                 <span className="text-gray-400">+44 7584 100552 (UK)</span>
@@ -112,6 +102,9 @@ const Footer: React.FC = () => {
             &copy; {currentYear} UK to Zimbabwe Shipping. All rights reserved.
           </p>
           <div className="flex items-center space-x-4 mt-4 md:mt-0">
+            <Link to="/pricing">
+              <span className="text-gray-500 hover:text-gray-400 text-sm">Pricing</span>
+            </Link>
             <Link to="/privacy">
               <span className="text-gray-500 hover:text-gray-400 text-sm">Privacy Policy</span>
             </Link>

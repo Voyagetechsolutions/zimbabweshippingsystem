@@ -8,15 +8,24 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import {
   TruckIcon, CheckCircle2, MapPin, Calendar, Clock, Phone, User, Package,
-  Truck, AlertTriangle, ArrowRightCircle, Filter
+  Truck, AlertTriangle, ArrowRightCircle, Filter, Camera, Upload
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const DriverDashboard = () => {
   const [activeDeliveries, setActiveDeliveries] = useState<any[]>([]);
   const [completedDeliveries, setCompletedDeliveries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [collectionSchedules, setCollectionSchedules] = useState<any[]>([]);
+  const [scheduleShipments, setScheduleShipments] = useState<{[key: string]: any[]}>({});
+  const [showImageUpload, setShowImageUpload] = useState(false);
+  const [currentShipmentId, setCurrentShipmentId] = useState<string>('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploadLoading, setUploadLoading] = useState(false);
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -28,11 +37,12 @@ const DriverDashboard = () => {
     try {
       setLoading(true);
       
-      // Fetch active deliveries
+      // Fetch active deliveries - only confirmed bookings
       const { data: activeData, error: activeError } = await supabase
         .from('shipments')
         .select('*')
         .in('status', ['Ready for Pickup', 'In Transit', 'Out for Delivery'])
+        .eq('can_modify', false) // Only confirmed bookings
         .order('created_at', { ascending: false });
 
       if (activeError) throw activeError;
@@ -57,6 +67,26 @@ const DriverDashboard = () => {
 
       if (scheduleError) throw scheduleError;
       setCollectionSchedules(scheduleData || []);
+      
+      // Fetch shipments for each schedule
+      if (scheduleData && scheduleData.length > 0) {
+        const schedulesWithShipments: {[key: string]: any[]} = {};
+        
+        for (const schedule of scheduleData) {
+          const { data: shipmentData, error: shipmentError } = await supabase
+            .from('shipments')
+            .select('*')
+            .eq('status', 'Ready for Pickup')
+            .eq('can_modify', false) // Only confirmed bookings
+            .contains('metadata', { pickup_date: schedule.pickup_date });
+            
+          if (!shipmentError) {
+            schedulesWithShipments[schedule.id] = shipmentData || [];
+          }
+        }
+        
+        setScheduleShipments(schedulesWithShipments);
+      }
       
     } catch (error: any) {
       console.error('Error fetching driver data:', error.message);
@@ -93,6 +123,77 @@ const DriverDashboard = () => {
         variant: 'destructive'
       });
     }
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const imageUrl = URL.createObjectURL(file);
+      setImagePreview(imageUrl);
+    }
+  };
+
+  const handleUploadDeliveryImage = async () => {
+    if (!imageFile || !currentShipmentId) return;
+    
+    try {
+      setUploadLoading(true);
+      
+      // Upload the image to storage
+      const fileName = `delivery-${currentShipmentId}-${Date.now()}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(`deliveries/${fileName}`, imageFile);
+        
+      if (uploadError) throw uploadError;
+      
+      // Get the public URL
+      const { data: urlData } = await supabase.storage
+        .from('images')
+        .getPublicUrl(`deliveries/${fileName}`);
+        
+      // Update the shipment with the image URL
+      const { error: updateError } = await supabase
+        .from('shipments')
+        .update({ 
+          metadata: { 
+            ...activeDeliveries.find(d => d.id === currentShipmentId)?.metadata,
+            delivery_image: urlData.publicUrl 
+          }
+        })
+        .eq('id', currentShipmentId);
+        
+      if (updateError) throw updateError;
+      
+      toast({
+        title: 'Image Uploaded',
+        description: 'Delivery image has been successfully uploaded',
+      });
+      
+      // Close modal and reset state
+      setShowImageUpload(false);
+      setImageFile(null);
+      setImagePreview(null);
+      setCurrentShipmentId('');
+      
+      // Update the shipment status to Delivered
+      await handleUpdateStatus(currentShipmentId, 'Delivered');
+      
+    } catch (error: any) {
+      toast({
+        title: 'Error uploading image',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  const openImageUploadModal = (shipmentId: string) => {
+    setCurrentShipmentId(shipmentId);
+    setShowImageUpload(true);
   };
 
   const getDeliveryAddress = (shipment: any) => {
@@ -191,10 +292,10 @@ const DriverDashboard = () => {
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
             </div>
-          ) : activeDeliveries.filter(d => d.status === 'Ready for Pickup').length > 0 ? (
+          ) : activeDeliveries.filter(d => d.status === 'Ready for Pickup' && !d.can_modify).length > 0 ? (
             <div className="space-y-4">
               {activeDeliveries
-                .filter(d => d.status === 'Ready for Pickup')
+                .filter(d => d.status === 'Ready for Pickup' && !d.can_modify)
                 .map((shipment) => {
                   const recipientInfo = getRecipientInfo(shipment);
                   return (
@@ -250,7 +351,7 @@ const DriverDashboard = () => {
               <Package className="h-12 w-12 mx-auto text-gray-300 mb-3" />
               <h3 className="text-lg font-medium text-gray-500 mb-1">No collections pending</h3>
               <p className="text-sm text-gray-500">
-                There are no packages ready for collection at the moment.
+                There are no confirmed packages ready for collection at the moment.
               </p>
             </div>
           )}
@@ -311,13 +412,13 @@ const DriverDashboard = () => {
                                 <span className="text-sm text-gray-700">{recipientInfo.phone}</span>
                               </div>
                             </div>
-                            <div className="flex items-end justify-start md:justify-end mt-4 md:mt-0">
+                            <div className="flex items-end justify-start md:justify-end mt-4 md:mt-0 space-x-2">
                               <Button 
-                                onClick={() => handleUpdateStatus(shipment.id, 'Delivered')}
-                                className="bg-zim-green hover:bg-zim-green/90 flex w-full md:w-auto justify-center"
+                                onClick={() => openImageUploadModal(shipment.id)}
+                                className="bg-blue-500 hover:bg-blue-600 flex w-full md:w-auto justify-center"
                               >
-                                <CheckCircle2 className="h-4 w-4 mr-2" />
-                                <span>Mark as Delivered</span>
+                                <Camera className="h-4 w-4 mr-2" />
+                                <span>Upload Delivery Photo</span>
                               </Button>
                             </div>
                           </div>
@@ -363,11 +464,36 @@ const DriverDashboard = () => {
                           ))}
                         </div>
                       </div>
-                      <Button variant="outline" className="flex items-center mt-2 md:mt-0 w-full md:w-auto justify-center">
-                        <ArrowRightCircle className="h-4 w-4 mr-2" />
-                        <span>View Route</span>
-                      </Button>
+                      <div className="flex gap-2 mt-2 md:mt-0">
+                        <Button variant="outline" className="flex items-center w-full md:w-auto justify-center">
+                          <ArrowRightCircle className="h-4 w-4 mr-2" />
+                          <span>View Route</span>
+                        </Button>
+                        <Button variant="outline" className="flex items-center w-full md:w-auto justify-center">
+                          <Package className="h-4 w-4 mr-2" />
+                          <span>View Shipments ({scheduleShipments[schedule.id]?.length || 0})</span>
+                        </Button>
+                      </div>
                     </div>
+                    
+                    {scheduleShipments[schedule.id] && scheduleShipments[schedule.id].length > 0 && (
+                      <div className="mt-4 pt-4 border-t">
+                        <h4 className="font-medium mb-2">Scheduled Shipments</h4>
+                        <div className="space-y-2">
+                          {scheduleShipments[schedule.id].map((shipment: any) => (
+                            <div key={shipment.id} className="flex justify-between items-center p-2 bg-gray-50 rounded-md">
+                              <div>
+                                <p className="font-medium">{shipment.tracking_number}</p>
+                                <p className="text-xs text-gray-500">{getDeliveryAddress(shipment)}</p>
+                              </div>
+                              <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">
+                                Ready for Pickup
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -383,6 +509,75 @@ const DriverDashboard = () => {
           )}
         </TabsContent>
       </Tabs>
+      
+      {/* Image Upload Dialog */}
+      <Dialog open={showImageUpload} onOpenChange={setShowImageUpload}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload Delivery Photo</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center justify-center">
+              {imagePreview ? (
+                <div className="relative">
+                  <img src={imagePreview} alt="Preview" className="max-h-60 rounded-md" />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="absolute top-2 right-2"
+                    onClick={() => {
+                      setImageFile(null);
+                      setImagePreview(null);
+                    }}
+                  >
+                    &times;
+                  </Button>
+                </div>
+              ) : (
+                <div className="border-2 border-dashed border-gray-300 rounded-md p-12 text-center">
+                  <Camera className="h-8 w-8 mx-auto text-gray-400" />
+                  <p className="mt-2 text-sm text-gray-500">Click to take or upload a photo</p>
+                </div>
+              )}
+            </div>
+            
+            <div>
+              <Label htmlFor="delivery-photo" className="sr-only">Delivery Photo</Label>
+              <Input
+                id="delivery-photo"
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className={imagePreview ? "hidden" : ""}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setShowImageUpload(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleUploadDeliveryImage}
+              disabled={!imageFile || uploadLoading}
+              className="bg-zim-green hover:bg-zim-green/90"
+            >
+              {uploadLoading ? (
+                <>
+                  <Upload className="mr-2 h-4 w-4 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload & Mark Delivered
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

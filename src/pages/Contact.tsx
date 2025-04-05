@@ -11,9 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { MapPin, Phone, Mail, Clock, Send, CheckCircle2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import WhatsAppButton from '@/components/WhatsAppButton';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Contact = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
+  
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -32,14 +36,38 @@ const Contact = () => {
     setFormData(prev => ({ ...prev, subject: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     
-    // Simulate form submission
-    setTimeout(() => {
-      console.log('Form submitted:', formData);
-      setIsSubmitting(false);
+    try {
+      // Determine priority based on subject
+      let priority = 'Medium';
+      if (formData.subject === 'complaint' || formData.subject === 'support') {
+        priority = 'High';
+      } else if (formData.subject === 'feedback') {
+        priority = 'Low';
+      }
+      
+      // Create support ticket
+      const { data, error } = await supabase
+        .from('support_tickets')
+        .insert({
+          user_id: user?.id || '00000000-0000-0000-0000-000000000000', // Anonymous or user ID
+          subject: formData.subject === 'general' 
+            ? `General Inquiry from ${formData.name}`
+            : `${formData.subject.charAt(0).toUpperCase() + formData.subject.slice(1)} from ${formData.name}`,
+          message: `Email: ${formData.email}\n\n${formData.message}`,
+          status: 'Open',
+          priority: priority,
+        })
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
+      console.log('Support ticket created:', data);
+      
       setIsSubmitted(true);
       
       toast({
@@ -57,7 +85,17 @@ const Contact = () => {
       
       // Reset submitted state after 3 seconds
       setTimeout(() => setIsSubmitted(false), 3000);
-    }, 1500);
+      
+    } catch (error: any) {
+      console.error('Error submitting contact form:', error);
+      toast({
+        title: "Error submitting form",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const businessHours = [
@@ -86,7 +124,7 @@ const Contact = () => {
     { 
       icon: <MapPin className="h-5 w-5 text-zim-red" />, 
       title: 'Office',
-      details: ['123 Shipping Lane', 'London, UK, SW1A 1AA'],
+      details: ['Pastures Lodge Farm, Raunds Road', 'Chelveston, Wellingborough, NN9 6AA'],
       action: { label: 'Get Directions', href: 'https://maps.google.com' }
     },
   ];
@@ -113,91 +151,87 @@ const Contact = () => {
               </CardHeader>
               <CardContent>
                 {isSubmitted ? (
-                  <div className="py-12 text-center">
-                    <div className="flex justify-center">
-                      <CheckCircle2 className="h-16 w-16 text-green-500" />
+                  <div className="text-center p-6">
+                    <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                      <CheckCircle2 className="h-6 w-6 text-green-600" />
                     </div>
-                    <h3 className="text-xl font-bold mt-4">Message Sent Successfully!</h3>
-                    <p className="text-gray-600 mt-2">
-                      Thank you for reaching out. We'll get back to you as soon as possible.
+                    <h3 className="text-xl font-semibold mb-2">Message Received!</h3>
+                    <p className="text-gray-600">
+                      Thank you for contacting us. Our team will get back to you as soon as possible.
                     </p>
-                    <Button 
-                      className="mt-6 bg-zim-green hover:bg-zim-green/90"
-                      onClick={() => setIsSubmitted(false)}
-                    >
-                      Send Another Message
-                    </Button>
                   </div>
                 ) : (
                   <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
                         <Label htmlFor="name">Your Name</Label>
                         <Input 
-                          id="name"
-                          name="name"
-                          placeholder="Enter your name" 
+                          id="name" 
+                          name="name" 
+                          placeholder="Enter your name"
                           value={formData.name}
                           onChange={handleInputChange}
                           required
-                          className="mt-1"
                         />
                       </div>
-                      <div>
+                      <div className="space-y-2">
                         <Label htmlFor="email">Email Address</Label>
                         <Input 
-                          id="email"
-                          name="email"
-                          type="email"
-                          placeholder="Enter your email" 
+                          id="email" 
+                          name="email" 
+                          type="email" 
+                          placeholder="Enter your email"
                           value={formData.email}
                           onChange={handleInputChange}
                           required
-                          className="mt-1"
                         />
                       </div>
                     </div>
-                    
-                    <div>
+                    <div className="space-y-2">
                       <Label htmlFor="subject">Subject</Label>
                       <Select 
                         value={formData.subject} 
                         onValueChange={handleSelectChange}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger id="subject">
                           <SelectValue placeholder="Select a subject" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="general">General Enquiry</SelectItem>
-                          <SelectItem value="quote">Request a Quote</SelectItem>
-                          <SelectItem value="tracking">Tracking Assistance</SelectItem>
+                          <SelectItem value="general">General Inquiry</SelectItem>
+                          <SelectItem value="shipping">Shipping Question</SelectItem>
+                          <SelectItem value="tracking">Tracking Issue</SelectItem>
+                          <SelectItem value="support">Technical Support</SelectItem>
                           <SelectItem value="feedback">Feedback</SelectItem>
                           <SelectItem value="complaint">Complaint</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                    
-                    <div>
-                      <Label htmlFor="message">Your Message</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="message">Message</Label>
                       <Textarea 
-                        id="message"
-                        name="message"
-                        placeholder="How can we help you today?" 
+                        id="message" 
+                        name="message" 
+                        placeholder="Enter your message here" 
+                        rows={6}
                         value={formData.message}
                         onChange={handleInputChange}
                         required
-                        className="mt-1 min-h-[150px]"
                       />
                     </div>
-                    
                     <Button 
                       type="submit" 
-                      className="bg-zim-green hover:bg-zim-green/90 w-full md:w-auto px-8"
+                      className="w-full bg-zim-green hover:bg-zim-green/90"
                       disabled={isSubmitting}
                     >
-                      {isSubmitting ? 'Sending...' : (
+                      {isSubmitting ? (
                         <>
-                          Send Message <Send className="ml-2 h-4 w-4" />
+                          <Send className="mr-2 h-4 w-4 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="mr-2 h-4 w-4" />
+                          Send Message
                         </>
                       )}
                     </Button>
@@ -207,98 +241,57 @@ const Contact = () => {
             </Card>
           </div>
           
-          <div className="lg:col-span-2">
-            <div className="grid grid-cols-1 gap-6">
-              {/* Contact Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Contact Information</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {contactInfo.map((item, index) => (
-                    <div key={index} className="flex items-start">
-                      <div className="flex-shrink-0 bg-gray-100 p-3 rounded-full">
-                        {item.icon}
-                      </div>
-                      <div className="ml-4">
-                        <h3 className="font-bold text-gray-800">{item.title}</h3>
-                        {item.details.map((detail, idx) => (
-                          <p key={idx} className="text-gray-600">{detail}</p>
-                        ))}
-                        <a 
-                          href={item.action.href} 
-                          className="inline-block mt-2 text-zim-green hover:underline text-sm font-medium"
-                        >
-                          {item.action.label}
-                        </a>
+          <div className="lg:col-span-2 space-y-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Contact Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {contactInfo.map((info, index) => (
+                  <div key={index} className="flex">
+                    <div className="bg-gray-100 p-3 rounded-full self-start mr-4">
+                      {info.icon}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg">{info.title}</h3>
+                      {info.details.map((detail, i) => (
+                        <p key={i} className="text-gray-600">{detail}</p>
+                      ))}
+                      <a 
+                        href={info.action.href} 
+                        className="text-zim-green hover:underline mt-2 inline-block"
+                      >
+                        {info.action.label}
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Business Hours</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {businessHours.map((item, index) => (
+                    <div key={index} className="flex justify-between">
+                      <div className="font-medium">{item.day}</div>
+                      <div className={item.hours === 'Closed' ? 'text-red-500' : 'text-gray-600'}>
+                        {item.hours}
                       </div>
                     </div>
                   ))}
-                </CardContent>
-              </Card>
-              
-              {/* Business Hours */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Clock className="mr-2 h-5 w-5 text-zim-green" />
-                    Business Hours
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {businessHours.map((item, index) => (
-                      <div key={index} className="flex justify-between items-center py-1 border-b last:border-0">
-                        <span className="font-medium">{item.day}</span>
-                        <span 
-                          className={`${
-                            item.hours === 'Closed' ? 'text-red-500' : 'text-gray-600'
-                          }`}
-                        >
-                          {item.hours}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-              
-              {/* Emergency Contact */}
-              <div className="bg-zim-yellow/10 border border-zim-yellow/20 rounded-lg p-6 text-center">
-                <h3 className="text-lg font-bold mb-2">Urgent Shipment Enquiry?</h3>
-                <p className="text-gray-600 mb-4">
-                  For urgent assistance with your shipments, please call our dedicated support line:
-                </p>
-                <a 
-                  href="tel:+447584100552" 
-                  className="inline-block text-xl font-bold text-zim-green hover:underline"
-                >
-                  +44 7584 100552
-                </a>
-              </div>
-            </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
       
-      {/* Map Section */}
-      <div className="py-12 bg-gray-50">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold">Find Our Office</h2>
-            <p className="text-gray-600">Visit our London office for face-to-face consultations and drop-offs</p>
-          </div>
-          <div className="h-96 bg-gray-200 rounded-lg overflow-hidden">
-            {/* In a real application, you would embed an actual map here */}
-            <div className="w-full h-full flex items-center justify-center">
-              <p className="text-gray-500">Map would be displayed here</p>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <WhatsAppButton />
       <Footer />
+      <WhatsAppButton />
     </div>
   );
 };

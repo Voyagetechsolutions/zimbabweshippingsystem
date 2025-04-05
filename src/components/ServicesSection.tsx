@@ -12,26 +12,31 @@ const ServicesSection: React.FC = () => {
       icon: <Ship className="h-10 w-10 text-zim-green dark:text-zim-green" />,
       title: 'Drum Shipping',
       description: 'Our specialized drum shipping service offers the most cost-effective way to send large quantities of goods to Zimbabwe. Each drum has a capacity of 220L.',
+      bgImage: 'url("/lovable-uploads/metal-drums.jpg")'
     },
     {
       icon: <Package className="h-10 w-10 text-zim-yellow dark:text-zim-yellow" />,
       title: 'Regular Parcels',
       description: 'Send packages of any size with our flexible parcel shipping options, with competitive rates based on weight.',
+      bgImage: 'url("/lovable-uploads/parcels.jpg")'
     },
     {
       icon: <Truck className="h-10 w-10 text-zim-red dark:text-zim-red" />,
       title: 'Door-to-Door Delivery',
       description: `We pick up from your UK address and deliver directly to your recipient's doorstep in Zimbabwe for an additional ${formatPrice(25)}.`,
+      bgImage: 'url("/lovable-uploads/door-delivery.jpg")'
     },
     {
       icon: <Globe className="h-10 w-10 text-zim-green dark:text-zim-green" />,
       title: 'Real-time Tracking',
       description: 'Stay informed with our advanced tracking system that provides real-time updates on your shipment\'s location.',
+      bgImage: 'url("/lovable-uploads/tracking.jpg")'
     },
     {
       icon: <DollarSign className="h-10 w-10 text-zim-yellow dark:text-zim-yellow" />,
       title: 'Flexible Payment Options',
       description: 'Multiple payment methods available including credit cards, PayPal, and mobile payment solutions.',
+      bgImage: 'url("/lovable-uploads/payment.jpg")'
     },
   ];
 
@@ -49,15 +54,20 @@ const ServicesSection: React.FC = () => {
           {services.map((service, index) => (
             <div 
               key={index} 
-              className="bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden"
+              className="rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden relative"
+              style={{ 
+                background: service.bgImage ? `linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), ${service.bgImage}` : 'white',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center'
+              }}
             >
-              <div className="p-6">
-                <div className="flex items-center justify-center w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full mb-6">
+              <div className="p-6 bg-white dark:bg-gray-800 dark:text-white bg-opacity-10 h-full">
+                <div className="flex items-center justify-center w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full mb-6 z-10 bg-opacity-90">
                   {service.icon}
                 </div>
-                <h3 className="text-xl font-semibold mb-3 dark:text-white">{service.title}</h3>
-                <p className="text-gray-600 dark:text-gray-300 mb-6">{service.description}</p>
-                <Button variant="outline" className="w-full justify-between border-zim-black text-zim-black dark:border-gray-600 dark:text-white hover:bg-zim-black hover:text-white dark:hover:bg-gray-700">
+                <h3 className="text-xl font-semibold mb-3 text-white">{service.title}</h3>
+                <p className="text-gray-200 mb-6">{service.description}</p>
+                <Button variant="outline" className="w-full justify-between border-white text-white hover:bg-white hover:text-gray-900 dark:border-gray-600 dark:hover:bg-gray-700 z-10">
                   Learn More <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
