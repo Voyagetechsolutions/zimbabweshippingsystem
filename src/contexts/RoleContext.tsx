@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,7 +21,6 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
-  // Fetch the user's role from the profiles table
   useEffect(() => {
     const fetchUserRole = async () => {
       if (!user) {
@@ -34,14 +32,12 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         setIsLoading(true);
         
-        // Use the isAdmin flag from AuthContext
         if (isAdmin) {
           setRole('admin');
           setIsLoading(false);
           return;
         }
         
-        // First try to get role from profiles table
         const { data, error } = await supabase
           .from('profiles')
           .select('role')
@@ -51,23 +47,20 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (error) {
           console.error('Error fetching user role:', error);
           
-          // If the column doesn't exist yet, set default role
           if (error.message.includes("column 'role' does not exist")) {
             console.log('Role column not found, setting default role');
-            setRole('customer'); // Default role
+            setRole('customer');
           } else {
-            setRole('customer'); // Default fallback for other errors
+            setRole('customer');
           }
         } else if (data && 'role' in data) {
-          // Check if 'role' property exists in data
           setRole(data.role as UserRoleType);
         } else {
-          // If no role found, default to customer
           setRole('customer');
         }
       } catch (error) {
         console.error('Error in fetchUserRole:', error);
-        setRole('customer'); // Default role
+        setRole('customer');
       } finally {
         setIsLoading(false);
       }
@@ -76,35 +69,29 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fetchUserRole();
   }, [user, isAdmin]);
 
-  // Check if the user has permission for a specific role
   const hasPermission = (requiredRole: UserRoleType): boolean => {
     if (!role) return false;
     
-    // If user is admin, they have all permissions
     if (role === 'admin' || isAdmin) return true;
 
-    // Role hierarchy: admin > logistics > driver/support > customer
     switch (requiredRole) {
       case 'admin':
         return role === 'admin';
       case 'logistics':
-        return ['admin', 'logistics'].includes(role as string);
+        return ['admin', 'logistics'].includes(role as UserRoleType);
       case 'driver':
-        return ['admin', 'logistics', 'driver'].includes(role as string);
+        return ['admin', 'logistics', 'driver'].includes(role as UserRoleType);
       case 'support':
-        return ['admin', 'logistics', 'support'].includes(role as string);
+        return ['admin', 'logistics', 'support'].includes(role as UserRoleType);
       case 'customer':
-        return true; // Everyone has customer access
+        return true;
       default:
         return false;
     }
   };
 
-  // Function to elevate a user to admin with the secret password
   const elevateToAdmin = async (password: string): Promise<boolean> => {
     try {
-      // Use the elevate_to_admin RPC function
-      // Using the raw supabase.rpc method
       const { data, error } = await supabase.rpc('elevate_to_admin', {
         admin_password: password
       });
@@ -143,7 +130,6 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Function to set another user's role (admin only)
   const setUserRole = async (userId: string, newRole: UserRoleType): Promise<boolean> => {
     try {
       if (!hasPermission('admin')) {
@@ -155,7 +141,6 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
 
-      // Update the user's role in the profiles table
       const { data, error } = await supabase
         .from('profiles')
         .update({ role: newRole })
@@ -204,5 +189,4 @@ export const useRole = () => {
   return context;
 };
 
-// Re-export UserRoleType for convenience
 export type { UserRoleType };
