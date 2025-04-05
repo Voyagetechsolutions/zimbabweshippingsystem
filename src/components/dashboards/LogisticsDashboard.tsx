@@ -8,6 +8,7 @@ import { Truck, Package, Calendar, Users, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { ShipmentStatus } from '@/types/admin';
+import { useToast } from '@/hooks/use-toast';
 
 const LogisticsDashboard = () => {
   const [shipments, setShipments] = useState<any[]>([]);
@@ -18,44 +19,50 @@ const LogisticsDashboard = () => {
     inTransit: 0,
     delivered: 0
   });
+  const { toast } = useToast();
 
   useEffect(() => {
-    const fetchShipments = async () => {
-      try {
-        setLoading(true);
-        const { data, error } = await supabase
-          .from('shipments')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(10);
-
-        if (error) throw error;
-        
-        setShipments(data || []);
-        
-        // Compute stats
-        if (data) {
-          const totalCount = data.length;
-          const bookedCount = data.filter(s => s.status === 'Booked' || s.status === 'Paid').length;
-          const inTransitCount = data.filter(s => s.status === 'In Transit').length;
-          const deliveredCount = data.filter(s => s.status === 'Delivered').length;
-          
-          setStats({
-            total: totalCount,
-            booked: bookedCount,
-            inTransit: inTransitCount,
-            delivered: deliveredCount
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching shipments:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchShipments();
   }, []);
+
+  const fetchShipments = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('shipments')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      
+      setShipments(data || []);
+      
+      // Compute stats
+      if (data) {
+        const totalCount = data.length;
+        const bookedCount = data.filter(s => s.status === 'Booked' || s.status === 'Paid').length;
+        const inTransitCount = data.filter(s => s.status === 'In Transit').length;
+        const deliveredCount = data.filter(s => s.status === 'Delivered').length;
+        
+        setStats({
+          total: totalCount,
+          booked: bookedCount,
+          inTransit: inTransitCount,
+          delivered: deliveredCount
+        });
+      }
+    } catch (error: any) {
+      console.error('Error fetching shipments:', error);
+      toast({
+        title: 'Error fetching shipments',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatusBadge = (status: ShipmentStatus) => {
     switch (status) {
@@ -76,8 +83,8 @@ const LogisticsDashboard = () => {
     }
   };
 
-  // Calculate the percentage of shipping capacity utilized
-  const capacityUtilized = 68; // Example value - in a real app, this would be calculated
+  // Calculate the percentage of shipping capacity utilized based on in-transit shipments
+  const capacityUtilized = stats.inTransit > 0 ? Math.min(Math.round((stats.inTransit / (stats.inTransit + stats.booked)) * 100), 100) : 0;
 
   return (
     <div className="space-y-8">
@@ -188,46 +195,52 @@ const LogisticsDashboard = () => {
               <CardTitle>Collection Schedule</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center p-4 border rounded-md">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center bg-blue-100 mr-4">
-                    <Calendar className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium">UK Northampton Collection</h3>
-                    <p className="text-sm text-gray-500">Every Monday & Thursday</p>
-                  </div>
-                  <Button variant="outline" size="sm" className="ml-auto">
-                    View Areas
-                  </Button>
+              {loading ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
                 </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center p-4 border rounded-md">
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center bg-blue-100 mr-4">
+                      <Calendar className="h-6 w-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium">UK Northampton Collection</h3>
+                      <p className="text-sm text-gray-500">Every Monday & Thursday</p>
+                    </div>
+                    <Button variant="outline" size="sm" className="ml-auto">
+                      View Areas
+                    </Button>
+                  </div>
 
-                <div className="flex items-center p-4 border rounded-md">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center bg-green-100 mr-4">
-                    <Truck className="h-6 w-6 text-green-600" />
+                  <div className="flex items-center p-4 border rounded-md">
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center bg-green-100 mr-4">
+                      <Truck className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium">UK to Zimbabwe Dispatch</h3>
+                      <p className="text-sm text-gray-500">Every other Friday</p>
+                    </div>
+                    <Button variant="outline" size="sm" className="ml-auto">
+                      View Schedule
+                    </Button>
                   </div>
-                  <div>
-                    <h3 className="font-medium">UK to Zimbabwe Dispatch</h3>
-                    <p className="text-sm text-gray-500">Every other Friday</p>
-                  </div>
-                  <Button variant="outline" size="sm" className="ml-auto">
-                    View Schedule
-                  </Button>
-                </div>
 
-                <div className="flex items-center p-4 border rounded-md">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center bg-purple-100 mr-4">
-                    <Users className="h-6 w-6 text-purple-600" />
+                  <div className="flex items-center p-4 border rounded-md">
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center bg-purple-100 mr-4">
+                      <Users className="h-6 w-6 text-purple-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium">Zimbabwe Deliveries</h3>
+                      <p className="text-sm text-gray-500">Starts 4-5 weeks after dispatch</p>
+                    </div>
+                    <Button variant="outline" size="sm" className="ml-auto">
+                      View Areas
+                    </Button>
                   </div>
-                  <div>
-                    <h3 className="font-medium">Zimbabwe Deliveries</h3>
-                    <p className="text-sm text-gray-500">Starts 4-5 weeks after dispatch</p>
-                  </div>
-                  <Button variant="outline" size="sm" className="ml-auto">
-                    View Areas
-                  </Button>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

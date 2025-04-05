@@ -7,6 +7,8 @@ import { Truck, MapPin, Calendar, Clock, Package, LocateFixed } from 'lucide-rea
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 const DriverDashboard = () => {
   const [deliveries, setDeliveries] = useState<any[]>([]);
@@ -17,62 +19,61 @@ const DriverDashboard = () => {
     completed: 0,
     pending: 0
   });
+  const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
-    const fetchDriverTasks = async () => {
-      try {
-        setLoading(true);
-        
-        // In a real application, this would fetch from a driver_tasks table
-        // For now, we'll pull from shipments and filter for demonstration
-        const { data, error } = await supabase
-          .from('shipments')
-          .select('*')
-          .in('status', ['Booked', 'Paid', 'In Transit'])
-          .order('created_at', { ascending: false });
+    if (user) {
+      fetchDriverTasks();
+    }
+  }, [user]);
 
-        if (error) throw error;
+  const fetchDriverTasks = async () => {
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase
+        .from('shipments')
+        .select('*')
+        .in('status', ['Booked', 'Paid', 'In Transit'])
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      if (data) {
+        // Filter into collections (UK) and deliveries (international)
+        const collectionsData = data.filter(item => 
+          item.origin?.toLowerCase().includes('uk') || 
+          item.origin?.toLowerCase().includes('united kingdom')
+        );
         
-        if (data) {
-          // Filter into collections (UK) and deliveries (Zimbabwe)
-          // This is simplified - in a real app, there would be a dedicated table for this
-          const collectionsData = data.filter((item, index) => index % 2 === 0);
-          const deliveriesData = data.filter((item, index) => index % 2 === 1);
-          
-          setCollections(collectionsData);
-          setDeliveries(deliveriesData);
-          
-          setStats({
-            assigned: data.length,
-            completed: Math.floor(data.length * 0.3), // Just for demonstration
-            pending: Math.floor(data.length * 0.7) // Just for demonstration
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching driver tasks:', error);
-      } finally {
-        setLoading(false);
+        const deliveriesData = data.filter(item => 
+          item.destination?.toLowerCase().includes('zimbabwe')
+        );
+        
+        setCollections(collectionsData);
+        setDeliveries(deliveriesData);
+        
+        setStats({
+          assigned: data.length,
+          completed: data.filter(item => item.status === 'Delivered').length,
+          pending: data.filter(item => item.status !== 'Delivered').length
+        });
       }
-    };
-
-    fetchDriverTasks();
-  }, []);
-
-  // Map to get a UK postcode area
-  const getRandomUKPostcode = () => {
-    const areas = ['NN', 'MK', 'LE', 'CV', 'OX', 'B', 'LU'];
-    const randomArea = areas[Math.floor(Math.random() * areas.length)];
-    return `${randomArea}${Math.floor(Math.random() * 20) + 1} ${Math.floor(Math.random() * 9)}XX`;
-  };
-
-  // Map to get a Zimbabwe city
-  const getRandomZimCity = () => {
-    const cities = ['Harare', 'Bulawayo', 'Mutare', 'Gweru', 'Kwekwe', 'Kadoma', 'Masvingo'];
-    return cities[Math.floor(Math.random() * cities.length)];
+    } catch (error: any) {
+      console.error('Error fetching driver tasks:', error);
+      toast({
+        title: 'Error fetching tasks',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Progress for today's tasks
-  const todayProgress = 40; // Example percentage
+  const todayProgress = Math.round((stats.completed / (stats.assigned || 1)) * 100);
 
   return (
     <div className="space-y-8">
@@ -144,14 +145,14 @@ const DriverDashboard = () => {
               ) : collections.length > 0 ? (
                 <div className="space-y-4">
                   {collections.slice(0, 5).map((item, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 border rounded-md">
+                    <div key={item.id} className="flex items-center justify-between p-4 border rounded-md">
                       <div className="flex items-center">
                         <div className="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100 mr-3">
                           <MapPin className="h-5 w-5 text-blue-600" />
                         </div>
                         <div>
                           <h3 className="font-medium">{item.tracking_number}</h3>
-                          <p className="text-sm text-gray-500">{getRandomUKPostcode()}</p>
+                          <p className="text-sm text-gray-500">{item.origin}</p>
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -185,14 +186,14 @@ const DriverDashboard = () => {
               ) : deliveries.length > 0 ? (
                 <div className="space-y-4">
                   {deliveries.slice(0, 5).map((item, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 border rounded-md">
+                    <div key={item.id} className="flex items-center justify-between p-4 border rounded-md">
                       <div className="flex items-center">
                         <div className="w-10 h-10 rounded-full flex items-center justify-center bg-green-100 mr-3">
                           <LocateFixed className="h-5 w-5 text-green-600" />
                         </div>
                         <div>
                           <h3 className="font-medium">{item.tracking_number}</h3>
-                          <p className="text-sm text-gray-500">{getRandomZimCity()}</p>
+                          <p className="text-sm text-gray-500">{item.destination}</p>
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -219,46 +220,52 @@ const DriverDashboard = () => {
               <CardTitle>Weekly Schedule</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center p-4 border rounded-md">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center bg-blue-100 mr-4">
-                    <Calendar className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium">Monday</h3>
-                    <p className="text-sm text-gray-500">Northampton Area Collections</p>
-                  </div>
-                  <Button variant="outline" size="sm" className="ml-auto">
-                    View Route
-                  </Button>
+              {loading ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
                 </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center p-4 border rounded-md">
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center bg-blue-100 mr-4">
+                      <Calendar className="h-6 w-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium">Monday</h3>
+                      <p className="text-sm text-gray-500">Northampton Area Collections</p>
+                    </div>
+                    <Button variant="outline" size="sm" className="ml-auto">
+                      View Route
+                    </Button>
+                  </div>
 
-                <div className="flex items-center p-4 border rounded-md">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center bg-purple-100 mr-4">
-                    <Calendar className="h-6 w-6 text-purple-600" />
+                  <div className="flex items-center p-4 border rounded-md">
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center bg-purple-100 mr-4">
+                      <Calendar className="h-6 w-6 text-purple-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium">Thursday</h3>
+                      <p className="text-sm text-gray-500">London Area Collections</p>
+                    </div>
+                    <Button variant="outline" size="sm" className="ml-auto">
+                      View Route
+                    </Button>
                   </div>
-                  <div>
-                    <h3 className="font-medium">Thursday</h3>
-                    <p className="text-sm text-gray-500">London Area Collections</p>
-                  </div>
-                  <Button variant="outline" size="sm" className="ml-auto">
-                    View Route
-                  </Button>
-                </div>
 
-                <div className="flex items-center p-4 border rounded-md">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center bg-green-100 mr-4">
-                    <Calendar className="h-6 w-6 text-green-600" />
+                  <div className="flex items-center p-4 border rounded-md">
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center bg-green-100 mr-4">
+                      <Calendar className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium">Friday</h3>
+                      <p className="text-sm text-gray-500">Warehouse Loading/Dispatch</p>
+                    </div>
+                    <Button variant="outline" size="sm" className="ml-auto">
+                      View Details
+                    </Button>
                   </div>
-                  <div>
-                    <h3 className="font-medium">Friday</h3>
-                    <p className="text-sm text-gray-500">Warehouse Loading/Dispatch</p>
-                  </div>
-                  <Button variant="outline" size="sm" className="ml-auto">
-                    View Details
-                  </Button>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

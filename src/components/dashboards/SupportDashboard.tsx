@@ -7,6 +7,7 @@ import { MessageSquare, Users, Clock, Bell, CheckCircle2, AlertCircle } from 'lu
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
 
 const SupportDashboard = () => {
   const [tickets, setTickets] = useState<any[]>([]);
@@ -17,46 +18,48 @@ const SupportDashboard = () => {
     highPriority: 0,
     responseRate: 90, // Example percentage
   });
+  const { toast } = useToast();
 
   useEffect(() => {
-    const fetchSupportTickets = async () => {
-      try {
-        setLoading(true);
-        
-        // In a real application, this would fetch from the support_tickets table
-        // For this demo, we'll create mock data
-        const mockTickets = Array.from({ length: 8 }, (_, i) => ({
-          id: `ticket-${i + 1}`,
-          subject: `Support Request #${i + 1}`,
-          message: `This is a sample support ticket message #${i + 1}`,
-          status: i < 5 ? 'Open' : 'Closed',
-          priority: i % 3 === 0 ? 'High' : i % 3 === 1 ? 'Medium' : 'Low',
-          created_at: new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString(),
-          user_id: `user-${i % 4 + 1}`,
-          user_email: `user${i % 4 + 1}@example.com`,
-        }));
-        
-        setTickets(mockTickets);
+    fetchSupportTickets();
+  }, []);
+
+  const fetchSupportTickets = async () => {
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase
+        .from('support_tickets')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        setTickets(data);
         
         // Compute stats
-        const openCount = mockTickets.filter(t => t.status === 'Open').length;
-        const highPriorityCount = mockTickets.filter(t => t.priority === 'High').length;
+        const openCount = data.filter(t => t.status === 'Open').length;
+        const highPriorityCount = data.filter(t => t.priority === 'High').length;
         
         setStats({
           open: openCount,
-          closed: mockTickets.length - openCount,
+          closed: data.length - openCount,
           highPriority: highPriorityCount,
-          responseRate: 90, // Example percentage
+          responseRate: 90, // Default percentage until we have more data
         });
-      } catch (error) {
-        console.error('Error fetching support tickets:', error);
-      } finally {
-        setLoading(false);
       }
-    };
-
-    fetchSupportTickets();
-  }, []);
+    } catch (error: any) {
+      console.error('Error fetching support tickets:', error.message);
+      toast({
+        title: 'Error fetching tickets',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getPriorityBadge = (priority: string) => {
     switch (priority) {
@@ -151,15 +154,15 @@ const SupportDashboard = () => {
                 </div>
               ) : tickets.filter(t => t.status === 'Open').length > 0 ? (
                 <div className="space-y-4">
-                  {tickets.filter(t => t.status === 'Open').map((ticket, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 border rounded-md">
+                  {tickets.filter(t => t.status === 'Open').map((ticket) => (
+                    <div key={ticket.id} className="flex items-center justify-between p-4 border rounded-md">
                       <div className="flex items-center">
                         <div className="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100 mr-3">
                           <Users className="h-5 w-5 text-blue-600" />
                         </div>
                         <div>
                           <h3 className="font-medium">{ticket.subject}</h3>
-                          <p className="text-sm text-gray-500">{ticket.user_email}</p>
+                          <p className="text-sm text-gray-500">{ticket.user_id}</p>
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -190,8 +193,8 @@ const SupportDashboard = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {tickets.filter(t => t.status === 'Open').slice(0, 3).map((ticket, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 border rounded-md">
+                  {tickets.filter(t => t.status === 'Open').slice(0, 3).map((ticket) => (
+                    <div key={ticket.id} className="flex items-center justify-between p-4 border rounded-md">
                       <div className="flex items-center">
                         <div className="w-10 h-10 rounded-full flex items-center justify-center bg-green-100 mr-3">
                           <MessageSquare className="h-5 w-5 text-green-600" />
@@ -234,15 +237,15 @@ const SupportDashboard = () => {
                 </div>
               ) : tickets.filter(t => t.status === 'Closed').length > 0 ? (
                 <div className="space-y-4">
-                  {tickets.filter(t => t.status === 'Closed').map((ticket, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 border rounded-md">
+                  {tickets.filter(t => t.status === 'Closed').map((ticket) => (
+                    <div key={ticket.id} className="flex items-center justify-between p-4 border rounded-md">
                       <div className="flex items-center">
                         <div className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-100 mr-3">
                           <CheckCircle2 className="h-5 w-5 text-gray-600" />
                         </div>
                         <div>
                           <h3 className="font-medium">{ticket.subject}</h3>
-                          <p className="text-sm text-gray-500">{ticket.user_email}</p>
+                          <p className="text-sm text-gray-500">{ticket.user_id}</p>
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
