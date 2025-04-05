@@ -51,23 +51,25 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      <main className="flex-grow container mx-auto px-4 py-8">
-        <div className="mb-8 flex justify-between items-center">
+      <main className="flex-grow container mx-auto px-4 py-4 md:py-8">
+        <div className="mb-4 md:mb-8 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
           <div>
-            <h1 className="text-3xl font-bold">
+            <h1 className="text-2xl md:text-3xl font-bold">
               {role === 'admin' ? 'Admin Dashboard' :
                role === 'logistics' ? 'Logistics Dashboard' :
                role === 'driver' ? 'Driver Dashboard' :
                role === 'support' ? 'Support Dashboard' :
                'My Dashboard'}
             </h1>
-            <p className="text-gray-500">
+            <p className="text-gray-500 text-sm md:text-base">
               Welcome back, {user?.user_metadata?.full_name || user?.email}
             </p>
           </div>
           
           {/* Role elevation dialog for testing purposes */}
-          <RoleElevationDialog />
+          <div className="self-start md:self-auto">
+            <RoleElevationDialog />
+          </div>
         </div>
         
         {renderDashboard()}
