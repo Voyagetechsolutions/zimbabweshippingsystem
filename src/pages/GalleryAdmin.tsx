@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { 
   Select, 
   SelectContent, 
@@ -30,6 +31,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { GalleryImage, GalleryCategory } from '@/types/gallery';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Json } from '@/integrations/supabase/types';
 
 const GalleryAdmin = () => {
   const { isAdmin } = useAuth();
@@ -72,7 +74,8 @@ const GalleryAdmin = () => {
       if (error) throw error;
       
       if (data) {
-        setImages(data as GalleryImage[]);
+        // Properly cast the Json[] to GalleryImage[]
+        setImages(data as unknown as GalleryImage[]);
       }
     } catch (error: any) {
       console.error('Error fetching gallery images:', error.message);

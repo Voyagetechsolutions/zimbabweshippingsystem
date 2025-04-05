@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { GalleryImage, GalleryCategory } from '@/types/gallery';
 import { useToast } from '@/hooks/use-toast';
 import { Image as ImageIcon, Loader } from 'lucide-react';
+import { Json } from '@/integrations/supabase/types';
 
 const Gallery = () => {
   const [images, setImages] = useState<GalleryImage[]>([]);
@@ -28,7 +29,8 @@ const Gallery = () => {
       }
       
       if (data) {
-        setImages(data as GalleryImage[]);
+        // Properly cast the Json[] to GalleryImage[]
+        setImages(data as unknown as GalleryImage[]);
       }
     } catch (error: any) {
       console.error('Error fetching gallery images:', error.message);
