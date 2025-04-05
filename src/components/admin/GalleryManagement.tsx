@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -55,10 +54,10 @@ const GalleryManagement = () => {
   const { data: galleryImages, isLoading } = useQuery({
     queryKey: ['adminGalleryImages'],
     queryFn: async () => {
-      const { data, error } = await callRpcFunction('get_gallery_images');
+      const { data, error } = await callRpcFunction<GalleryImage[]>('get_gallery_images');
       
       if (error) throw error;
-      return data ? (data as GalleryImage[]) : [];
+      return data ? (data as unknown as GalleryImage[]) : [];
     }
   });
 
@@ -84,7 +83,7 @@ const GalleryManagement = () => {
         .from('images')
         .getPublicUrl(filePath);
 
-      const { data, error: insertError } = await callRpcFunction('insert_gallery_image', {
+      const { data, error: insertError } = await callRpcFunction<GalleryImage>('insert_gallery_image', {
         p_src: publicURL.publicUrl,
         p_alt: newImage.alt || '',
         p_caption: newImage.caption || '',
@@ -120,7 +119,6 @@ const GalleryManagement = () => {
 
   const deleteImageMutation = useMutation({
     mutationFn: async (imageId: string) => {
-      // Type assertion to ensure galleryImages is treated as an array
       const images = galleryImages as GalleryImage[];
       const imageToDelete = images.find(img => img.id === imageId);
       if (!imageToDelete) throw new Error('Image not found');
@@ -141,7 +139,7 @@ const GalleryManagement = () => {
         console.warn('File may not exist in storage:', err);
       }
 
-      const { error: dbError } = await callRpcFunction('delete_gallery_image', { 
+      const { error: dbError } = await callRpcFunction<boolean>('delete_gallery_image', { 
         p_id: imageId 
       });
 
@@ -234,7 +232,6 @@ const GalleryManagement = () => {
     setFilePreview(null);
   };
 
-  // Ensure galleryImages is always treated as an array
   const safeGalleryImages = Array.isArray(galleryImages) ? galleryImages : [];
 
   return (

@@ -8,8 +8,8 @@ import { Json } from '@/integrations/supabase/types';
  * @param params Optional parameters to pass to the function
  * @returns The function result
  */
-export const callRpcFunction = async (functionName: string, params?: Record<string, any>) => {
-  return supabase.rpc(functionName, params || {});
+export const callRpcFunction = async <T = any>(functionName: string, params?: Record<string, any>) => {
+  return supabase.rpc(functionName, params || {}) as Promise<{ data: T; error: any }>;
 };
 
 /**
