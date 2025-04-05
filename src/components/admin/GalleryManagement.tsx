@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -54,10 +55,10 @@ const GalleryManagement = () => {
   const { data: galleryImages, isLoading } = useQuery({
     queryKey: ['adminGalleryImages'],
     queryFn: async () => {
-      const { data, error } = await callRpcFunction<GalleryImage[]>('get_gallery_images');
+      const { data, error } = await callRpcFunction('get_gallery_images');
       
       if (error) throw error;
-      return data || [];
+      return data ? (data as GalleryImage[]) : [];
     }
   });
 
@@ -74,16 +75,16 @@ const GalleryManagement = () => {
       const filePath = `gallery/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('public')
+        .from('images')
         .upload(filePath, uploadedFile);
 
       if (uploadError) throw uploadError;
 
       const { data: publicURL } = supabase.storage
-        .from('public')
+        .from('images')
         .getPublicUrl(filePath);
 
-      const { data, error: insertError } = await callRpcFunction<GalleryImage>('insert_gallery_image', {
+      const { data, error: insertError } = await callRpcFunction('insert_gallery_image', {
         p_src: publicURL.publicUrl,
         p_alt: newImage.alt || '',
         p_caption: newImage.caption || '',
@@ -119,22 +120,28 @@ const GalleryManagement = () => {
 
   const deleteImageMutation = useMutation({
     mutationFn: async (imageId: string) => {
-      const imageToDelete = galleryImages?.find(img => img.id === imageId);
+      // Type assertion to ensure galleryImages is treated as an array
+      const images = galleryImages as GalleryImage[];
+      const imageToDelete = images.find(img => img.id === imageId);
       if (!imageToDelete) throw new Error('Image not found');
 
       const fileUrl = imageToDelete.src;
       const fileName = fileUrl.split('/').pop();
       const filePath = `gallery/${fileName}`;
 
-      const { error: storageError } = await supabase.storage
-        .from('public')
-        .remove([filePath]);
+      try {
+        const { error: storageError } = await supabase.storage
+          .from('images')
+          .remove([filePath]);
 
-      if (storageError) {
-        console.warn('Error deleting file from storage:', storageError);
+        if (storageError) {
+          console.warn('Error deleting file from storage:', storageError);
+        }
+      } catch (err) {
+        console.warn('File may not exist in storage:', err);
       }
 
-      const { error: dbError } = await callRpcFunction<boolean>('delete_gallery_image', { 
+      const { error: dbError } = await callRpcFunction('delete_gallery_image', { 
         p_id: imageId 
       });
 
@@ -227,6 +234,9 @@ const GalleryManagement = () => {
     setFilePreview(null);
   };
 
+  // Ensure galleryImages is always treated as an array
+  const safeGalleryImages = Array.isArray(galleryImages) ? galleryImages : [];
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -256,8 +266,8 @@ const GalleryManagement = () => {
 
           <TabsContent value="all" className="mt-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {galleryImages && galleryImages.length > 0 ? (
-                galleryImages.map((image) => (
+              {safeGalleryImages.length > 0 ? (
+                safeGalleryImages.map((image) => (
                   <GalleryImageCard 
                     key={image.id} 
                     image={image} 
@@ -284,8 +294,8 @@ const GalleryManagement = () => {
           {galleryCategories.map((category) => (
             <TabsContent key={category.value} value={category.value} className="mt-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {galleryImages && galleryImages.filter(img => img.category === category.value).length > 0 ? (
-                  galleryImages
+                {safeGalleryImages.filter(img => img.category === category.value).length > 0 ? (
+                  safeGalleryImages
                     .filter(img => img.category === category.value)
                     .map((image) => (
                       <GalleryImageCard 
