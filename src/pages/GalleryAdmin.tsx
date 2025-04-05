@@ -1,447 +1,445 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { Separator } from '@/components/ui/separator';
-import { useAuth } from '@/contexts/AuthContext';
-import { Navigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
-import { 
-  Image as ImageIcon, 
-  Plus, 
-  Trash2, 
-  UploadCloud, 
-  Edit,
-  Check,
-  X
-} from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { AlertCircle, FileImage, Filter, MoreHorizontal, Plus, RefreshCw, Search, Trash, Upload, X } from 'lucide-react';
 import { GalleryImage, GalleryCategory } from '@/types/gallery';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Json } from '@/integrations/supabase/types';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 const GalleryAdmin = () => {
-  const { isAdmin } = useAuth();
   const [images, setImages] = useState<GalleryImage[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [imageToDelete, setImageToDelete] = useState<string | null>(null);
-
-  // Form state
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageAlt, setImageAlt] = useState('');
-  const [imageCaption, setImageCaption] = useState('');
-  const [imageCategory, setImageCategory] = useState<GalleryCategory>('facilities');
-
+  const [isLoading, setIsLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
+  const [formData, setFormData] = useState({
+    src: '',
+    alt: '',
+    caption: '',
+    category: 'facilities' as GalleryCategory,
+  });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterCategory, setFilterCategory] = useState('all');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-
-  // Categories for gallery images
-  const categories: { value: GalleryCategory; label: string }[] = [
-    { value: 'facilities', label: 'Our Facilities' },
-    { value: 'shipments', label: 'Shipments' },
-    { value: 'team', label: 'Our Team' },
-    { value: 'customers', label: 'Happy Customers' },
-  ];
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     fetchGalleryImages();
   }, []);
 
-  if (!isAdmin) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   const fetchGalleryImages = async () => {
     try {
-      setLoading(true);
+      setIsLoading(true);
+      
       const { data, error } = await supabase.rpc('get_gallery_images');
       
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
       
       if (data) {
         // Properly cast the Json[] to GalleryImage[]
         setImages(data as unknown as GalleryImage[]);
       }
     } catch (error: any) {
-      console.error('Error fetching gallery images:', error.message);
+      console.error('Error fetching gallery images:', error);
       toast({
         title: 'Error',
         description: 'Failed to load gallery images. Please try again.',
         variant: 'destructive',
       });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setImageFile(file);
-      
-      // Create a preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
+  const handleOpenDialog = () => {
+    setIsDialogOpen(true);
+    setIsEditing(false);
+    setSelectedImage(null);
+    setFormData({
+      src: '',
+      alt: '',
+      caption: '',
+      category: 'facilities',
+    });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!imageFile) {
-      toast({
-        title: 'Error',
-        description: 'Please select an image to upload.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    if (!imageAlt || !imageCaption || !imageCategory) {
-      toast({
-        title: 'Error',
-        description: 'Please fill in all fields.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSelectChange = (value: string) => {
+    setFormData(prev => ({ ...prev, category: value as GalleryCategory }));
+  };
+
+  const handleEditImage = (image: GalleryImage) => {
+    setIsEditing(true);
+    setSelectedImage(image);
+    setFormData({
+      src: image.src,
+      alt: image.alt,
+      caption: image.caption,
+      category: image.category,
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleDeleteImage = async (id: number) => {
+    const confirmDelete = window.confirm("Are you sure you want to delete this image?");
+    if (!confirmDelete) return;
+
     try {
-      setUploading(true);
-      
-      // Upload the image to Supabase Storage
-      const fileExt = imageFile.name.split('.').pop();
-      const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-      const filePath = `gallery/${fileName}`;
-      
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('images')
-        .upload(filePath, imageFile);
-      
-      if (uploadError) throw uploadError;
-      
-      // Get the public URL
-      const { data: urlData } = supabase.storage
-        .from('images')
-        .getPublicUrl(filePath);
-      
-      // Save the image info to the database
-      const { data: insertData, error: insertError } = await supabase.rpc(
-        'insert_gallery_image',
-        {
-          p_src: urlData.publicUrl,
-          p_alt: imageAlt,
-          p_caption: imageCaption,
-          p_category: imageCategory
-        }
-      );
-      
-      if (insertError) throw insertError;
-      
+      setIsLoading(true);
+      const { error } = await supabase
+        .from('gallery')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        throw error;
+      }
+
+      setImages(prevImages => prevImages.filter(image => image.id !== id));
       toast({
         title: 'Success',
-        description: 'Gallery image uploaded successfully.',
+        description: 'Image deleted successfully.',
       });
-      
-      // Refresh gallery images
-      fetchGalleryImages();
-      
-      // Reset form
-      setImageFile(null);
-      setImagePreview(null);
-      setImageAlt('');
-      setImageCaption('');
-      setImageCategory('facilities');
-      
-      // Reset file input
-      const fileInput = document.getElementById('image-upload') as HTMLInputElement;
-      if (fileInput) fileInput.value = '';
-      
     } catch (error: any) {
-      console.error('Error uploading image:', error.message);
-      toast({
-        title: 'Error',
-        description: 'Failed to upload image. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleDeleteImage = async () => {
-    if (!imageToDelete) return;
-    
-    try {
-      const { data, error } = await supabase.rpc(
-        'delete_gallery_image',
-        { p_id: imageToDelete }
-      );
-      
-      if (error) throw error;
-      
-      toast({
-        title: 'Success',
-        description: 'Gallery image deleted successfully.',
-      });
-      
-      // Refresh gallery images
-      fetchGalleryImages();
-      
-      // Close dialog
-      setDialogOpen(false);
-      setImageToDelete(null);
-      
-    } catch (error: any) {
-      console.error('Error deleting image:', error.message);
+      console.error('Error deleting image:', error);
       toast({
         title: 'Error',
         description: 'Failed to delete image. Please try again.',
         variant: 'destructive',
       });
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      if (isEditing && selectedImage) {
+        // Update existing image
+        const { error } = await supabase
+          .from('gallery')
+          .update({
+            src: formData.src,
+            alt: formData.alt,
+            caption: formData.caption,
+            category: formData.category,
+          })
+          .eq('id', selectedImage.id);
+
+        if (error) {
+          throw error;
+        }
+
+        setImages(prevImages =>
+          prevImages.map(image =>
+            image.id === selectedImage.id ? { ...image, ...formData } : image
+          )
+        );
+        toast({
+          title: 'Success',
+          description: 'Image updated successfully.',
+        });
+      } else {
+        // Create new image
+        const { data, error } = await supabase
+          .from('gallery')
+          .insert([
+            {
+              src: formData.src,
+              alt: formData.alt,
+              caption: formData.caption,
+              category: formData.category,
+            },
+          ]);
+
+        if (error) {
+          throw error;
+        }
+
+        // Fetch the updated gallery images to reflect the changes
+        await fetchGalleryImages();
+
+        toast({
+          title: 'Success',
+          description: 'Image added successfully.',
+        });
+      }
+    } catch (error: any) {
+      console.error('Error adding/updating image:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add/update image. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+      handleCloseDialog();
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      toast({
+        title: 'Error',
+        description: 'No file selected.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const timestamp = new Date().getTime();
+      const fileExt = file.name.split('.').pop();
+      const fileName = `gallery_${timestamp}.${fileExt}`;
+      const filePath = `gallery/${fileName}`;
+
+      const { data, error } = await supabase.storage
+        .from('images')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      const imageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${data.Key}`;
+      setFormData(prev => ({ ...prev, src: imageUrl }));
+      toast({
+        title: 'Success',
+        description: 'File uploaded successfully.',
+      });
+    } catch (error: any) {
+      console.error('Error uploading file:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to upload file. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const filteredImages = images.filter(image => {
+    const searchRegex = new RegExp(searchQuery, 'i');
+    const matchesSearch = searchRegex.test(image.alt) || searchRegex.test(image.caption);
+
+    const matchesCategory = filterCategory === 'all' || image.category === filterCategory;
+
+    return matchesSearch && matchesCategory;
+  });
+
+  const categories: { value: GalleryCategory | 'all'; label: string }[] = [
+    { value: 'all', label: 'All' },
+    { value: 'facilities', label: 'Our Facilities' },
+    { value: 'shipments', label: 'Shipments' },
+    { value: 'team', label: 'Our Team' },
+    { value: 'customers', label: 'Happy Customers' },
+  ];
 
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      <main className="flex-grow">
-        <div className="container mx-auto px-4 py-10 max-w-7xl">
-          <h1 className="text-3xl font-bold mb-2">Gallery Administration</h1>
-          <p className="text-gray-600 mb-6">
-            Manage gallery images for the website.
-          </p>
-          <Separator className="my-6" />
-          
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-1">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Add New Image</CardTitle>
-                  <CardDescription>Upload images to display on the gallery page</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleSubmit}>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="image-upload">Image</Label>
-                        <div 
-                          className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-center ${
-                            imagePreview ? 'border-green-300 bg-green-50' : 'border-gray-300 hover:border-gray-400'
-                          } transition-colors duration-200`}
-                        >
-                          {imagePreview ? (
-                            <div className="space-y-2">
-                              <img 
-                                src={imagePreview} 
-                                alt="Preview" 
-                                className="max-h-48 mx-auto rounded-md" 
-                              />
-                              <Button 
-                                type="button" 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => {
-                                  setImageFile(null);
-                                  setImagePreview(null);
-                                  const fileInput = document.getElementById('image-upload') as HTMLInputElement;
-                                  if (fileInput) fileInput.value = '';
-                                }}
-                              >
-                                <X className="h-4 w-4 mr-2" />
-                                Remove Image
-                              </Button>
-                            </div>
-                          ) : (
-                            <>
-                              <UploadCloud className="h-12 w-12 text-gray-400 mb-2" />
-                              <div className="text-sm text-gray-600 mb-2">
-                                <label 
-                                  htmlFor="image-upload"
-                                  className="font-medium text-zim-green hover:text-zim-green/90 cursor-pointer"
-                                >
-                                  Click to upload
-                                </label>
-                                {' '}or drag and drop
-                              </div>
-                              <p className="text-xs text-gray-500">
-                                PNG, JPG, GIF up to 10MB
-                              </p>
-                            </>
-                          )}
-                          <input
-                            id="image-upload"
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleFileChange}
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="alt">Alt Text</Label>
-                        <Input
-                          id="alt"
-                          placeholder="Description for screen readers"
-                          value={imageAlt}
-                          onChange={(e) => setImageAlt(e.target.value)}
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="caption">Caption</Label>
-                        <Textarea
-                          id="caption"
-                          placeholder="Image caption"
-                          value={imageCaption}
-                          onChange={(e) => setImageCaption(e.target.value)}
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="category">Category</Label>
-                        <Select
-                          value={imageCategory}
-                          onValueChange={(value: GalleryCategory) => setImageCategory(value)}
-                        >
-                          <SelectTrigger id="category">
-                            <SelectValue placeholder="Select a category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categories.map((category) => (
-                              <SelectItem key={category.value} value={category.value}>
-                                {category.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    
-                    <Button 
-                      type="submit" 
-                      className="w-full mt-6 bg-zim-green hover:bg-zim-green/90"
-                      disabled={uploading || !imageFile}
-                    >
-                      {uploading ? (
-                        <>
-                          <div className="animate-spin mr-2 h-4 w-4 border-t-2 border-b-2 border-white rounded-full" />
-                          Uploading...
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add to Gallery
-                        </>
-                      )}
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-            </div>
-            
-            <div className="lg:col-span-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Gallery Images</CardTitle>
-                  <CardDescription>Manage existing images in the gallery</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loading ? (
-                    <div className="flex justify-center items-center py-12">
-                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
-                    </div>
-                  ) : images.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {images.map((image) => (
-                        <Card key={image.id} className="overflow-hidden">
-                          <div className="aspect-w-16 aspect-h-9 relative">
-                            <img 
-                              src={image.src} 
-                              alt={image.alt} 
-                              className="object-cover w-full h-full"
-                            />
-                            <Button
-                              variant="destructive"
-                              size="icon"
-                              className="absolute top-2 right-2 opacity-90"
-                              onClick={() => {
-                                setImageToDelete(image.id);
-                                setDialogOpen(true);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          <CardFooter className="flex flex-col items-start pt-4 pb-4 px-4">
-                            <p className="font-medium text-sm mb-1 line-clamp-1">{image.caption}</p>
-                            <div className="flex items-center justify-between w-full">
-                              <Badge variant="secondary" className="capitalize text-xs">
-                                {image.category}
-                              </Badge>
-                              <span className="text-xs text-gray-500">
-                                {new Date(image.created_at || '').toLocaleDateString()}
-                              </span>
-                            </div>
-                          </CardFooter>
-                        </Card>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <ImageIcon className="h-12 w-12 mx-auto text-gray-300 mb-3" />
-                      <h3 className="text-lg font-medium text-gray-600 mb-1">No images yet</h3>
-                      <p className="text-gray-500 mb-4">
-                        Upload your first image to get started with the gallery.
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-          
-          {/* Delete Confirmation Dialog */}
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Confirm Deletion</DialogTitle>
-              </DialogHeader>
-              <div className="py-4">
-                <p>Are you sure you want to delete this image from the gallery? This action cannot be undone.</p>
+      <main className="flex-grow py-8 px-4">
+        <div className="container mx-auto max-w-7xl">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-2xl">Gallery Management</CardTitle>
+              <CardDescription>Manage and organize images in the gallery</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-4 mb-4 md:grid-cols-3">
+                <Input
+                  type="text"
+                  placeholder="Search images..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                />
+                <Select value={filterCategory} onValueChange={value => setFilterCategory(value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filter by category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map(category => (
+                      <SelectItem key={category.value} value={category.value}>
+                        {category.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button onClick={handleOpenDialog}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Image
+                </Button>
               </div>
-              <DialogFooter className="flex flex-row justify-end gap-2 sm:gap-0">
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button variant="destructive" onClick={handleDeleteImage}>
-                  Delete Image
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+
+              {isLoading ? (
+                <div className="flex justify-center items-center py-20">
+                  <RefreshCw className="h-12 w-12 animate-spin text-gray-400" />
+                </div>
+              ) : filteredImages.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredImages.map(image => (
+                    <div key={image.id} className="relative">
+                      <img
+                        src={image.src}
+                        alt={image.alt}
+                        className="object-cover w-full h-48 rounded-md shadow-md"
+                      />
+                      <div className="absolute top-2 right-2 flex space-x-2">
+                        <Button size="icon" variant="ghost" onClick={() => handleEditImage(image)}>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="destructive" onClick={() => handleDeleteImage(image.id)}>
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="mt-2">
+                        <p className="text-gray-800 font-medium">{image.caption}</p>
+                        <Badge className="mt-1">{image.category}</Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-20">
+                  <FileImage className="h-16 w-16 mx-auto text-gray-300 mb-4" />
+                  <h3 className="text-xl font-medium text-gray-600 mb-2">No images found</h3>
+                  <p className="text-gray-500">
+                    {searchQuery
+                      ? "No images match your search criteria."
+                      : "There are no gallery images available yet."}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </main>
       <Footer />
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{isEditing ? 'Edit Image' : 'Add Image'}</DialogTitle>
+            <DialogDescription>
+              {isEditing ? 'Update the image details.' : 'Upload a new image to the gallery.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="src" className="text-right">
+                Image URL
+              </Label>
+              <Input
+                id="src"
+                name="src"
+                value={formData.src}
+                onChange={handleInputChange}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="upload" className="text-right">
+                Upload Image
+              </Label>
+              <Input
+                type="file"
+                id="upload"
+                name="upload"
+                onChange={handleFileUpload}
+                className="col-span-3 hidden"
+                ref={fileInputRef}
+              />
+              <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="col-span-3 justify-start">
+                <Upload className="mr-2 h-4 w-4" />
+                {formData.src ? 'Change File' : 'Upload File'}
+              </Button>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="alt" className="text-right">
+                Alt Text
+              </Label>
+              <Input
+                id="alt"
+                name="alt"
+                value={formData.alt}
+                onChange={handleInputChange}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="caption" className="text-right mt-2">
+                Caption
+              </Label>
+              <Textarea
+                id="caption"
+                name="caption"
+                value={formData.caption}
+                onChange={handleInputChange}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="category" className="text-right">
+                Category
+              </Label>
+              <Select value={formData.category} onValueChange={handleSelectChange}>
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(category => (
+                    <SelectItem key={category.value} value={category.value}>
+                      {category.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="submit" onClick={handleSubmit} disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  Saving...
+                </>
+              ) : (
+                isEditing ? 'Update Image' : 'Add Image'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

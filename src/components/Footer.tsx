@@ -10,7 +10,7 @@ const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="bg-gray-900 text-white pt-16 pb-8">
+    <footer className="bg-gray-900 text-white pt-16 pb-8 w-full">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 pb-8">
           <div className="md:col-span-1">
@@ -39,9 +39,6 @@ const Footer: React.FC = () => {
               </li>
               <li>
                 <Link to="/services" className="text-gray-400 hover:text-white transition-colors">Services</Link>
-              </li>
-              <li>
-                <Link to="/pricing" className="text-gray-400 hover:text-white transition-colors">Pricing</Link>
               </li>
               <li>
                 <Link to="/track" className="text-gray-400 hover:text-white transition-colors">Track Shipment</Link>
@@ -81,14 +78,14 @@ const Footer: React.FC = () => {
                 <div>
                   <p className="text-gray-300">UK Office:</p>
                   <p className="text-gray-400">
-                    Unit 5, Enterprise Way<br />
-                    Northampton Business Park<br />
-                    Northampton, NN3 6QL<br />
-                    United Kingdom
+                    Pastures Lodge Farm, Raunds Road<br />
+                    Chelveston, Wellingborough<br />
+                    Northamptonshire, England<br />
+                    NN9 6AA
                   </p>
                 </div>
               </li>
-              <li className="flex">
+              <li className="flex items-start">
                 <MapPin className="h-5 w-5 text-zim-yellow mr-2 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-gray-300">Zimbabwe Office:</p>

@@ -8,7 +8,6 @@ import './App.css';
 import Index from './pages/Index';
 import Auth from './pages/Auth';
 import Services from './pages/Services';
-import Pricing from './pages/Pricing';
 import Gallery from './pages/Gallery';
 import Contact from './pages/Contact';
 import Track from './pages/Track';
@@ -61,7 +60,6 @@ function App() {
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<RedirectIfAuthenticated><Auth /></RedirectIfAuthenticated>} />
                   <Route path="/services" element={<Services />} />
-                  <Route path="/pricing" element={<Pricing />} />
                   <Route path="/gallery" element={<Gallery />} />
                   <Route path="/contact" element={<Contact />} />
                   <Route path="/track" element={<Track />} />

@@ -29,7 +29,7 @@ const Gallery = () => {
       }
       
       if (data) {
-        // Properly cast the Json[] to GalleryImage[]
+        // Properly cast the result to GalleryImage[]
         setImages(data as unknown as GalleryImage[]);
       }
     } catch (error: any) {
@@ -57,9 +57,9 @@ const Gallery = () => {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col w-full">
       <Navbar />
-      <main className="flex-grow py-8 px-4 md:px-8">
+      <main className="flex-grow py-8 px-4 md:px-8 w-full">
         <div className="container mx-auto max-w-7xl">
           <div className="mb-8 text-center">
             <h1 className="text-3xl md:text-4xl font-bold mb-2">Our Gallery</h1>
@@ -69,7 +69,7 @@ const Gallery = () => {
           </div>
 
           <Tabs defaultValue="all" value={activeCategory} onValueChange={(value) => setActiveCategory(value as GalleryCategory | 'all')}>
-            <div className="flex justify-center mb-8">
+            <div className="flex justify-center mb-8 overflow-x-auto w-full">
               <TabsList className="bg-gray-100 p-1 overflow-x-auto flex-wrap justify-center">
                 {categories.map((category) => (
                   <TabsTrigger 

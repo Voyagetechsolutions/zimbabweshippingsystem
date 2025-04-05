@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import WhatsAppButton from '@/components/WhatsAppButton';
+import TrackingInstructions from '@/components/TrackingInstructions';
 
 type TrackingResult = {
   status: string;
@@ -79,10 +80,10 @@ const Track = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col w-full">
       <Navbar />
-      <main className="flex-grow">
-        <section className="py-12 md:py-16">
+      <main className="flex-grow w-full">
+        <section className="py-12 md:py-16 w-full">
           <div className="container mx-auto px-4">
             <div className="max-w-4xl mx-auto">
               <div className="bg-white rounded-lg shadow-xl overflow-hidden">
@@ -251,6 +252,15 @@ const Track = () => {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="py-12 bg-gray-50 w-full">
+          <div className="container mx-auto px-4">
+            <h2 className="text-2xl font-bold mb-8 text-center">Tracking Guide</h2>
+            <div className="max-w-4xl mx-auto">
+              <TrackingInstructions />
             </div>
           </div>
         </section>
