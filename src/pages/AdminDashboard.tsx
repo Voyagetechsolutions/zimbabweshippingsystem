@@ -25,7 +25,7 @@ import {
   Package, Truck, Users, Search, 
   RefreshCcw, Filter, Eye, Edit, User,
   Settings, Activity, Calendar,
-  FileText, BarChart3, ImageIcon
+  FileText, BarChart3, ImageIcon, MessageSquare
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
