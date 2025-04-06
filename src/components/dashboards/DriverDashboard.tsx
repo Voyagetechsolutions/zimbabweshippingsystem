@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,7 +39,7 @@ const DriverDashboard = () => {
     try {
       setLoading(true);
       
-      // Fetch active deliveries - include statuses based on new status options
+      // Fetch active deliveries - include all active statuses
       const { data: activeData, error: activeError } = await supabase
         .from('shipments')
         .select('*')
@@ -55,6 +56,7 @@ const DriverDashboard = () => {
         .order('created_at', { ascending: false });
 
       if (activeError) throw activeError;
+      console.log("Active deliveries fetched:", activeData?.length);
       setActiveDeliveries(activeData || []);
       
       // Fetch completed deliveries
@@ -66,6 +68,7 @@ const DriverDashboard = () => {
         .limit(5);
 
       if (completedError) throw completedError;
+      console.log("Completed deliveries fetched:", completedData?.length);
       setCompletedDeliveries(completedData || []);
 
       // Fetch collection schedules
@@ -76,6 +79,7 @@ const DriverDashboard = () => {
 
       if (scheduleError) throw scheduleError;
       setCollectionSchedules(scheduleData || []);
+      console.log("Collection schedules fetched:", scheduleData?.length);
       
       // Fetch shipments for each schedule
       if (scheduleData && scheduleData.length > 0) {
@@ -91,6 +95,7 @@ const DriverDashboard = () => {
             
           if (!shipmentError) {
             schedulesWithShipments[schedule.id] = shipmentData || [];
+            console.log(`Schedule ${schedule.id} has ${shipmentData?.length || 0} shipments`);
           }
         }
         
@@ -123,7 +128,8 @@ const DriverDashboard = () => {
         description: `Shipment status updated to ${newStatus}`,
       });
       
-      fetchDriverData(); // Refresh data
+      // Refresh data after status update
+      fetchDriverData();
       
     } catch (error: any) {
       toast({
@@ -200,11 +206,6 @@ const DriverDashboard = () => {
     }
   };
 
-  const openImageUploadModal = (shipmentId: string) => {
-    setCurrentShipmentId(shipmentId);
-    setShowImageUpload(true);
-  };
-
   const getDeliveryAddress = (shipment: any) => {
     if (shipment.metadata && typeof shipment.metadata === 'object') {
       const pickup_area = shipment.metadata.pickup_area;
@@ -241,11 +242,13 @@ const DriverDashboard = () => {
       setExpandedSchedule(scheduleId);
     }
   };
-
+  
+  // Filter for pending collections (Ready for Pickup status only)
   const pendingCollections = activeDeliveries.filter(d => 
     d.status === 'Ready for Pickup'
   );
   
+  // Filter for in-transit deliveries (all delivery-related statuses)
   const inTransitDeliveries = activeDeliveries.filter(d => 
     ['In Transit', 'Out for Delivery', 'Customs Clearance', 'Processing in Warehouse (ZW)'].includes(d.status)
   );
@@ -547,8 +550,7 @@ const DriverDashboard = () => {
                                   </div>
                                   <Badge className={
                                     shipment.status === 'Ready for Pickup' ? "bg-yellow-100 text-yellow-800 border-yellow-300" :
-                                    shipment.status === 'Paid' ? "bg-green-100 text-green-800 border-green-300" :
-                                    shipment.status === 'Booked' ? "bg-blue-100 text-blue-800 border-blue-300" :
+                                    shipment.status === 'Booking Confirmed' ? "bg-blue-100 text-blue-800 border-blue-300" :
                                     "bg-orange-100 text-orange-800 border-orange-300"
                                   }>
                                     {shipment.status}
