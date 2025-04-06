@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { 
   Truck, Package, Calendar, Users, MapPin, BarChart3, 
   FileText, Clock, Filter, AlertTriangle, Download,
-  Printer, Send, Search, Plus, Mail
+  Printer, Send, Search, Plus, Mail, X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { 
   Dialog, 
   DialogContent, 
@@ -262,7 +263,8 @@ const LogisticsDashboard = () => {
         toast({
           title: 'No Recipients',
           description: 'No users found with shipments in this schedule.',
-          variant: 'warning'
+          // Changed 'warning' to 'destructive' since 'warning' is not an allowed variant
+          variant: 'destructive'
         });
         setShowNotifyDialog(false);
         return;
