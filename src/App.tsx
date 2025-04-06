@@ -22,8 +22,6 @@ import Notifications from './pages/Notifications';
 import AdminDashboard from './pages/AdminDashboard';
 import GalleryAdmin from './pages/GalleryAdmin';
 import Reviews from './pages/Reviews';
-import CreateShipment from './pages/CreateShipment';
-import TaskManagement from './pages/TaskManagement';
 import Support from './pages/Support';
 
 // Components
@@ -109,21 +107,13 @@ function App() {
                       </RequireAuth>
                     }
                   />
-                  <Route
-                    path="/create-shipment"
-                    element={
-                      <RequireAuth>
-                        <CreateShipment />
-                      </RequireAuth>
-                    }
-                  />
                   
                   {/* Role-specific routes */}
                   <Route
                     path="/admin/logistics"
                     element={
                       <RequireRole requiredRole="logistics">
-                        <TaskManagement />
+                        <Dashboard />
                       </RequireRole>
                     }
                   />
@@ -132,7 +122,7 @@ function App() {
                     path="/driver"
                     element={
                       <RequireRole requiredRole="driver">
-                        <TaskManagement />
+                        <Dashboard />
                       </RequireRole>
                     }
                   />
@@ -141,17 +131,8 @@ function App() {
                     path="/support"
                     element={
                       <RequireRole requiredRole="support">
-                        <TaskManagement />
+                        <Dashboard />
                       </RequireRole>
-                    }
-                  />
-
-                  <Route
-                    path="/task-management"
-                    element={
-                      <RequireAuth>
-                        <TaskManagement />
-                      </RequireAuth>
                     }
                   />
 

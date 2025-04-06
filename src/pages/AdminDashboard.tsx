@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,8 +24,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Package, Truck, Users, Search, 
   RefreshCcw, Filter, Eye, Edit, User,
-  Settings, Activity, ShieldCheck, LifeBuoy,
-  FileText, BarChart3, Layers, Calendar
+  Settings, Activity, Calendar,
+  FileText, BarChart3, ImageIcon
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -32,13 +33,9 @@ import { SetupAdmin } from '@/components/SetupAdmin';
 import UserManagement from '@/components/admin/UserManagement';
 import AnalyticsReports from '@/components/admin/AnalyticsReports';
 import SettingsManagement from '@/components/admin/SettingsManagement';
-import RoleManagement from '@/components/admin/RoleManagement';
-import BulkOperations from '@/components/admin/BulkOperations';
-import AuditLogs from '@/components/admin/AuditLogs';
-import SupportTickets from '@/components/admin/SupportTickets';
 import ContentManagement from '@/components/admin/ContentManagement';
 import CollectionScheduleManagement from '@/components/admin/CollectionScheduleManagement';
-import { tableFrom } from '@/integrations/supabase/db-types';
+import SupportTickets from '@/components/admin/SupportTickets';
 
 // Status options for updating shipments
 const STATUS_OPTIONS = [
@@ -278,7 +275,7 @@ const AdminDashboard = () => {
             onValueChange={setActiveTab}
             className="mb-8"
           >
-            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 xl:grid-cols-9 gap-2">
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
               <TabsTrigger value="overview" className="flex items-center gap-2">
                 <Activity className="h-4 w-4" />
                 <span className="hidden sm:inline">Overview</span>
@@ -298,18 +295,6 @@ const AdminDashboard = () => {
               <TabsTrigger value="settings" className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
                 <span className="hidden sm:inline">Settings</span>
-              </TabsTrigger>
-              <TabsTrigger value="roles" className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4" />
-                <span className="hidden sm:inline">Roles</span>
-              </TabsTrigger>
-              <TabsTrigger value="bulk" className="flex items-center gap-2">
-                <Layers className="h-4 w-4" />
-                <span className="hidden sm:inline">Bulk</span>
-              </TabsTrigger>
-              <TabsTrigger value="schedule" className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                <span className="hidden sm:inline">Schedule</span>
               </TabsTrigger>
               <TabsTrigger value="more" className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
@@ -576,16 +561,6 @@ const AdminDashboard = () => {
               <SettingsManagement />
             </TabsContent>
 
-            {/* Roles Tab */}
-            <TabsContent value="roles">
-              <RoleManagement />
-            </TabsContent>
-
-            {/* Bulk Operations Tab */}
-            <TabsContent value="bulk">
-              <BulkOperations />
-            </TabsContent>
-
             {/* Collection Schedule Tab */}
             <TabsContent value="schedule">
               <CollectionScheduleManagement />
@@ -593,31 +568,23 @@ const AdminDashboard = () => {
 
             {/* More Tab - with nested tabs */}
             <TabsContent value="more">
-              <Tabs defaultValue="audit">
+              <Tabs defaultValue="support">
                 <TabsList className="mb-6">
-                  <TabsTrigger value="audit" className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    <span>Audit Logs</span>
-                  </TabsTrigger>
                   <TabsTrigger value="support" className="flex items-center gap-2">
-                    <LifeBuoy className="h-4 w-4" />
+                    <MessageSquare className="h-4 w-4" />
                     <span>Support Tickets</span>
                   </TabsTrigger>
-                  <TabsTrigger value="content" className="flex items-center gap-2">
-                    <Layers className="h-4 w-4" />
-                    <span>Content</span>
+                  <TabsTrigger value="media" className="flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4" />
+                    <span>Media Library</span>
                   </TabsTrigger>
                 </TabsList>
-                
-                <TabsContent value="audit">
-                  <AuditLogs />
-                </TabsContent>
                 
                 <TabsContent value="support">
                   <SupportTickets />
                 </TabsContent>
                 
-                <TabsContent value="content">
+                <TabsContent value="media">
                   <ContentManagement />
                 </TabsContent>
               </Tabs>

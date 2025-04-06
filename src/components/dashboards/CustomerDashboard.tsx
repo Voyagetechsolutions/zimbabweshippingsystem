@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Link, useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { 
   Package, Search, Truck, Bell, MessageSquare, 
-  Plus, Clock, Calendar, MapPin
+  Plus, Clock, Calendar, MapPin, ChevronRight,
+  Home, Settings, User, Bookmark
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -126,45 +127,135 @@ const CustomerDashboard = () => {
 
   return (
     <div className="space-y-6">
-      <Card>
+      {/* Welcome Card */}
+      <Card className="border-none shadow-sm bg-gradient-to-r from-blue-50 to-indigo-50">
         <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button asChild className="bg-zim-green hover:bg-zim-green/90">
-              <Link to="/create-shipment" className="flex items-center justify-center h-full">
-                <Plus className="h-5 w-5 mr-2" />
-                Book New Shipment
-              </Link>
-            </Button>
-            
-            <div className="relative">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-2">
+                Welcome back, {user?.user_metadata?.full_name || user?.email}
+              </h2>
+              <p className="text-gray-600">Manage your shipments and track your packages in one place</p>
+            </div>
+            <div className="flex gap-3">
+              <Button asChild className="bg-zim-green hover:bg-zim-green/90 shadow-sm">
+                <Link to="/book-shipment" className="flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  Book Shipment
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="bg-white hover:shadow-md transition-shadow">
+          <CardContent className="p-0">
+            <Link to="/book-shipment" className="block p-5">
+              <div className="flex items-center gap-4">
+                <div className="bg-zim-green/10 rounded-full p-3">
+                  <Plus className="h-5 w-5 text-zim-green" />
+                </div>
+                <div>
+                  <h3 className="font-medium text-gray-900">Book Shipment</h3>
+                  <p className="text-sm text-gray-500">Create a new shipment</p>
+                </div>
+              </div>
+            </Link>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-white hover:shadow-md transition-shadow">
+          <CardContent className="p-0">
+            <Link to="/track" className="block p-5">
+              <div className="flex items-center gap-4">
+                <div className="bg-blue-100 rounded-full p-3">
+                  <Truck className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-medium text-gray-900">Track Shipment</h3>
+                  <p className="text-sm text-gray-500">View shipment status</p>
+                </div>
+              </div>
+            </Link>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-white hover:shadow-md transition-shadow">
+          <CardContent className="p-0">
+            <Link to="/address-book" className="block p-5">
+              <div className="flex items-center gap-4">
+                <div className="bg-amber-100 rounded-full p-3">
+                  <Bookmark className="h-5 w-5 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="font-medium text-gray-900">Address Book</h3>
+                  <p className="text-sm text-gray-500">Manage saved addresses</p>
+                </div>
+              </div>
+            </Link>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-white hover:shadow-md transition-shadow">
+          <CardContent className="p-0">
+            <Link to="/support" className="block p-5">
+              <div className="flex items-center gap-4">
+                <div className="bg-purple-100 rounded-full p-3">
+                  <MessageSquare className="h-5 w-5 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="font-medium text-gray-900">Get Support</h3>
+                  <p className="text-sm text-gray-500">Contact our team</p>
+                </div>
+              </div>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Search Shipment */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Search className="mr-2 h-5 w-5 text-zim-green" />
+            Track Your Shipment
+          </CardTitle>
+          <CardDescription>Enter your tracking number to track your shipment</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-grow">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
               <input 
                 type="text" 
-                placeholder="Track My Shipment" 
+                placeholder="Enter your tracking number" 
                 className="w-full h-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:border-zim-green focus:outline-none focus:ring-1 focus:ring-zim-green"
                 value={trackingNumber}
                 onChange={(e) => setTrackingNumber(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleTrackShipment()}
               />
             </div>
-            
-            <Button asChild variant="outline">
-              <Link to="/contact" className="flex items-center justify-center h-full">
-                <MessageSquare className="h-5 w-5 mr-2" />
-                Contact Support
-              </Link>
+            <Button 
+              onClick={handleTrackShipment}
+              className="bg-zim-green hover:bg-zim-green/90"
+            >
+              Track Now
             </Button>
           </div>
         </CardContent>
       </Card>
       
+      {/* Recent Shipments */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
             <Truck className="mr-2 h-5 w-5 text-zim-green" />
-            My Shipments
+            My Recent Shipments
           </CardTitle>
-          <CardDescription>Track and manage your shipments</CardDescription>
+          <CardDescription>Track and manage your recent shipments</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -174,7 +265,7 @@ const CustomerDashboard = () => {
           ) : shipments.length > 0 ? (
             <div className="divide-y">
               {shipments.map((shipment) => (
-                <div key={shipment.id} className="py-4">
+                <div key={shipment.id} className="py-4 hover:bg-gray-50 rounded-lg transition-colors px-2">
                   <div className="flex justify-between items-start">
                     <div>
                       <h4 className="font-medium">Shipment to {shipment.destination}</h4>
@@ -223,32 +314,36 @@ const CustomerDashboard = () => {
               ))}
             </div>
           ) : (
-            <div className="text-center py-10">
+            <div className="text-center py-10 bg-gray-50 rounded-lg">
               <Package className="h-12 w-12 mx-auto text-gray-300 mb-3" />
-              <p className="text-gray-500">You don't have any shipments yet</p>
-              <Button className="mt-4 bg-zim-green hover:bg-zim-green/90" asChild>
-                <Link to="/create-shipment">Book Your First Shipment</Link>
-              </Button>
-            </div>
-          )}
-          
-          {shipments.length > 0 && (
-            <div className="flex justify-center mt-6">
-              <Button asChild variant="outline">
-                <Link to="/dashboard">View All Shipments</Link>
+              <p className="text-gray-600 font-medium mb-2">You don't have any shipments yet</p>
+              <p className="text-gray-500 max-w-md mx-auto mb-4">Book your first shipment to start shipping packages from UK to Zimbabwe</p>
+              <Button className="mt-2 bg-zim-green hover:bg-zim-green/90" asChild>
+                <Link to="/book-shipment">Book Your First Shipment</Link>
               </Button>
             </div>
           )}
         </CardContent>
+        {shipments.length > 0 && (
+          <CardFooter className="pb-6 pt-2">
+            <Button asChild variant="outline" className="w-full">
+              <Link to="/shipment-history" className="flex items-center justify-center">
+                View All Shipments
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardFooter>
+        )}
       </Card>
       
+      {/* Notifications */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
             <Bell className="mr-2 h-5 w-5 text-zim-green" />
-            Notifications
+            Recent Notifications
           </CardTitle>
-          <CardDescription>Recent updates and alerts</CardDescription>
+          <CardDescription>Updates about your shipments and account</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -258,13 +353,13 @@ const CustomerDashboard = () => {
           ) : notifications.length > 0 ? (
             <div className="space-y-4">
               {notifications.map((notification) => (
-                <div key={notification.id} className="flex gap-3">
+                <div key={notification.id} className="flex gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
                   <div className={`${getNotificationColor(notification.type)} h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0`}>
                     {getNotificationIcon(notification.type)}
                   </div>
                   <div>
                     <h4 className="font-medium">{notification.title}</h4>
-                    <p className="text-sm text-gray-500">{notification.message}</p>
+                    <p className="text-sm text-gray-600">{notification.message}</p>
                     <p className="text-xs text-gray-400 mt-1">
                       {format(new Date(notification.created_at), 'MMM dd, yyyy - h:mmaaa')}
                     </p>
@@ -273,19 +368,40 @@ const CustomerDashboard = () => {
               ))}
             </div>
           ) : (
-            <div className="text-center py-10">
+            <div className="text-center py-10 bg-gray-50 rounded-lg">
               <Bell className="h-12 w-12 mx-auto text-gray-300 mb-3" />
-              <p className="text-gray-500">You don't have any notifications yet</p>
+              <p className="text-gray-600 font-medium mb-2">No notifications yet</p>
+              <p className="text-gray-500">We'll notify you about important updates to your shipments</p>
             </div>
           )}
-          
-          {notifications.length > 0 && (
-            <div className="flex justify-center mt-6">
-              <Button asChild variant="outline">
-                <Link to="/notifications">View All Notifications</Link>
-              </Button>
+        </CardContent>
+        {notifications.length > 0 && (
+          <CardFooter className="pb-6 pt-2">
+            <Button asChild variant="outline" className="w-full">
+              <Link to="/notifications" className="flex items-center justify-center">
+                View All Notifications
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardFooter>
+        )}
+      </Card>
+      
+      {/* Help Card */}
+      <Card className="bg-gray-50 border-none">
+        <CardContent className="p-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-medium mb-1">Need Help?</h3>
+              <p className="text-gray-600">Our support team is here to assist you with your shipping needs</p>
             </div>
-          )}
+            <Button asChild variant="outline">
+              <Link to="/contact" className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                Contact Support
+              </Link>
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
