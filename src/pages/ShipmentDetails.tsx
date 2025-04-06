@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,14 +31,26 @@ interface Shipment {
 }
 
 const getStatusColor = (status: string): string => {
-  switch (status.toLowerCase()) {
-    case 'processing':
-      return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-    case 'in transit':
+  const statusLower = status.toLowerCase();
+  
+  switch (true) {
+    case statusLower.includes('booking confirmed'):
       return 'bg-blue-100 text-blue-800 border-blue-300';
-    case 'delivered':
+    case statusLower.includes('ready for pickup'):
+      return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+    case statusLower.includes('processing'):
+      return 'bg-orange-100 text-orange-800 border-orange-300';
+    case statusLower.includes('customs'):
+      return 'bg-purple-100 text-purple-800 border-purple-300';
+    case statusLower.includes('transit'):
+      return 'bg-blue-100 text-blue-800 border-blue-300';
+    case statusLower.includes('out for delivery'):
+      return 'bg-indigo-100 text-indigo-800 border-indigo-300';
+    case statusLower.includes('delivered'):
       return 'bg-green-100 text-green-800 border-green-300';
-    case 'delayed':
+    case statusLower.includes('cancelled'):
+      return 'bg-red-100 text-red-800 border-red-300';
+    case statusLower.includes('delayed'):
       return 'bg-red-100 text-red-800 border-red-300';
     default:
       return 'bg-gray-100 text-gray-800 border-gray-300';
@@ -47,14 +58,26 @@ const getStatusColor = (status: string): string => {
 };
 
 const getStatusIcon = (status: string) => {
-  switch (status.toLowerCase()) {
-    case 'processing':
+  const statusLower = status.toLowerCase();
+  
+  switch (true) {
+    case statusLower.includes('booking confirmed'):
       return <Package className="h-5 w-5" />;
-    case 'in transit':
+    case statusLower.includes('ready for pickup'):
+      return <Package className="h-5 w-5" />;
+    case statusLower.includes('processing'):
+      return <Package className="h-5 w-5" />;
+    case statusLower.includes('customs'):
+      return <Package className="h-5 w-5" />;
+    case statusLower.includes('transit'):
       return <Truck className="h-5 w-5" />;
-    case 'delivered':
+    case statusLower.includes('out for delivery'):
+      return <Truck className="h-5 w-5" />;
+    case statusLower.includes('delivered'):
       return <Package2 className="h-5 w-5" />;
-    case 'delayed':
+    case statusLower.includes('cancelled'):
+      return <Clock className="h-5 w-5" />;
+    case statusLower.includes('delayed'):
       return <Clock className="h-5 w-5" />;
     default:
       return <Package className="h-5 w-5" />;
@@ -114,25 +137,25 @@ const ShipmentDetails = () => {
 
   const getTimelineSteps = (status: string) => {
     const allSteps = [
-      { name: 'Processing', completed: false },
-      { name: 'In Transit', completed: false },
+      { name: 'Booking Confirmed', completed: false },
+      { name: 'Ready for Pickup', completed: false },
+      { name: 'Processing in Warehouse (UK)', completed: false },
+      { name: 'Customs Clearance', completed: false },
+      { name: 'Processing in Warehouse (ZW)', completed: false },
       { name: 'Out for Delivery', completed: false },
       { name: 'Delivered', completed: false },
     ];
     
     const statusLower = status.toLowerCase();
+    const statusIndex = allSteps.findIndex(step => 
+      statusLower.includes(step.name.toLowerCase())
+    );
     
-    if (statusLower === 'processing') {
-      allSteps[0].completed = true;
-    } else if (statusLower === 'in transit') {
-      allSteps[0].completed = true;
-      allSteps[1].completed = true;
-    } else if (statusLower === 'out for delivery') {
-      allSteps[0].completed = true;
-      allSteps[1].completed = true;
-      allSteps[2].completed = true;
-    } else if (statusLower === 'delivered') {
-      allSteps.forEach(step => step.completed = true);
+    if (statusIndex !== -1) {
+      for (let i = 0; i <= statusIndex; i++) {
+        allSteps[i].completed = true;
+      }
+    } else if (statusLower.includes('cancelled')) {
     }
     
     return allSteps;

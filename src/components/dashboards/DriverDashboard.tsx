@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -39,11 +38,19 @@ const DriverDashboard = () => {
     try {
       setLoading(true);
       
-      // Fetch active deliveries - include processing and confirmed bookings
+      // Fetch active deliveries - include statuses based on new status options
       const { data: activeData, error: activeError } = await supabase
         .from('shipments')
         .select('*')
-        .in('status', ['Processing', 'Booked', 'Paid', 'Ready for Pickup', 'In Transit', 'Out for Delivery'])
+        .in('status', [
+          'Booking Confirmed', 
+          'Ready for Pickup', 
+          'Processing in Warehouse (UK)', 
+          'Customs Clearance', 
+          'Processing in Warehouse (ZW)', 
+          'In Transit', 
+          'Out for Delivery'
+        ])
         .eq('can_modify', false) // Only confirmed bookings
         .order('created_at', { ascending: false });
 
@@ -78,7 +85,7 @@ const DriverDashboard = () => {
           const { data: shipmentData, error: shipmentError } = await supabase
             .from('shipments')
             .select('*')
-            .in('status', ['Processing', 'Booked', 'Paid', 'Ready for Pickup'])
+            .in('status', ['Booking Confirmed', 'Ready for Pickup'])
             .eq('can_modify', false) // Only confirmed bookings
             .contains('metadata', { pickup_date: schedule.pickup_date });
             
@@ -236,11 +243,11 @@ const DriverDashboard = () => {
   };
 
   const pendingCollections = activeDeliveries.filter(d => 
-    ['Processing', 'Booked', 'Paid', 'Ready for Pickup'].includes(d.status) && !d.can_modify
+    d.status === 'Ready for Pickup'
   );
   
   const inTransitDeliveries = activeDeliveries.filter(d => 
-    ['In Transit', 'Out for Delivery'].includes(d.status)
+    ['In Transit', 'Out for Delivery', 'Customs Clearance', 'Processing in Warehouse (ZW)'].includes(d.status)
   );
 
   return (
@@ -329,12 +336,7 @@ const DriverDashboard = () => {
                               <span className="truncate max-w-[180px] md:max-w-none">{getDeliveryAddress(shipment)}</span>
                             </div>
                           </div>
-                          <Badge className={
-                            shipment.status === 'Ready for Pickup' ? "bg-yellow-100 text-yellow-800 border-yellow-300" :
-                            shipment.status === 'Paid' ? "bg-green-100 text-green-800 border-green-300" :
-                            shipment.status === 'Booked' ? "bg-blue-100 text-blue-800 border-blue-300" :
-                            "bg-orange-100 text-orange-800 border-orange-300"
-                          }>
+                          <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">
                             {shipment.status}
                           </Badge>
                         </div>
@@ -353,7 +355,7 @@ const DriverDashboard = () => {
                           </div>
                           <div className="flex items-end justify-start md:justify-end mt-4 md:mt-0">
                             <Button 
-                              onClick={() => handleUpdateStatus(shipment.id, 'In Transit')}
+                              onClick={() => handleUpdateStatus(shipment.id, 'Processing in Warehouse (UK)')}
                               className="bg-zim-green hover:bg-zim-green/90 flex w-full md:w-auto justify-center"
                             >
                               <CheckCircle2 className="h-4 w-4 mr-2" />
@@ -415,8 +417,10 @@ const DriverDashboard = () => {
                             </div>
                           </div>
                           <Badge className={
-                            shipment.status === 'In Transit' ? "bg-purple-100 text-purple-800 border-purple-300" :
-                            "bg-blue-100 text-blue-800 border-blue-300"
+                            shipment.status === 'In Transit' ? "bg-blue-100 text-blue-800 border-blue-300" :
+                            shipment.status === 'Out for Delivery' ? "bg-indigo-100 text-indigo-800 border-indigo-300" :
+                            shipment.status === 'Customs Clearance' ? "bg-purple-100 text-purple-800 border-purple-300" :
+                            "bg-orange-100 text-orange-800 border-orange-300"
                           }>
                             {shipment.status}
                           </Badge>
@@ -443,13 +447,29 @@ const DriverDashboard = () => {
                                 <Truck className="h-4 w-4 mr-2" />
                                 <span>Mark Out for Delivery</span>
                               </Button>
-                            ) : (
+                            ) : shipment.status === 'Out for Delivery' ? (
                               <Button 
                                 onClick={() => openImageUploadModal(shipment.id)}
                                 className="bg-green-500 hover:bg-green-600 flex w-full md:w-auto justify-center"
                               >
                                 <Camera className="h-4 w-4 mr-2" />
                                 <span>Upload Delivery Photo</span>
+                              </Button>
+                            ) : shipment.status === 'Customs Clearance' ? (
+                              <Button 
+                                onClick={() => handleUpdateStatus(shipment.id, 'Processing in Warehouse (ZW)')}
+                                className="bg-purple-500 hover:bg-purple-600 flex w-full md:w-auto justify-center"
+                              >
+                                <Package className="h-4 w-4 mr-2" />
+                                <span>Mark as Processing in Zimbabwe</span>
+                              </Button>
+                            ) : (
+                              <Button 
+                                onClick={() => handleUpdateStatus(shipment.id, 'Out for Delivery')}
+                                className="bg-orange-500 hover:bg-orange-600 flex w-full md:w-auto justify-center"
+                              >
+                                <Truck className="h-4 w-4 mr-2" />
+                                <span>Mark Out for Delivery</span>
                               </Button>
                             )}
                           </div>
@@ -560,7 +580,6 @@ const DriverDashboard = () => {
         </TabsContent>
       </Tabs>
       
-      {/* Image Upload Dialog */}
       <Dialog open={showImageUpload} onOpenChange={setShowImageUpload}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

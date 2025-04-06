@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from "@/components/ui/button";
@@ -39,7 +38,6 @@ const Track = () => {
     setIsTracking(true);
     
     try {
-      // Query the database for the tracking number
       const { data, error: queryError } = await supabase
         .from('shipments')
         .select('*')

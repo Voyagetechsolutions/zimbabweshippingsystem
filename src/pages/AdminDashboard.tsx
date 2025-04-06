@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,12 +38,14 @@ import SupportTickets from '@/components/admin/SupportTickets';
 
 // Status options for updating shipments
 const STATUS_OPTIONS = [
-  'Processing',
-  'In Transit',
+  'Booking Confirmed',
+  'Ready for Pickup',
+  'Processing in Warehouse (UK)',
+  'Customs Clearance',
+  'Processing in Warehouse (ZW)',
   'Out for Delivery',
   'Delivered',
-  'Delayed',
-  'Returned',
+  'Cancelled',
 ];
 
 // Define the shipment type
@@ -69,18 +70,24 @@ const getStatusBadgeClass = (status: string) => {
   const statusLower = status.toLowerCase();
   
   switch (true) {
-    case statusLower.includes('processing'):
+    case statusLower.includes('booking confirmed'):
+      return 'bg-blue-100 text-blue-800 border-blue-300';
+    case statusLower.includes('ready for pickup'):
       return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+    case statusLower.includes('processing'):
+      return 'bg-orange-100 text-orange-800 border-orange-300';
+    case statusLower.includes('customs'):
+      return 'bg-purple-100 text-purple-800 border-purple-300';
     case statusLower.includes('transit'):
       return 'bg-blue-100 text-blue-800 border-blue-300';
     case statusLower.includes('out for delivery'):
-      return 'bg-purple-100 text-purple-800 border-purple-300';
+      return 'bg-indigo-100 text-indigo-800 border-indigo-300';
     case statusLower.includes('delivered'):
       return 'bg-green-100 text-green-800 border-green-300';
+    case statusLower.includes('cancelled'):
+      return 'bg-red-100 text-red-800 border-red-300';
     case statusLower.includes('delayed'):
       return 'bg-red-100 text-red-800 border-red-300';
-    case statusLower.includes('returned'):
-      return 'bg-gray-100 text-gray-800 border-gray-300';
     default:
       return 'bg-gray-100 text-gray-500';
   }
