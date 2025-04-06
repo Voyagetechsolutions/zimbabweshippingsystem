@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -148,6 +149,11 @@ const DriverDashboard = () => {
     }
   };
 
+  const openImageUploadModal = (shipmentId: string) => {
+    setCurrentShipmentId(shipmentId);
+    setShowImageUpload(true);
+  };
+
   const handleUploadDeliveryImage = async () => {
     if (!imageFile || !currentShipmentId) return;
     
@@ -203,11 +209,6 @@ const DriverDashboard = () => {
     } finally {
       setUploadLoading(false);
     }
-  };
-
-  const openImageUploadModal = (shipmentId: string) => {
-    setCurrentShipmentId(shipmentId);
-    setShowImageUpload(true);
   };
 
   const getDeliveryAddress = (shipment: any) => {
