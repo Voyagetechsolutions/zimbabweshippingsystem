@@ -340,8 +340,6 @@ const UserManagement = () => {
     // Style badges based on role
     const getBadgeStyle = (role: string) => {
       switch(role) {
-        case 'admin':
-          return "bg-red-100 text-red-800 border-red-300";
         case 'logistics':
           return "bg-orange-100 text-orange-800 border-orange-300";
         case 'driver':
@@ -481,10 +479,10 @@ const UserManagement = () => {
                                 description: `A password reset email has been sent to ${user.email}`,
                               });
                             }}
-                            title="Reset Password"
+                            title="Send Password Reset"
                           >
                             <Mail className="h-4 w-4" />
-                            <span className="sr-only">Reset password</span>
+                            <span className="sr-only">Reset Password</span>
                           </Button>
                         </div>
                       </TableCell>
@@ -497,19 +495,22 @@ const UserManagement = () => {
         </CardContent>
       </Card>
 
-      {/* Edit User Dialog */}
+      {/* Create/Edit User Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
-            <DialogTitle>{isCreatingUser ? 'Create New User' : 'Edit User'}</DialogTitle>
+            <DialogTitle>
+              {isCreatingUser ? "Add New User" : "Edit User"}
+            </DialogTitle>
             <DialogDescription>
-              {isCreatingUser 
-                ? 'Add a new user to the system.' 
-                : `Update ${editingUser?.full_name || editingUser?.email}'s details.`}
+              {isCreatingUser
+                ? "Create a new user account"
+                : `Update details for ${editingUser?.email}`}
             </DialogDescription>
           </DialogHeader>
+
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
                 control={form.control}
                 name="email"
@@ -517,17 +518,18 @@ const UserManagement = () => {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input 
-                        {...field} 
+                      <Input
+                        {...field}
+                        type="email"
+                        placeholder="user@example.com"
                         disabled={!isCreatingUser}
-                        placeholder="user@example.com" 
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="full_name"
@@ -541,16 +543,48 @@ const UserManagement = () => {
                   </FormItem>
                 )}
               />
-              
+
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Role</FormLabel>
+                    <FormControl>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="customer">Customer</SelectItem>
+                          <SelectItem value="logistics">Logistics</SelectItem>
+                          <SelectItem value="driver">Driver</SelectItem>
+                          <SelectItem value="support">Support</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormDescription>
+                      The role determines what actions the user can perform
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="is_admin"
                 render={({ field }) => (
-                  <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
-                      <FormLabel className="text-base">Admin Privileges</FormLabel>
+                      <FormLabel className="text-base">
+                        Administrative Access
+                      </FormLabel>
                       <FormDescription>
-                        Grant administrative access to this user
+                        Grant full administrative privileges to this user
                       </FormDescription>
                     </div>
                     <FormControl>
@@ -562,44 +596,13 @@ const UserManagement = () => {
                   </FormItem>
                 )}
               />
-              
-              <FormField
-                control={form.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>User Role</FormLabel>
-                    <Select
-                      value={field.value}
-                      onValueChange={field.onChange}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a role" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="customer">Customer</SelectItem>
-                        <SelectItem value="driver">Driver</SelectItem>
-                        <SelectItem value="support">Support</SelectItem>
-                        <SelectItem value="logistics">Logistics</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      This determines what features the user can access
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
+
               <DialogFooter>
                 <Button variant="outline" type="button" onClick={closeDialog}>
                   Cancel
                 </Button>
                 <Button className="bg-zim-green hover:bg-zim-green/90" type="submit">
-                  {isCreatingUser ? 'Create User' : 'Save Changes'}
+                  {isCreatingUser ? "Create User" : "Save Changes"}
                 </Button>
               </DialogFooter>
             </form>
@@ -613,36 +616,29 @@ const UserManagement = () => {
           <DialogHeader>
             <DialogTitle>Assign Role</DialogTitle>
             <DialogDescription>
-              Change the role for {selectedUser?.full_name || selectedUser?.email}
+              Change the role for{" "}
+              {selectedUser?.full_name || selectedUser?.email || "user"}
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <div className="mb-4">
-              <h4 className="text-sm font-medium mb-2">Current Role</h4>
-              <Badge className="text-sm">
-                {selectedUser?.role || 'customer'}
-              </Badge>
-            </div>
-            
-            <div className="mb-4">
-              <label className="text-sm font-medium mb-2 block">New Role</label>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="role">Select Role</Label>
               <Select
                 value={selectedRole}
                 onValueChange={(value) => setSelectedRole(value as UserRoleType)}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger>
                   <SelectValue placeholder="Select a role" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="customer">Customer</SelectItem>
+                  <SelectItem value="logistics">Logistics</SelectItem>
                   <SelectItem value="driver">Driver</SelectItem>
                   <SelectItem value="support">Support</SelectItem>
-                  <SelectItem value="logistics">Logistics</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-sm text-gray-500 mt-1">
-                Each role has different permissions and access levels
+              <p className="text-sm text-gray-500">
+                This will change the user's permissions in the system
               </p>
             </div>
           </div>

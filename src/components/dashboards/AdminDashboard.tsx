@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
-  Activity, Users, Package, Settings, BarChart3, 
+  Activity, Users, Package, BarChart3, 
   ShieldCheck, Calendar 
 } from 'lucide-react';
 
@@ -65,7 +65,7 @@ const AdminDashboard = () => {
       </div>
       
       <Tabs defaultValue="users" className="mb-8">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 gap-2">
+        <TabsList className="grid w-full grid-cols-1 md:grid-cols-3 gap-2">
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Users</span>
@@ -77,10 +77,6 @@ const AdminDashboard = () => {
           <TabsTrigger value="gallery" className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4" />
             <span className="hidden sm:inline">Gallery</span>
-          </TabsTrigger>
-          <TabsTrigger value="tasks" className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            <span className="hidden sm:inline">Tasks</span>
           </TabsTrigger>
         </TabsList>
         
@@ -100,18 +96,6 @@ const AdminDashboard = () => {
             </CardHeader>
             <CardContent>
               <p>Shipment management content will go here.</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="tasks">
-          <Card>
-            <CardHeader>
-              <CardTitle>Task Management</CardTitle>
-              <CardDescription>Manage and assign tasks</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p>Task management content will go here.</p>
             </CardContent>
           </Card>
         </TabsContent>

@@ -1,8 +1,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Package, Truck, Clock, FileText, AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Package, FileText, Truck } from 'lucide-react';
 
 const TrackingInstructions = () => {
   return (
@@ -41,13 +40,6 @@ const TrackingInstructions = () => {
             </div>
           </div>
         </div>
-
-        <Alert className="bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800">
-          <AlertCircle className="h-4 w-4 text-amber-500 mr-2" />
-          <AlertDescription>
-            <span className="font-semibold">Note:</span> Tracking information is updated daily. Please allow up to 24 hours for status changes to reflect in the system. For urgent inquiries about your shipment, please contact our customer service team directly.
-          </AlertDescription>
-        </Alert>
       </CardContent>
     </Card>
   );

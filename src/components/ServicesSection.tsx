@@ -12,25 +12,25 @@ const ServicesSection: React.FC = () => {
       icon: <Ship className="h-10 w-10 text-zim-green dark:text-zim-green" />,
       title: 'Drum Shipping',
       description: 'Our specialized drum shipping service offers the most cost-effective way to send large quantities of goods to Zimbabwe. Each drum has a capacity of 220L.',
-      bgImage: 'url("/lovable-uploads/f427ac1e-be37-4600-94e5-cc4115c6e4c4.png")'
+      bgImage: 'url("/lovable-uploads/84bc927b-c216-4295-a210-64ee6b08eacd.png")'
     },
     {
       icon: <Package className="h-10 w-10 text-zim-yellow dark:text-zim-yellow" />,
       title: 'Regular Parcels',
       description: 'Send packages of any size with our flexible parcel shipping options, with competitive rates based on weight.',
-      bgImage: 'url("/lovable-uploads/parcels.jpg")'
+      bgImage: 'url("/lovable-uploads/27c10d33-77e5-440a-ad90-8cc4b2daad65.png")'
     },
     {
       icon: <Truck className="h-10 w-10 text-zim-red dark:text-zim-red" />,
       title: 'Door-to-Door Delivery',
       description: `We pick up from your UK address and deliver directly to your recipient's doorstep in Zimbabwe for an additional ${formatPrice(25)}.`,
-      bgImage: 'url("/lovable-uploads/door-delivery.jpg")'
+      bgImage: 'url("/lovable-uploads/c576984d-3677-4788-9e04-45fc49c28eed.png")'
     },
     {
       icon: <Globe className="h-10 w-10 text-zim-green dark:text-zim-green" />,
       title: 'Real-time Tracking',
       description: 'Stay informed with our advanced tracking system that provides real-time updates on your shipment\'s location.',
-      bgImage: 'url("/lovable-uploads/tracking.jpg")'
+      bgImage: 'url("/lovable-uploads/8aba4bb5-76cc-4202-a81d-e765192b2dbc.png")'
     },
     {
       icon: <DollarSign className="h-10 w-10 text-zim-yellow dark:text-zim-yellow" />,
