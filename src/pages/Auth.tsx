@@ -1,214 +1,350 @@
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Mail, Lock, User, ArrowRight, Truck } from 'lucide-react';
 import Logo from '@/components/Logo';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Mail, Lock, User, ArrowRight, AlertCircle, Facebook, Mail as MailIcon } from 'lucide-react';
+import { FaGoogle } from 'react-icons/fa';
 
 const Auth = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [isLogin, setIsLogin] = useState(!location.state?.signup);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
-  
-  const { signIn, signUp } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('login');
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const { session } = useAuth();
 
   useEffect(() => {
-    // Update form mode if navigated with state
-    setIsLogin(!location.state?.signup);
-  }, [location.state]);
+    if (session) {
+      navigate('/dashboard');
+    }
+  }, [session, navigate]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setIsSubmitting(true);
-    
+    if (!email || !password || !fullName) {
+      toast({
+        title: 'Missing Information',
+        description: 'Please fill in all fields to sign up.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
-      if (isLogin) {
-        await signIn(email, password);
-        // Will redirect via RouteGuard
-      } else {
-        if (!fullName) {
-          throw new Error('Please enter your full name');
-        }
-        await signUp(email, password, fullName);
-        setIsLogin(true); // Switch to login after successful signup
-      }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred');
+      setLoading(true);
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Registration Successful',
+        description: 'Please check your email to verify your account.',
+      });
+      setActiveTab('login');
+    } catch (error: any) {
+      toast({
+        title: 'Registration Failed',
+        description: error.message || 'An error occurred during registration.',
+        variant: 'destructive',
+      });
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
+    }
+  };
+
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      toast({
+        title: 'Missing Information',
+        description: 'Please enter both email and password.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      navigate('/dashboard');
+    } catch (error: any) {
+      toast({
+        title: 'Login Failed',
+        description: error.message || 'Invalid email or password.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth-callback`,
+        }
+      });
+
+      if (error) throw error;
+    } catch (error: any) {
+      toast({
+        title: 'Google Login Failed',
+        description: error.message || 'An error occurred during Google login.',
+        variant: 'destructive',
+      });
+      setLoading(false);
+    }
+  };
+
+  const handleFacebookSignIn = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'facebook',
+        options: {
+          redirectTo: `${window.location.origin}/auth-callback`,
+        }
+      });
+
+      if (error) throw error;
+    } catch (error: any) {
+      toast({
+        title: 'Facebook Login Failed',
+        description: error.message || 'An error occurred during Facebook login.',
+        variant: 'destructive',
+      });
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      <div className="container mx-auto px-4 py-8 flex-1 flex flex-col">
-        <div className="flex justify-center mb-6">
-          <Link to="/">
-            <Logo />
-          </Link>
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50">
+      <div className="w-full max-w-md space-y-6">
+        <div className="text-center">
+          <Logo className="mx-auto h-12 w-auto" />
+          <h1 className="mt-6 text-3xl font-bold">Welcome to Zimbabwe Shipping</h1>
+          <p className="mt-2 text-gray-600">Sign in to your account or create a new one</p>
         </div>
-        
-        <div className="max-w-md w-full mx-auto mt-4 flex-1 flex flex-col justify-center">
-          <Card className="border-0 shadow-lg">
-            <CardHeader className="space-y-1 text-center pb-2">
-              <div className="flex justify-center mb-2">
-                <div className="bg-zim-green/10 p-3 rounded-full">
-                  <Truck className="h-6 w-6 text-zim-green" />
-                </div>
-              </div>
-              <h1 className="text-2xl font-bold">
-                {isLogin ? 'Welcome Back' : 'Join Us Today'}
-              </h1>
-              <p className="text-sm text-gray-500">
-                {isLogin ? 'Sign in to access your account' : 'Create an account to get started'}
-              </p>
-            </CardHeader>
-            
-            <CardContent className="pt-4">
-              {error && (
-                <div className="bg-red-50 text-red-600 p-3 rounded-md mb-4 text-sm">
-                  {error}
-                </div>
-              )}
-              
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {!isLogin && (
-                  <div className="space-y-2">
-                    <Label htmlFor="fullName">Full Name</Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                      <Input 
-                        id="fullName"
-                        placeholder="Enter your full name"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        required={!isLogin}
-                        className="pl-10"
-                      />
-                    </div>
-                  </div>
-                )}
-                
+
+        <div className="bg-white p-8 rounded-lg shadow-md border border-gray-200">
+          <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-8">
+              <TabsTrigger value="login">Login</TabsTrigger>
+              <TabsTrigger value="register">Register</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="login" className="space-y-4">
+              <form onSubmit={handleSignIn} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email Address</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                    <Input 
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
                       id="email"
                       type="email"
                       placeholder="name@example.com"
+                      className="pl-10"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Password</Label>
-                    {isLogin && (
-                      <Link to="/forgot-password" className="text-xs text-zim-green hover:underline">
-                        Forgot password?
-                      </Link>
-                    )}
-                  </div>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                    <Input 
-                      id="password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      className="pl-10"
                     />
                   </div>
                 </div>
 
-                {isLogin && (
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="rememberMe" 
-                      checked={rememberMe} 
-                      onCheckedChange={(checked) => setRememberMe(checked as boolean)}
-                    />
-                    <label
-                      htmlFor="rememberMe"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      Remember me
-                    </label>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <Label htmlFor="password">Password</Label>
+                    <Link to="/forgot-password" className="text-sm text-zim-green hover:underline">
+                      Forgot Password?
+                    </Link>
                   </div>
-                )}
-                
-                <Button 
-                  type="submit" 
-                  className="w-full bg-zim-green hover:bg-zim-green/90"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <span className="flex items-center">
-                      <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Processing...
-                    </span>
-                  ) : (
-                    <span className="flex items-center justify-center">
-                      {isLogin ? 'Sign In' : 'Create Account'} 
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </span>
-                  )}
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="••••••••"
+                      className="pl-10"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <Button type="submit" className="w-full bg-zim-green hover:bg-zim-green/90" disabled={loading}>
+                  {loading ? 'Signing In...' : 'Sign In'}
                 </Button>
               </form>
-            </CardContent>
-            
-            <CardFooter className="flex flex-col space-y-4 pt-0">
-              <div className="relative w-full">
+
+              <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-gray-200" />
+                  <div className="w-full border-t border-gray-200"></div>
                 </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-gray-500">or</span>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">Or continue with</span>
                 </div>
               </div>
-              
-              <div className="text-center">
-                <p className="text-sm text-gray-600">
-                  {isLogin ? "Don't have an account?" : "Already have an account?"}
-                  <button 
-                    onClick={() => {
-                      setIsLogin(!isLogin);
-                      setError('');
-                    }}
-                    className="ml-1 text-zim-green hover:text-zim-green/90 font-medium"
-                  >
-                    {isLogin ? 'Sign Up' : 'Sign In'}
-                  </button>
-                </p>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full border-gray-300 hover:bg-gray-50 text-black"
+                  onClick={handleGoogleSignIn}
+                  disabled={loading}
+                >
+                  <FaGoogle className="mr-2 h-4 w-4 text-red-500" />
+                  Google
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full border-gray-300 hover:bg-gray-50 text-black"
+                  onClick={handleFacebookSignIn}
+                  disabled={loading}
+                >
+                  <Facebook className="mr-2 h-4 w-4 text-blue-600" />
+                  Facebook
+                </Button>
               </div>
-            </CardFooter>
-          </Card>
-          
-          <p className="text-center mt-6 text-sm text-gray-500">
-            By continuing, you agree to our <Link to="/terms" className="text-zim-green hover:underline">Terms of Service</Link> and <Link to="/privacy" className="text-zim-green hover:underline">Privacy Policy</Link>.
+            </TabsContent>
+
+            <TabsContent value="register" className="space-y-4">
+              <form onSubmit={handleSignUp} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="fullName">Full Name</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="fullName"
+                      type="text"
+                      placeholder="John Doe"
+                      className="pl-10"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="register-email">Email Address</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="register-email"
+                      type="email"
+                      placeholder="name@example.com"
+                      className="pl-10"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="register-password">Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="register-password"
+                      type="password"
+                      placeholder="••••••••"
+                      className="pl-10"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Must be at least 8 characters with uppercase, lowercase, number, and symbol.
+                  </p>
+                </div>
+
+                <Button type="submit" className="w-full bg-zim-green hover:bg-zim-green/90" disabled={loading}>
+                  {loading ? 'Creating Account...' : 'Create Account'}
+                </Button>
+              </form>
+
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">Or register with</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full border-gray-300 hover:bg-gray-50 text-black"
+                  onClick={handleGoogleSignIn}
+                  disabled={loading}
+                >
+                  <FaGoogle className="mr-2 h-4 w-4 text-red-500" />
+                  Google
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full border-gray-300 hover:bg-gray-50 text-black"
+                  onClick={handleFacebookSignIn}
+                  disabled={loading}
+                >
+                  <Facebook className="mr-2 h-4 w-4 text-blue-600" />
+                  Facebook
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        <div className="text-center">
+          <p className="text-sm text-gray-600">
+            By continuing, you agree to our{' '}
+            <Link to="/terms" className="text-zim-green hover:underline">
+              Terms of Service
+            </Link>{' '}
+            and{' '}
+            <Link to="/privacy" className="text-zim-green hover:underline">
+              Privacy Policy
+            </Link>
+            .
           </p>
+          <Link to="/" className="mt-4 inline-flex items-center text-sm text-zim-green hover:underline">
+            <ArrowRight className="mr-1 h-4 w-4" />
+            Return to Home
+          </Link>
         </div>
       </div>
     </div>

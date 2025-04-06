@@ -5,7 +5,7 @@ import Footer from '@/components/Footer';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from 'react-router-dom';
-import { ChevronRight, Ship, Package, Truck as TruckIcon, ClipboardCheck, DollarSign, Clock } from 'lucide-react';
+import { ChevronRight, Ship, Package, Truck as TruckIcon, ClipboardCheck, DollarSign } from 'lucide-react';
 
 const Services = () => {
   const services = [
@@ -20,7 +20,8 @@ const Services = () => {
         'Secure packaging and handling',
         'Full tracking capabilities',
         'Delivered to recipient\'s doorstep'
-      ]
+      ],
+      image: "/lovable-uploads/f427ac1e-be37-4600-94e5-cc4115c6e4c4.png"
     },
     {
       icon: <Package className="h-12 w-12 text-zim-yellow" />,
@@ -73,19 +74,6 @@ const Services = () => {
         'Multiple payment options',
         'Business accounts welcome'
       ]
-    },
-    {
-      icon: <Clock className="h-12 w-12 text-zim-yellow" />,
-      title: "Express Shipping",
-      description: "Expedited shipping options available for time-sensitive deliveries.",
-      price: 'From £80 per kg',
-      deliveryTime: '5-7 days',
-      features: [
-        'Priority handling',
-        'Expedited customs clearance',
-        'SMS delivery notifications',
-        'Available for all package sizes'
-      ]
     }
   ];
 
@@ -113,6 +101,17 @@ const Services = () => {
               {services.map((service, index) => (
                 <Card key={index} className="h-full flex flex-col border-none shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden group">
                   <div className="absolute inset-0 bg-gradient-to-r from-zim-green/5 via-zim-yellow/5 to-zim-red/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  
+                  {service.image && (
+                    <div className="w-full h-48 overflow-hidden">
+                      <img 
+                        src={service.image} 
+                        alt={service.title} 
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                    </div>
+                  )}
+                  
                   <CardHeader className="pb-2 relative z-10">
                     <div className="mb-4 transform group-hover:scale-110 transition-transform duration-300">{service.icon}</div>
                     <CardTitle className="text-xl font-bold">{service.title}</CardTitle>

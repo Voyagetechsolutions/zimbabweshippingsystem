@@ -12,7 +12,7 @@ const ServicesSection: React.FC = () => {
       icon: <Ship className="h-10 w-10 text-zim-green dark:text-zim-green" />,
       title: 'Drum Shipping',
       description: 'Our specialized drum shipping service offers the most cost-effective way to send large quantities of goods to Zimbabwe. Each drum has a capacity of 220L.',
-      bgImage: 'url("/lovable-uploads/metal-drums.jpg")'
+      bgImage: 'url("/lovable-uploads/f427ac1e-be37-4600-94e5-cc4115c6e4c4.png")'
     },
     {
       icon: <Package className="h-10 w-10 text-zim-yellow dark:text-zim-yellow" />,

@@ -26,7 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 const RoleElevationDialog = () => {
   const [open, setOpen] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
-  const [selectedRole, setSelectedRole] = useState<UserRoleType>('admin');
+  const [selectedRole, setSelectedRole] = useState<UserRoleType>('logistics');
   const { role, elevateToAdmin } = useRole();
   const { toast } = useToast();
 
@@ -59,7 +59,7 @@ const RoleElevationDialog = () => {
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Admin Access Elevation</DialogTitle>
+          <DialogTitle>Staff Access Elevation</DialogTitle>
           <DialogDescription>
             Enter the admin password to elevate your access privileges.
           </DialogDescription>
@@ -76,7 +76,6 @@ const RoleElevationDialog = () => {
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="admin">Admin</SelectItem>
                 <SelectItem value="logistics">Logistics</SelectItem>
                 <SelectItem value="driver">Driver</SelectItem>
                 <SelectItem value="support">Support</SelectItem>

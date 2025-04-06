@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Package, Truck, Clock, FileText, ArrowRight, AlertCircle } from 'lucide-react';
+import { Package, Truck, Clock, FileText, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const TrackingInstructions = () => {
@@ -37,38 +37,6 @@ const TrackingInstructions = () => {
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Enter your tracking number in the search box above and click "Track" to see the current status of your shipment.
                 Make sure to enter the full tracking number without any spaces.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex gap-3">
-            <div className="w-10 h-10 rounded-full bg-zim-green/10 flex items-center justify-center flex-shrink-0">
-              <Clock className="h-5 w-5 text-zim-green" />
-            </div>
-            <div>
-              <h3 className="font-medium mb-1">View Real-Time Updates</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Your shipment status will show in real-time with the following stages:
-              </p>
-              <ul className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-400 list-disc list-inside pl-2">
-                <li>Booking Confirmed - Your shipment has been booked and is awaiting collection</li>
-                <li>Collected - Your items have been collected from the pickup location</li>
-                <li>In Transit - Your shipment is on its way to Zimbabwe</li>
-                <li>Customs Clearance - Your shipment is being processed by customs</li>
-                <li>Out For Delivery - Your shipment is on its way to the final destination</li>
-                <li>Delivered - Your shipment has been delivered successfully</li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="flex gap-3">
-            <div className="w-10 h-10 rounded-full bg-zim-green/10 flex items-center justify-center flex-shrink-0">
-              <ArrowRight className="h-5 w-5 text-zim-green" />
-            </div>
-            <div>
-              <h3 className="font-medium mb-1">Contact Us for Assistance</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                If you need help with tracking or have any questions, contact our support team at +44 7584 100552 or email info@zimshipping.com with your tracking number.
               </p>
             </div>
           </div>
