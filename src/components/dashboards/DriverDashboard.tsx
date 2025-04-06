@@ -8,12 +8,13 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import {
   TruckIcon, CheckCircle2, MapPin, Calendar, Clock, Phone, User, Package,
-  Truck, AlertTriangle, ArrowRightCircle, Filter, Camera, Upload
+  Truck, AlertTriangle, ArrowRightCircle, Filter, Camera, Upload, ChevronDown
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const DriverDashboard = () => {
   const [activeDeliveries, setActiveDeliveries] = useState<any[]>([]);
@@ -26,6 +27,7 @@ const DriverDashboard = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadLoading, setUploadLoading] = useState(false);
+  const [expandedSchedule, setExpandedSchedule] = useState<string | null>(null);
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -37,11 +39,11 @@ const DriverDashboard = () => {
     try {
       setLoading(true);
       
-      // Fetch active deliveries - only confirmed bookings
+      // Fetch active deliveries - include processing and confirmed bookings
       const { data: activeData, error: activeError } = await supabase
         .from('shipments')
         .select('*')
-        .in('status', ['Ready for Pickup', 'In Transit', 'Out for Delivery'])
+        .in('status', ['Processing', 'Booked', 'Paid', 'Ready for Pickup', 'In Transit', 'Out for Delivery'])
         .eq('can_modify', false) // Only confirmed bookings
         .order('created_at', { ascending: false });
 
@@ -76,7 +78,7 @@ const DriverDashboard = () => {
           const { data: shipmentData, error: shipmentError } = await supabase
             .from('shipments')
             .select('*')
-            .eq('status', 'Ready for Pickup')
+            .in('status', ['Processing', 'Booked', 'Paid', 'Ready for Pickup'])
             .eq('can_modify', false) // Only confirmed bookings
             .contains('metadata', { pickup_date: schedule.pickup_date });
             
@@ -225,6 +227,22 @@ const DriverDashboard = () => {
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
+  const toggleScheduleDetails = (scheduleId: string) => {
+    if (expandedSchedule === scheduleId) {
+      setExpandedSchedule(null);
+    } else {
+      setExpandedSchedule(scheduleId);
+    }
+  };
+
+  const pendingCollections = activeDeliveries.filter(d => 
+    ['Processing', 'Booked', 'Paid', 'Ready for Pickup'].includes(d.status) && !d.can_modify
+  );
+  
+  const inTransitDeliveries = activeDeliveries.filter(d => 
+    ['In Transit', 'Out for Delivery'].includes(d.status)
+  );
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -236,7 +254,7 @@ const DriverDashboard = () => {
             <Package className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{activeDeliveries.filter(d => d.status === 'Ready for Pickup').length}</div>
+            <div className="text-2xl font-bold">{pendingCollections.length}</div>
             <p className="text-xs text-gray-500">Packages to collect</p>
           </CardContent>
         </Card>
@@ -249,7 +267,7 @@ const DriverDashboard = () => {
             <Truck className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{activeDeliveries.filter(d => d.status === 'In Transit').length}</div>
+            <div className="text-2xl font-bold">{inTransitDeliveries.length}</div>
             <p className="text-xs text-gray-500">Packages in transit</p>
           </CardContent>
         </Card>
@@ -292,59 +310,62 @@ const DriverDashboard = () => {
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
             </div>
-          ) : activeDeliveries.filter(d => d.status === 'Ready for Pickup' && !d.can_modify).length > 0 ? (
+          ) : pendingCollections.length > 0 ? (
             <div className="space-y-4">
-              {activeDeliveries
-                .filter(d => d.status === 'Ready for Pickup' && !d.can_modify)
-                .map((shipment) => {
-                  const recipientInfo = getRecipientInfo(shipment);
-                  return (
-                    <Card key={shipment.id} className="overflow-hidden">
-                      <CardContent className="p-0">
-                        <div className="p-4 border-b">
-                          <div className="flex justify-between flex-wrap gap-2">
-                            <div>
-                              <h3 className="font-medium text-base md:text-lg flex items-center">
-                                <Package className="h-4 w-4 mr-2 text-zim-green" />
-                                Collection #{shipment.tracking_number}
-                              </h3>
-                              <div className="flex items-center mt-1 text-sm text-gray-500">
-                                <MapPin className="h-3 w-3 mr-1" />
-                                <span className="truncate max-w-[180px] md:max-w-none">{getDeliveryAddress(shipment)}</span>
-                              </div>
-                            </div>
-                            <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">
-                              Ready for Pickup
-                            </Badge>
-                          </div>
-                        </div>
-                        <div className="p-4 bg-gray-50">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <div className="flex items-center mb-2">
-                                <User className="h-4 w-4 text-gray-500 mr-2" />
-                                <span className="text-sm text-gray-700">{recipientInfo.name}</span>
-                              </div>
-                              <div className="flex items-center">
-                                <Phone className="h-4 w-4 text-gray-500 mr-2" />
-                                <span className="text-sm text-gray-700">{recipientInfo.phone}</span>
-                              </div>
-                            </div>
-                            <div className="flex items-end justify-start md:justify-end mt-4 md:mt-0">
-                              <Button 
-                                onClick={() => handleUpdateStatus(shipment.id, 'In Transit')}
-                                className="bg-zim-green hover:bg-zim-green/90 flex w-full md:w-auto justify-center"
-                              >
-                                <CheckCircle2 className="h-4 w-4 mr-2" />
-                                <span>Mark as Collected</span>
-                              </Button>
+              {pendingCollections.map((shipment) => {
+                const recipientInfo = getRecipientInfo(shipment);
+                return (
+                  <Card key={shipment.id} className="overflow-hidden">
+                    <CardContent className="p-0">
+                      <div className="p-4 border-b">
+                        <div className="flex justify-between flex-wrap gap-2">
+                          <div>
+                            <h3 className="font-medium text-base md:text-lg flex items-center">
+                              <Package className="h-4 w-4 mr-2 text-zim-green" />
+                              Collection #{shipment.tracking_number}
+                            </h3>
+                            <div className="flex items-center mt-1 text-sm text-gray-500">
+                              <MapPin className="h-3 w-3 mr-1" />
+                              <span className="truncate max-w-[180px] md:max-w-none">{getDeliveryAddress(shipment)}</span>
                             </div>
                           </div>
+                          <Badge className={
+                            shipment.status === 'Ready for Pickup' ? "bg-yellow-100 text-yellow-800 border-yellow-300" :
+                            shipment.status === 'Paid' ? "bg-green-100 text-green-800 border-green-300" :
+                            shipment.status === 'Booked' ? "bg-blue-100 text-blue-800 border-blue-300" :
+                            "bg-orange-100 text-orange-800 border-orange-300"
+                          }>
+                            {shipment.status}
+                          </Badge>
                         </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                      </div>
+                      <div className="p-4 bg-gray-50">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <div className="flex items-center mb-2">
+                              <User className="h-4 w-4 text-gray-500 mr-2" />
+                              <span className="text-sm text-gray-700">{recipientInfo.name}</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Phone className="h-4 w-4 text-gray-500 mr-2" />
+                              <span className="text-sm text-gray-700">{recipientInfo.phone}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-end justify-start md:justify-end mt-4 md:mt-0">
+                            <Button 
+                              onClick={() => handleUpdateStatus(shipment.id, 'In Transit')}
+                              className="bg-zim-green hover:bg-zim-green/90 flex w-full md:w-auto justify-center"
+                            >
+                              <CheckCircle2 className="h-4 w-4 mr-2" />
+                              <span>Mark as Collected</span>
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-10 bg-gray-50 rounded-lg">
@@ -374,59 +395,70 @@ const DriverDashboard = () => {
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
             </div>
-          ) : activeDeliveries.filter(d => d.status === 'Out for Delivery').length > 0 ? (
+          ) : inTransitDeliveries.length > 0 ? (
             <div className="space-y-4">
-              {activeDeliveries
-                .filter(d => d.status === 'Out for Delivery')
-                .map((shipment) => {
-                  const recipientInfo = getRecipientInfo(shipment);
-                  return (
-                    <Card key={shipment.id} className="overflow-hidden">
-                      <CardContent className="p-0">
-                        <div className="p-4 border-b">
-                          <div className="flex justify-between flex-wrap gap-2">
-                            <div>
-                              <h3 className="font-medium text-base md:text-lg flex items-center">
-                                <Truck className="h-4 w-4 mr-2 text-blue-500" />
-                                Delivery #{shipment.tracking_number}
-                              </h3>
-                              <div className="flex items-center mt-1 text-sm text-gray-500">
-                                <MapPin className="h-3 w-3 mr-1" />
-                                <span className="truncate max-w-[180px] md:max-w-none">{getDeliveryAddress(shipment)}</span>
-                              </div>
+              {inTransitDeliveries.map((shipment) => {
+                const recipientInfo = getRecipientInfo(shipment);
+                return (
+                  <Card key={shipment.id} className="overflow-hidden">
+                    <CardContent className="p-0">
+                      <div className="p-4 border-b">
+                        <div className="flex justify-between flex-wrap gap-2">
+                          <div>
+                            <h3 className="font-medium text-base md:text-lg flex items-center">
+                              <Truck className="h-4 w-4 mr-2 text-blue-500" />
+                              Delivery #{shipment.tracking_number}
+                            </h3>
+                            <div className="flex items-center mt-1 text-sm text-gray-500">
+                              <MapPin className="h-3 w-3 mr-1" />
+                              <span className="truncate max-w-[180px] md:max-w-none">{getDeliveryAddress(shipment)}</span>
                             </div>
-                            <Badge className="bg-blue-100 text-blue-800 border-blue-300">
-                              Out for Delivery
-                            </Badge>
                           </div>
+                          <Badge className={
+                            shipment.status === 'In Transit' ? "bg-purple-100 text-purple-800 border-purple-300" :
+                            "bg-blue-100 text-blue-800 border-blue-300"
+                          }>
+                            {shipment.status}
+                          </Badge>
                         </div>
-                        <div className="p-4 bg-gray-50">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <div className="flex items-center mb-2">
-                                <User className="h-4 w-4 text-gray-500 mr-2" />
-                                <span className="text-sm text-gray-700">{recipientInfo.name}</span>
-                              </div>
-                              <div className="flex items-center">
-                                <Phone className="h-4 w-4 text-gray-500 mr-2" />
-                                <span className="text-sm text-gray-700">{recipientInfo.phone}</span>
-                              </div>
+                      </div>
+                      <div className="p-4 bg-gray-50">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <div className="flex items-center mb-2">
+                              <User className="h-4 w-4 text-gray-500 mr-2" />
+                              <span className="text-sm text-gray-700">{recipientInfo.name}</span>
                             </div>
-                            <div className="flex items-end justify-start md:justify-end mt-4 md:mt-0 space-x-2">
+                            <div className="flex items-center">
+                              <Phone className="h-4 w-4 text-gray-500 mr-2" />
+                              <span className="text-sm text-gray-700">{recipientInfo.phone}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-end justify-start md:justify-end mt-4 md:mt-0 space-x-2">
+                            {shipment.status === 'In Transit' ? (
+                              <Button 
+                                onClick={() => handleUpdateStatus(shipment.id, 'Out for Delivery')}
+                                className="bg-blue-500 hover:bg-blue-600 flex w-full md:w-auto justify-center"
+                              >
+                                <Truck className="h-4 w-4 mr-2" />
+                                <span>Mark Out for Delivery</span>
+                              </Button>
+                            ) : (
                               <Button 
                                 onClick={() => openImageUploadModal(shipment.id)}
-                                className="bg-blue-500 hover:bg-blue-600 flex w-full md:w-auto justify-center"
+                                className="bg-green-500 hover:bg-green-600 flex w-full md:w-auto justify-center"
                               >
                                 <Camera className="h-4 w-4 mr-2" />
                                 <span>Upload Delivery Photo</span>
                               </Button>
-                            </div>
+                            )}
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-10 bg-gray-50 rounded-lg">
@@ -446,8 +478,8 @@ const DriverDashboard = () => {
             </div>
           ) : collectionSchedules.length > 0 ? (
             <div className="space-y-4">
-              {collectionSchedules.map((schedule, index) => (
-                <Card key={index} className="overflow-hidden">
+              {collectionSchedules.map((schedule) => (
+                <Card key={schedule.id} className="overflow-hidden">
                   <CardContent className="p-4">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div>
@@ -469,31 +501,49 @@ const DriverDashboard = () => {
                           <ArrowRightCircle className="h-4 w-4 mr-2" />
                           <span>View Route</span>
                         </Button>
-                        <Button variant="outline" className="flex items-center w-full md:w-auto justify-center">
+                        <Button 
+                          variant="outline" 
+                          className="flex items-center w-full md:w-auto justify-center"
+                          onClick={() => toggleScheduleDetails(schedule.id)}
+                        >
                           <Package className="h-4 w-4 mr-2" />
                           <span>View Shipments ({scheduleShipments[schedule.id]?.length || 0})</span>
+                          <ChevronDown className={`h-4 w-4 ml-2 transform ${expandedSchedule === schedule.id ? 'rotate-180' : ''}`} />
                         </Button>
                       </div>
                     </div>
                     
-                    {scheduleShipments[schedule.id] && scheduleShipments[schedule.id].length > 0 && (
-                      <div className="mt-4 pt-4 border-t">
-                        <h4 className="font-medium mb-2">Scheduled Shipments</h4>
-                        <div className="space-y-2">
-                          {scheduleShipments[schedule.id].map((shipment: any) => (
-                            <div key={shipment.id} className="flex justify-between items-center p-2 bg-gray-50 rounded-md">
-                              <div>
-                                <p className="font-medium">{shipment.tracking_number}</p>
-                                <p className="text-xs text-gray-500">{getDeliveryAddress(shipment)}</p>
-                              </div>
-                              <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">
-                                Ready for Pickup
-                              </Badge>
+                    <Collapsible open={expandedSchedule === schedule.id} className="mt-4">
+                      <CollapsibleContent>
+                        {scheduleShipments[schedule.id] && scheduleShipments[schedule.id].length > 0 ? (
+                          <div className="mt-4 pt-4 border-t">
+                            <h4 className="font-medium mb-2">Scheduled Shipments</h4>
+                            <div className="space-y-2">
+                              {scheduleShipments[schedule.id].map((shipment: any) => (
+                                <div key={shipment.id} className="flex justify-between items-center p-2 bg-gray-50 rounded-md">
+                                  <div>
+                                    <p className="font-medium">{shipment.tracking_number}</p>
+                                    <p className="text-xs text-gray-500">{getDeliveryAddress(shipment)}</p>
+                                  </div>
+                                  <Badge className={
+                                    shipment.status === 'Ready for Pickup' ? "bg-yellow-100 text-yellow-800 border-yellow-300" :
+                                    shipment.status === 'Paid' ? "bg-green-100 text-green-800 border-green-300" :
+                                    shipment.status === 'Booked' ? "bg-blue-100 text-blue-800 border-blue-300" :
+                                    "bg-orange-100 text-orange-800 border-orange-300"
+                                  }>
+                                    {shipment.status}
+                                  </Badge>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                          </div>
+                        ) : (
+                          <div className="mt-4 pt-4 border-t text-center py-4">
+                            <p className="text-gray-500">No shipments scheduled for this route.</p>
+                          </div>
+                        )}
+                      </CollapsibleContent>
+                    </Collapsible>
                   </CardContent>
                 </Card>
               ))}
