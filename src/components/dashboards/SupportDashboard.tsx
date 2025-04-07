@@ -3,12 +3,51 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquare, Users, Clock, Bell, CheckCircle2, AlertCircle, User, Phone } from 'lucide-react';
+import { 
+  MessageSquare, 
+  Users, 
+  Clock, 
+  CheckCircle2, 
+  AlertCircle, 
+  User, 
+  Phone, 
+  Mail,
+  Send,
+  Loader2,
+  Save,
+  Forward,
+  ArrowRight
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+// Define saved response template interface
+interface ResponseTemplate {
+  id: string;
+  title: string;
+  content: string;
+  created_at: string;
+}
 
 const SupportDashboard = () => {
   const [tickets, setTickets] = useState<any[]>([]);
@@ -20,17 +59,31 @@ const SupportDashboard = () => {
     responseRate: 0,
     averageResponseTime: "N/A",
   });
+  const [viewingTicket, setViewingTicket] = useState<any>(null);
+  const [responseContent, setResponseContent] = useState('');
+  const [sendingResponse, setSendingResponse] = useState(false);
+  const [responseTemplates, setResponseTemplates] = useState<ResponseTemplate[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+  const [forwardDialogOpen, setForwardDialogOpen] = useState(false);
+  const [forwardEmail, setForwardEmail] = useState('');
+  const [forwardingTicket, setForwardingTicket] = useState(false);
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [newTemplateContent, setNewTemplateContent] = useState('');
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [ticketResponses, setTicketResponses] = useState<Record<string, any[]>>({});
+  
   const { toast } = useToast();
 
   useEffect(() => {
     fetchSupportTickets();
+    fetchResponseTemplates();
   }, []);
 
   const fetchSupportTickets = async () => {
     try {
       setLoading(true);
       
-      // Log to check if this function is being called
       console.log('Fetching support tickets...');
       
       const { data, error } = await supabase
@@ -77,6 +130,28 @@ const SupportDashboard = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+  
+  const fetchResponseTemplates = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('response_templates')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      if (data) {
+        setResponseTemplates(data);
+      }
+    } catch (error: any) {
+      console.error('Error fetching response templates:', error.message);
+      toast({
+        title: 'Error',
+        description: 'Failed to load response templates',
+        variant: 'destructive'
+      });
     }
   };
   
@@ -164,6 +239,253 @@ const SupportDashboard = () => {
       return format(new Date(dateString), 'MMM d, yyyy • h:mm a');
     } catch (e) {
       return dateString;
+    }
+  };
+
+  const handleViewTicket = async (ticket: any) => {
+    setViewingTicket(ticket);
+    setResponseContent('');
+    
+    try {
+      // Fetch responses for this ticket if we haven't already
+      if (!ticketResponses[ticket.id]) {
+        const { data, error } = await supabase
+          .from('ticket_responses')
+          .select('*')
+          .eq('ticket_id', ticket.id)
+          .order('created_at', { ascending: true });
+          
+        if (error) throw error;
+        
+        setTicketResponses(prev => ({
+          ...prev,
+          [ticket.id]: data || []
+        }));
+      }
+    } catch (error: any) {
+      console.error('Error fetching ticket responses:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load responses for this ticket',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleSendResponse = async () => {
+    if (!viewingTicket || !responseContent.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Response content cannot be empty',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    setSendingResponse(true);
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+      
+      // Add response
+      const { data: responseData, error: responseError } = await supabase
+        .from('ticket_responses')
+        .insert({
+          ticket_id: viewingTicket.id,
+          user_id: user.id,
+          message: responseContent,
+          is_staff_response: true
+        })
+        .select()
+        .single();
+      
+      if (responseError) throw responseError;
+      
+      // Update ticket status to 'In Progress' if it's 'Open'
+      if (viewingTicket.status === 'Open') {
+        const { error: updateError } = await supabase
+          .from('support_tickets')
+          .update({ 
+            status: 'In Progress',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', viewingTicket.id);
+        
+        if (updateError) throw updateError;
+        
+        // Update local ticket state
+        setViewingTicket({
+          ...viewingTicket,
+          status: 'In Progress'
+        });
+        
+        // Update tickets list
+        setTickets(prevTickets => 
+          prevTickets.map(t => 
+            t.id === viewingTicket.id 
+              ? { ...t, status: 'In Progress' } 
+              : t
+          )
+        );
+      }
+      
+      // Add the new response to our local state
+      setTicketResponses(prev => ({
+        ...prev,
+        [viewingTicket.id]: [...(prev[viewingTicket.id] || []), responseData]
+      }));
+      
+      // Clear the response field
+      setResponseContent('');
+      
+      toast({
+        title: 'Response Sent',
+        description: 'Your response has been sent successfully'
+      });
+    } catch (error: any) {
+      console.error('Error sending response:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to send response: ' + error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setSendingResponse(false);
+    }
+  };
+
+  const handleSelectTemplate = (templateId: string) => {
+    const template = responseTemplates.find(t => t.id === templateId);
+    if (template) {
+      setResponseContent(template.content);
+      setSelectedTemplate(templateId);
+    }
+  };
+
+  const handleSaveNewTemplate = async () => {
+    if (!newTemplateName.trim() || !newTemplateContent.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Template name and content are required',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setSavingTemplate(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      const { data, error } = await supabase
+        .from('response_templates')
+        .insert({
+          title: newTemplateName,
+          content: newTemplateContent,
+          user_id: user.id
+        })
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
+      // Add new template to state
+      setResponseTemplates(prev => [data, ...prev]);
+      
+      // Reset form
+      setNewTemplateName('');
+      setNewTemplateContent('');
+      setTemplateDialogOpen(false);
+      
+      toast({
+        title: 'Template Saved',
+        description: 'Response template has been saved successfully'
+      });
+    } catch (error: any) {
+      console.error('Error saving template:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save template: ' + error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  const handleForwardTicket = async () => {
+    if (!viewingTicket || !forwardEmail.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Forward email is required',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setForwardingTicket(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // In a real app, you would call a server function to send the email
+      // This is a placeholder to simulate the action
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Add a forwarding note to the ticket responses
+      const { error: responseError } = await supabase
+        .from('ticket_responses')
+        .insert({
+          ticket_id: viewingTicket.id,
+          user_id: user.id,
+          message: `This ticket was forwarded to ${forwardEmail}`,
+          is_staff_response: true
+        });
+      
+      if (responseError) throw responseError;
+      
+      // Update local state
+      const newResponse = {
+        id: Date.now().toString(),
+        ticket_id: viewingTicket.id,
+        user_id: user.id,
+        message: `This ticket was forwarded to ${forwardEmail}`,
+        is_staff_response: true,
+        created_at: new Date().toISOString()
+      };
+      
+      setTicketResponses(prev => ({
+        ...prev,
+        [viewingTicket.id]: [...(prev[viewingTicket.id] || []), newResponse]
+      }));
+      
+      // Close dialog and reset form
+      setForwardDialogOpen(false);
+      setForwardEmail('');
+      
+      toast({
+        title: 'Ticket Forwarded',
+        description: `Ticket has been forwarded to ${forwardEmail}`
+      });
+    } catch (error: any) {
+      console.error('Error forwarding ticket:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to forward ticket: ' + error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setForwardingTicket(false);
     }
   };
 
@@ -259,7 +581,11 @@ const SupportDashboard = () => {
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         {getPriorityBadge(ticket.priority)}
-                        <Button size="sm" variant="outline">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => handleViewTicket(ticket)}
+                        >
                           Respond
                         </Button>
                       </div>
@@ -310,7 +636,10 @@ const SupportDashboard = () => {
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
                           {getPriorityBadge(ticket.priority)}
-                          <Button size="sm">
+                          <Button 
+                            size="sm"
+                            onClick={() => handleViewTicket(ticket)}
+                          >
                             Respond
                           </Button>
                         </div>
@@ -359,7 +688,11 @@ const SupportDashboard = () => {
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         {getStatusBadge(ticket.status)}
-                        <Button size="sm" variant="outline">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleViewTicket(ticket)}
+                        >
                           View
                         </Button>
                       </div>
@@ -379,6 +712,234 @@ const SupportDashboard = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Response Dialog */}
+      {viewingTicket && (
+        <Dialog open={!!viewingTicket} onOpenChange={(open) => !open && setViewingTicket(null)}>
+          <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{viewingTicket.subject}</DialogTitle>
+              <DialogDescription>
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <Badge>{viewingTicket.category || 'General'}</Badge>
+                  {getPriorityBadge(viewingTicket.priority)}
+                  {getStatusBadge(viewingTicket.status)}
+                </div>
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              {/* Ticket details */}
+              <div className="bg-gray-50 p-4 rounded-md border">
+                <div className="flex items-center mb-2">
+                  <User className="h-4 w-4 mr-2 text-gray-500" />
+                  <span className="text-sm font-medium">{viewingTicket.email || 'Customer'}</span>
+                  <span className="text-xs text-gray-500 ml-auto">{formatDate(viewingTicket.created_at)}</span>
+                </div>
+                <p className="text-gray-700 whitespace-pre-line">{viewingTicket.message}</p>
+              </div>
+              
+              {/* Previous responses */}
+              {ticketResponses[viewingTicket.id] && ticketResponses[viewingTicket.id].length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium text-gray-700">Previous Responses</h3>
+                  {ticketResponses[viewingTicket.id].map((response: any) => (
+                    <div 
+                      key={response.id} 
+                      className={`p-3 rounded-md border ${response.is_staff_response ? 'bg-blue-50 border-blue-100' : 'bg-gray-50 border-gray-100'}`}
+                    >
+                      <div className="flex items-center mb-1">
+                        <span className="text-xs font-medium">
+                          {response.is_staff_response ? 'Support Agent' : 'Customer'}
+                        </span>
+                        <span className="text-xs text-gray-500 ml-auto">
+                          {formatDate(response.created_at)}
+                        </span>
+                      </div>
+                      <p className="text-sm whitespace-pre-line">{response.message}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* Response form */}
+              <div className="space-y-3 mt-4">
+                <div className="flex justify-between">
+                  <h3 className="text-sm font-medium text-gray-700">Your Response</h3>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setTemplateDialogOpen(true)}
+                    >
+                      <Save className="h-4 w-4 mr-1" />
+                      Save Template
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setForwardDialogOpen(true)}
+                    >
+                      <Forward className="h-4 w-4 mr-1" />
+                      Forward
+                    </Button>
+                  </div>
+                </div>
+                
+                {/* Template selector */}
+                {responseTemplates.length > 0 && (
+                  <Select value={selectedTemplate} onValueChange={handleSelectTemplate}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a response template" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {responseTemplates.map(template => (
+                        <SelectItem key={template.id} value={template.id}>
+                          {template.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                
+                <Textarea
+                  placeholder="Type your response here..."
+                  rows={6}
+                  value={responseContent}
+                  onChange={(e) => setResponseContent(e.target.value)}
+                  className="min-h-[100px]"
+                />
+                
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setViewingTicket(null)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleSendResponse}
+                    disabled={sendingResponse || !responseContent.trim()}
+                  >
+                    {sendingResponse ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4 mr-2" />
+                        Send Response
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+              
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Save Template Dialog */}
+      <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Save Response Template</DialogTitle>
+            <DialogDescription>
+              Create a reusable template for common responses
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Template Name</label>
+              <Input
+                placeholder="Enter template name"
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Template Content</label>
+              <Textarea
+                placeholder="Enter template content"
+                rows={6}
+                value={newTemplateContent || responseContent}
+                onChange={(e) => setNewTemplateContent(e.target.value)}
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTemplateDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveNewTemplate}
+              disabled={savingTemplate}
+            >
+              {savingTemplate ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Template
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Forward Ticket Dialog */}
+      <Dialog open={forwardDialogOpen} onOpenChange={setForwardDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Forward Ticket</DialogTitle>
+            <DialogDescription>
+              Forward this support ticket to another email
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Forward To</label>
+              <Input
+                type="email"
+                placeholder="Enter email address"
+                value={forwardEmail}
+                onChange={(e) => setForwardEmail(e.target.value)}
+              />
+              <p className="text-xs text-gray-500">
+                The ticket and all its responses will be forwarded to this email
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setForwardDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleForwardTicket}
+              disabled={forwardingTicket}
+            >
+              {forwardingTicket ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Forwarding...
+                </>
+              ) : (
+                <>
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  Forward Ticket
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

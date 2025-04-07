@@ -4,7 +4,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import SupportTicketForm from '@/components/SupportTicketForm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessagesSquare, Phone, Mail, Clock } from 'lucide-react';
+import { MessagesSquare, Phone, Mail, Clock, ArrowRight } from 'lucide-react';
 
 const Support = () => {
   return (
@@ -57,7 +57,13 @@ const Support = () => {
                   </CardHeader>
                   <CardContent>
                     <p className="text-gray-600 mb-2">General Inquiries: info@zimshipping.com</p>
-                    <p className="text-gray-600">Support: support@zimshipping.com</p>
+                    <p className="text-gray-600 mb-2">Support: support@zimshipping.com</p>
+                    <div className="mt-4 pt-3 border-t border-gray-100">
+                      <p className="text-sm text-gray-600 flex items-center">
+                        <ArrowRight className="h-4 w-4 text-zim-green mr-2" />
+                        All emails are automatically directed to our support system
+                      </p>
+                    </div>
                   </CardContent>
                 </Card>
                 
@@ -70,7 +76,7 @@ const Support = () => {
                   </CardHeader>
                   <CardContent>
                     <p className="text-gray-600 mb-2">Monday to Friday: 9am - 5pm (UK Time)</p>
-                    <p className="text-gray-600">Saturday: 9am - 1pm (UK Time)</p>
+                    <p className="text-gray-600 mb-2">Saturday: 9am - 1pm (UK Time)</p>
                     <p className="text-gray-600">Sunday: Closed</p>
                   </CardContent>
                 </Card>

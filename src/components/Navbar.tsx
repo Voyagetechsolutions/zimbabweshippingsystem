@@ -59,7 +59,11 @@ const Navbar = () => {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
             <Link to="/" className="flex-shrink-0">
-              <Logo />
+              {isMobile ? (
+                <img src="/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png" alt="Logo" className="h-10 w-auto" />
+              ) : (
+                <Logo />
+              )}
             </Link>
             <div className="hidden md:block ml-6">
               <div className="flex items-baseline space-x-3">
