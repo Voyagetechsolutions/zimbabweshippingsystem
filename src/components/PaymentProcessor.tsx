@@ -38,39 +38,84 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
     setError(null);
     
     try {
+      console.log("Processing offline payment with data:", {
+        shipment_id: bookingData.shipment_id,
+        amount: totalAmount
+      });
+      
+      // Create payment record for offline payment
       const { data: paymentData, error: paymentError } = await supabase.from('payments').insert({
         amount: totalAmount,
         payment_method: 'offline',
         payment_status: 'pending',
         shipment_id: bookingData.shipment_id,
-        user_id: bookingData.user_id,
+        user_id: bookingData.user_id || null,
         currency: 'GBP'
       }).select('id').single();
       
-      if (paymentError) throw paymentError;
+      if (paymentError) {
+        console.error('Payment error details:', paymentError);
+        throw paymentError;
+      }
+      
+      console.log("Created payment record:", paymentData);
       
       const receiptNumber = `RCT-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
       
-      const { data: receiptData, error: receiptError } = await supabase.from(tableFrom('receipts')).insert({
+      // Create receipt record
+      const { data: receiptData, error: receiptError } = await supabase.from('receipts').insert({
         payment_id: paymentData.id,
         shipment_id: bookingData.shipment_id,
         receipt_number: receiptNumber,
         payment_method: 'offline',
         amount: totalAmount,
         currency: 'GBP',
-        sender_details: bookingData.senderDetails,
-        recipient_details: bookingData.recipientDetails,
-        shipment_details: bookingData.shipmentDetails,
+        sender_details: bookingData.senderDetails || {
+          name: 'Unknown',
+          email: 'unknown@example.com',
+          phone: 'unknown',
+          address: 'Unknown'
+        },
+        recipient_details: bookingData.recipientDetails || {
+          name: 'Unknown',
+          phone: 'unknown',
+          address: 'Unknown'
+        },
+        shipment_details: bookingData.shipmentDetails || {
+          tracking_number: 'Unknown',
+          type: 'unknown',
+          quantity: 0,
+          weight: 0,
+          services: []
+        },
         status: 'pending_payment'
       }).select('id').single();
       
-      if (receiptError) throw receiptError;
+      if (receiptError) {
+        console.error('Receipt error details:', receiptError);
+        throw new Error(`Receipt creation failed: ${receiptError.message}`);
+      }
       
+      console.log("Created receipt record:", receiptData);
+      
+      // Update shipment status to 'Payment Pending'
+      const { error: updateError } = await supabase.from('shipments')
+        .update({ status: 'Payment Pending' })
+        .eq('id', bookingData.shipment_id);
+      
+      if (updateError) {
+        console.error('Error updating shipment status:', updateError);
+        // We'll continue anyway since the payment and receipt were created
+      } else {
+        console.log("Updated shipment status to Payment Pending");
+      }
+      
+      // Navigate to success page with receipt
       onPaymentComplete(paymentData.id, receiptData.id);
       
     } catch (err: any) {
       console.error('Offline payment error:', err);
-      setError('Failed to process your request. Please try again.');
+      setError('Failed to process your offline payment request. Please try again.');
       setLoading(false);
       toast({
         variant: "destructive",

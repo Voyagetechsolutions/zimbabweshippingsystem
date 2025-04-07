@@ -29,9 +29,15 @@ const BookShipment = () => {
 
   // Handle form submission to move to payment step
   const handleFormSubmit = async (data: any, shipmentId: string, amount: number) => {
+    console.log("Form submitted with data:", { data, shipmentId, amount });
+    
+    // Get user ID if logged in
+    const { data: { user } } = await supabase.auth.getUser();
+    
     setBookingData({
       ...data,
       shipment_id: shipmentId,
+      user_id: user?.id || null,
       senderDetails: {
         name: `${data.firstName} ${data.lastName}`,
         email: data.email,
@@ -62,7 +68,10 @@ const BookShipment = () => {
         .eq('id', shipmentId)
         .single();
       
-      if (shipmentError) throw shipmentError;
+      if (shipmentError) {
+        console.error('Error fetching tracking number:', shipmentError);
+        throw shipmentError;
+      }
       
       // Update the booking data with the tracking number
       setBookingData(prev => ({
@@ -72,6 +81,8 @@ const BookShipment = () => {
           tracking_number: shipmentData.tracking_number
         }
       }));
+      
+      console.log("Retrieved tracking number:", shipmentData.tracking_number);
     } catch (err) {
       console.error('Error fetching tracking number:', err);
     }
@@ -79,6 +90,7 @@ const BookShipment = () => {
 
   // Handle payment completion
   const handlePaymentComplete = (paymentId: string, receiptId: string) => {
+    console.log("Payment complete with:", { paymentId, receiptId });
     // Navigate to the success page with the receipt ID
     navigate(`/payment-success?receipt_id=${receiptId}`);
   };
