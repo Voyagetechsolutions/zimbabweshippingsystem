@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,13 +39,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { tableFrom } from '@/integrations/supabase/db-types';
 
-// Define saved response template interface
 interface ResponseTemplate {
   id: string;
   title: string;
   content: string;
   created_at: string;
+  user_id: string;
+  updated_at: string;
 }
 
 const SupportDashboard = () => {
@@ -87,7 +88,7 @@ const SupportDashboard = () => {
       console.log('Fetching support tickets...');
       
       const { data, error } = await supabase
-        .from('support_tickets')
+        .from(tableFrom('support_tickets'))
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -136,14 +137,14 @@ const SupportDashboard = () => {
   const fetchResponseTemplates = async () => {
     try {
       const { data, error } = await supabase
-        .from('response_templates')
+        .from(tableFrom('response_templates'))
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       
       if (data) {
-        setResponseTemplates(data);
+        setResponseTemplates(data as ResponseTemplate[]);
       }
     } catch (error: any) {
       console.error('Error fetching response templates:', error.message);
@@ -158,7 +159,7 @@ const SupportDashboard = () => {
   const countTicketsWithResponses = async () => {
     try {
       const { data, error } = await supabase
-        .from('ticket_responses')
+        .from(tableFrom('ticket_responses'))
         .select('ticket_id', { count: 'exact', head: true })
         .is('is_staff_response', true);
         
@@ -175,7 +176,7 @@ const SupportDashboard = () => {
     try {
       // This is a simplified calculation and would be more accurate with timestamps in the database
       const { data: tickets, error: ticketsError } = await supabase
-        .from('support_tickets')
+        .from(tableFrom('support_tickets'))
         .select('id, created_at, updated_at')
         .not('status', 'eq', 'Open');
         
@@ -250,7 +251,7 @@ const SupportDashboard = () => {
       // Fetch responses for this ticket if we haven't already
       if (!ticketResponses[ticket.id]) {
         const { data, error } = await supabase
-          .from('ticket_responses')
+          .from(tableFrom('ticket_responses'))
           .select('*')
           .eq('ticket_id', ticket.id)
           .order('created_at', { ascending: true });
@@ -293,7 +294,7 @@ const SupportDashboard = () => {
       
       // Add response
       const { data: responseData, error: responseError } = await supabase
-        .from('ticket_responses')
+        .from(tableFrom('ticket_responses'))
         .insert({
           ticket_id: viewingTicket.id,
           user_id: user.id,
@@ -308,7 +309,7 @@ const SupportDashboard = () => {
       // Update ticket status to 'In Progress' if it's 'Open'
       if (viewingTicket.status === 'Open') {
         const { error: updateError } = await supabase
-          .from('support_tickets')
+          .from(tableFrom('support_tickets'))
           .update({ 
             status: 'In Progress',
             updated_at: new Date().toISOString()
@@ -385,7 +386,7 @@ const SupportDashboard = () => {
       }
 
       const { data, error } = await supabase
-        .from('response_templates')
+        .from(tableFrom('response_templates'))
         .insert({
           title: newTemplateName,
           content: newTemplateContent,
@@ -397,7 +398,7 @@ const SupportDashboard = () => {
       if (error) throw error;
       
       // Add new template to state
-      setResponseTemplates(prev => [data, ...prev]);
+      setResponseTemplates(prev => [data as ResponseTemplate, ...prev]);
       
       // Reset form
       setNewTemplateName('');
@@ -444,7 +445,7 @@ const SupportDashboard = () => {
       
       // Add a forwarding note to the ticket responses
       const { error: responseError } = await supabase
-        .from('ticket_responses')
+        .from(tableFrom('ticket_responses'))
         .insert({
           ticket_id: viewingTicket.id,
           user_id: user.id,
@@ -713,7 +714,6 @@ const SupportDashboard = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Response Dialog */}
       {viewingTicket && (
         <Dialog open={!!viewingTicket} onOpenChange={(open) => !open && setViewingTicket(null)}>
           <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
@@ -729,7 +729,6 @@ const SupportDashboard = () => {
             </DialogHeader>
             
             <div className="space-y-4 py-4">
-              {/* Ticket details */}
               <div className="bg-gray-50 p-4 rounded-md border">
                 <div className="flex items-center mb-2">
                   <User className="h-4 w-4 mr-2 text-gray-500" />
@@ -739,7 +738,6 @@ const SupportDashboard = () => {
                 <p className="text-gray-700 whitespace-pre-line">{viewingTicket.message}</p>
               </div>
               
-              {/* Previous responses */}
               {ticketResponses[viewingTicket.id] && ticketResponses[viewingTicket.id].length > 0 && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-medium text-gray-700">Previous Responses</h3>
@@ -762,7 +760,6 @@ const SupportDashboard = () => {
                 </div>
               )}
               
-              {/* Response form */}
               <div className="space-y-3 mt-4">
                 <div className="flex justify-between">
                   <h3 className="text-sm font-medium text-gray-700">Your Response</h3>
@@ -786,7 +783,6 @@ const SupportDashboard = () => {
                   </div>
                 </div>
                 
-                {/* Template selector */}
                 {responseTemplates.length > 0 && (
                   <Select value={selectedTemplate} onValueChange={handleSelectTemplate}>
                     <SelectTrigger>
@@ -832,13 +828,11 @@ const SupportDashboard = () => {
                   </Button>
                 </div>
               </div>
-              
             </div>
           </DialogContent>
         </Dialog>
       )}
 
-      {/* Save Template Dialog */}
       <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
@@ -892,7 +886,6 @@ const SupportDashboard = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Forward Ticket Dialog */}
       <Dialog open={forwardDialogOpen} onOpenChange={setForwardDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>

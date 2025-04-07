@@ -4,7 +4,8 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import SupportTicketForm from '@/components/SupportTicketForm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessagesSquare, Phone, Mail, Clock, ArrowRight } from 'lucide-react';
+import { MessagesSquare, Phone, Mail, Clock, ArrowRight, HelpCircle } from 'lucide-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 const Support = () => {
   return (
@@ -88,19 +89,33 @@ const Support = () => {
                       FAQ
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <h3 className="font-medium">How long does shipping take?</h3>
-                      <p className="text-gray-600 text-sm">Standard shipping takes approximately 3-4 weeks from the UK to Zimbabwe.</p>
-                    </div>
-                    <div>
-                      <h3 className="font-medium">Can I track my shipment?</h3>
-                      <p className="text-gray-600 text-sm">Yes, you can track your shipment using the tracking number provided after booking.</p>
-                    </div>
-                    <div>
-                      <h3 className="font-medium">What items can't be shipped?</h3>
-                      <p className="text-gray-600 text-sm">Prohibited items include perishables, weapons, and hazardous materials.</p>
-                    </div>
+                  <CardContent>
+                    <Accordion type="single" collapsible className="w-full">
+                      <AccordionItem value="item-1">
+                        <AccordionTrigger className="text-sm font-medium">How long does shipping take?</AccordionTrigger>
+                        <AccordionContent className="text-gray-600 text-sm">
+                          Standard shipping takes approximately 3-4 weeks from the UK to Zimbabwe.
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="item-2">
+                        <AccordionTrigger className="text-sm font-medium">Can I track my shipment?</AccordionTrigger>
+                        <AccordionContent className="text-gray-600 text-sm">
+                          Yes, you can track your shipment using the tracking number provided after booking.
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="item-3">
+                        <AccordionTrigger className="text-sm font-medium">What items can't be shipped?</AccordionTrigger>
+                        <AccordionContent className="text-gray-600 text-sm">
+                          Prohibited items include perishables, weapons, and hazardous materials.
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="item-4">
+                        <AccordionTrigger className="text-sm font-medium">How do I get a response to my support ticket?</AccordionTrigger>
+                        <AccordionContent className="text-gray-600 text-sm">
+                          Our support team typically responds within 24 hours. You'll receive updates via email.
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
                   </CardContent>
                 </Card>
               </div>

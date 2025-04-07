@@ -80,6 +80,16 @@ export interface Tables {
     created_at: string;
   };
   
+  // Add the response_templates table we just created
+  response_templates: {
+    id: string;
+    user_id: string;
+    title: string;
+    content: string;
+    created_at: string;
+    updated_at: string;
+  };
+  
   system_settings: {
     id: string;
     key: string;
