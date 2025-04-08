@@ -18,13 +18,13 @@ const ServicesSection: React.FC = () => {
       icon: <Package className="h-10 w-10 text-zim-yellow dark:text-zim-yellow" />,
       title: 'Regular Parcels',
       description: 'Send packages of any size with our flexible parcel shipping options, with competitive rates based on weight.',
-      bgImage: 'url("/lovable-uploads/27c10d33-77e5-440a-ad90-8cc4b2daad65.png")'
+      bgImage: 'url("/lovable-uploads/28deab65-7859-4a23-8d21-37afd6bcda2a.png")'
     },
     {
       icon: <Truck className="h-10 w-10 text-zim-red dark:text-zim-red" />,
       title: 'Door-to-Door Delivery',
       description: `We pick up from your UK address and deliver directly to your recipient's doorstep in Zimbabwe for an additional ${formatPrice(25)}.`,
-      bgImage: 'url("/lovable-uploads/c576984d-3677-4788-9e04-45fc49c28eed.png")'
+      bgImage: 'url("/lovable-uploads/0027003d-7b3b-482d-82a2-9cc4877b58b6.png")'
     },
     {
       icon: <Globe className="h-10 w-10 text-zim-green dark:text-zim-green" />,
@@ -36,7 +36,7 @@ const ServicesSection: React.FC = () => {
       icon: <DollarSign className="h-10 w-10 text-zim-yellow dark:text-zim-yellow" />,
       title: 'Flexible Payment Options',
       description: 'Multiple payment methods available including credit cards, PayPal, and mobile payment solutions.',
-      bgImage: 'url("/lovable-uploads/payment.jpg")'
+      bgImage: 'url("/lovable-uploads/288d0f20-90b3-401c-be86-ac3405522ca9.png")'
     },
   ];
 
