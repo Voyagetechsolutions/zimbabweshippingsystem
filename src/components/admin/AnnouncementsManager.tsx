@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,7 +30,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Announcement } from '@/types/admin';
-import { Json } from '@/integrations/supabase/types';
+import { callRpcFunction } from '@/utils/supabaseUtils';
 
 const CATEGORIES = [
   { value: 'general', label: 'General' },
@@ -72,7 +73,8 @@ const AnnouncementsManager = () => {
     try {
       setLoading(true);
       
-      const { data, error } = await supabase.rpc('get_announcements' as any);
+      // Use the callRpcFunction utility to make the RPC call
+      const { data, error } = await callRpcFunction<Announcement[]>('get_announcements');
       
       if (error) throw error;
       
@@ -145,7 +147,7 @@ const AnnouncementsManager = () => {
       }
       
       if (isEditMode) {
-        const { data, error } = await supabase.rpc('update_announcement' as any, {
+        const { data, error } = await callRpcFunction('update_announcement', {
           p_id: formData.id,
           p_title: formData.title,
           p_content: formData.content,
@@ -163,7 +165,7 @@ const AnnouncementsManager = () => {
           });
         }
       } else {
-        const { data, error } = await supabase.rpc('create_announcement' as any, {
+        const { data, error } = await callRpcFunction('create_announcement', {
           p_title: formData.title,
           p_content: formData.content,
           p_category: formData.category,
@@ -202,7 +204,7 @@ const AnnouncementsManager = () => {
     try {
       setDeletingId(id);
       
-      const { data, error } = await supabase.rpc('delete_announcement' as any, {
+      const { data, error } = await callRpcFunction('delete_announcement', {
         p_id: id
       });
       

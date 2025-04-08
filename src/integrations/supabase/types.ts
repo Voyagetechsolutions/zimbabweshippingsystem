@@ -659,6 +659,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_announcement: {
+        Args: {
+          p_title: string
+          p_content: string
+          p_category: string
+          p_is_active: boolean
+          p_created_by: string
+          p_expiry_date?: string
+        }
+        Returns: Json
+      }
+      delete_announcement: {
+        Args: { p_id: string }
+        Returns: boolean
+      }
       delete_gallery_image: {
         Args: { p_id: string }
         Returns: boolean
@@ -666,6 +681,14 @@ export type Database = {
       elevate_to_admin: {
         Args: { admin_password: string }
         Returns: boolean
+      }
+      get_active_announcements: {
+        Args: Record<PropertyKey, never>
+        Returns: Json[]
+      }
+      get_announcements: {
+        Args: Record<PropertyKey, never>
+        Returns: Json[]
       }
       get_gallery_images: {
         Args: Record<PropertyKey, never>
@@ -691,6 +714,17 @@ export type Database = {
       make_admin: {
         Args: { user_email: string }
         Returns: boolean
+      }
+      update_announcement: {
+        Args: {
+          p_id: string
+          p_title: string
+          p_content: string
+          p_category: string
+          p_is_active: boolean
+          p_expiry_date?: string
+        }
+        Returns: Json
       }
     }
     Enums: {
