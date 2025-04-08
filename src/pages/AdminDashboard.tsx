@@ -99,7 +99,7 @@ const AdminDashboard = () => {
   const isMounted = useRef(true);
 
   const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [loading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
@@ -113,9 +113,6 @@ const AdminDashboard = () => {
     inTransit: 0,
     delivered: 0,
   });
-
-  // Use loading with a ref to prevent state updates after unmount
-  const [loading, setLoading] = useState(true);
 
   // Use this effect to set the isMounted ref to false when component unmounts
   useEffect(() => {
