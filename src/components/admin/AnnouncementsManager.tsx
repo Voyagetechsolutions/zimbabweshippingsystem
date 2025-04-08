@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,6 +30,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Announcement } from '@/types/admin';
 import { Json } from '@/integrations/supabase/types';
+import { callRpcFunction } from '@/utils/supabaseUtils';
 
 const CATEGORIES = [
   { value: 'general', label: 'General' },
@@ -73,14 +73,12 @@ const AnnouncementsManager = () => {
     try {
       setLoading(true);
       
-      // Call the RPC function to get announcements with type casting
-      const { data, error } = await supabase.rpc('get_announcements');
+      const { data, error } = await callRpcFunction<Announcement[]>('get_announcements');
       
       if (error) throw error;
       
       if (data && isMounted.current) {
-        // Use type assertion to properly cast the data
-        setAnnouncements(data as unknown as Announcement[]);
+        setAnnouncements(data);
       }
     } catch (error: any) {
       console.error('Error fetching announcements:', error);
@@ -148,15 +146,14 @@ const AnnouncementsManager = () => {
       }
       
       if (isEditMode) {
-        // Call the RPC function to update an announcement using type assertion
-        const { data, error } = await supabase.rpc('update_announcement', {
+        const { data, error } = await callRpcFunction('update_announcement', {
           p_id: formData.id,
           p_title: formData.title,
           p_content: formData.content,
           p_category: formData.category,
           p_is_active: formData.is_active,
           p_expiry_date: formData.expiry_date ? formData.expiry_date.toISOString() : null
-        }) as { data: any; error: any };
+        });
         
         if (error) throw error;
         
@@ -167,15 +164,14 @@ const AnnouncementsManager = () => {
           });
         }
       } else {
-        // Call the RPC function to create a new announcement using type assertion
-        const { data, error } = await supabase.rpc('create_announcement', {
+        const { data, error } = await callRpcFunction('create_announcement', {
           p_title: formData.title,
           p_content: formData.content,
           p_category: formData.category,
           p_is_active: formData.is_active,
           p_created_by: user.id,
           p_expiry_date: formData.expiry_date ? formData.expiry_date.toISOString() : null
-        }) as { data: any; error: any };
+        });
         
         if (error) throw error;
         
@@ -207,10 +203,9 @@ const AnnouncementsManager = () => {
     try {
       setDeletingId(id);
       
-      // Call the RPC function to delete an announcement using type assertion
-      const { data, error } = await supabase.rpc('delete_announcement', {
+      const { data, error } = await callRpcFunction('delete_announcement', {
         p_id: id
-      }) as { data: any; error: any };
+      });
       
       if (error) throw error;
       
@@ -220,7 +215,6 @@ const AnnouncementsManager = () => {
           description: 'Announcement deleted successfully.',
         });
         
-        // Filter out the deleted announcement
         setAnnouncements(prev => prev.filter(item => item.id !== id));
       }
     } catch (error: any) {
