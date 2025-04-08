@@ -30,6 +30,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Announcement } from '@/types/admin';
+import { Json } from '@/integrations/supabase/types';
 
 const CATEGORIES = [
   { value: 'general', label: 'General' },
@@ -72,13 +73,14 @@ const AnnouncementsManager = () => {
     try {
       setLoading(true);
       
-      // Call the RPC function to get announcements
+      // Call the RPC function to get announcements with type casting
       const { data, error } = await supabase.rpc('get_announcements');
       
       if (error) throw error;
       
       if (data && isMounted.current) {
-        setAnnouncements(data as Announcement[]);
+        // Use type assertion to properly cast the data
+        setAnnouncements(data as unknown as Announcement[]);
       }
     } catch (error: any) {
       console.error('Error fetching announcements:', error);
@@ -146,7 +148,7 @@ const AnnouncementsManager = () => {
       }
       
       if (isEditMode) {
-        // Call the RPC function to update an announcement
+        // Call the RPC function to update an announcement using type assertion
         const { data, error } = await supabase.rpc('update_announcement', {
           p_id: formData.id,
           p_title: formData.title,
@@ -154,7 +156,7 @@ const AnnouncementsManager = () => {
           p_category: formData.category,
           p_is_active: formData.is_active,
           p_expiry_date: formData.expiry_date ? formData.expiry_date.toISOString() : null
-        });
+        }) as { data: any; error: any };
         
         if (error) throw error;
         
@@ -165,7 +167,7 @@ const AnnouncementsManager = () => {
           });
         }
       } else {
-        // Call the RPC function to create a new announcement
+        // Call the RPC function to create a new announcement using type assertion
         const { data, error } = await supabase.rpc('create_announcement', {
           p_title: formData.title,
           p_content: formData.content,
@@ -173,7 +175,7 @@ const AnnouncementsManager = () => {
           p_is_active: formData.is_active,
           p_created_by: user.id,
           p_expiry_date: formData.expiry_date ? formData.expiry_date.toISOString() : null
-        });
+        }) as { data: any; error: any };
         
         if (error) throw error;
         
@@ -205,10 +207,10 @@ const AnnouncementsManager = () => {
     try {
       setDeletingId(id);
       
-      // Call the RPC function to delete an announcement
+      // Call the RPC function to delete an announcement using type assertion
       const { data, error } = await supabase.rpc('delete_announcement', {
         p_id: id
-      });
+      }) as { data: any; error: any };
       
       if (error) throw error;
       
