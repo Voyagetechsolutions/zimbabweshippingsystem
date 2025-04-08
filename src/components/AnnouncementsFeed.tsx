@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { callRpcFunction } from '@/utils/supabaseUtils';
 import { Announcement } from '@/types/admin';
@@ -36,7 +35,8 @@ const AnnouncementsFeed = () => {
     try {
       // Get the user's role and location if available
       const userRole = user?.role || null;
-      const userLocation = user?.location || 'global'; // Default to global if not specified
+      // Since location isn't a property of User type, we'll get it from user_metadata or default to 'global'
+      const userLocation = user?.user_metadata?.location || 'global';
 
       const { data, error } = await callRpcFunction<Announcement[]>('get_active_announcements', {
         p_user_role: userRole,
