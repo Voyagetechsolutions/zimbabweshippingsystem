@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Menu, X, ChevronDown, LogOut, User, Shield, Settings, Package, Bell, Truck, DollarSign, Image, Search, Phone, FileText } from 'lucide-react';
@@ -34,7 +33,6 @@ const Navbar = () => {
     navigate('/');
   };
 
-  // Get the display name - prioritize full name, then email username
   const getDisplayName = () => {
     if (user?.user_metadata?.full_name) {
       return user.user_metadata.full_name;
@@ -47,7 +45,6 @@ const Navbar = () => {
     return 'User';
   };
 
-  // Get the role display name (capitalized)
   const getRoleDisplay = () => {
     if (!role) return '';
     return role.charAt(0).toUpperCase() + role.slice(1);
@@ -229,7 +226,6 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* Mobile menu */}
       <div className={`md:hidden ${isOpen ? 'block' : 'hidden'}`}>
         <div className="px-2 pt-2 pb-3 space-y-1">
           <Link

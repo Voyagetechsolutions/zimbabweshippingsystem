@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -23,6 +22,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import GalleryAdmin from './pages/GalleryAdmin';
 import Reviews from './pages/Reviews';
 import Support from './pages/Support';
+import Pricing from './pages/Pricing';
 
 // Components
 import { RequireAuth, RequireAdmin, RedirectIfAuthenticated, RequireRole } from './components/RouteGuard';
@@ -65,6 +65,7 @@ function App() {
                   <Route path="/payment-success" element={<PaymentSuccess />} />
                   <Route path="/reviews" element={<Reviews />} />
                   <Route path="/support" element={<Support />} />
+                  <Route path="/pricing" element={<Pricing />} />
 
                   {/* Protected routes - any authenticated user */}
                   <Route
