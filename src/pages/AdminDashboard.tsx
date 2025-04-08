@@ -24,7 +24,7 @@ import {
   Package, Truck, Users, Search, 
   RefreshCcw, Filter, Eye, Edit, User,
   Settings, Activity, Calendar,
-  FileText, BarChart3, ImageIcon, MessageSquare
+  FileText, BarChart3, ImageIcon, MessageSquare, Megaphone
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -35,8 +35,8 @@ import SettingsManagement from '@/components/admin/SettingsManagement';
 import ContentManagement from '@/components/admin/ContentManagement';
 import CollectionScheduleManagement from '@/components/admin/CollectionScheduleManagement';
 import SupportTickets from '@/components/admin/SupportTickets';
+import AnnouncementsManager from '@/components/admin/AnnouncementsManager';
 
-// Status options for updating shipments
 const STATUS_OPTIONS = [
   'Booking Confirmed',
   'Ready for Pickup',
@@ -48,7 +48,6 @@ const STATUS_OPTIONS = [
   'Cancelled',
 ];
 
-// Define the shipment type
 interface Shipment {
   id: string;
   tracking_number: string;
@@ -65,7 +64,6 @@ interface Shipment {
   metadata: any | null;
 }
 
-// Map status to badge color
 const getStatusBadgeClass = (status: string) => {
   const statusLower = status.toLowerCase();
   
@@ -107,7 +105,6 @@ const AdminDashboard = () => {
   const [adminExists, setAdminExists] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   
-  // Stats
   const [stats, setStats] = useState({
     total: 0,
     processing: 0,
@@ -115,7 +112,6 @@ const AdminDashboard = () => {
     delivered: 0,
   });
 
-  // Check if any admin exists
   const checkIfAdminExists = async () => {
     try {
       const { data, error } = await supabase.rpc('is_admin');
@@ -126,10 +122,8 @@ const AdminDashboard = () => {
       }
 
       if (data) {
-        // Current user is an admin
         setAdminExists(true);
       } else {
-        // Check if any admin exists in the system
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
           .select('id')
@@ -150,18 +144,15 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     checkIfAdminExists();
-    // Only fetch shipments if we're not showing the setup form
     if (isAdmin || adminExists) {
       fetchShipments();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, navigate]);
 
   const fetchShipments = async () => {
     setLoading(true);
     try {
       console.log("Admin: Fetching all shipments");
-      // Fetch all shipments for admin view
       const { data, error } = await supabase
         .from('shipments')
         .select('*')
@@ -175,7 +166,6 @@ const AdminDashboard = () => {
       if (data) {
         console.log("Admin: Fetched shipments count:", data.length);
         setShipments(data as Shipment[]);
-        // Calculate stats
         const totalCount = data.length;
         const processingCount = data.filter(s => s.status.toLowerCase() === 'processing').length;
         const inTransitCount = data.filter(s => s.status.toLowerCase() === 'in transit').length;
@@ -200,7 +190,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // If no admin exists in the system, show the setup form
   if (adminExists === false) {
     return (
       <div className="min-h-screen flex flex-col">
@@ -234,10 +223,8 @@ const AdminDashboard = () => {
         description: `Shipment ${editingShipment.tracking_number} status updated to ${newStatus}`,
       });
 
-      // Refresh shipments list
       fetchShipments();
       
-      // Reset editing state
       setEditingShipment(null);
       setNewStatus('');
       
@@ -250,7 +237,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // Filter shipments based on search and status filter
   const filteredShipments = shipments.filter(shipment => {
     const matchesSearch = 
       searchQuery === '' ||
@@ -275,14 +261,13 @@ const AdminDashboard = () => {
             <p className="text-gray-500">Manage all aspects of your shipping operation</p>
           </div>
           
-          {/* Admin Dashboard Tabs */}
           <Tabs 
             defaultValue="overview" 
             value={activeTab} 
             onValueChange={setActiveTab}
             className="mb-8"
           >
-            <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2">
               <TabsTrigger value="overview" className="flex items-center gap-2">
                 <Activity className="h-4 w-4" />
                 <span className="hidden sm:inline">Overview</span>
@@ -303,15 +288,17 @@ const AdminDashboard = () => {
                 <Settings className="h-4 w-4" />
                 <span className="hidden sm:inline">Settings</span>
               </TabsTrigger>
+              <TabsTrigger value="announcements" className="flex items-center gap-2">
+                <Megaphone className="h-4 w-4" />
+                <span className="hidden sm:inline">Announcements</span>
+              </TabsTrigger>
               <TabsTrigger value="more" className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
                 <span className="hidden sm:inline">More</span>
               </TabsTrigger>
             </TabsList>
             
-            {/* Overview Tab */}
             <TabsContent value="overview">
-              {/* Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <Card>
                   <CardHeader className="pb-2">
@@ -362,7 +349,6 @@ const AdminDashboard = () => {
                 </Card>
               </div>
               
-              {/* Recent Shipments Preview */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-xl">Recent Shipments</CardTitle>
@@ -418,9 +404,7 @@ const AdminDashboard = () => {
               </Card>
             </TabsContent>
             
-            {/* Shipments Tab */}
             <TabsContent value="shipments">
-              {/* Filters and Search */}
               <Card className="mb-8">
                 <CardHeader>
                   <CardTitle className="text-xl">Shipments Management</CardTitle>
@@ -467,7 +451,6 @@ const AdminDashboard = () => {
                 </CardContent>
               </Card>
 
-              {/* Shipments Table */}
               <Card>
                 <CardContent className="p-0">
                   {loading ? (
@@ -553,27 +536,26 @@ const AdminDashboard = () => {
               </Card>
             </TabsContent>
             
-            {/* Users Tab */}
             <TabsContent value="users">
               <UserManagement />
             </TabsContent>
 
-            {/* Analytics Tab */}
             <TabsContent value="analytics">
               <AnalyticsReports />
             </TabsContent>
 
-            {/* Settings Tab */}
             <TabsContent value="settings">
               <SettingsManagement />
             </TabsContent>
 
-            {/* Collection Schedule Tab */}
             <TabsContent value="schedule">
               <CollectionScheduleManagement />
             </TabsContent>
 
-            {/* More Tab - with nested tabs */}
+            <TabsContent value="announcements">
+              <AnnouncementsManager />
+            </TabsContent>
+
             <TabsContent value="more">
               <Tabs defaultValue="support">
                 <TabsList className="mb-6">
@@ -598,59 +580,56 @@ const AdminDashboard = () => {
             </TabsContent>
           </Tabs>
           
-          {/* Edit Status Modal */}
-          {editingShipment && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-                <h3 className="text-lg font-bold mb-4">Update Shipment Status</h3>
-                <div className="mb-4">
-                  <p className="text-sm text-gray-500 mb-1">Tracking Number</p>
-                  <p className="font-medium font-mono">{editingShipment.tracking_number}</p>
-                </div>
-                <div className="mb-6">
-                  <p className="text-sm text-gray-500 mb-1">Current Status</p>
-                  <Badge className={getStatusBadgeClass(editingShipment.status)}>
-                    {editingShipment.status}
-                  </Badge>
-                </div>
-                <div className="mb-6">
-                  <label className="block text-sm font-medium mb-2">New Status</label>
-                  <Select
-                    value={newStatus}
-                    onValueChange={setNewStatus}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTIONS.map((status) => (
-                        <SelectItem key={status} value={status}>
-                          {status}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex justify-end space-x-3">
-                  <Button 
-                    variant="outline"
-                    onClick={() => {
-                      setEditingShipment(null);
-                      setNewStatus('');
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    className="bg-zim-green hover:bg-zim-green/90"
-                    onClick={updateShipmentStatus}
-                  >
-                    Update Status
-                  </Button>
-                </div>
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-bold mb-4">Update Shipment Status</h3>
+              <div className="mb-4">
+                <p className="text-sm text-gray-500 mb-1">Tracking Number</p>
+                <p className="font-medium font-mono">{editingShipment.tracking_number}</p>
+              </div>
+              <div className="mb-6">
+                <p className="text-sm text-gray-500 mb-1">Current Status</p>
+                <Badge className={getStatusBadgeClass(editingShipment.status)}>
+                  {editingShipment.status}
+                </Badge>
+              </div>
+              <div className="mb-6">
+                <label className="block text-sm font-medium mb-2">New Status</label>
+                <Select
+                  value={newStatus}
+                  onValueChange={setNewStatus}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end space-x-3">
+                <Button 
+                  variant="outline"
+                  onClick={() => {
+                    setEditingShipment(null);
+                    setNewStatus('');
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  className="bg-zim-green hover:bg-zim-green/90"
+                  onClick={updateShipmentStatus}
+                >
+                  Update Status
+                </Button>
               </div>
             </div>
-          )}
+          </div>
         </div>
       </main>
       <Footer />

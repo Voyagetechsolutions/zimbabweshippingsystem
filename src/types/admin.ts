@@ -1,4 +1,3 @@
-
 export interface Role {
   id: string;
   name: string;
@@ -54,8 +53,23 @@ export interface TicketResponse {
   message: string;
   is_staff_response: boolean;
   created_at: string;
+  notification_sent: boolean;
   user_email?: string;
   user_name?: string;
+}
+
+// Announcement interface
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  expiry_date: string | null;
+  author_name?: string; // For display purposes
 }
 
 // Helper function for typescript casting

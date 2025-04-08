@@ -294,7 +294,8 @@ const SupportDashboard = () => {
           ticket_id: viewingTicket.id,
           user_id: user.id,
           message: responseContent,
-          is_staff_response: true
+          is_staff_response: true,
+          notification_sent: false
         })
         .select()
         .single();
@@ -340,6 +341,22 @@ const SupportDashboard = () => {
         title: 'Response Sent',
         description: 'Your response has been sent successfully'
       });
+      
+      try {
+        await fetch('/api/send-support-notification', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ticketId: viewingTicket.id,
+            responseId: responseData.id
+          }),
+        });
+        console.log('Notification sent successfully');
+      } catch (notificationError) {
+        console.error('Error sending notification:', notificationError);
+      }
     } catch (error: any) {
       console.error('Error sending response:', error);
       toast({

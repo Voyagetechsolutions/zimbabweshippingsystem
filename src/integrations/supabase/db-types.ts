@@ -47,6 +47,19 @@ export interface Tables {
     updated_at: string;
   };
   
+  // Add the announcements table we just created
+  announcements: {
+    id: string;
+    title: string;
+    content: string;
+    category: string;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+    created_by: string;
+    expiry_date: string | null;
+  };
+  
   // New tables that aren't in the generated types yet
   audit_logs: {
     id: string;
@@ -78,6 +91,7 @@ export interface Tables {
     message: string;
     is_staff_response: boolean;
     created_at: string;
+    notification_sent: boolean;
   };
   
   // Add the response_templates table we just created

@@ -57,6 +57,42 @@ export type Database = {
         }
         Relationships: []
       }
+      announcements: {
+        Row: {
+          category: string
+          content: string
+          created_at: string
+          created_by: string
+          expiry_date: string | null
+          id: string
+          is_active: boolean
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          content: string
+          created_at?: string
+          created_by: string
+          expiry_date?: string | null
+          id?: string
+          is_active?: boolean
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string
+          created_by?: string
+          expiry_date?: string | null
+          id?: string
+          is_active?: boolean
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -527,6 +563,7 @@ export type Database = {
           id: string
           is_staff_response: boolean
           message: string
+          notification_sent: boolean | null
           ticket_id: string
           user_id: string
         }
@@ -535,6 +572,7 @@ export type Database = {
           id?: string
           is_staff_response?: boolean
           message: string
+          notification_sent?: boolean | null
           ticket_id: string
           user_id: string
         }
@@ -543,6 +581,7 @@ export type Database = {
           id?: string
           is_staff_response?: boolean
           message?: string
+          notification_sent?: boolean | null
           ticket_id?: string
           user_id?: string
         }
