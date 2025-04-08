@@ -1,11 +1,20 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Placeholder component that redirects to the full admin dashboard
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
+
+  useEffect(() => {
+    // Redirect to the admin dashboard page if authorized
+    if (isAdmin) {
+      navigate('/admin');
+    }
+  }, [isAdmin, navigate]);
 
   return (
     <div className="space-y-6">

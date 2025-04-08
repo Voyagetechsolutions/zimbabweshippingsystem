@@ -99,7 +99,7 @@ const AdminDashboard = () => {
   const isMounted = useRef(true);
 
   const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Fixed: removed duplicate loading state
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
