@@ -30,7 +30,6 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Announcement } from '@/types/admin';
 import { Json } from '@/integrations/supabase/types';
-import { callRpcFunction } from '@/utils/supabaseUtils';
 
 const CATEGORIES = [
   { value: 'general', label: 'General' },
@@ -73,12 +72,12 @@ const AnnouncementsManager = () => {
     try {
       setLoading(true);
       
-      const { data, error } = await callRpcFunction<Announcement[]>('get_announcements');
+      const { data, error } = await supabase.rpc('get_announcements');
       
       if (error) throw error;
       
       if (data && isMounted.current) {
-        setAnnouncements(data);
+        setAnnouncements(data as unknown as Announcement[]);
       }
     } catch (error: any) {
       console.error('Error fetching announcements:', error);
@@ -146,7 +145,7 @@ const AnnouncementsManager = () => {
       }
       
       if (isEditMode) {
-        const { data, error } = await callRpcFunction('update_announcement', {
+        const { data, error } = await supabase.rpc('update_announcement', {
           p_id: formData.id,
           p_title: formData.title,
           p_content: formData.content,
@@ -164,7 +163,7 @@ const AnnouncementsManager = () => {
           });
         }
       } else {
-        const { data, error } = await callRpcFunction('create_announcement', {
+        const { data, error } = await supabase.rpc('create_announcement', {
           p_title: formData.title,
           p_content: formData.content,
           p_category: formData.category,
@@ -203,7 +202,7 @@ const AnnouncementsManager = () => {
     try {
       setDeletingId(id);
       
-      const { data, error } = await callRpcFunction('delete_announcement', {
+      const { data, error } = await supabase.rpc('delete_announcement', {
         p_id: id
       });
       
