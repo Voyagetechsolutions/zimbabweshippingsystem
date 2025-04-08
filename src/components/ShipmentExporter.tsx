@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Download, FileSpreadsheet, FilePdf, ChevronDown } from 'lucide-react';
+import { Download, FileSpreadsheet, File, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -262,7 +262,7 @@ const ShipmentExporter = ({ shipmentIds, all = false }: ShipmentExporterProps) =
             onClick={() => handleExport('pdf')}
             disabled={exporting}
           >
-            <FilePdf className="h-4 w-4" />
+            <File className="h-4 w-4" />
             <span>Export to PDF</span>
           </Button>
         </div>

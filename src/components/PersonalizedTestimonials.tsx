@@ -57,7 +57,7 @@ const PersonalizedTestimonials = () => {
             user_id,
             rating,
             comment,
-            profiles(full_name, user_metadata->location)
+            profiles(full_name)
           `)
           .order('created_at', { ascending: false })
           .limit(6);
@@ -69,10 +69,10 @@ const PersonalizedTestimonials = () => {
           const formattedTestimonials = data.map(item => ({
             id: item.id,
             name: item.profiles?.full_name || 'Anonymous Customer',
-            location: item.profiles?.location || 'Global',
+            location: 'Zimbabwe', // Default location since we don't have it in profiles
             rating: item.rating,
             text: item.comment || 'Great service!',
-            user_region: item.profiles?.location
+            user_region: 'Zimbabwe' // Default region
           }));
 
           // Prioritize testimonials from the user's region if available
