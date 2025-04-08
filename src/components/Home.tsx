@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -13,6 +12,9 @@ import {
 import HeroImage from '@/assets/hero.webp';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import AnnouncementsFeed from '@/components/AnnouncementsFeed';
+import PersonalizedTestimonials from '@/components/PersonalizedTestimonials';
+import QuickShippingCalculator from '@/components/QuickShippingCalculator';
+import ShippingNewsTicker from '@/components/ShippingNewsTicker';
 
 const Home = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -91,34 +93,59 @@ const Home = () => {
         </div>
       </section>
 
+      {/* News Ticker Section */}
+      <section className="py-4 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <ShippingNewsTicker />
+      </section>
+
       {/* Announcements Section */}
       <section className="py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <AnnouncementsFeed />
       </section>
 
-      {/* Services Section */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto bg-gray-50">
-        <div className="text-center mb-12">
-          <h2 className={`text-3xl font-bold text-gray-900 mb-4 transition-all duration-700 delay-300 ${animationClass}`}>
-            Our Services
+      {/* Quick Calculator and Services Section */}
+      <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto bg-gray-50">
+        <div className="grid md:grid-cols-3 gap-8 mb-12">
+          <div className="md:col-span-2">
+            <div className="text-left mb-8">
+              <h2 className={`text-3xl font-bold text-gray-900 mb-4 transition-all duration-700 delay-300 ${animationClass}`}>
+                Our Services
+              </h2>
+              <p className={`text-lg text-gray-600 max-w-2xl transition-all duration-700 delay-400 ${animationClass}`}>
+                We offer comprehensive shipping solutions from the UK to Zimbabwe, with a focus on reliability and customer satisfaction.
+              </p>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-6">
+              {services.slice(0, 4).map((service, index) => (
+                <div
+                  key={index}
+                  className={`bg-white p-5 rounded-lg shadow-sm border border-gray-100 flex flex-col items-center text-center transition-all duration-700 ${animationClass}`}
+                  style={{ transitionDelay: `${500 + index * 100}ms` }}
+                >
+                  <div className="mb-3">{service.icon}</div>
+                  <h3 className="text-lg font-semibold mb-2">{service.title}</h3>
+                  <p className="text-gray-600 text-sm">{service.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <QuickShippingCalculator />
+          </div>
+        </div>
+      </section>
+
+      {/* Personalized Testimonials Section */}
+      <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <div className="text-center mb-10">
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">
+            What Our Customers Say
           </h2>
-          <p className={`text-lg text-gray-600 max-w-2xl mx-auto transition-all duration-700 delay-400 ${animationClass}`}>
-            We offer comprehensive shipping solutions from the UK to Zimbabwe, with a focus on reliability and customer satisfaction.
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Read testimonials from customers in your area who have experienced our reliable shipping services.
           </p>
         </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {services.map((service, index) => (
-            <div
-              key={index}
-              className={`bg-white p-6 rounded-lg shadow-sm border border-gray-100 flex flex-col items-center text-center transition-all duration-700 ${animationClass}`}
-              style={{ transitionDelay: `${500 + index * 100}ms` }}
-            >
-              <div className="mb-4">{service.icon}</div>
-              <h3 className="text-xl font-semibold mb-2">{service.title}</h3>
-              <p className="text-gray-600">{service.description}</p>
-            </div>
-          ))}
-        </div>
+        <PersonalizedTestimonials />
       </section>
 
       {/* CTA Section */}
