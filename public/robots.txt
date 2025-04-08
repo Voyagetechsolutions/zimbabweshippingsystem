@@ -1,14 +1,42 @@
+
+# Zimbabwe Shipping - UK to Zimbabwe Shipping Services
+# All robots allowed
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://yourdomain.com/sitemap.xml
+
+# Allow all search engines full access
 User-agent: Googlebot
 Allow: /
 
 User-agent: Bingbot
 Allow: /
 
-User-agent: Twitterbot
+User-agent: Slurp
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+User-agent: Baiduspider
+Allow: /
+
+User-agent: Yandex
+Allow: /
+
+User-agent: Sogou
+Allow: /
+
+User-agent: Exabot
 Allow: /
 
 User-agent: facebookexternalhit
 Allow: /
 
-User-agent: *
+User-agent: ia_archiver
 Allow: /
+
+# Crawl delay directive to prevent server overload
+Crawl-delay: 1
