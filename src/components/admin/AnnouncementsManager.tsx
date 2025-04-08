@@ -30,7 +30,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Announcement } from '@/types/admin';
-import { callRpcFunction } from '@/utils/supabaseUtils';
 
 const CATEGORIES = [
   { value: 'general', label: 'General' },
@@ -74,7 +73,7 @@ const AnnouncementsManager = () => {
       setLoading(true);
       
       // Call the RPC function to get announcements
-      const { data, error } = await callRpcFunction('get_announcements');
+      const { data, error } = await supabase.rpc('get_announcements');
       
       if (error) throw error;
       
@@ -146,24 +145,15 @@ const AnnouncementsManager = () => {
         throw new Error('User not authenticated');
       }
       
-      const announcementData = {
-        title: formData.title,
-        content: formData.content,
-        category: formData.category,
-        is_active: formData.is_active,
-        created_by: user.id,
-        expiry_date: formData.expiry_date ? formData.expiry_date.toISOString() : null,
-      };
-      
       if (isEditMode) {
         // Call the RPC function to update an announcement
-        const { data, error } = await callRpcFunction('update_announcement', {
+        const { data, error } = await supabase.rpc('update_announcement', {
           p_id: formData.id,
-          p_title: announcementData.title,
-          p_content: announcementData.content,
-          p_category: announcementData.category,
-          p_is_active: announcementData.is_active,
-          p_expiry_date: announcementData.expiry_date
+          p_title: formData.title,
+          p_content: formData.content,
+          p_category: formData.category,
+          p_is_active: formData.is_active,
+          p_expiry_date: formData.expiry_date ? formData.expiry_date.toISOString() : null
         });
         
         if (error) throw error;
@@ -176,13 +166,13 @@ const AnnouncementsManager = () => {
         }
       } else {
         // Call the RPC function to create a new announcement
-        const { data, error } = await callRpcFunction('create_announcement', {
-          p_title: announcementData.title,
-          p_content: announcementData.content,
-          p_category: announcementData.category,
-          p_is_active: announcementData.is_active,
-          p_created_by: announcementData.created_by,
-          p_expiry_date: announcementData.expiry_date
+        const { data, error } = await supabase.rpc('create_announcement', {
+          p_title: formData.title,
+          p_content: formData.content,
+          p_category: formData.category,
+          p_is_active: formData.is_active,
+          p_created_by: user.id,
+          p_expiry_date: formData.expiry_date ? formData.expiry_date.toISOString() : null
         });
         
         if (error) throw error;
@@ -216,7 +206,7 @@ const AnnouncementsManager = () => {
       setDeletingId(id);
       
       // Call the RPC function to delete an announcement
-      const { data, error } = await callRpcFunction('delete_announcement', {
+      const { data, error } = await supabase.rpc('delete_announcement', {
         p_id: id
       });
       
