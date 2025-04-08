@@ -5,7 +5,7 @@ User-agent: *
 Allow: /
 
 # Sitemap location
-Sitemap: https://yourdomain.com/sitemap.xml
+Sitemap: https://zimbabweshipping.com/sitemap.xml
 
 # Allow all search engines full access
 User-agent: Googlebot
