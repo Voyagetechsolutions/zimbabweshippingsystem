@@ -72,7 +72,7 @@ const AnnouncementsManager = () => {
     try {
       setLoading(true);
       
-      const { data, error } = await supabase.rpc('get_announcements');
+      const { data, error } = await supabase.rpc('get_announcements' as any);
       
       if (error) throw error;
       
@@ -145,7 +145,7 @@ const AnnouncementsManager = () => {
       }
       
       if (isEditMode) {
-        const { data, error } = await supabase.rpc('update_announcement', {
+        const { data, error } = await supabase.rpc('update_announcement' as any, {
           p_id: formData.id,
           p_title: formData.title,
           p_content: formData.content,
@@ -163,7 +163,7 @@ const AnnouncementsManager = () => {
           });
         }
       } else {
-        const { data, error } = await supabase.rpc('create_announcement', {
+        const { data, error } = await supabase.rpc('create_announcement' as any, {
           p_title: formData.title,
           p_content: formData.content,
           p_category: formData.category,
@@ -202,7 +202,7 @@ const AnnouncementsManager = () => {
     try {
       setDeletingId(id);
       
-      const { data, error } = await supabase.rpc('delete_announcement', {
+      const { data, error } = await supabase.rpc('delete_announcement' as any, {
         p_id: id
       });
       
