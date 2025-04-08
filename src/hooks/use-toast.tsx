@@ -1,3 +1,4 @@
+
 import * as React from "react"
 
 import type {
@@ -190,5 +191,6 @@ function useToast() {
 
 // Export the ToastAPI type
 export type ToastAPI = ReturnType<typeof useToast>;
+export type ToastMethod = typeof toast;
 
 export { useToast, toast }

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,7 +13,6 @@ import { RecentShipments } from '@/components/customer/RecentShipments';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { Package, Truck, MapPin, AlertTriangle, Calendar, ChevronRight, Download, Inbox } from 'lucide-react';
-import AnnouncementsFeed from '@/components/AnnouncementsFeed';
 import ShipmentExporter from '@/components/ShipmentExporter';
 
 const CustomerDashboard = () => {
@@ -74,8 +72,8 @@ const CustomerDashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* Announcements */}
-      <AnnouncementsFeed />
+      {/* Announcements - temporarily disabled */}
+      {/* <AnnouncementsFeed /> */}
       
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

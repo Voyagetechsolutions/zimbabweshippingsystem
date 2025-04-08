@@ -1,6 +1,6 @@
 
-import { format as formatDate } from 'date-fns';
-import type { ToastAPI } from '@/hooks/use-toast';
+import { formatDate } from 'date-fns';
+import type { ToastMethod } from '@/hooks/use-toast';
 
 interface Shipment {
   id: string;
@@ -18,7 +18,7 @@ interface Shipment {
 /**
  * Exports shipment data to CSV format
  */
-export const exportToCsv = async (data: Shipment[], toast: ToastAPI): Promise<void> => {
+export const exportToCsv = async (data: Shipment[], toast: ToastMethod): Promise<void> => {
   // Convert data to CSV
   const headers = [
     'Tracking Number',
@@ -68,7 +68,7 @@ export const exportToCsv = async (data: Shipment[], toast: ToastAPI): Promise<vo
 /**
  * Exports shipment data to PDF format
  */
-export const exportToPdf = async (data: Shipment[], toast: ToastAPI): Promise<void> => {
+export const exportToPdf = async (data: Shipment[], toast: ToastMethod): Promise<void> => {
   // For PDF, we need to dynamically import html2pdf
   const html2pdf = await import('html2pdf.js');
   

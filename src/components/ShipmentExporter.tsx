@@ -3,8 +3,8 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Download, FileSpreadsheet, File, ChevronDown } from 'lucide-react';
-import { format as formatDate } from 'date-fns';
-import { useToast } from '@/hooks/use-toast';
+import { formatDate } from 'date-fns';
+import { useToast, toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { exportToCsv, exportToPdf } from '@/utils/exportUtils';
 
