@@ -19,8 +19,8 @@ interface MultiSelectProps {
 }
 
 export function MultiSelect({
-  options,
-  selected,
+  options = [], // Default to empty array if undefined
+  selected = [], // Default to empty array if undefined
   onChange,
   placeholder = "Select...",
   className,
