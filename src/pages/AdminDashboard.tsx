@@ -580,56 +580,58 @@ const AdminDashboard = () => {
             </TabsContent>
           </Tabs>
           
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-bold mb-4">Update Shipment Status</h3>
-              <div className="mb-4">
-                <p className="text-sm text-gray-500 mb-1">Tracking Number</p>
-                <p className="font-medium font-mono">{editingShipment.tracking_number}</p>
-              </div>
-              <div className="mb-6">
-                <p className="text-sm text-gray-500 mb-1">Current Status</p>
-                <Badge className={getStatusBadgeClass(editingShipment.status)}>
-                  {editingShipment.status}
-                </Badge>
-              </div>
-              <div className="mb-6">
-                <label className="block text-sm font-medium mb-2">New Status</label>
-                <Select
-                  value={newStatus}
-                  onValueChange={setNewStatus}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {status}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex justify-end space-x-3">
-                <Button 
-                  variant="outline"
-                  onClick={() => {
-                    setEditingShipment(null);
-                    setNewStatus('');
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  className="bg-zim-green hover:bg-zim-green/90"
-                  onClick={updateShipmentStatus}
-                >
-                  Update Status
-                </Button>
+          {editingShipment && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 className="text-lg font-bold mb-4">Update Shipment Status</h3>
+                <div className="mb-4">
+                  <p className="text-sm text-gray-500 mb-1">Tracking Number</p>
+                  <p className="font-medium font-mono">{editingShipment.tracking_number}</p>
+                </div>
+                <div className="mb-6">
+                  <p className="text-sm text-gray-500 mb-1">Current Status</p>
+                  <Badge className={getStatusBadgeClass(editingShipment.status)}>
+                    {editingShipment.status}
+                  </Badge>
+                </div>
+                <div className="mb-6">
+                  <label className="block text-sm font-medium mb-2">New Status</label>
+                  <Select
+                    value={newStatus}
+                    onValueChange={setNewStatus}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_OPTIONS.map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {status}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex justify-end space-x-3">
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      setEditingShipment(null);
+                      setNewStatus('');
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    className="bg-zim-green hover:bg-zim-green/90"
+                    onClick={updateShipmentStatus}
+                  >
+                    Update Status
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </main>
       <Footer />
