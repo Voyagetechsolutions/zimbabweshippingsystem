@@ -1,567 +1,495 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Announcement, castTo } from '@/types/admin';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  CardFooter
+import { 
+  Card, CardContent, CardDescription, 
+  CardHeader, CardTitle, CardFooter 
 } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { 
+  Dialog, DialogContent, DialogDescription, DialogHeader, 
+  DialogTitle, DialogFooter, DialogTrigger 
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+import { 
+  Select, SelectContent, SelectItem, 
+  SelectTrigger, SelectValue 
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import {
-  Megaphone,
-  PlusCircle,
-  Edit,
-  Trash2,
-  Calendar,
-  RefreshCcw,
-  Search,
-  CheckCircle,
-  XCircle,
-  Loader2
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { 
+  CalendarIcon, Check, Megaphone, PlusCircle, Trash2, 
+  XCircle, Edit2, Filter, RefreshCw 
 } from 'lucide-react';
-import { format, formatDistance } from 'date-fns';
-import { tableFrom } from '@/integrations/supabase/db-types';
+import { Badge } from '@/components/ui/badge';
+import { format } from 'date-fns';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+import { Announcement } from '@/types/admin';
+import { callRpcFunction } from '@/utils/supabaseUtils';
 
 const CATEGORIES = [
-  'Route Update',
-  'Schedule Change',
-  'Promotion',
-  'Service Update',
-  'Pickup Location',
-  'Holiday Notice',
-  'General'
+  { value: 'general', label: 'General' },
+  { value: 'important', label: 'Important' },
+  { value: 'service_update', label: 'Service Update' },
+  { value: 'promotion', label: 'Promotion' },
+  { value: 'news', label: 'News' },
 ];
 
 const AnnouncementsManager = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const isMounted = useRef(true);
+  
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [category, setCategory] = useState(CATEGORIES[0]);
-  const [isActive, setIsActive] = useState(true);
-  const [expiryDate, setExpiryDate] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
-
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [filterCategory, setFilterCategory] = useState('all');
+  
+  const [formData, setFormData] = useState({
+    id: '',
+    title: '',
+    content: '',
+    category: 'general',
+    is_active: true,
+    expiry_date: null as Date | null,
+  });
+  
   useEffect(() => {
     fetchAnnouncements();
+    
+    return () => {
+      isMounted.current = false;
+    };
   }, []);
-
+  
   const fetchAnnouncements = async () => {
-    setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from(tableFrom('announcements'))
-        .select('*')
-        .order('created_at', { ascending: false });
-
+      setLoading(true);
+      
+      // Call the RPC function to get announcements
+      const { data, error } = await callRpcFunction('get_announcements');
+      
       if (error) throw error;
-
-      if (data) {
-        // Get author names for each announcement
-        const announcementsWithAuthors = await Promise.all(
-          data.map(async (announcement) => {
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('full_name')
-              .eq('id', announcement.created_by)
-              .single();
-              
-            return {
-              ...announcement,
-              author_name: profileData?.full_name || 'Unknown'
-            };
-          })
-        );
-        
-        setAnnouncements(castTo<Announcement[]>(announcementsWithAuthors));
+      
+      if (data && isMounted.current) {
+        setAnnouncements(data as Announcement[]);
       }
     } catch (error: any) {
       console.error('Error fetching announcements:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load announcements',
-        variant: 'destructive',
-      });
+      if (isMounted.current) {
+        toast({
+          title: 'Error',
+          description: 'Failed to load announcements. Please try again.',
+          variant: 'destructive',
+        });
+      }
     } finally {
-      setLoading(false);
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
   };
 
-  const handleOpenDialog = (announcement?: Announcement) => {
-    if (announcement) {
-      setEditingAnnouncement(announcement);
-      setTitle(announcement.title);
-      setContent(announcement.content);
-      setCategory(announcement.category);
-      setIsActive(announcement.is_active);
-      setExpiryDate(announcement.expiry_date ? format(new Date(announcement.expiry_date), 'yyyy-MM-dd') : '');
-    } else {
-      setEditingAnnouncement(null);
-      setTitle('');
-      setContent('');
-      setCategory(CATEGORIES[0]);
-      setIsActive(true);
-      setExpiryDate('');
-    }
-    setDialogOpen(true);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
-
-  const handleSubmit = async () => {
-    if (!title.trim() || !content.trim()) {
-      toast({
-        title: 'Missing fields',
-        description: 'Please fill in all required fields',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
+  
+  const handleSwitchChange = (checked: boolean) => {
+    setFormData(prev => ({ ...prev, is_active: checked }));
+  };
+  
+  const handleCategoryChange = (value: string) => {
+    setFormData(prev => ({ ...prev, category: value }));
+  };
+  
+  const handleDateChange = (date: Date | undefined) => {
+    setFormData(prev => ({ ...prev, expiry_date: date || null }));
+  };
+  
+  const handleAddNew = () => {
+    setIsEditMode(false);
+    setFormData({
+      id: '',
+      title: '',
+      content: '',
+      category: 'general',
+      is_active: true,
+      expiry_date: null,
+    });
+    setIsDialogOpen(true);
+  };
+  
+  const handleEdit = (announcement: Announcement) => {
+    setIsEditMode(true);
+    setFormData({
+      id: announcement.id,
+      title: announcement.title,
+      content: announcement.content,
+      category: announcement.category,
+      is_active: announcement.is_active,
+      expiry_date: announcement.expiry_date ? new Date(announcement.expiry_date) : null,
+    });
+    setIsDialogOpen(true);
+  };
+  
+  const handleSave = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
       if (!user) {
         throw new Error('User not authenticated');
       }
-
-      const formattedData = {
-        title,
-        content,
-        category,
-        is_active: isActive,
-        expiry_date: expiryDate ? new Date(expiryDate).toISOString() : null,
+      
+      const announcementData = {
+        title: formData.title,
+        content: formData.content,
+        category: formData.category,
+        is_active: formData.is_active,
+        created_by: user.id,
+        expiry_date: formData.expiry_date ? formData.expiry_date.toISOString() : null,
       };
-
-      let result;
       
-      if (editingAnnouncement) {
-        // Update existing announcement
-        const { data, error } = await supabase
-          .from(tableFrom('announcements'))
-          .update(formattedData)
-          .eq('id', editingAnnouncement.id)
-          .select()
-          .single();
-          
-        if (error) throw error;
-        result = data;
-        
-        // Update local state
-        setAnnouncements(prev => 
-          prev.map(item => 
-            item.id === editingAnnouncement.id 
-              ? { ...data, author_name: editingAnnouncement.author_name } 
-              : item
-          )
-        );
-        
-        toast({
-          title: 'Announcement updated',
-          description: 'The announcement has been updated successfully',
+      if (isEditMode) {
+        // Call the RPC function to update an announcement
+        const { data, error } = await callRpcFunction('update_announcement', {
+          p_id: formData.id,
+          p_title: announcementData.title,
+          p_content: announcementData.content,
+          p_category: announcementData.category,
+          p_is_active: announcementData.is_active,
+          p_expiry_date: announcementData.expiry_date
         });
+        
+        if (error) throw error;
+        
+        if (isMounted.current) {
+          toast({
+            title: 'Success',
+            description: 'Announcement updated successfully.',
+          });
+        }
       } else {
-        // Create new announcement
-        const { data, error } = await supabase
-          .from(tableFrom('announcements'))
-          .insert({
-            ...formattedData,
-            created_by: user.id,
-          })
-          .select()
-          .single();
-          
-        if (error) throw error;
-        result = data;
-        
-        // Get author name
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', user.id)
-          .single();
-
-        // Update local state
-        setAnnouncements(prev => [
-          { ...data, author_name: profileData?.full_name || 'Unknown' },
-          ...prev
-        ]);
-        
-        toast({
-          title: 'Announcement created',
-          description: 'The announcement has been created successfully',
+        // Call the RPC function to create a new announcement
+        const { data, error } = await callRpcFunction('create_announcement', {
+          p_title: announcementData.title,
+          p_content: announcementData.content,
+          p_category: announcementData.category,
+          p_is_active: announcementData.is_active,
+          p_created_by: announcementData.created_by,
+          p_expiry_date: announcementData.expiry_date
         });
+        
+        if (error) throw error;
+        
+        if (isMounted.current) {
+          toast({
+            title: 'Success',
+            description: 'Announcement created successfully.',
+          });
+        }
       }
-
-      // Close dialog and reset form
-      setDialogOpen(false);
       
+      fetchAnnouncements();
+      if (isMounted.current) {
+        setIsDialogOpen(false);
+      }
     } catch (error: any) {
       console.error('Error saving announcement:', error);
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSubmitting(false);
+      if (isMounted.current) {
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to save announcement. Please try again.',
+          variant: 'destructive',
+        });
+      }
     }
   };
-
+  
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this announcement?')) return;
-    
     try {
-      const { error } = await supabase
-        .from(tableFrom('announcements'))
-        .delete()
-        .eq('id', id);
-        
+      setDeletingId(id);
+      
+      // Call the RPC function to delete an announcement
+      const { data, error } = await callRpcFunction('delete_announcement', {
+        p_id: id
+      });
+      
       if (error) throw error;
       
-      // Remove from local state
-      setAnnouncements(prev => prev.filter(item => item.id !== id));
-      
-      toast({
-        title: 'Announcement deleted',
-        description: 'The announcement has been deleted successfully',
-      });
+      if (isMounted.current) {
+        toast({
+          title: 'Success',
+          description: 'Announcement deleted successfully.',
+        });
+        
+        // Filter out the deleted announcement
+        setAnnouncements(prev => prev.filter(item => item.id !== id));
+      }
     } catch (error: any) {
       console.error('Error deleting announcement:', error);
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
+      if (isMounted.current) {
+        toast({
+          title: 'Error',
+          description: 'Failed to delete announcement. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    } finally {
+      if (isMounted.current) {
+        setDeletingId(null);
+      }
     }
   };
-
-  const toggleActiveStatus = async (announcement: Announcement) => {
-    try {
-      const newStatus = !announcement.is_active;
-      
-      const { error } = await supabase
-        .from(tableFrom('announcements'))
-        .update({ is_active: newStatus })
-        .eq('id', announcement.id);
-        
-      if (error) throw error;
-      
-      // Update local state
-      setAnnouncements(prev => 
-        prev.map(item => 
-          item.id === announcement.id 
-            ? { ...item, is_active: newStatus } 
-            : item
-        )
-      );
-      
-      toast({
-        title: newStatus ? 'Announcement activated' : 'Announcement deactivated',
-        description: `The announcement has been ${newStatus ? 'activated' : 'deactivated'} successfully`,
-      });
-    } catch (error: any) {
-      console.error('Error toggling announcement status:', error);
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
-    }
-  };
-
-  // Filter announcements based on search query
-  const filteredAnnouncements = announcements.filter(announcement => 
-    announcement.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    announcement.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    announcement.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
+  
+  const filteredAnnouncements = filterCategory === 'all' 
+    ? announcements 
+    : announcements.filter(a => a.category === filterCategory);
+  
   return (
     <div>
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <CardTitle className="text-xl">Announcements</CardTitle>
-              <CardDescription>Manage public announcements and updates</CardDescription>
+              <CardTitle>Announcements Manager</CardTitle>
+              <CardDescription>
+                Create and manage announcements for your customers
+              </CardDescription>
             </div>
-            <Button 
-              onClick={() => handleOpenDialog()}
-              className="bg-zim-green hover:bg-zim-green/90"
-            >
-              <PlusCircle className="h-4 w-4 mr-2" />
-              New Announcement
-            </Button>
+            <div className="flex gap-2">
+              <Select 
+                value={filterCategory} 
+                onValueChange={setFilterCategory}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4" />
+                    <SelectValue placeholder="Filter by category" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {CATEGORIES.map(cat => (
+                    <SelectItem key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button 
+                onClick={fetchAnnouncements} 
+                variant="outline" 
+                size="icon"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+              <Button onClick={handleAddNew}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                New Announcement
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col md:flex-row gap-4 mb-4">
-            <div className="relative flex-grow">
-              <Input
-                placeholder="Search announcements..."
-                className="pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-            </div>
-            <Button 
-              variant="outline" 
-              onClick={fetchAnnouncements}
-              className="h-10 px-4"
-            >
-              <RefreshCcw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-          </div>
-
           {loading ? (
-            <div className="flex justify-center items-center p-12">
+            <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
             </div>
           ) : filteredAnnouncements.length === 0 ? (
-            <div className="text-center p-12">
-              <Megaphone className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium mb-2">No announcements found</h3>
-              <p className="text-gray-500">
-                {searchQuery
-                  ? "Try adjusting your search query"
-                  : "Start by creating your first announcement"}
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Megaphone className="h-12 w-12 text-gray-300 mb-3" />
+              <h3 className="text-lg font-medium mb-1">No announcements found</h3>
+              <p className="text-gray-500 mb-4">
+                {filterCategory !== 'all' 
+                  ? `There are no ${filterCategory} announcements yet` 
+                  : "You haven't created any announcements yet"}
               </p>
+              <Button onClick={handleAddNew} variant="default">
+                <PlusCircle className="h-4 w-4 mr-2" />
+                Create Your First Announcement
+              </Button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Posted By</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Expires</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredAnnouncements.map((announcement) => (
-                    <TableRow key={announcement.id}>
-                      <TableCell className="font-medium">{announcement.title}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="bg-slate-100">
-                          {announcement.category}
+            <div className="grid gap-4">
+              {filteredAnnouncements.map(announcement => (
+                <div 
+                  key={announcement.id} 
+                  className="border rounded-lg p-4 flex flex-col md:flex-row gap-4 md:items-center md:justify-between"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="font-medium">{announcement.title}</h3>
+                      {announcement.is_active ? (
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          <Check className="h-3 w-3 mr-1" />
+                          Active
                         </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {announcement.is_active ? (
-                          <Badge className="bg-green-100 text-green-800 border-green-300">
-                            Active
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-gray-100 text-gray-800 border-gray-300">
-                            Inactive
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>{announcement.author_name}</TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        {format(new Date(announcement.created_at), 'MMM d, yyyy')}
-                      </TableCell>
-                      <TableCell>
-                        {announcement.expiry_date 
-                          ? format(new Date(announcement.expiry_date), 'MMM d, yyyy')
-                          : "No expiry"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => toggleActiveStatus(announcement)}
-                            title={announcement.is_active ? "Deactivate" : "Activate"}
-                          >
-                            {announcement.is_active ? (
-                              <XCircle className="h-4 w-4 text-gray-500" />
-                            ) : (
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenDialog(announcement)}
-                            title="Edit"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(announcement.id)}
-                            title="Delete"
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      ) : (
+                        <Badge variant="outline" className="bg-gray-50 text-gray-500 border-gray-200">
+                          <XCircle className="h-3 w-3 mr-1" />
+                          Inactive
+                        </Badge>
+                      )}
+                      <Badge>{CATEGORIES.find(c => c.value === announcement.category)?.label || announcement.category}</Badge>
+                    </div>
+                    <p className="text-gray-600 text-sm line-clamp-2 mb-2">{announcement.content}</p>
+                    <div className="text-xs text-gray-500 flex gap-3">
+                      <span>Created: {format(new Date(announcement.created_at), 'MMM d, yyyy')}</span>
+                      {announcement.expiry_date && (
+                        <span>Expires: {format(new Date(announcement.expiry_date), 'MMM d, yyyy')}</span>
+                      )}
+                      {announcement.author_name && (
+                        <span>By: {announcement.author_name}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 self-end md:self-center">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleEdit(announcement)}
+                    >
+                      <Edit2 className="h-3.5 w-3.5 mr-1" />
+                      Edit
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      onClick={() => handleDelete(announcement.id)}
+                      disabled={deletingId === announcement.id}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1" />
+                      {deletingId === announcement.id ? 'Deleting...' : 'Delete'}
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Create/Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>
-              {editingAnnouncement ? 'Edit Announcement' : 'Create Announcement'}
-            </DialogTitle>
+            <DialogTitle>{isEditMode ? 'Edit Announcement' : 'Create New Announcement'}</DialogTitle>
             <DialogDescription>
-              {editingAnnouncement 
-                ? 'Update the details of this announcement' 
-                : 'Create a new announcement to share updates'}
+              {isEditMode 
+                ? 'Update the announcement details below.' 
+                : 'Fill in the details to create a new announcement for your customers.'}
             </DialogDescription>
           </DialogHeader>
-
+          
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <label htmlFor="title" className="text-sm font-medium">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="title" className="text-right">
                 Title
-              </label>
+              </Label>
               <Input
                 id="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                name="title"
+                value={formData.title}
+                onChange={handleInputChange}
+                className="col-span-3"
                 placeholder="Enter announcement title"
               />
             </div>
-
-            <div className="grid gap-2">
-              <label htmlFor="category" className="text-sm font-medium">
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="category" className="text-right">
                 Category
-              </label>
-              <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger>
+              </Label>
+              <Select
+                value={formData.category}
+                onValueChange={handleCategoryChange}
+              >
+                <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
+                  {CATEGORIES.map(cat => (
+                    <SelectItem key={cat.value} value={cat.value}>
+                      {cat.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="grid gap-2">
-              <label htmlFor="content" className="text-sm font-medium">
+            
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="content" className="text-right mt-2">
                 Content
-              </label>
+              </Label>
               <Textarea
                 id="content"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
+                name="content"
+                value={formData.content}
+                onChange={handleInputChange}
+                className="col-span-3 min-h-[100px]"
                 placeholder="Enter announcement content"
-                rows={5}
               />
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <label htmlFor="status" className="text-sm font-medium">
-                  Status
-                </label>
-                <Select
-                  value={isActive ? "active" : "inactive"}
-                  onValueChange={(val) => setIsActive(val === "active")}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="expiry_date" className="text-right">
+                Expiry Date
+              </Label>
+              <div className="col-span-3">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !formData.expiry_date && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.expiry_date ? format(formData.expiry_date, "PPP") : "No expiry date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={formData.expiry_date || undefined}
+                      onSelect={handleDateChange}
+                      initialFocus
+                      disabled={(date) => date < new Date()}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
-
-              <div className="grid gap-2">
-                <label htmlFor="expiryDate" className="text-sm font-medium">
-                  Expiry Date (Optional)
-                </label>
-                <div className="flex">
-                  <Input
-                    id="expiryDate"
-                    type="date"
-                    value={expiryDate}
-                    onChange={(e) => setExpiryDate(e.target.value)}
-                    className="w-full"
-                    min={new Date().toISOString().split('T')[0]}
-                  />
-                </div>
+            </div>
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="is_active" className="text-right">
+                Active
+              </Label>
+              <div className="flex items-center space-x-2 col-span-3">
+                <Switch
+                  id="is_active"
+                  checked={formData.is_active}
+                  onCheckedChange={handleSwitchChange}
+                />
+                <Label htmlFor="is_active">
+                  {formData.is_active ? 'Visible to customers' : 'Hidden from customers'}
+                </Label>
               </div>
             </div>
           </div>
-
+          
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>
-            <Button 
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="bg-zim-green hover:bg-zim-green/90"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  {editingAnnouncement ? 'Update' : 'Create'}
-                </>
-              )}
+            <Button type="button" onClick={handleSave}>
+              {isEditMode ? 'Update' : 'Create'} Announcement
             </Button>
           </DialogFooter>
         </DialogContent>

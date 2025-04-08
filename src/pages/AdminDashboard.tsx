@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -95,9 +96,10 @@ const AdminDashboard = () => {
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isMounted = useRef(true);
 
   const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
@@ -112,6 +114,16 @@ const AdminDashboard = () => {
     delivered: 0,
   });
 
+  // Use loading with a ref to prevent state updates after unmount
+  const [loading, setLoading] = useState(true);
+
+  // Use this effect to set the isMounted ref to false when component unmounts
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
   const checkIfAdminExists = async () => {
     try {
       const { data, error } = await supabase.rpc('is_admin');
@@ -120,6 +132,8 @@ const AdminDashboard = () => {
         console.error('Error checking admin status:', error);
         return;
       }
+
+      if (!isMounted.current) return;
 
       if (data) {
         setAdminExists(true);
@@ -135,6 +149,7 @@ const AdminDashboard = () => {
           return;
         }
 
+        if (!isMounted.current) return;
         setAdminExists(profilesData && profilesData.length > 0);
       }
     } catch (error) {
@@ -147,9 +162,15 @@ const AdminDashboard = () => {
     if (isAdmin || adminExists) {
       fetchShipments();
     }
+
+    return () => {
+      isMounted.current = false;
+    };
   }, [user, navigate]);
 
   const fetchShipments = async () => {
+    if (!isMounted.current) return;
+    
     setLoading(true);
     try {
       console.log("Admin: Fetching all shipments");
@@ -163,7 +184,7 @@ const AdminDashboard = () => {
         throw error;
       }
 
-      if (data) {
+      if (data && isMounted.current) {
         console.log("Admin: Fetched shipments count:", data.length);
         setShipments(data as Shipment[]);
         const totalCount = data.length;
@@ -180,13 +201,17 @@ const AdminDashboard = () => {
       }
     } catch (error: any) {
       console.error("Error in fetchShipments:", error);
-      toast({
-        title: 'Error fetching shipments',
-        description: error.message,
-        variant: 'destructive',
-      });
+      if (isMounted.current) {
+        toast({
+          title: 'Error fetching shipments',
+          description: error.message,
+          variant: 'destructive',
+        });
+      }
     } finally {
-      setLoading(false);
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -218,22 +243,26 @@ const AdminDashboard = () => {
 
       if (error) throw error;
 
-      toast({
-        title: 'Status Updated',
-        description: `Shipment ${editingShipment.tracking_number} status updated to ${newStatus}`,
-      });
+      if (isMounted.current) {
+        toast({
+          title: 'Status Updated',
+          description: `Shipment ${editingShipment.tracking_number} status updated to ${newStatus}`,
+        });
 
-      fetchShipments();
-      
-      setEditingShipment(null);
-      setNewStatus('');
+        fetchShipments();
+        
+        setEditingShipment(null);
+        setNewStatus('');
+      }
       
     } catch (error: any) {
-      toast({
-        title: 'Error updating status',
-        description: error.message,
-        variant: 'destructive',
-      });
+      if (isMounted.current) {
+        toast({
+          title: 'Error updating status',
+          description: error.message,
+          variant: 'destructive',
+        });
+      }
     }
   };
 
