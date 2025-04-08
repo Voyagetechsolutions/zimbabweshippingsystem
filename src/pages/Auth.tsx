@@ -9,8 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import Logo from '@/components/Logo';
-import { Mail, Lock, User, ArrowRight, AlertCircle, Facebook, Mail as MailIcon } from 'lucide-react';
-import { FaGoogle } from 'react-icons/fa';
+import { Mail, Lock, User, ArrowRight, AlertCircle } from 'lucide-react';
 
 const Auth = () => {
   const [email, setEmail] = useState('');
@@ -101,48 +100,6 @@ const Auth = () => {
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth-callback`,
-        }
-      });
-
-      if (error) throw error;
-    } catch (error: any) {
-      toast({
-        title: 'Google Login Failed',
-        description: error.message || 'An error occurred during Google login.',
-        variant: 'destructive',
-      });
-      setLoading(false);
-    }
-  };
-
-  const handleFacebookSignIn = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'facebook',
-        options: {
-          redirectTo: `${window.location.origin}/auth-callback`,
-        }
-      });
-
-      if (error) throw error;
-    } catch (error: any) {
-      toast({
-        title: 'Facebook Login Failed',
-        description: error.message || 'An error occurred during Facebook login.',
-        variant: 'destructive',
-      });
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50">
       <div className="w-full max-w-md space-y-6">
@@ -202,38 +159,6 @@ const Auth = () => {
                   {loading ? 'Signing In...' : 'Sign In'}
                 </Button>
               </form>
-
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Or continue with</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full border-gray-300 hover:bg-gray-50 text-black"
-                  onClick={handleGoogleSignIn}
-                  disabled={loading}
-                >
-                  <FaGoogle className="mr-2 h-4 w-4 text-red-500" />
-                  Google
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full border-gray-300 hover:bg-gray-50 text-black"
-                  onClick={handleFacebookSignIn}
-                  disabled={loading}
-                >
-                  <Facebook className="mr-2 h-4 w-4 text-blue-600" />
-                  Facebook
-                </Button>
-              </div>
             </TabsContent>
 
             <TabsContent value="register" className="space-y-4">
@@ -293,38 +218,6 @@ const Auth = () => {
                   {loading ? 'Creating Account...' : 'Create Account'}
                 </Button>
               </form>
-
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Or register with</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full border-gray-300 hover:bg-gray-50 text-black"
-                  onClick={handleGoogleSignIn}
-                  disabled={loading}
-                >
-                  <FaGoogle className="mr-2 h-4 w-4 text-red-500" />
-                  Google
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full border-gray-300 hover:bg-gray-50 text-black"
-                  onClick={handleFacebookSignIn}
-                  disabled={loading}
-                >
-                  <Facebook className="mr-2 h-4 w-4 text-blue-600" />
-                  Facebook
-                </Button>
-              </div>
             </TabsContent>
           </Tabs>
         </div>
