@@ -29,6 +29,9 @@ export function MultiSelect({
   const [open, setOpen] = React.useState(false);
   const [inputValue, setInputValue] = React.useState("");
 
+  // Ensure options is always an array
+  const safeOptions = Array.isArray(options) ? options : [];
+  
   // Ensure selected is always an array
   const safeSelected = Array.isArray(selected) ? selected : [];
 
@@ -48,13 +51,13 @@ export function MultiSelect({
   };
 
   // Ensure we're only filtering valid options
-  const selectables = options.filter(
+  const selectables = safeOptions.filter(
     (option) => !safeSelected.includes(option.value)
   );
 
   // Map selected values to their corresponding option objects
   const selectedOptions = safeSelected.map((value) => 
-    options.find((option) => option.value === value) || { value, label: value }
+    safeOptions.find((option) => option.value === value) || { value, label: value }
   );
 
   return (
@@ -97,7 +100,7 @@ export function MultiSelect({
         </div>
       </div>
       <div className="relative">
-        {open && selectables.length > 0 && (
+        {open && selectables.length > 0 ? (
           <div className="absolute w-full z-10 top-0 rounded-md border bg-popover text-popover-foreground shadow-md outline-none animate-in">
             <CommandGroup className="h-full overflow-auto max-h-80">
               {selectables.map((option) => (
@@ -118,7 +121,7 @@ export function MultiSelect({
               ))}
             </CommandGroup>
           </div>
-        )}
+        ) : null}
       </div>
     </Command>
   );
