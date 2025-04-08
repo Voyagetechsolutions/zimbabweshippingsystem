@@ -29,26 +29,31 @@ export function MultiSelect({
   const [open, setOpen] = React.useState(false);
   const [inputValue, setInputValue] = React.useState("");
 
+  // Ensure selected is always an array
+  const safeSelected = Array.isArray(selected) ? selected : [];
+
   const handleUnselect = (option: string) => {
-    onChange(selected.filter((s) => s !== option));
+    onChange(safeSelected.filter((s) => s !== option));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     const input = inputRef.current;
     if (input) {
       if (e.key === "Delete" || e.key === "Backspace") {
-        if (input.value === "" && selected.length > 0) {
-          handleUnselect(selected[selected.length - 1]);
+        if (input.value === "" && safeSelected.length > 0) {
+          handleUnselect(safeSelected[safeSelected.length - 1]);
         }
       }
     }
   };
 
+  // Ensure we're only filtering valid options
   const selectables = options.filter(
-    (option) => !selected.includes(option.value)
+    (option) => !safeSelected.includes(option.value)
   );
 
-  const selectedOptions = selected.map((value) => 
+  // Map selected values to their corresponding option objects
+  const selectedOptions = safeSelected.map((value) => 
     options.find((option) => option.value === value) || { value, label: value }
   );
 
@@ -86,7 +91,7 @@ export function MultiSelect({
             onValueChange={setInputValue}
             onBlur={() => setOpen(false)}
             onFocus={() => setOpen(true)}
-            placeholder={selected.length === 0 ? placeholder : ""}
+            placeholder={safeSelected.length === 0 ? placeholder : ""}
             className="ml-2 bg-transparent outline-none placeholder:text-muted-foreground flex-1 placeholder:text-gray-500 min-w-[120px] inline-flex"
           />
         </div>
@@ -103,7 +108,7 @@ export function MultiSelect({
                     e.stopPropagation();
                   }}
                   onSelect={() => {
-                    onChange([...selected, option.value]);
+                    onChange([...safeSelected, option.value]);
                     setInputValue("");
                   }}
                   className="cursor-pointer"
