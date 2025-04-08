@@ -86,19 +86,29 @@ const AnnouncementsManager = () => {
     try {
       const { data, error } = await supabase
         .from(tableFrom('announcements'))
-        .select('*, profiles(full_name)')
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
       if (data) {
-        // Transform data to include author_name
-        const formattedData = data.map((item: any) => ({
-          ...item,
-          author_name: item.profiles?.full_name || 'Unknown'
-        }));
+        // Get author names for each announcement
+        const announcementsWithAuthors = await Promise.all(
+          data.map(async (announcement) => {
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('id', announcement.created_by)
+              .single();
+              
+            return {
+              ...announcement,
+              author_name: profileData?.full_name || 'Unknown'
+            };
+          })
+        );
         
-        setAnnouncements(castTo<Announcement[]>(formattedData));
+        setAnnouncements(castTo<Announcement[]>(announcementsWithAuthors));
       }
     } catch (error: any) {
       console.error('Error fetching announcements:', error);
@@ -165,7 +175,7 @@ const AnnouncementsManager = () => {
           .from(tableFrom('announcements'))
           .update(formattedData)
           .eq('id', editingAnnouncement.id)
-          .select('*, profiles(full_name)')
+          .select()
           .single();
           
         if (error) throw error;
@@ -175,7 +185,7 @@ const AnnouncementsManager = () => {
         setAnnouncements(prev => 
           prev.map(item => 
             item.id === editingAnnouncement.id 
-              ? { ...data, author_name: data.profiles?.full_name || 'Unknown' } 
+              ? { ...data, author_name: editingAnnouncement.author_name } 
               : item
           )
         );
@@ -192,15 +202,22 @@ const AnnouncementsManager = () => {
             ...formattedData,
             created_by: user.id,
           })
-          .select('*, profiles(full_name)')
+          .select()
           .single();
           
         if (error) throw error;
         result = data;
         
+        // Get author name
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single();
+
         // Update local state
         setAnnouncements(prev => [
-          { ...data, author_name: data.profiles?.full_name || 'Unknown' },
+          { ...data, author_name: profileData?.full_name || 'Unknown' },
           ...prev
         ]);
         

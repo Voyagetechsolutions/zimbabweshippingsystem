@@ -47,7 +47,7 @@ export interface Tables {
     updated_at: string;
   };
   
-  // Add the announcements table we just created
+  // Add the announcements table
   announcements: {
     id: string;
     title: string;
@@ -127,6 +127,15 @@ export interface Tables {
     role_id: string;
     assigned_by: string | null;
     created_at: string;
+  };
+  
+  collection_schedules: {
+    id: string;
+    route: string;
+    pickup_date: string;
+    areas: string[];
+    created_at: string;
+    updated_at: string;
   };
 }
 
