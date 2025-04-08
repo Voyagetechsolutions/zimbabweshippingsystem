@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Download, FileSpreadsheet, File, ChevronDown } from 'lucide-react';
-import { format } from 'date-fns';
+import { format as formatDate } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -82,8 +82,8 @@ const ShipmentExporter = ({ shipmentIds, all = false }: ShipmentExporterProps) =
             shipment.weight,
             `"${shipment.dimensions || ''}"`,
             `"${shipment.carrier || ''}"`,
-            shipment.created_at ? format(new Date(shipment.created_at), 'yyyy-MM-dd') : '',
-            shipment.estimated_delivery ? format(new Date(shipment.estimated_delivery), 'yyyy-MM-dd') : ''
+            shipment.created_at ? formatDate(new Date(shipment.created_at), 'yyyy-MM-dd') : '',
+            shipment.estimated_delivery ? formatDate(new Date(shipment.estimated_delivery), 'yyyy-MM-dd') : ''
           ].join(','))
         ];
         
@@ -94,7 +94,7 @@ const ShipmentExporter = ({ shipmentIds, all = false }: ShipmentExporterProps) =
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.setAttribute('href', url);
-        link.setAttribute('download', `shipments_export_${format(new Date(), 'yyyyMMdd')}.csv`);
+        link.setAttribute('download', `shipments_export_${formatDate(new Date(), 'yyyyMMdd')}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -173,8 +173,8 @@ const ShipmentExporter = ({ shipmentIds, all = false }: ShipmentExporterProps) =
           // Date
           const tdDate = document.createElement('td');
           tdDate.innerHTML = `
-            <strong>Created:</strong> ${shipment.created_at ? format(new Date(shipment.created_at), 'yyyy-MM-dd') : 'N/A'}<br>
-            <strong>Delivery:</strong> ${shipment.estimated_delivery ? format(new Date(shipment.estimated_delivery), 'yyyy-MM-dd') : 'N/A'}
+            <strong>Created:</strong> ${shipment.created_at ? formatDate(new Date(shipment.created_at), 'yyyy-MM-dd') : 'N/A'}<br>
+            <strong>Delivery:</strong> ${shipment.estimated_delivery ? formatDate(new Date(shipment.estimated_delivery), 'yyyy-MM-dd') : 'N/A'}
           `;
           tdDate.style.border = '1px solid #ddd';
           tdDate.style.padding = '8px';
@@ -197,7 +197,7 @@ const ShipmentExporter = ({ shipmentIds, all = false }: ShipmentExporterProps) =
         header.appendChild(title);
         
         const subtitle = document.createElement('p');
-        subtitle.textContent = `Generated on ${format(new Date(), 'MMMM dd, yyyy')}`;
+        subtitle.textContent = `Generated on ${formatDate(new Date(), 'MMMM dd, yyyy')}`;
         subtitle.style.color = '#718096';
         header.appendChild(subtitle);
         
@@ -207,7 +207,7 @@ const ShipmentExporter = ({ shipmentIds, all = false }: ShipmentExporterProps) =
         // Generate PDF
         const opt = {
           margin: 10,
-          filename: `shipments_export_${format(new Date(), 'yyyyMMdd')}.pdf`,
+          filename: `shipments_export_${formatDate(new Date(), 'yyyyMMdd')}.pdf`,
           image: { type: 'jpeg', quality: 0.98 },
           html2canvas: { scale: 2 },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
