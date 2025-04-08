@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { callRpcFunction } from '@/utils/supabaseUtils';
 import { Announcement } from '@/types/admin';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRole } from '@/contexts/RoleContext';
 import { 
   Card, 
   CardContent, 
@@ -22,19 +24,20 @@ import { format } from 'date-fns';
 
 const AnnouncementsFeed = () => {
   const { user } = useAuth();
+  const { role } = useRole();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
 
   useEffect(() => {
     fetchAnnouncements();
-  }, [user]);
+  }, [user, role]);
 
   const fetchAnnouncements = async () => {
     setLoading(true);
     try {
       // Get the user's role and location if available
-      const userRole = user?.role || null;
+      const userRole = role || null;
       // Since location isn't a property of User type, we'll get it from user_metadata or default to 'global'
       const userLocation = user?.user_metadata?.location || 'global';
 
@@ -66,7 +69,8 @@ const AnnouncementsFeed = () => {
     setCurrentPage((prev) => (prev - 1 + totalPages) % totalPages);
   };
 
-  const currentAnnouncement = announcements[currentPage];
+  // Make sure currentAnnouncement doesn't cause issues if announcements is empty
+  const currentAnnouncement = announcements.length > 0 ? announcements[currentPage] : null;
 
   if (loading) {
     return (
@@ -79,6 +83,10 @@ const AnnouncementsFeed = () => {
   }
 
   if (!hasAnnouncements) {
+    return null;
+  }
+
+  if (!currentAnnouncement) {
     return null;
   }
 
