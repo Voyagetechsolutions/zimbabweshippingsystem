@@ -102,16 +102,13 @@ const SupportDashboard = () => {
       if (data) {
         setTickets(data);
         
-        // Compute stats
         const openCount = data.filter(t => t.status === 'Open').length;
         const closedCount = data.filter(t => t.status === 'Closed').length;
         const highPriorityCount = data.filter(t => t.priority === 'High').length;
         
-        // Calculate response rate - the percentage of tickets that received a response
         const hasResponsesCount = await countTicketsWithResponses();
         const responseRate = data.length > 0 ? Math.round((hasResponsesCount / data.length) * 100) : 0;
         
-        // Calculate average response time
         const averageTime = await calculateAverageResponseTime();
         
         setStats({
@@ -144,7 +141,7 @@ const SupportDashboard = () => {
       if (error) throw error;
       
       if (data) {
-        setResponseTemplates(data as ResponseTemplate[]);
+        setResponseTemplates(data as unknown as ResponseTemplate[]);
       }
     } catch (error: any) {
       console.error('Error fetching response templates:', error.message);
@@ -174,7 +171,6 @@ const SupportDashboard = () => {
   
   const calculateAverageResponseTime = async () => {
     try {
-      // This is a simplified calculation and would be more accurate with timestamps in the database
       const { data: tickets, error: ticketsError } = await supabase
         .from(tableFrom('support_tickets'))
         .select('id, created_at, updated_at')
@@ -248,7 +244,6 @@ const SupportDashboard = () => {
     setResponseContent('');
     
     try {
-      // Fetch responses for this ticket if we haven't already
       if (!ticketResponses[ticket.id]) {
         const { data, error } = await supabase
           .from(tableFrom('ticket_responses'))
@@ -285,14 +280,14 @@ const SupportDashboard = () => {
     
     setSendingResponse(true);
     try {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
         throw new Error('User not authenticated');
       }
       
-      // Add response
+      console.log('Authenticated user:', user.id);
+      
       const { data: responseData, error: responseError } = await supabase
         .from(tableFrom('ticket_responses'))
         .insert({
@@ -304,9 +299,11 @@ const SupportDashboard = () => {
         .select()
         .single();
       
-      if (responseError) throw responseError;
+      if (responseError) {
+        console.error('Response insert error:', responseError);
+        throw responseError;
+      }
       
-      // Update ticket status to 'In Progress' if it's 'Open'
       if (viewingTicket.status === 'Open') {
         const { error: updateError } = await supabase
           .from(tableFrom('support_tickets'))
@@ -318,13 +315,11 @@ const SupportDashboard = () => {
         
         if (updateError) throw updateError;
         
-        // Update local ticket state
         setViewingTicket({
           ...viewingTicket,
           status: 'In Progress'
         });
         
-        // Update tickets list
         setTickets(prevTickets => 
           prevTickets.map(t => 
             t.id === viewingTicket.id 
@@ -334,13 +329,11 @@ const SupportDashboard = () => {
         );
       }
       
-      // Add the new response to our local state
       setTicketResponses(prev => ({
         ...prev,
         [viewingTicket.id]: [...(prev[viewingTicket.id] || []), responseData]
       }));
       
-      // Clear the response field
       setResponseContent('');
       
       toast({
@@ -395,12 +388,13 @@ const SupportDashboard = () => {
         .select()
         .single();
         
-      if (error) throw error;
+      if (error) {
+        console.error('Template save error:', error);
+        throw error;
+      }
       
-      // Add new template to state
-      setResponseTemplates(prev => [data as ResponseTemplate, ...prev]);
+      setResponseTemplates(prev => [data as unknown as ResponseTemplate, ...prev]);
       
-      // Reset form
       setNewTemplateName('');
       setNewTemplateContent('');
       setTemplateDialogOpen(false);
@@ -439,11 +433,8 @@ const SupportDashboard = () => {
         throw new Error('User not authenticated');
       }
 
-      // In a real app, you would call a server function to send the email
-      // This is a placeholder to simulate the action
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Add a forwarding note to the ticket responses
       const { error: responseError } = await supabase
         .from(tableFrom('ticket_responses'))
         .insert({
@@ -455,7 +446,6 @@ const SupportDashboard = () => {
       
       if (responseError) throw responseError;
       
-      // Update local state
       const newResponse = {
         id: Date.now().toString(),
         ticket_id: viewingTicket.id,
@@ -470,7 +460,6 @@ const SupportDashboard = () => {
         [viewingTicket.id]: [...(prev[viewingTicket.id] || []), newResponse]
       }));
       
-      // Close dialog and reset form
       setForwardDialogOpen(false);
       setForwardEmail('');
       
