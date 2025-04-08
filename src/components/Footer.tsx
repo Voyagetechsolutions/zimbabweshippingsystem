@@ -19,12 +19,10 @@ const Footer: React.FC = () => {
               Connecting Zimbabwe to the UK with reliable shipping solutions since 2020.
             </p>
             <div className="flex space-x-4 mt-6">
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
+              <a href="https://www.facebook.com/bulawayo.shipping" className="text-gray-400 hover:text-white transition-colors">
                 <Facebook size={20} />
               </a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                <Twitter size={20} />
-              </a>
+          
               <a href="#" className="text-gray-400 hover:text-white transition-colors">
                 <Instagram size={20} />
               </a>
@@ -40,6 +38,11 @@ const Footer: React.FC = () => {
               <li>
                 <Link to="/services" className="text-gray-400 hover:text-white transition-colors">Services</Link>
               </li>
+              <li>
+               <Link to="/pricing">
+              <span className="text-gray-500 hover:text-gray-400 text-sm">Pricing</span>
+            </Link>
+                </li>
               <li>
                 <Link to="/track" className="text-gray-400 hover:text-white transition-colors">Track Shipment</Link>
               </li>
