@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -36,7 +35,6 @@ import SettingsManagement from '@/components/admin/SettingsManagement';
 import ContentManagement from '@/components/admin/ContentManagement';
 import CollectionScheduleManagement from '@/components/admin/CollectionScheduleManagement';
 import SupportTickets from '@/components/admin/SupportTickets';
-import AnnouncementsManager from '@/components/admin/AnnouncementsManager';
 
 const STATUS_OPTIONS = [
   'Booking Confirmed',
@@ -99,7 +97,7 @@ const AdminDashboard = () => {
   const isMounted = useRef(true);
 
   const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [loading, setLoading] = useState(true); // Fixed: removed duplicate loading state
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
@@ -114,7 +112,6 @@ const AdminDashboard = () => {
     delivered: 0,
   });
 
-  // Use this effect to set the isMounted ref to false when component unmounts
   useEffect(() => {
     return () => {
       isMounted.current = false;
@@ -313,10 +310,6 @@ const AdminDashboard = () => {
               <TabsTrigger value="settings" className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
                 <span className="hidden sm:inline">Settings</span>
-              </TabsTrigger>
-              <TabsTrigger value="announcements" className="flex items-center gap-2">
-                <Megaphone className="h-4 w-4" />
-                <span className="hidden sm:inline">Announcements</span>
               </TabsTrigger>
               <TabsTrigger value="more" className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
@@ -576,10 +569,6 @@ const AdminDashboard = () => {
 
             <TabsContent value="schedule">
               <CollectionScheduleManagement />
-            </TabsContent>
-
-            <TabsContent value="announcements">
-              <AnnouncementsManager />
             </TabsContent>
 
             <TabsContent value="more">
