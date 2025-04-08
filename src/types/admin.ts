@@ -58,7 +58,7 @@ export interface TicketResponse {
   user_name?: string;
 }
 
-// Announcement interface
+// Announcement interface with enhanced fields
 export interface Announcement {
   id: string;
   title: string;
@@ -70,6 +70,12 @@ export interface Announcement {
   created_by: string;
   expiry_date: string | null;
   author_name?: string; // For display purposes
+  status: 'draft' | 'published' | 'scheduled' | string;
+  publish_at: string | null;
+  archived: boolean;
+  target_roles: string[] | null;
+  target_locations: string[] | null;
+  is_critical: boolean;
 }
 
 // Helper function for typescript casting

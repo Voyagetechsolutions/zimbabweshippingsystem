@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { callRpcFunction } from '@/utils/supabaseUtils';
 import { Announcement } from '@/types/admin';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   Card, 
   CardContent, 
@@ -14,24 +15,33 @@ import {
   Megaphone, 
   Calendar, 
   ChevronRight, 
-  ChevronLeft 
+  ChevronLeft,
+  AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 
 const AnnouncementsFeed = () => {
+  const { user } = useAuth();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
 
   useEffect(() => {
     fetchAnnouncements();
-  }, []);
+  }, [user]);
 
   const fetchAnnouncements = async () => {
     setLoading(true);
     try {
-      const { data, error } = await callRpcFunction<Announcement[]>('get_active_announcements');
+      // Get the user's role and location if available
+      const userRole = user?.role || null;
+      const userLocation = user?.location || 'global'; // Default to global if not specified
+
+      const { data, error } = await callRpcFunction<Announcement[]>('get_active_announcements', {
+        p_user_role: userRole,
+        p_user_location: userLocation
+      });
 
       if (error) throw error;
 
@@ -73,12 +83,16 @@ const AnnouncementsFeed = () => {
   }
 
   return (
-    <Card className="border-l-4 border-l-zim-green overflow-hidden">
+    <Card className={`border-l-4 ${currentAnnouncement.is_critical ? 'border-l-red-500 bg-red-50/30' : 'border-l-zim-green'} overflow-hidden`}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
-            <Megaphone className="h-5 w-5 text-zim-green" />
-            Latest Updates
+            {currentAnnouncement.is_critical ? (
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+            ) : (
+              <Megaphone className="h-5 w-5 text-zim-green" />
+            )}
+            {currentAnnouncement.is_critical ? 'Important Notice' : 'Latest Updates'}
           </CardTitle>
           {totalPages > 1 && (
             <div className="flex items-center gap-1">
@@ -109,7 +123,7 @@ const AnnouncementsFeed = () => {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold">{currentAnnouncement.title}</h3>
-            <Badge variant="outline" className="text-xs">
+            <Badge variant="outline" className={`text-xs ${currentAnnouncement.is_critical ? 'bg-red-100 text-red-800 border-red-300' : ''}`}>
               {currentAnnouncement.category}
             </Badge>
           </div>

@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import HeroImage from '@/assets/hero.webp';
 import WhatsAppButton from '@/components/WhatsAppButton';
-import Announcements from '@/components/Announcements';
+import AnnouncementsFeed from '@/components/AnnouncementsFeed';
 
 const Home = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -93,7 +93,7 @@ const Home = () => {
 
       {/* Announcements Section */}
       <section className="py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <Announcements />
+        <AnnouncementsFeed />
       </section>
 
       {/* Services Section */}
