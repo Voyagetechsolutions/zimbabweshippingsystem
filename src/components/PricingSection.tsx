@@ -6,13 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 
 const PricingSection: React.FC = () => {
-  const standardPricingOptions = [
+  const drumShippingOptions = [
     {
       title: "Single Drum",
-      price: "£240",
+      price: "£260",
       description: "Perfect for sending a single drum of items to Zimbabwe",
       features: [
-        "1 standard drum",
+        "1 standard drum (200L)",
         "Real-time tracking",
         "Customs clearance",
         "SMS notifications",
@@ -23,7 +23,7 @@ const PricingSection: React.FC = () => {
     },
     {
       title: "Multiple Drums (2-4)",
-      price: "£240",
+      price: "£250",
       priceDetail: "per drum",
       description: "Multiple drum shipments",
       features: [
@@ -56,56 +56,6 @@ const PricingSection: React.FC = () => {
     }
   ];
 
-  const payLaterPricingOptions = [
-    {
-      title: "Single Drum (Pay Later)",
-      price: "£280",
-      description: "Pay within 30 days for a single drum",
-      features: [
-        "1 standard drum",
-        "Real-time tracking",
-        "Customs clearance",
-        "SMS notifications",
-        "Collection from UK address",
-        "30-day payment terms"
-      ],
-      buttonText: "Book Single Drum",
-      popular: false
-    },
-    {
-      title: "Multiple Drums (2-4)",
-      price: "£260",
-      priceDetail: "per drum",
-      description: "Pay within 30 days for multiple drums",
-      features: [
-        "2-4 standard drums",
-        "Real-time tracking",
-        "Customs clearance",
-        "SMS & Email notifications",
-        "Collection from UK address",
-        "30-day payment terms"
-      ],
-      buttonText: "Book Multiple Drums",
-      popular: false
-    },
-    {
-      title: "Bulk Shipping (5+)",
-      price: "£240",
-      priceDetail: "per drum",
-      description: "Pay within 30 days for bulk shipments",
-      features: [
-        "5+ standard drums",
-        "Real-time tracking",
-        "Customs clearance",
-        "SMS & Email notifications",
-        "Collection from UK address",
-        "30-day payment terms"
-      ],
-      buttonText: "Book Bulk Shipping",
-      popular: false
-    }
-  ];
-
   return (
     <section id="pricing" className="py-16 bg-white">
       <div className="container mx-auto px-4">
@@ -121,9 +71,9 @@ const PricingSection: React.FC = () => {
           </div>
         </div>
 
-        <h3 className="text-2xl font-semibold mb-6 text-center">Standard Payment Options</h3>
+        <h3 className="text-2xl font-semibold mb-6 text-center">Drum Shipping Options</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-          {standardPricingOptions.map((option, index) => (
+          {drumShippingOptions.map((option, index) => (
             <div key={index} className="relative flex flex-col h-full transition-transform duration-300 hover:translate-y-[-8px]">
               <Card className={`border h-full flex flex-col ${option.popular ? 'border-zim-yellow shadow-xl' : 'border-gray-200 shadow-lg'} relative`}>
                 {option.popular && (
@@ -168,43 +118,38 @@ const PricingSection: React.FC = () => {
           ))}
         </div>
 
-        <h3 className="text-2xl font-semibold mb-6 text-center">Pay Later Options (30-day Terms)</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {payLaterPricingOptions.map((option, index) => (
-            <div key={index} className="relative flex flex-col h-full transition-transform duration-300 hover:translate-y-[-8px]">
-              <Card className="border h-full flex flex-col border-gray-200 shadow-lg relative">
-                <CardHeader>
-                  <CardTitle className="text-2xl font-bold">{option.title}</CardTitle>
-                  <div className="mt-2 flex items-baseline">
-                    <span className="text-4xl font-bold">{option.price}</span>
-                    {option.priceDetail && <span className="text-gray-500 ml-1">{option.priceDetail}</span>}
-                  </div>
-                  <CardDescription className="mt-2 text-base">
-                    {option.description}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <ul className="space-y-3">
-                    {option.features.map((feature, featureIndex) => (
-                      <li key={featureIndex} className="flex items-center">
-                        <Check className="h-5 w-5 text-zim-green mr-2 flex-shrink-0" />
-                        <span className="text-gray-700">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-                <CardFooter>
-                  <Link to="/book-shipment" className="w-full">
-                    <Button 
-                      className="w-full bg-zim-green hover:bg-zim-green/90 text-white font-semibold"
-                    >
-                      {option.buttonText}
-                    </Button>
-                  </Link>
-                </CardFooter>
-              </Card>
-            </div>
-          ))}
+        <div className="text-center mb-10">
+          <h3 className="text-2xl font-semibold mb-6">Parcel Shipping</h3>
+          <div className="max-w-xl mx-auto bg-gray-50 p-8 rounded-lg shadow-md">
+            <p className="text-lg mb-4">For items not shipped in drums, we offer per-kilogram pricing:</p>
+            <p className="text-4xl font-bold text-zim-red mb-2">£10 per kg</p>
+            <p className="text-sm text-gray-500 mb-6">Minimum charge: £20</p>
+            
+            <ul className="text-left max-w-md mx-auto space-y-2 mb-6">
+              <li className="flex items-center">
+                <Check className="h-5 w-5 text-zim-green mr-2 flex-shrink-0" />
+                <span>Door-to-door delivery</span>
+              </li>
+              <li className="flex items-center">
+                <Check className="h-5 w-5 text-zim-green mr-2 flex-shrink-0" />
+                <span>Weight-based pricing</span>
+              </li>
+              <li className="flex items-center">
+                <Check className="h-5 w-5 text-zim-green mr-2 flex-shrink-0" />
+                <span>Tracking & notifications</span>
+              </li>
+              <li className="flex items-center">
+                <Check className="h-5 w-5 text-zim-green mr-2 flex-shrink-0" />
+                <span>Customs clearance</span>
+              </li>
+            </ul>
+            
+            <Link to="/book-shipment">
+              <Button className="bg-zim-green hover:bg-zim-green/90 text-white font-semibold">
+                Ship a Parcel
+              </Button>
+            </Link>
+          </div>
         </div>
 
         <div className="mt-12 text-center">
@@ -241,9 +186,9 @@ const PricingSection: React.FC = () => {
           </div>
           
           <div className="mt-8">
-            <Link to="/services">
+            <Link to="/pricing">
               <Button variant="outline" className="border-zim-green text-zim-green hover:bg-zim-green hover:text-white">
-                View Full Shipping Services
+                View Full Pricing Details
               </Button>
             </Link>
           </div>
