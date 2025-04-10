@@ -44,65 +44,140 @@ const Pricing = () => {
                 </TabsList>
                 
                 <TabsContent value="drums" className="mt-8">
-                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-                    <div className="p-6">
-                      <h3 className="text-2xl font-bold text-center mb-6">Drum Shipping Rates</h3>
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-1/3">Quantity</TableHead>
-                              <TableHead className="w-1/3">Price per Drum</TableHead>
-                              <TableHead className="w-1/3">Total Price</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            <TableRow>
-                              <TableCell className="font-medium">1 Drum</TableCell>
-                              <TableCell>£260</TableCell>
-                              <TableCell>£260</TableCell>
-                            </TableRow>
-                            <TableRow>
-                              <TableCell className="font-medium">2-4 Drums</TableCell>
-                              <TableCell>£250</TableCell>
-                              <TableCell>£500 - £1,000</TableCell>
-                            </TableRow>
-                            <TableRow>
-                              <TableCell className="font-medium">5+ Drums</TableCell>
-                              <TableCell>£220</TableCell>
-                              <TableCell>£1,100+</TableCell>
-                            </TableRow>
-                          </TableBody>
-                        </Table>
+                  <Tabs defaultValue="standard" className="w-full">
+                    <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-6">
+                      <TabsTrigger value="standard">Standard Payment</TabsTrigger>
+                      <TabsTrigger value="payLater">Pay Later (30 Days)</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="standard">
+                      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+                        <div className="p-6">
+                          <h3 className="text-2xl font-bold text-center mb-6">Standard Payment - Drum Shipping Rates</h3>
+                          <div className="overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="w-1/3">Quantity</TableHead>
+                                  <TableHead className="w-1/3">Price per Drum</TableHead>
+                                  <TableHead className="w-1/3">Total Price</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                <TableRow>
+                                  <TableCell className="font-medium">1 Drum</TableCell>
+                                  <TableCell>£260</TableCell>
+                                  <TableCell>£260</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell className="font-medium">2-4 Drums</TableCell>
+                                  <TableCell>£240</TableCell>
+                                  <TableCell>£480 - £960</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell className="font-medium">5+ Drums</TableCell>
+                                  <TableCell>£220</TableCell>
+                                  <TableCell>£1,100+</TableCell>
+                                </TableRow>
+                              </TableBody>
+                            </Table>
+                          </div>
+                          
+                          <div className="mt-8">
+                            <h4 className="text-lg font-semibold mb-4">What's Included:</h4>
+                            <ul className="space-y-2">
+                              <li className="flex items-start">
+                                <Check className="h-5 w-5 text-zim-green mr-2" />
+                                <span>200L Metal/Plastic Drums</span>
+                              </li>
+                              <li className="flex items-start">
+                                <Check className="h-5 w-5 text-zim-green mr-2" />
+                                <span>Door-to-door delivery</span>
+                              </li>
+                              <li className="flex items-start">
+                                <Check className="h-5 w-5 text-zim-green mr-2" />
+                                <span>Basic shipping insurance</span>
+                              </li>
+                              <li className="flex items-start">
+                                <Check className="h-5 w-5 text-zim-green mr-2" />
+                                <span>Tracking & notifications</span>
+                              </li>
+                              <li className="flex items-start">
+                                <Check className="h-5 w-5 text-zim-green mr-2" />
+                                <span>Customs clearance handling</span>
+                              </li>
+                            </ul>
+                          </div>
+                        </div>
                       </div>
-                      
-                      <div className="mt-8">
-                        <h4 className="text-lg font-semibold mb-4">What's Included:</h4>
-                        <ul className="space-y-2">
-                          <li className="flex items-start">
-                            <Check className="h-5 w-5 text-zim-green mr-2" />
-                            <span>200L Metal/Plastic Drums</span>
-                          </li>
-                          <li className="flex items-start">
-                            <Check className="h-5 w-5 text-zim-green mr-2" />
-                            <span>Door-to-door delivery</span>
-                          </li>
-                          <li className="flex items-start">
-                            <Check className="h-5 w-5 text-zim-green mr-2" />
-                            <span>Basic shipping insurance</span>
-                          </li>
-                          <li className="flex items-start">
-                            <Check className="h-5 w-5 text-zim-green mr-2" />
-                            <span>Tracking & notifications</span>
-                          </li>
-                          <li className="flex items-start">
-                            <Check className="h-5 w-5 text-zim-green mr-2" />
-                            <span>Customs clearance handling</span>
-                          </li>
-                        </ul>
+                    </TabsContent>
+                    
+                    <TabsContent value="payLater">
+                      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+                        <div className="p-6">
+                          <h3 className="text-2xl font-bold text-center mb-6">Pay Later (30 Days) - Drum Shipping Rates</h3>
+                          <div className="overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="w-1/3">Quantity</TableHead>
+                                  <TableHead className="w-1/3">Price per Drum</TableHead>
+                                  <TableHead className="w-1/3">Total Price</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                <TableRow>
+                                  <TableCell className="font-medium">1 Drum</TableCell>
+                                  <TableCell>£280</TableCell>
+                                  <TableCell>£280</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell className="font-medium">2-4 Drums</TableCell>
+                                  <TableCell>£260</TableCell>
+                                  <TableCell>£520 - £1,040</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                  <TableCell className="font-medium">5+ Drums</TableCell>
+                                  <TableCell>£240</TableCell>
+                                  <TableCell>£1,200+</TableCell>
+                                </TableRow>
+                              </TableBody>
+                            </Table>
+                          </div>
+                          
+                          <div className="mt-8">
+                            <h4 className="text-lg font-semibold mb-4">What's Included:</h4>
+                            <ul className="space-y-2">
+                              <li className="flex items-start">
+                                <Check className="h-5 w-5 text-zim-green mr-2" />
+                                <span>200L Metal/Plastic Drums</span>
+                              </li>
+                              <li className="flex items-start">
+                                <Check className="h-5 w-5 text-zim-green mr-2" />
+                                <span>Door-to-door delivery</span>
+                              </li>
+                              <li className="flex items-start">
+                                <Check className="h-5 w-5 text-zim-green mr-2" />
+                                <span>Basic shipping insurance</span>
+                              </li>
+                              <li className="flex items-start">
+                                <Check className="h-5 w-5 text-zim-green mr-2" />
+                                <span>Tracking & notifications</span>
+                              </li>
+                              <li className="flex items-start">
+                                <Check className="h-5 w-5 text-zim-green mr-2" />
+                                <span>Customs clearance handling</span>
+                              </li>
+                              <li className="flex items-start">
+                                <Check className="h-5 w-5 text-zim-yellow mr-2" />
+                                <span>30-day payment terms</span>
+                              </li>
+                            </ul>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    </TabsContent>
+                  </Tabs>
                 </TabsContent>
                 
                 <TabsContent value="parcels" className="mt-8">
