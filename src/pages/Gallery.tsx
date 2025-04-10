@@ -3,7 +3,14 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { GalleryImage, GalleryCategory } from '@/types/gallery';
+import { 
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
+import { GalleryImage, GalleryCategory, GalleryCategoryInfo } from '@/types/gallery';
 import { useToast } from '@/hooks/use-toast';
 import { Image as ImageIcon, Loader } from 'lucide-react';
 import { callRpcFunction } from '@/utils/supabaseUtils';
@@ -47,12 +54,12 @@ const Gallery = () => {
     ? images 
     : images.filter(image => image.category === activeCategory);
 
-  const categories: { value: GalleryCategory | 'all'; label: string }[] = [
-    { value: 'all', label: 'All' },
-    { value: 'facilities', label: 'Our Facilities' },
-    { value: 'shipments', label: 'Shipments' },
-    { value: 'team', label: 'Our Team' },
-    { value: 'customers', label: 'Happy Customers' },
+  const categories: { value: GalleryCategory | 'all'; label: string; icon: string }[] = [
+    { value: 'all', label: 'All', icon: 'images' },
+    { value: 'facilities', label: 'Our Facilities', icon: 'building' },
+    { value: 'shipments', label: 'Shipments', icon: 'package' },
+    { value: 'team', label: 'Our Team', icon: 'users' },
+    { value: 'customers', label: 'Happy Customers', icon: 'heart' },
   ];
 
   return (
@@ -88,25 +95,56 @@ const Gallery = () => {
                   <Loader className="h-12 w-12 animate-spin text-gray-400" />
                 </div>
               ) : filteredImages.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredImages.map((image) => (
-                    <div 
-                      key={image.id} 
-                      className="overflow-hidden rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300"
-                    >
-                      <div className="relative aspect-w-4 aspect-h-3">
-                        <img 
-                          src={image.src} 
-                          alt={image.alt} 
-                          className="object-cover w-full h-full transition-transform duration-300 hover:scale-105"
-                        />
+                <div className="space-y-12">
+                  {activeCategory === 'all' && (
+                    <Carousel className="w-full max-w-5xl mx-auto mb-12">
+                      <CarouselContent>
+                        {images.slice(0, 5).map((image) => (
+                          <CarouselItem key={`carousel-${image.id}`} className="md:basis-1/2 lg:basis-1/3">
+                            <div className="p-1">
+                              <div className="overflow-hidden rounded-lg shadow-md">
+                                <div className="relative aspect-w-4 aspect-h-3">
+                                  <img 
+                                    src={image.src} 
+                                    alt={image.alt} 
+                                    className="object-cover w-full h-64 transition-transform duration-300 hover:scale-105"
+                                  />
+                                </div>
+                                <div className="p-4 bg-white">
+                                  <p className="text-gray-800 font-medium">{image.caption}</p>
+                                  <p className="text-gray-500 text-sm mt-1 capitalize">{image.category}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </CarouselItem>
+                        ))}
+                      </CarouselContent>
+                      <CarouselPrevious className="left-0" />
+                      <CarouselNext className="right-0" />
+                    </Carousel>
+                  )}
+                
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredImages.map((image) => (
+                      <div 
+                        key={image.id} 
+                        className="overflow-hidden rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300"
+                      >
+                        <div className="relative aspect-w-4 aspect-h-3">
+                          <img 
+                            src={image.src} 
+                            alt={image.alt} 
+                            className="object-cover w-full h-64 transition-transform duration-300 hover:scale-105"
+                            loading="lazy"
+                          />
+                        </div>
+                        <div className="p-4 bg-white">
+                          <p className="text-gray-800 font-medium">{image.caption}</p>
+                          <p className="text-gray-500 text-sm mt-1 capitalize">{image.category}</p>
+                        </div>
                       </div>
-                      <div className="p-4 bg-white">
-                        <p className="text-gray-800 font-medium">{image.caption}</p>
-                        <p className="text-gray-500 text-sm mt-1 capitalize">{image.category}</p>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-20">

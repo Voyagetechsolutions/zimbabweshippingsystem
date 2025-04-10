@@ -16,8 +16,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Json } from '@/integrations/supabase/types';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { callRpcFunction } from '@/utils/supabaseUtils';
+import GalleryPopulator from '@/components/admin/GalleryPopulator';
 
 const GalleryAdmin = () => {
   const [images, setImages] = useState<GalleryImage[]>([]);
@@ -272,78 +272,112 @@ const GalleryAdmin = () => {
       <Navbar />
       <main className="flex-grow py-8 px-4">
         <div className="container mx-auto max-w-7xl">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-2xl">Gallery Management</CardTitle>
-              <CardDescription>Manage and organize images in the gallery</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 gap-4 mb-4 md:grid-cols-3">
-                <Input
-                  type="text"
-                  placeholder="Search images..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                />
-                <Select value={filterCategory} onValueChange={value => setFilterCategory(value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Filter by category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map(category => (
-                      <SelectItem key={category.value} value={category.value}>
-                        {category.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button onClick={handleOpenDialog}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Image
-                </Button>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+            <div className="md:col-span-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-2xl">Gallery Management</CardTitle>
+                  <CardDescription>Manage and organize images in the gallery</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 gap-4 mb-4 md:grid-cols-3">
+                    <Input
+                      type="text"
+                      placeholder="Search images..."
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                    />
+                    <Select value={filterCategory} onValueChange={value => setFilterCategory(value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Filter by category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map(category => (
+                          <SelectItem key={category.value} value={category.value}>
+                            {category.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button onClick={handleOpenDialog}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Image
+                    </Button>
+                  </div>
 
-              {isLoading ? (
-                <div className="flex justify-center items-center py-20">
-                  <RefreshCw className="h-12 w-12 animate-spin text-gray-400" />
-                </div>
-              ) : filteredImages.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredImages.map(image => (
-                    <div key={image.id} className="relative">
-                      <img
-                        src={image.src}
-                        alt={image.alt}
-                        className="object-cover w-full h-48 rounded-md shadow-md"
-                      />
-                      <div className="absolute top-2 right-2 flex space-x-2">
-                        <Button size="icon" variant="ghost" onClick={() => handleEditImage(image)}>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                        <Button size="icon" variant="destructive" onClick={() => handleDeleteImage(image.id || '')}>
-                          <Trash className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="mt-2">
-                        <p className="text-gray-800 font-medium">{image.caption}</p>
-                        <Badge variant="secondary" className="mt-1">{image.category}</Badge>
-                      </div>
+                  {isLoading ? (
+                    <div className="flex justify-center items-center py-20">
+                      <RefreshCw className="h-12 w-12 animate-spin text-gray-400" />
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-20">
-                  <FileImage className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-                  <h3 className="text-xl font-medium text-gray-600 mb-2">No images found</h3>
-                  <p className="text-gray-500">
-                    {searchQuery
-                      ? "No images match your search criteria."
-                      : "There are no gallery images available yet."}
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  ) : filteredImages.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {filteredImages.map(image => (
+                        <div key={image.id} className="relative">
+                          <img
+                            src={image.src}
+                            alt={image.alt}
+                            className="object-cover w-full h-48 rounded-md shadow-md"
+                          />
+                          <div className="absolute top-2 right-2 flex space-x-2">
+                            <Button size="icon" variant="ghost" onClick={() => handleEditImage(image)}>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                            <Button size="icon" variant="destructive" onClick={() => handleDeleteImage(image.id || '')}>
+                              <Trash className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="mt-2">
+                            <p className="text-gray-800 font-medium">{image.caption}</p>
+                            <Badge variant="secondary" className="mt-1">{image.category}</Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-20">
+                      <FileImage className="h-16 w-16 mx-auto text-gray-300 mb-4" />
+                      <h3 className="text-xl font-medium text-gray-600 mb-2">No images found</h3>
+                      <p className="text-gray-500">
+                        {searchQuery
+                          ? "No images match your search criteria."
+                          : "There are no gallery images available yet."}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+            
+            <div>
+              <GalleryPopulator />
+              
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle>Gallery Tips</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3 text-sm">
+                    <li className="flex">
+                      <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 text-amber-500" />
+                      <span>For best display, use images with a 4:3 or 16:9 aspect ratio</span>
+                    </li>
+                    <li className="flex">
+                      <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 text-amber-500" />
+                      <span>Optimize images before uploading for faster loading</span>
+                    </li>
+                    <li className="flex">
+                      <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 text-amber-500" />
+                      <span>Write descriptive alt text to improve accessibility</span>
+                    </li>
+                    <li className="flex">
+                      <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 text-amber-500" />
+                      <span>Keep captions concise and informative</span>
+                    </li>
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
       </main>
       <Footer />
