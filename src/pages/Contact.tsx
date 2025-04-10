@@ -1,297 +1,303 @@
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Phone, Mail, Clock, Send, CheckCircle2 } from 'lucide-react';
-import { useToast } from "@/hooks/use-toast";
-import WhatsAppButton from '@/components/WhatsAppButton';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Mail, Phone, MapPin, MessageSquare, Send, Check } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 const Contact = () => {
   const { toast } = useToast();
-  const { user } = useAuth();
-  
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    subject: 'general',
-    message: '',
+    phone: '',
+    subject: '',
+    message: ''
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
-  const handleSelectChange = (value: string) => {
-    setFormData(prev => ({ ...prev, subject: value }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    setSending(true);
     
-    try {
-      // Determine priority based on subject
-      let priority = 'Medium';
-      if (formData.subject === 'complaint' || formData.subject === 'support') {
-        priority = 'High';
-      } else if (formData.subject === 'feedback') {
-        priority = 'Low';
-      }
-      
-      // Create support ticket
-      const { data, error } = await supabase
-        .from('support_tickets')
-        .insert({
-          user_id: user?.id || '00000000-0000-0000-0000-000000000000', // Anonymous or user ID
-          subject: formData.subject === 'general' 
-            ? `General Inquiry from ${formData.name}`
-            : `${formData.subject.charAt(0).toUpperCase() + formData.subject.slice(1)} from ${formData.name}`,
-          message: `Email: ${formData.email}\n\n${formData.message}`,
-          status: 'Open',
-          priority: priority,
-        })
-        .select()
-        .single();
-        
-      if (error) throw error;
-      
-      console.log('Support ticket created:', data);
-      
-      setIsSubmitted(true);
-      
+    // Mock form submission
+    setTimeout(() => {
+      setSending(false);
+      setSubmitted(true);
       toast({
-        title: "Message Sent!",
-        description: "Thank you for contacting us. We'll get back to you shortly.",
+        title: "Message sent!",
+        description: "We'll get back to you as soon as possible.",
       });
-
-      // Reset form after submission
+      // Reset form
       setFormData({
         name: '',
         email: '',
-        subject: 'general',
-        message: '',
+        phone: '',
+        subject: '',
+        message: ''
       });
       
-      // Reset submitted state after 3 seconds
-      setTimeout(() => setIsSubmitted(false), 3000);
-      
-    } catch (error: any) {
-      console.error('Error submitting contact form:', error);
-      toast({
-        title: "Error submitting form",
-        description: error.message,
-        variant: "destructive"
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+      // Reset submitted state after a delay
+      setTimeout(() => setSubmitted(false), 3000);
+    }, 1500);
   };
-
-  const businessHours = [
-    { day: 'Monday', hours: '7:00 AM - 6:00 PM' },
-    { day: 'Tuesday', hours: '7:00 AM - 6:00 PM' },
-    { day: 'Wednesday', hours: '7:00 AM - 6:00 PM' },
-    { day: 'Thursday', hours: '7:00 AM - 6:00 PM' },
-    { day: 'Friday', hours: '7:00 AM - 6:00 PM' },
-    { day: 'Saturday', hours: '8:00 AM - 4:00 PM' },
-    { day: 'Sunday', hours: 'Closed' },
-  ];
-
-  const contactInfo = [
-    { 
-      icon: <Phone className="h-5 w-5 text-zim-green" />, 
-      title: 'Phone',
-      details: ['+44 7584 100552', '+263 772 123456'],
-      action: { label: 'Call Us', href: 'tel:+447584100552' }
-    },
-    { 
-      icon: <Mail className="h-5 w-5 text-zim-yellow" />, 
-      title: 'Email',
-      details: ['info@zimbabweshipping.com', 'support@zimbabweshipping.com'],
-      action: { label: 'Email Us', href: 'mailto:info@zimbabweshipping.com' }
-    },
-    { 
-      icon: <MapPin className="h-5 w-5 text-zim-red" />, 
-      title: 'Office',
-      details: ['Pastures Lodge Farm, Raunds Road', 'Chelveston, Wellingborough, NN9 6AA'],
-      action: { label: 'Get Directions', href: 'https://maps.google.com' }
-    },
-  ];
 
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      
-      <div className="bg-zim-green/10 py-12">
-        <div className="container mx-auto px-4 text-center">
-          <h1 className="text-4xl font-bold mb-4">Contact Us</h1>
-          <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-            Have questions or need assistance with your shipment? Get in touch with our friendly team.
-          </p>
-        </div>
-      </div>
-      
-      <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-          <div className="lg:col-span-3">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-2xl">Send Us a Message</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isSubmitted ? (
-                  <div className="text-center p-6">
-                    <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                      <CheckCircle2 className="h-6 w-6 text-green-600" />
-                    </div>
-                    <h3 className="text-xl font-semibold mb-2">Message Received!</h3>
-                    <p className="text-gray-600">
-                      Thank you for contacting us. Our team will get back to you as soon as possible.
-                    </p>
-                  </div>
-                ) : (
-                  <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Your Name</Label>
-                        <Input 
-                          id="name" 
-                          name="name" 
-                          placeholder="Enter your name"
-                          value={formData.name}
-                          onChange={handleInputChange}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email Address</Label>
-                        <Input 
-                          id="email" 
-                          name="email" 
-                          type="email" 
-                          placeholder="Enter your email"
-                          value={formData.email}
-                          onChange={handleInputChange}
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="subject">Subject</Label>
-                      <Select 
-                        value={formData.subject} 
-                        onValueChange={handleSelectChange}
-                      >
-                        <SelectTrigger id="subject">
-                          <SelectValue placeholder="Select a subject" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="general">General Inquiry</SelectItem>
-                          <SelectItem value="shipping">Shipping Question</SelectItem>
-                          <SelectItem value="tracking">Tracking Issue</SelectItem>
-                          <SelectItem value="support">Technical Support</SelectItem>
-                          <SelectItem value="feedback">Feedback</SelectItem>
-                          <SelectItem value="complaint">Complaint</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="message">Message</Label>
-                      <Textarea 
-                        id="message" 
-                        name="message" 
-                        placeholder="Enter your message here" 
-                        rows={6}
-                        value={formData.message}
-                        onChange={handleInputChange}
-                        required
-                      />
-                    </div>
-                    <Button 
-                      type="submit" 
-                      className="w-full bg-zim-green hover:bg-zim-green/90"
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <Send className="mr-2 h-4 w-4 animate-spin" />
-                          Sending...
-                        </>
-                      ) : (
-                        <>
-                          <Send className="mr-2 h-4 w-4" />
-                          Send Message
-                        </>
-                      )}
-                    </Button>
-                  </form>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-          
-          <div className="lg:col-span-2 space-y-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Contact Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {contactInfo.map((info, index) => (
-                  <div key={index} className="flex">
-                    <div className="bg-gray-100 p-3 rounded-full self-start mr-4">
-                      {info.icon}
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg">{info.title}</h3>
-                      {info.details.map((detail, i) => (
-                        <p key={i} className="text-gray-600">{detail}</p>
-                      ))}
-                      <a 
-                        href={info.action.href} 
-                        className="text-zim-green hover:underline mt-2 inline-block"
-                      >
-                        {info.action.label}
-                      </a>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+      <main className="flex-grow">
+        <div className="bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 py-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center">
+              <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+                Contact Us
+              </h1>
+              <p className="text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+                Get in touch with our team for inquiries, quotes, or support
+              </p>
+              <div className="flex justify-center mt-6">
+                <div className="h-1 w-20 bg-zim-green rounded-full mx-1"></div>
+                <div className="h-1 w-20 bg-zim-yellow rounded-full mx-1"></div>
+                <div className="h-1 w-20 bg-zim-red rounded-full mx-1"></div>
+              </div>
+            </div>
             
-            <Card>
-              <CardHeader>
-                <CardTitle>Business Hours</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {businessHours.map((item, index) => (
-                    <div key={index} className="flex justify-between">
-                      <div className="font-medium">{item.day}</div>
-                      <div className={item.hours === 'Closed' ? 'text-red-500' : 'text-gray-600'}>
-                        {item.hours}
+            <div className="mt-16 grid grid-cols-1 lg:grid-cols-2 gap-12">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+                <div className="p-8">
+                  <h2 className="text-2xl font-bold mb-6">Send Us a Message</h2>
+                  
+                  {submitted ? (
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mb-4">
+                        <Check className="h-8 w-8 text-green-600 dark:text-green-300" />
+                      </div>
+                      <h3 className="text-xl font-semibold mb-2">Message Sent!</h3>
+                      <p className="text-gray-600 dark:text-gray-300 text-center">
+                        Thank you for contacting us. We'll get back to you as soon as possible.
+                      </p>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label htmlFor="name" className="block text-sm font-medium mb-2">
+                            Your Name
+                          </label>
+                          <Input
+                            id="name"
+                            name="name"
+                            value={formData.name}
+                            onChange={handleChange}
+                            required
+                            placeholder="John Doe"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="email" className="block text-sm font-medium mb-2">
+                            Email Address
+                          </label>
+                          <Input
+                            id="email"
+                            name="email"
+                            type="email"
+                            value={formData.email}
+                            onChange={handleChange}
+                            required
+                            placeholder="john@example.com"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label htmlFor="phone" className="block text-sm font-medium mb-2">
+                            Phone Number (Optional)
+                          </label>
+                          <Input
+                            id="phone"
+                            name="phone"
+                            value={formData.phone}
+                            onChange={handleChange}
+                            placeholder="+44 7123 456789"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="subject" className="block text-sm font-medium mb-2">
+                            Subject
+                          </label>
+                          <Input
+                            id="subject"
+                            name="subject"
+                            value={formData.subject}
+                            onChange={handleChange}
+                            required
+                            placeholder="Shipping Inquiry"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label htmlFor="message" className="block text-sm font-medium mb-2">
+                          Your Message
+                        </label>
+                        <Textarea
+                          id="message"
+                          name="message"
+                          value={formData.message}
+                          onChange={handleChange}
+                          required
+                          rows={5}
+                          placeholder="Enter your message here..."
+                        />
+                      </div>
+                      
+                      <Button
+                        type="submit"
+                        className="bg-zim-red hover:bg-zim-red/90 text-white w-full"
+                        disabled={sending}
+                      >
+                        {sending ? (
+                          <div className="flex items-center">
+                            <div className="animate-spin mr-2 h-5 w-5 border-t-2 border-white rounded-full" />
+                            Sending...
+                          </div>
+                        ) : (
+                          <div className="flex items-center">
+                            <Send className="mr-2 h-4 w-4" /> Send Message
+                          </div>
+                        )}
+                      </Button>
+                    </form>
+                  )}
+                </div>
+              </div>
+              
+              <div>
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden mb-8">
+                  <div className="p-8">
+                    <h2 className="text-2xl font-bold mb-6">Contact Information</h2>
+                    
+                    <div className="space-y-6">
+                      <div className="flex items-start">
+                        <div className="w-12 h-12 rounded-full bg-zim-red/10 flex items-center justify-center mr-4">
+                          <MapPin className="h-6 w-6 text-zim-red" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg mb-1">Office Address</h3>
+                          <p className="text-gray-600 dark:text-gray-300">
+                            Pastures Lodge Farm, Raunds Road<br />
+                            Chelveston, Wellingborough<br />
+                            Northamptonshire, NN9 6AA
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start">
+                        <div className="w-12 h-12 rounded-full bg-zim-yellow/10 flex items-center justify-center mr-4">
+                          <Phone className="h-6 w-6 text-zim-yellow" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg mb-1">Phone Number</h3>
+                          <p className="text-gray-600 dark:text-gray-300">
+                            <a href="tel:+447584100552" className="hover:text-zim-yellow transition-colors">
+                              +44 7584 100552
+                            </a>
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start">
+                        <div className="w-12 h-12 rounded-full bg-zim-green/10 flex items-center justify-center mr-4">
+                          <Mail className="h-6 w-6 text-zim-green" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg mb-1">Email Address</h3>
+                          <p className="text-gray-600 dark:text-gray-300">
+                            <a href="mailto:info@zimbabweshipping.com" className="hover:text-zim-green transition-colors">
+                              info@zimbabweshipping.com
+                            </a>
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start">
+                        <div className="w-12 h-12 rounded-full bg-green-600/10 flex items-center justify-center mr-4">
+                          <MessageSquare className="h-6 w-6 text-green-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg mb-1">WhatsApp Support</h3>
+                          <p className="text-gray-600 dark:text-gray-300">
+                            <a 
+                              href="https://wa.me/447584100552" 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="hover:text-green-600 transition-colors"
+                            >
+                              +44 7584 100552
+                            </a>
+                          </p>
+                          <a 
+                            href="https://wa.me/447584100552" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md mt-2"
+                          >
+                            <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
+                            </svg>
+                            Chat on WhatsApp
+                          </a>
+                        </div>
                       </div>
                     </div>
-                  ))}
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+                
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+                  <div className="p-8">
+                    <h2 className="text-2xl font-bold mb-6">Business Hours</h2>
+                    
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="font-medium">Monday - Friday</span>
+                        <span>9:00 AM - 6:00 PM</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium">Saturday</span>
+                        <span>10:00 AM - 4:00 PM</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium">Sunday</span>
+                        <span>Closed</span>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                      <p className="text-gray-600 dark:text-gray-300">
+                        For urgent matters outside business hours, please use our WhatsApp support or email us.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-      
+      </main>
       <Footer />
-      <WhatsAppButton />
     </div>
   );
 };
