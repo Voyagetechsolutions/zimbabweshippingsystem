@@ -47,6 +47,7 @@ const SupportTicketForm: React.FC = () => {
     setIsSubmitting(true);
 
     try {
+      // Create the support ticket
       const { data, error } = await supabase
         .from('support_tickets')
         .insert({
@@ -54,12 +55,32 @@ const SupportTicketForm: React.FC = () => {
           subject: formData.subject,
           message: formData.message,
           priority: formData.priority,
-          status: 'Open'
+          status: 'Open',
+          // Add email to the metadata if user is not logged in
+          ...(user ? {} : { metadata: { 
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            email: formData.email 
+          }})
         })
         .select('id')
         .single();
 
       if (error) throw error;
+      
+      // Create notification for admins about the new ticket
+      const { error: notificationError } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: 'system', // This can be filtered on the admin side
+          title: 'New Support Ticket',
+          message: `A new support ticket #${data.id.substring(0, 8)} has been created: ${formData.subject}`,
+          type: 'support',
+          related_id: data.id,
+          is_read: false,
+        });
+      
+      if (notificationError) console.error("Error creating notification:", notificationError);
       
       toast({
         title: "Support ticket created",

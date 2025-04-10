@@ -184,10 +184,10 @@ const Pricing = () => {
                   <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
                     <div className="p-6">
                       <h3 className="text-2xl font-bold text-center mb-6">Parcel Shipping Rates</h3>
-                      <p className="text-center mb-6">For all other items not shipped in drums, we charge per kilogram:</p>
+                      <p className="text-center mb-6">For all other items not shipped in drums, we charge based on volume:</p>
                       
                       <div className="bg-gray-50 dark:bg-gray-700 p-8 rounded-lg text-center mb-8">
-                        <p className="text-3xl font-bold text-zim-red">£10 per kg</p>
+                        <p className="text-3xl font-bold text-zim-red">£15 per cubic meter</p>
                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Minimum charge: £20</p>
                       </div>
                       
@@ -200,7 +200,7 @@ const Pricing = () => {
                           </li>
                           <li className="flex items-start">
                             <Check className="h-5 w-5 text-zim-green mr-2" />
-                            <span>Weight-based pricing</span>
+                            <span>Volume-based pricing</span>
                           </li>
                           <li className="flex items-start">
                             <Check className="h-5 w-5 text-zim-green mr-2" />

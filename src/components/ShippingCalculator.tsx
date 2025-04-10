@@ -14,6 +14,7 @@ const ShippingCalculator: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>("drum");
   const [drumQuantity, setDrumQuantity] = useState<string>("1");
   const [paymentType, setPaymentType] = useState<string>("standard");
+  const [volume, setVolume] = useState<string>("1");
   const [additionalServices, setAdditionalServices] = useState({
     doorToDoor: false
   });
@@ -36,9 +37,9 @@ const ShippingCalculator: React.FC = () => {
         if (qty >= 5) {
           basePrice = qty * 220;
         } else if (qty >= 2) {
-          basePrice = qty * 240; // Updated to £240 per drum
+          basePrice = qty * 240;
         } else {
-          basePrice = 240; // Updated to £240 for single drum
+          basePrice = 260;
         }
       } else {
         // Pay later prices (30-day terms)
@@ -50,6 +51,10 @@ const ShippingCalculator: React.FC = () => {
           basePrice = 280;
         }
       }
+    } else {
+      // For parcels, calculate based on volume (cubic meters)
+      const volumeValue = parseFloat(volume);
+      basePrice = Math.max(volumeValue * 15, 20); // £15 per cubic meter with £20 minimum
     }
     
     // Add price for additional services
@@ -134,7 +139,7 @@ const ShippingCalculator: React.FC = () => {
                     <div className="font-medium mb-2 dark:text-white">Pricing Tiers:</div>
                     {paymentType === "standard" ? (
                       <ul className="space-y-1 list-disc pl-5 dark:text-gray-200">
-                        <li>1 Drum: {formatPrice(240)} each</li>
+                        <li>1 Drum: {formatPrice(260)} each</li>
                         <li>2-4 Drums: {formatPrice(240)} each</li>
                         <li>5+ Drums: {formatPrice(220)} each</li>
                       </ul>
@@ -150,8 +155,30 @@ const ShippingCalculator: React.FC = () => {
                 </TabsContent>
                 
                 <TabsContent value="other" className="space-y-6">
+                  <div>
+                    <Label htmlFor="volume">Volume (cubic meters)</Label>
+                    <Select value={volume} onValueChange={setVolume}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select volume" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5].map(vol => (
+                          <SelectItem key={vol} value={vol.toString()}>
+                            {vol} m³
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
                   <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-md">
-                    <h3 className="font-medium mb-2 dark:text-white">Items We Ship:</h3>
+                    <div className="font-medium mb-2 dark:text-white">Volume-Based Pricing:</div>
+                    <ul className="space-y-1 list-disc pl-5 dark:text-gray-200">
+                      <li>{formatPrice(15)} per cubic meter</li>
+                      <li>Minimum charge: {formatPrice(20)}</li>
+                    </ul>
+                    
+                    <h3 className="font-medium text-sm mt-4 mb-1 dark:text-white">Items We Ship:</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                       <div>
                         <h4 className="font-medium text-sm mb-1 dark:text-white">Household Items:</h4>
@@ -210,7 +237,7 @@ const ShippingCalculator: React.FC = () => {
                 </div>
               </Tabs>
               
-              {activeTab === 'drum' && (
+              {(activeTab === 'drum' || activeTab === 'other') && (
                 <div className="mt-8 p-6 bg-gray-50 dark:bg-gray-800 rounded-lg border dark:border-gray-700">
                   <div className="flex justify-between items-center pb-3 border-b dark:border-gray-700">
                     <span className="font-medium dark:text-white">Base Shipping Cost:</span>
