@@ -379,12 +379,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       <Card>
         <CardHeader>
           <CardTitle>Delivery Information (Zimbabwe)</CardTitle>
-          <CardDescription>Recipient details in Zimbabwe</CardDescription>
+          <CardDescription>Receiver details in Zimbabwe</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="recipientName">Recipient Name</Label>
+              <Label htmlFor="recipientName">Receiver Name</Label>
               <Input 
                 id="recipientName"
                 name="recipientName"
@@ -395,7 +395,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="recipientPhone">Recipient Phone</Label>
+              <Label htmlFor="recipientPhone">Receiver Phone</Label>
               <Input 
                 id="recipientPhone"
                 name="recipientPhone"
