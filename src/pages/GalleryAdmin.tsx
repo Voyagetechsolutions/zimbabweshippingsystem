@@ -34,7 +34,6 @@ const GalleryAdmin = () => {
   const [filterCategory, setFilterCategory] = useState('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   useEffect(() => {
     fetchGalleryImages();
@@ -44,7 +43,6 @@ const GalleryAdmin = () => {
     try {
       setIsLoading(true);
       
-      // Use the RPC function instead of directly accessing the gallery table
       const { data, error } = await callRpcFunction('get_gallery_images');
       
       if (error) {
@@ -52,7 +50,6 @@ const GalleryAdmin = () => {
       }
       
       if (data) {
-        // Properly cast the Json[] to GalleryImage[]
         setImages(data as unknown as GalleryImage[]);
       }
     } catch (error: any) {
@@ -110,16 +107,13 @@ const GalleryAdmin = () => {
 
     try {
       setIsLoading(true);
-      // Use the RPC function to delete the image
       const { data, error } = await callRpcFunction('delete_gallery_image', { p_id: id });
 
       if (error) {
         throw error;
       }
 
-      // Check if the deletion was successful
       if (data) {
-        // Remove the deleted image from the state
         setImages(prevImages => prevImages.filter(image => image.id !== id));
         toast({
           title: 'Success',
@@ -146,8 +140,6 @@ const GalleryAdmin = () => {
 
     try {
       if (isEditing && selectedImage) {
-        // For editing, we need to use a direct approach since there's no RPC for updating
-        // This is where we might need to handle things differently in the future
         const { data: updatedData, error: updateError } = await callRpcFunction('update_gallery_image', {
           p_id: selectedImage.id,
           p_src: formData.src,
@@ -160,7 +152,6 @@ const GalleryAdmin = () => {
           throw updateError;
         }
 
-        // Refresh the gallery images
         await fetchGalleryImages();
         
         toast({
@@ -168,7 +159,6 @@ const GalleryAdmin = () => {
           description: 'Image updated successfully.',
         });
       } else {
-        // For insertion, use the insert_gallery_image RPC function
         const { data: newImage, error: insertError } = await callRpcFunction('insert_gallery_image', {
           p_src: formData.src,
           p_alt: formData.alt,
@@ -180,7 +170,6 @@ const GalleryAdmin = () => {
           throw insertError;
         }
 
-        // Refresh the gallery images
         await fetchGalleryImages();
 
         toast({
@@ -230,7 +219,6 @@ const GalleryAdmin = () => {
         throw error;
       }
 
-      // Construct the public URL for the uploaded file
       const imageUrl = `https://oncsaunsqtekwwbzvvyh.supabase.co/storage/v1/object/public/images/${filePath}`;
       setFormData(prev => ({ ...prev, src: imageUrl }));
       toast({
