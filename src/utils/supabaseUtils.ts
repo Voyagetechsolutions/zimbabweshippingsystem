@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Json } from '@/integrations/supabase/types';
 
@@ -56,4 +55,20 @@ export const deleteStorageFile = async (bucket: string, path: string) => {
   return supabase.storage
     .from(bucket)
     .remove([path]);
+};
+
+// Add a helper function to get the current authenticated user
+export const getCurrentUser = async () => {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) {
+    console.error('Error getting current user:', error);
+    return null;
+  }
+  return data?.user || null;
+};
+
+// Add a function to check if the user is authenticated
+export const isAuthenticated = async () => {
+  const user = await getCurrentUser();
+  return !!user;
 };
