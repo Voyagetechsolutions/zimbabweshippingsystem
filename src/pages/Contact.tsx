@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -7,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Mail, Phone, MapPin, MessageSquare, Send, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const Contact = () => {
   const { toast } = useToast();
@@ -28,18 +28,53 @@ const Contact = () => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSending(true);
     
-    // Mock form submission
-    setTimeout(() => {
+    try {
+      // Create support ticket from contact form
+      const { data, error } = await supabase
+        .from('support_tickets')
+        .insert({
+          user_id: 'contact-form', // Special ID for contact form submissions
+          subject: formData.subject,
+          message: `Email: ${formData.email}\nPhone: ${formData.phone || 'Not provided'}\n\n${formData.message}`,
+          priority: 'Medium',
+          status: 'Open',
+          metadata: { 
+            firstName: formData.name.split(' ')[0],
+            lastName: formData.name.split(' ').slice(1).join(' '),
+            email: formData.email,
+            phone: formData.phone
+          }
+        })
+        .select('id')
+        .single();
+
+      if (error) throw error;
+      
+      // Create notification for admins about the new contact form submission
+      const { error: notificationError } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: 'system', // This can be filtered on the admin side
+          title: 'New Contact Form Submission',
+          message: `A new contact form submission from ${formData.name}: ${formData.subject}`,
+          type: 'support',
+          related_id: data.id,
+          is_read: false,
+        });
+      
+      if (notificationError) console.error("Error creating notification:", notificationError);
+      
       setSending(false);
       setSubmitted(true);
       toast({
         title: "Message sent!",
         description: "We'll get back to you as soon as possible.",
       });
+      
       // Reset form
       setFormData({
         name: '',
@@ -51,7 +86,15 @@ const Contact = () => {
       
       // Reset submitted state after a delay
       setTimeout(() => setSubmitted(false), 3000);
-    }, 1500);
+    } catch (error: any) {
+      console.error("Error submitting contact form:", error);
+      setSending(false);
+      toast({
+        title: "Error sending message",
+        description: error.message || "An error occurred. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (

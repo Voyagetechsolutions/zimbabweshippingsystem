@@ -48,6 +48,7 @@ import {
   Filter,
   Inbox,
   Send,
+  Mail,
 } from "lucide-react";
 import { format, formatDistance } from 'date-fns';
 
@@ -76,6 +77,7 @@ const SupportTickets = () => {
   const fetchTickets = async () => {
     setLoading(true);
     try {
+      console.info("Fetching support tickets...");
       const { data, error } = await (supabase
         .from('support_tickets' as any)
         .select('*')
@@ -83,22 +85,33 @@ const SupportTickets = () => {
 
       if (error) throw error;
       
+      console.info("Fetched tickets:", data);
+      
       if (data) {
-        // Get user information for each ticket
         const ticketsWithUsers = await Promise.all(
           data.map(async (ticket: any) => {
-            // Fetch user profile information
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('email, full_name')
-              .eq('id', ticket.user_id)
-              .single();
-            
-            return {
-              ...ticket,
-              user_email: profileData?.email || 'Unknown',
-              user_name: profileData?.full_name || 'Unknown User'
-            };
+            if (ticket.user_id === 'contact-form') {
+              const metadata = ticket.metadata || {};
+              return {
+                ...ticket,
+                user_email: metadata.email || 'Unknown',
+                user_name: `${metadata.firstName || ''} ${metadata.lastName || ''}`.trim() || 'Unknown User',
+                is_contact_form: true
+              };
+            } else {
+              const { data: profileData } = await supabase
+                .from('profiles')
+                .select('email, full_name')
+                .eq('id', ticket.user_id)
+                .single();
+              
+              return {
+                ...ticket,
+                user_email: profileData?.email || 'Unknown',
+                user_name: profileData?.full_name || 'Unknown User',
+                is_contact_form: false
+              };
+            }
           })
         );
         
@@ -127,10 +140,8 @@ const SupportTickets = () => {
       if (error) throw error;
       
       if (data) {
-        // Get user information for each response
         const responsesWithUsers = await Promise.all(
           data.map(async (response: any) => {
-            // Fetch user profile information
             const { data: profileData } = await supabase
               .from('profiles')
               .select('email, full_name')
@@ -167,7 +178,6 @@ const SupportTickets = () => {
     
     setSendingResponse(true);
     try {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -185,10 +195,8 @@ const SupportTickets = () => {
       
       if (error) throw error;
       
-      // Refresh responses
       await fetchTicketResponses(viewingTicket.id);
       
-      // Clear response field
       setNewResponse('');
       
       toast({
@@ -222,13 +230,11 @@ const SupportTickets = () => {
       
       if (error) throw error;
       
-      // Update local state
       setViewingTicket({
         ...viewingTicket,
         status
       });
       
-      // Update in the tickets list
       setTickets(prevTickets =>
         prevTickets.map(ticket =>
           ticket.id === viewingTicket.id ? { ...ticket, status } : ticket
@@ -251,7 +257,6 @@ const SupportTickets = () => {
     }
   };
 
-  // Get status badge color
   const getStatusBadgeClass = (status: string) => {
     switch (status.toLowerCase()) {
       case 'open':
@@ -269,7 +274,6 @@ const SupportTickets = () => {
     }
   };
 
-  // Get priority badge color
   const getPriorityBadgeClass = (priority: string) => {
     switch (priority.toLowerCase()) {
       case 'high':
@@ -283,7 +287,6 @@ const SupportTickets = () => {
     }
   };
 
-  // Filter tickets
   const filteredTickets = tickets.filter(ticket => {
     const matchesSearch = 
       searchQuery === '' ||
@@ -377,7 +380,14 @@ const SupportTickets = () => {
                 <TableBody>
                   {filteredTickets.map((ticket) => (
                     <TableRow key={ticket.id}>
-                      <TableCell className="font-medium">{ticket.subject}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center">
+                          {ticket.is_contact_form && (
+                            <Mail className="h-4 w-4 mr-2 text-blue-500" />
+                          )}
+                          {ticket.subject}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Badge className={getStatusBadgeClass(ticket.status)}>
                           {ticket.status}
@@ -418,16 +428,27 @@ const SupportTickets = () => {
         </CardContent>
       </Card>
 
-      {/* Ticket Details Dialog */}
       {viewingTicket && (
         <Dialog open={!!viewingTicket} onOpenChange={(open) => !open && setViewingTicket(null)}>
           <DialogContent className="sm:max-w-[750px]">
             <DialogHeader>
-              <DialogTitle>{viewingTicket.subject}</DialogTitle>
+              <DialogTitle>
+                <div className="flex items-center gap-2">
+                  {viewingTicket.is_contact_form && (
+                    <Mail className="h-5 w-5 text-blue-500" />
+                  )}
+                  {viewingTicket.subject}
+                </div>
+              </DialogTitle>
               <DialogDescription>
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-gray-500" />
                   <span>{viewingTicket.user_name}</span>
+                  {viewingTicket.is_contact_form && (
+                    <Badge className="bg-blue-100 text-blue-800 border-blue-300">
+                      Contact Form
+                    </Badge>
+                  )}
                   <Badge className={getStatusBadgeClass(viewingTicket.status)}>
                     {viewingTicket.status}
                   </Badge>
