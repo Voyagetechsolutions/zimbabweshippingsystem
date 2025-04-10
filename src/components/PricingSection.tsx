@@ -10,7 +10,7 @@ const PricingSection: React.FC = () => {
   const standardPricingOptions = [
     {
       title: "Single Drum",
-      price: "£240",
+      price: "£260",
       description: "Perfect for sending a single drum of items to Zimbabwe",
       features: [
         "1 standard drum",
