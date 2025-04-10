@@ -1,3 +1,4 @@
+
 export interface Role {
   id: string;
   name: string;
@@ -43,6 +44,8 @@ export interface Ticket {
   updated_at: string;
   user_email?: string;
   user_name?: string;
+  metadata?: any;
+  is_contact_form?: boolean;
 }
 
 // Ticket response interface
