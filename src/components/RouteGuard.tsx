@@ -26,7 +26,6 @@ export const RequireAuth = React.memo(({ children, requiredRole }: RequireAuthPr
     );
   }
 
-  // Always call useEffect, regardless of conditions
   useEffect(() => {
     if (!user) {
       toast({
@@ -71,7 +70,6 @@ export const RequireAdmin = React.memo(({ children }: { children: JSX.Element })
     );
   }
 
-  // Always call useEffect, regardless of conditions
   useEffect(() => {
     if (!user) {
       toast({
@@ -113,9 +111,8 @@ export const RedirectIfAuthenticated = React.memo(({ children }: { children: JSX
   // Get the intended destination from state, or default to home page
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
 
-  // Always call useEffect, regardless of conditions
+  // Always define hooks at the top level, never conditionally
   useEffect(() => {
-    // Using a conditional inside useEffect is safe
     if (user) {
       toast({
         title: "Already authenticated",
