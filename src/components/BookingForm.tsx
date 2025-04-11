@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -24,13 +23,11 @@ import {
 } from '@/data/collectionSchedule';
 import { Package, Truck, AlertTriangle, CreditCard, PoundSterling, Banknote, CreditCard as CreditCardIcon } from 'lucide-react';
 
-// List of restricted rural areas
 const RESTRICTED_RURAL_AREAS = [
   'Binga', 'Gokwe', 'Beitbridge Outskirts', 'Chipinge Rural', 'Mutare Rural', 
   'Rushinga', 'Muzarabani', 'Mbire', 'Centenary', 'Chiredzi Rural', 'Mwenezi'
 ];
 
-// List of shipping items
 const SHIPPING_ITEMS = [
   'Bicycle', 'Bin', 'Plastic Tubs', 'Washing Machine', 'Dishwasher', 'Dryer', 'Ironing Board', 
   'Wheelchair', 'Adult Walking Aid', 'Mobility Scooter', 'Car Wheels/Tyres', 'Sofas', 'Chairs', 
@@ -43,7 +40,6 @@ const SHIPPING_ITEMS = [
   'Deep Freezer', 'Water Pump', 'Heater', 'Air Conditioner', 'Office Equipment', 'Building Equipment', 'Ladder'
 ];
 
-// Categorized shipping items
 const CATEGORIZED_SHIPPING_ITEMS = {
   'Furniture': ['Sofas', 'Chairs', 'Dining Chairs', 'Dining Table', 'Coffee Table', 'Beds', 'Dismantled Wardrobe', 'Chest of Drawers', 'Dressing Unit'],
   'Household Appliances': ['Washing Machine', 'Dishwasher', 'Dryer', 'American Fridge', 'Standard Fridge Freezer', 'Deep Freezer', 'Heater', 'Air Conditioner'],
@@ -98,12 +94,13 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const [ruralAreaWarning, setRuralAreaWarning] = useState(false);
   const [showOtherItemInput, setShowOtherItemInput] = useState(false);
   const [paymentTab, setPaymentTab] = useState('immediate');
+  const [detectedRoute, setDetectedRoute] = useState<string | null>(null);
+  const [pickupDateFromRoute, setPickupDateFromRoute] = useState<string>('');
+  const [isRestrictedArea, setIsRestrictedArea] = useState(false);
 
-  // Calculate the total amount
   const calculateAmount = () => {
     let baseAmount = 0;
     
-    // Base pricing
     if (formData.shipmentType === 'drum') {
       const quantity = parseInt(formData.drumQuantity);
       if (quantity === 1) {
@@ -116,19 +113,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     } else if (formData.shipmentType === 'parcel' && formData.weight) {
       baseAmount = parseFloat(formData.weight) * 50;
     } else if (formData.shipmentType === 'other' && formData.otherItems.length > 0) {
-      // Each item is £100 base price
       baseAmount = formData.otherItems.length * 100;
     }
     
-    // Add door-to-door delivery fee
     baseAmount += 25;
     
-    // Payment options
     if (formData.paymentOption === 'onArrival') {
-      // Add 20% premium for Pay on Goods Arriving
       baseAmount = baseAmount * 1.2;
     } else if (formData.paymentOption === 'immediate' && formData.paymentMethod === 'cash') {
-      // 5% discount for cash payment on collection
       baseAmount = baseAmount * 0.95;
     }
     
@@ -157,7 +149,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     loadData();
   }, [formData.selectedRoute]);
 
-  // Check for rural areas in delivery address
   useEffect(() => {
     const checkRuralArea = () => {
       const addressText = `${formData.deliveryAddress} ${formData.deliveryCity}`.toLowerCase();
@@ -171,6 +162,43 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     checkRuralArea();
   }, [formData.deliveryAddress, formData.deliveryCity]);
 
+  useEffect(() => {
+    if (formData.pickupPostcode) {
+      const { getRouteForPostalCode, isRestrictedPostalCode } = require('@/utils/postalCodeUtils');
+      
+      const restricted = isRestrictedPostalCode(formData.pickupPostcode);
+      setIsRestrictedArea(restricted);
+      
+      if (!restricted) {
+        const route = getRouteForPostalCode(formData.pickupPostcode);
+        setDetectedRoute(route);
+        
+        if (route) {
+          setFormData(prev => ({ ...prev, selectedRoute: route }));
+          
+          const areas = getAreasByRoute(route);
+          setAvailableAreas(areas);
+          
+          const date = getDateByRoute(route);
+          setPickupDateFromRoute(date);
+          setPickupDate(date);
+        } else {
+          setAvailableAreas([]);
+          setPickupDateFromRoute('');
+        }
+      } else {
+        setDetectedRoute(null);
+        setAvailableAreas([]);
+        setPickupDateFromRoute('');
+      }
+    } else {
+      setDetectedRoute(null);
+      setIsRestrictedArea(false);
+      setAvailableAreas([]);
+      setPickupDateFromRoute('');
+    }
+  }, [formData.pickupPostcode]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -179,7 +207,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const handleSelectChange = (name: string, value: string) => {
     setFormData(prev => ({ ...prev, [name]: value }));
     
-    // If changing payment option, update the payment tab
     if (name === 'paymentOption') {
       setPaymentTab(value);
     }
@@ -359,7 +386,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
-      {/* Customer Information */}
       <Card>
         <CardHeader>
           <CardTitle>Customer Information</CardTitle>
@@ -419,19 +445,55 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         </CardContent>
       </Card>
       
-      {/* Collection Information */}
       <Card>
         <CardHeader>
           <CardTitle>Collection Information</CardTitle>
           <CardDescription>Select the collection route and area</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="pickupPostcode">Collection Postcode</Label>
+            <Input 
+              id="pickupPostcode"
+              name="pickupPostcode"
+              value={formData.pickupPostcode}
+              onChange={handleInputChange}
+              required
+              placeholder="Enter pickup postcode"
+            />
+          </div>
+          
+          {isRestrictedArea && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Restricted Area</AlertTitle>
+              <AlertDescription>
+                <p>These areas are only serviced for large business shipments due to logistics limitations.</p>
+                <p className="mt-2">Please contact our support team at <a href="tel:+447584100552" className="font-bold underline">+44 7584 100552</a> before booking.</p>
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {detectedRoute && !isRestrictedArea && (
+            <div className="bg-green-50 p-4 rounded-md border border-green-200">
+              <div className="flex items-start gap-2">
+                <Truck className="h-5 w-5 text-green-600 mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-green-800">Collection Route Detected</h4>
+                  <p className="text-green-700">Based on your postal code, you're on the {detectedRoute}</p>
+                  <p className="text-green-700 mt-1">Collection Date: {pickupDateFromRoute}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="selectedRoute">Collection Route</Label>
               <Select
                 value={formData.selectedRoute}
                 onValueChange={(value) => handleSelectChange('selectedRoute', value)}
+                disabled={!!detectedRoute}
               >
                 <SelectTrigger id="selectedRoute">
                   <SelectValue placeholder="Select a route" />
@@ -489,22 +551,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               rows={3}
             />
           </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="pickupPostcode">Collection Postcode</Label>
-            <Input 
-              id="pickupPostcode"
-              name="pickupPostcode"
-              value={formData.pickupPostcode}
-              onChange={handleInputChange}
-              required
-              placeholder="Enter pickup postcode"
-            />
-          </div>
         </CardContent>
       </Card>
       
-      {/* Delivery Information */}
       <Card>
         <CardHeader>
           <CardTitle>Delivery Information </CardTitle>
@@ -574,7 +623,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         </CardContent>
       </Card>
       
-      {/* Shipment Details */}
       <Card className="dark:bg-gray-800 dark:border-gray-700">
         <CardHeader>
           <CardTitle className="dark:text-white">Shipment Details</CardTitle>
@@ -791,7 +839,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         </CardContent>
       </Card>
       
-      {/* Payment Options */}
       <Card className="dark:bg-gray-800 dark:border-gray-700">
         <CardHeader>
           <CardTitle className="dark:text-white">Payment Options</CardTitle>
@@ -845,7 +892,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 </RadioGroup>
               </div>
               
-              {/* Price display */}
               <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-md">
                 <div className="flex justify-between mb-2">
                   <span className="dark:text-gray-300">Base price:</span>
@@ -880,7 +926,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 </p>
               </div>
               
-              {/* Price calculation with 20% premium */}
               <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-md">
                 <div className="flex justify-between mb-2">
                   <span className="dark:text-gray-300">Base price:</span>
@@ -950,7 +995,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 </div>
               </RadioGroup>
               
-              {/* Price display */}
               <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-md">
                 <div className="flex justify-between mb-2">
                   <span className="dark:text-gray-300">Base price:</span>
@@ -972,7 +1016,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         </CardContent>
       </Card>
       
-      {/* Terms and Submit */}
       <Card className="dark:bg-gray-800 dark:border-gray-700">
         <CardContent className="pt-6">
           <div className="flex items-start space-x-3 mb-6">

@@ -27,23 +27,8 @@ interface CollectionScheduleItem {
   areas: string[];
 }
 
-interface ShipmentData {
-  id: string;
-  status: string;
-  tracking_number: string;
-  metadata: {
-    pickup_route?: string;
-    pickup_area?: string;
-    pickup_date?: string;
-    shipment_type?: string;
-    recipient_name?: string;
-  };
-}
-
 const CollectionSchedule = () => {
   const [schedules, setSchedules] = useState<CollectionScheduleItem[]>([]);
-  const [shipments, setShipments] = useState<ShipmentData[]>([]);
-  const [filteredShipments, setFilteredShipments] = useState<ShipmentData[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRoute, setFilterRoute] = useState('');
@@ -77,31 +62,11 @@ const CollectionSchedule = () => {
           const areas = [...new Set(schedulesData.flatMap(schedule => schedule.areas))];
           setAllAreas(areas);
         }
-        
-        // Fetch shipments
-        const { data: shipmentsData, error: shipmentsError } = await supabase
-          .from('shipments')
-          .select('id, tracking_number, status, metadata');
-          
-        if (shipmentsError) throw shipmentsError;
-        
-        if (shipmentsData) {
-          // Cast the returned data to the expected ShipmentData type
-          const typedShipments: ShipmentData[] = shipmentsData.map(shipment => ({
-            id: shipment.id,
-            tracking_number: shipment.tracking_number,
-            status: shipment.status,
-            metadata: shipment.metadata as ShipmentData['metadata'] || {}
-          }));
-          
-          setShipments(typedShipments);
-          setFilteredShipments(typedShipments);
-        }
       } catch (error) {
         console.error('Error fetching data:', error);
         toast({
           title: "Error",
-          description: "Failed to load collection schedules and shipments.",
+          description: "Failed to load collection schedules.",
           variant: "destructive",
         });
       } finally {
@@ -112,38 +77,22 @@ const CollectionSchedule = () => {
     fetchData();
   }, [toast]);
 
-  useEffect(() => {
-    // Apply filters whenever filter criteria changes
-    let filtered = [...shipments];
+  // Filter schedules based on search term and filters
+  const filteredSchedules = schedules.filter(schedule => {
+    const matchesSearch = searchTerm === '' || 
+      schedule.route.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      schedule.areas.some(area => area.toLowerCase().includes(searchTerm.toLowerCase()));
     
-    if (searchTerm) {
-      filtered = filtered.filter(shipment => 
-        shipment.tracking_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        shipment.metadata?.recipient_name?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
+    const matchesRoute = filterRoute === '' || schedule.route === filterRoute;
     
-    if (filterRoute) {
-      filtered = filtered.filter(shipment => 
-        shipment.metadata?.pickup_route === filterRoute
-      );
-    }
+    const matchesArea = filterArea === '' || 
+      schedule.areas.some(area => area === filterArea);
     
-    if (filterArea) {
-      filtered = filtered.filter(shipment => 
-        shipment.metadata?.pickup_area === filterArea
-      );
-    }
+    const matchesDate = !filterDate || 
+      schedule.pickup_date.toLowerCase().includes(format(filterDate, 'do of MMMM').toLowerCase());
     
-    if (filterDate) {
-      const dateStr = format(filterDate, 'do of MMMM').toLowerCase();
-      filtered = filtered.filter(shipment => 
-        shipment.metadata?.pickup_date?.toLowerCase().includes(dateStr)
-      );
-    }
-    
-    setFilteredShipments(filtered);
-  }, [searchTerm, filterRoute, filterArea, filterDate, shipments]);
+    return matchesSearch && matchesRoute && matchesArea && matchesDate;
+  });
 
   const resetFilters = () => {
     setSearchTerm('');
@@ -190,7 +139,7 @@ const CollectionSchedule = () => {
                       <SelectValue placeholder="Filter by route" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Routes</SelectItem>
+                      <SelectItem value="">All Routes</SelectItem>
                       {allRoutes.map(route => (
                         <SelectItem key={route} value={route}>{route}</SelectItem>
                       ))}
@@ -204,7 +153,7 @@ const CollectionSchedule = () => {
                       <SelectValue placeholder="Filter by area" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Areas</SelectItem>
+                      <SelectItem value="">All Areas</SelectItem>
                       {allAreas.map(area => (
                         <SelectItem key={area} value={area}>{area}</SelectItem>
                       ))}
@@ -255,7 +204,7 @@ const CollectionSchedule = () => {
           <div className="mb-8">
             <h2 className="text-2xl font-bold mb-4">Upcoming Collections</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {schedules.map((schedule) => (
+              {filteredSchedules.map((schedule) => (
                 <Card key={schedule.id} className="h-full">
                   <CardHeader className="pb-2">
                     <CardTitle>{schedule.route}</CardTitle>
@@ -278,48 +227,11 @@ const CollectionSchedule = () => {
                         ))}
                       </div>
                     </div>
-                    
-                    {/* Shipments for this schedule */}
-                    <div>
-                      <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
-                        <Truck className="h-4 w-4" />
-                        Shipments:
-                      </h4>
-                      {filteredShipments.filter(s => 
-                        s.metadata?.pickup_route === schedule.route
-                      ).length > 0 ? (
-                        <ul className="space-y-2 text-sm">
-                          {filteredShipments
-                            .filter(s => s.metadata?.pickup_route === schedule.route)
-                            .map(shipment => (
-                              <li key={shipment.id} className="p-2 bg-gray-50 rounded-md">
-                                <div className="font-medium">{shipment.tracking_number}</div>
-                                <div className="text-gray-500">
-                                  Area: {shipment.metadata?.pickup_area || 'N/A'}
-                                </div>
-                                <div className="text-gray-500">
-                                  Type: {shipment.metadata?.shipment_type || 'N/A'}
-                                </div>
-                                <Badge className={
-                                  shipment.status === 'Booking Confirmed' ? 'bg-blue-100 text-blue-800' :
-                                  shipment.status === 'In Transit' ? 'bg-yellow-100 text-yellow-800' :
-                                  shipment.status === 'Delivered' ? 'bg-green-100 text-green-800' :
-                                  'bg-gray-100 text-gray-800'
-                                }>
-                                  {shipment.status}
-                                </Badge>
-                              </li>
-                            ))}
-                        </ul>
-                      ) : (
-                        <div className="text-gray-500 text-sm">No shipments found</div>
-                      )}
-                    </div>
                   </CardContent>
                 </Card>
               ))}
               
-              {schedules.length === 0 && !loading && (
+              {filteredSchedules.length === 0 && !loading && (
                 <div className="col-span-3 text-center py-8">
                   <p className="text-gray-500">No collection schedules found</p>
                 </div>

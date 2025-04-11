@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { postalCodeToRouteMap, restrictedPostalCodes } from '@/utils/postalCodeUtils';
 
 export interface RouteSchedule {
   route: string;
@@ -65,6 +66,17 @@ export const collectionSchedules: RouteSchedule[] = [
     areas: ["GLASSGOW", "EDINBURGH", "NECASTLE", "MIDDLESBROUGH", "PRESTON", "CARLLSLE"]
   }
 ];
+
+// Add a function to get areas based on postal code prefix
+export function getAreasFromPostalCode(postalCode: string): string[] {
+  const prefix = postalCode.trim().toUpperCase().match(/^[A-Z]+/);
+  if (!prefix) return [];
+  
+  const route = postalCodeToRouteMap[prefix[0]];
+  if (!route) return [];
+  
+  return getAreasByRoute(route);
+}
 
 // Type for the collection_schedules table in Supabase
 type CollectionSchedule = {
