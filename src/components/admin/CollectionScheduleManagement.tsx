@@ -67,7 +67,7 @@ const CollectionScheduleManagement: React.FC = () => {
     };
     
     loadSchedules();
-  }, [toast]);
+  }, []);
 
   // Handle date selection for a route
   const handleDateSelect = async (route: string, date: Date | undefined) => {
@@ -474,6 +474,7 @@ const CollectionScheduleManagement: React.FC = () => {
                           onClick={() => handleRemoveArea(schedule.route, area)}
                           className="ml-1 text-gray-500 hover:text-red-500"
                           disabled={isLoading}
+                          type="button"
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -493,6 +494,7 @@ const CollectionScheduleManagement: React.FC = () => {
                         onClick={() => handleAddArea(schedule.route)}
                         className="h-8 px-2"
                         disabled={isLoading}
+                        type="button"
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
@@ -507,6 +509,7 @@ const CollectionScheduleManagement: React.FC = () => {
                         size="sm"
                         onClick={() => setEditingRoute(null)}
                         disabled={isLoading}
+                        type="button"
                       >
                         <X className="h-4 w-4" />
                       </Button>
@@ -516,6 +519,7 @@ const CollectionScheduleManagement: React.FC = () => {
                         size="sm"
                         onClick={() => handleEditRoute(schedule.route)}
                         disabled={isLoading}
+                        type="button"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -526,6 +530,7 @@ const CollectionScheduleManagement: React.FC = () => {
                       onClick={() => handleRemoveRoute(schedule.route)}
                       className="text-red-500 hover:text-red-700 hover:bg-red-50"
                       disabled={isLoading}
+                      type="button"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

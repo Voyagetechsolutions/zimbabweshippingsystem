@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -156,11 +157,7 @@ const AdminDashboard = () => {
     if (isAdmin || adminExists) {
       fetchShipments();
     }
-
-    return () => {
-      isMounted.current = false;
-    };
-  }, [user, navigate]);
+  }, [adminExists, isAdmin]);
 
   const fetchShipments = async () => {
     if (!isMounted.current) return;
@@ -182,9 +179,9 @@ const AdminDashboard = () => {
         console.log("Admin: Fetched shipments count:", data.length);
         setShipments(data as Shipment[]);
         const totalCount = data.length;
-        const processingCount = data.filter(s => s.status.toLowerCase() === 'processing').length;
-        const inTransitCount = data.filter(s => s.status.toLowerCase() === 'in transit').length;
-        const deliveredCount = data.filter(s => s.status.toLowerCase() === 'delivered').length;
+        const processingCount = data.filter(s => s.status.toLowerCase().includes('processing')).length;
+        const inTransitCount = data.filter(s => s.status.toLowerCase().includes('transit')).length;
+        const deliveredCount = data.filter(s => s.status.toLowerCase().includes('delivered')).length;
         
         setStats({
           total: totalCount,
@@ -310,6 +307,10 @@ const AdminDashboard = () => {
               <TabsTrigger value="settings" className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
                 <span className="hidden sm:inline">Settings</span>
+              </TabsTrigger>
+              <TabsTrigger value="schedule" className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                <span className="hidden sm:inline">Schedule</span>
               </TabsTrigger>
               <TabsTrigger value="more" className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
@@ -638,8 +639,8 @@ const AdminDashboard = () => {
                     Cancel
                   </Button>
                   <Button 
-                    className="bg-zim-green hover:bg-zim-green/90"
                     onClick={updateShipmentStatus}
+                    disabled={!newStatus || newStatus === editingShipment.status}
                   >
                     Update Status
                   </Button>
