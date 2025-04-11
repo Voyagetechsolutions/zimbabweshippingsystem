@@ -71,7 +71,7 @@ export const RequireAdmin = React.memo(({ children }: { children: JSX.Element })
     );
   }
 
-  // Use useEffect for side effects like showing toast
+  // Always call useEffect, regardless of conditions
   useEffect(() => {
     if (!user) {
       toast({
@@ -112,6 +112,11 @@ export const RedirectIfAuthenticated = React.memo(({ children }: { children: JSX
   
   // Get the intended destination from state, or default to home page
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
+
+  // Always call useEffect, regardless of conditions
+  useEffect(() => {
+    // This is intentionally left empty to ensure hooks are called in the same order
+  }, []);
 
   // Show loading state if auth is still being checked
   if (isLoading) {
