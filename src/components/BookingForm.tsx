@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, Controller } from 'react-hook-form';
@@ -48,16 +47,88 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { AlertCircle, Check, Info, PackageCheck, Truck } from 'lucide-react';
+import { 
+  AlertCircle, 
+  Check, 
+  Info, 
+  Package, 
+  Truck, 
+  Upload, 
+  Shield,
+  Home
+} from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
   getRouteForPostalCode, 
-  isRestrictedPostalCode,
-  getAreasFromPostalCode
+  isRestrictedPostalCode
 } from '@/utils/postalCodeUtils';
 import { getDateByRoute } from '@/data/collectionSchedule';
 
-// Define the form schema
+const getAreasFromPostalCode = (postcode: string): string[] => {
+  const prefix = postcode.trim().toUpperCase().split(' ')[0].replace(/[0-9]/g, '');
+  
+  const areaMap: Record<string, string[]> = {
+    'N': ['North London'],
+    'NW': ['North West London'],
+    'W': ['West London'],
+    'SW': ['South West London'],
+    'SE': ['South East London'],
+    'E': ['East London'],
+    'EC': ['East Central London'],
+    'WC': ['West Central London'],
+    'BR': ['Bromley'],
+    'CR': ['Croydon'],
+    'DA': ['Dartford'],
+    'EN': ['Enfield'],
+    'HA': ['Harrow'],
+    'IG': ['Ilford'],
+    'KT': ['Kingston upon Thames'],
+    'RM': ['Romford'],
+    'SM': ['Sutton'],
+    'TW': ['Twickenham'],
+    'UB': ['Southall', 'Uxbridge'],
+    'WD': ['Watford'],
+  };
+  
+  return areaMap[prefix] || ['Area not specified'];
+};
+
+const categorizeItems = () => {
+  return {
+    "Household Furniture": [
+      "Sofas", "Chairs", "Dining Chairs", "Dining Table", "Coffee Table", "Beds", 
+      "Mattress", "Dismantled Wardrobe", "Chest of Drawers", "Dressing Unit"
+    ],
+    "Household Appliances": [
+      "Washing Machine", "Dishwasher", "Dryer", "American Fridge", "Standard Fridge Freezer", 
+      "Deep Freezer", "Air Conditioner", "Heater"
+    ],
+    "Transportation & Mobility": [
+      "Bicycle", "Wheelchair", "Adult Walking Aid", "Mobility Scooter", "Kids Push Chair"
+    ],
+    "Home Items": [
+      "Rugs/Carpets", "Internal Doors", "External Doors", "Wall Frames", "Mirror", 
+      "Bathroom Equipment", "Ironing Board"
+    ],
+    "Storage & Containers": [
+      "Bin", "Plastic Tubs", "Boxes", "Bags", "Suitcase", "Amazon Bags", "Changani Bags", "Pallet"
+    ],
+    "Automotive": [
+      "Car Wheels/Tyres", "Vehicle Parts", "Engine"
+    ],
+    "Tools & Equipment": [
+      "Tool Box", "Air Compressor", "Generator", "Solar Panels", "Garden Tools", 
+      "Lawn Mower", "Water Pump", "Office Equipment", "Building Equipment", "Ladder"
+    ],
+    "Recreation": [
+      "Trampoline", "TVs"
+    ],
+    "Furniture": [
+      "Furniture" // Generic category for uncategorized furniture
+    ]
+  };
+};
+
 const formSchema = z.object({
   firstName: z.string().min(2, 'First name is required'),
   lastName: z.string().min(2, 'Last name is required'),
@@ -69,10 +140,14 @@ const formSchema = z.object({
   recipientPhone: z.string().min(10, 'Please enter a valid phone number'),
   deliveryAddress: z.string().min(5, 'Delivery address is required'),
   deliveryCity: z.string().min(2, 'City is required'),
-  shipmentType: z.enum(['drum', 'parcel']),
+  shipmentType: z.enum(['drum', 'other']),
   drumQuantity: z.string().optional(),
-  weight: z.string().optional(),
+  paymentOption: z.enum(['standard', '30day']),
+  selectedItems: z.array(z.string()).optional(),
+  otherItemDescription: z.string().optional(),
   specialInstructions: z.string().optional(),
+  metalSeal: z.boolean().default(true),
+  doorToDoor: z.boolean().default(false),
   termsAgreed: z.boolean().refine(val => val === true, {
     message: 'You must agree to the terms and conditions',
   }),
@@ -80,19 +155,27 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-const initialDrumPrices = {
-  small: 150,
-  medium: 185,
-  large: 220,
+const DRUM_STANDARD_PRICES = {
+  single: 260, // 1 drum
+  medium: 240, // 2-4 drums
+  bulk: 220,   // 5+ drums
 };
 
-const parcelRatePerKg = 14;
+const DRUM_30DAY_PRICES = {
+  single: 280, // 1 drum
+  medium: 280, // 2-4 drums
+  bulk: 240,   // 5+ drums
+};
+
+const METAL_SEAL_PRICE = 5;
+const DOOR_TO_DOOR_PRICE = 25;
 
 interface BookingFormProps {
   onSubmitComplete: (data: FormValues, shipmentId: string, amount: number) => void;
+  onRequestCustomQuote: () => void;
 }
 
-const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
+const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete, onRequestCustomQuote }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -100,11 +183,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const [collectionArea, setCollectionArea] = useState<string[]>([]);
   const [collectionDate, setCollectionDate] = useState<string | null>(null);
   const [isRestrictedArea, setIsRestrictedArea] = useState(false);
-  const [drumSize, setDrumSize] = useState<'small' | 'medium' | 'large'>('medium');
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [itemCategories, setItemCategories] = useState<Record<string, string[]>>(categorizeItems());
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [otherSelectedItems, setOtherSelectedItems] = useState<string[]>([]);
   
-  // Initialize the form
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -120,18 +204,24 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       deliveryCity: '',
       shipmentType: 'drum',
       drumQuantity: '1',
-      weight: '',
+      paymentOption: 'standard',
+      selectedItems: [],
+      otherItemDescription: '',
       specialInstructions: '',
+      metalSeal: true,
+      doorToDoor: false,
       termsAgreed: false,
     },
   });
   
   const watchShipmentType = form.watch('shipmentType');
   const watchDrumQuantity = form.watch('drumQuantity');
-  const watchWeight = form.watch('weight');
+  const watchPaymentOption = form.watch('paymentOption');
+  const watchMetalSeal = form.watch('metalSeal');
+  const watchDoorToDoor = form.watch('doorToDoor');
   const watchPostcode = form.watch('pickupPostcode');
+  const watchSelectedItems = form.watch('selectedItems');
   
-  // Handle postal code changes
   useEffect(() => {
     if (watchPostcode && watchPostcode.length >= 2) {
       const route = getRouteForPostalCode(watchPostcode);
@@ -154,24 +244,45 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
   }, [watchPostcode]);
   
-  // Calculate total amount when form values change
+  const handleItemSelect = (item: string) => {
+    const currentItems = form.getValues('selectedItems') || [];
+    
+    if (currentItems.includes(item)) {
+      form.setValue('selectedItems', currentItems.filter(i => i !== item));
+    } else {
+      form.setValue('selectedItems', [...currentItems, item]);
+    }
+  };
+  
+  const calculateDrumPrice = (quantity: number, paymentOption: 'standard' | '30day'): number => {
+    const priceTable = paymentOption === 'standard' ? DRUM_STANDARD_PRICES : DRUM_30DAY_PRICES;
+    
+    if (quantity === 1) return priceTable.single;
+    if (quantity >= 2 && quantity <= 4) return priceTable.medium;
+    return priceTable.bulk; // 5+ drums
+  };
+  
   useEffect(() => {
+    let baseAmount = 0;
+    let additionalCharges = 0;
+    
     if (watchShipmentType === 'drum') {
       const quantity = parseInt(watchDrumQuantity || '1', 10);
-      const basePrice = initialDrumPrices[drumSize];
-      setTotalAmount(basePrice * quantity);
-    } else if (watchShipmentType === 'parcel') {
-      const weight = parseFloat(watchWeight || '0');
-      if (!isNaN(weight) && weight > 0) {
-        const calculatedAmount = weight * parcelRatePerKg;
-        setTotalAmount(calculatedAmount);
-      } else {
-        setTotalAmount(0);
-      }
+      const unitPrice = calculateDrumPrice(quantity, watchPaymentOption);
+      baseAmount = unitPrice * quantity;
     }
-  }, [watchShipmentType, watchDrumQuantity, watchWeight, drumSize]);
+    
+    if (watchMetalSeal) {
+      additionalCharges += METAL_SEAL_PRICE;
+    }
+    
+    if (watchDoorToDoor) {
+      additionalCharges += DOOR_TO_DOOR_PRICE;
+    }
+    
+    setTotalAmount(baseAmount + additionalCharges);
+  }, [watchShipmentType, watchDrumQuantity, watchPaymentOption, watchMetalSeal, watchDoorToDoor]);
   
-  // Handle form submission
   const onSubmit = async (data: FormValues) => {
     try {
       setIsCalculating(true);
@@ -186,35 +297,17 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         return;
       }
       
-      // Calculate final amount based on form data
-      let finalAmount = 0;
-      
-      if (data.shipmentType === 'drum') {
-        const quantity = parseInt(data.drumQuantity || '1', 10);
-        const basePrice = initialDrumPrices[drumSize];
-        finalAmount = basePrice * quantity;
-      } else if (data.shipmentType === 'parcel') {
-        const weight = parseFloat(data.weight || '0');
-        if (!isNaN(weight) && weight > 0) {
-          finalAmount = weight * parcelRatePerKg;
-        }
-      }
-      
-      // Generate a tracking number
       const trackingNumber = `ZS${Date.now().toString().substring(5)}`;
       
-      // Create shipment in the database - using the correct schema fields
       const { data: shipmentData, error: shipmentError } = await supabase
         .from('shipments')
         .insert({
-          user_id: null, // Will be updated after payment if user is authenticated
+          user_id: null,
           status: 'pending_payment',
           tracking_number: trackingNumber,
           origin: `${data.pickupAddress}, ${data.pickupPostcode}`,
           destination: `${data.deliveryAddress}, ${data.deliveryCity}, Zimbabwe`,
           carrier: 'Zimbabwe Shipping',
-          weight: data.shipmentType === 'parcel' ? parseFloat(data.weight || '0') : null,
-          dimensions: data.shipmentType === 'drum' ? `${drumSize} drum x ${data.drumQuantity}` : null,
           metadata: {
             sender_name: `${data.firstName} ${data.lastName}`,
             sender_email: data.email,
@@ -222,9 +315,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             recipient_name: data.recipientName,
             recipient_phone: data.recipientPhone,
             shipment_type: data.shipmentType,
-            drum_size: data.shipmentType === 'drum' ? drumSize : null,
             drum_quantity: data.shipmentType === 'drum' ? parseInt(data.drumQuantity || '1', 10) : null,
-            amount: finalAmount,
+            selected_items: data.shipmentType === 'other' ? data.selectedItems : null,
+            payment_option: data.paymentOption,
+            metal_seal: data.metalSeal,
+            door_to_door: data.doorToDoor,
+            amount: totalAmount,
             special_instructions: data.specialInstructions || null,
             route: collectionRoute,
             collection_date: collectionDate
@@ -239,8 +335,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       
       setIsCalculating(false);
       
-      // Pass the data to the parent component for payment processing
-      onSubmitComplete(data, shipmentData.id, finalAmount);
+      onSubmitComplete(data, shipmentData.id, totalAmount);
       
     } catch (error: any) {
       console.error('Error creating shipment:', error);
@@ -263,7 +358,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             <TabsTrigger value="shipment">Shipment Details</TabsTrigger>
           </TabsList>
           
-          {/* Sender Details Tab */}
           <TabsContent value="sender" className="space-y-4 pt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
@@ -357,7 +451,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               )}
             />
             
-            {/* Collection Information Card */}
             <Card className="mt-6">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center">
@@ -411,7 +504,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             </Card>
           </TabsContent>
           
-          {/* Recipient Details Tab */}
           <TabsContent value="recipient" className="space-y-4 pt-4">
             <FormField
               control={form.control}
@@ -483,33 +575,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             
           </TabsContent>
           
-          {/* Shipment Details Tab */}
           <TabsContent value="shipment" className="space-y-4 pt-4">
-            {/* Restricted Areas Notice */}
-            <Card className="border-yellow-300 bg-yellow-50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center text-yellow-800">
-                  <AlertCircle className="mr-2 h-5 w-5" />
-                  Restricted Areas Notice
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-yellow-800 text-sm">
-                  We have delivery restrictions in some areas. If your postcode falls in one of the following areas, 
-                  please contact us directly to arrange your shipment:
-                </p>
-                <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-yellow-800">
-                  <div>EX, TQ, DT, SA</div>
-                  <div>LD, HR, IP, NR</div>
-                  <div>HU, TS, DL, SR</div>
-                  <div>DH, CA, NE, TD</div>
-                  <div>EH, ML, KA, DG</div>
-                  <div>G, KY, PA, IV</div>
-                  <div>AB, DD</div>
-                </div>
-              </CardContent>
-            </Card>
-            
             <FormField
               control={form.control}
               name="shipmentType"
@@ -527,8 +593,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                         <Label htmlFor="drum">Drum Shipping</Label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="parcel" id="parcel" />
-                        <Label htmlFor="parcel">Parcel Shipping</Label>
+                        <RadioGroupItem value="other" id="other" />
+                        <Label htmlFor="other">Other Items</Label>
                       </div>
                     </RadioGroup>
                   </FormControl>
@@ -538,51 +604,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             />
             
             {watchShipmentType === 'drum' && (
-              <div className="space-y-4">
-                <div>
-                  <Label>Drum Size</Label>
-                  <RadioGroup
-                    defaultValue={drumSize}
-                    onValueChange={(value) => setDrumSize(value as 'small' | 'medium' | 'large')}
-                    className="mt-2"
-                  >
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className={`border rounded-lg p-4 ${drumSize === 'small' ? 'bg-blue-50 border-blue-200' : ''}`}>
-                        <div className="flex items-start space-x-3">
-                          <RadioGroupItem value="small" id="small" className="mt-1" />
-                          <div>
-                            <Label htmlFor="small" className="font-medium">Small Drum</Label>
-                            <p className="text-sm text-gray-500">£150 per drum</p>
-                            <p className="text-xs text-gray-500 mt-1">Capacity: 60 liters</p>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className={`border rounded-lg p-4 ${drumSize === 'medium' ? 'bg-blue-50 border-blue-200' : ''}`}>
-                        <div className="flex items-start space-x-3">
-                          <RadioGroupItem value="medium" id="medium" className="mt-1" />
-                          <div>
-                            <Label htmlFor="medium" className="font-medium">Medium Drum</Label>
-                            <p className="text-sm text-gray-500">£185 per drum</p>
-                            <p className="text-xs text-gray-500 mt-1">Capacity: 120 liters</p>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className={`border rounded-lg p-4 ${drumSize === 'large' ? 'bg-blue-50 border-blue-200' : ''}`}>
-                        <div className="flex items-start space-x-3">
-                          <RadioGroupItem value="large" id="large" className="mt-1" />
-                          <div>
-                            <Label htmlFor="large" className="font-medium">Large Drum</Label>
-                            <p className="text-sm text-gray-500">£220 per drum</p>
-                            <p className="text-xs text-gray-500 mt-1">Capacity: 210 liters</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </RadioGroup>
-                </div>
-                
+              <div className="space-y-6">
                 <FormField
                   control={form.control}
                   name="drumQuantity"
@@ -605,37 +627,234 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                     </FormItem>
                   )}
                 />
+                
+                <FormField
+                  control={form.control}
+                  name="paymentOption"
+                  render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel>Payment Option</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          className="space-y-4"
+                        >
+                          <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                            <div className="flex items-start space-x-3">
+                              <RadioGroupItem value="standard" id="standard" className="mt-1" />
+                              <div>
+                                <Label htmlFor="standard" className="font-medium">Standard Payment</Label>
+                                <p className="text-sm text-gray-500 mt-1">
+                                  Pay now for the best rates:
+                                </p>
+                                <ul className="text-sm text-gray-600 mt-2 list-disc list-inside">
+                                  <li>1 drum: £{DRUM_STANDARD_PRICES.single} each</li>
+                                  <li>2-4 drums: £{DRUM_STANDARD_PRICES.medium} each</li>
+                                  <li>5+ drums: £{DRUM_STANDARD_PRICES.bulk} each</li>
+                                </ul>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                            <div className="flex items-start space-x-3">
+                              <RadioGroupItem value="30day" id="30day" className="mt-1" />
+                              <div>
+                                <Label htmlFor="30day" className="font-medium">30-Day Payment Plan</Label>
+                                <p className="text-sm text-gray-500 mt-1">
+                                  Pay within 30 days of collection:
+                                </p>
+                                <ul className="text-sm text-gray-600 mt-2 list-disc list-inside">
+                                  <li>1 drum: £{DRUM_30DAY_PRICES.single} each</li>
+                                  <li>2-4 drums: £{DRUM_30DAY_PRICES.medium} each</li>
+                                  <li>5+ drums: £{DRUM_30DAY_PRICES.bulk} each</li>
+                                </ul>
+                              </div>
+                            </div>
+                          </div>
+                        </RadioGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             )}
             
-            {watchShipmentType === 'parcel' && (
+            {watchShipmentType === 'other' && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-medium mb-3">Select Items to Ship</h3>
+                  
+                  <div className="flex mb-4">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={onRequestCustomQuote}
+                      className="flex items-center"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Request Custom Quote
+                    </Button>
+                    <p className="text-sm text-gray-500 ml-3 mt-2">
+                      For items not listed or special requirements
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <Select onValueChange={(value) => setSelectedCategory(value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.keys(itemCategories).map((category) => (
+                          <SelectItem key={category} value={category}>{category}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    
+                    {selectedCategory && (
+                      <div className="border rounded-md p-4">
+                        <h4 className="font-medium mb-3">{selectedCategory}</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {itemCategories[selectedCategory].map((item) => (
+                            <div 
+                              key={item} 
+                              className={`
+                                flex items-center space-x-2 p-2 border rounded-md cursor-pointer
+                                ${watchSelectedItems?.includes(item) ? 'bg-blue-50 border-blue-200' : ''}
+                              `}
+                              onClick={() => handleItemSelect(item)}
+                            >
+                              <Checkbox 
+                                checked={watchSelectedItems?.includes(item)} 
+                                onCheckedChange={() => handleItemSelect(item)}
+                              />
+                              <label className="cursor-pointer flex-grow text-sm">{item}</label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {watchSelectedItems && watchSelectedItems.length > 0 && (
+                      <div className="bg-gray-50 p-3 rounded-md">
+                        <h4 className="font-medium mb-2">Selected Items:</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {watchSelectedItems.map((item) => (
+                            <div 
+                              key={item} 
+                              className="bg-white px-2 py-1 rounded-full border flex items-center text-sm"
+                            >
+                              {item}
+                              <button 
+                                type="button" 
+                                className="ml-1 text-gray-500 hover:text-gray-700"
+                                onClick={() => handleItemSelect(item)}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <p className="text-amber-800 text-sm">
+                        <strong>Note:</strong> After selecting your items, we'll calculate a quote 
+                        based on volume. You'll be able to review the quote before proceeding to payment.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <FormField
+                  control={form.control}
+                  name="otherItemDescription"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Additional Item Description (Optional)</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Provide additional details about your items"
+                          className="resize-none"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Please include any specific details about size, condition, or special handling requirements.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
+            
+            <div className="mt-8 space-y-4">
+              <h3 className="font-medium">Additional Services</h3>
+              
               <FormField
                 control={form.control}
-                name="weight"
+                name="metalSeal"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Weight (kg)</FormLabel>
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 bg-gray-50 p-3 rounded-md border">
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.1" 
-                        min="0.1" 
-                        placeholder="Enter weight in kg" 
-                        {...field}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value);
-                          field.onChange(val < 0.1 ? '0.1' : e.target.value);
-                        }}
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={true}
                       />
                     </FormControl>
-                    <FormDescription>
-                      Rate: £{parcelRatePerKg} per kg
-                    </FormDescription>
-                    <FormMessage />
+                    <div className="space-y-1 leading-none">
+                      <div className="flex items-center">
+                        <FormLabel className="font-medium">
+                          Metal Security Seal
+                        </FormLabel>
+                        <span className="ml-2 text-blue-600 font-medium">£{METAL_SEAL_PRICE}</span>
+                      </div>
+                      <FormDescription>
+                        <div className="flex items-center">
+                          <Shield className="h-3 w-3 mr-1 text-green-600" /> 
+                          Mandatory security seal for all shipments
+                        </div>
+                      </FormDescription>
+                    </div>
                   </FormItem>
                 )}
               />
-            )}
+              
+              <FormField
+                control={form.control}
+                name="doorToDoor"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 bg-green-50 p-3 rounded-md border border-green-100">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <div className="flex items-center">
+                        <FormLabel className="font-medium">
+                          Door-to-Door Delivery
+                        </FormLabel>
+                        <span className="ml-2 text-blue-600 font-medium">£{DOOR_TO_DOOR_PRICE}</span>
+                      </div>
+                      <FormDescription>
+                        <div className="flex items-center">
+                          <Home className="h-3 w-3 mr-1 text-green-600" /> 
+                          Direct delivery to the recipient's doorstep in Zimbabwe
+                        </div>
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
+            </div>
             
             <FormField
               control={form.control}
@@ -670,9 +889,60 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             </Accordion>
             
             <div>
-              <Label>Total Amount</Label>
-              <div className="mt-1 p-3 bg-blue-50 border border-blue-200 rounded-lg font-medium text-xl">
-                £{totalAmount.toFixed(2)}
+              <h3 className="font-medium mb-2">Price Summary</h3>
+              <div className="space-y-2 border rounded-md p-4 bg-blue-50">
+                {watchShipmentType === 'drum' && (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span>Drums ({watchDrumQuantity} × £{calculateDrumPrice(parseInt(watchDrumQuantity), watchPaymentOption)})</span>
+                      <span>£{(parseInt(watchDrumQuantity) * calculateDrumPrice(parseInt(watchDrumQuantity), watchPaymentOption)).toFixed(2)}</span>
+                    </div>
+                    
+                    <div className="flex justify-between text-sm">
+                      <span>Metal Security Seal (Mandatory)</span>
+                      <span>£{METAL_SEAL_PRICE.toFixed(2)}</span>
+                    </div>
+                    
+                    {watchDoorToDoor && (
+                      <div className="flex justify-between text-sm">
+                        <span>Door-to-Door Delivery</span>
+                        <span>£{DOOR_TO_DOOR_PRICE.toFixed(2)}</span>
+                      </div>
+                    )}
+                    
+                    <div className="border-t my-2"></div>
+                    
+                    <div className="flex justify-between font-medium">
+                      <span>Total Amount</span>
+                      <span>£{totalAmount.toFixed(2)}</span>
+                    </div>
+                    
+                    {watchPaymentOption === '30day' && (
+                      <div className="mt-2 text-xs text-gray-600 bg-yellow-50 p-2 rounded">
+                        <p className="font-medium text-amber-700">30-Day Payment Plan:</p>
+                        <p>You'll have 30 days from the collection date to complete your payment.</p>
+                      </div>
+                    )}
+                  </>
+                )}
+                
+                {watchShipmentType === 'other' && (
+                  <div className="py-3 text-center">
+                    <Package className="h-12 w-12 mx-auto mb-2 text-blue-400" />
+                    <p>Custom pricing will be calculated based on your selected items.</p>
+                    <div className="mt-3">
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={onRequestCustomQuote}
+                        className="text-sm"
+                      >
+                        <Upload className="h-3 w-3 mr-1" />
+                        Need a custom quote?
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             

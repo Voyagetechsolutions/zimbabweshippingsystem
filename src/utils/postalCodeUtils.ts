@@ -1,148 +1,127 @@
 
-// Map of postal code prefixes to routes
-export const postalCodeToRouteMap: Record<string, string> = {
-  // Cardiff Route
-  "SP": "CARDIFF ROUTE",
-  "SN": "CARDIFF ROUTE",
-  "BA": "CARDIFF ROUTE",
-  "NP": "CARDIFF ROUTE",
-  "CP": "CARDIFF ROUTE",
-  "SA": "CARDIFF ROUTE",
+/**
+ * Utility functions for working with UK postal codes
+ */
+
+// Extract area from the postcode
+export const getAreasFromPostalCode = (postcode: string): string[] => {
+  // Extract the first part of the postcode (e.g., "SW" from "SW1A 1AA")
+  const prefix = postcode.trim().toUpperCase().split(' ')[0].replace(/[0-9]/g, '');
   
-  // Bournemouth Route
-  "BH": "BOURNEMOUTH ROUTE",
-  "SO": "BOURNEMOUTH ROUTE",
-  "GU": "BOURNEMOUTH ROUTE",
-  "RG": "BOURNEMOUTH ROUTE",
-  "OX": "BOURNEMOUTH ROUTE",
+  // Map of postcode prefixes to areas
+  const areaMap: Record<string, string[]> = {
+    'N': ['North London'],
+    'NW': ['North West London'],
+    'W': ['West London'],
+    'SW': ['South West London'],
+    'SE': ['South East London'],
+    'E': ['East London'],
+    'EC': ['East Central London'],
+    'WC': ['West Central London'],
+    'BR': ['Bromley'],
+    'CR': ['Croydon'],
+    'DA': ['Dartford'],
+    'EN': ['Enfield'],
+    'HA': ['Harrow'],
+    'IG': ['Ilford'],
+    'KT': ['Kingston upon Thames'],
+    'RM': ['Romford'],
+    'SM': ['Sutton'],
+    'TW': ['Twickenham'],
+    'UB': ['Southall', 'Uxbridge'],
+    'WD': ['Watford'],
+    // Add more mappings as needed
+  };
   
-  // Southend Route
-  "SG": "SOUTHEND ROUTE",
-  "CM": "SOUTHEND ROUTE",
-  "SS": "SOUTHEND ROUTE",
-  "CO": "SOUTHEND ROUTE",
-  "CB": "SOUTHEND ROUTE",
-  
-  // Leeds Route
-  "LS": "LEEDS ROUTE",
-  "S": "LEEDS ROUTE",
-  "DN": "LEEDS ROUTE",
-  "WF": "LEEDS ROUTE",
-  "YO": "LEEDS ROUTE",
-  "HD": "LEEDS ROUTE",
-  "HX": "LEEDS ROUTE",
-  "BD": "LEEDS ROUTE",
-  "HG": "LEEDS ROUTE",
-  
-  // Birmingham Route
-  "CV": "BIRMINGHAM ROUTE",
-  "B": "BIRMINGHAM ROUTE",
-  "WR": "BIRMINGHAM ROUTE",
-  "DY": "BIRMINGHAM ROUTE",
-  "WV": "BIRMINGHAM ROUTE",
-  "SY": "BIRMINGHAM ROUTE",
-  "WS": "BIRMINGHAM ROUTE",
-  "TF": "BIRMINGHAM ROUTE",
-  
-  // Nottingham Route
-  "NG": "NOTTINGHAM ROUTE",
-  "DE": "NOTTINGHAM ROUTE",
-  "LE": "NOTTINGHAM ROUTE",
-  "PE": "NOTTINGHAM ROUTE",
-  "LN": "NOTTINGHAM ROUTE",
-  
-  // Manchester Route
-  "ST": "MANCHESTER ROUTE",
-  "M": "MANCHESTER ROUTE",
-  "SK": "MANCHESTER ROUTE",
-  "CW": "MANCHESTER ROUTE",
-  "CH": "MANCHESTER ROUTE",
-  "LL": "MANCHESTER ROUTE",
-  "L": "MANCHESTER ROUTE",
-  "WN": "MANCHESTER ROUTE",
-  "BL": "MANCHESTER ROUTE",
-  "OL": "MANCHESTER ROUTE",
-  "FY": "MANCHESTER ROUTE",
-  "PR": "MANCHESTER ROUTE",
-  "BB": "MANCHESTER ROUTE",
-  
-  // London Route
-  "EN": "LONDON ROUTE",
-  "IG": "LONDON ROUTE",
-  "RM": "LONDON ROUTE",
-  "DA": "LONDON ROUTE",
-  "BR": "LONDON ROUTE",
-  "UB": "LONDON ROUTE",
-  "HA": "LONDON ROUTE",
-  "WD": "LONDON ROUTE",
-  
-  // Brighton Route
-  "SL": "BRIGHTON ROUTE",
-  "CR": "BRIGHTON ROUTE",
-  "TW": "BRIGHTON ROUTE",
-  "KT": "BRIGHTON ROUTE",
-  "RH": "BRIGHTON ROUTE",
-  "BN": "BRIGHTON ROUTE",
-  "TN": "BRIGHTON ROUTE",
-  "ME": "BRIGHTON ROUTE",
-  
-  // Northampton Route
-  "NN": "NORTHAMPTON ROUTE",
-  "MK": "NORTHAMPTON ROUTE",
-  "LU": "NORTHAMPTON ROUTE",
-  "HP": "NORTHAMPTON ROUTE",
-  "AL": "NORTHAMPTON ROUTE"
+  return areaMap[prefix] || ['Area not specified'];
 };
 
-// Map of postal code areas for each route
-const routeAreas: Record<string, string[]> = {
-  "CARDIFF ROUTE": ["Cardiff", "Swansea", "Newport", "Swindon", "Bath"],
-  "BOURNEMOUTH ROUTE": ["Bournemouth", "Southampton", "Guildford", "Reading", "Oxford"],
-  "SOUTHEND ROUTE": ["Southend", "Chelmsford", "Colchester", "Cambridge", "Stevenage"],
-  "LEEDS ROUTE": ["Leeds", "Sheffield", "Doncaster", "York", "Bradford", "Huddersfield", "Halifax"],
-  "BIRMINGHAM ROUTE": ["Birmingham", "Coventry", "Worcester", "Dudley", "Wolverhampton", "Shrewsbury"],
-  "NOTTINGHAM ROUTE": ["Nottingham", "Derby", "Leicester", "Peterborough", "Lincoln"],
-  "MANCHESTER ROUTE": ["Manchester", "Liverpool", "Chester", "Stockport", "Wigan", "Bolton", "Oldham", "Blackpool", "Preston"],
-  "LONDON ROUTE": ["North London", "East London", "Enfield", "Ilford", "Romford", "Dartford", "Bromley", "Uxbridge", "Harrow", "Watford"],
-  "BRIGHTON ROUTE": ["Brighton", "Slough", "Croydon", "Twickenham", "Kingston", "Redhill", "Tunbridge Wells", "Maidstone"],
-  "NORTHAMPTON ROUTE": ["Northampton", "Milton Keynes", "Luton", "Hemel Hempstead", "St Albans"]
+// Get the route for a given postal code
+export const getRouteForPostalCode = (postcode: string): string | null => {
+  // Normalize postcode
+  const normalizedPostcode = postcode.trim().toUpperCase();
+  
+  // Extract the first part of the postcode (e.g., "SW" from "SW1A 1AA")
+  const prefix = normalizedPostcode.split(' ')[0].replace(/[0-9]/g, '');
+  
+  // Map postal code prefixes to routes
+  const routeMap: Record<string, string> = {
+    // London
+    'N': 'London North',
+    'NW': 'London North West',
+    'W': 'London West',
+    'SW': 'London South West',
+    'SE': 'London South East',
+    'E': 'London East',
+    'EC': 'London Central',
+    'WC': 'London Central',
+    
+    // Greater London
+    'BR': 'South London',
+    'CR': 'South London',
+    'DA': 'East London',
+    'EN': 'North London',
+    'HA': 'North West London',
+    'IG': 'East London',
+    'KT': 'South West London',
+    'RM': 'East London',
+    'SM': 'South London',
+    'TW': 'West London',
+    'UB': 'West London',
+    'WD': 'North London',
+    
+    // Rest of UK - sample data
+    'B': 'Birmingham',
+    'CF': 'Cardiff',
+    'CH': 'Chester',
+    'CV': 'Coventry',
+    'G': 'Glasgow',
+    'L': 'Liverpool',
+    'M': 'Manchester',
+    'NG': 'Nottingham',
+    'OX': 'Oxford',
+    'S': 'Sheffield',
+    // Add more routes as needed
+  };
+  
+  return routeMap[prefix] || null;
 };
-
-// Restricted areas (with contact before booking)
-export const restrictedPostalCodes = [
-  "EX", "TQ", "DT", "SA", "LD", "HR", "IP", "NR", "HU", "TS", 
-  "DL", "SR", "DH", "CA", "NE", "TD", "EH", "ML", "KA", "DG", 
-  "G", "KY", "PA", "IV", "AB", "DD"
-];
-
-// Get route for a given postal code
-export function getRouteForPostalCode(postalCode: string): string | null {
-  if (!postalCode) return null;
-  
-  // Extract the alphabetic prefix from the postal code
-  const prefix = postalCode.trim().toUpperCase().match(/^[A-Z]+/);
-  if (!prefix) return null;
-  
-  return postalCodeToRouteMap[prefix[0]] || null;
-}
-
-// Get areas for a given postal code
-export function getAreasFromPostalCode(postalCode: string): string[] {
-  if (!postalCode) return [];
-  
-  const route = getRouteForPostalCode(postalCode);
-  if (!route) return [];
-  
-  return routeAreas[route] || [];
-}
 
 // Check if a postal code is in a restricted area
-export function isRestrictedPostalCode(postalCode: string): boolean {
-  if (!postalCode) return false;
+export const isRestrictedPostalCode = (postcode: string): boolean => {
+  // Normalize postcode
+  const normalizedPostcode = postcode.trim().toUpperCase();
   
-  // Extract the alphabetic prefix from the postal code
-  const prefix = postalCode.trim().toUpperCase().match(/^[A-Z]+/);
-  if (!prefix) return false;
+  // List of restricted area prefixes
+  const restrictedPrefixes = [
+    'EX', 'TQ', 'DT', 'SA',  // South West
+    'LD', 'HR', 'IP', 'NR',  // Wales & East Anglia
+    'HU', 'TS', 'DL', 'SR',  // North East
+    'DH', 'CA', 'NE', 'TD',  // North & Borders
+    'EH', 'ML', 'KA', 'DG',  // Scotland South
+    'G', 'KY', 'PA', 'IV',   // Scotland Central & Highlands
+    'AB', 'DD'               // Scotland North East
+  ];
   
-  return restrictedPostalCodes.includes(prefix[0]);
-}
+  // Check if the postcode starts with any of the restricted prefixes
+  return restrictedPrefixes.some(prefix => normalizedPostcode.startsWith(prefix));
+};
+
+// Get the outward code (first part of postcode)
+export const getOutwardCode = (postcode: string): string => {
+  const parts = postcode.trim().toUpperCase().split(' ');
+  return parts[0];
+};
+
+// Get the inward code (second part of postcode)
+export const getInwardCode = (postcode: string): string | null => {
+  const parts = postcode.trim().toUpperCase().split(' ');
+  return parts.length > 1 ? parts[1] : null;
+};
+
+// Validate a UK postcode format
+export const isValidUKPostcode = (postcode: string): boolean => {
+  // UK postcode regex pattern
+  const postcodePattern = /^[A-Z]{1,2}[0-9][A-Z0-9]? ?[0-9][A-Z]{2}$/i;
+  return postcodePattern.test(postcode.trim());
+};

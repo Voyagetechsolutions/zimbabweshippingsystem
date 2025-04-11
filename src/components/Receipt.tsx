@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Download, Printer, Mail } from 'lucide-react';
+import { Download, Printer, Mail, Shield, Home } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { formatDate } from '@/utils/formatters';
 import { supabase } from '@/integrations/supabase/client';
@@ -224,6 +224,29 @@ const Receipt: React.FC<ReceiptProps> = ({ receipt, shipment }) => {
     }
   };
 
+  // Helper function to format payment method for display
+  const formatPaymentMethod = (method: string) => {
+    const methodMap: Record<string, string> = {
+      'cash': 'Cash Payment',
+      'bank_transfer': 'Bank Transfer',
+      'direct_debit': 'Direct Debit',
+      '30day': '30-Day Payment Plan',
+      'cash_on_arrival': 'Cash Payment on Arrival',
+      'bank_transfer_on_arrival': 'Bank Transfer on Arrival',
+      'test': 'Test Payment'
+    };
+    
+    return methodMap[method] || method;
+  };
+
+  // Helper function to get payment status description
+  const getPaymentStatusDescription = (status: string, method: string) => {
+    if (status === 'issued') return 'Paid';
+    if (status === 'pending_arrival') return 'Pay on Goods Arriving';
+    if (status === 'pending_30day') return 'Due within 30 days of collection';
+    return 'Pending';
+  };
+
   return (
     <div className="container mx-auto px-2 sm:px-4 max-w-4xl">
       <Card className="border-0 shadow-lg overflow-hidden">
@@ -279,8 +302,10 @@ Chelveston, Wellingborough, NN9 6AA</p>
                     <td className="p-2 sm:p-3 text-xs sm:text-sm break-all sm:break-normal">{shipment?.tracking_number || receipt.shipment_details.tracking_number}</td>
                     <td className="p-2 sm:p-3 text-xs sm:text-sm">
                       {receipt.shipment_details.type === 'drum'
-                        ? `${receipt.shipment_details.quantity} x 200L Drums`
-                        : `Parcel (${receipt.shipment_details.weight}kg)`
+                        ? `${receipt.shipment_details.quantity} × Drum(s)`
+                        : receipt.shipment_details.type === 'other' && receipt.shipment_details.items
+                          ? `Other Items: ${Array.isArray(receipt.shipment_details.items) ? receipt.shipment_details.items.join(', ') : receipt.shipment_details.items}`
+                          : 'Other Items'
                       }
                     </td>
                     <td className="p-2 sm:p-3 text-xs sm:text-sm">{shipment?.status || receipt.status}</td>
@@ -291,15 +316,62 @@ Chelveston, Wellingborough, NN9 6AA</p>
           </div>
           
           <div className="mb-4 sm:mb-6">
+            <h3 className="font-bold text-sm mb-1 sm:mb-2">Additional Services</h3>
+            <div className="border rounded-md overflow-hidden">
+              <div className="flex flex-col divide-y">
+                {receipt.shipment_details.metal_seal && (
+                  <div className="flex justify-between p-2 sm:p-3 text-xs sm:text-sm bg-gray-50">
+                    <span className="flex items-center">
+                      <Shield className="h-3 w-3 mr-1 text-blue-600" /> 
+                      Metal Security Seal
+                    </span>
+                    <span>Included</span>
+                  </div>
+                )}
+                
+                {receipt.shipment_details.door_to_door && (
+                  <div className="flex justify-between p-2 sm:p-3 text-xs sm:text-sm">
+                    <span className="flex items-center">
+                      <Home className="h-3 w-3 mr-1 text-green-600" /> 
+                      Door-to-Door Delivery
+                    </span>
+                    <span>Included</span>
+                  </div>
+                )}
+                
+                {!receipt.shipment_details.metal_seal && !receipt.shipment_details.door_to_door && (
+                  <div className="p-2 sm:p-3 text-xs sm:text-sm text-center text-gray-500">
+                    No additional services selected
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <div className="mb-4 sm:mb-6">
             <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
               <span className="font-medium">Shipping Cost</span>
-              <span>£{(receipt.amount * 0.9).toFixed(2)}</span>
+              <span>£{(receipt.amount * 0.95).toFixed(2)}</span>
             </div>
             
-            {receipt.shipment_details.services && receipt.shipment_details.services.length > 0 && (
+            {receipt.shipment_details.metal_seal && (
               <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
-                <span className="font-medium">Additional Services</span>
-                <span>£{(receipt.amount * 0.1).toFixed(2)}</span>
+                <span className="font-medium">Metal Security Seal</span>
+                <span>£5.00</span>
+              </div>
+            )}
+            
+            {receipt.shipment_details.door_to_door && (
+              <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
+                <span className="font-medium">Door-to-Door Delivery</span>
+                <span>£25.00</span>
+              </div>
+            )}
+            
+            {receipt.shipment_details.pay_on_arrival && (
+              <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
+                <span className="font-medium">Pay on Arrival Premium (20%)</span>
+                <span>£{(receipt.amount * 0.2).toFixed(2)}</span>
               </div>
             )}
             
@@ -309,8 +381,24 @@ Chelveston, Wellingborough, NN9 6AA</p>
             </div>
             
             <div className="border rounded-md p-2 sm:p-3 bg-gray-50 mt-2">
-              <p className="font-medium text-sm">Payment Method: {receipt.payment_method === 'stripe' ? 'Credit Card' : receipt.payment_method === 'paypal' ? 'PayPal' : 'Pay Later'}</p>
-              <p className="text-xs sm:text-sm text-gray-600 mt-1">Payment Status: {receipt.status === 'issued' ? 'Paid' : 'Pending'}</p>
+              <p className="font-medium text-sm">Payment Method: {formatPaymentMethod(receipt.payment_method)}</p>
+              <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                Payment Status: {getPaymentStatusDescription(receipt.status, receipt.payment_method)}
+              </p>
+              
+              {receipt.status === 'pending_30day' && (
+                <div className="mt-2 text-xs bg-blue-50 p-2 rounded text-blue-700">
+                  <p className="font-medium">30-Day Payment Plan:</p>
+                  <p>Payment due within 30 days of collection date.</p>
+                </div>
+              )}
+              
+              {receipt.status === 'pending_arrival' && (
+                <div className="mt-2 text-xs bg-yellow-50 p-2 rounded text-yellow-700">
+                  <p className="font-medium">Pay on Arrival:</p>
+                  <p>Payment will be collected when goods arrive in Zimbabwe.</p>
+                </div>
+              )}
             </div>
           </div>
           
