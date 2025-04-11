@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, X, ChevronDown, LogOut, User, Shield, Settings, Package, Bell, Truck, DollarSign, Image, Search, Phone, FileText } from 'lucide-react';
+import { Menu, X, ChevronDown, LogOut, User, Shield, Settings, Package, Bell, Truck, DollarSign, Image, Search, Phone, FileText, Calendar, Book } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/contexts/RoleContext';
@@ -79,11 +80,25 @@ const Navbar = () => {
                   <span>Pricing</span>
                 </Link>
                 <Link
+                  to="/about-us"
+                  className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium flex items-center"
+                >
+                  <Book className="mr-1 h-4 w-4" />
+                  <span>About Us</span>
+                </Link>
+                <Link
                   to="/gallery"
                   className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium flex items-center"
                 >
                   <Image className="mr-1 h-4 w-4" />
                   <span>Gallery</span>
+                </Link>
+                <Link
+                  to="/collection-schedule"
+                  className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium flex items-center"
+                >
+                  <Calendar className="mr-1 h-4 w-4" />
+                  <span>Schedule</span>
                 </Link>
                 <Link
                   to="/track"
@@ -245,12 +260,28 @@ const Navbar = () => {
             <span>Pricing</span>
           </Link>
           <Link
+            to="/about-us"
+            className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center"
+            onClick={toggleMenu}
+          >
+            <Book className="mr-2 h-4 w-4" />
+            <span>About Us</span>
+          </Link>
+          <Link
             to="/gallery"
             className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center"
             onClick={toggleMenu}
           >
             <Image className="mr-2 h-4 w-4" />
             <span>Gallery</span>
+          </Link>
+          <Link
+            to="/collection-schedule"
+            className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center"
+            onClick={toggleMenu}
+          >
+            <Calendar className="mr-2 h-4 w-4" />
+            <span>Schedule</span>
           </Link>
           <Link
             to="/track"
