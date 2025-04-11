@@ -378,8 +378,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       {/* Delivery Information */}
       <Card>
         <CardHeader>
-          <CardTitle>Delivery Information (Zimbabwe)</CardTitle>
-          <CardDescription>Receiver details in Zimbabwe</CardDescription>
+          <CardTitle>Delivery Information </CardTitle>
+          <CardDescription>Receiver details</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -408,14 +408,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="deliveryAddress">Delivery Address (Zimbabwe)</Label>
+            <Label htmlFor="deliveryAddress">Delivery Address </Label>
             <Textarea
               id="deliveryAddress"
               name="deliveryAddress"
               value={formData.deliveryAddress}
               onChange={handleInputChange}
               required
-              placeholder="Enter full delivery address in Zimbabwe"
+              placeholder="Enter full delivery address "
               rows={3}
             />
           </div>
@@ -428,7 +428,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               value={formData.deliveryCity}
               onChange={handleInputChange}
               required
-              placeholder="Enter city/town in Zimbabwe"
+              placeholder="Enter delivery city/town"
             />
           </div>
         </CardContent>
@@ -452,14 +452,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 <RadioGroupItem value="drum" id="drum" />
                 <Label htmlFor="drum" className="flex flex-1 items-center gap-2 font-normal dark:text-white">
                   <Package className="h-5 w-5" />
-                  <span>Drum Shipping (220L capacity)</span>
+                  <span>Drum Shipping (200L-220L capacity)</span>
                 </Label>
               </div>
               <div className="flex items-center space-x-3 rounded-md border p-4 dark:border-gray-700">
                 <RadioGroupItem value="parcel" id="parcel" />
                 <Label htmlFor="parcel" className="flex flex-1 items-center gap-2 font-normal dark:text-white">
                   <Package className="h-5 w-5" />
-                  <span>Regular Parcel</span>
+                  <span>Other Parcel</span>
                 </Label>
               </div>
             </RadioGroup>
