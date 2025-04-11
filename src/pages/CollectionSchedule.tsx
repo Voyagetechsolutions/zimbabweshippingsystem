@@ -86,8 +86,16 @@ const CollectionSchedule = () => {
         if (shipmentsError) throw shipmentsError;
         
         if (shipmentsData) {
-          setShipments(shipmentsData);
-          setFilteredShipments(shipmentsData);
+          // Cast the returned data to the expected ShipmentData type
+          const typedShipments: ShipmentData[] = shipmentsData.map(shipment => ({
+            id: shipment.id,
+            tracking_number: shipment.tracking_number,
+            status: shipment.status,
+            metadata: shipment.metadata as ShipmentData['metadata'] || {}
+          }));
+          
+          setShipments(typedShipments);
+          setFilteredShipments(typedShipments);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
