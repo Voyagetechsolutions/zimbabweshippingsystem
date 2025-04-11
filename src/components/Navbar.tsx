@@ -68,10 +68,10 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex-shrink-0">
-            <Link to="/" className="flex items-center">
+            { /*<Link to="/" className="flex items-center">
               <Logo className="h-8 w-auto" />
               <span className="ml-2 text-xl font-bold text-gray-900">ZimbabweShipping</span>
-            </Link>
+            </Link>*/}
           </div>
 
           {/* Desktop Navigation */}
