@@ -1,74 +1,60 @@
+
 import { supabase } from '@/integrations/supabase/client';
-import { Json } from '@/integrations/supabase/types';
 
 /**
- * Call a Supabase RPC function with parameters
+ * Helper function to call Supabase RPC functions
  * @param functionName The name of the function to call
- * @param params Optional parameters to pass to the function
- * @returns The function result
+ * @param params Parameters to pass to the function
+ * @returns The result of the function call
  */
 export const callRpcFunction = async <T = any>(
-  functionName: string, 
+  functionName: string,
   params?: Record<string, any>
-) => {
-  // Cast the function name to any to bypass the strict function name checking
-  // This allows us to call any RPC function by name
-  const response = await supabase.rpc(functionName as any, params || {});
+): Promise<T> => {
+  const { data, error } = await supabase.rpc(functionName, params);
   
-  // Return the data and error in the expected format
-  return { 
-    data: response.data as T, 
-    error: response.error 
-  };
-};
-
-/**
- * Upload a file to Supabase storage
- * @param bucket The storage bucket
- * @param path The path within the bucket
- * @param file The file to upload
- * @returns The upload result
- */
-export const uploadStorageFile = async (bucket: string, path: string, file: File) => {
-  const fileName = `${path}/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .upload(fileName, file);
-    
-  if (error) throw error;
-  
-  // Get the public URL
-  const { data: publicUrlData } = supabase.storage
-    .from(bucket)
-    .getPublicUrl(fileName);
-    
-  return publicUrlData.publicUrl;
-};
-
-/**
- * Delete a file from Supabase storage
- * @param bucket The storage bucket
- * @param path The path of the file to delete
- * @returns The delete result
- */
-export const deleteStorageFile = async (bucket: string, path: string) => {
-  return supabase.storage
-    .from(bucket)
-    .remove([path]);
-};
-
-// Add a helper function to get the current authenticated user
-export const getCurrentUser = async () => {
-  const { data, error } = await supabase.auth.getUser();
   if (error) {
-    console.error('Error getting current user:', error);
-    return null;
+    console.error(`Error calling ${functionName}:`, error);
+    throw error;
   }
-  return data?.user || null;
+  
+  return data as T;
 };
 
-// Add a function to check if the user is authenticated
-export const isAuthenticated = async () => {
-  const user = await getCurrentUser();
-  return !!user;
+/**
+ * Check if the current user is an admin
+ * @returns A boolean indicating if the user is an admin
+ */
+export const isUserAdmin = async (): Promise<boolean> => {
+  try {
+    const result = await callRpcFunction<boolean>('is_admin');
+    return result;
+  } catch (error) {
+    console.error('Error checking admin status:', error);
+    return false;
+  }
+};
+
+/**
+ * Helper function to handle shipment access
+ * @param userId User ID to check
+ * @returns A boolean indicating if the user has access
+ */
+export const hasShipmentAccess = async (userId: string): Promise<boolean> => {
+  // If no user ID, public shipment
+  if (!userId) return true;
+  
+  // Get the current user
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  // If no logged in user, deny access
+  if (!user) return false;
+  
+  // If it's the user's own shipment, allow access
+  if (user.id === userId) return true;
+  
+  // Check if the user is an admin
+  const isAdmin = await isUserAdmin();
+  
+  return isAdmin;
 };
