@@ -65,7 +65,7 @@ const HeroSection: React.FC = () => {
                   </div>
                   <div className="text-sm">
                     <p className="font-medium">Volume Based</p>
-                    <p className="text-gray-500 text-xs">Pricing by volume, not weight</p>
+                    <p className="text-gray-500 text-xs">Pricing by volume</p>
                   </div>
                 </div>
               </div>
