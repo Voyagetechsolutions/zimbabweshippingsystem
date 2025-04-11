@@ -58,10 +58,10 @@ const CollectionSchedule = () => {
           
           // Extract unique routes and areas
           const routes = [...new Set(schedulesData.map(schedule => schedule.route))];
-          setAllRoutes(routes);
+          setAllRoutes(routes as string[]);
           
           const areas = [...new Set(schedulesData.flatMap(schedule => schedule.areas))];
-          setAllAreas(areas);
+          setAllAreas(areas as string[]);
         } else {
           // If no data in database, use the default data from collectionSchedule.ts
           const defaultSchedules = collectionSchedules.map((schedule, index) => ({
