@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,7 +25,7 @@ import {
   Package, Truck, Users, Search, 
   RefreshCcw, Filter, Eye, Edit, User,
   Settings, Activity, Calendar,
-  FileText, BarChart3, ImageIcon, MessageSquare, Megaphone
+  FileText, BarChart3, ImageIcon, MessageSquare
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -119,7 +119,7 @@ const AdminDashboard = () => {
     };
   }, []);
 
-  const checkIfAdminExists = async () => {
+  const checkIfAdminExists = useCallback(async () => {
     try {
       const { data, error } = await supabase.rpc('is_admin');
       
@@ -150,10 +150,13 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error('Error checking admin status:', error);
     }
-  };
+  }, []);
 
   useEffect(() => {
     checkIfAdminExists();
+  }, [checkIfAdminExists]);
+
+  useEffect(() => {
     if (isAdmin || adminExists) {
       fetchShipments();
     }
@@ -206,20 +209,6 @@ const AdminDashboard = () => {
     }
   };
 
-  if (adminExists === false) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Navbar />
-        <main className="flex-grow py-8 bg-gray-50">
-          <div className="container mx-auto px-4 max-w-md">
-            <SetupAdmin />
-          </div>
-        </main>
-        <Footer />
-      </div>
-    );
-  }
-
   const updateShipmentStatus = async () => {
     if (!editingShipment || !newStatus) return;
     
@@ -270,6 +259,20 @@ const AdminDashboard = () => {
     
     return matchesSearch && matchesStatus;
   });
+
+  if (adminExists === false) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-grow py-8 bg-gray-50">
+          <div className="container mx-auto px-4 max-w-md">
+            <SetupAdmin />
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import { Calendar as CalendarIcon, Plus, Trash2, Edit, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -67,11 +67,10 @@ const CollectionScheduleManagement: React.FC = () => {
     };
     
     loadSchedules();
-    // Do not include toast in dependencies array as it can cause re-renders
   }, []);
 
-  // Handle date selection for a route
-  const handleDateSelect = async (route: string, date: Date | undefined) => {
+  // Handle date selection for a route - using useCallback to avoid re-creation on each render
+  const handleDateSelect = useCallback(async (route: string, date: Date | undefined) => {
     if (!date) return;
     
     // Format date as "1st of April", "2nd of April", etc.
@@ -109,7 +108,7 @@ const CollectionScheduleManagement: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
 
   // Get ordinal suffix for day (1st, 2nd, 3rd, etc.)
   const getOrdinalSuffix = (day: number): string => {
@@ -152,14 +151,14 @@ const CollectionScheduleManagement: React.FC = () => {
   };
   
   // Start editing a route
-  const handleEditRoute = (route: string) => {
+  const handleEditRoute = useCallback((route: string) => {
     // Avoid setting state during render
     const schedule = schedules.find(s => s.route === route);
     if (schedule) {
       setEditingRoute(route);
       setSelectedDate(parseRouteDate(schedule.date));
     }
-  };
+  }, [schedules]);
 
   // Add a new route
   const handleAddRoute = async () => {
