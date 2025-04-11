@@ -111,7 +111,7 @@ export const RedirectIfAuthenticated = React.memo(({ children }: { children: JSX
   // Get the intended destination from state, or default to home page
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
 
-  // Always define hooks at the top level, never conditionally
+  // Always call hooks at the top level, never conditionally
   useEffect(() => {
     if (user) {
       toast({
