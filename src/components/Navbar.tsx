@@ -70,7 +70,7 @@ const Navbar = () => {
           <div className="flex-shrink-0">
             <Link to="/" className="flex items-center">
               <Logo className="h-8 w-auto" />
-              <span className="ml-2 text-xl font-bold text-gray-900">Zimbabwe Shipping</span>
+              <span className="ml-2 text-xl font-bold text-gray-900">ZimbabweShipping</span>
             </Link>
           </div>
 
