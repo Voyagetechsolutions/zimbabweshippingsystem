@@ -19,7 +19,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
-import { collectionSchedules } from '@/data/collectionSchedule';
 
 interface CollectionScheduleItem {
   id: string;
@@ -53,7 +52,7 @@ const CollectionSchedule = () => {
           
         if (schedulesError) throw schedulesError;
         
-        if (schedulesData && schedulesData.length > 0) {
+        if (schedulesData) {
           setSchedules(schedulesData);
           
           // Extract unique routes and areas
@@ -62,48 +61,13 @@ const CollectionSchedule = () => {
           
           const areas = [...new Set(schedulesData.flatMap(schedule => schedule.areas))];
           setAllAreas(areas);
-        } else {
-          // If no data in database, use the default data from collectionSchedule.ts
-          const defaultSchedules = collectionSchedules.map((schedule, index) => ({
-            id: index.toString(),
-            route: schedule.route,
-            pickup_date: schedule.date,
-            areas: schedule.areas
-          }));
-          
-          setSchedules(defaultSchedules);
-          
-          // Extract unique routes and areas from default data
-          const routes = [...new Set(defaultSchedules.map(schedule => schedule.route))];
-          setAllRoutes(routes);
-          
-          const areas = [...new Set(defaultSchedules.flatMap(schedule => schedule.areas))];
-          setAllAreas(areas);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
-        
-        // Fallback to static data if API fails
-        const defaultSchedules = collectionSchedules.map((schedule, index) => ({
-          id: index.toString(),
-          route: schedule.route,
-          pickup_date: schedule.date,
-          areas: schedule.areas
-        }));
-        
-        setSchedules(defaultSchedules);
-        
-        // Extract unique routes and areas from default data
-        const routes = [...new Set(defaultSchedules.map(schedule => schedule.route))];
-        setAllRoutes(routes);
-        
-        const areas = [...new Set(defaultSchedules.flatMap(schedule => schedule.areas))];
-        setAllAreas(areas);
-        
         toast({
-          title: "Notice",
-          description: "Using default collection schedule data",
-          variant: "default",
+          title: "Error",
+          description: "Failed to load collection schedules.",
+          variant: "destructive",
         });
       } finally {
         setLoading(false);

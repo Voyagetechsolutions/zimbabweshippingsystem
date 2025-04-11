@@ -1,343 +1,315 @@
 
-import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, ChevronDown, User, ShoppingBag, LogOut } from 'lucide-react';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Menu, X, ChevronDown, LogOut, User, Shield, Settings, Package, Bell, Truck, DollarSign, Image, Search, Phone, FileText, Calendar, Book } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  NavigationMenu,
-  NavigationMenuContent,
-  NavigationMenuItem,
-  NavigationMenuLink,
-  NavigationMenuList,
-  NavigationMenuTrigger,
-  navigationMenuTriggerStyle,
-} from "@/components/ui/navigation-menu";
-import Logo from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRole } from '@/contexts/RoleContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
+} from '@/components/ui/dropdown-menu';
+import ThemeToggle from '@/components/ThemeToggle';
+import Logo from '@/components/Logo';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
-  const { user, signOut } = useAuth();
-  const location = useLocation();
-
-  // Function to handle the reviews link click
-  const handleReviewsClick = (e: React.MouseEvent) => {
-    if (location.pathname === '/') {
-      e.preventDefault();
-      
-      // Find the reviews section and scroll to it
-      const reviewsSection = document.querySelector('.reviews-section');
-      if (reviewsSection) {
-        reviewsSection.scrollIntoView({ behavior: 'smooth' });
-      }
-    }
-  };
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollPosition = window.scrollY;
-      setIsScrolled(scrollPosition > 10);
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  const { user, signOut, isAdmin } = useAuth();
+  const { role } = useRole();
+  const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const toggleMenu = () => {
     setIsOpen(!isOpen);
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
+
+  const getDisplayName = () => {
+    if (user?.user_metadata?.full_name) {
+      return user.user_metadata.full_name;
+    }
+    
+    if (user?.email) {
+      return user.email.split('@')[0];
+    }
+    
+    return 'User';
+  };
+
+  const getRoleDisplay = () => {
+    if (!role) return '';
+    return role.charAt(0).toUpperCase() + role.slice(1);
+  };
+
   return (
-    <header
-      className={cn(
-        "sticky top-0 z-50 w-full transition-all duration-200",
-        isScrolled ? "bg-white shadow-md" : "bg-white/80 backdrop-blur-sm"
-      )}
-    >
+    <nav className="bg-white dark:bg-gray-900 shadow-sm sticky top-0 z-50">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <div className="flex-shrink-0">
-            { /*<Link to="/" className="flex items-center">
-              <Logo className="h-8 w-auto" />
-              <span className="ml-2 text-xl font-bold text-gray-900">ZimbabweShipping</span>
-            </Link>*/}
+        <div className="flex justify-between items-center h-16">
+          <div className="flex items-center">
+            <Link to="/" className="flex-shrink-0">
+              {isMobile ? (
+                <img src="/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png" alt="Logo" className="h-10 w-auto" />
+              ) : (
+                <Logo />
+              )}
+            </Link>
+            <div className="hidden md:block ml-6">
+              <div className="flex items-baseline space-x-3">
+                <Link
+                  to="/services"
+                  className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium flex items-center"
+                >
+                  <FileText className="mr-1 h-4 w-4" />
+                  <span>Services</span>
+                </Link>
+                <Link
+                  to="/pricing"
+                  className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium flex items-center"
+                >
+                  <DollarSign className="mr-1 h-4 w-4" />
+                  <span>Pricing</span>
+                </Link>
+                <Link
+                  to="/about-us"
+                  className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium flex items-center"
+                >
+                  <Book className="mr-1 h-4 w-4" />
+                  <span>About Us</span>
+                </Link>
+                <Link
+                  to="/gallery"
+                  className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium flex items-center"
+                >
+                  <Image className="mr-1 h-4 w-4" />
+                  <span>Gallery</span>
+                </Link>
+                <Link
+                  to="/collection-schedule"
+                  className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium flex items-center"
+                >
+                  <Calendar className="mr-1 h-4 w-4" />
+                  <span>Schedule</span>
+                </Link>
+                <Link
+                  to="/track"
+                  className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium flex items-center"
+                >
+                  <Search className="mr-1 h-4 w-4" />
+                  <span>Track</span>
+                </Link>
+                <Link
+                  to="/contact"
+                  className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium flex items-center"
+                >
+                  <Phone className="mr-1 h-4 w-4" />
+                  <span>Contact</span>
+                </Link>
+                <Link
+                  to="/book-shipment"
+                  className="bg-red-600 text-white hover:bg-red-700 px-3 py-2 rounded-md text-sm font-medium flex items-center"
+                >
+                  <Truck className="mr-1 h-4 w-4" />
+                  <span>Book Shipment</span>
+                </Link>
+              </div>
+            </div>
           </div>
-
-          {/* Desktop Navigation */}
-          <div className="hidden md:block">
-            <NavigationMenu>
-              <NavigationMenuList>
-                <NavigationMenuItem>
-                  <Link to="/">
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                      Home
-                    </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>
-                
-                <NavigationMenuItem>
-                  <Link to="/services">
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                      Services
-                    </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>
-                
-                <NavigationMenuItem>
-                  <NavigationMenuTrigger>Shipping</NavigationMenuTrigger>
-                  <NavigationMenuContent>
-                    <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
-                      <li>
-                        <Link to="/pricing">
-                          <NavigationMenuLink
-                            className={cn(
-                              "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                            )}
-                          >
-                            <div className="text-sm font-medium leading-none">Pricing</div>
-                            <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                              View our transparent pricing structure for shipping from UK to Zimbabwe
-                            </p>
-                          </NavigationMenuLink>
-                        </Link>
-                      </li>
-                      <li>
-                        <Link to="/collection-schedule">
-                          <NavigationMenuLink
-                            className={cn(
-                              "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                            )}
-                          >
-                            <div className="text-sm font-medium leading-none">Collection Schedule</div>
-                            <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                              Check when we're collecting in your area
-                            </p>
-                          </NavigationMenuLink>
-                        </Link>
-                      </li>
-                      <li>
-                        <Link to="/track">
-                          <NavigationMenuLink
-                            className={cn(
-                              "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                            )}
-                          >
-                            <div className="text-sm font-medium leading-none">Track Shipment</div>
-                            <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                              Track the status of your shipment in real-time
-                            </p>
-                          </NavigationMenuLink>
-                        </Link>
-                      </li>
-                      <li>
-                        <Link to="/book-shipment">
-                          <NavigationMenuLink
-                            className={cn(
-                              "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                            )}
-                          >
-                            <div className="text-sm font-medium leading-none">Book a Shipment</div>
-                            <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                              Schedule a new shipment to Zimbabwe
-                            </p>
-                          </NavigationMenuLink>
-                        </Link>
-                      </li>
-                    </ul>
-                  </NavigationMenuContent>
-                </NavigationMenuItem>
-                
-                <NavigationMenuItem>
-                  <Link to="/gallery">
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                      Gallery
-                    </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>
-                
-                <NavigationMenuItem>
-                  <Link to="/" onClick={handleReviewsClick}>
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                      Reviews
-                    </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>
-                
-                <NavigationMenuItem>
-                  <Link to="/contact">
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                      Contact
-                    </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>
-                
-                <NavigationMenuItem>
-                  <Link to="/about-us">
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                      About Us
-                    </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>
-              </NavigationMenuList>
-            </NavigationMenu>
-          </div>
-
-          {/* Authentication Buttons */}
-          <div className="hidden md:flex items-center">
+          <div className="hidden md:flex items-center space-x-4">
+            <ThemeToggle />
+            
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative ml-4 flex items-center">
-                    <User className="h-5 w-5 mr-2" />
-                    <span className="max-w-[100px] truncate">
-                      {user.user_metadata?.full_name || user.email?.split('@')[0]}
-                    </span>
+                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                    <div className="flex items-center justify-center h-full w-full bg-zim-green/10 text-zim-green rounded-full">
+                      {getDisplayName().charAt(0).toUpperCase()}
+                    </div>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{getDisplayName()}</p>
+                      <p className="text-xs leading-none text-gray-500">{user.email}</p>
+                      {role && (
+                        <p className="text-xs leading-none text-zim-green mt-1">{getRoleDisplay()}</p>
+                      )}
+                    </div>
+                  </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <Link to="/dashboard">
-                    <DropdownMenuItem className="cursor-pointer">
-                      <User className="mr-2 h-4 w-4" />
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem onClick={() => navigate('/dashboard')}>
+                      <Package className="mr-2 h-4 w-4" />
                       <span>Dashboard</span>
                     </DropdownMenuItem>
-                  </Link>
-                  <Link to="/account">
-                    <DropdownMenuItem className="cursor-pointer">
+                    <DropdownMenuItem onClick={() => navigate('/account')}>
                       <User className="mr-2 h-4 w-4" />
-                      <span>Profile</span>
+                      <span>My Account</span>
                     </DropdownMenuItem>
-                  </Link>
-                  <Link to="/shipments">
-                    <DropdownMenuItem className="cursor-pointer">
-                      <ShoppingBag className="mr-2 h-4 w-4" />
-                      <span>My Shipments</span>
+                    <DropdownMenuItem onClick={() => navigate('/notifications')}>
+                      <Bell className="mr-2 h-4 w-4" />
+                      <span>Notifications</span>
                     </DropdownMenuItem>
-                  </Link>
+                    {(isAdmin || role === 'admin') && (
+                      <DropdownMenuItem onClick={() => navigate('/admin')}>
+                        <Shield className="mr-2 h-4 w-4" />
+                        <span>Admin Panel</span>
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem onClick={() => navigate('/settings')}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer">
+                  <DropdownMenuItem onClick={handleSignOut}>
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Log out</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <>
-                <Link to="/auth">
-                  <Button variant="outline" className="mr-2">Log in</Button>
-                </Link>
-                <Link to="/auth?signup=true">
-                  <Button>Sign up</Button>
-                </Link>
-              </>
+              <Button className="bg-zim-green hover:bg-zim-green/90" asChild>
+                <Link to="/auth">Sign In</Link>
+              </Button>
             )}
           </div>
-
-          {/* Mobile Menu Button */}
-          <div className="md:hidden">
+          <div className="md:hidden flex items-center space-x-4">
+            <ThemeToggle />
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                    <div className="flex items-center justify-center h-full w-full bg-zim-green/10 text-zim-green rounded-full">
+                      {getDisplayName().charAt(0).toUpperCase()}
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{getDisplayName()}</p>
+                      <p className="text-xs leading-none text-gray-500">{user.email}</p>
+                      {role && (
+                        <p className="text-xs leading-none text-zim-green mt-1">{getRoleDisplay()}</p>
+                      )}
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem onClick={() => navigate('/dashboard')}>
+                      <Package className="mr-2 h-4 w-4" />
+                      <span>Dashboard</span>
+                    </DropdownMenuItem>
+                    {(isAdmin || role === 'admin') && (
+                      <DropdownMenuItem onClick={() => navigate('/admin')}>
+                        <Shield className="mr-2 h-4 w-4" />
+                        <span>Admin Panel</span>
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Log out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button className="bg-zim-green hover:bg-zim-green/90" size="sm" asChild>
+                <Link to="/auth">Sign In</Link>
+              </Button>
+            )}
             <button
               onClick={toggleMenu}
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-zim-green"
+              className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-zim-green"
             >
               <span className="sr-only">Open main menu</span>
-              {isOpen ? (
-                <X className="block h-6 w-6" aria-hidden="true" />
-              ) : (
-                <Menu className="block h-6 w-6" aria-hidden="true" />
-              )}
+              {isOpen ? <X className="block h-6 w-6" /> : <Menu className="block h-6 w-6" />}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Mobile Menu */}
       <div className={`md:hidden ${isOpen ? 'block' : 'hidden'}`}>
-        <div className="px-2 pt-2 pb-3 space-y-1 bg-white">
-          <Link to="/" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-            Home
+        <div className="px-2 pt-2 pb-3 space-y-1">
+          <Link
+            to="/services"
+            className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center"
+            onClick={toggleMenu}
+          >
+            <FileText className="mr-2 h-4 w-4" />
+            <span>Services</span>
           </Link>
-          <Link to="/services" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-            Services
+          <Link
+            to="/pricing"
+            className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center"
+            onClick={toggleMenu}
+          >
+            <DollarSign className="mr-2 h-4 w-4" />
+            <span>Pricing</span>
           </Link>
-          <Link to="/pricing" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-            Pricing
+          <Link
+            to="/about-us"
+            className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center"
+            onClick={toggleMenu}
+          >
+            <Book className="mr-2 h-4 w-4" />
+            <span>About Us</span>
           </Link>
-          <Link to="/track" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-            Track Shipment
+          <Link
+            to="/gallery"
+            className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center"
+            onClick={toggleMenu}
+          >
+            <Image className="mr-2 h-4 w-4" />
+            <span>Gallery</span>
           </Link>
-          <Link to="/book-shipment" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-            Book Shipment
+          <Link
+            to="/collection-schedule"
+            className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center"
+            onClick={toggleMenu}
+          >
+            <Calendar className="mr-2 h-4 w-4" />
+            <span>Schedule</span>
           </Link>
-          <Link to="/collection-schedule" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-            Collection Schedule
+          <Link
+            to="/track"
+            className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center"
+            onClick={toggleMenu}
+          >
+            <Search className="mr-2 h-4 w-4" />
+            <span>Track</span>
           </Link>
-          <Link to="/gallery" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-            Gallery
+          <Link
+            to="/contact"
+            className="text-gray-600 dark:text-gray-300 hover:text-zim-green dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center"
+            onClick={toggleMenu}
+          >
+            <Phone className="mr-2 h-4 w-4" />
+            <span>Contact</span>
           </Link>
-          <Link to="/" onClick={(e) => { handleReviewsClick(e); setIsOpen(false); }} className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50">
-            Reviews
+          <Link
+            to="/book-shipment"
+            className="bg-red-600 text-white hover:bg-red-700 block px-3 py-2 rounded-md text-base font-medium flex items-center"
+            onClick={toggleMenu}
+          >
+            <Truck className="mr-2 h-4 w-4" />
+            <span>Book Shipment</span>
           </Link>
-          <Link to="/contact" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-            Contact
-          </Link>
-          <Link to="/about-us" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-            About Us
-          </Link>
-          
-          {user ? (
-            <>
-              <Link to="/dashboard" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-                Dashboard
-              </Link>
-              <Link to="/account" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-                Profile
-              </Link>
-              <Link to="/shipments" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-                My Shipments
-              </Link>
-              <button
-                onClick={() => { signOut(); setIsOpen(false); }}
-                className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50"
-              >
-                Log out
-              </button>
-            </>
-          ) : (
-            <div className="pt-4 pb-3 border-t border-gray-200">
-              <div className="flex items-center px-5">
-                <Link to="/auth" className="block w-full text-center px-4 py-2 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-zim-green hover:bg-zim-green-dark" onClick={() => setIsOpen(false)}>
-                  Log in
-                </Link>
-              </div>
-              <div className="mt-3 flex items-center px-5">
-                <Link to="/auth?signup=true" className="block w-full text-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-base font-medium text-gray-700 bg-white hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-                  Sign up
-                </Link>
-              </div>
-            </div>
-          )}
         </div>
       </div>
-      
-      {/* Zimbabwe Flag Colors Strip */}
-      <div className="w-full flex h-1">
-        <div className="w-1/3 bg-zim-green"></div>
-        <div className="w-1/3 bg-zim-yellow"></div>
-        <div className="w-1/3 bg-zim-red"></div>
-      </div>
-    </header>
+    </nav>
   );
 };
 
