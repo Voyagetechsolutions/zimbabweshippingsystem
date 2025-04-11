@@ -8,6 +8,7 @@ import PaymentProcessor from '@/components/PaymentProcessor';
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { callRpcFunction } from '@/utils/supabaseUtils';
 
 // Define booking steps
 enum BookingStep {
