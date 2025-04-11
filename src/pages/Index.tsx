@@ -77,7 +77,7 @@ const Index = () => {
         <TrackingSection />
         <PricingSection />
         <ShippingCalculator />
-        <section className="py-16 bg-gray-50">
+        <section id="reviews" className="py-16 bg-gray-50 reviews-section">
           <div className="container mx-auto px-4">
             <h2 className="text-3xl font-bold text-center mb-12">What Our Customers Say</h2>
             <ReviewsSection />
