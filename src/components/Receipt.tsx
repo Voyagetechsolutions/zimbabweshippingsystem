@@ -234,8 +234,9 @@ const Receipt: React.FC<ReceiptProps> = ({ receipt, shipment }) => {
                 <Logo size={isMobile ? "small" : "medium"} />
               </div>
               <div>
-                <h1 className="text-lg sm:text-2xl font-bold text-zim-green">UK to Zimbabwe Shipping</h1>
-                <p className="text-gray-600 text-xs sm:text-sm">123 Ship Street, London, UK</p>
+                <h1 className="text-lg sm:text-2xl font-bold text-zim-green">Zimbabwe Shipping</h1>
+                <p className="text-gray-600 text-xs sm:text-sm">Pastures Lodge Farm, Raunds Road
+Chelveston, Wellingborough, NN9 6AA</p>
               </div>
             </div>
             <div className="text-left sm:text-right mt-2 sm:mt-0">
@@ -314,8 +315,8 @@ const Receipt: React.FC<ReceiptProps> = ({ receipt, shipment }) => {
           </div>
           
           <div className="text-center text-gray-500 text-xs sm:text-sm mt-8 sm:mt-12 pt-3 sm:pt-4 border-t">
-            <p>Thank you for choosing UK to Zimbabwe Shipping</p>
-            <p>For any inquiries, please contact us at support@ukzimshipping.com</p>
+            <p>Thank you for choosing Zimbabwe Shipping</p>
+            <p>For any inquiries, please contact us at +44 7584 100552</p>
           </div>
         </div>
         
