@@ -5,20 +5,16 @@ import { supabase } from '@/integrations/supabase/client';
  * Helper function to call Supabase RPC functions
  * @param functionName The name of the function to call
  * @param params Parameters to pass to the function
- * @returns The result of the function call
+ * @returns The result of the function call with data and error properties
  */
 export const callRpcFunction = async <T = any>(
   functionName: string,
   params?: Record<string, any>
-): Promise<T> => {
-  const { data, error } = await supabase.rpc(functionName, params);
+): Promise<{ data: T | null; error: any }> => {
+  // Using 'as any' to bypass TypeScript's restriction on function names
+  const { data, error } = await supabase.rpc(functionName as any, params);
   
-  if (error) {
-    console.error(`Error calling ${functionName}:`, error);
-    throw error;
-  }
-  
-  return data as T;
+  return { data: data as T, error };
 };
 
 /**
@@ -27,8 +23,9 @@ export const callRpcFunction = async <T = any>(
  */
 export const isUserAdmin = async (): Promise<boolean> => {
   try {
-    const result = await callRpcFunction<boolean>('is_admin');
-    return result;
+    const { data, error } = await callRpcFunction<boolean>('is_admin');
+    if (error) throw error;
+    return data || false;
   } catch (error) {
     console.error('Error checking admin status:', error);
     return false;

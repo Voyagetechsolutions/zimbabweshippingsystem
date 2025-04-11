@@ -116,7 +116,7 @@ const AnnouncementsManager = () => {
       if (error) throw error;
       
       if (data && isMounted.current) {
-        setAnnouncements(data as unknown as Announcement[]);
+        setAnnouncements(data);
       }
     } catch (error: any) {
       console.error('Error fetching announcements:', error);

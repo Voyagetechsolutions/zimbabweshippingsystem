@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -58,8 +57,7 @@ const GalleryManagement = () => {
       const { data, error } = await callRpcFunction<GalleryImage[]>('get_gallery_images');
       
       if (error) throw error;
-      // Explicitly convert the data to GalleryImage[]
-      return data ? (data as unknown as GalleryImage[]) : [];
+      return data || [];
     }
   });
 
@@ -141,11 +139,11 @@ const GalleryManagement = () => {
         console.warn('File may not exist in storage:', err);
       }
 
-      const { error: dbError } = await callRpcFunction<boolean>('delete_gallery_image', { 
+      const { data, error } = await callRpcFunction<boolean>('delete_gallery_image', { 
         p_id: imageId 
       });
 
-      if (dbError) throw dbError;
+      if (error) throw error;
 
       return imageId;
     },
