@@ -8,6 +8,7 @@ import PaymentProcessor from '@/components/PaymentProcessor';
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { tableFrom } from '@/integrations/supabase/db-types';
 
 // Define booking steps
 enum BookingStep {
@@ -95,13 +96,69 @@ const BookShipment = () => {
   // Handle custom quote submission
   const handleCustomQuoteSubmit = async (data: any) => {
     console.log("Custom quote submitted with data:", data);
-    // Notify the user that their custom quote request has been submitted
-    toast({
-      title: "Custom Quote Submitted",
-      description: "We'll review your request and get back to you as soon as possible.",
-    });
-    // Navigate back to home
-    navigate('/');
+    try {
+      // Get user ID if logged in
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Upload images to Supabase Storage
+      const imageUrls: string[] = [];
+      
+      for (const image of data.images) {
+        const fileName = `${Date.now()}-${image.name}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('custom-quotes')
+          .upload(`quotes/${fileName}`, image);
+        
+        if (uploadError) {
+          throw uploadError;
+        }
+        
+        imageUrls.push(uploadData.path);
+      }
+      
+      // Create the custom quote record
+      const { data: quoteData, error } = await supabase
+        .from(tableFrom('custom_quotes'))
+        .insert({
+          user_id: user?.id || null,
+          phone_number: data.phone,
+          description: data.description,
+          image_urls: imageUrls,
+          status: 'pending'
+        })
+        .select('id')
+        .single();
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Create notification for admins
+      await supabase.from('notifications')
+        .insert({
+          title: 'New Custom Quote Request',
+          message: `A new custom quote request has been submitted. Phone: ${data.phone}`,
+          type: 'custom_quote',
+          related_id: quoteData.id,
+          user_id: null, // This will be updated to admin IDs through a trigger or function
+        });
+      
+      // Notify the user that their custom quote request has been submitted
+      toast({
+        title: "Custom Quote Submitted",
+        description: "We'll review your request and get back to you as soon as possible.",
+      });
+      
+      // Navigate back to home
+      navigate('/');
+    } catch (error: any) {
+      console.error('Error submitting custom quote:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit custom quote request",
+        variant: "destructive",
+      });
+    }
   };
 
   // Handle payment completion
@@ -200,55 +257,14 @@ const CustomQuoteForm = ({ onSubmit, onCancel }: { onSubmit: (data: any) => void
     setIsSubmitting(true);
 
     try {
-      // Get user ID if logged in
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      // Upload images to Supabase Storage
-      const imageUrls: string[] = [];
-      
-      for (const image of images) {
-        const fileName = `${Date.now()}-${image.name}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('custom-quotes')
-          .upload(`quotes/${fileName}`, image);
-        
-        if (uploadError) {
-          throw uploadError;
-        }
-        
-        imageUrls.push(uploadData.path);
-      }
-      
-      // Create the custom quote record
-      const { data, error } = await supabase
-        .from('custom_quotes')
-        .insert({
-          user_id: user?.id || null,
-          phone_number: phone,
-          description,
-          image_urls: imageUrls,
-          status: 'pending'
-        })
-        .select('id')
-        .single();
-      
-      if (error) {
-        throw error;
-      }
-      
-      // Create notification for admins
-      await supabase.from('notifications')
-        .insert({
-          title: 'New Custom Quote Request',
-          message: `A new custom quote request has been submitted. Phone: ${phone}`,
-          type: 'custom_quote',
-          related_id: data.id,
-          user_id: null, // This will be updated to admin IDs through a trigger or function
-        });
-      
-      onSubmit({ phone, description, images: imageUrls, id: data.id });
+      // Submit the form data
+      await onSubmit({
+        phone,
+        description,
+        images
+      });
     } catch (error: any) {
-      console.error('Error submitting custom quote:', error);
+      console.error('Error submitting form:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to submit custom quote request",
