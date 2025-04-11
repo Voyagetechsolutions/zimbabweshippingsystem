@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,24 +7,24 @@ import { format } from 'date-fns';
 import { 
   Card, CardContent, CardDescription, 
   CardHeader, CardTitle, CardFooter 
-} from "@/components/ui/card";
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
   Table, TableBody, TableCell, TableHead, 
   TableHeader, TableRow 
-} from "@/components/ui/table";
+} from '@/components/ui/table';
 import { 
   Select, SelectContent, SelectItem, 
   SelectTrigger, SelectValue 
-} from "@/components/ui/select";
+} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Package, Truck, Users, Search, 
   RefreshCcw, Filter, Eye, Edit, User,
   Settings, Activity, Calendar,
-  FileText, BarChart3, ImageIcon, MessageSquare
+  FileText, BarChart3, ImageIcon, MessageSquare, Megaphone
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -119,7 +118,7 @@ const AdminDashboard = () => {
     };
   }, []);
 
-  const checkIfAdminExists = useCallback(async () => {
+  const checkIfAdminExists = async () => {
     try {
       const { data, error } = await supabase.rpc('is_admin');
       
@@ -150,17 +149,18 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error('Error checking admin status:', error);
     }
-  }, []);
+  };
 
   useEffect(() => {
     checkIfAdminExists();
-  }, [checkIfAdminExists]);
-
-  useEffect(() => {
     if (isAdmin || adminExists) {
       fetchShipments();
     }
-  }, [adminExists, isAdmin]);
+
+    return () => {
+      isMounted.current = false;
+    };
+  }, [user, navigate]);
 
   const fetchShipments = async () => {
     if (!isMounted.current) return;
@@ -182,9 +182,9 @@ const AdminDashboard = () => {
         console.log("Admin: Fetched shipments count:", data.length);
         setShipments(data as Shipment[]);
         const totalCount = data.length;
-        const processingCount = data.filter(s => s.status.toLowerCase().includes('processing')).length;
-        const inTransitCount = data.filter(s => s.status.toLowerCase().includes('transit')).length;
-        const deliveredCount = data.filter(s => s.status.toLowerCase().includes('delivered')).length;
+        const processingCount = data.filter(s => s.status.toLowerCase() === 'processing').length;
+        const inTransitCount = data.filter(s => s.status.toLowerCase() === 'in transit').length;
+        const deliveredCount = data.filter(s => s.status.toLowerCase() === 'delivered').length;
         
         setStats({
           total: totalCount,
@@ -208,6 +208,20 @@ const AdminDashboard = () => {
       }
     }
   };
+
+  if (adminExists === false) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-grow py-8 bg-gray-50">
+          <div className="container mx-auto px-4 max-w-md">
+            <SetupAdmin />
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   const updateShipmentStatus = async () => {
     if (!editingShipment || !newStatus) return;
@@ -260,20 +274,6 @@ const AdminDashboard = () => {
     return matchesSearch && matchesStatus;
   });
 
-  if (adminExists === false) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Navbar />
-        <main className="flex-grow py-8 bg-gray-50">
-          <div className="container mx-auto px-4 max-w-md">
-            <SetupAdmin />
-          </div>
-        </main>
-        <Footer />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -310,10 +310,6 @@ const AdminDashboard = () => {
               <TabsTrigger value="settings" className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
                 <span className="hidden sm:inline">Settings</span>
-              </TabsTrigger>
-              <TabsTrigger value="schedule" className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                <span className="hidden sm:inline">Schedule</span>
               </TabsTrigger>
               <TabsTrigger value="more" className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
@@ -409,7 +405,6 @@ const AdminDashboard = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => navigate(`/shipment/${shipment.id}`)}
-                                type="button"
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
@@ -421,12 +416,7 @@ const AdminDashboard = () => {
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setActiveTab('shipments')} 
-                    className="w-full"
-                    type="button"
-                  >
+                  <Button variant="outline" onClick={() => setActiveTab('shipments')} className="w-full">
                     View All Shipments
                   </Button>
                 </CardFooter>
@@ -471,7 +461,6 @@ const AdminDashboard = () => {
                         variant="outline"
                         onClick={fetchShipments}
                         className="h-10 px-4"
-                        type="button"
                       >
                         <RefreshCcw className="h-4 w-4 mr-2" />
                         Refresh
@@ -536,7 +525,6 @@ const AdminDashboard = () => {
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => navigate(`/shipment/${shipment.id}`)}
-                                    type="button"
                                   >
                                     <Eye className="h-4 w-4" />
                                   </Button>
@@ -547,7 +535,6 @@ const AdminDashboard = () => {
                                       setEditingShipment(shipment);
                                       setNewStatus(shipment.status);
                                     }}
-                                    type="button"
                                   >
                                     <Edit className="h-4 w-4" />
                                   </Button>
@@ -647,14 +634,12 @@ const AdminDashboard = () => {
                       setEditingShipment(null);
                       setNewStatus('');
                     }}
-                    type="button"
                   >
                     Cancel
                   </Button>
                   <Button 
+                    className="bg-zim-green hover:bg-zim-green/90"
                     onClick={updateShipmentStatus}
-                    disabled={!newStatus || newStatus === editingShipment.status}
-                    type="button"
                   >
                     Update Status
                   </Button>

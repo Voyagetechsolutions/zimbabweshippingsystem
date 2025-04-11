@@ -5,6 +5,7 @@ import Footer from '@/components/Footer';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Card, CardContent, CardHeader, CardTitle 
 } from '@/components/ui/card';
@@ -41,7 +42,7 @@ const TaskManagementPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  // Check authentication first before rendering anything else
+  // Redirect if not logged in or not an admin
   if (!user) {
     return <Navigate to="/auth" replace />;
   }
@@ -50,8 +51,6 @@ const TaskManagementPage: React.FC = () => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // This useEffect will only run after the component has mounted
-  // and the authentication checks have passed
   useEffect(() => {
     fetchTasks();
   }, []);
@@ -542,5 +541,4 @@ const TaskManagementPage: React.FC = () => {
   );
 };
 
-// Use React.memo to prevent unnecessary re-renders
-export default React.memo(TaskManagementPage);
+export default TaskManagementPage;
