@@ -67,6 +67,7 @@ const CollectionScheduleManagement: React.FC = () => {
     };
     
     loadSchedules();
+    // Do not include toast in dependencies array as it can cause re-renders
   }, []);
 
   // Handle date selection for a route
@@ -152,6 +153,7 @@ const CollectionScheduleManagement: React.FC = () => {
   
   // Start editing a route
   const handleEditRoute = (route: string) => {
+    // Avoid setting state during render
     const schedule = schedules.find(s => s.route === route);
     if (schedule) {
       setEditingRoute(route);
@@ -329,6 +331,7 @@ const CollectionScheduleManagement: React.FC = () => {
           onClick={() => setAddingNewRoute(true)} 
           className="bg-zim-green hover:bg-zim-green/90"
           disabled={isLoading}
+          type="button"
         >
           <Plus className="h-4 w-4 mr-2" />
           Add New Route
@@ -366,6 +369,7 @@ const CollectionScheduleManagement: React.FC = () => {
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
+                      type="button"
                       variant="outline"
                       className="w-full justify-start text-left font-normal"
                     >
@@ -408,6 +412,7 @@ const CollectionScheduleManagement: React.FC = () => {
                 setNewRouteAreas('');
               }}
               disabled={isLoading}
+              type="button"
             >
               Cancel
             </Button>
@@ -415,6 +420,7 @@ const CollectionScheduleManagement: React.FC = () => {
               onClick={handleAddRoute} 
               className="bg-zim-green hover:bg-zim-green/90"
               disabled={isLoading}
+              type="button"
             >
               Add Route
             </Button>
@@ -442,6 +448,7 @@ const CollectionScheduleManagement: React.FC = () => {
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
+                          type="button"
                           variant="outline"
                           className="w-[240px] justify-start text-left font-normal"
                         >

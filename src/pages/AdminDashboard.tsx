@@ -8,17 +8,17 @@ import { format } from 'date-fns';
 import { 
   Card, CardContent, CardDescription, 
   CardHeader, CardTitle, CardFooter 
-} from '@/components/ui/card';
+} from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
   Table, TableBody, TableCell, TableHead, 
   TableHeader, TableRow 
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import { 
   Select, SelectContent, SelectItem, 
   SelectTrigger, SelectValue 
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -406,6 +406,7 @@ const AdminDashboard = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => navigate(`/shipment/${shipment.id}`)}
+                                type="button"
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
@@ -417,7 +418,12 @@ const AdminDashboard = () => {
                   </div>
                 </CardContent>
                 <CardFooter>
-                  <Button variant="outline" onClick={() => setActiveTab('shipments')} className="w-full">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setActiveTab('shipments')} 
+                    className="w-full"
+                    type="button"
+                  >
                     View All Shipments
                   </Button>
                 </CardFooter>
@@ -462,6 +468,7 @@ const AdminDashboard = () => {
                         variant="outline"
                         onClick={fetchShipments}
                         className="h-10 px-4"
+                        type="button"
                       >
                         <RefreshCcw className="h-4 w-4 mr-2" />
                         Refresh
@@ -526,6 +533,7 @@ const AdminDashboard = () => {
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => navigate(`/shipment/${shipment.id}`)}
+                                    type="button"
                                   >
                                     <Eye className="h-4 w-4" />
                                   </Button>
@@ -536,6 +544,7 @@ const AdminDashboard = () => {
                                       setEditingShipment(shipment);
                                       setNewStatus(shipment.status);
                                     }}
+                                    type="button"
                                   >
                                     <Edit className="h-4 w-4" />
                                   </Button>
@@ -635,12 +644,14 @@ const AdminDashboard = () => {
                       setEditingShipment(null);
                       setNewStatus('');
                     }}
+                    type="button"
                   >
                     Cancel
                   </Button>
                   <Button 
                     onClick={updateShipmentStatus}
                     disabled={!newStatus || newStatus === editingShipment.status}
+                    type="button"
                   >
                     Update Status
                   </Button>
