@@ -5,7 +5,25 @@ import Footer from '@/components/Footer';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from 'react-router-dom';
-import { ChevronRight, Ship, Package, Truck as TruckIcon, ClipboardCheck, DollarSign } from 'lucide-react';
+import { 
+  ChevronRight, 
+  Ship, 
+  Package, 
+  Truck as TruckIcon, 
+  ClipboardCheck, 
+  DollarSign,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  CornerRightDown,
+  HelpCircle
+} from 'lucide-react';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 const Services = () => {
   const services = [
@@ -74,6 +92,88 @@ const Services = () => {
         'Multiple payment options',
         'Business accounts welcome'
       ]
+    }
+  ];
+
+  const shippingGuidelinesCategories = [
+    {
+      title: 'Permitted Items',
+      icon: <CheckCircle2 className="h-6 w-6 text-green-500" />,
+      description: 'Items that are allowed to be shipped to Zimbabwe',
+      items: [
+        { name: 'Clothing & Textiles', details: 'All types of clothing, bedding, and textiles are permitted.' },
+        { name: 'Non-perishable Food', details: 'Properly packaged dry goods, canned foods, and sealed non-perishable items.' },
+        { name: 'Personal Care Items', details: 'Toiletries, cosmetics, and personal hygiene products (non-aerosol).' },
+        { name: 'Household Goods', details: 'Kitchenware, small appliances, and home accessories.' },
+        { name: 'Electronics', details: 'Computers, phones, tablets, and other electronics (limit of 2 per category per shipment).' },
+        { name: 'Books & Educational Materials', details: 'All types of books, educational resources, and stationery.' },
+        { name: 'Medical Supplies', details: 'Non-prescription medications, first aid supplies, and medical devices.' },
+        { name: 'Toys & Games', details: 'Children\'s toys, board games, and recreational items.' },
+        { name: 'Sporting Goods', details: 'Sports equipment and recreational gear (size restrictions apply).' }
+      ]
+    },
+    {
+      title: 'Restricted Items',
+      icon: <AlertTriangle className="h-6 w-6 text-amber-500" />,
+      description: 'Items that require special permission or have limitations',
+      items: [
+        { name: 'Prescription Medications', details: 'Requires proper documentation and prescription copies.' },
+        { name: 'High-Value Electronics', details: 'Items valued over £500 require additional insurance and documentation.' },
+        { name: 'Used Motor Vehicle Parts', details: 'Limited quantities allowed; requires detailed listing and inspection.' },
+        { name: 'Agricultural Items', details: 'Seeds, plants, and agricultural products require phytosanitary certificates.' },
+        { name: 'Jewelry & Valuables', details: 'High-value items must be declared and may incur additional customs duties.' },
+        { name: 'Animal Products', details: 'Limited to properly processed and packaged items with appropriate documentation.' },
+        { name: 'Commercial Quantities', details: 'Bulk commercial goods require import licenses and additional paperwork.' }
+      ]
+    },
+    {
+      title: 'Prohibited Items',
+      icon: <XCircle className="h-6 w-6 text-red-500" />,
+      description: 'Items that cannot be shipped under any circumstances',
+      items: [
+        { name: 'Weapons & Ammunition', details: 'All firearms, weapons, explosives, and related items.' },
+        { name: 'Illegal Drugs', details: 'Narcotics and controlled substances of any kind.' },
+        { name: 'Perishable Foods', details: 'Fresh fruits, vegetables, meat, and other perishable food items.' },
+        { name: 'Flammable Materials', details: 'Fuel, matches, lighters, and other flammable substances.' },
+        { name: 'Pornographic Materials', details: 'Adult content or obscene materials.' },
+        { name: 'Currency & Bearer Instruments', details: 'Cash, blank checks, and negotiable financial instruments.' },
+        { name: 'Hazardous Materials', details: 'Chemicals, corrosives, and dangerous goods.' },
+        { name: 'Counterfeit Goods', details: 'Fake or replica branded items and intellectual property violations.' },
+        { name: 'Live Animals', details: 'All live animals and insects.' },
+        { name: 'Alcohol & Tobacco', details: 'Alcoholic beverages and tobacco products are not permitted.' }
+      ]
+    },
+    {
+      title: 'Packaging Guidelines',
+      icon: <CornerRightDown className="h-6 w-6 text-blue-500" />,
+      description: 'Proper packaging ensures your items arrive safely',
+      items: [
+        { name: 'Drum Packaging', details: 'Use plastic bags to group similar items, fill empty spaces with soft items, and secure drum lids properly.' },
+        { name: 'Fragile Items', details: 'Wrap in bubble wrap or paper, place in center of package surrounded by cushioning material.' },
+        { name: 'Electronics', details: 'Use original packaging when possible, remove batteries, and wrap in anti-static material.' },
+        { name: 'Clothing', details: 'Vacuum seal bags can maximize space, group clothing by type and recipient.' },
+        { name: 'Liquids', details: 'Must be sealed in leak-proof containers, wrapped in plastic, and clearly labeled.' },
+        { name: 'Documentation', details: 'Include a detailed packing list with estimated values for customs purposes.' }
+      ]
+    }
+  ];
+
+  const shippingFAQs = [
+    {
+      question: 'How do I determine the right shipping method for my needs?',
+      answer: 'Consider the volume and weight of your items. Drum shipping is ideal for sending multiple items or larger volumes (up to 80kg per drum). Parcel delivery is better for smaller, lighter shipments or when faster delivery is needed.'
+    },
+    {
+      question: 'What is the weight limit for drums and parcels?',
+      answer: 'Our standard drums can accommodate up to 80kg of items. For parcel shipping, we accept packages up to 30kg, with pricing calculated based on actual weight.'
+    },
+    {
+      question: 'How are restricted postal codes handled?',
+      answer: 'For postal codes in restricted areas, we only offer collection services for large business shipments due to logistical limitations. If you\'re in a restricted area, please contact our support team via WhatsApp at +44 7584 100552 to discuss possible arrangements.'
+    },
+    {
+      question: 'What should I do if my item is not listed in the guidelines?',
+      answer: 'If you\'re unsure about shipping a particular item, please contact our customer service team before booking your shipment. We can provide guidance on specific items and any documentation requirements.'
     }
   ];
 
@@ -154,6 +254,81 @@ const Services = () => {
                   <div className="h-1 w-full zim-gradient-horizontal transition-all duration-300 group-hover:h-2"></div>
                 </Card>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Shipping Guidelines and Restrictions Section */}
+        <section id="shipping-guidelines" className="py-16 bg-white">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold">Shipping Guidelines & Restrictions</h2>
+              <p className="text-gray-600 max-w-3xl mx-auto mt-4">
+                Understanding what can and cannot be shipped to Zimbabwe is essential for a smooth shipping experience. 
+                Review our comprehensive guidelines to ensure your items comply with customs regulations.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+              {shippingGuidelinesCategories.map((category, index) => (
+                <Card key={index} className="border-t-4 border-t-zim-green h-full">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="flex items-center">
+                      <div className="mr-2">{category.icon}</div>
+                      <span>{category.title}</span>
+                    </CardTitle>
+                    <CardDescription>{category.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-3">
+                      {category.items.map((item, i) => (
+                        <li key={i} className="pb-3 border-b border-gray-100 last:border-0">
+                          <h4 className="font-medium text-gray-900">{item.name}</h4>
+                          <p className="text-sm text-gray-600 mt-1">{item.details}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <div className="bg-amber-50 border-l-4 border-amber-500 p-6 rounded-r-md shadow-sm mb-12">
+              <div className="flex items-start">
+                <AlertTriangle className="h-6 w-6 text-amber-500 mr-3 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h3 className="font-bold text-amber-800 mb-2">Restricted Areas Notice</h3>
+                  <p className="text-amber-700">
+                    The following postal code areas are only serviced for large business shipments due to logistics limitations:
+                  </p>
+                  <p className="text-amber-700 mt-2 font-medium">
+                    EX, TQ, DT, SA, LD, HR, IP, NR, HU, TS, DL, SR, DH, CA, NE, TD, EH, ML, KA, DG, G, KY, PA, IV, AB, DD
+                  </p>
+                  <p className="text-amber-700 mt-2">
+                    If your postal code is in a restricted area, please contact our support team via WhatsApp at{' '}
+                    <a href="https://wa.me/447584100552" className="font-bold underline">+44 7584 100552</a> for assistance.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-12">
+              <h3 className="text-2xl font-bold mb-6">Frequently Asked Questions</h3>
+              <Accordion type="single" collapsible className="w-full">
+                {shippingFAQs.map((faq, index) => (
+                  <AccordionItem key={index} value={`faq-${index}`}>
+                    <AccordionTrigger className="text-left font-medium">
+                      <div className="flex items-center">
+                        <HelpCircle className="h-5 w-5 text-zim-green mr-2" />
+                        <span>{faq.question}</span>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="text-gray-600">
+                      {faq.answer}
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
             </div>
 
             <div className="mt-16 text-center">

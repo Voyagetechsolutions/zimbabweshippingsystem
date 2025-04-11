@@ -26,6 +26,7 @@ import Support from './pages/Support';
 import Pricing from './pages/Pricing';
 import AboutUs from './pages/AboutUs';
 import CollectionSchedule from './pages/CollectionSchedule';
+import FAQ from './pages/FAQ';
 
 // Components
 import { RequireAuth, RequireAdmin, RedirectIfAuthenticated, RequireRole } from './components/RouteGuard';
@@ -71,6 +72,7 @@ function App() {
                   <Route path="/pricing" element={<Pricing />} />
                   <Route path="/about-us" element={<AboutUs />} />
                   <Route path="/collection-schedule" element={<CollectionSchedule />} />
+                  <Route path="/faq" element={<FAQ />} />
 
                   {/* Protected routes - any authenticated user */}
                   <Route
