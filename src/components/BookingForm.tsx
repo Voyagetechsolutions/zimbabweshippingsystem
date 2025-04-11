@@ -1,1064 +1,711 @@
 
 import React, { useState, useEffect } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm, Controller } from 'react-hook-form';
+import { z } from 'zod';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { AlertCircle, Check, Info, PackageCheck, Truck } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
-import { useShipping } from '@/contexts/ShippingContext';
-import { supabase } from '@/integrations/supabase/client';
-import { 
-  getRouteNames, 
-  getAreasByRoute, 
-  getDateByRoute,
-  syncSchedulesWithDatabase
-} from '@/data/collectionSchedule';
 import { 
   getRouteForPostalCode, 
-  isRestrictedPostalCode 
+  isRestrictedPostalCode,
+  getAreasFromPostalCode
 } from '@/utils/postalCodeUtils';
-import { Package, Truck, AlertTriangle, CreditCard, PoundSterling, Banknote, CreditCard as CreditCardIcon } from 'lucide-react';
+import { getDateByRoute } from '@/data/collectionSchedule';
 
-const RESTRICTED_RURAL_AREAS = [
-  'Binga', 'Gokwe', 'Beitbridge Outskirts', 'Chipinge Rural', 'Mutare Rural', 
-  'Rushinga', 'Muzarabani', 'Mbire', 'Centenary', 'Chiredzi Rural', 'Mwenezi'
-];
+// Define the form schema
+const formSchema = z.object({
+  firstName: z.string().min(2, 'First name is required'),
+  lastName: z.string().min(2, 'Last name is required'),
+  email: z.string().email('Please enter a valid email address'),
+  phone: z.string().min(10, 'Please enter a valid phone number'),
+  pickupAddress: z.string().min(5, 'Address is required'),
+  pickupPostcode: z.string().min(4, 'Postcode is required'),
+  recipientName: z.string().min(2, 'Recipient name is required'),
+  recipientPhone: z.string().min(10, 'Please enter a valid phone number'),
+  deliveryAddress: z.string().min(5, 'Delivery address is required'),
+  deliveryCity: z.string().min(2, 'City is required'),
+  shipmentType: z.enum(['drum', 'parcel']),
+  drumQuantity: z.string().optional(),
+  weight: z.string().optional(),
+  specialInstructions: z.string().optional(),
+  termsAgreed: z.boolean().refine(val => val === true, {
+    message: 'You must agree to the terms and conditions',
+  }),
+});
 
-const SHIPPING_ITEMS = [
-  'Bicycle', 'Bin', 'Plastic Tubs', 'Washing Machine', 'Dishwasher', 'Dryer', 'Ironing Board', 
-  'Wheelchair', 'Adult Walking Aid', 'Mobility Scooter', 'Car Wheels/Tyres', 'Sofas', 'Chairs', 
-  'Kids Push Chair', 'Trampoline', 'Dining Chairs', 'Dining Table', 'Coffee Table', 
-  'Rugs/Carpets', 'Internal Doors', 'External Doors', 'Vehicle Parts', 'Engine', 'Boxes', 
-  'Bags', 'Suitcase', 'Beds', 'Mattress', 'Dismantled Wardrobe', 'Chest of Drawers', 
-  'Dressing Unit', 'Wall Frames', 'Mirror', 'Pallet', 'Furniture', 'TVs', 'Tool Box', 
-  'Air Compressor', 'Generator', 'Solar Panels', 'Amazon Bags', 'Changani Bags', 
-  'Garden Tools', 'Lawn Mower', 'Bathroom Equipment', 'American Fridge', 'Standard Fridge Freezer', 
-  'Deep Freezer', 'Water Pump', 'Heater', 'Air Conditioner', 'Office Equipment', 'Building Equipment', 'Ladder'
-];
+type FormValues = z.infer<typeof formSchema>;
 
-const CATEGORIZED_SHIPPING_ITEMS = {
-  'Furniture': ['Sofas', 'Chairs', 'Dining Chairs', 'Dining Table', 'Coffee Table', 'Beds', 'Dismantled Wardrobe', 'Chest of Drawers', 'Dressing Unit'],
-  'Household Appliances': ['Washing Machine', 'Dishwasher', 'Dryer', 'American Fridge', 'Standard Fridge Freezer', 'Deep Freezer', 'Heater', 'Air Conditioner'],
-  'Mobility & Personal': ['Bicycle', 'Wheelchair', 'Adult Walking Aid', 'Mobility Scooter', 'Kids Push Chair'],
-  'Storage & Containers': ['Bin', 'Plastic Tubs', 'Boxes', 'Bags', 'Suitcase', 'Amazon Bags', 'Changani Bags'],
-  'Garden & Outdoor': ['Trampoline', 'Garden Tools', 'Lawn Mower'],
-  'Building & Materials': ['Internal Doors', 'External Doors', 'Rugs/Carpets', 'Building Equipment', 'Ladder'],
-  'Automotive': ['Car Wheels/Tyres', 'Vehicle Parts', 'Engine'],
-  'Electronics & Equipment': ['TVs', 'Tool Box', 'Air Compressor', 'Generator', 'Solar Panels', 'Water Pump', 'Office Equipment'],
-  'Miscellaneous': ['Ironing Board', 'Wall Frames', 'Mirror', 'Pallet', 'Furniture', 'Bathroom Equipment']
+const initialDrumPrices = {
+  small: 150,
+  medium: 185,
+  large: 220,
 };
 
+const parcelRatePerKg = 14;
+
 interface BookingFormProps {
-  onSubmitComplete?: (data: any, shipmentId: string, amount: number) => void;
+  onSubmitComplete: (data: FormValues, shipmentId: string, amount: number) => void;
 }
 
 const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { formatPrice } = useShipping();
-  const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    selectedRoute: '',
-    selectedArea: '',
-    pickupAddress: '',
-    pickupPostcode: '',
-    recipientName: '',
-    recipientPhone: '',
-    deliveryAddress: '',
-    deliveryCity: '',
-    shipmentType: 'drum',
-    drumQuantity: '1',
-    weight: '',
-    dimensions: '',
-    otherItems: [] as string[],
-    customItem: '',
-    paymentOption: 'immediate',
-    paymentMethod: 'card',
-    specialInstructions: '',
-    termsAccepted: false
-  });
-
-  const [availableAreas, setAvailableAreas] = useState<string[]>([]);
-  const [pickupDate, setPickupDate] = useState<string>('');
-  const [routes, setRoutes] = useState<string[]>([]);
-  const [ruralAreaWarning, setRuralAreaWarning] = useState(false);
-  const [showOtherItemInput, setShowOtherItemInput] = useState(false);
-  const [paymentTab, setPaymentTab] = useState('immediate');
-  const [detectedRoute, setDetectedRoute] = useState<string | null>(null);
-  const [pickupDateFromRoute, setPickupDateFromRoute] = useState<string>('');
+  const [collectionRoute, setCollectionRoute] = useState<string | null>(null);
+  const [collectionArea, setCollectionArea] = useState<string[]>([]);
+  const [collectionDate, setCollectionDate] = useState<string | null>(null);
   const [isRestrictedArea, setIsRestrictedArea] = useState(false);
-
-  const calculateAmount = () => {
-    let baseAmount = 0;
-    
-    if (formData.shipmentType === 'drum') {
-      const quantity = parseInt(formData.drumQuantity);
-      if (quantity === 1) {
-        baseAmount = 260;
-      } else if (quantity >= 2 && quantity <= 4) {
-        baseAmount = quantity * 250;
-      } else if (quantity >= 5) {
-        baseAmount = quantity * 220;
-      }
-    } else if (formData.shipmentType === 'parcel' && formData.weight) {
-      baseAmount = parseFloat(formData.weight) * 50;
-    } else if (formData.shipmentType === 'other' && formData.otherItems.length > 0) {
-      baseAmount = formData.otherItems.length * 100;
-    }
-    
-    baseAmount += 25;
-    
-    if (formData.paymentOption === 'onArrival') {
-      baseAmount = baseAmount * 1.2;
-    } else if (formData.paymentOption === 'immediate' && formData.paymentMethod === 'cash') {
-      baseAmount = baseAmount * 0.95;
-    }
-    
-    return baseAmount;
-  };
-
-  React.useEffect(() => {
-    const loadData = async () => {
-      await syncSchedulesWithDatabase();
-      
-      const routeNames = getRouteNames();
-      setRoutes(routeNames);
-      
-      if (formData.selectedRoute) {
-        const areas = getAreasByRoute(formData.selectedRoute);
-        setAvailableAreas(areas);
-        setPickupDate(getDateByRoute(formData.selectedRoute));
-        
-        setFormData(prev => ({ ...prev, selectedArea: '' }));
-      } else {
-        setAvailableAreas([]);
-        setPickupDate('');
-      }
-    };
-    
-    loadData();
-  }, [formData.selectedRoute]);
-
+  const [drumSize, setDrumSize] = useState<'small' | 'medium' | 'large'>('medium');
+  const [totalAmount, setTotalAmount] = useState<number>(0);
+  const [isCalculating, setIsCalculating] = useState(false);
+  
+  // Initialize the form
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      pickupAddress: '',
+      pickupPostcode: '',
+      recipientName: '',
+      recipientPhone: '',
+      deliveryAddress: '',
+      deliveryCity: '',
+      shipmentType: 'drum',
+      drumQuantity: '1',
+      weight: '',
+      specialInstructions: '',
+      termsAgreed: false,
+    },
+  });
+  
+  const watchShipmentType = form.watch('shipmentType');
+  const watchDrumQuantity = form.watch('drumQuantity');
+  const watchWeight = form.watch('weight');
+  const watchPostcode = form.watch('pickupPostcode');
+  
+  // Handle postal code changes
   useEffect(() => {
-    const checkRuralArea = () => {
-      const addressText = `${formData.deliveryAddress} ${formData.deliveryCity}`.toLowerCase();
-      const isRural = RESTRICTED_RURAL_AREAS.some(area => 
-        addressText.includes(area.toLowerCase())
-      );
+    if (watchPostcode && watchPostcode.length >= 2) {
+      const route = getRouteForPostalCode(watchPostcode);
+      setCollectionRoute(route);
       
-      setRuralAreaWarning(isRural);
-    };
-    
-    checkRuralArea();
-  }, [formData.deliveryAddress, formData.deliveryCity]);
-
-  useEffect(() => {
-    if (formData.pickupPostcode) {
-      const restricted = isRestrictedPostalCode(formData.pickupPostcode);
-      setIsRestrictedArea(restricted);
-      
-      if (!restricted) {
-        const route = getRouteForPostalCode(formData.pickupPostcode);
-        setDetectedRoute(route);
-        
-        if (route) {
-          setFormData(prev => ({ ...prev, selectedRoute: route }));
-          
-          const areas = getAreasByRoute(route);
-          setAvailableAreas(areas);
-          
-          const date = getDateByRoute(route);
-          setPickupDateFromRoute(date);
-          setPickupDate(date);
-        } else {
-          setAvailableAreas([]);
-          setPickupDateFromRoute('');
-        }
+      if (route) {
+        setCollectionArea(getAreasFromPostalCode(watchPostcode));
+        setCollectionDate(getDateByRoute(route));
       } else {
-        setDetectedRoute(null);
-        setAvailableAreas([]);
-        setPickupDateFromRoute('');
+        setCollectionArea([]);
+        setCollectionDate(null);
       }
+      
+      setIsRestrictedArea(isRestrictedPostalCode(watchPostcode));
     } else {
-      setDetectedRoute(null);
+      setCollectionRoute(null);
+      setCollectionArea([]);
+      setCollectionDate(null);
       setIsRestrictedArea(false);
-      setAvailableAreas([]);
-      setPickupDateFromRoute('');
     }
-  }, [formData.pickupPostcode]);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
-    
-    if (name === 'paymentOption') {
-      setPaymentTab(value);
+  }, [watchPostcode]);
+  
+  // Calculate total amount when form values change
+  useEffect(() => {
+    if (watchShipmentType === 'drum') {
+      const quantity = parseInt(watchDrumQuantity || '1', 10);
+      const basePrice = initialDrumPrices[drumSize];
+      setTotalAmount(basePrice * quantity);
+    } else if (watchShipmentType === 'parcel') {
+      const weight = parseFloat(watchWeight || '0');
+      if (!isNaN(weight) && weight > 0) {
+        const calculatedAmount = weight * parcelRatePerKg;
+        setTotalAmount(calculatedAmount);
+      } else {
+        setTotalAmount(0);
+      }
     }
-  };
-
-  const handleCheckboxChange = (checked: boolean) => {
-    setFormData(prev => ({ ...prev, termsAccepted: checked }));
-  };
-
-  const handleOtherItemChange = (item: string, checked: boolean) => {
-    if (checked) {
-      setFormData(prev => ({
-        ...prev,
-        otherItems: [...prev.otherItems, item]
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        otherItems: prev.otherItems.filter(i => i !== item)
-      }));
-    }
-  };
-
-  const handleCustomItemAdd = () => {
-    if (formData.customItem.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        otherItems: [...prev.otherItems, formData.customItem.trim()],
-        customItem: ''
-      }));
-    }
-  };
-
-  const generateTrackingNumber = () => {
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const numbers = '0123456789';
-    let tracking = '';
-    
-    for (let i = 0; i < 4; i++) {
-      tracking += letters.charAt(Math.floor(Math.random() * letters.length));
-    }
-    
-    for (let i = 0; i < 4; i++) {
-      tracking += numbers.charAt(Math.floor(Math.random() * numbers.length));
-    }
-    
-    return tracking;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.termsAccepted) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "You must accept the terms and conditions to proceed.",
-      });
-      return;
-    }
-    
-    if (!formData.selectedRoute || !formData.selectedArea) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Please select both a route and an area for collection.",
-      });
-      return;
-    }
-    
-    if (!formData.pickupAddress || !formData.deliveryAddress) {
-      toast({
-        variant: "destructive",
-        title: "Missing information",
-        description: "Please fill in both pickup and delivery address fields.",
-      });
-      return;
-    }
-    
-    if (ruralAreaWarning) {
-      toast({
-        variant: "destructive",
-        title: "Rural Area Restriction",
-        description: "We do not deliver to the specified rural area. Please choose an urban area destination.",
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-
+  }, [watchShipmentType, watchDrumQuantity, watchWeight, drumSize]);
+  
+  // Handle form submission
+  const onSubmit = async (data: FormValues) => {
     try {
-      const trackingNumber = generateTrackingNumber();
+      setIsCalculating(true);
       
-      let weightValue = null;
-      let dimensionsValue = null;
-      
-      if (formData.shipmentType === 'drum') {
-        weightValue = parseInt(formData.drumQuantity) * 25;
-        dimensionsValue = `${formData.drumQuantity} x 200L Drum`;
-      } else if (formData.shipmentType === 'parcel' && formData.weight) {
-        weightValue = parseFloat(formData.weight);
-        dimensionsValue = formData.dimensions || 'Regular Parcel';
-      } else if (formData.shipmentType === 'other') {
-        dimensionsValue = formData.otherItems.join(', ');
+      if (isRestrictedArea) {
+        toast({
+          title: "Restricted Area",
+          description: "Please contact us directly for shipments from this area.",
+          variant: "destructive"
+        });
+        setIsCalculating(false);
+        return;
       }
       
-      const fullName = `${formData.firstName} ${formData.lastName}`.trim();
-      const origin = `${formData.pickupAddress}, ${formData.pickupPostcode}`;
-      const destination = `${formData.deliveryAddress}, ${formData.deliveryCity}, Zimbabwe`;
-
-      const twoWeeksFromNow = new Date();
-      twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
-
-      const metaData = {
-        shipment_type: formData.shipmentType,
-        drum_quantity: formData.shipmentType === 'drum' ? parseInt(formData.drumQuantity) : null,
-        other_items: formData.shipmentType === 'other' ? formData.otherItems : null,
-        pickup_route: formData.selectedRoute,
-        pickup_area: formData.selectedArea,
-        pickup_date: pickupDate,
-        sender_name: fullName,
-        sender_email: formData.email,
-        sender_phone: formData.phone,
-        recipient_name: formData.recipientName,
-        recipient_phone: formData.recipientPhone,
-        special_instructions: formData.specialInstructions || null,
-        payment_option: formData.paymentOption,
-        payment_method: formData.paymentMethod
-      };
+      // Calculate final amount based on form data
+      let finalAmount = 0;
       
-      const amount = calculateAmount();
+      if (data.shipmentType === 'drum') {
+        const quantity = parseInt(data.drumQuantity || '1', 10);
+        const basePrice = initialDrumPrices[drumSize];
+        finalAmount = basePrice * quantity;
+      } else if (data.shipmentType === 'parcel') {
+        const weight = parseFloat(data.weight || '0');
+        if (!isNaN(weight) && weight > 0) {
+          finalAmount = weight * parcelRatePerKg;
+        }
+      }
       
-      const { data, error } = await supabase
+      // Generate a tracking number
+      const trackingNumber = `ZS${Date.now().toString().substring(5)}`;
+      
+      // Create shipment in the database
+      const { data: shipmentData, error: shipmentError } = await supabase
         .from('shipments')
         .insert({
-          user_id: user?.id || null,
+          user_id: null, // Will be updated after payment if user is authenticated
+          status: 'pending_payment',
           tracking_number: trackingNumber,
-          origin: origin,
-          destination: destination,
-          status: 'Booking Confirmed',
-          weight: weightValue,
-          dimensions: dimensionsValue,
-          carrier: 'ZimExpress',
-          estimated_delivery: twoWeeksFromNow.toISOString(),
-          metadata: metaData
+          sender_name: `${data.firstName} ${data.lastName}`,
+          sender_email: data.email,
+          sender_phone: data.phone,
+          sender_address: `${data.pickupAddress}, ${data.pickupPostcode}`,
+          recipient_name: data.recipientName,
+          recipient_phone: data.recipientPhone,
+          recipient_address: `${data.deliveryAddress}, ${data.deliveryCity}, Zimbabwe`,
+          shipment_type: data.shipmentType,
+          drum_quantity: data.shipmentType === 'drum' ? parseInt(data.drumQuantity || '1', 10) : null,
+          drum_size: data.shipmentType === 'drum' ? drumSize : null,
+          parcel_weight: data.shipmentType === 'parcel' ? parseFloat(data.weight || '0') : null,
+          amount: finalAmount,
+          special_instructions: data.specialInstructions || null,
+          route: collectionRoute,
+          collection_date: collectionDate,
         })
         .select('id')
         .single();
-
-      if (error) throw error;
       
-      if (onSubmitComplete) {
-        onSubmitComplete(formData, data.id, amount);
-      } else {
-        toast({
-          title: "Booking Confirmed",
-          description: `Your shipment has been booked with tracking number: ${trackingNumber}`,
-        });
-        
-        if (user) {
-          navigate('/dashboard');
-        } else {
-          navigate('/track');
-        }
+      if (shipmentError) {
+        throw shipmentError;
       }
+      
+      setIsCalculating(false);
+      
+      // Pass the data to the parent component for payment processing
+      onSubmitComplete(data, shipmentData.id, finalAmount);
+      
     } catch (error: any) {
+      console.error('Error creating shipment:', error);
+      setIsCalculating(false);
       toast({
-        title: "Error processing booking",
-        description: error.message || "An error occurred while processing your booking.",
-        variant: "destructive",
+        title: 'Error',
+        description: error.message || 'An error occurred while processing your booking. Please try again.',
+        variant: 'destructive',
       });
-      console.error("Booking error:", error);
-    } finally {
-      setIsSubmitting(false);
     }
   };
-
+  
   return (
-    <form onSubmit={handleSubmit} className="space-y-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>Customer Information</CardTitle>
-          <CardDescription>Please provide your contact details</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First Name</Label>
-              <Input 
-                id="firstName"
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <Tabs defaultValue="sender" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="sender">Sender Details</TabsTrigger>
+            <TabsTrigger value="recipient">Recipient Details</TabsTrigger>
+            <TabsTrigger value="shipment">Shipment Details</TabsTrigger>
+          </TabsList>
+          
+          {/* Sender Details Tab */}
+          <TabsContent value="sender" className="space-y-4 pt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
                 name="firstName"
-                value={formData.firstName}
-                onChange={handleInputChange}
-                required
-                placeholder="Enter your first name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>First Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="John" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name</Label>
-              <Input 
-                id="lastName"
+              
+              <FormField
+                control={form.control}
                 name="lastName"
-                value={formData.lastName}
-                onChange={handleInputChange}
-                required
-                placeholder="Enter your last name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Last Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Doe" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             </div>
-          </div>
-          
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input 
-                id="email"
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
                 name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                required
-                placeholder="youremail@example.com"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="john.doe@example.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number</Label>
-              <Input 
-                id="phone"
+              
+              <FormField
+                control={form.control}
                 name="phone"
-                value={formData.phone}
-                onChange={handleInputChange}
-                required
-                placeholder="Enter your phone number"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="+44 7123 456789" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             </div>
-          </div>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>Collection Information</CardTitle>
-          <CardDescription>Select the collection route and area</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="pickupPostcode">Collection Postcode</Label>
-            <Input 
-              id="pickupPostcode"
-              name="pickupPostcode"
-              value={formData.pickupPostcode}
-              onChange={handleInputChange}
-              required
-              placeholder="Enter pickup postcode"
-            />
-          </div>
-          
-          {isRestrictedArea && (
-            <Alert variant="destructive" className="mt-4">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Restricted Area</AlertTitle>
-              <AlertDescription>
-                <p>These areas are only serviced for large business shipments due to logistics limitations.</p>
-                <p className="mt-2">Please contact our support team at <a href="tel:+447584100552" className="font-bold underline">+44 7584 100552</a> before booking.</p>
-              </AlertDescription>
-            </Alert>
-          )}
-          
-          {detectedRoute && !isRestrictedArea && (
-            <div className="bg-green-50 p-4 rounded-md border border-green-200">
-              <div className="flex items-start gap-2">
-                <Truck className="h-5 w-5 text-green-600 mt-0.5" />
-                <div>
-                  <h4 className="font-medium text-green-800">Collection Route Detected</h4>
-                  <p className="text-green-700">Based on your postal code, you're on the {detectedRoute}</p>
-                  <p className="text-green-700 mt-1">Collection Date: {pickupDateFromRoute}</p>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="selectedRoute">Collection Route</Label>
-              <Select
-                value={formData.selectedRoute}
-                onValueChange={(value) => handleSelectChange('selectedRoute', value)}
-                disabled={!!detectedRoute}
-              >
-                <SelectTrigger id="selectedRoute">
-                  <SelectValue placeholder="Select a route" />
-                </SelectTrigger>
-                <SelectContent>
-                  {routes.map((route) => (
-                    <SelectItem key={route} value={route}>
-                      {route}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="selectedArea">Collection Area</Label>
-              <Select
-                value={formData.selectedArea}
-                onValueChange={(value) => handleSelectChange('selectedArea', value)}
-                disabled={!formData.selectedRoute}
-              >
-                <SelectTrigger id="selectedArea">
-                  <SelectValue placeholder="Select an area" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableAreas.map((area) => (
-                    <SelectItem key={area} value={area}>
-                      {area}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          {pickupDate && (
-            <div className="bg-muted p-4 rounded-md">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Truck size={18} />
-                <span>Collection Date:</span>
-              </div>
-              <p className="text-lg font-medium mt-1">{pickupDate}</p>
-            </div>
-          )}
-          
-          <div className="space-y-2">
-            <Label htmlFor="pickupAddress">Collection Address</Label>
-            <Textarea
-              id="pickupAddress"
+            <FormField
+              control={form.control}
               name="pickupAddress"
-              value={formData.pickupAddress}
-              onChange={handleInputChange}
-              required
-              placeholder="Enter your full pickup address"
-              rows={3}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Pickup Address</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Enter your full address" 
+                      className="resize-none" 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>Delivery Information </CardTitle>
-          <CardDescription>Receiver details</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="recipientName">Receiver Name</Label>
-              <Input 
-                id="recipientName"
-                name="recipientName"
-                value={formData.recipientName}
-                onChange={handleInputChange}
-                required
-                placeholder="Enter recipient's full name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="recipientPhone">Receiver Phone</Label>
-              <Input 
-                id="recipientPhone"
-                name="recipientPhone"
-                value={formData.recipientPhone}
-                onChange={handleInputChange}
-                required
-                placeholder="Enter recipient's phone number"
-              />
-            </div>
-          </div>
+            
+            <FormField
+              control={form.control}
+              name="pickupPostcode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Postcode</FormLabel>
+                  <FormControl>
+                    <Input placeholder="AB12 3CD" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            {/* Collection Information Card */}
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center">
+                  <Truck className="mr-2 h-5 w-5 text-zim-green" />
+                  Collection Information
+                </CardTitle>
+                <CardDescription>
+                  Based on your postcode, we'll collect your shipment on the following schedule:
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isRestrictedArea && (
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Restricted Area</AlertTitle>
+                    <AlertDescription>
+                      Your postcode falls in a restricted area. Please contact us directly at +44 7584 100552 to arrange collection.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {collectionRoute ? (
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Collection Route</Label>
+                      <div className="mt-1 p-2 bg-gray-50 rounded border">
+                        {collectionRoute || "Please enter a valid postcode"}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label>Collection Area</Label>
+                      <div className="mt-1 p-2 bg-gray-50 rounded border">
+                        {collectionArea.length > 0 ? collectionArea.join(", ") : "No areas found for this route"}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label>Collection Date</Label>
+                      <div className="mt-1 p-2 bg-gray-50 rounded border">
+                        {collectionDate || "No date available for this route"}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-gray-500">Enter your postcode to see collection details</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
           
-          <div className="space-y-2">
-            <Label htmlFor="deliveryAddress">Delivery Address </Label>
-            <Textarea
-              id="deliveryAddress"
+          {/* Recipient Details Tab */}
+          <TabsContent value="recipient" className="space-y-4 pt-4">
+            <FormField
+              control={form.control}
+              name="recipientName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Recipient Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Jane Smith" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="recipientPhone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Recipient Phone Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="+263 77 123 4567" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
               name="deliveryAddress"
-              value={formData.deliveryAddress}
-              onChange={handleInputChange}
-              required
-              placeholder="Enter full delivery address "
-              rows={3}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Delivery Address in Zimbabwe</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Enter the delivery address" 
+                      className="resize-none" 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="deliveryCity">City/Town</Label>
-            <Input 
-              id="deliveryCity"
+            
+            <FormField
+              control={form.control}
               name="deliveryCity"
-              value={formData.deliveryCity}
-              onChange={handleInputChange}
-              required
-              placeholder="Enter delivery city/town"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>City/Town in Zimbabwe</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Harare" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          
-          {ruralAreaWarning && (
-            <Alert variant="destructive" className="mt-4">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Rural Area Restriction</AlertTitle>
+            
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertTitle>Delivery Information</AlertTitle>
               <AlertDescription>
-                We currently do not deliver to rural areas including {RESTRICTED_RURAL_AREAS.join(', ')}. 
-                Please select an urban area destination.
+                We deliver to all locations in Zimbabwe. Standard delivery time is 4-6 weeks from collection.
               </AlertDescription>
             </Alert>
-          )}
-        </CardContent>
-      </Card>
-      
-      <Card className="dark:bg-gray-800 dark:border-gray-700">
-        <CardHeader>
-          <CardTitle className="dark:text-white">Shipment Details</CardTitle>
-          <CardDescription className="dark:text-gray-300">Provide information about your shipment</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-3">
-            <Label className="dark:text-white">Shipment Type</Label>
-            <RadioGroup 
-              value={formData.shipmentType} 
-              onValueChange={(value) => handleSelectChange('shipmentType', value)}
-              className="flex flex-col space-y-3"
-            >
-              <div className="flex items-center space-x-3 rounded-md border p-4 dark:border-gray-700">
-                <RadioGroupItem value="drum" id="drum" />
-                <Label htmlFor="drum" className="flex flex-1 items-center gap-2 font-normal dark:text-white">
-                  <Package className="h-5 w-5" />
-                  <span>Drum Shipping (200L-220L capacity)</span>
-                </Label>
-              </div>
-              <div className="flex items-center space-x-3 rounded-md border p-4 dark:border-gray-700">
-                <RadioGroupItem value="parcel" id="parcel" />
-                <Label htmlFor="parcel" className="flex flex-1 items-center gap-2 font-normal dark:text-white">
-                  <Package className="h-5 w-5" />
-                  <span>Regular Parcel</span>
-                </Label>
-              </div>
-              <div className="flex items-center space-x-3 rounded-md border p-4 dark:border-gray-700">
-                <RadioGroupItem value="other" id="other" />
-                <Label htmlFor="other" className="flex flex-1 items-center gap-2 font-normal dark:text-white">
-                  <Package className="h-5 w-5" />
-                  <span>Other Items</span>
-                </Label>
-              </div>
-            </RadioGroup>
-          </div>
+            
+          </TabsContent>
           
-          {formData.shipmentType === 'drum' && (
-            <div className="space-y-2">
-              <Label htmlFor="drumQuantity" className="dark:text-white">Number of Drums</Label>
-              <Select
-                value={formData.drumQuantity}
-                onValueChange={(value) => handleSelectChange('drumQuantity', value)}
-              >
-                <SelectTrigger id="drumQuantity" className="dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                  <SelectValue placeholder="Select quantity" />
-                </SelectTrigger>
-                <SelectContent className="dark:bg-gray-800 dark:border-gray-700">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-                    <SelectItem key={num} value={num.toString()} className="dark:text-white dark:focus:bg-gray-700">
-                      {num} {num === 1 ? 'Drum' : 'Drums'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-sm text-muted-foreground dark:text-gray-400 mt-1">
-                Pricing: 1 Drum: {formatPrice(260)} | 2-4 Drums: {formatPrice(250)} each | 5+ Drums: {formatPrice(220)} each
-              </p>
-              <p className="text-sm text-muted-foreground dark:text-gray-400 mt-1">
-                Door-to-door delivery: {formatPrice(25)}
-              </p>
-            </div>
-          )}
-          
-          {formData.shipmentType === 'parcel' && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="weight" className="dark:text-white">Package Weight (kg)</Label>
-                <Input 
-                  id="weight"
-                  name="weight"
-                  type="number" 
-                  min="1"
-                  value={formData.weight}
-                  onChange={handleInputChange}
-                  required={formData.shipmentType === 'parcel'}
-                  placeholder="Enter weight in kg"
-                  className="dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="dimensions" className="dark:text-white">Dimensions (Optional)</Label>
-                <Input 
-                  id="dimensions"
-                  name="dimensions"
-                  value={formData.dimensions}
-                  onChange={handleInputChange}
-                  placeholder="e.g., 30cm x 40cm x 20cm"
-                  className="dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                />
-              </div>
-              
-              <p className="text-sm text-muted-foreground dark:text-gray-400 mt-1">
-                Regular parcel pricing: {formatPrice(50)} per kg
-              </p>
-              <p className="text-sm text-muted-foreground dark:text-gray-400 mt-1">
-                Door-to-door delivery: {formatPrice(25)}
-              </p>
-            </div>
-          )}
-          
-          {formData.shipmentType === 'other' && (
-            <div className="space-y-4">
-              <Label className="dark:text-white">Select Items</Label>
-              
-              <div className="space-y-4">
-                {Object.entries(CATEGORIZED_SHIPPING_ITEMS).map(([category, items]) => (
-                  <div key={category} className="space-y-2">
-                    <h4 className="text-md font-medium dark:text-white">{category}</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                      {items.map(item => (
-                        <div key={item} className="flex items-center space-x-2">
-                          <Checkbox 
-                            id={`item-${item}`}
-                            checked={formData.otherItems.includes(item)}
-                            onCheckedChange={(checked) => 
-                              handleOtherItemChange(item, checked as boolean)
-                            }
-                          />
-                          <Label 
-                            htmlFor={`item-${item}`}
-                            className="text-sm font-normal dark:text-gray-300"
-                          >
-                            {item}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="other-item"
-                    checked={showOtherItemInput}
-                    onCheckedChange={(checked) => 
-                      setShowOtherItemInput(checked as boolean)
-                    }
-                  />
-                  <Label 
-                    htmlFor="other-item"
-                    className="font-normal dark:text-white"
-                  >
-                    Other item not listed
-                  </Label>
+          {/* Shipment Details Tab */}
+          <TabsContent value="shipment" className="space-y-4 pt-4">
+            {/* Restricted Areas Notice */}
+            <Card className="border-yellow-300 bg-yellow-50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center text-yellow-800">
+                  <AlertCircle className="mr-2 h-5 w-5" />
+                  Restricted Areas Notice
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-yellow-800 text-sm">
+                  We have delivery restrictions in some areas. If your postcode falls in one of the following areas, 
+                  please contact us directly to arrange your shipment:
+                </p>
+                <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-yellow-800">
+                  <div>EX, TQ, DT, SA</div>
+                  <div>LD, HR, IP, NR</div>
+                  <div>HU, TS, DL, SR</div>
+                  <div>DH, CA, NE, TD</div>
+                  <div>EH, ML, KA, DG</div>
+                  <div>G, KY, PA, IV</div>
+                  <div>AB, DD</div>
                 </div>
-                
-                {showOtherItemInput && (
-                  <div className="flex space-x-2 mt-2">
-                    <Input 
-                      id="customItem"
-                      name="customItem"
-                      value={formData.customItem}
-                      onChange={handleInputChange}
-                      placeholder="Enter item name"
-                      className="dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    />
-                    <Button 
-                      type="button" 
-                      variant="secondary"
-                      onClick={handleCustomItemAdd}
-                      className="whitespace-nowrap"
+              </CardContent>
+            </Card>
+            
+            <FormField
+              control={form.control}
+              name="shipmentType"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel>Shipment Type</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      className="flex flex-col space-y-1"
                     >
-                      Add Item
-                    </Button>
-                  </div>
-                )}
-              </div>
-              
-              {formData.otherItems.length > 0 && (
-                <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-md">
-                  <h4 className="font-medium mb-2 dark:text-white">Selected Items:</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {formData.otherItems.map(item => (
-                      <Badge 
-                        key={item}
-                        variant="secondary"
-                        className="flex items-center gap-1"
-                      >
-                        {item}
-                        <button
-                          type="button"
-                          onClick={() => handleOtherItemChange(item, false)}
-                          className="ml-1 hover:text-red-500"
-                        >
-                          ×
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                  <p className="text-sm mt-4 dark:text-gray-300">
-                    Base pricing: {formatPrice(100)} per item + door-to-door delivery: {formatPrice(25)}
-                  </p>
-                </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="drum" id="drum" />
+                        <Label htmlFor="drum">Drum Shipping</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="parcel" id="parcel" />
+                        <Label htmlFor="parcel">Parcel Shipping</Label>
+                      </div>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
               )}
-            </div>
-          )}
-          
-          <div className="space-y-2">
-            <Label htmlFor="specialInstructions" className="dark:text-white">Special Instructions (Optional)</Label>
-            <Textarea
-              id="specialInstructions"
-              name="specialInstructions"
-              value={formData.specialInstructions}
-              onChange={handleInputChange}
-              placeholder="Enter any special instructions or notes"
-              rows={3}
-              className="dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             />
-          </div>
-        </CardContent>
-      </Card>
-      
-      <Card className="dark:bg-gray-800 dark:border-gray-700">
-        <CardHeader>
-          <CardTitle className="dark:text-white">Payment Options</CardTitle>
-          <CardDescription className="dark:text-gray-300">Choose how and when you want to pay</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <Tabs value={paymentTab} onValueChange={(value) => {
-            setPaymentTab(value);
-            handleSelectChange('paymentOption', value);
-          }}>
-            <TabsList className="grid grid-cols-3 mb-4">
-              <TabsTrigger value="immediate">Pay Now</TabsTrigger>
-              <TabsTrigger value="onArrival">Pay on Arrival</TabsTrigger>
-              <TabsTrigger value="later">Pay Later</TabsTrigger>
-            </TabsList>
             
-            <TabsContent value="immediate" className="space-y-4">
-              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-md">
-                <h3 className="text-lg font-medium mb-2 text-green-800 dark:text-green-300">
-                  Special Deal for Cash on Collection!
-                </h3>
-                <p className="text-green-700 dark:text-green-400 mb-4">
-                  Pay with cash during collection and get 5% off your total shipping cost!
-                </p>
+            {watchShipmentType === 'drum' && (
+              <div className="space-y-4">
+                <div>
+                  <Label>Drum Size</Label>
+                  <RadioGroup
+                    defaultValue={drumSize}
+                    onValueChange={(value) => setDrumSize(value as 'small' | 'medium' | 'large')}
+                    className="mt-2"
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className={`border rounded-lg p-4 ${drumSize === 'small' ? 'bg-blue-50 border-blue-200' : ''}`}>
+                        <div className="flex items-start space-x-3">
+                          <RadioGroupItem value="small" id="small" className="mt-1" />
+                          <div>
+                            <Label htmlFor="small" className="font-medium">Small Drum</Label>
+                            <p className="text-sm text-gray-500">£150 per drum</p>
+                            <p className="text-xs text-gray-500 mt-1">Capacity: 60 liters</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className={`border rounded-lg p-4 ${drumSize === 'medium' ? 'bg-blue-50 border-blue-200' : ''}`}>
+                        <div className="flex items-start space-x-3">
+                          <RadioGroupItem value="medium" id="medium" className="mt-1" />
+                          <div>
+                            <Label htmlFor="medium" className="font-medium">Medium Drum</Label>
+                            <p className="text-sm text-gray-500">£185 per drum</p>
+                            <p className="text-xs text-gray-500 mt-1">Capacity: 120 liters</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className={`border rounded-lg p-4 ${drumSize === 'large' ? 'bg-blue-50 border-blue-200' : ''}`}>
+                        <div className="flex items-start space-x-3">
+                          <RadioGroupItem value="large" id="large" className="mt-1" />
+                          <div>
+                            <Label htmlFor="large" className="font-medium">Large Drum</Label>
+                            <p className="text-sm text-gray-500">£220 per drum</p>
+                            <p className="text-xs text-gray-500 mt-1">Capacity: 210 liters</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                </div>
                 
-                <RadioGroup 
-                  value={formData.paymentMethod} 
-                  onValueChange={(value) => handleSelectChange('paymentMethod', value)}
-                  className="flex flex-col space-y-2"
-                >
-                  <div className="flex items-center space-x-3 rounded-md border border-green-200 dark:border-green-800 p-4 bg-white dark:bg-gray-800">
-                    <RadioGroupItem value="cash" id="cash" />
-                    <Label htmlFor="cash" className="flex flex-1 items-center gap-2 font-normal dark:text-white">
-                      <Banknote className="h-5 w-5 text-green-600 dark:text-green-400" />
-                      <div>
-                        <span className="font-medium">Cash on Collection (5% discount)</span>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Pay with cash when we collect your items</p>
-                      </div>
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-3 rounded-md border p-4 dark:border-gray-700">
-                    <RadioGroupItem value="card" id="card" />
-                    <Label htmlFor="card" className="flex flex-1 items-center gap-2 font-normal dark:text-white">
-                      <CreditCardIcon className="h-5 w-5" />
-                      <div>
-                        <span className="font-medium">Card Payment</span>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Pay now with credit or debit card</p>
-                      </div>
-                    </Label>
-                  </div>
-                </RadioGroup>
+                <FormField
+                  control={form.control}
+                  name="drumQuantity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Number of Drums</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="1" 
+                          placeholder="1" 
+                          {...field}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value);
+                            field.onChange(val < 1 ? '1' : e.target.value);
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-              
-              <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-md">
-                <div className="flex justify-between mb-2">
-                  <span className="dark:text-gray-300">Base price:</span>
-                  <span className="font-medium dark:text-white">
-                    {formatPrice(calculateAmount() - 25)}
-                  </span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span className="dark:text-gray-300">Door-to-door delivery:</span>
-                  <span className="font-medium dark:text-white">{formatPrice(25)}</span>
-                </div>
-                {formData.paymentMethod === 'cash' && (
-                  <div className="flex justify-between mb-2 text-green-600 dark:text-green-400">
-                    <span>Cash discount (5%):</span>
-                    <span>-{formatPrice(calculateAmount() * 0.05)}</span>
-                  </div>
-                )}
-                <div className="border-t pt-2 mt-2 flex justify-between">
-                  <span className="font-bold dark:text-white">Total:</span>
-                  <span className="font-bold dark:text-white">{formatPrice(calculateAmount())}</span>
-                </div>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="onArrival" className="space-y-4">
-              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-md">
-                <h3 className="text-lg font-medium mb-2 text-yellow-800 dark:text-yellow-300">
-                  Pay on Goods Arriving
-                </h3>
-                <p className="text-yellow-700 dark:text-yellow-400">
-                  This option includes a 20% premium on the standard price. Payment will be required before goods can be released in Zimbabwe.
-                </p>
-              </div>
-              
-              <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-md">
-                <div className="flex justify-between mb-2">
-                  <span className="dark:text-gray-300">Base price:</span>
-                  <span className="font-medium dark:text-white">
-                    {formatPrice((calculateAmount() / 1.2) - 25)}
-                  </span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span className="dark:text-gray-300">Door-to-door delivery:</span>
-                  <span className="font-medium dark:text-white">{formatPrice(25)}</span>
-                </div>
-                <div className="flex justify-between mb-2 text-yellow-600 dark:text-yellow-400">
-                  <span>Pay on arrival premium (20%):</span>
-                  <span>{formatPrice(calculateAmount() - (calculateAmount() / 1.2))}</span>
-                </div>
-                <div className="border-t pt-2 mt-2 flex justify-between">
-                  <span className="font-bold dark:text-white">Total to pay on arrival:</span>
-                  <span className="font-bold dark:text-white">{formatPrice(calculateAmount())}</span>
-                </div>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="later" className="space-y-4">
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                <h3 className="text-lg font-medium mb-2 text-blue-800 dark:text-blue-300">
-                  Pay Later (Within 30 Days)
-                </h3>
-                <p className="text-blue-700 dark:text-blue-400">
-                  You'll have a flexible 30-day payment period starting from the collection date.
-                </p>
-              </div>
-              
-              <RadioGroup 
-                value={formData.paymentMethod} 
-                onValueChange={(value) => handleSelectChange('paymentMethod', value)}
-                className="flex flex-col space-y-2"
-              >
-                <div className="flex items-center space-x-3 rounded-md border p-4 dark:border-gray-700">
-                  <RadioGroupItem value="cash" id="cash-later" />
-                  <Label htmlFor="cash-later" className="flex flex-1 items-center gap-2 font-normal dark:text-white">
-                    <PoundSterling className="h-5 w-5" />
-                    <div>
-                      <span className="font-medium">Cash Payment</span>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Pay cash within 30 days</p>
-                    </div>
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-3 rounded-md border p-4 dark:border-gray-700">
-                  <RadioGroupItem value="transfer" id="transfer" />
-                  <Label htmlFor="transfer" className="flex flex-1 items-center gap-2 font-normal dark:text-white">
-                    <CreditCardIcon className="h-5 w-5" />
-                    <div>
-                      <span className="font-medium">Bank Transfer</span>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Pay via bank transfer within 30 days</p>
-                    </div>
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-3 rounded-md border p-4 dark:border-gray-700">
-                  <RadioGroupItem value="direct-debit" id="direct-debit" />
-                  <Label htmlFor="direct-debit" className="flex flex-1 items-center gap-2 font-normal dark:text-white">
-                    <CreditCardIcon className="h-5 w-5" />
-                    <div>
-                      <span className="font-medium">Direct Debit</span>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Set up a direct debit payment</p>
-                    </div>
-                  </Label>
-                </div>
-              </RadioGroup>
-              
-              <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-md">
-                <div className="flex justify-between mb-2">
-                  <span className="dark:text-gray-300">Base price:</span>
-                  <span className="font-medium dark:text-white">
-                    {formatPrice(calculateAmount() - 25)}
-                  </span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span className="dark:text-gray-300">Door-to-door delivery:</span>
-                  <span className="font-medium dark:text-white">{formatPrice(25)}</span>
-                </div>
-                <div className="border-t pt-2 mt-2 flex justify-between">
-                  <span className="font-bold dark:text-white">Total to pay within 30 days:</span>
-                  <span className="font-bold dark:text-white">{formatPrice(calculateAmount())}</span>
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-      
-      <Card className="dark:bg-gray-800 dark:border-gray-700">
-        <CardContent className="pt-6">
-          <div className="flex items-start space-x-3 mb-6">
-            <Checkbox 
-              id="termsAccepted" 
-              checked={formData.termsAccepted}
-              onCheckedChange={handleCheckboxChange}
-            />
-            <Label 
-              htmlFor="termsAccepted" 
-              className="text-sm font-normal leading-relaxed dark:text-white"
-            >
-              I agree to the Terms and Conditions, including acceptance of the shipping rates, collection schedule, and delivery policies.
-            </Label>
-          </div>
-          
-          <Button 
-            type="submit" 
-            className="w-full bg-zim-green hover:bg-zim-green/90"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <span className="flex items-center">
-                <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Processing...
-              </span>
-            ) : (
-              formData.paymentOption === 'immediate' ? "Proceed to Payment" : "Complete Booking"
             )}
+            
+            {watchShipmentType === 'parcel' && (
+              <FormField
+                control={form.control}
+                name="weight"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Weight (kg)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.1" 
+                        min="0.1" 
+                        placeholder="Enter weight in kg" 
+                        {...field}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          field.onChange(val < 0.1 ? '0.1' : e.target.value);
+                        }}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Rate: £{parcelRatePerKg} per kg
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            
+            <FormField
+              control={form.control}
+              name="specialInstructions"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Special Instructions (Optional)</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Any special handling or delivery instructions" 
+                      className="resize-none"
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="items">
+                <AccordionTrigger>What can I ship?</AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-2 text-sm">
+                    <p><strong>Allowed Items:</strong> Clothing, shoes, non-perishable food items, household goods, electronics (for personal use), books, and toiletries.</p>
+                    <p><strong>Restricted Items:</strong> Batteries, aerosols, perfumes, and certain electronics may have restrictions.</p>
+                    <p><strong>Prohibited Items:</strong> Illegal substances, weapons, flammable items, perishable foods, and currency.</p>
+                    <p>For a complete list, please refer to our <a href="/services" className="text-blue-600 hover:underline">Shipping Guidelines</a>.</p>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+            
+            <div>
+              <Label>Total Amount</Label>
+              <div className="mt-1 p-3 bg-blue-50 border border-blue-200 rounded-lg font-medium text-xl">
+                £{totalAmount.toFixed(2)}
+              </div>
+            </div>
+            
+            <FormField
+              control={form.control}
+              name="termsAgreed"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 mt-6">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>
+                      I agree to the <a href="/terms" className="text-blue-600 hover:underline">terms and conditions</a> and <a href="/privacy" className="text-blue-600 hover:underline">privacy policy</a>
+                    </FormLabel>
+                    <FormMessage />
+                  </div>
+                </FormItem>
+              )}
+            />
+            
+          </TabsContent>
+        </Tabs>
+        
+        <div className="flex justify-between mt-8">
+          <Button type="button" variant="outline" onClick={() => navigate('/')}>
+            Cancel
           </Button>
-          
-          <p className="text-xs text-center text-muted-foreground dark:text-gray-400 mt-4">
-            By submitting this form, you consent to our processing of your information in accordance with our Privacy Policy.
-          </p>
-        </CardContent>
-      </Card>
-    </form>
+          <Button type="submit" disabled={isCalculating} className="bg-zim-green hover:bg-zim-green/90">
+            {isCalculating ? 'Processing...' : 'Continue to Payment'}
+          </Button>
+        </div>
+      </form>
+    </Form>
   );
 };
 

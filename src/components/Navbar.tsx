@@ -70,7 +70,6 @@ const Navbar = () => {
           <div className="flex-shrink-0">
             <Link to="/" className="flex items-center">
               <Logo className="h-8 w-auto" />
-              <span className="ml-2 text-xl font-bold text-gray-900">Zimbabwe Shipping</span>
             </Link>
           </div>
 
@@ -78,14 +77,6 @@ const Navbar = () => {
           <div className="hidden md:block">
             <NavigationMenu>
               <NavigationMenuList>
-                <NavigationMenuItem>
-                  <Link to="/">
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                      Home
-                    </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>
-                
                 <NavigationMenuItem>
                   <Link to="/services">
                     <NavigationMenuLink className={navigationMenuTriggerStyle()}>
@@ -189,6 +180,14 @@ const Navbar = () => {
                     </NavigationMenuLink>
                   </Link>
                 </NavigationMenuItem>
+                
+                <NavigationMenuItem>
+                  <Link to="/book-shipment">
+                    <Button className="bg-zim-red hover:bg-zim-red/90 text-white">
+                      Book Shipment
+                    </Button>
+                  </Link>
+                </NavigationMenuItem>
               </NavigationMenuList>
             </NavigationMenu>
           </div>
@@ -265,9 +264,6 @@ const Navbar = () => {
       {/* Mobile Menu */}
       <div className={`md:hidden ${isOpen ? 'block' : 'hidden'}`}>
         <div className="px-2 pt-2 pb-3 space-y-1 bg-white">
-          <Link to="/" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-            Home
-          </Link>
           <Link to="/services" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
             Services
           </Link>
