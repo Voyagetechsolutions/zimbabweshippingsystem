@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -22,10 +21,6 @@ import {
   getDateByRoute,
   syncSchedulesWithDatabase
 } from '@/data/collectionSchedule';
-import { 
-  getRouteForPostalCode, 
-  isRestrictedPostalCode 
-} from '@/utils/postalCodeUtils';
 import { Package, Truck, AlertTriangle, CreditCard, PoundSterling, Banknote, CreditCard as CreditCardIcon } from 'lucide-react';
 
 const RESTRICTED_RURAL_AREAS = [
@@ -169,6 +164,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
 
   useEffect(() => {
     if (formData.pickupPostcode) {
+      const { getRouteForPostalCode, isRestrictedPostalCode } = require('@/utils/postalCodeUtils');
+      
       const restricted = isRestrictedPostalCode(formData.pickupPostcode);
       setIsRestrictedArea(restricted);
       
