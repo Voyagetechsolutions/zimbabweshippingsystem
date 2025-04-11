@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import { Calendar as CalendarIcon, Plus, Trash2, Edit, Save, X } from 'lucide-react';
@@ -35,7 +34,7 @@ import {
   syncSchedulesWithDatabase
 } from '@/data/collectionSchedule';
 
-const CollectionScheduleManagement: React.FC = () => {
+const CollectionScheduleManagement: React.FC = React.memo(() => {
   const [schedules, setSchedules] = useState<RouteSchedule[]>([]);
   const [editingRoute, setEditingRoute] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
@@ -47,7 +46,6 @@ const CollectionScheduleManagement: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
-  // Load schedules from database
   useEffect(() => {
     const loadSchedules = async () => {
       setIsLoading(true);
@@ -67,13 +65,53 @@ const CollectionScheduleManagement: React.FC = () => {
     };
     
     loadSchedules();
+  }, [toast]);
+
+  const getOrdinalSuffix = useCallback((day: number): string => {
+    if (day > 3 && day < 21) return 'th';
+    switch (day % 10) {
+      case 1: return 'st';
+      case 2: return 'nd';
+      case 3: return 'rd';
+      default: return 'th';
+    }
   }, []);
 
-  // Handle date selection for a route - using useCallback to avoid re-creation on each render
+  const parseRouteDate = useCallback((dateStr: string): Date | undefined => {
+    if (!dateStr || dateStr === "No date available") return undefined;
+    
+    const match = dateStr.match(/(\d+)(?:st|nd|rd|th) of (\w+)/);
+    if (!match) return undefined;
+    
+    const day = parseInt(match[1], 10);
+    const month = match[2];
+    
+    const date = new Date();
+    date.setDate(day);
+    
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    const monthIndex = months.findIndex(m => m.toLowerCase() === month.toLowerCase());
+    if (monthIndex !== -1) {
+      date.setMonth(monthIndex);
+    }
+    
+    return date;
+  }, []);
+
+  const handleEditRoute = useCallback((route: string) => {
+    const schedule = schedules.find(s => s.route === route);
+    if (schedule) {
+      setEditingRoute(route);
+      setSelectedDate(parseRouteDate(schedule.date));
+    }
+  }, [schedules, parseRouteDate]);
+
   const handleDateSelect = useCallback(async (route: string, date: Date | undefined) => {
     if (!date) return;
     
-    // Format date as "1st of April", "2nd of April", etc.
     const day = date.getDate();
     const suffix = getOrdinalSuffix(day);
     const month = date.toLocaleString('default', { month: 'long' });
@@ -82,11 +120,9 @@ const CollectionScheduleManagement: React.FC = () => {
     setIsLoading(true);
     
     try {
-      // Update the date in our collection and database
       const success = await updateRouteDate(route, formattedDate);
       
       if (success) {
-        // Update local state
         setSchedules([...collectionSchedules]);
         setEditingRoute(null);
         setSelectedDate(undefined);
@@ -108,60 +144,9 @@ const CollectionScheduleManagement: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [toast, getOrdinalSuffix]);
 
-  // Get ordinal suffix for day (1st, 2nd, 3rd, etc.)
-  const getOrdinalSuffix = (day: number): string => {
-    if (day > 3 && day < 21) return 'th';
-    switch (day % 10) {
-      case 1: return 'st';
-      case 2: return 'nd';
-      case 3: return 'rd';
-      default: return 'th';
-    }
-  };
-
-  // Convert date string to Date object
-  const parseRouteDate = (dateStr: string): Date | undefined => {
-    // Handle empty date
-    if (!dateStr || dateStr === "No date available") return undefined;
-    
-    // Extract the day and month from string like "21st of April"
-    const match = dateStr.match(/(\d+)(?:st|nd|rd|th) of (\w+)/);
-    if (!match) return undefined;
-    
-    const day = parseInt(match[1], 10);
-    const month = match[2];
-    
-    // Create a date object for the current year
-    const date = new Date();
-    date.setDate(day);
-    
-    // Map month name to month number (0-11)
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    const monthIndex = months.findIndex(m => m.toLowerCase() === month.toLowerCase());
-    if (monthIndex !== -1) {
-      date.setMonth(monthIndex);
-    }
-    
-    return date;
-  };
-  
-  // Start editing a route
-  const handleEditRoute = useCallback((route: string) => {
-    // Avoid setting state during render
-    const schedule = schedules.find(s => s.route === route);
-    if (schedule) {
-      setEditingRoute(route);
-      setSelectedDate(parseRouteDate(schedule.date));
-    }
-  }, [schedules]);
-
-  // Add a new route
-  const handleAddRoute = async () => {
+  const handleAddRoute = useCallback(async () => {
     if (!newRouteName || !newRouteDate) {
       toast({
         title: "Missing Information",
@@ -171,13 +156,11 @@ const CollectionScheduleManagement: React.FC = () => {
       return;
     }
     
-    // Format the new route date
     const day = newRouteDate.getDate();
     const suffix = getOrdinalSuffix(day);
     const month = newRouteDate.toLocaleString('default', { month: 'long' });
     const formattedDate = `${day}${suffix} of ${month}`;
     
-    // Parse areas from comma-separated string
     const areas = newRouteAreas
       .split(',')
       .map(area => area.trim().toUpperCase())
@@ -195,7 +178,6 @@ const CollectionScheduleManagement: React.FC = () => {
     setIsLoading(true);
     
     try {
-      // Add the new route to the database
       const success = await addRoute(newRouteName.toUpperCase(), formattedDate, areas);
       
       if (success) {
@@ -222,10 +204,9 @@ const CollectionScheduleManagement: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [newRouteName, newRouteDate, newRouteAreas, getOrdinalSuffix, toast]);
 
-  // Remove a route
-  const handleRemoveRoute = async (route: string) => {
+  const handleRemoveRoute = useCallback(async (route: string) => {
     if (isLoading) return;
     
     setIsLoading(true);
@@ -252,10 +233,9 @@ const CollectionScheduleManagement: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isLoading, toast]);
 
-  // Add an area to a route
-  const handleAddArea = async (route: string) => {
+  const handleAddArea = useCallback(async (route: string) => {
     if (!newArea || isLoading) {
       toast({
         title: "Missing Area Name",
@@ -290,10 +270,9 @@ const CollectionScheduleManagement: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [newArea, isLoading, toast]);
 
-  // Remove an area from a route
-  const handleRemoveArea = async (route: string, area: string) => {
+  const handleRemoveArea = useCallback(async (route: string, area: string) => {
     if (isLoading) return;
     
     setIsLoading(true);
@@ -320,7 +299,7 @@ const CollectionScheduleManagement: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isLoading, toast]);
 
   return (
     <div className="space-y-6">
@@ -337,14 +316,12 @@ const CollectionScheduleManagement: React.FC = () => {
         </Button>
       </div>
 
-      {/* Loading state */}
       {isLoading && (
         <div className="flex justify-center py-8">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
         </div>
       )}
 
-      {/* Add new route form */}
       {addingNewRoute && (
         <Card>
           <CardHeader>
@@ -427,7 +404,6 @@ const CollectionScheduleManagement: React.FC = () => {
         </Card>
       )}
 
-      {/* Collection routes table */}
       <div className="bg-white rounded-lg shadow">
         <Table>
           <TableHeader>
@@ -549,6 +525,6 @@ const CollectionScheduleManagement: React.FC = () => {
       </div>
     </div>
   );
-};
+});
 
 export default CollectionScheduleManagement;
