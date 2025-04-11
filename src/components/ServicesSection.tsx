@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, Ship, Package, Truck, Globe, DollarSign } from 'lucide-react';
+import { ChevronRight, Ship, Package, Truck, Globe, PoundSterling } from 'lucide-react';
 import { useShipping } from '@/contexts/ShippingContext';
 
 const ServicesSection: React.FC = () => {
@@ -17,13 +17,13 @@ const ServicesSection: React.FC = () => {
     {
       icon: <Package className="h-10 w-10 text-zim-yellow dark:text-zim-yellow" />,
       title: 'Regular Parcels',
-      description: 'Send packages of any size with our flexible parcel shipping options, with competitive rates based on weight.',
+      description: 'Send packages of any size with our flexible parcel shipping options, with competitive rates based on volume.',
       bgImage: 'url("/lovable-uploads/28deab65-7859-4a23-8d21-37afd6bcda2a.png")'
     },
     {
       icon: <Truck className="h-10 w-10 text-zim-red dark:text-zim-red" />,
       title: 'Door-to-Door Delivery',
-      description: `We pick up from your UK address and deliver directly to your recipient's doorstep in Zimbabwe for an additional ${formatPrice(25)}.`,
+      description: `We collect from your UK address and deliver directly to your recipient's doorstep in Zimbabwe for an additional ${formatPrice(25)}.`,
       bgImage: 'url("/lovable-uploads/0027003d-7b3b-482d-82a2-9cc4877b58b6.png")'
     },
     {
@@ -33,9 +33,9 @@ const ServicesSection: React.FC = () => {
       bgImage: 'url("/lovable-uploads/8aba4bb5-76cc-4202-a81d-e765192b2dbc.png")'
     },
     {
-      icon: <DollarSign className="h-10 w-10 text-zim-yellow dark:text-zim-yellow" />,
+      icon: <PoundSterling className="h-10 w-10 text-zim-yellow dark:text-zim-yellow" />,
       title: 'Flexible Payment Options',
-      description: 'Multiple payment methods available including credit cards, PayPal, and mobile payment solutions.',
+      description: 'Multiple payment methods available including credit cards, cash on collection, and various deferred payment options.',
       bgImage: 'url("/lovable-uploads/288d0f20-90b3-401c-be86-ac3405522ca9.png")'
     },
   ];
