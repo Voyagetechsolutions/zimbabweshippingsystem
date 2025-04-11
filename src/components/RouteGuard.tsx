@@ -116,7 +116,6 @@ export const RedirectIfAuthenticated = React.memo(({ children }: { children: JSX
   // Always call useEffect, regardless of conditions
   useEffect(() => {
     // Using a conditional inside useEffect is safe
-    // Only show toast notifications if user is trying to access auth pages while already logged in
     if (user) {
       toast({
         title: "Already authenticated",
