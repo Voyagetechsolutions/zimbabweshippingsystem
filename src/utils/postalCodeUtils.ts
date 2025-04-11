@@ -94,6 +94,20 @@ export const postalCodeToRouteMap: Record<string, string> = {
   "AL": "NORTHAMPTON ROUTE"
 };
 
+// Map of postal code areas for each route
+const routeAreas: Record<string, string[]> = {
+  "CARDIFF ROUTE": ["Cardiff", "Swansea", "Newport", "Swindon", "Bath"],
+  "BOURNEMOUTH ROUTE": ["Bournemouth", "Southampton", "Guildford", "Reading", "Oxford"],
+  "SOUTHEND ROUTE": ["Southend", "Chelmsford", "Colchester", "Cambridge", "Stevenage"],
+  "LEEDS ROUTE": ["Leeds", "Sheffield", "Doncaster", "York", "Bradford", "Huddersfield", "Halifax"],
+  "BIRMINGHAM ROUTE": ["Birmingham", "Coventry", "Worcester", "Dudley", "Wolverhampton", "Shrewsbury"],
+  "NOTTINGHAM ROUTE": ["Nottingham", "Derby", "Leicester", "Peterborough", "Lincoln"],
+  "MANCHESTER ROUTE": ["Manchester", "Liverpool", "Chester", "Stockport", "Wigan", "Bolton", "Oldham", "Blackpool", "Preston"],
+  "LONDON ROUTE": ["North London", "East London", "Enfield", "Ilford", "Romford", "Dartford", "Bromley", "Uxbridge", "Harrow", "Watford"],
+  "BRIGHTON ROUTE": ["Brighton", "Slough", "Croydon", "Twickenham", "Kingston", "Redhill", "Tunbridge Wells", "Maidstone"],
+  "NORTHAMPTON ROUTE": ["Northampton", "Milton Keynes", "Luton", "Hemel Hempstead", "St Albans"]
+};
+
 // Restricted areas (with contact before booking)
 export const restrictedPostalCodes = [
   "EX", "TQ", "DT", "SA", "LD", "HR", "IP", "NR", "HU", "TS", 
@@ -110,6 +124,16 @@ export function getRouteForPostalCode(postalCode: string): string | null {
   if (!prefix) return null;
   
   return postalCodeToRouteMap[prefix[0]] || null;
+}
+
+// Get areas for a given postal code
+export function getAreasFromPostalCode(postalCode: string): string[] {
+  if (!postalCode) return [];
+  
+  const route = getRouteForPostalCode(postalCode);
+  if (!route) return [];
+  
+  return routeAreas[route] || [];
 }
 
 // Check if a postal code is in a restricted area

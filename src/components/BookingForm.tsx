@@ -203,28 +203,32 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       // Generate a tracking number
       const trackingNumber = `ZS${Date.now().toString().substring(5)}`;
       
-      // Create shipment in the database
+      // Create shipment in the database - using the correct schema fields
       const { data: shipmentData, error: shipmentError } = await supabase
         .from('shipments')
         .insert({
           user_id: null, // Will be updated after payment if user is authenticated
           status: 'pending_payment',
           tracking_number: trackingNumber,
-          sender_name: `${data.firstName} ${data.lastName}`,
-          sender_email: data.email,
-          sender_phone: data.phone,
-          sender_address: `${data.pickupAddress}, ${data.pickupPostcode}`,
-          recipient_name: data.recipientName,
-          recipient_phone: data.recipientPhone,
-          recipient_address: `${data.deliveryAddress}, ${data.deliveryCity}, Zimbabwe`,
-          shipment_type: data.shipmentType,
-          drum_quantity: data.shipmentType === 'drum' ? parseInt(data.drumQuantity || '1', 10) : null,
-          drum_size: data.shipmentType === 'drum' ? drumSize : null,
-          parcel_weight: data.shipmentType === 'parcel' ? parseFloat(data.weight || '0') : null,
-          amount: finalAmount,
-          special_instructions: data.specialInstructions || null,
-          route: collectionRoute,
-          collection_date: collectionDate,
+          origin: `${data.pickupAddress}, ${data.pickupPostcode}`,
+          destination: `${data.deliveryAddress}, ${data.deliveryCity}, Zimbabwe`,
+          carrier: 'Zimbabwe Shipping',
+          weight: data.shipmentType === 'parcel' ? parseFloat(data.weight || '0') : null,
+          dimensions: data.shipmentType === 'drum' ? `${drumSize} drum x ${data.drumQuantity}` : null,
+          metadata: {
+            sender_name: `${data.firstName} ${data.lastName}`,
+            sender_email: data.email,
+            sender_phone: data.phone,
+            recipient_name: data.recipientName,
+            recipient_phone: data.recipientPhone,
+            shipment_type: data.shipmentType,
+            drum_size: data.shipmentType === 'drum' ? drumSize : null,
+            drum_quantity: data.shipmentType === 'drum' ? parseInt(data.drumQuantity || '1', 10) : null,
+            amount: finalAmount,
+            special_instructions: data.specialInstructions || null,
+            route: collectionRoute,
+            collection_date: collectionDate
+          }
         })
         .select('id')
         .single();
