@@ -26,7 +26,7 @@ export const RequireAuth = React.memo(({ children, requiredRole }: RequireAuthPr
     );
   }
 
-  // Use useEffect for side effects like showing toast
+  // Always call useEffect, regardless of conditions
   useEffect(() => {
     if (!user) {
       toast({
@@ -115,8 +115,15 @@ export const RedirectIfAuthenticated = React.memo(({ children }: { children: JSX
 
   // Always call useEffect, regardless of conditions
   useEffect(() => {
-    // This is intentionally left empty to ensure hooks are called in the same order
-  }, []);
+    // Using a conditional inside useEffect is safe
+    // Only show toast notifications if user is trying to access auth pages while already logged in
+    if (user) {
+      toast({
+        title: "Already authenticated",
+        description: "You are already signed in",
+      });
+    }
+  }, [user, toast]);
 
   // Show loading state if auth is still being checked
   if (isLoading) {
