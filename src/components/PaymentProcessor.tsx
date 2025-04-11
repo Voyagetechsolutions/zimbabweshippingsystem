@@ -1,33 +1,19 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { tableFrom } from '@/integrations/supabase/db-types';
 import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from '@/components/ui/tabs';
-import { toast } from '@/hooks/use-toast';
-import {
-  ArrowLeftRight,
-  Calendar,
-  CreditCard,
-  DollarSign,
-  Landmark,
-  LoaderCircle,
-  Clock,
-  Wallet,
-  ReceiptText,
-  CreditCard as DirectDebit,
-  CircleAlert,
-  Info
-} from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardFooter, 
+  CardHeader, 
+  CardTitle 
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useToast } from '@/hooks/use-toast';
+import { Loader2, AlertCircle, Bug } from 'lucide-react';
 
 interface PaymentProcessorProps {
   bookingData: any;
@@ -36,432 +22,286 @@ interface PaymentProcessorProps {
   onCancel: () => void;
 }
 
-const PaymentProcessor: React.FC<PaymentProcessorProps> = ({ 
-  bookingData, 
-  totalAmount, 
-  onPaymentComplete, 
-  onCancel 
+const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
+  bookingData,
+  totalAmount,
+  onPaymentComplete,
+  onCancel
 }) => {
+  const { toast } = useToast();
   const navigate = useNavigate();
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('card');
-  const [activeTab, setActiveTab] = useState<string>("standard");
-  const [paymentAmount, setPaymentAmount] = useState<number>(totalAmount);
-  const [calculatedAmounts, setCalculatedAmounts] = useState({
-    baseAmount: totalAmount,
-    additionalCharge: 0,
-    totalAmount: totalAmount
-  });
-
-  // Set the default tab based on bookingData payment option
-  useEffect(() => {
-    if (bookingData?.shipmentDetails?.payment_option === 'payLater') {
-      setActiveTab('payLater');
-    }
-  }, [bookingData]);
-
-  // Calculate payment amount based on payment method
-  useEffect(() => {
-    let baseAmount = totalAmount;
-    let additionalCharge = 0;
-    let finalAmount = totalAmount;
-
-    // If "Pay on Goods Arriving" is selected, add 20% charge
-    if (selectedPaymentMethod === 'payOnArrival') {
-      additionalCharge = baseAmount * 0.2;
-      finalAmount = baseAmount + additionalCharge;
-    }
-
-    setCalculatedAmounts({
-      baseAmount,
-      additionalCharge,
-      totalAmount: finalAmount
-    });
-
-    setPaymentAmount(finalAmount);
-  }, [selectedPaymentMethod, totalAmount]);
-
-  // Handle payment processing
-  const handlePaymentProcess = async () => {
-    setIsProcessing(true);
-
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  const handleOfflinePayment = async () => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      let paymentMethodDescription = '';
-      let paymentStatus = '';
-
-      // Set payment method description and status based on selection
-      switch (selectedPaymentMethod) {
-        case 'card':
-          paymentMethodDescription = 'Credit/Debit Card';
-          paymentStatus = 'completed';
-          break;
-        case 'bank':
-          paymentMethodDescription = 'Bank Transfer';
-          paymentStatus = 'pending';
-          break;
-        case 'directDebit':
-          paymentMethodDescription = 'Direct Debit';
-          paymentStatus = 'pending';
-          break;
-        case 'payLater':
-          paymentMethodDescription = 'Pay Later (30 Days)';
-          paymentStatus = 'pending';
-          break;
-        case 'payOnArrival':
-          paymentMethodDescription = 'Pay on Goods Arriving';
-          paymentStatus = 'pending';
-          break;
-        default:
-          paymentMethodDescription = 'Other';
-          paymentStatus = 'pending';
+      console.log("Processing offline payment with data:", {
+        shipment_id: bookingData.shipment_id,
+        amount: totalAmount
+      });
+      
+      // Create payment record for offline payment
+      const { data: paymentData, error: paymentError } = await supabase.from('payments').insert({
+        amount: totalAmount,
+        payment_method: 'offline',
+        payment_status: 'pending',
+        shipment_id: bookingData.shipment_id,
+        user_id: bookingData.user_id || null,
+        currency: 'GBP'
+      }).select('id').single();
+      
+      if (paymentError) {
+        console.error('Payment error details:', paymentError);
+        throw paymentError;
       }
-
-      // Create payment record
-      const { data: paymentData, error: paymentError } = await supabase
-        .from('payments')
-        .insert({
-          amount: paymentAmount,
-          currency: 'GBP',
-          shipment_id: bookingData.shipment_id,
-          payment_method: paymentMethodDescription,
-          payment_status: paymentStatus,
-          user_id: bookingData.user_id || null
-        })
-        .select('id')
-        .single();
-
-      if (paymentError) throw paymentError;
-
-      // Update shipment status
-      const { error: shipmentError } = await supabase
-        .from('shipments')
-        .update({ 
-          status: 'Paid',
-          // Add payment information to metadata
-          metadata: { 
-            ...bookingData.shipmentDetails,
-            payment_method: paymentMethodDescription,
-            payment_amount: paymentAmount,
-            payment_status: paymentStatus
-          }
-        })
+      
+      console.log("Created payment record:", paymentData);
+      
+      const receiptNumber = `RCT-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+      
+      // Create receipt record
+      const { data: receiptData, error: receiptError } = await supabase.from('receipts').insert({
+        payment_id: paymentData.id,
+        shipment_id: bookingData.shipment_id,
+        receipt_number: receiptNumber,
+        payment_method: 'offline',
+        amount: totalAmount,
+        currency: 'GBP',
+        sender_details: bookingData.senderDetails || {
+          name: 'Unknown',
+          email: 'unknown@example.com',
+          phone: 'unknown',
+          address: 'Unknown'
+        },
+        recipient_details: bookingData.recipientDetails || {
+          name: 'Unknown',
+          phone: 'unknown',
+          address: 'Unknown'
+        },
+        shipment_details: bookingData.shipmentDetails || {
+          tracking_number: 'Unknown',
+          type: 'unknown',
+          quantity: 0,
+          weight: 0,
+          services: []
+        },
+        status: 'pending_payment'
+      }).select('id').single();
+      
+      if (receiptError) {
+        console.error('Receipt error details:', receiptError);
+        throw new Error(`Receipt creation failed: ${receiptError.message}`);
+      }
+      
+      console.log("Created receipt record:", receiptData);
+      
+      // Update shipment status to 'Payment Pending'
+      const { error: updateError } = await supabase.from('shipments')
+        .update({ status: 'Payment Pending' })
         .eq('id', bookingData.shipment_id);
-
-      if (shipmentError) throw shipmentError;
-
-      // Generate receipt
-      const receiptNumber = `R-${Date.now().toString().substring(7)}`;
       
-      const { data: receiptData, error: receiptError } = await supabase
-        .from('receipts')
-        .insert({
-          shipment_id: bookingData.shipment_id,
-          payment_id: paymentData.id,
-          receipt_number: receiptNumber,
-          payment_method: paymentMethodDescription,
-          amount: paymentAmount,
-          currency: 'GBP',
-          status: paymentStatus === 'completed' ? 'issued' : 'pending',
-          sender_details: bookingData.senderDetails,
-          recipient_details: bookingData.recipientDetails,
-          shipment_details: {
-            ...bookingData.shipmentDetails,
-            payment_method: paymentMethodDescription,
-            payment_status: paymentStatus,
-            tracking_number: bookingData.shipmentDetails.tracking_number,
-            services: [
-              ...(bookingData.metalSeal ? [{ name: 'Metal Seal', price: 5 }] : []),
-              ...(bookingData.doorToDoorDelivery ? [{ name: 'Door-to-Door Delivery', price: 25 }] : [])
-            ]
-          }
-        })
-        .select('id')
-        .single();
-
-      if (receiptError) throw receiptError;
-
-      // Process completed
-      setIsProcessing(false);
+      if (updateError) {
+        console.error('Error updating shipment status:', updateError);
+        // We'll continue anyway since the payment and receipt were created
+      } else {
+        console.log("Updated shipment status to Payment Pending");
+      }
       
-      // Call the completion handler
+      // Navigate to success page with receipt
       onPaymentComplete(paymentData.id, receiptData.id);
       
-    } catch (error: any) {
-      console.error('Payment processing error:', error);
-      setIsProcessing(false);
+    } catch (err: any) {
+      console.error('Offline payment error:', err);
+      setError('Failed to process your offline payment request. Please try again.');
+      setLoading(false);
       toast({
-        title: 'Payment Error',
-        description: error.message || 'An error occurred during payment processing. Please try again.',
-        variant: 'destructive',
+        variant: "destructive",
+        title: "Payment Error",
+        description: err.message || 'An error occurred during payment processing',
       });
     }
   };
 
-  // Handle payment cancellation
-  const handleCancel = () => {
-    if (isProcessing) return; // Prevent cancellation during processing
-    onCancel();
+  const handleDebugPayment = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // First try to create the shipment if it doesn't exist (this is just for the debug mode)
+      if (!bookingData.shipment_id) {
+        toast({
+          title: "Missing shipment ID",
+          description: "Creating a test shipment for you first",
+        });
+        
+        // Create a test shipment
+        const { data: shipmentData, error: shipmentError } = await supabase.from('shipments').insert({
+          origin: bookingData.senderDetails?.address || 'Test Origin Address',
+          destination: bookingData.recipientDetails?.address || 'Test Destination Address',
+          status: 'Booked',
+          user_id: bookingData.user_id || (await supabase.auth.getUser()).data.user?.id || null,
+          tracking_number: `TEST-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+          metadata: {
+            sender_name: bookingData.senderDetails?.name || 'Test Sender',
+            sender_email: bookingData.senderDetails?.email || 'test@example.com',
+            sender_phone: bookingData.senderDetails?.phone || '+1234567890',
+            recipient_name: bookingData.recipientDetails?.name || 'Test Recipient',
+            recipient_phone: bookingData.recipientDetails?.phone || '+1234567890',
+            shipment_type: bookingData.shipmentDetails?.type || 'parcel',
+            drum_quantity: bookingData.shipmentDetails?.quantity || 1,
+          },
+          weight: bookingData.shipmentDetails?.weight || 10,
+        }).select('id').single();
+        
+        if (shipmentError) throw shipmentError;
+        
+        bookingData.shipment_id = shipmentData.id;
+      }
+
+      // Now create the test payment
+      const { data: paymentData, error: paymentError } = await supabase.from('payments').insert({
+        amount: totalAmount,
+        payment_method: 'test',
+        payment_status: 'completed',
+        shipment_id: bookingData.shipment_id,
+        user_id: bookingData.user_id || (await supabase.auth.getUser()).data.user?.id || null,
+        currency: 'GBP',
+        transaction_id: `test-${Date.now()}`
+      }).select('id').single();
+      
+      if (paymentError) {
+        console.error('Payment error details:', paymentError);
+        throw new Error(`Payment creation failed: ${paymentError.message}`);
+      }
+      
+      const receiptNumber = `TEST-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      
+      // Create a receipt for the test payment
+      const { data: receiptData, error: receiptError } = await supabase.from(tableFrom('receipts')).insert({
+        payment_id: paymentData.id,
+        shipment_id: bookingData.shipment_id,
+        receipt_number: receiptNumber,
+        payment_method: 'test',
+        amount: totalAmount,
+        currency: 'GBP',
+        sender_details: bookingData.senderDetails || {
+          name: 'Test Sender',
+          email: 'test@example.com',
+          phone: '+1234567890',
+          address: 'Test Origin Address'
+        },
+        recipient_details: bookingData.recipientDetails || {
+          name: 'Test Recipient',
+          phone: '+1234567890',
+          address: 'Test Destination Address'
+        },
+        shipment_details: bookingData.shipmentDetails || {
+          tracking_number: `TEST-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+          type: 'parcel',
+          quantity: 1,
+          weight: 10,
+          services: []
+        },
+        status: 'issued'
+      }).select('id').single();
+      
+      if (receiptError) {
+        console.error('Receipt error details:', receiptError);
+        throw new Error(`Receipt creation failed: ${receiptError.message}`);
+      }
+      
+      // Update the shipment status to Paid
+      await supabase
+        .from('shipments')
+        .update({ status: 'Paid' })
+        .eq('id', bookingData.shipment_id);
+      
+      onPaymentComplete(paymentData.id, receiptData.id);
+      
+    } catch (err: any) {
+      console.error('Debug payment error:', err);
+      setError(`Failed to process test payment: ${err.message}`);
+      setLoading(false);
+      toast({
+        variant: "destructive",
+        title: "Test Payment Error",
+        description: err.message || 'An error occurred during test payment processing',
+      });
+    }
   };
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Payment Options</CardTitle>
-          <CardDescription>
-            Select your preferred payment method to complete your booking
-          </CardDescription>
-        </CardHeader>
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle>Payment Method</CardTitle>
+        <CardDescription>
+          Choose how you would like to pay for your shipment
+        </CardDescription>
+      </CardHeader>
+      
+      <CardContent className="space-y-6">
+        {error && (
+          <div className="bg-destructive/10 text-destructive p-4 rounded-md flex items-start">
+            <AlertCircle className="h-5 w-5 mr-2 shrink-0 mt-0.5" />
+            <p>{error}</p>
+          </div>
+        )}
         
-        <CardContent className="space-y-6">
-          <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="standard" className="flex items-center gap-2">
-                <CreditCard className="h-4 w-4" />
-                Standard Payment
-              </TabsTrigger>
-              <TabsTrigger value="special" className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Special Payment Options
-              </TabsTrigger>
-            </TabsList>
-            
-            {/* Standard Payment Options Tab */}
-            <TabsContent value="standard" className="space-y-6 pt-4">
-              <div className="space-y-4">
-                <Label>Select Payment Method</Label>
-                <RadioGroup 
-                  value={selectedPaymentMethod} 
-                  onValueChange={setSelectedPaymentMethod}
-                  className="space-y-3"
-                >
-                  {/* Credit/Debit Card Option */}
-                  <div className={`border rounded-lg p-4 transition-colors ${selectedPaymentMethod === 'card' ? 'bg-blue-50 border-blue-200' : ''}`}>
-                    <div className="flex items-start space-x-3">
-                      <RadioGroupItem value="card" id="card" className="mt-1" />
-                      <div className="flex-1">
-                        <div className="flex justify-between">
-                          <Label htmlFor="card" className="font-medium cursor-pointer flex items-center">
-                            <CreditCard className="h-4 w-4 mr-2 text-blue-600" />
-                            Credit / Debit Card
-                          </Label>
-                          <span className="text-sm font-medium text-green-600">£{calculatedAmounts.totalAmount.toFixed(2)}</span>
-                        </div>
-                        <p className="text-sm text-gray-500 mt-1">
-                          Secure payment processed by Stripe
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Bank Transfer Option */}
-                  <div className={`border rounded-lg p-4 transition-colors ${selectedPaymentMethod === 'bank' ? 'bg-blue-50 border-blue-200' : ''}`}>
-                    <div className="flex items-start space-x-3">
-                      <RadioGroupItem value="bank" id="bank" className="mt-1" />
-                      <div className="flex-1">
-                        <div className="flex justify-between">
-                          <Label htmlFor="bank" className="font-medium cursor-pointer flex items-center">
-                            <Landmark className="h-4 w-4 mr-2 text-blue-600" />
-                            Bank Transfer
-                          </Label>
-                          <span className="text-sm font-medium text-green-600">£{calculatedAmounts.totalAmount.toFixed(2)}</span>
-                        </div>
-                        <p className="text-sm text-gray-500 mt-1">
-                          Make a manual bank transfer to our account
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Direct Debit Option */}
-                  <div className={`border rounded-lg p-4 transition-colors ${selectedPaymentMethod === 'directDebit' ? 'bg-blue-50 border-blue-200' : ''}`}>
-                    <div className="flex items-start space-x-3">
-                      <RadioGroupItem value="directDebit" id="directDebit" className="mt-1" />
-                      <div className="flex-1">
-                        <div className="flex justify-between">
-                          <Label htmlFor="directDebit" className="font-medium cursor-pointer flex items-center">
-                            <DirectDebit className="h-4 w-4 mr-2 text-blue-600" />
-                            Direct Debit
-                          </Label>
-                          <span className="text-sm font-medium text-green-600">£{calculatedAmounts.totalAmount.toFixed(2)}</span>
-                        </div>
-                        <p className="text-sm text-gray-500 mt-1">
-                          Set up automatic payment from your bank account
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </RadioGroup>
-              </div>
-            </TabsContent>
-            
-            {/* Special Payment Options Tab */}
-            <TabsContent value="special" className="space-y-6 pt-4">
-              <div className="space-y-4">
-                <Label>Select Special Payment Method</Label>
-                <RadioGroup 
-                  value={selectedPaymentMethod} 
-                  onValueChange={setSelectedPaymentMethod}
-                  className="space-y-3"
-                >
-                  {/* Pay Later Option */}
-                  <div className={`border rounded-lg p-4 transition-colors ${selectedPaymentMethod === 'payLater' ? 'bg-blue-50 border-blue-200' : ''}`}>
-                    <div className="flex items-start space-x-3">
-                      <RadioGroupItem value="payLater" id="payLater" className="mt-1" />
-                      <div className="flex-1">
-                        <div className="flex justify-between">
-                          <Label htmlFor="payLater" className="font-medium cursor-pointer flex items-center">
-                            <Clock className="h-4 w-4 mr-2 text-blue-600" />
-                            Pay Later (30 Days)
-                          </Label>
-                          <span className="text-sm font-medium text-green-600">£{calculatedAmounts.totalAmount.toFixed(2)}</span>
-                        </div>
-                        <p className="text-sm text-gray-500 mt-1">
-                          Flexible 30-day payment period from the collection date
-                        </p>
-                        {selectedPaymentMethod === 'payLater' && (
-                          <Alert className="mt-2">
-                            <Info className="h-4 w-4" />
-                            <AlertTitle>30-Day Payment Terms</AlertTitle>
-                            <AlertDescription className="text-xs">
-                              You'll have 30 days from the collection date to complete your payment. We'll send you a reminder 5 days before the due date.
-                            </AlertDescription>
-                          </Alert>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Pay on Goods Arriving Option */}
-                  <div className={`border rounded-lg p-4 transition-colors ${selectedPaymentMethod === 'payOnArrival' ? 'bg-blue-50 border-blue-200' : ''}`}>
-                    <div className="flex items-start space-x-3">
-                      <RadioGroupItem value="payOnArrival" id="payOnArrival" className="mt-1" />
-                      <div className="flex-1">
-                        <div className="flex justify-between">
-                          <Label htmlFor="payOnArrival" className="font-medium cursor-pointer flex items-center">
-                            <Wallet className="h-4 w-4 mr-2 text-blue-600" />
-                            Pay on Goods Arriving
-                          </Label>
-                          <span className="text-sm font-medium text-green-600">£{calculatedAmounts.totalAmount.toFixed(2)}</span>
-                        </div>
-                        <p className="text-sm text-gray-500 mt-1">
-                          Pay when your shipment arrives in Zimbabwe (20% additional charge)
-                        </p>
-                        
-                        {selectedPaymentMethod === 'payOnArrival' && (
-                          <div className="mt-3 p-3 bg-gray-50 rounded-md">
-                            <h4 className="text-sm font-medium flex items-center">
-                              <ReceiptText className="h-4 w-4 mr-1 text-gray-600" />
-                              Price Breakdown
-                            </h4>
-                            <div className="mt-2 space-y-2 text-sm">
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Base Amount:</span>
-                                <span>£{calculatedAmounts.baseAmount.toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Additional Charge (20%):</span>
-                                <span>£{calculatedAmounts.additionalCharge.toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between font-medium pt-1 border-t">
-                                <span>Total Amount:</span>
-                                <span>£{calculatedAmounts.totalAmount.toFixed(2)}</span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </RadioGroup>
-              </div>
-              
-              {selectedPaymentMethod === 'payOnArrival' && (
-                <Alert variant="destructive" className="mt-4">
-                  <CircleAlert className="h-4 w-4" />
-                  <AlertTitle>Important Notice</AlertTitle>
-                  <AlertDescription>
-                    When choosing "Pay on Goods Arriving", you agree to pay the full amount when your shipment arrives in Zimbabwe. 
-                    Failure to pay may result in your goods being held until payment is received.
-                  </AlertDescription>
-                </Alert>
-              )}
-            </TabsContent>
-          </Tabs>
-          
-          {/* Payment Summary */}
-          <div className="mt-8 p-5 bg-gray-50 rounded-lg border">
-            <h3 className="font-semibold text-lg mb-3">Payment Summary</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Shipment Type:</span>
-                <span className="font-medium">{bookingData?.shipmentDetails?.type === 'drum' ? 'Drum Shipping' : 'Other Items'}</span>
-              </div>
-              
-              {bookingData?.shipmentDetails?.type === 'drum' && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Quantity:</span>
-                  <span>{bookingData?.shipmentDetails?.quantity} drum(s)</span>
-                </div>
-              )}
-              
-              {bookingData?.metalSeal && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Metal Seal:</span>
-                  <span>£5.00</span>
-                </div>
-              )}
-              
-              {bookingData?.doorToDoorDelivery && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Door-to-Door Delivery:</span>
-                  <span>£25.00</span>
-                </div>
-              )}
-              
-              {selectedPaymentMethod === 'payOnArrival' && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Additional Charge (20%):</span>
-                  <span>£{calculatedAmounts.additionalCharge.toFixed(2)}</span>
-                </div>
-              )}
-              
-              <div className="flex justify-between font-medium text-lg pt-2 border-t mt-2">
-                <span>Total:</span>
-                <span className="text-green-600">£{paymentAmount.toFixed(2)}</span>
+        <div className="space-y-4">
+          <button 
+            onClick={handleOfflinePayment}
+            disabled={loading}
+            className="w-full flex items-center justify-between p-4 border rounded-md hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center">
+              <svg className="h-5 w-5 mr-3 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M3 3h18v18H3V3m15 3H6v9h12V6m-1 7H7v-5h10v5z" />
+              </svg>
+              <div>
+                <p className="font-medium">Pay Later</p>
+                <p className="text-sm text-gray-500">You'll receive a payment invoice</p>
               </div>
             </div>
-          </div>
-        </CardContent>
-        
-        <CardFooter className="flex justify-between pt-6">
-          <Button 
-            type="button" 
-            variant="outline" 
-            onClick={handleCancel}
-            disabled={isProcessing}
-          >
-            <ArrowLeftRight className="mr-2 h-4 w-4" /> Change Details
-          </Button>
+            <div className="text-lg font-semibold">£{totalAmount.toFixed(2)}</div>
+          </button>
           
-          <Button 
-            onClick={handlePaymentProcess}
-            disabled={isProcessing}
-            className="bg-zim-green hover:bg-zim-green/90"
+          <button 
+            onClick={handleDebugPayment}
+            disabled={loading}
+            className="w-full flex items-center justify-between p-4 border border-amber-200 bg-amber-50 rounded-md hover:bg-amber-100 transition-colors"
           >
-            {isProcessing ? (
-              <>
-                <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Processing...
-              </>
-            ) : (
-              <>
-                <DollarSign className="mr-2 h-4 w-4" /> Complete Payment
-              </>
-            )}
-          </Button>
-        </CardFooter>
-      </Card>
-    </div>
+            <div className="flex items-center">
+              <Bug className="h-5 w-5 mr-3 text-amber-600" />
+              <div>
+                <p className="font-medium">Test Payment (Skip Payment Flow)</p>
+                <p className="text-sm text-amber-700">For testing receipt page only</p>
+              </div>
+            </div>
+            <div className="text-lg font-semibold">£{totalAmount.toFixed(2)}</div>
+          </button>
+        </div>
+      </CardContent>
+      
+      <CardFooter className="flex justify-between">
+        <Button
+          variant="outline"
+          onClick={onCancel}
+          disabled={loading}
+        >
+          Back
+        </Button>
+        
+        {loading && (
+          <div className="flex items-center">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Processing...
+          </div>
+        )}
+      </CardFooter>
+    </Card>
   );
 };
 

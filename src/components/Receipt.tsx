@@ -27,7 +27,6 @@ interface ReceiptProps {
     origin: string;
     destination: string;
     status: string;
-    metadata?: any;
   };
 }
 
@@ -225,29 +224,6 @@ const Receipt: React.FC<ReceiptProps> = ({ receipt, shipment }) => {
     }
   };
 
-  // Helper function to format payment method for display
-  const getPaymentMethodDisplay = (method: string) => {
-    if (!method) return 'N/A';
-    
-    switch (method) {
-      case 'Credit/Debit Card':
-        return 'Credit/Debit Card';
-      case 'Bank Transfer':
-        return 'Bank Transfer';
-      case 'Direct Debit':
-        return 'Direct Debit';
-      case 'Pay Later (30 Days)':
-        return 'Pay Later (30 Days)';
-      case 'Pay on Goods Arriving':
-        return 'Pay on Goods Arriving (20% Premium)';
-      default:
-        return method;
-    }
-  };
-
-  // Get shipment metadata (either from shipment or receipt)
-  const shipmentMetadata = shipment?.metadata || receipt.shipment_details;
-
   return (
     <div className="container mx-auto px-2 sm:px-4 max-w-4xl">
       <Card className="border-0 shadow-lg overflow-hidden">
@@ -302,17 +278,10 @@ Chelveston, Wellingborough, NN9 6AA</p>
                   <tr className="border-t">
                     <td className="p-2 sm:p-3 text-xs sm:text-sm break-all sm:break-normal">{shipment?.tracking_number || receipt.shipment_details.tracking_number}</td>
                     <td className="p-2 sm:p-3 text-xs sm:text-sm">
-                      {shipmentMetadata.type === 'drum'
-                        ? `${shipmentMetadata.drum_quantity} x ${shipmentMetadata.drum_size || 'Standard'} Drums`
-                        : shipmentMetadata.item_type
-                          ? `Other Item: ${shipmentMetadata.item_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`
-                          : 'Other Item'
+                      {receipt.shipment_details.type === 'drum'
+                        ? `${receipt.shipment_details.quantity} x 200L Drums`
+                        : `Parcel (${receipt.shipment_details.weight}kg)`
                       }
-                      {shipmentMetadata.custom_item_description && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          Description: {shipmentMetadata.custom_item_description}
-                        </div>
-                      )}
                     </td>
                     <td className="p-2 sm:p-3 text-xs sm:text-sm">{shipment?.status || receipt.status}</td>
                   </tr>
@@ -320,108 +289,30 @@ Chelveston, Wellingborough, NN9 6AA</p>
               </table>
             </div>
           </div>
-
-          {/* Collection Information */}
-          {shipmentMetadata.route && (
-            <div className="mb-4 sm:mb-6">
-              <h3 className="font-bold text-sm mb-1 sm:mb-2">Collection Information</h3>
-              <div className="border rounded-md p-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500">Collection Route:</p>
-                    <p className="text-sm">{shipmentMetadata.route}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-gray-500">Collection Date:</p>
-                    <p className="text-sm">{shipmentMetadata.collection_date || 'To be confirmed'}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
           
           <div className="mb-4 sm:mb-6">
-            <h3 className="font-bold text-sm mb-1 sm:mb-2">Payment Details</h3>
-            <div className="border rounded-md p-3">
+            <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
+              <span className="font-medium">Shipping Cost</span>
+              <span>£{(receipt.amount * 0.9).toFixed(2)}</span>
+            </div>
+            
+            {receipt.shipment_details.services && receipt.shipment_details.services.length > 0 && (
               <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
-                <span className="font-medium">Shipping Cost</span>
-                <span>£{((receipt.amount - (shipmentMetadata.metal_seal_price || 0) - (shipmentMetadata.door_to_door_price || 0)) * 0.9).toFixed(2)}</span>
+                <span className="font-medium">Additional Services</span>
+                <span>£{(receipt.amount * 0.1).toFixed(2)}</span>
               </div>
-              
-              {/* Metal Seal - Mandatory */}
-              {(shipmentMetadata.metal_seal_price || shipmentMetadata.metal_seal) && (
-                <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
-                  <span className="font-medium">Metal Seal</span>
-                  <span>£{shipmentMetadata.metal_seal_price || 5.00}</span>
-                </div>
-              )}
-              
-              {/* Door to Door Delivery - Optional */}
-              {(shipmentMetadata.door_to_door_price || shipmentMetadata.door_to_door_delivery) && (
-                <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
-                  <span className="font-medium">Door-to-Door Delivery</span>
-                  <span>£{shipmentMetadata.door_to_door_price || 25.00}</span>
-                </div>
-              )}
-              
-              {/* Additional Charge for Pay on Goods Arriving */}
-              {receipt.payment_method === 'Pay on Goods Arriving' && (
-                <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
-                  <span className="font-medium">Additional Charge (20%)</span>
-                  <span>£{(receipt.amount * 0.2).toFixed(2)}</span>
-                </div>
-              )}
-              
-              <div className="flex justify-between py-3 sm:py-4 font-bold text-base sm:text-lg">
-                <span>Total</span>
-                <span>£{receipt.amount.toFixed(2)}</span>
-              </div>
-              
-              <div className="border rounded-md p-2 sm:p-3 bg-gray-50 mt-2">
-                <p className="font-medium text-sm">Payment Method: {getPaymentMethodDisplay(receipt.payment_method)}</p>
-                <p className="text-xs sm:text-sm text-gray-600 mt-1">
-                  Payment Status: {receipt.status === 'issued' ? 'Paid' : receipt.status === 'pending' ? 'Pending' : receipt.status}
-                </p>
-                
-                {/* Payment Instructions for specific methods */}
-                {receipt.payment_method === 'Bank Transfer' && (
-                  <div className="mt-2 p-2 bg-white rounded border text-xs">
-                    <p className="font-medium">Bank Transfer Details:</p>
-                    <p>Account Name: Zimbabwe Shipping Ltd</p>
-                    <p>Account Number: 12345678</p>
-                    <p>Sort Code: 12-34-56</p>
-                    <p>Reference: {receipt.receipt_number}</p>
-                  </div>
-                )}
-                
-                {receipt.payment_method === 'Pay Later (30 Days)' && (
-                  <div className="mt-2 p-2 bg-white rounded border text-xs">
-                    <p className="font-medium">Payment Due:</p>
-                    <p>Please make payment within 30 days of collection date.</p>
-                    <p>You will receive payment instructions via email.</p>
-                  </div>
-                )}
-                
-                {receipt.payment_method === 'Pay on Goods Arriving' && (
-                  <div className="mt-2 p-2 bg-white rounded border text-xs">
-                    <p className="font-medium">Payment Due On Arrival:</p>
-                    <p>Full payment must be made when goods arrive in Zimbabwe.</p>
-                    <p>You will be contacted when your shipment arrives.</p>
-                  </div>
-                )}
-              </div>
+            )}
+            
+            <div className="flex justify-between py-3 sm:py-4 font-bold text-base sm:text-lg">
+              <span>Total</span>
+              <span>£{receipt.amount.toFixed(2)}</span>
+            </div>
+            
+            <div className="border rounded-md p-2 sm:p-3 bg-gray-50 mt-2">
+              <p className="font-medium text-sm">Payment Method: {receipt.payment_method === 'stripe' ? 'Credit Card' : receipt.payment_method === 'paypal' ? 'PayPal' : 'Pay Later'}</p>
+              <p className="text-xs sm:text-sm text-gray-600 mt-1">Payment Status: {receipt.status === 'issued' ? 'Paid' : 'Pending'}</p>
             </div>
           </div>
-
-          {/* Special Instructions */}
-          {shipmentMetadata.special_instructions && (
-            <div className="mb-4 sm:mb-6">
-              <h3 className="font-bold text-sm mb-1 sm:mb-2">Special Instructions</h3>
-              <div className="border rounded-md p-3 text-sm">
-                {shipmentMetadata.special_instructions}
-              </div>
-            </div>
-          )}
           
           <div className="text-center text-gray-500 text-xs sm:text-sm mt-8 sm:mt-12 pt-3 sm:pt-4 border-t">
             <p>Thank you for choosing Zimbabwe Shipping</p>
