@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 const Navbar: React.FC = () => {
-  const { isAuthenticated, user, signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const location = useLocation();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -89,7 +89,7 @@ const Navbar: React.FC = () => {
             <ThemeToggle />
             
             {/* User Menu (if authenticated) */}
-            {isAuthenticated ? (
+            {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -160,7 +160,7 @@ const Navbar: React.FC = () => {
                       <PackageCheck className="h-4 w-4 mr-2" />
                       Book Shipment
                     </Link>
-                    {!isAuthenticated && (
+                    {!user && (
                       <Link
                         to="/auth"
                         className="flex items-center py-2 px-3 rounded-md text-sm font-medium border border-gray-200 dark:border-gray-700"

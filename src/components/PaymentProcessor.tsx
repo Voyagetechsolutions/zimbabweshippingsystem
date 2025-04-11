@@ -21,7 +21,7 @@ import {
   Landmark,
   LoaderCircle,
   Clock,
-  Cash,
+  Wallet,
   ReceiptText,
   CreditCard as DirectDebit,
   CircleAlert,
@@ -339,7 +339,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
                       <div className="flex-1">
                         <div className="flex justify-between">
                           <Label htmlFor="payOnArrival" className="font-medium cursor-pointer flex items-center">
-                            <Cash className="h-4 w-4 mr-2 text-blue-600" />
+                            <Wallet className="h-4 w-4 mr-2 text-blue-600" />
                             Pay on Goods Arriving
                           </Label>
                           <span className="text-sm font-medium text-green-600">£{calculatedAmounts.totalAmount.toFixed(2)}</span>
@@ -377,7 +377,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
               </div>
               
               {selectedPaymentMethod === 'payOnArrival' && (
-                <Alert variant="warning" className="mt-4">
+                <Alert variant="destructive" className="mt-4">
                   <CircleAlert className="h-4 w-4" />
                   <AlertTitle>Important Notice</AlertTitle>
                   <AlertDescription>
