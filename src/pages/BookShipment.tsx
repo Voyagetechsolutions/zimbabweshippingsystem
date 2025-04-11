@@ -51,11 +51,26 @@ const BookShipment = () => {
       },
       shipmentDetails: {
         type: data.shipmentType,
+        payment_option: data.paymentOption,
         quantity: data.shipmentType === 'drum' ? parseInt(data.drumQuantity) : null,
         weight: data.shipmentType === 'parcel' ? parseFloat(data.weight) : null,
+        item_type: data.shipmentType === 'other' ? data.itemType : null,
+        custom_item_description: data.customItemDescription,
         tracking_number: '', // Will be filled from the database
-        services: [], // Add any additional services here
+        metal_seal: data.metalSeal,
+        metal_seal_price: 5, // Mandatory seal price
+        door_to_door_delivery: data.doorToDoorDelivery,
+        door_to_door_price: data.doorToDoorDelivery ? 25 : 0,
+        services: [
+          // Add mandatory metal seal
+          { name: 'Metal Seal', price: 5 },
+          // Add door-to-door delivery if selected
+          ...(data.doorToDoorDelivery ? [{ name: 'Door-to-Door Delivery', price: 25 }] : [])
+        ],
       },
+      // Pass additional properties
+      metalSeal: data.metalSeal,
+      doorToDoorDelivery: data.doorToDoorDelivery
     });
     setTotalAmount(amount);
     setCurrentStep(BookingStep.PAYMENT);
@@ -64,7 +79,7 @@ const BookShipment = () => {
     try {
       const { data: shipmentData, error: shipmentError } = await supabase
         .from('shipments')
-        .select('tracking_number')
+        .select('tracking_number, metadata')
         .eq('id', shipmentId)
         .single();
       

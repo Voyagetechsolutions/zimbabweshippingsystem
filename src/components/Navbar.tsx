@@ -1,19 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, ChevronDown, User, ShoppingBag, LogOut } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import {
-  NavigationMenu,
-  NavigationMenuContent,
-  NavigationMenuItem,
-  NavigationMenuLink,
-  NavigationMenuList,
-  NavigationMenuTrigger,
-  navigationMenuTriggerStyle,
-} from "@/components/ui/navigation-menu";
-import Logo from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
+import { Menu, X, User, Package, Book, Search, PackageCheck } from 'lucide-react';
+import Logo from './Logo';
+import { Button } from '@/components/ui/button';
+import ThemeToggle from '@/components/ThemeToggle';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,317 +14,167 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
+} from '@/components/ui/dropdown-menu';
 
-const Navbar = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
-  const { user, signOut } = useAuth();
+const Navbar: React.FC = () => {
+  const { isAuthenticated, user, signOut } = useAuth();
   const location = useLocation();
-
-  // Function to handle the reviews link click
-  const handleReviewsClick = (e: React.MouseEvent) => {
-    if (location.pathname === '/') {
-      e.preventDefault();
-      
-      // Find the reviews section and scroll to it
-      const reviewsSection = document.querySelector('.reviews-section');
-      if (reviewsSection) {
-        reviewsSection.scrollIntoView({ behavior: 'smooth' });
-      }
-    }
-  };
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
-      const scrollPosition = window.scrollY;
-      setIsScrolled(scrollPosition > 10);
+      setIsScrolled(window.scrollY > 10);
     };
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const toggleMenu = () => {
-    setIsOpen(!isOpen);
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false);
   };
 
+  // Navigation links - both for desktop and mobile
+  const navLinks = [
+    { name: 'Services', path: '/services', icon: <Package className="h-4 w-4 mr-2" /> },
+    { name: 'Pricing', path: '/pricing', icon: <Book className="h-4 w-4 mr-2" /> },
+    { name: 'Track', path: '/track', icon: <Search className="h-4 w-4 mr-2" /> },
+    { name: 'Contact', path: '/contact', icon: <User className="h-4 w-4 mr-2" /> },
+  ];
+
   return (
-    <header
-      className={cn(
-        "sticky top-0 z-50 w-full transition-all duration-200",
-        isScrolled ? "bg-white shadow-md" : "bg-white/80 backdrop-blur-sm"
-      )}
+    <header 
+      className={`sticky top-0 z-50 w-full transition-all duration-200 ${
+        isScrolled ? 'bg-white/95 backdrop-blur-sm shadow-sm dark:bg-gray-900/95' : 'bg-white dark:bg-gray-900'
+      }`}
     >
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <div className="flex-shrink-0">
-            <Link to="/" className="flex items-center">
-              <Logo className="h-8 w-auto" />
+        <div className="flex h-16 items-center justify-between">
+          {/* Logo and Brand */}
+          <div className="flex items-center">
+            <Link to="/" className="flex items-center space-x-2" onClick={closeMobileMenu}>
+              <Logo size="small" />
             </Link>
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:block">
-            <NavigationMenu>
-              <NavigationMenuList>
-                <NavigationMenuItem>
-                  <Link to="/services">
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                      Services
-                    </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>
-                
-                <NavigationMenuItem>
-                  <NavigationMenuTrigger>Shipping</NavigationMenuTrigger>
-                  <NavigationMenuContent>
-                    <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
-                      <li>
-                        <Link to="/pricing">
-                          <NavigationMenuLink
-                            className={cn(
-                              "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                            )}
-                          >
-                            <div className="text-sm font-medium leading-none">Pricing</div>
-                            <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                              View our transparent pricing structure for shipping from UK to Zimbabwe
-                            </p>
-                          </NavigationMenuLink>
-                        </Link>
-                      </li>
-                      <li>
-                        <Link to="/collection-schedule">
-                          <NavigationMenuLink
-                            className={cn(
-                              "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                            )}
-                          >
-                            <div className="text-sm font-medium leading-none">Collection Schedule</div>
-                            <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                              Check when we're collecting in your area
-                            </p>
-                          </NavigationMenuLink>
-                        </Link>
-                      </li>
-                      <li>
-                        <Link to="/track">
-                          <NavigationMenuLink
-                            className={cn(
-                              "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                            )}
-                          >
-                            <div className="text-sm font-medium leading-none">Track Shipment</div>
-                            <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                              Track the status of your shipment in real-time
-                            </p>
-                          </NavigationMenuLink>
-                        </Link>
-                      </li>
-                      <li>
-                        <Link to="/book-shipment">
-                          <NavigationMenuLink
-                            className={cn(
-                              "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                            )}
-                          >
-                            <div className="text-sm font-medium leading-none">Book a Shipment</div>
-                            <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                              Schedule a new shipment to Zimbabwe
-                            </p>
-                          </NavigationMenuLink>
-                        </Link>
-                      </li>
-                    </ul>
-                  </NavigationMenuContent>
-                </NavigationMenuItem>
-                
-                <NavigationMenuItem>
-                  <Link to="/gallery">
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                      Gallery
-                    </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>
-                
-                <NavigationMenuItem>
-                  <Link to="/" onClick={handleReviewsClick}>
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                      Reviews
-                    </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>
-                
-                <NavigationMenuItem>
-                  <Link to="/contact">
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                      Contact
-                    </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>
-                
-                <NavigationMenuItem>
-                  <Link to="/about-us">
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                      About Us
-                    </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>
-                
-                <NavigationMenuItem>
-                  <Link to="/book-shipment">
-                    <Button className="bg-zim-red hover:bg-zim-red/90 text-white">
-                      Book Shipment
-                    </Button>
-                  </Link>
-                </NavigationMenuItem>
-              </NavigationMenuList>
-            </NavigationMenu>
-          </div>
+          <nav className="hidden md:flex items-center space-x-6">
+            {navLinks.map((link) => (
+              <Link
+                key={link.path}
+                to={link.path}
+                className={`text-sm font-medium transition-colors hover:text-zim-green ${
+                  location.pathname === link.path
+                    ? 'text-zim-green font-semibold'
+                    : 'text-gray-600 dark:text-gray-200'
+                }`}
+              >
+                {link.name}
+              </Link>
+            ))}
+          </nav>
 
-          {/* Authentication Buttons */}
-          <div className="hidden md:flex items-center">
-            {user ? (
+          {/* Right side actions */}
+          <div className="flex items-center space-x-3">
+            {/* Book Shipment Button */}
+            <Link to="/book-shipment">
+              <Button className="hidden md:flex items-center bg-zim-red hover:bg-zim-red/90 text-white">
+                <PackageCheck className="h-4 w-4 mr-2" />
+                Book Shipment
+              </Button>
+            </Link>
+            
+            {/* Theme Toggle */}
+            <ThemeToggle />
+            
+            {/* User Menu (if authenticated) */}
+            {isAuthenticated ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative ml-4 flex items-center">
-                    <User className="h-5 w-5 mr-2" />
-                    <span className="max-w-[100px] truncate">
-                      {user.user_metadata?.full_name || user.email?.split('@')[0]}
-                    </span>
+                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                    <User className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuContent align="end">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <Link to="/dashboard">
-                    <DropdownMenuItem className="cursor-pointer">
-                      <User className="mr-2 h-4 w-4" />
-                      <span>Dashboard</span>
-                    </DropdownMenuItem>
+                    <DropdownMenuItem>Dashboard</DropdownMenuItem>
                   </Link>
                   <Link to="/account">
-                    <DropdownMenuItem className="cursor-pointer">
-                      <User className="mr-2 h-4 w-4" />
-                      <span>Profile</span>
-                    </DropdownMenuItem>
-                  </Link>
-                  <Link to="/shipments">
-                    <DropdownMenuItem className="cursor-pointer">
-                      <ShoppingBag className="mr-2 h-4 w-4" />
-                      <span>My Shipments</span>
-                    </DropdownMenuItem>
+                    <DropdownMenuItem>Profile</DropdownMenuItem>
                   </Link>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
+                  <DropdownMenuItem onClick={() => signOut()}>
+                    Log out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <>
-                <Link to="/auth">
-                  <Button variant="outline" className="mr-2">Log in</Button>
-                </Link>
-                <Link to="/auth?signup=true">
-                  <Button>Sign up</Button>
-                </Link>
-              </>
+              <Link to="/auth">
+                <Button variant="outline" size="sm" className="hidden md:inline-flex">
+                  Sign In
+                </Button>
+              </Link>
             )}
-          </div>
-
-          {/* Mobile Menu Button */}
-          <div className="md:hidden">
-            <button
-              onClick={toggleMenu}
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-zim-green"
-            >
-              <span className="sr-only">Open main menu</span>
-              {isOpen ? (
-                <X className="block h-6 w-6" aria-hidden="true" />
-              ) : (
-                <Menu className="block h-6 w-6" aria-hidden="true" />
-              )}
-            </button>
+            
+            {/* Mobile Menu Trigger */}
+            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" className="h-10 w-10 p-0 md:hidden">
+                  <span className="sr-only">Toggle Menu</span>
+                  {isMobileMenuOpen ? (
+                    <X className="h-5 w-5" />
+                  ) : (
+                    <Menu className="h-5 w-5" />
+                  )}
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[300px] sm:w-[350px]">
+                <div className="flex flex-col h-full">
+                  <div className="pt-6 pb-8">
+                    <Logo size="small" />
+                  </div>
+                  <nav className="flex flex-col space-y-4">
+                    {navLinks.map((link) => (
+                      <Link
+                        key={link.path}
+                        to={link.path}
+                        className={`flex items-center py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+                          location.pathname === link.path
+                            ? 'bg-gray-100 text-zim-green dark:bg-gray-800'
+                            : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                        }`}
+                        onClick={closeMobileMenu}
+                      >
+                        {link.icon}
+                        {link.name}
+                      </Link>
+                    ))}
+                    <Link
+                      to="/book-shipment"
+                      className="flex items-center py-2 px-3 rounded-md text-sm font-medium bg-zim-red text-white"
+                      onClick={closeMobileMenu}
+                    >
+                      <PackageCheck className="h-4 w-4 mr-2" />
+                      Book Shipment
+                    </Link>
+                    {!isAuthenticated && (
+                      <Link
+                        to="/auth"
+                        className="flex items-center py-2 px-3 rounded-md text-sm font-medium border border-gray-200 dark:border-gray-700"
+                        onClick={closeMobileMenu}
+                      >
+                        Sign In
+                      </Link>
+                    )}
+                  </nav>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
-      </div>
-
-      {/* Mobile Menu */}
-      <div className={`md:hidden ${isOpen ? 'block' : 'hidden'}`}>
-        <div className="px-2 pt-2 pb-3 space-y-1 bg-white">
-          <Link to="/services" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-            Services
-          </Link>
-          <Link to="/pricing" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-            Pricing
-          </Link>
-          <Link to="/track" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-            Track Shipment
-          </Link>
-          <Link to="/book-shipment" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-            Book Shipment
-          </Link>
-          <Link to="/collection-schedule" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-            Collection Schedule
-          </Link>
-          <Link to="/gallery" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-            Gallery
-          </Link>
-          <Link to="/" onClick={(e) => { handleReviewsClick(e); setIsOpen(false); }} className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50">
-            Reviews
-          </Link>
-          <Link to="/contact" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-            Contact
-          </Link>
-          <Link to="/about-us" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-            About Us
-          </Link>
-          
-          {user ? (
-            <>
-              <Link to="/dashboard" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-                Dashboard
-              </Link>
-              <Link to="/account" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-                Profile
-              </Link>
-              <Link to="/shipments" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-                My Shipments
-              </Link>
-              <button
-                onClick={() => { signOut(); setIsOpen(false); }}
-                className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50"
-              >
-                Log out
-              </button>
-            </>
-          ) : (
-            <div className="pt-4 pb-3 border-t border-gray-200">
-              <div className="flex items-center px-5">
-                <Link to="/auth" className="block w-full text-center px-4 py-2 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-zim-green hover:bg-zim-green-dark" onClick={() => setIsOpen(false)}>
-                  Log in
-                </Link>
-              </div>
-              <div className="mt-3 flex items-center px-5">
-                <Link to="/auth?signup=true" className="block w-full text-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-base font-medium text-gray-700 bg-white hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-                  Sign up
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-      
-      {/* Zimbabwe Flag Colors Strip */}
-      <div className="w-full flex h-1">
-        <div className="w-1/3 bg-zim-green"></div>
-        <div className="w-1/3 bg-zim-yellow"></div>
-        <div className="w-1/3 bg-zim-red"></div>
       </div>
     </header>
   );
