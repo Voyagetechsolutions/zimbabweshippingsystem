@@ -48,7 +48,24 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { AlertCircle, Check, Info, PackageCheck, Truck } from 'lucide-react';
+import { 
+  AlertCircle, 
+  Check, 
+  Info, 
+  PackageCheck, 
+  Truck,
+  Bicycle,
+  Trash2,
+  Box,
+  WashingMachine,
+  Sofa,
+  Monitor,
+  Tool,
+  Plug,
+  Fan,
+  PenTool,
+  Briefcase
+} from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
   getRouteForPostalCode, 
@@ -56,6 +73,80 @@ import {
   getAreasFromPostalCode
 } from '@/utils/postalCodeUtils';
 import { getDateByRoute } from '@/data/collectionSchedule';
+
+// Define item categories
+const itemCategories = {
+  "Vehicles & Mobility": [
+    "Bicycle", 
+    "Wheelchair", 
+    "Adult Walking Aid", 
+    "Mobility Scooter", 
+    "Car Wheels/Tyres",
+    "Vehicle Parts",
+    "Engine"
+  ],
+  "Household Items": [
+    "Bin", 
+    "Plastic Tubs", 
+    "Washing Machine", 
+    "Dishwasher", 
+    "Dryer", 
+    "Ironing Board",
+    "Boxes", 
+    "Bags", 
+    "Suitcase",
+    "American Fridge", 
+    "Standard Fridge Freezer", 
+    "Deep Freezer",
+    "Heater",
+    "Air Conditioner"
+  ],
+  "Furniture": [
+    "Sofas", 
+    "Chairs", 
+    "Kids Push Chair", 
+    "Dining Chairs", 
+    "Dining Table", 
+    "Coffee Table", 
+    "Beds", 
+    "Mattress", 
+    "Dismantled Wardrobe", 
+    "Chest of Drawers", 
+    "Dressing Unit"
+  ],
+  "Home Decor": [
+    "Rugs/Carpets", 
+    "Wall Frames", 
+    "Mirror",
+    "TVs"
+  ],
+  "Tools & Equipment": [
+    "Tool Box", 
+    "Air Compressor", 
+    "Generator", 
+    "Solar Panels", 
+    "Garden Tools", 
+    "Lawn Mower", 
+    "Bathroom Equipment",
+    "Water Pump",
+    "Building Equipment",
+    "Ladder"
+  ],
+  "Construction": [
+    "Internal Doors", 
+    "External Doors", 
+    "Pallet"
+  ],
+  "Business & Office": [
+    "Office Equipment",
+    "Amazon Bags", 
+    "Changani Bags"
+  ]
+};
+
+// Flatten the categories for the schema validation
+const allItems = Object.values(itemCategories).flat();
+allItems.push("Other"); // Add "Other" option
 
 // Define the form schema
 const formSchema = z.object({
@@ -69,24 +160,33 @@ const formSchema = z.object({
   recipientPhone: z.string().min(10, 'Please enter a valid phone number'),
   deliveryAddress: z.string().min(5, 'Delivery address is required'),
   deliveryCity: z.string().min(2, 'City is required'),
-  shipmentType: z.enum(['drum', 'parcel']),
+  shipmentType: z.enum(['drum', 'other', 'custom']),
   drumQuantity: z.string().optional(),
-  weight: z.string().optional(),
+  itemCategory: z.string().optional(),
+  itemDescription: z.string().optional(),
   specialInstructions: z.string().optional(),
   termsAgreed: z.boolean().refine(val => val === true, {
     message: 'You must agree to the terms and conditions',
   }),
+  doorToDoor: z.boolean().optional(),
+  paymentOption: z.enum(['standard', 'payLater']).default('standard'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
-const initialDrumPrices = {
-  small: 150,
-  medium: 185,
-  large: 220,
+// Drum pricing based on quantity and payment option
+const drumPricing = {
+  standard: {
+    single: 260,
+    multiple: 240,
+    bulk: 220
+  },
+  payLater: {
+    single: 280,
+    multiple: 260,
+    bulk: 240
+  }
 };
-
-const parcelRatePerKg = 14;
 
 interface BookingFormProps {
   onSubmitComplete: (data: FormValues, shipmentId: string, amount: number) => void;
@@ -100,9 +200,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const [collectionArea, setCollectionArea] = useState<string[]>([]);
   const [collectionDate, setCollectionDate] = useState<string | null>(null);
   const [isRestrictedArea, setIsRestrictedArea] = useState(false);
-  const [drumSize, setDrumSize] = useState<'small' | 'medium' | 'large'>('medium');
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   
   // Initialize the form
   const form = useForm<FormValues>({
@@ -120,16 +220,20 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       deliveryCity: '',
       shipmentType: 'drum',
       drumQuantity: '1',
-      weight: '',
+      itemCategory: '',
+      itemDescription: '',
       specialInstructions: '',
       termsAgreed: false,
+      doorToDoor: false,
+      paymentOption: 'standard',
     },
   });
   
   const watchShipmentType = form.watch('shipmentType');
   const watchDrumQuantity = form.watch('drumQuantity');
-  const watchWeight = form.watch('weight');
   const watchPostcode = form.watch('pickupPostcode');
+  const watchPaymentOption = form.watch('paymentOption');
+  const watchDoorToDoor = form.watch('doorToDoor');
   
   // Handle postal code changes
   useEffect(() => {
@@ -158,18 +262,30 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   useEffect(() => {
     if (watchShipmentType === 'drum') {
       const quantity = parseInt(watchDrumQuantity || '1', 10);
-      const basePrice = initialDrumPrices[drumSize];
-      setTotalAmount(basePrice * quantity);
-    } else if (watchShipmentType === 'parcel') {
-      const weight = parseFloat(watchWeight || '0');
-      if (!isNaN(weight) && weight > 0) {
-        const calculatedAmount = weight * parcelRatePerKg;
-        setTotalAmount(calculatedAmount);
+      let basePrice;
+      
+      // Determine price based on quantity and payment option
+      if (quantity >= 5) {
+        basePrice = drumPricing[watchPaymentOption].bulk;
+      } else if (quantity >= 2) {
+        basePrice = drumPricing[watchPaymentOption].multiple;
       } else {
-        setTotalAmount(0);
+        basePrice = drumPricing[watchPaymentOption].single;
       }
+      
+      const subtotal = basePrice * quantity;
+      
+      // Add mandatory metal seal cost
+      const totalWithSeal = subtotal + 5;
+      
+      // Add door-to-door delivery if selected
+      const doorToDoorCost = watchDoorToDoor ? 25 : 0;
+      
+      setTotalAmount(totalWithSeal + doorToDoorCost);
+    } else {
+      setTotalAmount(0); // For custom items, we won't know the price yet
     }
-  }, [watchShipmentType, watchDrumQuantity, watchWeight, drumSize]);
+  }, [watchShipmentType, watchDrumQuantity, watchPaymentOption, watchDoorToDoor]);
   
   // Handle form submission
   const onSubmit = async (data: FormValues) => {
@@ -186,24 +302,20 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         return;
       }
       
-      // Calculate final amount based on form data
-      let finalAmount = 0;
-      
-      if (data.shipmentType === 'drum') {
-        const quantity = parseInt(data.drumQuantity || '1', 10);
-        const basePrice = initialDrumPrices[drumSize];
-        finalAmount = basePrice * quantity;
-      } else if (data.shipmentType === 'parcel') {
-        const weight = parseFloat(data.weight || '0');
-        if (!isNaN(weight) && weight > 0) {
-          finalAmount = weight * parcelRatePerKg;
-        }
+      // For custom items, redirect to custom quote
+      if (data.shipmentType === 'custom') {
+        onSubmitComplete(data, 'custom', 0);
+        setIsCalculating(false);
+        return;
       }
       
       // Generate a tracking number
       const trackingNumber = `ZS${Date.now().toString().substring(5)}`;
       
-      // Create shipment in the database - using the correct schema fields
+      // Calculate final amount
+      let finalAmount = totalAmount;
+      
+      // Create shipment in the database
       const { data: shipmentData, error: shipmentError } = await supabase
         .from('shipments')
         .insert({
@@ -213,8 +325,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
           origin: `${data.pickupAddress}, ${data.pickupPostcode}`,
           destination: `${data.deliveryAddress}, ${data.deliveryCity}, Zimbabwe`,
           carrier: 'Zimbabwe Shipping',
-          weight: data.shipmentType === 'parcel' ? parseFloat(data.weight || '0') : null,
-          dimensions: data.shipmentType === 'drum' ? `${drumSize} drum x ${data.drumQuantity}` : null,
           metadata: {
             sender_name: `${data.firstName} ${data.lastName}`,
             sender_email: data.email,
@@ -222,9 +332,13 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             recipient_name: data.recipientName,
             recipient_phone: data.recipientPhone,
             shipment_type: data.shipmentType,
-            drum_size: data.shipmentType === 'drum' ? drumSize : null,
             drum_quantity: data.shipmentType === 'drum' ? parseInt(data.drumQuantity || '1', 10) : null,
+            item_category: data.shipmentType === 'other' ? data.itemCategory : null,
+            item_description: data.shipmentType === 'other' ? data.itemDescription : null,
             amount: finalAmount,
+            payment_option: data.paymentOption,
+            door_to_door: data.doorToDoor,
+            metal_seal: true, // Mandatory
             special_instructions: data.specialInstructions || null,
             route: collectionRoute,
             collection_date: collectionDate
@@ -250,6 +364,27 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         description: error.message || 'An error occurred while processing your booking. Please try again.',
         variant: 'destructive',
       });
+    }
+  };
+  
+  const getCategoryIcon = (category: string) => {
+    switch(category) {
+      case "Vehicles & Mobility":
+        return <Bicycle className="h-5 w-5" />;
+      case "Household Items":
+        return <WashingMachine className="h-5 w-5" />;
+      case "Furniture":
+        return <Sofa className="h-5 w-5" />;
+      case "Home Decor":
+        return <Monitor className="h-5 w-5" />;
+      case "Tools & Equipment":
+        return <Tool className="h-5 w-5" />;
+      case "Construction":
+        return <PenTool className="h-5 w-5" />;
+      case "Business & Office":
+        return <Briefcase className="h-5 w-5" />;
+      default:
+        return <Box className="h-5 w-5" />;
     }
   };
   
@@ -480,11 +615,44 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 We deliver to all locations in Zimbabwe. Standard delivery time is 4-6 weeks from collection.
               </AlertDescription>
             </Alert>
-            
           </TabsContent>
           
           {/* Shipment Details Tab */}
           <TabsContent value="shipment" className="space-y-4 pt-4">
+            {/* Payment Option Selection */}
+            <FormField
+              control={form.control}
+              name="paymentOption"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel>Payment Option</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      className="flex flex-col space-y-1"
+                    >
+                      <div className="flex items-center space-x-2 p-3 border rounded-md">
+                        <RadioGroupItem value="standard" id="standard" />
+                        <div>
+                          <Label htmlFor="standard" className="font-medium">Standard Payment</Label>
+                          <p className="text-sm text-gray-500">Pay now to secure your shipment</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2 p-3 border rounded-md">
+                        <RadioGroupItem value="payLater" id="payLater" />
+                        <div>
+                          <Label htmlFor="payLater" className="font-medium">30-Day Payment Terms</Label>
+                          <p className="text-sm text-gray-500">Pay within 30 days of collection date</p>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
             {/* Restricted Areas Notice */}
             <Card className="border-yellow-300 bg-yellow-50">
               <CardHeader className="pb-2">
@@ -519,7 +687,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   <FormControl>
                     <RadioGroup
                       onValueChange={field.onChange}
-                      defaultValue={field.value}
+                      value={field.value}
                       className="flex flex-col space-y-1"
                     >
                       <div className="flex items-center space-x-2">
@@ -527,8 +695,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                         <Label htmlFor="drum">Drum Shipping</Label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="parcel" id="parcel" />
-                        <Label htmlFor="parcel">Parcel Shipping</Label>
+                        <RadioGroupItem value="other" id="other" />
+                        <Label htmlFor="other">Other Items</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="custom" id="custom" />
+                        <Label htmlFor="custom">Request Custom Quote</Label>
                       </div>
                     </RadioGroup>
                   </FormControl>
@@ -538,50 +710,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             />
             
             {watchShipmentType === 'drum' && (
-              <div className="space-y-4">
-                <div>
-                  <Label>Drum Size</Label>
-                  <RadioGroup
-                    defaultValue={drumSize}
-                    onValueChange={(value) => setDrumSize(value as 'small' | 'medium' | 'large')}
-                    className="mt-2"
-                  >
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className={`border rounded-lg p-4 ${drumSize === 'small' ? 'bg-blue-50 border-blue-200' : ''}`}>
-                        <div className="flex items-start space-x-3">
-                          <RadioGroupItem value="small" id="small" className="mt-1" />
-                          <div>
-                            <Label htmlFor="small" className="font-medium">Small Drum</Label>
-                            <p className="text-sm text-gray-500">£150 per drum</p>
-                            <p className="text-xs text-gray-500 mt-1">Capacity: 60 liters</p>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className={`border rounded-lg p-4 ${drumSize === 'medium' ? 'bg-blue-50 border-blue-200' : ''}`}>
-                        <div className="flex items-start space-x-3">
-                          <RadioGroupItem value="medium" id="medium" className="mt-1" />
-                          <div>
-                            <Label htmlFor="medium" className="font-medium">Medium Drum</Label>
-                            <p className="text-sm text-gray-500">£185 per drum</p>
-                            <p className="text-xs text-gray-500 mt-1">Capacity: 120 liters</p>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className={`border rounded-lg p-4 ${drumSize === 'large' ? 'bg-blue-50 border-blue-200' : ''}`}>
-                        <div className="flex items-start space-x-3">
-                          <RadioGroupItem value="large" id="large" className="mt-1" />
-                          <div>
-                            <Label htmlFor="large" className="font-medium">Large Drum</Label>
-                            <p className="text-sm text-gray-500">£220 per drum</p>
-                            <p className="text-xs text-gray-500 mt-1">Capacity: 210 liters</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </RadioGroup>
-                </div>
+              <div className="space-y-6 p-4 border rounded-md">
+                <h3 className="font-semibold">Drum Shipping Options</h3>
                 
                 <FormField
                   control={form.control}
@@ -589,53 +719,186 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Number of Drums</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select quantity" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                            <SelectItem key={num} value={num.toString()}>
+                              {num}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="bg-gray-50 p-4 rounded-md">
+                  <h4 className="font-medium mb-2">Pricing Information</h4>
+                  <p className="text-sm mb-3">Current payment option: <span className="font-medium">{watchPaymentOption === 'standard' ? 'Standard Payment' : '30-Day Payment Terms'}</span></p>
+                  
+                  {watchPaymentOption === 'standard' ? (
+                    <ul className="space-y-1 list-disc pl-5 text-sm">
+                      <li>1 Drum: £260 each</li>
+                      <li>2-4 Drums: £240 each</li>
+                      <li>5+ Drums: £220 each</li>
+                    </ul>
+                  ) : (
+                    <ul className="space-y-1 list-disc pl-5 text-sm">
+                      <li>1 Drum: £280 each</li>
+                      <li>2-4 Drums: £260 each</li>
+                      <li>5+ Drums: £240 each</li>
+                    </ul>
+                  )}
+                  
+                  <p className="text-xs text-gray-500 mt-2">Each drum has a capacity of 200L</p>
+                </div>
+              </div>
+            )}
+            
+            {watchShipmentType === 'other' && (
+              <div className="space-y-6 p-4 border rounded-md">
+                <h3 className="font-semibold">Other Items</h3>
+                
+                <div>
+                  <Label className="mb-2 block">Select Item Category</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {Object.keys(itemCategories).map((category) => (
+                      <div 
+                        key={category} 
+                        className={`p-3 border rounded-md cursor-pointer flex items-center ${selectedCategory === category ? 'bg-blue-50 border-blue-300' : ''}`}
+                        onClick={() => setSelectedCategory(category)}
+                      >
+                        <div className="mr-2 text-gray-600">
+                          {getCategoryIcon(category)}
+                        </div>
+                        <span>{category}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                {selectedCategory && (
+                  <FormField
+                    control={form.control}
+                    name="itemCategory"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Select Specific Item</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select an item" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {itemCategories[selectedCategory].map((item) => (
+                              <SelectItem key={item} value={item}>
+                                {item}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="Other">Other (please specify)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+                
+                <FormField
+                  control={form.control}
+                  name="itemDescription"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Item Description</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          min="1" 
-                          placeholder="1" 
-                          {...field}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value);
-                            field.onChange(val < 1 ? '1' : e.target.value);
-                          }}
+                        <Textarea 
+                          placeholder="Please provide details about your item (dimensions, weight, etc.)" 
+                          className="resize-none" 
+                          {...field} 
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+                
+                <div className="bg-gray-50 p-4 rounded-md">
+                  <h4 className="font-medium mb-2">Volume-Based Pricing</h4>
+                  <p className="text-sm">We charge based on volume rather than weight:</p>
+                  <ul className="space-y-1 list-disc pl-5 text-sm mt-2">
+                    <li>Pricing varies by item size and type</li>
+                    <li>Please provide accurate item description</li>
+                    <li>We'll contact you with a price quote</li>
+                  </ul>
+                  
+                  <div className="mt-4">
+                    <Button 
+                      type="button"
+                      variant="outline"
+                      onClick={() => form.setValue('shipmentType', 'custom')}
+                    >
+                      Request Custom Quote
+                    </Button>
+                  </div>
+                </div>
               </div>
             )}
             
-            {watchShipmentType === 'parcel' && (
+            {watchShipmentType === 'custom' && (
+              <div className="p-4 bg-blue-50 rounded-md">
+                <h3 className="font-medium text-blue-800 mb-2">Request Custom Quote</h3>
+                <p className="text-sm mb-4">
+                  For items that don't fit our standard categories, we offer custom quotes. 
+                  Submit your shipping details and we'll contact you with a personalized quote.
+                </p>
+                <p className="text-sm font-medium">
+                  Click "Continue" to proceed with your custom quote request.
+                </p>
+              </div>
+            )}
+            
+            {/* Additional Services */}
+            <div className="space-y-4 p-4 border rounded-md">
+              <h3 className="font-semibold">Additional Services</h3>
+              
+              <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-md">
+                <Checkbox disabled checked />
+                <div>
+                  <Label className="font-medium">Mandatory Metal Seal</Label>
+                  <p className="text-sm text-gray-500">For increased security (£5.00)</p>
+                </div>
+              </div>
+              
               <FormField
                 control={form.control}
-                name="weight"
+                name="doorToDoor"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Weight (kg)</FormLabel>
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 p-3 border rounded-md">
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.1" 
-                        min="0.1" 
-                        placeholder="Enter weight in kg" 
-                        {...field}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value);
-                          field.onChange(val < 0.1 ? '0.1' : e.target.value);
-                        }}
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
                       />
                     </FormControl>
-                    <FormDescription>
-                      Rate: £{parcelRatePerKg} per kg
-                    </FormDescription>
-                    <FormMessage />
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>
+                        Door-to-Door Delivery
+                      </FormLabel>
+                      <FormDescription>
+                        We'll deliver directly to the recipient's address (£25.00)
+                      </FormDescription>
+                    </div>
                   </FormItem>
                 )}
               />
-            )}
+            </div>
             
             <FormField
               control={form.control}
@@ -645,8 +908,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   <FormLabel>Special Instructions (Optional)</FormLabel>
                   <FormControl>
                     <Textarea 
-                      placeholder="Any special handling or delivery instructions" 
-                      className="resize-none"
+                      placeholder="Add any special instructions for your shipment" 
+                      className="resize-none" 
                       {...field} 
                     />
                   </FormControl>
@@ -655,32 +918,48 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               )}
             />
             
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="items">
-                <AccordionTrigger>What can I ship?</AccordionTrigger>
-                <AccordionContent>
-                  <div className="space-y-2 text-sm">
-                    <p><strong>Allowed Items:</strong> Clothing, shoes, non-perishable food items, household goods, electronics (for personal use), books, and toiletries.</p>
-                    <p><strong>Restricted Items:</strong> Batteries, aerosols, perfumes, and certain electronics may have restrictions.</p>
-                    <p><strong>Prohibited Items:</strong> Illegal substances, weapons, flammable items, perishable foods, and currency.</p>
-                    <p>For a complete list, please refer to our <a href="/services" className="text-blue-600 hover:underline">Shipping Guidelines</a>.</p>
+            {/* Price Summary */}
+            {watchShipmentType === 'drum' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Price Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between py-1">
+                    <span className="text-gray-600">
+                      {parseInt(watchDrumQuantity || '1', 10)} x Drum{parseInt(watchDrumQuantity || '1', 10) > 1 ? 's' : ''}
+                    </span>
+                    <span>£{parseInt(watchDrumQuantity || '1', 10) >= 5 
+                      ? (watchPaymentOption === 'standard' ? 220 : 240)
+                      : parseInt(watchDrumQuantity || '1', 10) >= 2
+                        ? (watchPaymentOption === 'standard' ? 240 : 260)
+                        : (watchPaymentOption === 'standard' ? 260 : 280)
+                      } x {parseInt(watchDrumQuantity || '1', 10)}
+                    </span>
                   </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-            
-            <div>
-              <Label>Total Amount</Label>
-              <div className="mt-1 p-3 bg-blue-50 border border-blue-200 rounded-lg font-medium text-xl">
-                £{totalAmount.toFixed(2)}
-              </div>
-            </div>
+                  <div className="flex justify-between py-1">
+                    <span className="text-gray-600">Mandatory Metal Seal</span>
+                    <span>£5.00</span>
+                  </div>
+                  {watchDoorToDoor && (
+                    <div className="flex justify-between py-1">
+                      <span className="text-gray-600">Door-to-Door Delivery</span>
+                      <span>£25.00</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between py-2 border-t font-medium">
+                    <span>Total</span>
+                    <span className="text-zim-green">£{totalAmount.toFixed(2)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             
             <FormField
               control={form.control}
               name="termsAgreed"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 mt-6">
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                   <FormControl>
                     <Checkbox
                       checked={field.value}
@@ -689,23 +968,25 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   </FormControl>
                   <div className="space-y-1 leading-none">
                     <FormLabel>
-                      I agree to the <a href="/terms" className="text-blue-600 hover:underline">terms and conditions</a> and <a href="/privacy" className="text-blue-600 hover:underline">privacy policy</a>
+                      I agree to the terms and conditions
                     </FormLabel>
-                    <FormMessage />
+                    <FormDescription>
+                      By checking this box, you confirm that you have read and agreed to our <a href="/terms" className="text-zim-green hover:underline">Terms and Conditions</a>.
+                    </FormDescription>
                   </div>
                 </FormItem>
               )}
             />
-            
           </TabsContent>
         </Tabs>
         
-        <div className="flex justify-between mt-8">
-          <Button type="button" variant="outline" onClick={() => navigate('/')}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={isCalculating} className="bg-zim-green hover:bg-zim-green/90">
-            {isCalculating ? 'Processing...' : 'Continue to Payment'}
+        <div className="flex justify-end">
+          <Button 
+            type="submit" 
+            className="bg-zim-green hover:bg-zim-green/90 text-white"
+            disabled={isCalculating}
+          >
+            {isCalculating ? 'Processing...' : watchShipmentType === 'custom' ? 'Continue to Custom Quote' : 'Continue to Payment'}
           </Button>
         </div>
       </form>

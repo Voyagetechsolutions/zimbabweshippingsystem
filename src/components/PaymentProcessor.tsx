@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { tableFrom } from '@/integrations/supabase/db-types';
+import { Button } from '@/components/ui/button';
 import { 
   Card, 
   CardContent, 
@@ -10,10 +11,22 @@ import {
   CardFooter, 
   CardHeader, 
   CardTitle 
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { useToast } from '@/hooks/use-toast';
-import { Loader2, AlertCircle, Bug } from 'lucide-react';
+} from '@/components/ui/card';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { 
+  CreditCard, 
+  BanknoteIcon, 
+  ArrowRight, 
+  CircleDollarSign, 
+  Calendar, 
+  AlertCircle, 
+  ArrowLeftCircle, 
+  CheckCircle2,
+  BuildingBank
+} from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface PaymentProcessorProps {
   bookingData: any;
@@ -22,286 +35,284 @@ interface PaymentProcessorProps {
   onCancel: () => void;
 }
 
-const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
-  bookingData,
-  totalAmount,
+const PaymentProcessor: React.FC<PaymentProcessorProps> = ({ 
+  bookingData, 
+  totalAmount, 
   onPaymentComplete,
   onCancel
 }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   
-  const handleOfflinePayment = async () => {
-    setLoading(true);
-    setError(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('card');
+  const [isGoodsArriving, setIsGoodsArriving] = useState<boolean>(false);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  
+  // Calculate the arrival payment premium (20%)
+  const premiumAmount = totalAmount * 0.2;
+  const totalWithPremium = isGoodsArriving ? totalAmount + premiumAmount : totalAmount;
+  
+  const handlePayment = async () => {
+    setIsProcessing(true);
     
     try {
-      console.log("Processing offline payment with data:", {
-        shipment_id: bookingData.shipment_id,
-        amount: totalAmount
-      });
+      // Get current user info
+      const { data: { user } } = await supabase.auth.getUser();
       
-      // Create payment record for offline payment
-      const { data: paymentData, error: paymentError } = await supabase.from('payments').insert({
-        amount: totalAmount,
-        payment_method: 'offline',
-        payment_status: 'pending',
-        shipment_id: bookingData.shipment_id,
-        user_id: bookingData.user_id || null,
-        currency: 'GBP'
-      }).select('id').single();
+      // Generate receipt number
+      const receiptNumber = `REC-${Date.now().toString().slice(-8)}`;
       
-      if (paymentError) {
-        console.error('Payment error details:', paymentError);
-        throw paymentError;
-      }
+      // Determine payment status based on method
+      const paymentStatus = selectedPaymentMethod === 'pay_later' || isGoodsArriving ? 'pending' : 'completed';
       
-      console.log("Created payment record:", paymentData);
+      // Create payment record
+      const { data: paymentData, error: paymentError } = await supabase
+        .from('payments')
+        .insert({
+          user_id: user?.id || bookingData.user_id || null,
+          shipment_id: bookingData.shipment_id,
+          amount: totalWithPremium,
+          currency: 'GBP',
+          payment_method: selectedPaymentMethod,
+          payment_status: paymentStatus,
+          transaction_id: `TX-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+        })
+        .select()
+        .single();
       
-      const receiptNumber = `RCT-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+      if (paymentError) throw paymentError;
       
-      // Create receipt record
-      const { data: receiptData, error: receiptError } = await supabase.from('receipts').insert({
-        payment_id: paymentData.id,
-        shipment_id: bookingData.shipment_id,
-        receipt_number: receiptNumber,
-        payment_method: 'offline',
-        amount: totalAmount,
-        currency: 'GBP',
-        sender_details: bookingData.senderDetails || {
-          name: 'Unknown',
-          email: 'unknown@example.com',
-          phone: 'unknown',
-          address: 'Unknown'
-        },
-        recipient_details: bookingData.recipientDetails || {
-          name: 'Unknown',
-          phone: 'unknown',
-          address: 'Unknown'
-        },
-        shipment_details: bookingData.shipmentDetails || {
-          tracking_number: 'Unknown',
-          type: 'unknown',
-          quantity: 0,
-          weight: 0,
-          services: []
-        },
-        status: 'pending_payment'
-      }).select('id').single();
+      // Create receipt
+      const { data: receiptData, error: receiptError } = await supabase
+        .from('receipts')
+        .insert({
+          shipment_id: bookingData.shipment_id,
+          payment_id: paymentData.id,
+          receipt_number: receiptNumber,
+          amount: totalWithPremium,
+          currency: 'GBP',
+          payment_method: isGoodsArriving ? 'goods_arriving' : selectedPaymentMethod,
+          status: paymentStatus === 'completed' ? 'issued' : 'pending',
+          sender_details: bookingData.senderDetails,
+          recipient_details: bookingData.recipientDetails,
+          shipment_details: bookingData.shipmentDetails
+        })
+        .select()
+        .single();
       
-      if (receiptError) {
-        console.error('Receipt error details:', receiptError);
-        throw new Error(`Receipt creation failed: ${receiptError.message}`);
-      }
+      if (receiptError) throw receiptError;
       
-      console.log("Created receipt record:", receiptData);
-      
-      // Update shipment status to 'Payment Pending'
-      const { error: updateError } = await supabase.from('shipments')
-        .update({ status: 'Payment Pending' })
-        .eq('id', bookingData.shipment_id);
-      
-      if (updateError) {
-        console.error('Error updating shipment status:', updateError);
-        // We'll continue anyway since the payment and receipt were created
-      } else {
-        console.log("Updated shipment status to Payment Pending");
-      }
-      
-      // Navigate to success page with receipt
-      onPaymentComplete(paymentData.id, receiptData.id);
-      
-    } catch (err: any) {
-      console.error('Offline payment error:', err);
-      setError('Failed to process your offline payment request. Please try again.');
-      setLoading(false);
-      toast({
-        variant: "destructive",
-        title: "Payment Error",
-        description: err.message || 'An error occurred during payment processing',
-      });
-    }
-  };
-
-  const handleDebugPayment = async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // First try to create the shipment if it doesn't exist (this is just for the debug mode)
-      if (!bookingData.shipment_id) {
-        toast({
-          title: "Missing shipment ID",
-          description: "Creating a test shipment for you first",
-        });
-        
-        // Create a test shipment
-        const { data: shipmentData, error: shipmentError } = await supabase.from('shipments').insert({
-          origin: bookingData.senderDetails?.address || 'Test Origin Address',
-          destination: bookingData.recipientDetails?.address || 'Test Destination Address',
-          status: 'Booked',
-          user_id: bookingData.user_id || (await supabase.auth.getUser()).data.user?.id || null,
-          tracking_number: `TEST-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-          metadata: {
-            sender_name: bookingData.senderDetails?.name || 'Test Sender',
-            sender_email: bookingData.senderDetails?.email || 'test@example.com',
-            sender_phone: bookingData.senderDetails?.phone || '+1234567890',
-            recipient_name: bookingData.recipientDetails?.name || 'Test Recipient',
-            recipient_phone: bookingData.recipientDetails?.phone || '+1234567890',
-            shipment_type: bookingData.shipmentDetails?.type || 'parcel',
-            drum_quantity: bookingData.shipmentDetails?.quantity || 1,
-          },
-          weight: bookingData.shipmentDetails?.weight || 10,
-        }).select('id').single();
-        
-        if (shipmentError) throw shipmentError;
-        
-        bookingData.shipment_id = shipmentData.id;
-      }
-
-      // Now create the test payment
-      const { data: paymentData, error: paymentError } = await supabase.from('payments').insert({
-        amount: totalAmount,
-        payment_method: 'test',
-        payment_status: 'completed',
-        shipment_id: bookingData.shipment_id,
-        user_id: bookingData.user_id || (await supabase.auth.getUser()).data.user?.id || null,
-        currency: 'GBP',
-        transaction_id: `test-${Date.now()}`
-      }).select('id').single();
-      
-      if (paymentError) {
-        console.error('Payment error details:', paymentError);
-        throw new Error(`Payment creation failed: ${paymentError.message}`);
-      }
-      
-      const receiptNumber = `TEST-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      
-      // Create a receipt for the test payment
-      const { data: receiptData, error: receiptError } = await supabase.from(tableFrom('receipts')).insert({
-        payment_id: paymentData.id,
-        shipment_id: bookingData.shipment_id,
-        receipt_number: receiptNumber,
-        payment_method: 'test',
-        amount: totalAmount,
-        currency: 'GBP',
-        sender_details: bookingData.senderDetails || {
-          name: 'Test Sender',
-          email: 'test@example.com',
-          phone: '+1234567890',
-          address: 'Test Origin Address'
-        },
-        recipient_details: bookingData.recipientDetails || {
-          name: 'Test Recipient',
-          phone: '+1234567890',
-          address: 'Test Destination Address'
-        },
-        shipment_details: bookingData.shipmentDetails || {
-          tracking_number: `TEST-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-          type: 'parcel',
-          quantity: 1,
-          weight: 10,
-          services: []
-        },
-        status: 'issued'
-      }).select('id').single();
-      
-      if (receiptError) {
-        console.error('Receipt error details:', receiptError);
-        throw new Error(`Receipt creation failed: ${receiptError.message}`);
-      }
-      
-      // Update the shipment status to Paid
+      // Update shipment status
       await supabase
         .from('shipments')
-        .update({ status: 'Paid' })
+        .update({ 
+          status: paymentStatus === 'completed' ? 'booking_confirmed' : 'pending_payment',
+          user_id: user?.id || bookingData.user_id || null
+        })
         .eq('id', bookingData.shipment_id);
       
+      // Show success message
+      toast({
+        title: 'Payment Processed',
+        description: paymentStatus === 'completed' 
+          ? 'Your payment was successful. Your shipment is confirmed.' 
+          : 'Your booking is confirmed. Payment will be processed later.',
+      });
+      
+      // Call the onPaymentComplete callback with payment ID and receipt ID
       onPaymentComplete(paymentData.id, receiptData.id);
       
-    } catch (err: any) {
-      console.error('Debug payment error:', err);
-      setError(`Failed to process test payment: ${err.message}`);
-      setLoading(false);
+    } catch (error: any) {
+      console.error('Payment error:', error);
       toast({
-        variant: "destructive",
-        title: "Test Payment Error",
-        description: err.message || 'An error occurred during test payment processing',
+        title: 'Payment Error',
+        description: error.message || 'There was a problem processing your payment. Please try again.',
+        variant: 'destructive',
       });
+      setIsProcessing(false);
     }
   };
-
+  
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>Payment Method</CardTitle>
-        <CardDescription>
-          Choose how you would like to pay for your shipment
-        </CardDescription>
-      </CardHeader>
-      
-      <CardContent className="space-y-6">
-        {error && (
-          <div className="bg-destructive/10 text-destructive p-4 rounded-md flex items-start">
-            <AlertCircle className="h-5 w-5 mr-2 shrink-0 mt-0.5" />
-            <p>{error}</p>
-          </div>
-        )}
-        
-        <div className="space-y-4">
-          <button 
-            onClick={handleOfflinePayment}
-            disabled={loading}
-            className="w-full flex items-center justify-between p-4 border rounded-md hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex items-center">
-              <svg className="h-5 w-5 mr-3 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M3 3h18v18H3V3m15 3H6v9h12V6m-1 7H7v-5h10v5z" />
-              </svg>
-              <div>
-                <p className="font-medium">Pay Later</p>
-                <p className="text-sm text-gray-500">You'll receive a payment invoice</p>
-              </div>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Payment Method</CardTitle>
+          <CardDescription>
+            Select your preferred payment method
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2 pb-4">
+              <input
+                type="checkbox"
+                id="goodsArriving"
+                checked={isGoodsArriving}
+                onChange={() => setIsGoodsArriving(!isGoodsArriving)}
+                className="h-4 w-4 rounded border-gray-300 text-zim-green focus:ring-zim-green"
+              />
+              <label htmlFor="goodsArriving" className="font-medium cursor-pointer">
+                Pay on Goods Arriving (20% premium)
+              </label>
             </div>
-            <div className="text-lg font-semibold">£{totalAmount.toFixed(2)}</div>
-          </button>
-          
-          <button 
-            onClick={handleDebugPayment}
-            disabled={loading}
-            className="w-full flex items-center justify-between p-4 border border-amber-200 bg-amber-50 rounded-md hover:bg-amber-100 transition-colors"
-          >
-            <div className="flex items-center">
-              <Bug className="h-5 w-5 mr-3 text-amber-600" />
-              <div>
-                <p className="font-medium">Test Payment (Skip Payment Flow)</p>
-                <p className="text-sm text-amber-700">For testing receipt page only</p>
+            
+            {isGoodsArriving && (
+              <Alert className="bg-blue-50 border-blue-200">
+                <AlertCircle className="h-4 w-4 text-blue-800" />
+                <AlertTitle className="text-blue-800">Payment on Goods Arriving</AlertTitle>
+                <AlertDescription className="text-blue-700">
+                  You'll pay when your goods arrive in Zimbabwe. This option includes a 20% premium on the standard shipping cost.
+                  We'll contact you when your goods arrive to arrange payment.
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            <RadioGroup
+              value={selectedPaymentMethod}
+              onValueChange={setSelectedPaymentMethod}
+              className="space-y-3"
+              disabled={isGoodsArriving}
+            >
+              <div className={`flex items-start space-x-3 border rounded-md p-3 ${selectedPaymentMethod === 'card' && !isGoodsArriving ? 'bg-gray-50 border-zim-green' : ''}`}>
+                <RadioGroupItem value="card" id="card" disabled={isGoodsArriving} />
+                <div className="space-y-1">
+                  <Label htmlFor="card" className="flex items-center">
+                    <CreditCard className="h-5 w-5 mr-2" />
+                    Credit/Debit Card
+                  </Label>
+                  <p className="text-sm text-gray-500">Pay securely using your credit or debit card</p>
+                </div>
               </div>
-            </div>
-            <div className="text-lg font-semibold">£{totalAmount.toFixed(2)}</div>
-          </button>
-        </div>
-      </CardContent>
-      
-      <CardFooter className="flex justify-between">
-        <Button
-          variant="outline"
-          onClick={onCancel}
-          disabled={loading}
-        >
-          Back
-        </Button>
-        
-        {loading && (
-          <div className="flex items-center">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Processing...
+              
+              <div className={`flex items-start space-x-3 border rounded-md p-3 ${selectedPaymentMethod === 'bank_transfer' && !isGoodsArriving ? 'bg-gray-50 border-zim-green' : ''}`}>
+                <RadioGroupItem value="bank_transfer" id="bank_transfer" disabled={isGoodsArriving} />
+                <div className="space-y-1">
+                  <Label htmlFor="bank_transfer" className="flex items-center">
+                    <BuildingBank className="h-5 w-5 mr-2" />
+                    Bank Transfer
+                  </Label>
+                  <p className="text-sm text-gray-500">Make a direct bank transfer to our account</p>
+                  {selectedPaymentMethod === 'bank_transfer' && !isGoodsArriving && (
+                    <div className="mt-2 p-3 bg-gray-100 rounded text-sm">
+                      <p className="font-medium">Bank Transfer Details:</p>
+                      <p>Account Name: Zimbabwe Shipping Ltd</p>
+                      <p>Account Number: 12345678</p>
+                      <p>Sort Code: 12-34-56</p>
+                      <p>Reference: Your tracking number</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className={`flex items-start space-x-3 border rounded-md p-3 ${selectedPaymentMethod === 'cash' && !isGoodsArriving ? 'bg-gray-50 border-zim-green' : ''}`}>
+                <RadioGroupItem value="cash" id="cash" disabled={isGoodsArriving} />
+                <div className="space-y-1">
+                  <Label htmlFor="cash" className="flex items-center">
+                    <BanknoteIcon className="h-5 w-5 mr-2" />
+                    Cash Payment
+                  </Label>
+                  <p className="text-sm text-gray-500">Pay in cash when we collect your shipment</p>
+                </div>
+              </div>
+              
+              <div className={`flex items-start space-x-3 border rounded-md p-3 ${selectedPaymentMethod === 'pay_later' && !isGoodsArriving ? 'bg-gray-50 border-zim-green' : ''}`}>
+                <RadioGroupItem value="pay_later" id="pay_later" disabled={isGoodsArriving} />
+                <div className="space-y-1">
+                  <Label htmlFor="pay_later" className="flex items-center">
+                    <Calendar className="h-5 w-5 mr-2" />
+                    Pay Later (30 Days)
+                  </Label>
+                  <p className="text-sm text-gray-500">Pay within 30 days of the collection date</p>
+                  
+                  {selectedPaymentMethod === 'pay_later' && !isGoodsArriving && bookingData?.paymentOption === 'standard' && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Standard Payment Selected</AlertTitle>
+                      <AlertDescription>
+                        You selected standard payment during booking. Switching to Pay Later may result in additional charges.
+                        Please go back and choose "30-Day Payment Terms" during booking for the correct pricing.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              </div>
+            </RadioGroup>
           </div>
-        )}
-      </CardFooter>
-    </Card>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Order Summary</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            {bookingData?.shipmentDetails?.type === 'drum' && (
+              <div className="flex justify-between">
+                <span className="text-gray-600">
+                  {bookingData.shipmentDetails.quantity} x Drum{bookingData.shipmentDetails.quantity > 1 ? 's' : ''}
+                </span>
+                <span>£{(totalAmount - (bookingData.shipmentDetails.services?.reduce((acc: number, service: any) => acc + service.price, 0) || 0)).toFixed(2)}</span>
+              </div>
+            )}
+            
+            {bookingData?.shipmentDetails?.services?.map((service: any, index: number) => (
+              <div key={index} className="flex justify-between">
+                <span className="text-gray-600">{service.name}</span>
+                <span>£{service.price.toFixed(2)}</span>
+              </div>
+            ))}
+            
+            <div className="flex justify-between pt-2 border-t">
+              <span className="font-medium">Subtotal</span>
+              <span>£{totalAmount.toFixed(2)}</span>
+            </div>
+            
+            {isGoodsArriving && (
+              <div className="flex justify-between">
+                <span className="text-gray-600">Arrival Payment Premium (20%)</span>
+                <span>£{premiumAmount.toFixed(2)}</span>
+              </div>
+            )}
+            
+            <div className="flex justify-between pt-2 font-bold">
+              <span>Total</span>
+              <span className="text-zim-green">£{totalWithPremium.toFixed(2)}</span>
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter className="flex gap-3 justify-end">
+          <Button
+            variant="outline"
+            onClick={onCancel}
+            disabled={isProcessing}
+            className="flex items-center"
+          >
+            <ArrowLeftCircle className="mr-2 h-4 w-4" /> Back
+          </Button>
+          <Button
+            onClick={handlePayment}
+            disabled={isProcessing}
+            className="bg-zim-green hover:bg-zim-green/90 text-white flex items-center"
+          >
+            {isProcessing ? (
+              <>Processing...</>
+            ) : (
+              <>
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                {isGoodsArriving 
+                  ? "Confirm Payment on Arrival" 
+                  : selectedPaymentMethod === 'pay_later'
+                    ? "Confirm 30-Day Payment"
+                    : "Complete Payment"
+                }
+              </>
+            )}
+          </Button>
+        </CardFooter>
+      </Card>
+    </div>
   );
 };
 
