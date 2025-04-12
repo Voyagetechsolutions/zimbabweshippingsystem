@@ -81,7 +81,7 @@ const Services = () => {
                   <ul className="space-y-2">
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
-                      <span>Available with a capacity of 200L-220L</span>
+                      <span>Available in various sizes (small, medium, large)</span>
                     </li>
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
@@ -110,7 +110,7 @@ const Services = () => {
                   <div className="w-12 h-12 bg-zim-red/10 rounded-full flex items-center justify-center mb-4">
                     <Truck className="h-6 w-6 text-zim-red" />
                   </div>
-                  <CardTitle>Other Items Shipping</CardTitle>
+                  <CardTitle>Parcel Shipping</CardTitle>
                   <CardDescription>
                     Fast and efficient individual parcel delivery
                   </CardDescription>
@@ -119,7 +119,7 @@ const Services = () => {
                   <ul className="space-y-2">
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
-                      <span>Competitive and reasonable pricing </span>
+                      <span>Competitive per-kilogram pricing</span>
                     </li>
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
@@ -129,11 +129,15 @@ const Services = () => {
                       <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
                       <span>Door-to-door delivery option</span>
                     </li>
+                    <li className="flex items-start">
+                      <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
+                      <span>Insurance options available</span>
+                    </li>
                   </ul>
                 </CardContent>
                 <CardFooter>
                   <Button asChild className="w-full">
-                    <Link to="/book-shipment">Ship an item</Link>
+                    <Link to="/book-shipment">Ship a Parcel</Link>
                   </Button>
                 </CardFooter>
               </Card>
@@ -157,7 +161,7 @@ const Services = () => {
                     </li>
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
-                      <span>Delivery to any town in Zimbabwe except for rural area</span>
+                      <span>Delivery to any location in Zimbabwe</span>
                     </li>
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
@@ -248,6 +252,44 @@ const Services = () => {
                 <CardFooter>
                   <Button asChild className="w-full">
                     <Link to="/contact">Business Inquiries</Link>
+                  </Button>
+                </CardFooter>
+              </Card>
+
+              {/* Express Shipping */}
+              <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
+                <CardHeader>
+                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                    <Clock className="h-6 w-6 text-green-600" />
+                  </div>
+                  <CardTitle>Express Shipping</CardTitle>
+                  <CardDescription>
+                    Faster delivery for urgent items
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    <li className="flex items-start">
+                      <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
+                      <span>Priority handling and shipping</span>
+                    </li>
+                    <li className="flex items-start">
+                      <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
+                      <span>Faster transit times (2-3 weeks)</span>
+                    </li>
+                    <li className="flex items-start">
+                      <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
+                      <span>Enhanced tracking services</span>
+                    </li>
+                    <li className="flex items-start">
+                      <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
+                      <span>Available for critical documents</span>
+                    </li>
+                  </ul>
+                </CardContent>
+                <CardFooter>
+                  <Button asChild className="w-full">
+                    <Link to="/contact">Request Express Service</Link>
                   </Button>
                 </CardFooter>
               </Card>
@@ -442,11 +484,13 @@ const Services = () => {
                 <div className="border rounded-lg p-5 hover:shadow-md transition-shadow">
                   <div className="flex items-center mb-3">
                     <Scale className="h-5 w-5 text-zim-yellow mr-2" />
-                    <h4 className="font-semibold">Volume Limits</h4>
+                    <h4 className="font-semibold">Weight Limits</h4>
                   </div>
                   <p className="text-sm text-gray-600">
-                    Drums have a capacity of 200L-220L<br />
-                    Other items are measured based of volume. <br />
+                    Small drum: 40kg max<br />
+                    Medium drum: 60kg max<br />
+                    Large drum: 80kg max<br />
+                    Parcels: 30kg per package
                   </p>
                 </div>
                 
@@ -537,7 +581,7 @@ const Services = () => {
               <Button asChild size="lg" className="bg-white text-zim-green hover:bg-gray-100">
                 <Link to="/book-shipment">Book a Shipment</Link>
               </Button>
-              <Button asChild size="lg" variant="outline" className="border-white text-black hover:bg-white/10">
+              <Button asChild size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
                 <Link to="/contact">Contact Us</Link>
               </Button>
             </div>
