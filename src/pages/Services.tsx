@@ -218,7 +218,7 @@ const Services = () => {
               <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
                 <CardHeader>
                   <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mb-4">
-                    <PoundSign className="h-6 w-6 text-purple-600" />
+                    <DollarSign className="h-6 w-6 text-purple-600" />
                   </div>
                   <CardTitle>Commercial Shipping</CardTitle>
                   <CardDescription>
