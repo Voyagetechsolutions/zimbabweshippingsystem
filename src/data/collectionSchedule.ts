@@ -129,10 +129,9 @@ export const syncSchedulesWithDatabase = async (): Promise<boolean> => {
       }));
       
       // Initialize database with our schedules
-      const { error: initError } = await supabase.rpc(
-        'initialize_collection_schedules',
-        { schedules: scheduleData }
-      );
+      const { error: initError } = await supabase
+        .from('collection_schedules')
+        .insert(scheduleData);
       
       if (initError) throw initError;
     } else {
@@ -159,13 +158,10 @@ export const syncSchedulesWithDatabase = async (): Promise<boolean> => {
 export const updateRouteDate = async (route: string, newDate: string): Promise<boolean> => {
   try {
     // Update in database
-    const { error } = await supabase.rpc(
-      'update_route_date',
-      { 
-        route_name: route,
-        new_date: newDate
-      }
-    );
+    const { error } = await supabase
+      .from('collection_schedules')
+      .update({ pickup_date: newDate })
+      .eq('route', route);
     
     if (error) throw error;
     
@@ -192,14 +188,13 @@ export const addRoute = async (route: string, date: string, areas: string[]): Pr
     }
     
     // Add to database
-    const { error } = await supabase.rpc(
-      'add_collection_route',
-      { 
-        route_name: route,
+    const { error } = await supabase
+      .from('collection_schedules')
+      .insert({
+        route,
         pickup_date: date,
-        route_areas: areas
-      }
-    );
+        areas
+      });
     
     if (error) throw error;
     
@@ -221,10 +216,10 @@ export const addRoute = async (route: string, date: string, areas: string[]): Pr
 export const removeRoute = async (route: string): Promise<boolean> => {
   try {
     // Remove from database
-    const { error } = await supabase.rpc(
-      'remove_collection_route',
-      { route_name: route }
-    );
+    const { error } = await supabase
+      .from('collection_schedules')
+      .delete()
+      .eq('route', route);
     
     if (error) throw error;
     
@@ -250,14 +245,23 @@ export const addAreaToRoute = async (route: string, area: string): Promise<boole
       throw new Error('This area is already part of the route');
     }
     
-    // Add to database
-    const { error } = await supabase.rpc(
-      'add_area_to_route',
-      { 
-        route_name: route,
-        area_name: area
-      }
-    );
+    // Get current areas for this route
+    const { data, error: fetchError } = await supabase
+      .from('collection_schedules')
+      .select('areas')
+      .eq('route', route)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    
+    // Add area to the array
+    const updatedAreas = [...data.areas, area];
+    
+    // Update in database
+    const { error } = await supabase
+      .from('collection_schedules')
+      .update({ areas: updatedAreas })
+      .eq('route', route);
     
     if (error) throw error;
     
@@ -277,14 +281,23 @@ export const addAreaToRoute = async (route: string, area: string): Promise<boole
 // Remove area from route
 export const removeAreaFromRoute = async (route: string, area: string): Promise<boolean> => {
   try {
-    // Remove from database
-    const { error } = await supabase.rpc(
-      'remove_area_from_route',
-      { 
-        route_name: route,
-        area_name: area
-      }
-    );
+    // Get current areas for this route
+    const { data, error: fetchError } = await supabase
+      .from('collection_schedules')
+      .select('areas')
+      .eq('route', route)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    
+    // Remove area from the array
+    const updatedAreas = data.areas.filter((a: string) => a !== area);
+    
+    // Update in database
+    const { error } = await supabase
+      .from('collection_schedules')
+      .update({ areas: updatedAreas })
+      .eq('route', route);
     
     if (error) throw error;
     

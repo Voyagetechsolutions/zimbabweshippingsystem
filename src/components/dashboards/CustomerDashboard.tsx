@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/contexts/RoleContext';
-import RecentShipments from '../customer/RecentShipments';
+import { RecentShipments } from '../customer/RecentShipments';
 import { supabase } from '@/integrations/supabase/client';
 
 const CustomerDashboard = () => {
