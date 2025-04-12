@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, ChevronDown, User, ShoppingBag, LogOut } from 'lucide-react';
+import { Menu, X, ChevronDown, User, ShoppingBag, LogOut, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   NavigationMenu,
@@ -225,6 +225,15 @@ const Navbar = () => {
                       <span>My Shipments</span>
                     </DropdownMenuItem>
                   </Link>
+                  {/* Add Admin Panel option if user is admin */}
+                  {isAdmin && (
+                    <Link to="/admin">
+                      <DropdownMenuItem className="cursor-pointer">
+                        <Shield className="mr-2 h-4 w-4" />
+                        <span>Admin Panel</span>
+                      </DropdownMenuItem>
+                    </Link>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer">
                     <LogOut className="mr-2 h-4 w-4" />
@@ -303,6 +312,12 @@ const Navbar = () => {
               <Link to="/shipments" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
                 My Shipments
               </Link>
+              {/* Add Admin Panel option in mobile menu if user is admin */}
+              {isAdmin && (
+                <Link to="/admin" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
+                  Admin Panel
+                </Link>
+              )}
               <button
                 onClick={() => { signOut(); setIsOpen(false); }}
                 className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50"

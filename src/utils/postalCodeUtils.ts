@@ -38,6 +38,8 @@ export const getAreasFromPostalCode = (postcode: string): string[] => {
 
 // Get the route for a given postal code
 export const getRouteForPostalCode = (postcode: string): string | null => {
+  if (!postcode) return null;
+  
   // Normalize postcode
   const normalizedPostcode = postcode.trim().toUpperCase();
   
@@ -89,6 +91,8 @@ export const getRouteForPostalCode = (postcode: string): string | null => {
 
 // Check if a postal code is in a restricted area
 export const isRestrictedPostalCode = (postcode: string): boolean => {
+  if (!postcode) return false;
+  
   // Normalize postcode
   const normalizedPostcode = postcode.trim().toUpperCase();
   
