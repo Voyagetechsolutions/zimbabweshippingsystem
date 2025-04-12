@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -125,7 +124,7 @@ const CollectionSchedule = () => {
       schedule.areas.some(area => area === filterArea);
     
     const matchesDate = !filterDate || 
-      schedule.pickup_date.toLowerCase().includes(format(filterDate, 'do of MMMM').toLowerCase());
+      schedule.pickup_date.toLowerCase().includes(format(filterDate, 'd MMMM').toLowerCase());
     
     return matchesSearch && matchesRoute && matchesArea && matchesDate;
   });
