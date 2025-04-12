@@ -101,33 +101,6 @@ export const getAreasFromPostalCode = (postcode: string): string[] => {
     'PR': ['Manchester Area'],
     'BB': ['Manchester Area'],
     
-    // London Routes
-    'EN': ['London Area'],
-    'IG': ['London Area'],
-    'RM': ['London Area'],
-    'DA': ['London Area'],
-    'BR': ['London Area'],
-    'UB': ['London Area'],
-    'HA': ['London Area'],
-    'WD': ['London Area'],
-    
-    // Brighton Route
-    'SL': ['Brighton Area'],
-    'CR': ['Brighton Area'],
-    'TW': ['Brighton Area'],
-    'KT': ['Brighton Area'],
-    'RH': ['Brighton Area'],
-    'BN': ['Brighton Area'],
-    'TN': ['Brighton Area'],
-    'ME': ['Brighton Area'],
-    
-    // Northampton Route
-    'NN': ['Northampton Area'],
-    'MK': ['Northampton Area'],
-    'LU': ['Northampton Area'],
-    'HP': ['Northampton Area'],
-    'AL': ['Northampton Area'],
-    
     // Single letter fallbacks
     'S': ['Sheffield Area'],
   };
