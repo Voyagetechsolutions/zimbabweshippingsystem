@@ -137,20 +137,6 @@ export interface Tables {
     created_at: string;
     updated_at: string;
   };
-  
-  // Add the custom_quotes table we just created
-  custom_quotes: {
-    id: string;
-    user_id: string | null;
-    phone_number: string;
-    description: string;
-    image_urls: string[];
-    status: string;
-    admin_notes: string | null;
-    quoted_amount: number | null;
-    created_at: string;
-    updated_at: string;
-  };
 }
 
 // Helper function to cast types safely when using tables not in the generated types

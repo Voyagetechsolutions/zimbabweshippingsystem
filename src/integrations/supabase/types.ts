@@ -153,45 +153,6 @@ export type Database = {
         }
         Relationships: []
       }
-      custom_quotes: {
-        Row: {
-          admin_notes: string | null
-          created_at: string
-          description: string
-          id: string
-          image_urls: string[]
-          phone_number: string
-          quoted_amount: number | null
-          status: string
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          admin_notes?: string | null
-          created_at?: string
-          description: string
-          id?: string
-          image_urls?: string[]
-          phone_number: string
-          quoted_amount?: number | null
-          status?: string
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          admin_notes?: string | null
-          created_at?: string
-          description?: string
-          id?: string
-          image_urls?: string[]
-          phone_number?: string
-          quoted_amount?: number | null
-          status?: string
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       gallery: {
         Row: {
           alt: string

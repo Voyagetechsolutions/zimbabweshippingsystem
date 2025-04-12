@@ -1,305 +1,350 @@
 
-import { getRouteForPostalCode, isRestrictedPostalCode } from '@/utils/postalCodeUtils';
 import { supabase } from '@/integrations/supabase/client';
+import { postalCodeToRouteMap, restrictedPostalCodes } from '@/utils/postalCodeUtils';
 
-// Define the RouteSchedule interface
 export interface RouteSchedule {
   route: string;
   date: string;
   areas: string[];
 }
 
-// Collection dates by route
-const routeSchedules: Record<string, string> = {
-  'London North': 'Every Monday',
-  'London North West': 'Every Monday',
-  'London West': 'Every Tuesday',
-  'London South West': 'Every Tuesday',
-  'London South East': 'Every Wednesday',
-  'London East': 'Every Wednesday',
-  'London Central': 'Every Thursday',
-  
-  // Greater London
-  'South London': 'Every Friday',
-  'East London': 'Every Friday',
-  'North London': 'Every Saturday',
-  'West London': 'Every Saturday',
-  
-  // Rest of UK
-  'Birmingham': 'First Monday of the month',
-  'Cardiff': 'Second Monday of the month',
-  'Chester': 'Second Monday of the month',
-  'Coventry': 'First Tuesday of the month',
-  'Glasgow': 'Third Monday of the month',
-  'Liverpool': 'Second Tuesday of the month',
-  'Manchester': 'Second Tuesday of the month',
-  'Nottingham': 'First Wednesday of the month',
-  'Oxford': 'First Thursday of the month',
-  'Sheffield': 'Second Wednesday of the month',
-};
-
-// Collection schedules data
+// Initial data that will be used until we load from the database
 export const collectionSchedules: RouteSchedule[] = [
   {
-    route: 'LONDON NORTH',
-    date: 'Every Monday',
-    areas: ['NORTH LONDON', 'HIGHGATE', 'HAMPSTEAD', 'FINCHLEY', 'BARNET']
+    route: "CARDIFF ROUTE",
+    date: "21st of April",
+    areas: ["CARDIFF", "GLOUCESTER", "BRISTOL", "SWINDON", "BATH", "SALISBURY"]
   },
   {
-    route: 'LONDON EAST',
-    date: 'Every Wednesday',
-    areas: ['EAST LONDON', 'STRATFORD', 'HACKNEY', 'BOW', 'BETHNAL GREEN']
+    route: "BOURNEMOUTH ROUTE",
+    date: "22nd of April",
+    areas: ["SOUTHAMPTON", "OXFORD", "HAMPHIRE", "READING", "GUILFORD", "PORTSMOUTH"]
   },
   {
-    route: 'LONDON SOUTH',
-    date: 'Every Friday',
-    areas: ['SOUTH LONDON', 'CROYDON', 'BRIXTON', 'STREATHAM', 'PECKHAM']
+    route: "BIRMINGHAM ROUTE",
+    date: "24th of April",
+    areas: ["WOLVEHAMPTON", "COVENTRY", "WARWICK", "DUDLEY", "WALSALL", "RUGBY"]
   },
   {
-    route: 'LONDON WEST',
-    date: 'Every Tuesday',
-    areas: ['WEST LONDON', 'EALING', 'HOUNSLOW', 'HAMMERSMITH', 'ACTON']
+    route: "LONDON ROUTE",
+    date: "19th of April",
+    areas: ["CENTRAL LONDON", "HEATHROW", "EAST LONDON", "ROMFORD", "ALL AREAS INSIDE M25"]
   },
   {
-    route: 'LONDON CENTRAL',
-    date: 'Every Thursday',
-    areas: ['CENTRAL LONDON', 'WESTMINSTER', 'CAMDEN', 'ISLINGTON', 'CITY OF LONDON']
+    route: "LEEDS ROUTE",
+    date: "17th of April",
+    areas: ["WAKEFIELD", "HALIFAX", "DONCASTER", "SHEFFIELD", "HUDDERSFIELD", "YORK"]
   },
   {
-    route: 'BIRMINGHAM',
-    date: 'First Monday of the month',
-    areas: ['BIRMINGHAM CITY', 'SOLIHULL', 'SUTTON COLDFIELD', 'ERDINGTON']
+    route: "NOTTINGHAM ROUTE",
+    date: "18th of April",
+    areas: ["LIECESTER", "DERBY", "PETERSBOROUGH", "CORBY", "MARKET HARB"]
   },
   {
-    route: 'MANCHESTER',
-    date: 'Second Tuesday of the month',
-    areas: ['MANCHESTER CITY', 'OLDHAM', 'STOCKPORT', 'SALFORD', 'BOLTON']
+    route: "MANCHESTER ROUTE",
+    date: "26th of April",
+    areas: ["LIVERPOOL", "STOKE ON TRENT", "BOLTON", "WARRINGTON", "OLDHAM", "SHREWBURY"]
   },
   {
-    route: 'LIVERPOOL',
-    date: 'Second Tuesday of the month',
-    areas: ['LIVERPOOL CITY', 'WIRRAL', 'SEFTON', 'KNOWSLEY', 'ST HELENS']
+    route: "BRIGHTON ROUTE",
+    date: "28th of April",
+    areas: ["HIGH COMBE", "SLOUGH", "VRAWLEY", "LANCING", "EASTBOURNE", "CANTEBURY"]
   },
   {
-    route: 'GLASGOW',
-    date: 'Third Monday of the month',
-    areas: ['GLASGOW CITY', 'PAISLEY', 'CUMBERNAULD', 'EAST KILBRIDE', 'HAMILTON']
+    route: "SOUTHEND ROUTE",
+    date: "29th of April",
+    areas: ["NORWICH", "IPSWICH", "COLCHESTER", "BRAINTREE", "CAMBRIDGE", "BASILDON"]
   },
   {
-    route: 'CARDIFF',
-    date: 'Second Monday of the month',
-    areas: ['CARDIFF CITY', 'NEWPORT', 'CAERPHILLY', 'PENARTH', 'BARRY']
+    route: "NORTHAMPTON ROUTE",
+    date: "16th of April",
+    areas: ["KETTERING", "BEDFORD", "MILTON KEYNES", "BANBURY", "AYLESBURY", "LUTON"]
+  },
+  {
+    route: "SCOTLAND ROUTE",
+    date: "30th of April",
+    areas: ["GLASSGOW", "EDINBURGH", "NECASTLE", "MIDDLESBROUGH", "PRESTON", "CARLLSLE"]
   }
 ];
 
-// Get collection date by route
-export const getDateByRoute = (route: string): string | null => {
-  return routeSchedules[route] || null;
-};
+// Add a function to get areas based on postal code prefix
+export function getAreasFromPostalCode(postalCode: string): string[] {
+  const prefix = postalCode.trim().toUpperCase().match(/^[A-Z]+/);
+  if (!prefix) return [];
+  
+  const route = postalCodeToRouteMap[prefix[0]];
+  if (!route) return [];
+  
+  return getAreasByRoute(route);
+}
 
-// Get collection date by postcode
-export const getDateByPostcode = (postcode: string): string | null => {
-  const route = getRouteForPostalCode(postcode);
-  if (!route) return null;
-  return routeSchedules[route] || null;
-};
+// Type for the collection_schedules table in Supabase
+type CollectionSchedule = {
+  id: string;
+  route: string;
+  pickup_date: string;
+  areas: string[];
+  created_at: string;
+  updated_at: string;
+}
 
-// Check if postcode is serviced
-export const isServicedPostcode = (postcode: string): boolean => {
-  return !isRestrictedPostalCode(postcode) && getRouteForPostalCode(postcode) !== null;
-};
-
-// Sync schedules with the database
-export const syncSchedulesWithDatabase = async (): Promise<boolean> => {
+// Sync collection schedules with Supabase
+export async function syncSchedulesWithDatabase() {
   try {
-    // Fetch collection schedules from database
-    const { data, error } = await supabase
-      .from('collection_schedules')
-      .select('*');
-      
-    if (error) throw error;
+    // Call the edge function to get collection schedules
+    const response = await fetch('https://oncsaunsqtekwwbzvvyh.supabase.co/functions/v1/get-collection-schedules', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9uY3NhdW5zcXRla3d3Ynp2dnloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM2MjY4NDEsImV4cCI6MjA1OTIwMjg0MX0.pzj7yFjXaCgAETrVauXF3JgtAI_-N9DPP-sF1i1QfAA'
+      }
+    });
     
-    // If no schedules in database, initialize with our static data
-    if (!data || data.length === 0) {
-      // Convert our static data to the format expected by the database
-      const scheduleData = collectionSchedules.map(schedule => ({
-        route: schedule.route,
-        pickup_date: schedule.date,
-        areas: schedule.areas
-      }));
-      
-      // Initialize database with our schedules
-      const { error: initError } = await supabase.rpc(
-        'initialize_collection_schedules',
-        { schedules: scheduleData }
-      );
-      
-      if (initError) throw initError;
-    } else {
-      // Update our static data with database data
-      collectionSchedules.length = 0; // Clear array
-
-      data.forEach(dbSchedule => {
-        collectionSchedules.push({
-          route: dbSchedule.route,
-          date: dbSchedule.pickup_date,
-          areas: dbSchedule.areas
-        });
-      });
+    if (!response.ok) {
+      throw new Error('Failed to fetch collection schedules');
     }
     
-    return true;
+    const result = await response.json();
+    
+    if (result.data && Array.isArray(result.data) && result.data.length > 0) {
+      // Clear the local array and populate with data from the database
+      collectionSchedules.length = 0;
+      
+      result.data.forEach((item: CollectionSchedule) => {
+        collectionSchedules.push({
+          route: item.route,
+          date: item.pickup_date,
+          areas: item.areas
+        });
+      });
+      return true;
+    } else {
+      // If no data in database, initialize it with our default data
+      await initializeCollectionSchedules();
+      return true;
+    }
   } catch (error) {
     console.error('Error syncing schedules with database:', error);
     return false;
   }
-};
+}
 
-// Update route date
-export const updateRouteDate = async (route: string, newDate: string): Promise<boolean> => {
+// Initialize collection schedules in the database
+async function initializeCollectionSchedules() {
   try {
-    // Update in database
-    const { error } = await supabase.rpc(
-      'update_route_date',
-      { 
-        route_name: route,
-        new_date: newDate
-      }
-    );
+    for (const schedule of collectionSchedules) {
+      await supabase
+        .from('collection_schedules')
+        .insert({
+          route: schedule.route,
+          pickup_date: schedule.date,
+          areas: schedule.areas
+        });
+    }
+    return true;
+  } catch (error) {
+    console.error('Error initializing collection schedules:', error);
+    return false;
+  }
+}
+
+// Get all route names
+export function getRouteNames(): string[] {
+  return collectionSchedules.map(schedule => schedule.route);
+}
+
+// Get areas for a specific route
+export function getAreasByRoute(routeName: string): string[] {
+  const route = collectionSchedules.find(schedule => schedule.route === routeName);
+  return route?.areas || [];
+}
+
+// Get date for a specific route
+export function getDateByRoute(routeName: string): string {
+  const route = collectionSchedules.find(schedule => schedule.route === routeName);
+  return route?.date || "No date available";
+}
+
+// Get date by route and area
+export function getDateByRouteAndArea(routeName: string, areaName: string): string {
+  const route = collectionSchedules.find(schedule => 
+    schedule.route === routeName && schedule.areas.includes(areaName)
+  );
+  return route?.date || "No date available";
+}
+
+// Update date for a specific route and sync with database
+export async function updateRouteDate(routeName: string, newDate: string): Promise<boolean> {
+  // Update in local array
+  const index = collectionSchedules.findIndex(schedule => schedule.route === routeName);
+  if (index !== -1) {
+    collectionSchedules[index].date = newDate;
     
-    if (error) throw error;
+    // Sync with database using direct table update
+    const { error } = await supabase
+      .from('collection_schedules')
+      .update({ pickup_date: newDate })
+      .eq('route', routeName);
     
-    // Update in our static data
-    const scheduleIndex = collectionSchedules.findIndex(s => s.route === route);
-    if (scheduleIndex !== -1) {
-      collectionSchedules[scheduleIndex].date = newDate;
+    if (error) {
+      console.error('Error updating route date:', error);
+      return false;
     }
     
     return true;
-  } catch (error) {
-    console.error('Error updating route date:', error);
+  }
+  return false;
+}
+
+// Add a new route and sync with database
+export async function addRoute(route: string, date: string, areas: string[]): Promise<boolean> {
+  // Check if route already exists
+  if (collectionSchedules.some(schedule => schedule.route === route)) {
     return false;
   }
-};
-
-// Add a new route
-export const addRoute = async (route: string, date: string, areas: string[]): Promise<boolean> => {
-  try {
-    // Check if route already exists
-    const existingRoute = collectionSchedules.find(s => s.route === route);
-    if (existingRoute) {
-      throw new Error('A route with this name already exists');
-    }
-    
-    // Add to database
-    const { error } = await supabase.rpc(
-      'add_collection_route',
-      { 
-        route_name: route,
-        pickup_date: date,
-        route_areas: areas
-      }
-    );
-    
-    if (error) throw error;
-    
-    // Add to our static data
-    collectionSchedules.push({
-      route,
-      date,
-      areas
+  
+  // Add to local array
+  collectionSchedules.push({
+    route,
+    date,
+    areas
+  });
+  
+  // Sync with database using direct table insert
+  const { error } = await supabase
+    .from('collection_schedules')
+    .insert({
+      route: route,
+      pickup_date: date,
+      areas: areas
     });
-    
-    return true;
-  } catch (error) {
+  
+  if (error) {
     console.error('Error adding route:', error);
-    throw error;
-  }
-};
-
-// Remove a route
-export const removeRoute = async (route: string): Promise<boolean> => {
-  try {
-    // Remove from database
-    const { error } = await supabase.rpc(
-      'remove_collection_route',
-      { route_name: route }
-    );
-    
-    if (error) throw error;
-    
-    // Remove from our static data
-    const scheduleIndex = collectionSchedules.findIndex(s => s.route === route);
-    if (scheduleIndex !== -1) {
-      collectionSchedules.splice(scheduleIndex, 1);
+    // Rollback local change
+    const index = collectionSchedules.findIndex(schedule => schedule.route === route);
+    if (index !== -1) {
+      collectionSchedules.splice(index, 1);
     }
-    
-    return true;
-  } catch (error) {
-    console.error('Error removing route:', error);
     return false;
   }
-};
+  
+  return true;
+}
 
-// Add area to route
-export const addAreaToRoute = async (route: string, area: string): Promise<boolean> => {
-  try {
-    // Check if area already exists in route
-    const routeData = collectionSchedules.find(s => s.route === route);
-    if (routeData && routeData.areas.includes(area)) {
-      throw new Error('This area is already part of the route');
-    }
+// Remove a route and sync with database
+export async function removeRoute(routeName: string): Promise<boolean> {
+  // Remove from local array
+  const index = collectionSchedules.findIndex(schedule => schedule.route === routeName);
+  if (index !== -1) {
+    const removedRoute = collectionSchedules.splice(index, 1)[0];
     
-    // Add to database
-    const { error } = await supabase.rpc(
-      'add_area_to_route',
-      { 
-        route_name: route,
-        area_name: area
-      }
-    );
+    // Sync with database using direct table delete
+    const { error } = await supabase
+      .from('collection_schedules')
+      .delete()
+      .eq('route', routeName);
     
-    if (error) throw error;
-    
-    // Add to our static data
-    const scheduleIndex = collectionSchedules.findIndex(s => s.route === route);
-    if (scheduleIndex !== -1) {
-      collectionSchedules[scheduleIndex].areas.push(area);
+    if (error) {
+      console.error('Error removing route:', error);
+      // Rollback local change
+      collectionSchedules.splice(index, 0, removedRoute);
+      return false;
     }
     
     return true;
-  } catch (error) {
-    console.error('Error adding area to route:', error);
-    throw error;
   }
-};
+  return false;
+}
 
-// Remove area from route
-export const removeAreaFromRoute = async (route: string, area: string): Promise<boolean> => {
-  try {
-    // Remove from database
-    const { error } = await supabase.rpc(
-      'remove_area_from_route',
-      { 
-        route_name: route,
-        area_name: area
+// Add an area to a route and sync with database
+export async function addAreaToRoute(routeName: string, area: string): Promise<boolean> {
+  // Update in local array
+  const index = collectionSchedules.findIndex(schedule => schedule.route === routeName);
+  if (index !== -1) {
+    if (!collectionSchedules[index].areas.includes(area)) {
+      collectionSchedules[index].areas.push(area);
+      
+      // Get current areas from database
+      const { data, error: fetchError } = await supabase
+        .from('collection_schedules')
+        .select('areas')
+        .eq('route', routeName)
+        .single();
+      
+      if (fetchError) {
+        console.error('Error fetching areas:', fetchError);
+        // Rollback local change
+        const areaIndex = collectionSchedules[index].areas.indexOf(area);
+        if (areaIndex !== -1) {
+          collectionSchedules[index].areas.splice(areaIndex, 1);
+        }
+        return false;
       }
-    );
-    
-    if (error) throw error;
-    
-    // Remove from our static data
-    const scheduleIndex = collectionSchedules.findIndex(s => s.route === route);
-    if (scheduleIndex !== -1) {
-      const areaIndex = collectionSchedules[scheduleIndex].areas.indexOf(area);
-      if (areaIndex !== -1) {
-        collectionSchedules[scheduleIndex].areas.splice(areaIndex, 1);
+      
+      // Update areas in database
+      const updatedAreas = [...data.areas, area];
+      const { error: updateError } = await supabase
+        .from('collection_schedules')
+        .update({ areas: updatedAreas })
+        .eq('route', routeName);
+      
+      if (updateError) {
+        console.error('Error updating areas:', updateError);
+        // Rollback local change
+        const areaIndex = collectionSchedules[index].areas.indexOf(area);
+        if (areaIndex !== -1) {
+          collectionSchedules[index].areas.splice(areaIndex, 1);
+        }
+        return false;
       }
+      
+      return true;
     }
-    
-    return true;
-  } catch (error) {
-    console.error('Error removing area from route:', error);
-    return false;
   }
-};
+  return false;
+}
+
+// Remove an area from a route and sync with database
+export async function removeAreaFromRoute(routeName: string, area: string): Promise<boolean> {
+  // Update in local array
+  const index = collectionSchedules.findIndex(schedule => schedule.route === routeName);
+  if (index !== -1) {
+    const areaIndex = collectionSchedules[index].areas.indexOf(area);
+    if (areaIndex !== -1) {
+      const prevAreas = [...collectionSchedules[index].areas];
+      collectionSchedules[index].areas.splice(areaIndex, 1);
+      
+      // Get current areas from database
+      const { data, error: fetchError } = await supabase
+        .from('collection_schedules')
+        .select('areas')
+        .eq('route', routeName)
+        .single();
+      
+      if (fetchError) {
+        console.error('Error fetching areas:', fetchError);
+        // Rollback local change
+        collectionSchedules[index].areas = prevAreas;
+        return false;
+      }
+      
+      // Update areas in database
+      const updatedAreas = data.areas.filter((a: string) => a !== area);
+      const { error: updateError } = await supabase
+        .from('collection_schedules')
+        .update({ areas: updatedAreas })
+        .eq('route', routeName);
+      
+      if (updateError) {
+        console.error('Error updating areas:', updateError);
+        // Rollback local change
+        collectionSchedules[index].areas = prevAreas;
+        return false;
+      }
+      
+      return true;
+    }
+  }
+  return false;
+}
