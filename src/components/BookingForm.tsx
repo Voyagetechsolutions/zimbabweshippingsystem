@@ -374,7 +374,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         <Tabs defaultValue="sender" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="sender">Sender Details</TabsTrigger>
-            <TabsTrigger value="recipient">Receiver Details</TabsTrigger>
+            <TabsTrigger value="recipient">Recipient Details</TabsTrigger>
             <TabsTrigger value="shipment">Shipment Details</TabsTrigger>
           </TabsList>
           
@@ -530,7 +530,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               name="recipientName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Receiver Name</FormLabel>
+                  <FormLabel>Recipient Name</FormLabel>
                   <FormControl>
                     <Input placeholder="Jane Smith" {...field} />
                   </FormControl>
@@ -544,7 +544,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               name="recipientPhone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Receiver Phone Number</FormLabel>
+                  <FormLabel>Recipient Phone Number</FormLabel>
                   <FormControl>
                     <Input placeholder="+263 77 123 4567" {...field} />
                   </FormControl>
@@ -589,7 +589,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               <Info className="h-4 w-4" />
               <AlertTitle>Delivery Information</AlertTitle>
               <AlertDescription>
-                We deliver to all locations in Zimbabwe. Standard delivery time is 7-8 weeks from loading day.
+                We deliver to all locations in Zimbabwe. Standard delivery time is 4-6 weeks from collection.
               </AlertDescription>
             </Alert>
           </TabsContent>
