@@ -1,32 +1,40 @@
 
-import React, { useState } from 'react';
-import { getRouteForPostalCode, getDateByPostcode, getAreasFromPostalCode, isRestrictedPostalCode } from '@/utils/postalCodeUtils';
+import React, { useState, useEffect } from 'react';
+import { getRouteForPostalCode, getDateByPostcode, getAreasFromPostalCode, isRestrictedPostalCode, isValidUKPostcode } from '@/utils/postalCodeUtils';
 
 interface PostalLookupProps {
   postcode: string;
   className?: string;
+  showOnlyWhenValid?: boolean;
 }
 
-const PostalLookup: React.FC<PostalLookupProps> = ({ postcode, className }) => {
+const PostalLookup: React.FC<PostalLookupProps> = ({ 
+  postcode, 
+  className, 
+  showOnlyWhenValid = false 
+}) => {
   const [lookupData, setLookupData] = useState<{
     route: string | null;
     date: string | null;
     areas: string[];
     isRestricted: boolean;
+    isValid: boolean;
   }>({
     route: null,
     date: null,
     areas: [],
     isRestricted: false,
+    isValid: false,
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!postcode) {
       setLookupData({
         route: null,
         date: null,
         areas: [],
         isRestricted: false,
+        isValid: false,
       });
       return;
     }
@@ -35,7 +43,15 @@ const PostalLookup: React.FC<PostalLookupProps> = ({ postcode, className }) => {
     const normalizedPostcode = postcode.trim().toUpperCase();
     
     // Check if we have a valid UK postcode format (basic check)
-    if (normalizedPostcode.length < 5) {
+    const valid = isValidUKPostcode(normalizedPostcode);
+    if (!valid && normalizedPostcode.length >= 6) {
+      setLookupData({
+        route: null,
+        date: null,
+        areas: [],
+        isRestricted: false,
+        isValid: false,
+      });
       return;
     }
 
@@ -56,10 +72,17 @@ const PostalLookup: React.FC<PostalLookupProps> = ({ postcode, className }) => {
       date,
       areas,
       isRestricted: restricted,
+      isValid: valid,
     });
   }, [postcode]);
 
-  if (!postcode || postcode.trim().length < 5) {
+  // Don't render anything if postcode is too short
+  if (!postcode || postcode.trim().length < 4) {
+    return null;
+  }
+
+  // If we're only showing when valid and it's not valid, return null
+  if (showOnlyWhenValid && !lookupData.isValid) {
     return null;
   }
 
