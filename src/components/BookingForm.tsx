@@ -595,6 +595,30 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
           </TabsContent>
           
           <TabsContent value="shipment" className="space-y-4 pt-4">
+            <Card className="border-yellow-300 bg-yellow-50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center text-yellow-800">
+                  <AlertCircle className="mr-2 h-5 w-5" />
+                  Restricted Areas Notice
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-yellow-800 text-sm">
+                  We have delivery restrictions in some areas. If your postcode falls in one of the following areas, 
+                  please contact us directly to arrange your shipment:
+                </p>
+                <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-yellow-800">
+                  <div>EX, TQ, DT, SA</div>
+                  <div>LD, HR, IP, NR</div>
+                  <div>HU, TS, DL, SR</div>
+                  <div>DH, CA, NE, TD</div>
+                  <div>EH, ML, KA, DG</div>
+                  <div>G, KY, PA, IV</div>
+                  <div>AB, DD</div>
+                </div>
+              </CardContent>
+            </Card>
+            
             <FormField
               control={form.control}
               name="paymentOption"
@@ -627,30 +651,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 </FormItem>
               )}
             />
-            
-            <Card className="border-yellow-300 bg-yellow-50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center text-yellow-800">
-                  <AlertCircle className="mr-2 h-5 w-5" />
-                  Restricted Areas Notice
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-yellow-800 text-sm">
-                  We have delivery restrictions in some areas. If your postcode falls in one of the following areas, 
-                  please contact us directly to arrange your shipment:
-                </p>
-                <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-yellow-800">
-                  <div>EX, TQ, DT, SA</div>
-                  <div>LD, HR, IP, NR</div>
-                  <div>HU, TS, DL, SR</div>
-                  <div>DH, CA, NE, TD</div>
-                  <div>EH, ML, KA, DG</div>
-                  <div>G, KY, PA, IV</div>
-                  <div>AB, DD</div>
-                </div>
-              </CardContent>
-            </Card>
             
             <FormField
               control={form.control}

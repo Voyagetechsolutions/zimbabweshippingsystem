@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
-import { ArrowLeft, Package, MapPin, Scale, Calendar, Truck, Clock, Package2 } from 'lucide-react';
+import { ArrowLeft, Package, MapPin, Calendar, Truck, Clock, Package2 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import WhatsAppButton from '@/components/WhatsAppButton';
@@ -247,7 +247,6 @@ const ShipmentDetails = () => {
             </div>
           </div>
 
-          {/* Shipment Timeline */}
           <Card className="mb-6">
             <CardHeader>
               <h2 className="text-xl font-bold flex items-center">
@@ -289,7 +288,6 @@ const ShipmentDetails = () => {
             </CardContent>
           </Card>
 
-          {/* Shipment Information */}
           <Card className="mb-6">
             <CardHeader>
               <h2 className="text-xl font-bold flex items-center">
@@ -335,17 +333,7 @@ const ShipmentDetails = () => {
               </div>
 
               <div>
-                <h3 className="font-medium text-gray-500 mb-2">Weight</h3>
-                <div className="flex items-center">
-                  <Scale className="mr-2 h-5 w-5" />
-                  <p className="font-medium">
-                    {shipment.weight ? `${shipment.weight} kg` : 'Not specified'}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-medium text-gray-500 mb-2">Dimensions</h3>
+                <h3 className="font-medium text-gray-500 mb-2">Volume</h3>
                 <div className="flex items-center">
                   <Package2 className="mr-2 h-5 w-5" />
                   <p className="font-medium">{shipment.dimensions || 'Not specified'}</p>
@@ -354,7 +342,6 @@ const ShipmentDetails = () => {
             </CardContent>
           </Card>
 
-          {/* Dates and Actions */}
           <Card>
             <CardContent className="pt-6">
               <div className="flex flex-col md:flex-row justify-between text-sm text-gray-500 mb-4">

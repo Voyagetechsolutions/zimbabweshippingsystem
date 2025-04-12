@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -18,7 +19,7 @@ import {
   CreditCard, 
   BanknoteIcon, 
   ArrowRight, 
-  CircleDollarSign, 
+  PoundSterling, 
   Calendar, 
   AlertCircle, 
   ArrowLeftCircle, 
