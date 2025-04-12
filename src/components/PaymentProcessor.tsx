@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -24,7 +23,7 @@ import {
   AlertCircle, 
   ArrowLeftCircle, 
   CheckCircle2,
-  BuildingBank
+  Building
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -48,7 +47,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
   const [isGoodsArriving, setIsGoodsArriving] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   
-  // Calculate the arrival payment premium (20%)
   const premiumAmount = totalAmount * 0.2;
   const totalWithPremium = isGoodsArriving ? totalAmount + premiumAmount : totalAmount;
   
@@ -56,16 +54,12 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
     setIsProcessing(true);
     
     try {
-      // Get current user info
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Generate receipt number
       const receiptNumber = `REC-${Date.now().toString().slice(-8)}`;
       
-      // Determine payment status based on method
       const paymentStatus = selectedPaymentMethod === 'pay_later' || isGoodsArriving ? 'pending' : 'completed';
       
-      // Create payment record
       const { data: paymentData, error: paymentError } = await supabase
         .from('payments')
         .insert({
@@ -82,7 +76,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       
       if (paymentError) throw paymentError;
       
-      // Create receipt
       const { data: receiptData, error: receiptError } = await supabase
         .from('receipts')
         .insert({
@@ -102,7 +95,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       
       if (receiptError) throw receiptError;
       
-      // Update shipment status
       await supabase
         .from('shipments')
         .update({ 
@@ -111,7 +103,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         })
         .eq('id', bookingData.shipment_id);
       
-      // Show success message
       toast({
         title: 'Payment Processed',
         description: paymentStatus === 'completed' 
@@ -119,7 +110,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
           : 'Your booking is confirmed. Payment will be processed later.',
       });
       
-      // Call the onPaymentComplete callback with payment ID and receipt ID
       onPaymentComplete(paymentData.id, receiptData.id);
       
     } catch (error: any) {
@@ -189,7 +179,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
                 <RadioGroupItem value="bank_transfer" id="bank_transfer" disabled={isGoodsArriving} />
                 <div className="space-y-1">
                   <Label htmlFor="bank_transfer" className="flex items-center">
-                    <BuildingBank className="h-5 w-5 mr-2" />
+                    <Building className="h-5 w-5 mr-2" />
                     Bank Transfer
                   </Label>
                   <p className="text-sm text-gray-500">Make a direct bank transfer to our account</p>

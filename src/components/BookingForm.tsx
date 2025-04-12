@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, Controller } from 'react-hook-form';
@@ -54,13 +53,13 @@ import {
   Info, 
   PackageCheck, 
   Truck,
-  Bicycle,
+  Bike,
   Trash2,
   Box,
   WashingMachine,
   Sofa,
   Monitor,
-  Tool,
+  Wrench,
   Plug,
   Fan,
   PenTool,
@@ -74,7 +73,6 @@ import {
 } from '@/utils/postalCodeUtils';
 import { getDateByRoute } from '@/data/collectionSchedule';
 
-// Define item categories
 const itemCategories = {
   "Vehicles & Mobility": [
     "Bicycle", 
@@ -144,11 +142,9 @@ const itemCategories = {
   ]
 };
 
-// Flatten the categories for the schema validation
 const allItems = Object.values(itemCategories).flat();
-allItems.push("Other"); // Add "Other" option
+allItems.push("Other");
 
-// Define the form schema
 const formSchema = z.object({
   firstName: z.string().min(2, 'First name is required'),
   lastName: z.string().min(2, 'Last name is required'),
@@ -174,7 +170,6 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-// Drum pricing based on quantity and payment option
 const drumPricing = {
   standard: {
     single: 260,
@@ -204,7 +199,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const [isCalculating, setIsCalculating] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   
-  // Initialize the form
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -235,7 +229,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const watchPaymentOption = form.watch('paymentOption');
   const watchDoorToDoor = form.watch('doorToDoor');
   
-  // Handle postal code changes
   useEffect(() => {
     if (watchPostcode && watchPostcode.length >= 2) {
       const route = getRouteForPostalCode(watchPostcode);
@@ -258,13 +251,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
   }, [watchPostcode]);
   
-  // Calculate total amount when form values change
   useEffect(() => {
     if (watchShipmentType === 'drum') {
       const quantity = parseInt(watchDrumQuantity || '1', 10);
       let basePrice;
       
-      // Determine price based on quantity and payment option
       if (quantity >= 5) {
         basePrice = drumPricing[watchPaymentOption].bulk;
       } else if (quantity >= 2) {
@@ -275,19 +266,16 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       
       const subtotal = basePrice * quantity;
       
-      // Add mandatory metal seal cost
       const totalWithSeal = subtotal + 5;
       
-      // Add door-to-door delivery if selected
       const doorToDoorCost = watchDoorToDoor ? 25 : 0;
       
       setTotalAmount(totalWithSeal + doorToDoorCost);
     } else {
-      setTotalAmount(0); // For custom items, we won't know the price yet
+      setTotalAmount(0);
     }
   }, [watchShipmentType, watchDrumQuantity, watchPaymentOption, watchDoorToDoor]);
   
-  // Handle form submission
   const onSubmit = async (data: FormValues) => {
     try {
       setIsCalculating(true);
@@ -302,24 +290,18 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         return;
       }
       
-      // For custom items, redirect to custom quote
       if (data.shipmentType === 'custom') {
         onSubmitComplete(data, 'custom', 0);
         setIsCalculating(false);
         return;
       }
       
-      // Generate a tracking number
       const trackingNumber = `ZS${Date.now().toString().substring(5)}`;
       
-      // Calculate final amount
-      let finalAmount = totalAmount;
-      
-      // Create shipment in the database
       const { data: shipmentData, error: shipmentError } = await supabase
         .from('shipments')
         .insert({
-          user_id: null, // Will be updated after payment if user is authenticated
+          user_id: null,
           status: 'pending_payment',
           tracking_number: trackingNumber,
           origin: `${data.pickupAddress}, ${data.pickupPostcode}`,
@@ -335,10 +317,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             drum_quantity: data.shipmentType === 'drum' ? parseInt(data.drumQuantity || '1', 10) : null,
             item_category: data.shipmentType === 'other' ? data.itemCategory : null,
             item_description: data.shipmentType === 'other' ? data.itemDescription : null,
-            amount: finalAmount,
+            amount: totalAmount,
             payment_option: data.paymentOption,
             door_to_door: data.doorToDoor,
-            metal_seal: true, // Mandatory
+            metal_seal: true,
             special_instructions: data.specialInstructions || null,
             route: collectionRoute,
             collection_date: collectionDate
@@ -353,9 +335,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       
       setIsCalculating(false);
       
-      // Pass the data to the parent component for payment processing
-      onSubmitComplete(data, shipmentData.id, finalAmount);
-      
+      onSubmitComplete(data, shipmentData.id, totalAmount);
     } catch (error: any) {
       console.error('Error creating shipment:', error);
       setIsCalculating(false);
@@ -370,7 +350,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const getCategoryIcon = (category: string) => {
     switch(category) {
       case "Vehicles & Mobility":
-        return <Bicycle className="h-5 w-5" />;
+        return <Bike className="h-5 w-5" />;
       case "Household Items":
         return <WashingMachine className="h-5 w-5" />;
       case "Furniture":
@@ -378,7 +358,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       case "Home Decor":
         return <Monitor className="h-5 w-5" />;
       case "Tools & Equipment":
-        return <Tool className="h-5 w-5" />;
+        return <Wrench className="h-5 w-5" />;
       case "Construction":
         return <PenTool className="h-5 w-5" />;
       case "Business & Office":
@@ -398,7 +378,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             <TabsTrigger value="shipment">Shipment Details</TabsTrigger>
           </TabsList>
           
-          {/* Sender Details Tab */}
           <TabsContent value="sender" className="space-y-4 pt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
@@ -492,7 +471,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               )}
             />
             
-            {/* Collection Information Card */}
             <Card className="mt-6">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center">
@@ -546,7 +524,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             </Card>
           </TabsContent>
           
-          {/* Recipient Details Tab */}
           <TabsContent value="recipient" className="space-y-4 pt-4">
             <FormField
               control={form.control}
@@ -617,9 +594,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             </Alert>
           </TabsContent>
           
-          {/* Shipment Details Tab */}
           <TabsContent value="shipment" className="space-y-4 pt-4">
-            {/* Payment Option Selection */}
             <FormField
               control={form.control}
               name="paymentOption"
@@ -653,7 +628,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               )}
             />
             
-            {/* Restricted Areas Notice */}
             <Card className="border-yellow-300 bg-yellow-50">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center text-yellow-800">
@@ -864,7 +838,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               </div>
             )}
             
-            {/* Additional Services */}
             <div className="space-y-4 p-4 border rounded-md">
               <h3 className="font-semibold">Additional Services</h3>
               
@@ -918,42 +891,39 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               )}
             />
             
-            {/* Price Summary */}
-            {watchShipmentType === 'drum' && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Price Summary</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Price Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex justify-between py-1">
+                  <span className="text-gray-600">
+                    {parseInt(watchDrumQuantity || '1', 10)} x Drum{parseInt(watchDrumQuantity || '1', 10) > 1 ? 's' : ''}
+                  </span>
+                  <span>£{parseInt(watchDrumQuantity || '1', 10) >= 5 
+                    ? (watchPaymentOption === 'standard' ? 220 : 240)
+                    : parseInt(watchDrumQuantity || '1', 10) >= 2
+                      ? (watchPaymentOption === 'standard' ? 240 : 260)
+                      : (watchPaymentOption === 'standard' ? 260 : 280)
+                    } x {parseInt(watchDrumQuantity || '1', 10)}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-gray-600">Mandatory Metal Seal</span>
+                  <span>£5.00</span>
+                </div>
+                {watchDoorToDoor && (
                   <div className="flex justify-between py-1">
-                    <span className="text-gray-600">
-                      {parseInt(watchDrumQuantity || '1', 10)} x Drum{parseInt(watchDrumQuantity || '1', 10) > 1 ? 's' : ''}
-                    </span>
-                    <span>£{parseInt(watchDrumQuantity || '1', 10) >= 5 
-                      ? (watchPaymentOption === 'standard' ? 220 : 240)
-                      : parseInt(watchDrumQuantity || '1', 10) >= 2
-                        ? (watchPaymentOption === 'standard' ? 240 : 260)
-                        : (watchPaymentOption === 'standard' ? 260 : 280)
-                      } x {parseInt(watchDrumQuantity || '1', 10)}
-                    </span>
+                    <span className="text-gray-600">Door-to-Door Delivery</span>
+                    <span>£25.00</span>
                   </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-gray-600">Mandatory Metal Seal</span>
-                    <span>£5.00</span>
-                  </div>
-                  {watchDoorToDoor && (
-                    <div className="flex justify-between py-1">
-                      <span className="text-gray-600">Door-to-Door Delivery</span>
-                      <span>£25.00</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between py-2 border-t font-medium">
-                    <span>Total</span>
-                    <span className="text-zim-green">£{totalAmount.toFixed(2)}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                )}
+                <div className="flex justify-between py-2 border-t font-medium">
+                  <span>Total</span>
+                  <span className="text-zim-green">£{totalAmount.toFixed(2)}</span>
+                </div>
+              </CardContent>
+            </Card>
             
             <FormField
               control={form.control}
