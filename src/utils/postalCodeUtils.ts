@@ -1,4 +1,3 @@
-
 /**
  * Utility functions for working with UK postal codes
  */
@@ -128,4 +127,11 @@ export const isValidUKPostcode = (postcode: string): boolean => {
   // UK postcode regex pattern
   const postcodePattern = /^[A-Z]{1,2}[0-9][A-Z0-9]? ?[0-9][A-Z]{2}$/i;
   return postcodePattern.test(postcode.trim());
+};
+
+// Get the date by postcode
+export const getDateByPostcode = (postcode: string): string | null => {
+  const route = getRouteForPostalCode(postcode);
+  if (!route) return null;
+  return getDateByRoute(route);
 };
