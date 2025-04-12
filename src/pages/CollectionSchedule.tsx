@@ -32,8 +32,8 @@ const CollectionSchedule = () => {
   const [schedules, setSchedules] = useState<CollectionScheduleItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterRoute, setFilterRoute] = useState('');
-  const [filterArea, setFilterArea] = useState('');
+  const [filterRoute, setFilterRoute] = useState('all');
+  const [filterArea, setFilterArea] = useState('all');
   const [filterDate, setFilterDate] = useState<Date | undefined>();
   const [allRoutes, setAllRoutes] = useState<string[]>([]);
   const [allAreas, setAllAreas] = useState<string[]>([]);
@@ -119,9 +119,9 @@ const CollectionSchedule = () => {
       schedule.route.toLowerCase().includes(searchTerm.toLowerCase()) ||
       schedule.areas.some(area => area.toLowerCase().includes(searchTerm.toLowerCase()));
     
-    const matchesRoute = filterRoute === '' || schedule.route === filterRoute;
+    const matchesRoute = filterRoute === 'all' || schedule.route === filterRoute;
     
-    const matchesArea = filterArea === '' || 
+    const matchesArea = filterArea === 'all' || 
       schedule.areas.some(area => area === filterArea);
     
     const matchesDate = !filterDate || 
@@ -132,8 +132,8 @@ const CollectionSchedule = () => {
 
   const resetFilters = () => {
     setSearchTerm('');
-    setFilterRoute('');
-    setFilterArea('');
+    setFilterRoute('all');
+    setFilterArea('all');
     setFilterDate(undefined);
   };
 
@@ -175,7 +175,7 @@ const CollectionSchedule = () => {
                       <SelectValue placeholder="Filter by route" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Routes</SelectItem>
+                      <SelectItem value="all">All Routes</SelectItem>
                       {allRoutes.map(route => (
                         <SelectItem key={route} value={route}>{route}</SelectItem>
                       ))}
@@ -189,7 +189,7 @@ const CollectionSchedule = () => {
                       <SelectValue placeholder="Filter by area" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Areas</SelectItem>
+                      <SelectItem value="all">All Areas</SelectItem>
                       {allAreas.map(area => (
                         <SelectItem key={area} value={area}>{area}</SelectItem>
                       ))}
