@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, Controller } from 'react-hook-form';
@@ -61,11 +60,9 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
   getRouteForPostalCode, 
-  isRestrictedPostalCode,
-  isValidUKPostcode
+  isRestrictedPostalCode
 } from '@/utils/postalCodeUtils';
 import { getDateByRoute } from '@/data/collectionSchedule';
-import PostalLookup from '@/components/PostalLookup';
 
 const getAreasFromPostalCode = (postcode: string): string[] => {
   const prefix = postcode.trim().toUpperCase().split(' ')[0].replace(/[0-9]/g, '');
@@ -450,11 +447,61 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete, onRequestCu
                     <Input placeholder="AB12 3CD" {...field} />
                   </FormControl>
                   <FormMessage />
-                  {/* Add the PostalLookup component here */}
-                  <PostalLookup postcode={field.value} />
                 </FormItem>
               )}
             />
+            
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center">
+                  <Truck className="mr-2 h-5 w-5 text-zim-green" />
+                  Collection Information
+                </CardTitle>
+                <CardDescription>
+                  Based on your postcode, we'll collect your shipment on the following schedule:
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isRestrictedArea && (
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Restricted Area</AlertTitle>
+                    <AlertDescription>
+                      Your postcode falls in a restricted area. Please contact us directly at +44 7584 100552 to arrange collection.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {collectionRoute ? (
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Collection Route</Label>
+                      <div className="mt-1 p-2 bg-gray-50 rounded border">
+                        {collectionRoute || "Please enter a valid postcode"}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label>Collection Area</Label>
+                      <div className="mt-1 p-2 bg-gray-50 rounded border">
+                        {collectionArea.length > 0 ? collectionArea.join(", ") : "No areas found for this route"}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label>Collection Date</Label>
+                      <div className="mt-1 p-2 bg-gray-50 rounded border">
+                        {collectionDate || "No date available for this route"}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-gray-500">Enter your postcode to see collection details</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
           
           <TabsContent value="recipient" className="space-y-4 pt-4">
@@ -912,26 +959,23 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete, onRequestCu
                   </FormControl>
                   <div className="space-y-1 leading-none">
                     <FormLabel>
-                      I agree to the terms and conditions of shipping, including compliance with customs regulations.
+                      I agree to the <a href="/terms" className="text-blue-600 hover:underline">terms and conditions</a> and <a href="/privacy" className="text-blue-600 hover:underline">privacy policy</a>
                     </FormLabel>
+                    <FormMessage />
                   </div>
                 </FormItem>
               )}
             />
+            
           </TabsContent>
         </Tabs>
         
-        <div className="flex justify-end space-x-2">
-          <Button type="submit" disabled={isCalculating}>
-            {isCalculating ? (
-              <span className="flex items-center">
-                Processing...
-              </span>
-            ) : (
-              <span className="flex items-center">
-                Continue to Payment
-              </span>
-            )}
+        <div className="flex justify-between mt-8">
+          <Button type="button" variant="outline" onClick={() => navigate('/')}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={isCalculating} className="bg-zim-green hover:bg-zim-green/90">
+            {isCalculating ? 'Processing...' : 'Continue to Payment'}
           </Button>
         </div>
       </form>

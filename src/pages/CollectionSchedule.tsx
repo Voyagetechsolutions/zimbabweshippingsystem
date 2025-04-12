@@ -32,8 +32,8 @@ const CollectionSchedule = () => {
   const [schedules, setSchedules] = useState<CollectionScheduleItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterRoute, setFilterRoute] = useState('all');
-  const [filterArea, setFilterArea] = useState('all');
+  const [filterRoute, setFilterRoute] = useState('');
+  const [filterArea, setFilterArea] = useState('');
   const [filterDate, setFilterDate] = useState<Date | undefined>();
   const [allRoutes, setAllRoutes] = useState<string[]>([]);
   const [allAreas, setAllAreas] = useState<string[]>([]);
@@ -119,21 +119,21 @@ const CollectionSchedule = () => {
       schedule.route.toLowerCase().includes(searchTerm.toLowerCase()) ||
       schedule.areas.some(area => area.toLowerCase().includes(searchTerm.toLowerCase()));
     
-    const matchesRoute = filterRoute === 'all' || schedule.route === filterRoute;
+    const matchesRoute = filterRoute === '' || schedule.route === filterRoute;
     
-    const matchesArea = filterArea === 'all' || 
+    const matchesArea = filterArea === '' || 
       schedule.areas.some(area => area === filterArea);
     
     const matchesDate = !filterDate || 
-      schedule.pickup_date.toLowerCase().includes(format(filterDate, 'd MMMM').toLowerCase());
+      schedule.pickup_date.toLowerCase().includes(format(filterDate, 'do of MMMM').toLowerCase());
     
     return matchesSearch && matchesRoute && matchesArea && matchesDate;
   });
 
   const resetFilters = () => {
     setSearchTerm('');
-    setFilterRoute('all');
-    setFilterArea('all');
+    setFilterRoute('');
+    setFilterArea('');
     setFilterDate(undefined);
   };
 
@@ -175,7 +175,7 @@ const CollectionSchedule = () => {
                       <SelectValue placeholder="Filter by route" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Routes</SelectItem>
+                      <SelectItem value="all-routes">All Routes</SelectItem>
                       {allRoutes.map(route => (
                         <SelectItem key={route} value={route}>{route}</SelectItem>
                       ))}
@@ -189,7 +189,7 @@ const CollectionSchedule = () => {
                       <SelectValue placeholder="Filter by area" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Areas</SelectItem>
+                      <SelectItem value="all-areas">All Areas</SelectItem>
                       {allAreas.map(area => (
                         <SelectItem key={area} value={area}>{area}</SelectItem>
                       ))}
