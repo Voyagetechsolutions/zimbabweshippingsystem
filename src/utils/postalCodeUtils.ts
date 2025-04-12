@@ -7,11 +7,15 @@ import { getDateByRoute } from '@/data/collectionSchedule';
 
 // Extract area from the postcode
 export const getAreasFromPostalCode = (postcode: string): string[] => {
+  if (!postcode || postcode.length < 1) return ['Area not specified'];
+  
   // Extract the first part of the postcode (e.g., "SW" from "SW1A 1AA")
   const prefix = postcode.trim().toUpperCase().split(' ')[0].replace(/[0-9]/g, '');
+  const prefixFirstChar = prefix.charAt(0);
   
   // Map of postcode prefixes to areas
   const areaMap: Record<string, string[]> = {
+    // London Areas
     'N': ['North London'],
     'NW': ['North West London'],
     'W': ['West London'],
@@ -32,21 +36,116 @@ export const getAreasFromPostalCode = (postcode: string): string[] => {
     'TW': ['Twickenham'],
     'UB': ['Southall', 'Uxbridge'],
     'WD': ['Watford'],
-    // Add more mappings as needed
+    
+    // Cardiff Route
+    'SP': ['Cardiff Area'],
+    'SN': ['Cardiff Area'],
+    'BA': ['Cardiff Area'],
+    'NP': ['Cardiff Area'],
+    'CP': ['Cardiff Area'],
+    'SA': ['Cardiff Area'],
+    
+    // Bournemouth Route
+    'BH': ['Bournemouth Area'],
+    'SO': ['Bournemouth Area'],
+    'GU': ['Bournemouth Area'],
+    'RG': ['Bournemouth Area'],
+    'OX': ['Bournemouth Area'],
+    
+    // Southend Route
+    'SG': ['Southend Area'],
+    'CM': ['Southend Area'],
+    'SS': ['Southend Area'],
+    'CO': ['Southend Area'],
+    'CB': ['Southend Area'],
+    
+    // Leeds Route
+    'LS': ['Leeds Area'],
+    'DN': ['Leeds Area'],
+    'WF': ['Leeds Area'],
+    'YO': ['Leeds Area'],
+    'HD': ['Leeds Area'],
+    'HX': ['Leeds Area'],
+    'BD': ['Leeds Area'],
+    'HG': ['Leeds Area'],
+    
+    // Birmingham Route
+    'CV': ['Birmingham Area'],
+    'B': ['Birmingham Area'],
+    'WR': ['Birmingham Area'],
+    'DY': ['Birmingham Area'],
+    'WV': ['Birmingham Area'],
+    'SY': ['Birmingham Area'],
+    'WS': ['Birmingham Area'],
+    'TF': ['Birmingham Area'],
+    
+    // Nottingham Route
+    'NG': ['Nottingham Area'],
+    'DE': ['Nottingham Area'],
+    'LE': ['Nottingham Area'],
+    'PE': ['Nottingham Area'],
+    'LN': ['Nottingham Area'],
+    
+    // Manchester Route
+    'ST': ['Manchester Area'],
+    'M': ['Manchester Area'],
+    'SK': ['Manchester Area'],
+    'CW': ['Manchester Area'],
+    'CH': ['Manchester Area'],
+    'LL': ['Manchester Area'],
+    'L': ['Liverpool Area'],
+    'WN': ['Manchester Area'],
+    'BL': ['Manchester Area'],
+    'OL': ['Manchester Area'],
+    'FY': ['Manchester Area'],
+    'PR': ['Manchester Area'],
+    'BB': ['Manchester Area'],
+    
+    // London Routes
+    'EN': ['London Area'],
+    'IG': ['London Area'],
+    'RM': ['London Area'],
+    'DA': ['London Area'],
+    'BR': ['London Area'],
+    'UB': ['London Area'],
+    'HA': ['London Area'],
+    'WD': ['London Area'],
+    
+    // Brighton Route
+    'SL': ['Brighton Area'],
+    'CR': ['Brighton Area'],
+    'TW': ['Brighton Area'],
+    'KT': ['Brighton Area'],
+    'RH': ['Brighton Area'],
+    'BN': ['Brighton Area'],
+    'TN': ['Brighton Area'],
+    'ME': ['Brighton Area'],
+    
+    // Northampton Route
+    'NN': ['Northampton Area'],
+    'MK': ['Northampton Area'],
+    'LU': ['Northampton Area'],
+    'HP': ['Northampton Area'],
+    'AL': ['Northampton Area'],
+    
+    // Single letter fallbacks
+    'S': ['Sheffield Area'],
   };
   
-  return areaMap[prefix] || ['Area not specified'];
+  // Try to match with full prefix first, then with the first character
+  return areaMap[prefix] || areaMap[prefixFirstChar] || ['Area not specified'];
 };
 
 // Get the route for a given postal code
 export const getRouteForPostalCode = (postcode: string): string | null => {
-  if (!postcode) return null;
+  if (!postcode || postcode.length < 1) return null;
   
   // Normalize postcode
   const normalizedPostcode = postcode.trim().toUpperCase();
   
   // Extract the first part of the postcode (e.g., "SW" from "SW1A 1AA")
   const prefix = normalizedPostcode.split(' ')[0].replace(/[0-9]/g, '');
+  const prefixFirstChar = prefix.charAt(0);
   
   // Map postal code prefixes to routes
   const routeMap: Record<string, string> = {
@@ -74,26 +173,87 @@ export const getRouteForPostalCode = (postcode: string): string | null => {
     'UB': 'West London',
     'WD': 'North London',
     
-    // Rest of UK - sample data
+    // Main Routes
+    'SP': 'Cardiff',
+    'SN': 'Cardiff',
+    'BA': 'Cardiff',
+    'NP': 'Cardiff',
+    'CP': 'Cardiff',
+    'SA': 'Cardiff',
+    
+    'BH': 'Bournemouth',
+    'SO': 'Bournemouth',
+    'GU': 'Bournemouth',
+    'RG': 'Bournemouth',
+    'OX': 'Bournemouth',
+    
+    'SG': 'Southend',
+    'CM': 'Southend',
+    'SS': 'Southend',
+    'CO': 'Southend',
+    'CB': 'Southend',
+    
+    'LS': 'Leeds',
+    'DN': 'Leeds',
+    'WF': 'Leeds',
+    'YO': 'Leeds',
+    'HD': 'Leeds',
+    'HX': 'Leeds',
+    'BD': 'Leeds',
+    'HG': 'Leeds',
+    
+    'CV': 'Birmingham',
     'B': 'Birmingham',
-    'CF': 'Cardiff',
-    'CH': 'Chester',
-    'CV': 'Coventry',
-    'G': 'Glasgow',
-    'L': 'Liverpool',
-    'M': 'Manchester',
+    'WR': 'Birmingham',
+    'DY': 'Birmingham',
+    'WV': 'Birmingham',
+    'SY': 'Birmingham',
+    'WS': 'Birmingham',
+    'TF': 'Birmingham',
+    
     'NG': 'Nottingham',
-    'OX': 'Oxford',
+    'DE': 'Nottingham',
+    'LE': 'Nottingham',
+    'PE': 'Nottingham',
+    'LN': 'Nottingham',
+    
+    'ST': 'Manchester',
+    'M': 'Manchester',
+    'SK': 'Manchester',
+    'CW': 'Manchester',
+    'CH': 'Manchester',
+    'LL': 'Manchester',
+    'L': 'Liverpool',
+    'WN': 'Manchester',
+    'BL': 'Manchester',
+    'OL': 'Manchester',
+    'FY': 'Manchester',
+    'PR': 'Manchester',
+    'BB': 'Manchester',
+    
+    'SL': 'Brighton',
+    'RH': 'Brighton',
+    'BN': 'Brighton',
+    'TN': 'Brighton',
+    'ME': 'Brighton',
+    
+    'NN': 'Northampton',
+    'MK': 'Northampton',
+    'LU': 'Northampton',
+    'HP': 'Northampton',
+    'AL': 'Northampton',
+    
+    // Single letter fallbacks
     'S': 'Sheffield',
-    // Add more routes as needed
   };
   
-  return routeMap[prefix] || null;
+  // Try to match with full prefix first, then with the first character
+  return routeMap[prefix] || routeMap[prefixFirstChar] || null;
 };
 
 // Check if a postal code is in a restricted area
 export const isRestrictedPostalCode = (postcode: string): boolean => {
-  if (!postcode) return false;
+  if (!postcode || postcode.length < 1) return false;
   
   // Normalize postcode
   const normalizedPostcode = postcode.trim().toUpperCase();
@@ -109,8 +269,11 @@ export const isRestrictedPostalCode = (postcode: string): boolean => {
     'AB', 'DD'               // Scotland North East
   ];
   
+  // Extract the prefix (first one or two characters, removing any numbers)
+  const prefix = normalizedPostcode.split(' ')[0].replace(/[0-9]/g, '');
+  
   // Check if the postcode starts with any of the restricted prefixes
-  return restrictedPrefixes.some(prefix => normalizedPostcode.startsWith(prefix));
+  return restrictedPrefixes.some(restrictedPrefix => prefix === restrictedPrefix);
 };
 
 // Get the outward code (first part of postcode)
@@ -130,6 +293,21 @@ export const isValidUKPostcode = (postcode: string): boolean => {
   // UK postcode regex pattern
   const postcodePattern = /^[A-Z]{1,2}[0-9][A-Z0-9]? ?[0-9][A-Z]{2}$/i;
   return postcodePattern.test(postcode.trim());
+};
+
+// Check if this is a partial postcode that we can identify (first 1-2 letters)
+export const canIdentifyPartialPostcode = (postcode: string): boolean => {
+  if (!postcode || postcode.length < 1) return false;
+  
+  // Extract just the letters from the beginning
+  const prefix = postcode.trim().toUpperCase().replace(/[0-9]/g, '');
+  
+  // Get the first 1-2 characters
+  const firstChars = prefix.substring(0, Math.min(2, prefix.length));
+  const firstChar = firstChars.charAt(0);
+  
+  // Check if we can identify the route
+  return getRouteForPostalCode(firstChars) !== null || getRouteForPostalCode(firstChar) !== null;
 };
 
 // Get the date by postcode

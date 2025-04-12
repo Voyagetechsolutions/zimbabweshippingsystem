@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -174,7 +175,7 @@ const CollectionSchedule = () => {
                       <SelectValue placeholder="Filter by route" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all-routes">All Routes</SelectItem>
+                      <SelectItem value="">All Routes</SelectItem>
                       {allRoutes.map(route => (
                         <SelectItem key={route} value={route}>{route}</SelectItem>
                       ))}
@@ -188,7 +189,7 @@ const CollectionSchedule = () => {
                       <SelectValue placeholder="Filter by area" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all-areas">All Areas</SelectItem>
+                      <SelectItem value="">All Areas</SelectItem>
                       {allAreas.map(area => (
                         <SelectItem key={area} value={area}>{area}</SelectItem>
                       ))}
