@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, Controller } from 'react-hook-form';
@@ -454,8 +455,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete, onRequestCu
                 </FormItem>
               )}
             />
-            
-            {/* Remove the old collection information card since we now use PostalLookup */}
           </TabsContent>
           
           <TabsContent value="recipient" className="space-y-4 pt-4">
@@ -913,4 +912,31 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete, onRequestCu
                   </FormControl>
                   <div className="space-y-1 leading-none">
                     <FormLabel>
-                      I agree
+                      I agree to the terms and conditions of shipping, including compliance with customs regulations.
+                    </FormLabel>
+                  </div>
+                </FormItem>
+              )}
+            />
+          </TabsContent>
+        </Tabs>
+        
+        <div className="flex justify-end space-x-2">
+          <Button type="submit" disabled={isCalculating}>
+            {isCalculating ? (
+              <span className="flex items-center">
+                Processing...
+              </span>
+            ) : (
+              <span className="flex items-center">
+                Continue to Payment
+              </span>
+            )}
+          </Button>
+        </div>
+      </form>
+    </Form>
+  );
+};
+
+export default BookingForm;
