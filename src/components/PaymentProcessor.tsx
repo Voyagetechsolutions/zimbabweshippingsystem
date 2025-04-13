@@ -51,12 +51,79 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
   const premiumAmount = totalAmount * 0.2;
   const totalWithPremium = isGoodsArriving ? totalAmount + premiumAmount : totalAmount;
   
+  const handleStripePayment = async () => {
+    try {
+      // Convert pounds to pennies for Stripe
+      const amountInPennies = Math.round(totalWithPremium * 100);
+      
+      const { data, error } = await supabase.functions.invoke('create-payment', {
+        body: { 
+          amount: amountInPennies,
+          bookingData,
+          paymentMethod: selectedPaymentMethod
+        }
+      });
+      
+      if (error) throw error;
+      
+      // Redirect to Stripe Checkout
+      window.location.href = data.url;
+      
+    } catch (error: any) {
+      console.error('Stripe payment error:', error);
+      toast({
+        title: 'Payment Error',
+        description: error.message || 'Error creating payment. Please try again.',
+        variant: 'destructive',
+      });
+      setIsProcessing(false);
+    }
+  };
+  
+  const handlePayPalPayment = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('create-paypal-payment', {
+        body: { 
+          amount: totalWithPremium,
+          bookingData
+        }
+      });
+      
+      if (error) throw error;
+      
+      // Redirect to PayPal
+      window.location.href = data.url;
+      
+    } catch (error: any) {
+      console.error('PayPal payment error:', error);
+      toast({
+        title: 'Payment Error',
+        description: error.message || 'Error creating PayPal payment. Please try again.',
+        variant: 'destructive',
+      });
+      setIsProcessing(false);
+    }
+  };
+  
   const handlePayment = async () => {
     setIsProcessing(true);
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
+      // For card payments, use Stripe
+      if (selectedPaymentMethod === 'card' && !isGoodsArriving) {
+        await handleStripePayment();
+        return; // Don't proceed further, as we're redirecting to Stripe
+      }
+      
+      // For PayPal payments
+      if (selectedPaymentMethod === 'paypal' && !isGoodsArriving) {
+        await handlePayPalPayment();
+        return; // Don't proceed further, as we're redirecting to PayPal
+      }
+      
+      // For all other payment methods or goods arriving, create local records
       const receiptNumber = `REC-${Date.now().toString().slice(-8)}`;
       
       const paymentStatus = selectedPaymentMethod === 'pay_later' || isGoodsArriving ? 'pending' : 'completed';
