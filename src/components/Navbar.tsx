@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, ChevronDown, User, ShoppingBag, LogOut } from 'lucide-react';
+import { Menu, X, ChevronDown, User, ShoppingBag, LogOut, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   NavigationMenu,
@@ -23,19 +22,20 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useRole } from '@/contexts/RoleContext';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const { user, signOut } = useAuth();
   const location = useLocation();
+  const { role } = useRole();
+  const isAdmin = role === 'admin';
 
-  // Function to handle the reviews link click
   const handleReviewsClick = (e: React.MouseEvent) => {
     if (location.pathname === '/') {
       e.preventDefault();
       
-      // Find the reviews section and scroll to it
       const reviewsSection = document.querySelector('.reviews-section');
       if (reviewsSection) {
         reviewsSection.scrollIntoView({ behavior: 'smooth' });
@@ -66,14 +66,12 @@ const Navbar = () => {
     >
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
           <div className="flex-shrink-0">
             <Link to="/" className="flex items-center">
               <Logo className="h-8 w-auto" />
             </Link>
           </div>
 
-          {/* Desktop Navigation */}
           <div className="hidden md:block">
             <NavigationMenu>
               <NavigationMenuList>
@@ -192,7 +190,6 @@ const Navbar = () => {
             </NavigationMenu>
           </div>
 
-          {/* Authentication Buttons */}
           <div className="hidden md:flex items-center">
             {user ? (
               <DropdownMenu>
@@ -225,6 +222,19 @@ const Navbar = () => {
                       <span>My Shipments</span>
                     </DropdownMenuItem>
                   </Link>
+                  
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <Link to="/admin">
+                        <DropdownMenuItem className="cursor-pointer">
+                          <Shield className="mr-2 h-4 w-4" />
+                          <span>Admin Panel</span>
+                        </DropdownMenuItem>
+                      </Link>
+                    </>
+                  )}
+                  
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer">
                     <LogOut className="mr-2 h-4 w-4" />
@@ -244,7 +254,6 @@ const Navbar = () => {
             )}
           </div>
 
-          {/* Mobile Menu Button */}
           <div className="md:hidden">
             <button
               onClick={toggleMenu}
@@ -261,7 +270,6 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* Mobile Menu */}
       <div className={`md:hidden ${isOpen ? 'block' : 'hidden'}`}>
         <div className="px-2 pt-2 pb-3 space-y-1 bg-white">
           <Link to="/services" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
@@ -303,6 +311,13 @@ const Navbar = () => {
               <Link to="/shipments" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
                 My Shipments
               </Link>
+              
+              {isAdmin && (
+                <Link to="/admin" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
+                  Admin Panel
+                </Link>
+              )}
+              
               <button
                 onClick={() => { signOut(); setIsOpen(false); }}
                 className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50"
@@ -327,7 +342,6 @@ const Navbar = () => {
         </div>
       </div>
       
-      {/* Zimbabwe Flag Colors Strip */}
       <div className="w-full flex h-1">
         <div className="w-1/3 bg-zim-green"></div>
         <div className="w-1/3 bg-zim-yellow"></div>

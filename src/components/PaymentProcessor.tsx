@@ -14,9 +14,8 @@ import {
 } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { 
-  CreditCard, 
+  CalendarClock, 
   BanknoteIcon, 
   ArrowRight, 
   PoundSterling, 
@@ -25,7 +24,10 @@ import {
   ArrowLeftCircle, 
   CheckCircle2,
   Building,
-  CreditCard as PaypalIcon
+  Truck,
+  Wallet,
+  CreditCard,
+  Tag
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -45,98 +47,59 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('card');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('pay_later');
+  const [payLaterMethod, setPayLaterMethod] = useState<string>('cash');
   const [isGoodsArriving, setIsGoodsArriving] = useState<boolean>(false);
+  const [isSpecialDeal, setIsSpecialDeal] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   
+  // Calculate prices based on selections
   const premiumAmount = totalAmount * 0.2;
-  const totalWithPremium = isGoodsArriving ? totalAmount + premiumAmount : totalAmount;
+  const specialDealDiscount = bookingData?.shipmentDetails?.type === 'drum' ? 15 : 0;
   
-  const handleStripePayment = async () => {
-    try {
-      // Convert pounds to pennies for Stripe
-      const amountInPennies = Math.round(totalWithPremium * 100);
-      
-      const { data, error } = await supabase.functions.invoke('create-payment', {
-        body: { 
-          amount: amountInPennies,
-          bookingData,
-          paymentMethod: selectedPaymentMethod
-        }
-      });
-      
-      if (error) throw error;
-      
-      // Redirect to Stripe Checkout
-      window.location.href = data.url;
-      
-    } catch (error: any) {
-      console.error('Stripe payment error:', error);
-      toast({
-        title: 'Payment Error',
-        description: error.message || 'Error creating payment. Please try again.',
-        variant: 'destructive',
-      });
-      setIsProcessing(false);
-    }
+  // Calculate final amount
+  let finalAmount = totalAmount;
+  if (isGoodsArriving) {
+    finalAmount += premiumAmount;
+  }
+  if (isSpecialDeal && bookingData?.shipmentDetails?.type === 'drum') {
+    finalAmount -= specialDealDiscount;
+  }
+  
+  // Get collection date + 30 days for payment deadline
+  const collectionDate = new Date();
+  const paymentDeadline = new Date(collectionDate);
+  paymentDeadline.setDate(paymentDeadline.getDate() + 30);
+  
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
   };
   
-  const handlePayPalPayment = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('create-paypal-payment', {
-        body: { 
-          amount: totalWithPremium,
-          bookingData
-        }
-      });
-      
-      if (error) throw error;
-      
-      // Redirect to PayPal
-      window.location.href = data.url;
-      
-    } catch (error: any) {
-      console.error('PayPal payment error:', error);
-      toast({
-        title: 'Payment Error',
-        description: error.message || 'Error creating PayPal payment. Please try again.',
-        variant: 'destructive',
-      });
-      setIsProcessing(false);
-    }
-  };
-  
-  const handlePayment = async () => {
+  const handleConfirm = async () => {
     setIsProcessing(true);
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      // For card payments, use Stripe
-      if (selectedPaymentMethod === 'card' && !isGoodsArriving) {
-        await handleStripePayment();
-        return; // Don't proceed further, as we're redirecting to Stripe
-      }
+      // Create payment record
+      const paymentMethod = isGoodsArriving 
+        ? 'goods_arriving' 
+        : (selectedPaymentMethod === 'pay_later' ? payLaterMethod : selectedPaymentMethod);
       
-      // For PayPal payments
-      if (selectedPaymentMethod === 'paypal' && !isGoodsArriving) {
-        await handlePayPalPayment();
-        return; // Don't proceed further, as we're redirecting to PayPal
-      }
-      
-      // For all other payment methods or goods arriving, create local records
-      const receiptNumber = `REC-${Date.now().toString().slice(-8)}`;
-      
-      const paymentStatus = selectedPaymentMethod === 'pay_later' || isGoodsArriving ? 'pending' : 'completed';
+      const paymentStatus = 'pending'; // All payments are pending since no online payment
       
       const { data: paymentData, error: paymentError } = await supabase
         .from('payments')
         .insert({
           user_id: user?.id || bookingData.user_id || null,
           shipment_id: bookingData.shipment_id,
-          amount: totalWithPremium,
+          amount: finalAmount,
           currency: 'GBP',
-          payment_method: selectedPaymentMethod,
+          payment_method: paymentMethod,
           payment_status: paymentStatus,
           transaction_id: `TX-${Date.now()}-${Math.floor(Math.random() * 1000)}`
         })
@@ -145,16 +108,20 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       
       if (paymentError) throw paymentError;
       
+      // Generate receipt number
+      const receiptNumber = `REC-${Date.now().toString().slice(-8)}`;
+      
+      // Create receipt record
       const { data: receiptData, error: receiptError } = await supabase
         .from('receipts')
         .insert({
           shipment_id: bookingData.shipment_id,
           payment_id: paymentData.id,
           receipt_number: receiptNumber,
-          amount: totalWithPremium,
+          amount: finalAmount,
           currency: 'GBP',
-          payment_method: isGoodsArriving ? 'goods_arriving' : selectedPaymentMethod,
-          status: paymentStatus === 'completed' ? 'issued' : 'pending',
+          payment_method: paymentMethod,
+          status: 'pending',
           sender_details: bookingData.senderDetails,
           recipient_details: bookingData.recipientDetails,
           shipment_details: bookingData.shipmentDetails
@@ -164,28 +131,31 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       
       if (receiptError) throw receiptError;
       
+      // Update shipment status
       await supabase
         .from('shipments')
         .update({ 
-          status: paymentStatus === 'completed' ? 'booking_confirmed' : 'pending_payment',
+          status: 'pending_payment',
           user_id: user?.id || bookingData.user_id || null
         })
         .eq('id', bookingData.shipment_id);
       
       toast({
-        title: 'Payment Processed',
-        description: paymentStatus === 'completed' 
-          ? 'Your payment was successful. Your shipment is confirmed.' 
-          : 'Your booking is confirmed. Payment will be processed later.',
+        title: 'Payment Method Selected',
+        description: isGoodsArriving 
+          ? 'You will pay when your goods arrive in Zimbabwe.' 
+          : selectedPaymentMethod === 'cash_on_collection'
+            ? 'You will pay cash on collection with our special discount.'
+            : 'Your booking is confirmed with 30-day payment terms.',
       });
       
       onPaymentComplete(paymentData.id, receiptData.id);
       
     } catch (error: any) {
-      console.error('Payment error:', error);
+      console.error('Error processing payment selection:', error);
       toast({
-        title: 'Payment Error',
-        description: error.message || 'There was a problem processing your payment. Please try again.',
+        title: 'Error',
+        description: error.message || 'There was a problem processing your selection. Please try again.',
         variant: 'destructive',
       });
       setIsProcessing(false);
@@ -198,112 +168,148 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         <CardHeader>
           <CardTitle>Payment Method</CardTitle>
           <CardDescription>
-            Select your preferred payment method
+            Choose how you would like to pay for your shipment
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2 pb-4">
-              <input
-                type="checkbox"
-                id="goodsArriving"
-                checked={isGoodsArriving}
-                onChange={() => setIsGoodsArriving(!isGoodsArriving)}
-                className="h-4 w-4 rounded border-gray-300 text-zim-green focus:ring-zim-green"
-              />
-              <label htmlFor="goodsArriving" className="font-medium cursor-pointer">
-                Pay on Goods Arriving (20% premium)
-              </label>
-            </div>
-            
-            {isGoodsArriving && (
-              <Alert className="bg-blue-50 border-blue-200">
-                <AlertCircle className="h-4 w-4 text-blue-800" />
-                <AlertTitle className="text-blue-800">Payment on Goods Arriving</AlertTitle>
-                <AlertDescription className="text-blue-700">
-                  You'll pay when your goods arrive in Zimbabwe. This option includes a 20% premium on the standard shipping cost.
-                  We'll contact you when your goods arrive to arrange payment.
-                </AlertDescription>
-              </Alert>
-            )}
-            
+          <div className="space-y-6">
+            {/* Payment Options */}
             <RadioGroup
               value={selectedPaymentMethod}
-              onValueChange={setSelectedPaymentMethod}
-              className="space-y-3"
-              disabled={isGoodsArriving}
+              onValueChange={(value) => {
+                setSelectedPaymentMethod(value);
+                setIsGoodsArriving(value === 'goods_arriving');
+                setIsSpecialDeal(value === 'cash_on_collection');
+              }}
+              className="space-y-4"
             >
-              <div className={`flex items-start space-x-3 border rounded-md p-3 ${selectedPaymentMethod === 'card' && !isGoodsArriving ? 'bg-gray-50 border-zim-green' : ''}`}>
-                <RadioGroupItem value="card" id="card" disabled={isGoodsArriving} />
-                <div className="space-y-1">
-                  <Label htmlFor="card" className="flex items-center">
-                    <CreditCard className="h-5 w-5 mr-2" />
-                    Credit/Debit Card
+              {/* Pay on Goods Arriving */}
+              <div className={`flex items-start space-x-3 border rounded-md p-4 ${selectedPaymentMethod === 'goods_arriving' ? 'bg-blue-50 border-blue-300' : ''}`}>
+                <RadioGroupItem value="goods_arriving" id="goods_arriving" />
+                <div className="space-y-2 w-full">
+                  <Label htmlFor="goods_arriving" className="flex items-center text-lg font-medium">
+                    <Truck className="h-5 w-5 mr-2 text-blue-600" />
+                    Pay on Goods Arriving (20% premium)
                   </Label>
-                  <p className="text-sm text-gray-500">Pay securely using your credit or debit card</p>
-                </div>
-              </div>
-              
-              <div className={`flex items-start space-x-3 border rounded-md p-3 ${selectedPaymentMethod === 'paypal' && !isGoodsArriving ? 'bg-gray-50 border-zim-green' : ''}`}>
-                <RadioGroupItem value="paypal" id="paypal" disabled={isGoodsArriving} />
-                <div className="space-y-1">
-                  <Label htmlFor="paypal" className="flex items-center">
-                    <PaypalIcon className="h-5 w-5 mr-2" />
-                    PayPal
-                  </Label>
-                  <p className="text-sm text-gray-500">Pay quickly and securely using your PayPal account</p>
-                </div>
-              </div>
-              
-              <div className={`flex items-start space-x-3 border rounded-md p-3 ${selectedPaymentMethod === 'bank_transfer' && !isGoodsArriving ? 'bg-gray-50 border-zim-green' : ''}`}>
-                <RadioGroupItem value="bank_transfer" id="bank_transfer" disabled={isGoodsArriving} />
-                <div className="space-y-1">
-                  <Label htmlFor="bank_transfer" className="flex items-center">
-                    <Building className="h-5 w-5 mr-2" />
-                    Bank Transfer
-                  </Label>
-                  <p className="text-sm text-gray-500">Make a direct bank transfer to our account</p>
-                  {selectedPaymentMethod === 'bank_transfer' && !isGoodsArriving && (
-                    <div className="mt-2 p-3 bg-gray-100 rounded text-sm">
-                      <p className="font-medium">Bank Transfer Details:</p>
-                      <p>Account Name: Zimbabwe Shipping Ltd</p>
-                      <p>Account Number: 12345678</p>
-                      <p>Sort Code: 12-34-56</p>
-                      <p>Reference: Your tracking number</p>
+                  <p className="text-sm text-gray-600">
+                    Pay when your goods arrive in Zimbabwe. A 20% premium is added to the standard shipping cost.
+                  </p>
+                  
+                  {selectedPaymentMethod === 'goods_arriving' && (
+                    <div className="mt-3 p-3 bg-blue-100 rounded-md">
+                      <h4 className="font-medium flex items-center text-blue-800">
+                        <AlertCircle className="h-4 w-4 mr-1" /> 
+                        Price Calculation
+                      </h4>
+                      <div className="grid grid-cols-2 gap-1 mt-2 text-sm">
+                        <span className="text-blue-700">Base Amount:</span>
+                        <span className="text-right font-medium">£{totalAmount.toFixed(2)}</span>
+                        
+                        <span className="text-blue-700">20% Premium:</span>
+                        <span className="text-right font-medium">£{premiumAmount.toFixed(2)}</span>
+                        
+                        <span className="text-blue-800 font-medium pt-1 border-t border-blue-200">Total:</span>
+                        <span className="text-right font-bold pt-1 border-t border-blue-200">£{(totalAmount + premiumAmount).toFixed(2)}</span>
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
               
-              <div className={`flex items-start space-x-3 border rounded-md p-3 ${selectedPaymentMethod === 'cash' && !isGoodsArriving ? 'bg-gray-50 border-zim-green' : ''}`}>
-                <RadioGroupItem value="cash" id="cash" disabled={isGoodsArriving} />
-                <div className="space-y-1">
-                  <Label htmlFor="cash" className="flex items-center">
-                    <BanknoteIcon className="h-5 w-5 mr-2" />
-                    Cash Payment
-                  </Label>
-                  <p className="text-sm text-gray-500">Pay in cash when we collect your shipment</p>
+              {/* Cash on Collection Special Deal */}
+              {bookingData?.shipmentDetails?.type === 'drum' && (
+                <div className={`flex items-start space-x-3 border-2 rounded-md p-4 ${selectedPaymentMethod === 'cash_on_collection' ? 'bg-green-50 border-green-400' : 'border-dashed border-yellow-400'}`}>
+                  <RadioGroupItem value="cash_on_collection" id="cash_on_collection" />
+                  <div className="space-y-2 w-full">
+                    <div className="flex justify-between items-center">
+                      <Label htmlFor="cash_on_collection" className="flex items-center text-lg font-medium">
+                        <Tag className="h-5 w-5 mr-2 text-green-600" />
+                        Special Deal: Cash on Collection
+                      </Label>
+                      <span className="bg-yellow-400 text-yellow-800 text-xs font-bold px-2 py-1 rounded-full">SAVE £15</span>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      Pay cash when we collect your drums and receive a £15 discount on your shipment. Limited time offer!
+                    </p>
+                    
+                    {selectedPaymentMethod === 'cash_on_collection' && (
+                      <div className="mt-3 p-3 bg-green-100 rounded-md">
+                        <h4 className="font-medium flex items-center text-green-800">
+                          <PoundSterling className="h-4 w-4 mr-1" /> 
+                          Your Discount
+                        </h4>
+                        <div className="grid grid-cols-2 gap-1 mt-2 text-sm">
+                          <span className="text-green-700">Original Price:</span>
+                          <span className="text-right font-medium">£{totalAmount.toFixed(2)}</span>
+                          
+                          <span className="text-green-700">Cash Discount:</span>
+                          <span className="text-right font-medium">-£{specialDealDiscount.toFixed(2)}</span>
+                          
+                          <span className="text-green-800 font-medium pt-1 border-t border-green-200">Final Total:</span>
+                          <span className="text-right font-bold pt-1 border-t border-green-200">£{(totalAmount - specialDealDiscount).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
               
-              <div className={`flex items-start space-x-3 border rounded-md p-3 ${selectedPaymentMethod === 'pay_later' && !isGoodsArriving ? 'bg-gray-50 border-zim-green' : ''}`}>
-                <RadioGroupItem value="pay_later" id="pay_later" disabled={isGoodsArriving} />
-                <div className="space-y-1">
-                  <Label htmlFor="pay_later" className="flex items-center">
-                    <Calendar className="h-5 w-5 mr-2" />
-                    Pay Later (30 Days)
+              {/* 30-Day Payment */}
+              <div className={`flex items-start space-x-3 border rounded-md p-4 ${selectedPaymentMethod === 'pay_later' ? 'bg-gray-50 border-gray-300' : ''}`}>
+                <RadioGroupItem value="pay_later" id="pay_later" />
+                <div className="space-y-2 w-full">
+                  <Label htmlFor="pay_later" className="flex items-center text-lg font-medium">
+                    <CalendarClock className="h-5 w-5 mr-2 text-gray-600" />
+                    30-Day Payment Terms
                   </Label>
-                  <p className="text-sm text-gray-500">Pay within 30 days of the collection date</p>
+                  <p className="text-sm text-gray-600">
+                    Book now and pay within 30 days of collection date ({formatDate(paymentDeadline)}).
+                  </p>
                   
-                  {selectedPaymentMethod === 'pay_later' && !isGoodsArriving && bookingData?.paymentOption === 'standard' && (
-                    <Alert variant="destructive" className="mt-2">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertTitle>Standard Payment Selected</AlertTitle>
-                      <AlertDescription>
-                        You selected standard payment during booking. Switching to Pay Later may result in additional charges.
-                        Please go back and choose "30-Day Payment Terms" during booking for the correct pricing.
-                      </AlertDescription>
-                    </Alert>
+                  {selectedPaymentMethod === 'pay_later' && (
+                    <div className="mt-3 space-y-3">
+                      <p className="text-sm font-medium text-gray-700">Select your preferred payment method:</p>
+                      
+                      <RadioGroup
+                        value={payLaterMethod}
+                        onValueChange={setPayLaterMethod}
+                        className="space-y-2"
+                      >
+                        <div className="flex items-center space-x-2 border rounded p-2 pl-3">
+                          <RadioGroupItem value="cash" id="method-cash" />
+                          <Label htmlFor="method-cash" className="flex items-center">
+                            <BanknoteIcon className="h-4 w-4 mr-2 text-green-600" />
+                            Cash Payment
+                          </Label>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2 border rounded p-2 pl-3">
+                          <RadioGroupItem value="bank_transfer" id="method-bank" />
+                          <Label htmlFor="method-bank" className="flex items-center">
+                            <Building className="h-4 w-4 mr-2 text-blue-600" />
+                            Bank Transfer
+                          </Label>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2 border rounded p-2 pl-3">
+                          <RadioGroupItem value="direct_debit" id="method-dd" />
+                          <Label htmlFor="method-dd" className="flex items-center">
+                            <CreditCard className="h-4 w-4 mr-2 text-purple-600" />
+                            Direct Debit
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                      
+                      {payLaterMethod === 'bank_transfer' && (
+                        <div className="mt-2 p-3 bg-gray-100 rounded text-sm">
+                          <p className="font-medium">Bank Transfer Details:</p>
+                          <p>Account Name: Zimbabwe Shipping Ltd</p>
+                          <p>Account Number: 12345678</p>
+                          <p>Sort Code: 12-34-56</p>
+                          <p>Reference: Your tracking number</p>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -346,9 +352,16 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
               </div>
             )}
             
+            {isSpecialDeal && bookingData?.shipmentDetails?.type === 'drum' && (
+              <div className="flex justify-between">
+                <span className="text-green-600">Cash on Collection Discount</span>
+                <span className="text-green-600">-£{specialDealDiscount.toFixed(2)}</span>
+              </div>
+            )}
+            
             <div className="flex justify-between pt-2 font-bold">
               <span>Total</span>
-              <span className="text-zim-green">£{totalWithPremium.toFixed(2)}</span>
+              <span className="text-zim-green">£{finalAmount.toFixed(2)}</span>
             </div>
           </div>
         </CardContent>
@@ -362,7 +375,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
             <ArrowLeftCircle className="mr-2 h-4 w-4" /> Back
           </Button>
           <Button
-            onClick={handlePayment}
+            onClick={handleConfirm}
             disabled={isProcessing}
             className="bg-zim-green hover:bg-zim-green/90 text-white flex items-center"
           >
@@ -371,12 +384,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
             ) : (
               <>
                 <CheckCircle2 className="mr-2 h-4 w-4" />
-                {isGoodsArriving 
-                  ? "Confirm Payment on Arrival" 
-                  : selectedPaymentMethod === 'pay_later'
-                    ? "Confirm 30-Day Payment"
-                    : "Complete Payment"
-                }
+                Confirm Payment Method
               </>
             )}
           </Button>
