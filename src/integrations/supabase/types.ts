@@ -482,7 +482,7 @@ export type Database = {
           status: string
           tracking_number: string
           updated_at: string
-          user_id: string
+          user_id: string | null
           weight: number | null
         }
         Insert: {
@@ -499,7 +499,7 @@ export type Database = {
           status: string
           tracking_number: string
           updated_at?: string
-          user_id: string
+          user_id?: string | null
           weight?: number | null
         }
         Update: {
@@ -516,7 +516,7 @@ export type Database = {
           status?: string
           tracking_number?: string
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
           weight?: number | null
         }
         Relationships: []

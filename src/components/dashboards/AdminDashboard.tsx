@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,6 +29,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
   Package, 
   Truck, 
@@ -48,7 +48,8 @@ import {
   ImageIcon, 
   MessageSquare, 
   Megaphone,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Menu
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { SetupAdmin } from '@/components/SetupAdmin';
@@ -118,6 +119,7 @@ const AdminDashboard = () => {
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -126,13 +128,14 @@ const AdminDashboard = () => {
   const [newStatus, setNewStatus] = useState<string>('');
   const [adminExists, setAdminExists] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const [showFullMenu, setShowFullMenu] = useState(false);
   
   const [stats, setStats] = useState({
     total: 0,
     processing: 0,
     inTransit: 0,
     delivered: 0,
-    quotes: 0, // Added for custom quotes
+    quotes: 0,
   });
 
   const checkIfAdminExists = async () => {
@@ -175,7 +178,6 @@ const AdminDashboard = () => {
 
   const fetchStats = async () => {
     try {
-      // Fetch custom quotes stats
       const { data: quotesData, error: quotesError } = await supabase
         .from('custom_quotes')
         .select('id', { count: 'exact' });
@@ -286,46 +288,119 @@ const AdminDashboard = () => {
 
   return (
     <div>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+        {isMobile && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowFullMenu(!showFullMenu)}
+          >
+            <Menu className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+      
       <Tabs 
         defaultValue="overview" 
         value={activeTab} 
         onValueChange={setActiveTab}
         className="mb-8"
       >
-        <TabsList className="grid w-full grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            <span className="hidden sm:inline">Overview</span>
-          </TabsTrigger>
-          <TabsTrigger value="shipments" className="flex items-center gap-2">
-            <Package className="h-4 w-4" />
-            <span className="hidden sm:inline">Shipments</span>
-          </TabsTrigger>
-          <TabsTrigger value="quotes" className="flex items-center gap-2">
-            <FileSpreadsheet className="h-4 w-4" />
-            <span className="hidden sm:inline">Custom Quotes</span>
-          </TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center gap-2">
-            <User className="h-4 w-4" />
-            <span className="hidden sm:inline">Users</span>
-          </TabsTrigger>
-          <TabsTrigger value="analytics" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            <span className="hidden sm:inline">Analytics</span>
-          </TabsTrigger>
-          <TabsTrigger value="schedule" className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            <span className="hidden sm:inline">Schedule</span>
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            <span className="hidden sm:inline">Settings</span>
-          </TabsTrigger>
-          <TabsTrigger value="more" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            <span className="hidden sm:inline">More</span>
-          </TabsTrigger>
-        </TabsList>
+        {isMobile && !showFullMenu ? (
+          <TabsList className="grid grid-cols-2 gap-2 mb-4">
+            <TabsTrigger value="overview" className="flex items-center justify-center gap-2 p-3">
+              <Activity className="h-5 w-5" />
+              <span>Overview</span>
+            </TabsTrigger>
+            <Select value={activeTab} onValueChange={setActiveTab}>
+              <SelectTrigger className="h-full">
+                <div className="flex items-center">
+                  <span>More</span>
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="shipments">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    <span>Shipments</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="quotes">
+                  <div className="flex items-center gap-2">
+                    <FileSpreadsheet className="h-4 w-4" />
+                    <span>Custom Quotes</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="users">
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    <span>Users</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="analytics">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    <span>Analytics</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="schedule">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    <span>Schedule</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="settings">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    <span>Settings</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="more">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    <span>More</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </TabsList>
+        ) : (
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-8 gap-2 mb-4">
+            <TabsTrigger value="overview" className="flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              <span className={isMobile ? "" : "hidden sm:inline"}>Overview</span>
+            </TabsTrigger>
+            <TabsTrigger value="shipments" className="flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              <span className={isMobile ? "" : "hidden sm:inline"}>Shipments</span>
+            </TabsTrigger>
+            <TabsTrigger value="quotes" className="flex items-center gap-2">
+              <FileSpreadsheet className="h-4 w-4" />
+              <span className={isMobile ? "" : "hidden sm:inline"}>Custom Quotes</span>
+            </TabsTrigger>
+            <TabsTrigger value="users" className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              <span className={isMobile ? "" : "hidden sm:inline"}>Users</span>
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              <span className={isMobile ? "" : "hidden sm:inline"}>Analytics</span>
+            </TabsTrigger>
+            <TabsTrigger value="schedule" className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              <span className={isMobile ? "" : "hidden sm:inline"}>Schedule</span>
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              <span className={isMobile ? "" : "hidden sm:inline"}>Settings</span>
+            </TabsTrigger>
+            <TabsTrigger value="more" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              <span className={isMobile ? "" : "hidden sm:inline"}>More</span>
+            </TabsTrigger>
+          </TabsList>
+        )}
         
         <TabsContent value="overview">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
