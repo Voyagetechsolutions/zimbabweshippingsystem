@@ -1,4 +1,3 @@
-
 import React from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -8,7 +7,7 @@ import {
   Truck, 
   Package, 
   Clock, 
-  DollarSign, 
+  PoundSterling, 
   Shield, 
   MapPin,
   CheckCircle2,
@@ -222,7 +221,7 @@ const Services = () => {
               <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
                 <CardHeader>
                   <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mb-4">
-                    <DollarSign className="h-6 w-6 text-purple-600" />
+                    <PoundSterling className="h-6 w-6 text-purple-600" />
                   </div>
                   <CardTitle>Commercial Shipping</CardTitle>
                   <CardDescription>
@@ -252,44 +251,6 @@ const Services = () => {
                 <CardFooter>
                   <Button asChild className="w-full">
                     <Link to="/contact">Business Inquiries</Link>
-                  </Button>
-                </CardFooter>
-              </Card>
-
-              {/* Express Shipping */}
-              <Card className="bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
-                <CardHeader>
-                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                    <Clock className="h-6 w-6 text-green-600" />
-                  </div>
-                  <CardTitle>Express Shipping</CardTitle>
-                  <CardDescription>
-                    Faster delivery for urgent items
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2">
-                    <li className="flex items-start">
-                      <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
-                      <span>Priority handling and shipping</span>
-                    </li>
-                    <li className="flex items-start">
-                      <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
-                      <span>Faster transit times (2-3 weeks)</span>
-                    </li>
-                    <li className="flex items-start">
-                      <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
-                      <span>Enhanced tracking services</span>
-                    </li>
-                    <li className="flex items-start">
-                      <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
-                      <span>Available for critical documents</span>
-                    </li>
-                  </ul>
-                </CardContent>
-                <CardFooter>
-                  <Button asChild className="w-full">
-                    <Link to="/contact">Request Express Service</Link>
                   </Button>
                 </CardFooter>
               </Card>
@@ -469,7 +430,7 @@ const Services = () => {
                 <h3 className="text-2xl font-bold">Packing Guidelines</h3>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
                 <div className="border rounded-lg p-5 hover:shadow-md transition-shadow">
                   <div className="flex items-center mb-3">
                     <PlusCircle className="h-5 w-5 text-zim-green mr-2" />
@@ -478,19 +439,6 @@ const Services = () => {
                   <p className="text-sm text-gray-600">
                     Maximize space by rolling clothes tightly. Place heavier items at the bottom. 
                     Place fragile items in the center surrounded by soft items for protection.
-                  </p>
-                </div>
-                
-                <div className="border rounded-lg p-5 hover:shadow-md transition-shadow">
-                  <div className="flex items-center mb-3">
-                    <Scale className="h-5 w-5 text-zim-yellow mr-2" />
-                    <h4 className="font-semibold">Weight Limits</h4>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    Small drum: 40kg max<br />
-                    Medium drum: 60kg max<br />
-                    Large drum: 80kg max<br />
-                    Parcels: 30kg per package
                   </p>
                 </div>
                 
