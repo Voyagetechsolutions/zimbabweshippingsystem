@@ -127,7 +127,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               setValue('firstName', nameParts[0] || '');
               setValue('lastName', nameParts.slice(1).join(' ') || '');
             }
-            if (data.phone) setValue('phone', data.phone);
+            
+            if (data.phone_number) setValue('phone', data.phone_number);
             if (data.address) setValue('pickupAddress', data.address);
             if (data.postcode) setValue('pickupPostcode', data.postcode);
           }
@@ -232,7 +233,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       const { data: shipmentData, error: shipmentError } = await supabase
         .from('shipments')
         .insert({
-          user_id: user?.id,
           origin: `${data.pickupAddress}, ${data.pickupPostcode}`,
           destination: `${data.deliveryAddress}, ${data.deliveryCity}, Zimbabwe`,
           status: 'booked',
@@ -252,6 +252,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
           },
           weight: data.shipmentType === 'parcel' ? parseFloat(data.weight || "0") : null,
           tracking_number: `ZIM-${Math.floor(100000 + Math.random() * 900000)}`,
+          user_id: user?.id || null,
         })
         .select()
         .single();
