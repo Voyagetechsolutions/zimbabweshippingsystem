@@ -1,155 +1,108 @@
 
-import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Star } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Card, CardContent } from "@/components/ui/card";
+import { Star, MapPin } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
-const TestimonialSection: React.FC = () => {
-  const testimonials = [
-    {
-      id: 1,
-      name: 'Tatenda Moyo',
-      location: 'Harare',
-      rating: 5,
-      text: 'Made it so easy to receive my family\'s care package from the UK. Everything arrived intact and the drum shipping option was perfect for sending multiple items at once. Highly recommend!',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png' 
-    },
-    {
-      id: 2,
-      name: 'Fungai Chikwava',
-      location: 'Bulawayo',
-      rating: 5,
-      text: 'I\'ve been using their services for over 2 years now to receive goods from my children in the UK. Their door-to-door delivery option saves me so much time and everything always arrives safely.',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 3,
-      name: 'Kudzai Mutasa',
-      location: 'Mutare',
-      rating: 4,
-      text: 'Great pricing and reliable service. The tracking feature kept me informed about my package throughout the shipping process. Will definitely use their services again!',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 4,
-      name: 'Tendai Nyamukapa',
-      location: 'Gweru',
-      rating: 5,
-      text: 'My family sent me important medication and supplies and everything arrived quickly. The customer service team was very helpful when I had questions.',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 5,
-      name: 'Vimbai Chikomba',
-      location: 'Masvingo',
-      rating: 5,
-      text: 'As someone who regularly receives packages from relatives in the UK, I\'ve tried many shipping services, but this is by far the most reliable and affordable option.',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 6,
-      name: 'Tanaka Manyika',
-      location: 'Chinhoyi',
-      rating: 5,
-      text: 'The drum shipping option is brilliant! I was able to receive so many items from my family in the UK at once, saving a lot on individual shipping costs. Everything arrived safely and on time.',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 7,
-      name: 'Rudo Makoni',
-      location: 'Kadoma',
-      rating: 5,
-      text: 'My mother sent me drums full of groceries and clothing. The quality of service was exceptional - everything arrived in perfect condition.',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 8,
-      name: 'Simba Nyathi',
-      location: 'Harare',
-      rating: 5,
-      text: 'Used the service to ship a washing machine and refrigerator. The team handled the items with care and kept me updated throughout. Would definitely recommend for large appliances.',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 9,
-      name: 'Chipo Moyo',
-      location: 'Bulawayo',
-      rating: 4,
-      text: 'The pay-on-arrival option was perfect for our family arrangement. My son paid in the UK and I received the goods without any hassle. Very convenient service.',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 10,
-      name: 'Farai Dzonga',
-      location: 'Mutare',
-      rating: 5,
-      text: 'I shipped a drum containing assorted items for my sister\'s wedding. Everything arrived on time and intact. The special handling was worth every penny!',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 11,
-      name: 'Nyasha Chuma',
-      location: 'Gweru',
-      rating: 5,
-      text: 'As a business owner, I rely on regular shipments from the UK. Their commercial shipping service has never disappointed. Consistent quality service every time.',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 12,
-      name: 'Gift Moyana',
-      location: 'Victoria Falls',
-      rating: 4,
-      text: 'Even though we\'re in a remote location, the delivery was still made on time. Impressive logistics and wonderful customer service throughout.',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 13,
-      name: 'Blessing Mukwara',
-      location: 'Harare',
-      rating: 5,
-      text: 'I've received multiple shipments of clothing and household items from my daughter in Manchester. The condition of all items was perfect and delivery was on time.',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 14,
-      name: 'Rumbidzai Dube',
-      location: 'Bulawayo',
-      rating: 5,
-      text: 'The tracking system is excellent - I could see exactly where my shipment was at all times. Communication from the staff was also top-notch.',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 15,
-      name: 'Tapiwa Gumbo',
-      location: 'Gweru',
-      rating: 5,
-      text: 'My brother ships business inventory to me regularly. The commercial shipping rates are very competitive and the service is reliable for my business needs.',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 16,
-      name: 'Tsitsi Moyo',
-      location: 'Mutare',
-      rating: 4,
-      text: 'I received a large shipment of construction materials for my new home. Everything was properly packed and arrived undamaged. Very satisfied with their service.',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 17,
-      name: 'Donald Zindi',
-      location: 'Masvingo',
-      rating: 5,
-      text: 'The flexibility in payment options really helped my situation. I was able to choose the pay-on-arrival option which worked perfectly for my family.',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 18,
-      name: 'Patience Ndlovu',
-      location: 'Harare',
-      rating: 5,
-      text: 'I received 10 drums of various household items and groceries. Everything was well-organized and intact. The door-to-door service was worth the extra cost.',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    }
-  ];
+interface Testimonial {
+  id: string;
+  name: string;
+  avatar?: string;
+  location: string;
+  rating: number;
+  text: string;
+}
+
+// Fallback testimonials if database fetch fails
+const fallbackTestimonials: Testimonial[] = [
+  {
+    id: '1',
+    name: 'Tatenda Moyo',
+    location: 'Harare, Zimbabwe',
+    rating: 5,
+    text: 'UK Shipping made it so easy to receive my family\'s care package from London. Everything arrived intact and the drum shipping option was perfect!'
+  },
+  {
+    id: '2',
+    name: 'Fungai Chikwava',
+    location: 'Bulawayo, Zimbabwe',
+    rating: 5,
+    text: 'I\'ve been using their services for over 2 years now to receive supplies for my small business. The service is always reliable.'
+  },
+  {
+    id: '3',
+    name: 'David Thompson',
+    location: 'Manchester, UK',
+    rating: 4,
+    text: 'Sending a care package to family in Zimbabwe was simple with this service. Good pricing compared to others I've tried.'
+  },
+  {
+    id: '4',
+    name: 'Vimbai Ncube',
+    location: 'Gweru, Zimbabwe',
+    rating: 5,
+    text: 'I received my drum shipment in excellent condition. All my items were packed carefully and arrived safely.'
+  },
+  {
+    id: '5',
+    name: 'Emma Clarke',
+    location: 'London, UK',
+    rating: 4,
+    text: 'The door-to-door delivery option made sending items to my elderly relatives so much easier for both of us.'
+  },
+  {
+    id: '6',
+    name: 'Tinashe Mabhena',
+    location: 'Harare, Zimbabwe',
+    rating: 5,
+    text: 'The collection process in the UK was convenient for my sister, and I loved being able to track my shipment throughout the journey.'
+  }
+];
+
+const TestimonialSection = () => {
+  const [testimonials, setTestimonials] = useState<Testimonial[]>(fallbackTestimonials);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTestimonials = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('reviews')
+          .select(`
+            id,
+            user_id,
+            rating,
+            comment,
+            profiles(full_name)
+          `)
+          .order('created_at', { ascending: false })
+          .limit(6);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          // Transform data to match Testimonial interface
+          const formattedTestimonials = data.map(item => ({
+            id: item.id,
+            name: item.profiles?.full_name || 'Anonymous Customer',
+            location: 'Zimbabwe', // Default location
+            rating: item.rating,
+            text: item.comment || 'Great service!'
+          }));
+          
+          setTestimonials(formattedTestimonials);
+        }
+      } catch (error) {
+        console.error('Error fetching testimonials:', error);
+        // Already using fallback testimonials as default state
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTestimonials();
+  }, []);
 
   const renderStars = (rating: number) => {
     return Array(5).fill(0).map((_, i) => (
@@ -160,47 +113,57 @@ const TestimonialSection: React.FC = () => {
     ));
   };
 
+  function getInitials(name: string) {
+    return name
+      .split(' ')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 2);
+  }
+
   return (
-    <section className="py-16 bg-white">
+    <section className="bg-gray-50 py-12 md:py-20">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">What Our Customers Say</h2>
           <p className="text-gray-600 max-w-2xl mx-auto">
-            Hear from our satisfied customers who have experienced our reliable shipping services.
+            Read testimonials from satisfied customers who have used our services to send 
+            and receive shipments between the UK and Zimbabwe.
           </p>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {testimonials.map((testimonial) => (
-            <Card key={testimonial.id} className="border-gray-200 hover:shadow-md transition-shadow duration-300">
+            <Card key={testimonial.id} className="border-0 shadow-md hover:shadow-lg transition-shadow">
               <CardContent className="p-6">
-                <div className="flex items-center mb-4">
-                  <div className="flex">
-                    {renderStars(testimonial.rating)}
-                  </div>
-                </div>
-                <p className="text-gray-700 mb-6 italic">"{testimonial.text}"</p>
-                <div className="flex items-center">
-                  <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
-                    <span className="text-xl font-bold text-gray-500">{testimonial.name.charAt(0)}</span>
-                  </div>
-                  <div className="ml-3">
+                <div className="flex items-start mb-4">
+                  <Avatar className="h-10 w-10 mr-3">
+                    {testimonial.avatar ? (
+                      <AvatarImage src={testimonial.avatar} alt={testimonial.name} />
+                    ) : (
+                      <AvatarFallback className="bg-zim-green text-white">
+                        {getInitials(testimonial.name)}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
+                  <div>
                     <h3 className="font-semibold">{testimonial.name}</h3>
-                    <p className="text-sm text-gray-500">{testimonial.location}</p>
+                    <div className="flex items-center text-sm text-gray-500">
+                      <MapPin className="h-3 w-3 mr-1" />
+                      <span>{testimonial.location}</span>
+                    </div>
                   </div>
                 </div>
+                
+                <div className="flex mb-3">
+                  {renderStars(testimonial.rating)}
+                </div>
+                
+                <p className="text-gray-600">{testimonial.text}</p>
               </CardContent>
             </Card>
           ))}
-        </div>
-
-        <div className="mt-12 text-center">
-          <p className="text-lg font-medium">Trusted by hundreds of families for reliable UK shipping.</p>
-          <div className="mt-6">
-            <a href="/reviews" className="bg-zim-green hover:bg-zim-green/90 text-white px-6 py-3 rounded-lg font-medium">
-              Share Your Experience
-            </a>
-          </div>
         </div>
       </div>
     </section>
