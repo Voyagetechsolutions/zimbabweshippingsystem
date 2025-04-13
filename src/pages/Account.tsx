@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import NotificationsPanel from '@/components/NotificationsPanel';
 
 const Account = () => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -26,7 +26,7 @@ const Account = () => {
               <TabsTrigger value="profile">Profile</TabsTrigger>
               <TabsTrigger value="communication">Communication</TabsTrigger>
               <TabsTrigger value="security">Security</TabsTrigger>
-              {user?.is_admin && (
+              {isAdmin && (
                 <TabsTrigger value="admin">Admin</TabsTrigger>
               )}
             </TabsList>
@@ -70,7 +70,7 @@ const Account = () => {
               </div>
             </TabsContent>
             
-            {user?.is_admin && (
+            {isAdmin && (
               <TabsContent value="admin">
                 <div className="space-y-6">
                   <div className="bg-white p-6 rounded-lg shadow-sm border">
