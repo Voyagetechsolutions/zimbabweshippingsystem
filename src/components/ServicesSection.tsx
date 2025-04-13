@@ -8,7 +8,7 @@ const ServicesSection: React.FC = () => {
     {
       icon: <Truck className="h-12 w-12 text-zim-green" />,
       title: "Drum Shipping",
-      description: "Our most popular service. We provide standardized drums with a capacity of 200L-220L for shipping your goods safely to Zimbabwe.",
+      description: "Our most popular service. We provide standardized drums for shipping your goods safely to Zimbabwe.",
       link: "/services#drum-shipping"
     },
     {

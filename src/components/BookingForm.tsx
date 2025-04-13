@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -28,8 +29,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PoundSterling, TruckIcon, Package, Calendar, Info, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Link } from 'react-router-dom';
 
+// Form schema using Zod
 const formSchema = z.object({
   firstName: z.string().min(2, { message: "First name must be at least 2 characters" }),
   lastName: z.string().min(2, { message: "Last name must be at least 2 characters" }),
@@ -56,6 +57,7 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+// Define booking steps
 enum BookingStep {
   SENDER_DETAILS = 0,
   RECIPIENT_DETAILS = 1,
@@ -77,6 +79,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const { toast } = useToast();
   const { user } = useAuth();
 
+  // Create form
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -109,10 +112,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const doorToDoor = watch("doorToDoor");
   const paymentMethod = watch("paymentMethod");
 
+  // Fill form with user data if available
   useEffect(() => {
     const fetchUserData = async () => {
       if (user) {
         try {
+          // Get user profile data
           const { data, error } = await supabase
             .from('profiles')
             .select('*')
@@ -122,13 +127,13 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
           if (error) throw error;
           
           if (data) {
+            // Update form with user data if available
             if (data.full_name) {
               const nameParts = data.full_name.split(' ');
               setValue('firstName', nameParts[0] || '');
               setValue('lastName', nameParts.slice(1).join(' ') || '');
             }
-            
-            if (data.phone_number) setValue('phone', data.phone_number);
+            if (data.phone) setValue('phone', data.phone);
             if (data.address) setValue('pickupAddress', data.address);
             if (data.postcode) setValue('pickupPostcode', data.postcode);
           }
@@ -141,32 +146,40 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     fetchUserData();
   }, [user, setValue]);
 
+  // Calculate shipping cost
   useEffect(() => {
     const calculateCost = () => {
       let cost = 0;
       
       if (shipmentType === "drum") {
+        // £100 per drum
         cost = parseInt(drumQuantity || "1") * 100;
         
+        // Apply cash on collection discount (10%)
         if (paymentMethod === "cash-collection") {
-          cost = cost * 0.9;
+          cost = cost * 0.9; // 10% discount
         }
       } else if (shipmentType === "parcel") {
+        // £15 per kg with minimum charge of £20
         const weightValue = parseFloat(weight || "0");
         cost = Math.max(weightValue * 15, 20);
       }
       
       setBaseShipmentCost(cost);
       
+      // Add door-to-door cost if selected
       const doorToDoorCost = doorToDoor ? 25 : 0;
       
+      // Calculate total before payment method adjustment
       let totalBeforePaymentMethod = cost + doorToDoorCost;
       
+      // Add metal seal cost (£5)
       totalBeforePaymentMethod += 5;
       
+      // Calculate additional cost based on payment method
       let additionalPaymentCost = 0;
       if (paymentMethod === "goods-arriving") {
-        additionalPaymentCost = totalBeforePaymentMethod * 0.2;
+        additionalPaymentCost = totalBeforePaymentMethod * 0.2; // 20% additional charge
       }
       
       setAdditionalCost(additionalPaymentCost);
@@ -176,11 +189,13 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     calculateCost();
   }, [shipmentType, drumQuantity, weight, doorToDoor, paymentMethod]);
 
+  // Next step handler
   const handleNext = async () => {
     const currentFields = getFieldsForCurrentStep();
     
     const result = await form.trigger(currentFields as any);
     if (!result) {
+      // Show validation errors
       return;
     }
     
@@ -190,6 +205,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
   };
 
+  // Previous step handler
   const handlePrev = () => {
     if (currentStep > 0) {
       setCurrentStep(prev => prev - 1);
@@ -197,6 +213,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
   };
 
+  // Get fields for validation by step
   const getFieldsForCurrentStep = () => {
     switch (currentStep) {
       case BookingStep.SENDER_DETAILS:
@@ -226,39 +243,40 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
   };
 
+  // Form submission handler
   const onSubmit = async (data: FormValues) => {
     setIsSubmitting(true);
     
     try {
+      // Insert shipment to Supabase
       const { data: shipmentData, error: shipmentError } = await supabase
         .from('shipments')
         .insert({
+          user_id: user?.id,
           origin: `${data.pickupAddress}, ${data.pickupPostcode}`,
           destination: `${data.deliveryAddress}, ${data.deliveryCity}, Zimbabwe`,
           status: 'booked',
-          metadata: {
-            shipment_type: data.shipmentType,
-            quantity: data.shipmentType === 'drum' ? parseInt(data.drumQuantity || "1") : null,
-            door_to_door: data.doorToDoor,
-            sender_name: `${data.firstName} ${data.lastName}`,
-            sender_email: data.email,
-            sender_phone: data.phone,
-            recipient_name: data.recipientName,
-            recipient_phone: data.recipientPhone,
-            item_category: data.shipmentType === 'custom' ? data.itemCategory : null,
-            item_description: data.shipmentType === 'custom' ? data.itemDescription : null,
-            payment_method: data.paymentMethod,
-            payment_type: data.paymentMethod === '30-day' ? data.paymentType : null,
-          },
+          shipment_type: data.shipmentType,
           weight: data.shipmentType === 'parcel' ? parseFloat(data.weight || "0") : null,
-          tracking_number: `ZIM-${Math.floor(100000 + Math.random() * 900000)}`,
-          user_id: user?.id || null,
+          quantity: data.shipmentType === 'drum' ? parseInt(data.drumQuantity || "1") : null,
+          door_to_door: data.doorToDoor,
+          sender_name: `${data.firstName} ${data.lastName}`,
+          sender_email: data.email,
+          sender_phone: data.phone,
+          recipient_name: data.recipientName,
+          recipient_phone: data.recipientPhone,
+          item_category: data.shipmentType === 'custom' ? data.itemCategory : null,
+          item_description: data.shipmentType === 'custom' ? data.itemDescription : null,
+          payment_method: data.paymentMethod,
+          payment_type: data.paymentMethod === '30-day' ? data.paymentType : null,
+          amount: calculatedCost
         })
         .select()
         .single();
       
       if (shipmentError) throw shipmentError;
       
+      // Call the onSubmitComplete callback with form data, shipment ID, and calculated cost
       onSubmitComplete(data, shipmentData.id, calculatedCost);
       
     } catch (error: any) {
@@ -273,6 +291,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
   };
 
+  // Render progress indicator
   const renderProgress = () => {
     const steps = [
       { name: 'Sender Details', icon: <PoundSterling className="w-5 h-5" /> },
@@ -335,6 +354,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     );
   };
 
+  // Render step content
   const renderStepContent = () => {
     switch (currentStep) {
       case BookingStep.SENDER_DETAILS:
@@ -508,6 +528,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                       value={field.value} 
                       onValueChange={(value) => {
                         field.onChange(value);
+                        // Reset related fields when changing type
                         if (value === "drum") {
                           setValue("weight", "");
                           setValue("itemCategory", "");
