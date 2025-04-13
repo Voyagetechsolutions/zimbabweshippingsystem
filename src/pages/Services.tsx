@@ -81,11 +81,11 @@ const Services = () => {
                   <ul className="space-y-2">
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
-                      <span>Available in various sizes (small, medium, large)</span>
+                      <span>Available with a capacity of 200L-220L</span>
                     </li>
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
-                      <span>Ideal for clothing, shoes, household items</span>
+                      <span>Ideal for clothing, shoes, household items and groceries</span>
                     </li>
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
@@ -110,7 +110,7 @@ const Services = () => {
                   <div className="w-12 h-12 bg-zim-red/10 rounded-full flex items-center justify-center mb-4">
                     <Truck className="h-6 w-6 text-zim-red" />
                   </div>
-                  <CardTitle>Parcel Shipping</CardTitle>
+                  <CardTitle>Other Item Shipping</CardTitle>
                   <CardDescription>
                     Fast and efficient individual parcel delivery
                   </CardDescription>
@@ -119,7 +119,7 @@ const Services = () => {
                   <ul className="space-y-2">
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
-                      <span>Competitive per-kilogram pricing</span>
+                      <span>Competitive pricing</span>
                     </li>
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
@@ -128,11 +128,7 @@ const Services = () => {
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
                       <span>Door-to-door delivery option</span>
-                    </li>
-                    <li className="flex items-start">
-                      <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
-                      <span>Insurance options available</span>
-                    </li>
+                    </li>                    
                   </ul>
                 </CardContent>
                 <CardFooter>
