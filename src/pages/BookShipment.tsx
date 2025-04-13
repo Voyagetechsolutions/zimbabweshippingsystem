@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -66,7 +67,7 @@ const BookShipment = () => {
           ...(data.doorToDoor ? [{ name: 'Door to Door Delivery', price: 25 }] : [])
         ],
         item_category: data.shipmentType === 'other' ? data.itemCategory : null,
-        item_description: data.itemDescription,
+        item_description: data.shipmentType === 'other' ? data.itemDescription : null,
       },
       paymentOption: data.paymentOption || 'standard',
       paymentMethod: data.paymentMethod || 'card',
@@ -111,17 +112,6 @@ const BookShipment = () => {
       const receiptNumber = `R${Date.now().toString().substring(6)}`;
       
       try {
-        // Update the shipment with the receipt info - using update to avoid RLS policy issues
-        await supabase
-          .from('shipments')
-          .update({ 
-            status: data.paymentOption === 'payLater' ? 'pending_payment' : 
-                   data.paymentOption === 'cashOnCollection' ? 'awaiting_collection' : 
-                   'awaiting_arrival'
-          })
-          .eq('id', shipmentId);
-        
-        // Create receipt without referencing the shipment directly for now
         const { data: receiptData, error: receiptError } = await supabase
           .from('receipts')
           .insert({
@@ -148,7 +138,7 @@ const BookShipment = () => {
                 ...(data.doorToDoor ? [{ name: 'Door to Door Delivery', price: 25 }] : [])
               ],
               item_category: data.shipmentType === 'other' ? data.itemCategory : null,
-              item_description: data.itemDescription,
+              item_description: data.shipmentType === 'other' ? data.itemDescription : null,
             },
             status: 'pending',
             payment_id: null,
@@ -158,6 +148,17 @@ const BookShipment = () => {
           .single();
           
         if (receiptError) throw receiptError;
+        
+        // Update the shipment with the receipt info
+        await supabase
+          .from('shipments')
+          .update({ 
+            receipt_id: receiptData.id,
+            status: data.paymentOption === 'payLater' ? 'pending_payment' : 
+                   data.paymentOption === 'cashOnCollection' ? 'awaiting_collection' : 
+                   'awaiting_arrival'
+          })
+          .eq('id', shipmentId);
         
         // Navigate to the success page with the receipt ID
         navigate(`/payment-success?receipt_id=${receiptData.id}`);

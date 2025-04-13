@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, Controller } from 'react-hook-form';
@@ -75,7 +76,6 @@ import {
   getAreasFromPostalCode
 } from '@/utils/postalCodeUtils';
 import { getDateByRoute } from '@/data/collectionSchedule';
-import { getValidUserId } from '@/utils/supabaseUtils';
 
 const itemCategories = {
   "Vehicles & Mobility": [
@@ -236,6 +236,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const watchPaymentOption = form.watch('paymentOption');
   const watchDoorToDoor = form.watch('doorToDoor');
   
+  // Try to pre-fill form with user data if available
   useEffect(() => {
     const loadUserData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -248,6 +249,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         .single();
       
       if (profile) {
+        // Be careful with optional chaining here to avoid TS errors
         if (profile.full_name) {
           const nameParts = profile.full_name.split(' ');
           form.setValue('firstName', nameParts[0] || '');
@@ -311,21 +313,24 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   }, [watchShipmentType, watchDrumQuantity, watchPaymentOption, watchDoorToDoor]);
   
   const handleTabChange = (value: string) => {
+    // Validate the current tab before moving to the next one
     if (activeTab === 'sender' && value === 'recipient') {
       const senderFields = ['firstName', 'lastName', 'email', 'phone', 'pickupAddress', 'pickupPostcode'];
       const senderFieldsValid = senderFields.every(field => form.getFieldState(field as any).invalid !== true);
       
       if (!senderFieldsValid) {
+        // Trigger validation for all sender fields
         senderFields.forEach(field => form.trigger(field as any));
-        return;
+        return; // Don't proceed if any fields are invalid
       }
     } else if (activeTab === 'recipient' && value === 'shipment') {
       const recipientFields = ['recipientName', 'recipientPhone', 'deliveryAddress', 'deliveryCity'];
       const recipientFieldsValid = recipientFields.every(field => form.getFieldState(field as any).invalid !== true);
       
       if (!recipientFieldsValid) {
+        // Trigger validation for all recipient fields
         recipientFields.forEach(field => form.trigger(field as any));
-        return;
+        return; // Don't proceed if any fields are invalid
       }
     } else if (activeTab === 'shipment' && value === 'payment') {
       const termsAccepted = form.getValues('termsAgreed');
@@ -363,12 +368,13 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       }
       
       const trackingNumber = `ZS${Date.now().toString().substring(5)}`;
-    
-      // Get a valid user ID - will be null for non-authenticated users
-      const userId = await getValidUserId();
       
-      try {
-        const shipmentData = {
+      // Get the user ID if logged in
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { data: shipmentData, error: shipmentError } = await supabase
+        .from('shipments')
+        .insert({
           tracking_number: trackingNumber,
           origin: `${data.pickupAddress}, ${data.pickupPostcode}`,
           destination: `${data.deliveryAddress}, ${data.deliveryCity}`,
@@ -393,40 +399,20 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             route: collectionRoute,
             collection_date: collectionDate
           },
-          user_id: userId
-        };
-        
-        console.log("Creating shipment with data:", shipmentData);
-        
-        // Only add user_id field if we have a valid user
-        if (userId === null) {
-          delete shipmentData.user_id;
-        }
-        
-        const { data: result, error: shipmentError } = await supabase
-          .from('shipments')
-          .insert(shipmentData)
-          .select('id')
-          .single();
-        
-        if (shipmentError) {
-          console.error('Shipment creation error:', shipmentError);
-          throw shipmentError;
-        }
-        
-        setIsCalculating(false);
-        onSubmitComplete(data, result.id, totalAmount);
-      } catch (error: any) {
-        console.error('Error creating shipment:', error);
-        setIsCalculating(false);
-        toast({
-          title: 'Error',
-          description: error.message || 'An error occurred while processing your booking. Please try again.',
-          variant: 'destructive',
-        });
+          user_id: user?.id || null
+        })
+        .select('id')
+        .single();
+      
+      if (shipmentError) {
+        throw shipmentError;
       }
+      
+      setIsCalculating(false);
+      
+      onSubmitComplete(data, shipmentData.id, totalAmount);
     } catch (error: any) {
-      console.error('Form submission error:', error);
+      console.error('Error creating shipment:', error);
       setIsCalculating(false);
       toast({
         title: 'Error',
@@ -464,6 +450,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     if (currentIndex < tabOrder.length - 1) {
       handleTabChange(tabOrder[currentIndex + 1]);
     } else {
+      // If we're on the last tab, submit the form
       form.handleSubmit(onSubmit)();
     }
   };
@@ -960,64 +947,151 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 />
               </div>
             )}
+            
+            <FormField
+              control={form.control}
+              name="specialInstructions"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Special Instructions (Optional)</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Any special handling instructions or notes" 
+                      className="resize-none" 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="termsAgreed"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>
+                      I agree to the terms and conditions
+                    </FormLabel>
+                    <FormDescription>
+                      By proceeding, you agree to our <a href="/terms" className="text-zim-green hover:underline">Terms of Service</a> and <a href="/privacy" className="text-zim-green hover:underline">Privacy Policy</a>
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+            
+            <div className="flex justify-between mt-4">
+              <Button 
+                type="button" 
+                variant="outline"
+                onClick={() => handleTabChange('recipient')}
+              >
+                Back
+              </Button>
+              <Button 
+                type="button" 
+                className="bg-zim-green hover:bg-zim-green/90 text-white"
+                onClick={goToNextTab}
+              >
+                Next
+              </Button>
+            </div>
           </TabsContent>
           
           <TabsContent value="payment" className="space-y-4 pt-4">
-            <div className="space-y-6">
+            <FormField
+              control={form.control}
+              name="paymentOption"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel>Payment Option</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      className="flex flex-col space-y-1"
+                    >
+                      <div className="flex items-center space-x-2 p-3 border rounded-md">
+                        <RadioGroupItem value="standard" id="standard" />
+                        <div>
+                          <Label htmlFor="standard" className="font-medium">Standard Payment</Label>
+                          <p className="text-sm text-gray-500">Pay now to secure your shipment</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2 p-3 border rounded-md">
+                        <RadioGroupItem value="payLater" id="payLater" />
+                        <div>
+                          <Label htmlFor="payLater" className="font-medium">30-Day Payment Terms</Label>
+                          <p className="text-sm text-gray-500">Pay within 30 days of collection date</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2 p-3 border rounded-md">
+                        <RadioGroupItem value="cashOnCollection" id="cashOnCollection" />
+                        <div>
+                          <Label htmlFor="cashOnCollection" className="font-medium">Cash on Collection</Label>
+                          <p className="text-sm text-gray-500">Pay cash when we collect your shipment</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2 p-3 border rounded-md">
+                        <RadioGroupItem value="payOnArrival" id="payOnArrival" />
+                        <div>
+                          <Label htmlFor="payOnArrival" className="font-medium">Pay on Arrival</Label>
+                          <p className="text-sm text-gray-500">Reciever pays when goods arrive at destination</p>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            {watchPaymentOption === 'standard' && (
               <FormField
                 control={form.control}
-                name="paymentOption"
+                name="paymentMethod"
                 render={({ field }) => (
                   <FormItem className="space-y-3">
-                    <FormLabel>Payment Option</FormLabel>
+                    <FormLabel>Payment Method</FormLabel>
                     <FormControl>
                       <RadioGroup
                         onValueChange={field.onChange}
                         value={field.value}
                         className="flex flex-col space-y-1"
                       >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="standard" id="standard" />
-                          <Label htmlFor="standard" className="flex items-center">
-                            <CreditCard className="mr-2 h-4 w-4 text-zim-green" />
-                            <div>
-                              <span className="font-medium">Standard Payment</span>
-                              <p className="text-xs text-gray-500">Pay now using card or PayPal</p>
-                            </div>
-                          </Label>
+                        <div className="flex items-center space-x-2 p-3 border rounded-md">
+                          <RadioGroupItem value="card" id="card" />
+                          <div className="flex items-center">
+                            <CreditCard className="h-5 w-5 mr-2 text-gray-600" />
+                            <Label htmlFor="card">Credit/Debit Card</Label>
+                          </div>
                         </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="payLater" id="payLater" />
-                          <Label htmlFor="payLater" className="flex items-center">
-                            <Calendar className="mr-2 h-4 w-4 text-zim-green" />
-                            <div>
-                              <span className="font-medium">30-Day Payment Terms</span>
-                              <p className="text-xs text-gray-500">Pay within 30 days (slightly higher rates)</p>
-                            </div>
-                          </Label>
+                        <div className="flex items-center space-x-2 p-3 border rounded-md">
+                          <RadioGroupItem value="paypal" id="paypal" />
+                          <div className="flex items-center">
+                            <svg className="h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                              <path d="M20.067 8.478c.492.876.663 1.903.51 2.876-.684 4.816-5.4 6.199-9.444 6.199H9.743a.64.64 0 0 0-.631.75l.921 5.826.94.059a.639.639 0 0 0 .627-.51l.205-1.076c.184-.914.965-1.615 1.9-1.615h1.359c3.588 0 6.175-1.56 6.942-6.021.465-2.654-.067-4.396-1.939-5.759-1.367-.997-3.952-1.416-6.055-1.416H9.032c-1.155 0-1.84 1.042-1.536 2.145l1.45 5.273A1.54 1.54 0 0 0 9.498 16a9.54 9.54 0 0 0 1.635.14h1.108c.38 0 .752-.031 1.104-.097" fill="#002c8a"/>
+                              <path d="M18.128 2.667C16.761 1.67 14.176 1.25 12.073 1.25H7.094c-1.155 0-1.84 1.041-1.535 2.144L8.14 13.13a1.54 1.54 0 0 0 1.552 1.159c.544.093 1.098.14 1.635.14h1.108c.38 0 .752-.032 1.104-.097a4.35 4.35 0 0 0 2.635-1.74c.443-.607.736-1.319.844-2.066.15-.87-.06-1.65-.621-2.23-.437-.45-1.084-.761-1.893-.921-.141-.028-.28-.051-.416-.07a7.98 7.98 0 0 0-1.234-.097h-3.88c-.446 0-.818-.295-.939-.724L7.38 4.852a.524.524 0 0 1 .502-.602h4.95c.989 0 1.908.135 2.637.414 1.346.512 2.225 1.265 2.627 2.25.393.956.327 2.102-.175 3.112a4.01 4.01 0 0 1-.976.5c.336.18.635.408.879.678.561.58.772 1.36.621 2.23-.108.747-.401 1.459-.844 2.066a4.35 4.35 0 0 1-2.635 1.74c-.352.065-.724.097-1.104.097h-1.108a9.54 9.54 0 0 1-1.635-.14 1.54 1.54 0 0 1-1.552-1.159L5.56 3.394c-.305-1.103.38-2.145 1.535-2.145h4.979c2.103 0 4.688.421 6.055 1.417.257.187.504.4.725.637 1.037 1.108 1.578 2.67 1.13 4.48-.397 1.598-1.396 2.738-2.856 3.373" fill="#009be1"/>
+                              <path d="M12.073 7.5h-3.88c-.446 0-.818-.295-.939-.724L6.62 5.211a.524.524 0 0 1 .502-.602h4.95c.989 0 1.908.135 2.637.414 1.346.512 2.225 1.265 2.627 2.25.393.956.327 2.102-.175 3.112a4.01 4.01 0 0 1-.976.5" fill="#001f6b"/>
+                            </svg>
+                            <Label htmlFor="paypal">PayPal</Label>
+                          </div>
                         </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="cashOnCollection" id="cashOnCollection" />
-                          <Label htmlFor="cashOnCollection" className="flex items-center">
-                            <Banknote className="mr-2 h-4 w-4 text-zim-green" />
-                            <div>
-                              <span className="font-medium">Cash on Collection</span>
-                              <p className="text-xs text-gray-500">Pay cash when your items are collected</p>
-                            </div>
-                          </Label>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="payOnArrival" id="payOnArrival" />
-                          <Label htmlFor="payOnArrival" className="flex items-center">
-                            <Truck className="mr-2 h-4 w-4 text-zim-green" />
-                            <div>
-                              <span className="font-medium">Pay on Arrival</span>
-                              <p className="text-xs text-gray-500">Pay when your shipment arrives in Zimbabwe</p>
-                            </div>
-                          </Label>
+                        <div className="flex items-center space-x-2 p-3 border rounded-md">
+                          <RadioGroupItem value="bankTransfer" id="bankTransfer" />
+                          <div className="flex items-center">
+                            <Banknote className="h-5 w-5 mr-2 text-gray-600" />
+                            <Label htmlFor="bankTransfer">Bank Transfer</Label>
+                          </div>
                         </div>
                       </RadioGroup>
                     </FormControl>
@@ -1025,100 +1099,54 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   </FormItem>
                 )}
               />
-              
-              {watchPaymentOption === 'standard' && (
-                <FormField
-                  control={form.control}
-                  name="paymentMethod"
-                  render={({ field }) => (
-                    <FormItem className="space-y-3">
-                      <FormLabel>Payment Method</FormLabel>
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          value={field.value}
-                          className="flex flex-col space-y-1"
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="card" id="card" />
-                            <Label htmlFor="card">Credit/Debit Card</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="paypal" id="paypal" />
-                            <Label htmlFor="paypal">PayPal</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="bankTransfer" id="bankTransfer" />
-                            <Label htmlFor="bankTransfer">Bank Transfer</Label>
-                          </div>
-                        </RadioGroup>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-              
-              <Card className="bg-gray-50">
-                <CardContent className="p-4 mt-4">
-                  <h3 className="font-semibold mb-2">Booking Summary</h3>
-                  
-                  {watchShipmentType === 'drum' ? (
-                    <>
-                      <div className="flex justify-between py-2 text-sm border-b">
-                        <span>{parseInt(watchDrumQuantity || '1', 10)} x Drum Shipping</span>
-                        <span>£{totalAmount - 5}</span>
-                      </div>
-                      <div className="flex justify-between py-2 text-sm border-b">
-                        <span>Metal Seal (Mandatory)</span>
-                        <span>£5</span>
-                      </div>
-                      {watchDoorToDoor && (
-                        <div className="flex justify-between py-2 text-sm border-b">
-                          <span>Door-to-Door Delivery</span>
-                          <span>£25</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between py-3 font-bold">
-                        <span>Total</span>
-                        <span>£{totalAmount}</span>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-sm italic text-gray-600">
-                      {watchShipmentType === 'other' 
-                        ? 'Custom quote will be provided after submission' 
-                        : 'Please provide shipment details for a quote'}
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-              
-              <FormField
-                control={form.control}
-                name="termsAgreed"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>
-                        I agree to the terms and conditions
-                      </FormLabel>
-                      <FormDescription>
-                        By checking this box, you agree to our <a href="/terms" className="text-blue-600 hover:underline" target="_blank">Terms of Service</a> and <a href="/privacy" className="text-blue-600 hover:underline" target="_blank">Privacy Policy</a>.
-                      </FormDescription>
-                    </div>
-                  </FormItem>
-                )}
-              />
-            </div>
+            )}
             
-            <div className="flex justify-between mt-4">
+            {watchShipmentType === 'drum' && (
+              <div className="bg-gray-50 p-4 rounded-md mt-4">
+                <h3 className="font-semibold mb-3">Order Summary</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm">
+                      {watchDrumQuantity} x Drum{parseInt(watchDrumQuantity) > 1 ? 's' : ''} 
+                      ({watchDrumQuantity === '1' 
+                        ? watchPaymentOption === 'standard' ? '£260' : '£280' 
+                        : parseInt(watchDrumQuantity) >= 2 && parseInt(watchDrumQuantity) < 5
+                        ? watchPaymentOption === 'standard' ? '£240' : '£260'
+                        : watchPaymentOption === 'standard' ? '£220' : '£240'} each)
+                    </span>
+                    <span className="font-medium">
+                      £{(watchPaymentOption === 'standard' 
+                        ? (parseInt(watchDrumQuantity) === 1 
+                          ? 260 
+                          : parseInt(watchDrumQuantity) >= 2 && parseInt(watchDrumQuantity) < 5 
+                          ? 240 
+                          : 220) 
+                        : (parseInt(watchDrumQuantity) === 1 
+                          ? 280 
+                          : parseInt(watchDrumQuantity) >= 2 && parseInt(watchDrumQuantity) < 5 
+                          ? 260 
+                          : 240)) * parseInt(watchDrumQuantity)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm">Mandatory Metal Seal</span>
+                    <span className="font-medium">£5</span>
+                  </div>
+                  {watchDoorToDoor && (
+                    <div className="flex justify-between">
+                      <span className="text-sm">Door-to-Door Delivery</span>
+                      <span className="font-medium">£25</span>
+                    </div>
+                  )}
+                  <div className="border-t pt-2 mt-2 flex justify-between font-bold">
+                    <span>Total</span>
+                    <span>£{totalAmount}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex justify-between mt-6">
               <Button 
                 type="button" 
                 variant="outline"
@@ -1132,15 +1160,15 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 disabled={isCalculating}
               >
                 {isCalculating ? (
-                  <>
-                    <span className="mr-2">Processing...</span>
-                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                  </>
+                    Processing...
+                  </span>
                 ) : (
-                  'Complete Booking'
+                  watchPaymentOption === 'standard' ? 'Continue to Payment' : 'Complete Booking'
                 )}
               </Button>
             </div>
@@ -1152,3 +1180,4 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
 };
 
 export default BookingForm;
+

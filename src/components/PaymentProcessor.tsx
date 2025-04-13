@@ -27,8 +27,7 @@ import {
   Truck,
   Wallet,
   CreditCard,
-  Tag,
-  Info
+  Tag
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -79,22 +78,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       year: 'numeric'
     });
   };
-
-  // Payment method instructions
-  const getPaymentInstructions = (method: string) => {
-    switch(method) {
-      case 'standard':
-        return "Please go to our nearest office to make payment.";
-      case 'pay_later':
-        return "Please contact support at +44 7584 100552 with your tracking number to confirm payment option.";
-      case 'cash_on_collection':
-        return "Please contact support at +44 7584 100552 with your tracking number. Make sure you confirm your collection information.";
-      case 'goods_arriving':
-        return "Please ensure payment is settled on arrival to avoid goods kept in our possession.";
-      default:
-        return "";
-    }
-  };
   
   const handleConfirm = async () => {
     setIsProcessing(true);
@@ -118,8 +101,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
           currency: 'GBP',
           payment_method: paymentMethod,
           payment_status: paymentStatus,
-          transaction_id: `TX-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-          payment_instructions: getPaymentInstructions(isGoodsArriving ? 'goods_arriving' : selectedPaymentMethod)
+          transaction_id: `TX-${Date.now()}-${Math.floor(Math.random() * 1000)}`
         })
         .select()
         .single();
@@ -142,8 +124,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
           status: 'pending',
           sender_details: bookingData.senderDetails,
           recipient_details: bookingData.recipientDetails,
-          shipment_details: bookingData.shipmentDetails,
-          payment_instructions: getPaymentInstructions(isGoodsArriving ? 'goods_arriving' : selectedPaymentMethod)
+          shipment_details: bookingData.shipmentDetails
         })
         .select()
         .single();
@@ -162,7 +143,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       toast({
         title: 'Payment Method Selected',
         description: isGoodsArriving 
-          ? 'You will pay when your goods arrive in the destination country.' 
+          ? 'You will pay when your goods arrive in Zimbabwe.' 
           : selectedPaymentMethod === 'cash_on_collection'
             ? 'You will pay cash on collection with our special discount.'
             : 'Your booking is confirmed with 30-day payment terms.',
@@ -202,30 +183,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
               }}
               className="space-y-4"
             >
-              {/* Standard Payment */}
-              <div className={`flex items-start space-x-3 border rounded-md p-4 ${selectedPaymentMethod === 'standard' ? 'bg-green-50 border-green-300' : ''}`}>
-                <RadioGroupItem value="standard" id="standard" />
-                <div className="space-y-2 w-full">
-                  <Label htmlFor="standard" className="flex items-center text-lg font-medium">
-                    <CreditCard className="h-5 w-5 mr-2 text-green-600" />
-                    Standard Payment
-                  </Label>
-                  <p className="text-sm text-gray-600">
-                    Pay immediately to confirm your shipment booking.
-                  </p>
-                  
-                  {selectedPaymentMethod === 'standard' && (
-                    <Alert className="mt-3 bg-green-50 border-green-200">
-                      <Info className="h-4 w-4 text-green-600" />
-                      <AlertTitle className="text-green-800">Payment Instruction</AlertTitle>
-                      <AlertDescription className="text-green-700">
-                        Please go to our nearest office to make payment.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                </div>
-              </div>
-              
               {/* Pay on Goods Arriving */}
               <div className={`flex items-start space-x-3 border rounded-md p-4 ${selectedPaymentMethod === 'goods_arriving' ? 'bg-blue-50 border-blue-300' : ''}`}>
                 <RadioGroupItem value="goods_arriving" id="goods_arriving" />
@@ -235,35 +192,25 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
                     Pay on Goods Arriving (20% premium)
                   </Label>
                   <p className="text-sm text-gray-600">
-                    Pay when your goods arrive at the destination. A 20% premium is added to the standard shipping cost.
+                    Pay when your goods arrive in Zimbabwe. A 20% premium is added to the standard shipping cost.
                   </p>
                   
                   {selectedPaymentMethod === 'goods_arriving' && (
-                    <div className="mt-3">
-                      <div className="p-3 bg-blue-100 rounded-md">
-                        <h4 className="font-medium flex items-center text-blue-800">
-                          <AlertCircle className="h-4 w-4 mr-1" /> 
-                          Price Calculation
-                        </h4>
-                        <div className="grid grid-cols-2 gap-1 mt-2 text-sm">
-                          <span className="text-blue-700">Base Amount:</span>
-                          <span className="text-right font-medium">£{totalAmount.toFixed(2)}</span>
-                          
-                          <span className="text-blue-700">20% Premium:</span>
-                          <span className="text-right font-medium">£{premiumAmount.toFixed(2)}</span>
-                          
-                          <span className="text-blue-800 font-medium pt-1 border-t border-blue-200">Total:</span>
-                          <span className="text-right font-bold pt-1 border-t border-blue-200">£{(totalAmount + premiumAmount).toFixed(2)}</span>
-                        </div>
+                    <div className="mt-3 p-3 bg-blue-100 rounded-md">
+                      <h4 className="font-medium flex items-center text-blue-800">
+                        <AlertCircle className="h-4 w-4 mr-1" /> 
+                        Price Calculation
+                      </h4>
+                      <div className="grid grid-cols-2 gap-1 mt-2 text-sm">
+                        <span className="text-blue-700">Base Amount:</span>
+                        <span className="text-right font-medium">£{totalAmount.toFixed(2)}</span>
+                        
+                        <span className="text-blue-700">20% Premium:</span>
+                        <span className="text-right font-medium">£{premiumAmount.toFixed(2)}</span>
+                        
+                        <span className="text-blue-800 font-medium pt-1 border-t border-blue-200">Total:</span>
+                        <span className="text-right font-bold pt-1 border-t border-blue-200">£{(totalAmount + premiumAmount).toFixed(2)}</span>
                       </div>
-                      
-                      <Alert className="mt-3 bg-blue-50 border-blue-200">
-                        <Info className="h-4 w-4 text-blue-600" />
-                        <AlertTitle className="text-blue-800">Payment Instruction</AlertTitle>
-                        <AlertDescription className="text-blue-700">
-                          Please ensure payment is settled on arrival to avoid goods kept in our possession.
-                        </AlertDescription>
-                      </Alert>
                     </div>
                   )}
                 </div>
@@ -286,31 +233,21 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
                     </p>
                     
                     {selectedPaymentMethod === 'cash_on_collection' && (
-                      <div className="mt-3">
-                        <div className="p-3 bg-green-100 rounded-md">
-                          <h4 className="font-medium flex items-center text-green-800">
-                            <PoundSterling className="h-4 w-4 mr-1" /> 
-                            Your Discount
-                          </h4>
-                          <div className="grid grid-cols-2 gap-1 mt-2 text-sm">
-                            <span className="text-green-700">Original Price:</span>
-                            <span className="text-right font-medium">£{totalAmount.toFixed(2)}</span>
-                            
-                            <span className="text-green-700">Cash Discount:</span>
-                            <span className="text-right font-medium">-£{specialDealDiscount.toFixed(2)}</span>
-                            
-                            <span className="text-green-800 font-medium pt-1 border-t border-green-200">Final Total:</span>
-                            <span className="text-right font-bold pt-1 border-t border-green-200">£{(totalAmount - specialDealDiscount).toFixed(2)}</span>
-                          </div>
+                      <div className="mt-3 p-3 bg-green-100 rounded-md">
+                        <h4 className="font-medium flex items-center text-green-800">
+                          <PoundSterling className="h-4 w-4 mr-1" /> 
+                          Your Discount
+                        </h4>
+                        <div className="grid grid-cols-2 gap-1 mt-2 text-sm">
+                          <span className="text-green-700">Original Price:</span>
+                          <span className="text-right font-medium">£{totalAmount.toFixed(2)}</span>
+                          
+                          <span className="text-green-700">Cash Discount:</span>
+                          <span className="text-right font-medium">-£{specialDealDiscount.toFixed(2)}</span>
+                          
+                          <span className="text-green-800 font-medium pt-1 border-t border-green-200">Final Total:</span>
+                          <span className="text-right font-bold pt-1 border-t border-green-200">£{(totalAmount - specialDealDiscount).toFixed(2)}</span>
                         </div>
-                        
-                        <Alert className="mt-3 bg-green-50 border-green-200">
-                          <Info className="h-4 w-4 text-green-600" />
-                          <AlertTitle className="text-green-800">Payment Instruction</AlertTitle>
-                          <AlertDescription className="text-green-700">
-                            Please contact support at +44 7584 100552 with your tracking number. Make sure you confirm your collection information.
-                          </AlertDescription>
-                        </Alert>
                       </div>
                     )}
                   </div>
@@ -362,14 +299,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
                           </Label>
                         </div>
                       </RadioGroup>
-                      
-                      <Alert className="mt-3 bg-gray-100 border-gray-200">
-                        <Info className="h-4 w-4 text-gray-600" />
-                        <AlertTitle className="text-gray-800">Payment Instruction</AlertTitle>
-                        <AlertDescription className="text-gray-700">
-                          Please contact support at +44 7584 100552 with your tracking number to confirm payment option.
-                        </AlertDescription>
-                      </Alert>
                       
                       {payLaterMethod === 'bank_transfer' && (
                         <div className="mt-2 p-3 bg-gray-100 rounded text-sm">

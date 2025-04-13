@@ -139,7 +139,7 @@ serve(async (req) => {
           payment_method: paymentInfo.payment_method,
           payment_status: paymentInfo.status,
           transaction_id: paymentInfo.transaction_id,
-          user_id: shipmentData.user_id || null // Allow null user_id
+          user_id: shipmentData.user_id || '00000000-0000-0000-0000-000000000000' // Use placeholder ID if not logged in
         })
         .select('id')
         .single();
