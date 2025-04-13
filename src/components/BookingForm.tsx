@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, Controller } from 'react-hook-form';
@@ -236,7 +235,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const watchPaymentOption = form.watch('paymentOption');
   const watchDoorToDoor = form.watch('doorToDoor');
   
-  // Try to pre-fill form with user data if available
   useEffect(() => {
     const loadUserData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -249,7 +247,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         .single();
       
       if (profile) {
-        // Be careful with optional chaining here to avoid TS errors
         if (profile.full_name) {
           const nameParts = profile.full_name.split(' ');
           form.setValue('firstName', nameParts[0] || '');
@@ -313,24 +310,21 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   }, [watchShipmentType, watchDrumQuantity, watchPaymentOption, watchDoorToDoor]);
   
   const handleTabChange = (value: string) => {
-    // Validate the current tab before moving to the next one
     if (activeTab === 'sender' && value === 'recipient') {
       const senderFields = ['firstName', 'lastName', 'email', 'phone', 'pickupAddress', 'pickupPostcode'];
       const senderFieldsValid = senderFields.every(field => form.getFieldState(field as any).invalid !== true);
       
       if (!senderFieldsValid) {
-        // Trigger validation for all sender fields
         senderFields.forEach(field => form.trigger(field as any));
-        return; // Don't proceed if any fields are invalid
+        return;
       }
     } else if (activeTab === 'recipient' && value === 'shipment') {
       const recipientFields = ['recipientName', 'recipientPhone', 'deliveryAddress', 'deliveryCity'];
       const recipientFieldsValid = recipientFields.every(field => form.getFieldState(field as any).invalid !== true);
       
       if (!recipientFieldsValid) {
-        // Trigger validation for all recipient fields
         recipientFields.forEach(field => form.trigger(field as any));
-        return; // Don't proceed if any fields are invalid
+        return;
       }
     } else if (activeTab === 'shipment' && value === 'payment') {
       const termsAccepted = form.getValues('termsAgreed');
@@ -369,12 +363,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       
       const trackingNumber = `ZS${Date.now().toString().substring(5)}`;
       
-      // Get the user ID if logged in
       const { data: { user } } = await supabase.auth.getUser();
       
-      const { data: shipmentData, error: shipmentError } = await supabase
-        .from('shipments')
-        .insert({
+      try {
+        const shipmentData = {
           tracking_number: trackingNumber,
           origin: `${data.pickupAddress}, ${data.pickupPostcode}`,
           destination: `${data.deliveryAddress}, ${data.deliveryCity}`,
@@ -399,20 +391,35 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             route: collectionRoute,
             collection_date: collectionDate
           },
-          user_id: user?.id || null
-        })
-        .select('id')
-        .single();
-      
-      if (shipmentError) {
-        throw shipmentError;
+          user_id: user?.id || '00000000-0000-0000-0000-000000000000'
+        };
+        
+        console.log("Creating shipment with data:", shipmentData);
+        
+        const { data: result, error: shipmentError } = await supabase
+          .from('shipments')
+          .insert(shipmentData)
+          .select('id')
+          .single();
+        
+        if (shipmentError) {
+          console.error('Shipment creation error:', shipmentError);
+          throw shipmentError;
+        }
+        
+        setIsCalculating(false);
+        onSubmitComplete(data, result.id, totalAmount);
+      } catch (error: any) {
+        console.error('Error creating shipment:', error);
+        setIsCalculating(false);
+        toast({
+          title: 'Error',
+          description: error.message || 'An error occurred while processing your booking. Please try again.',
+          variant: 'destructive',
+        });
       }
-      
-      setIsCalculating(false);
-      
-      onSubmitComplete(data, shipmentData.id, totalAmount);
     } catch (error: any) {
-      console.error('Error creating shipment:', error);
+      console.error('Form submission error:', error);
       setIsCalculating(false);
       toast({
         title: 'Error',
@@ -450,7 +457,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     if (currentIndex < tabOrder.length - 1) {
       handleTabChange(tabOrder[currentIndex + 1]);
     } else {
-      // If we're on the last tab, submit the form
       form.handleSubmit(onSubmit)();
     }
   };
@@ -1180,4 +1186,3 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
 };
 
 export default BookingForm;
-
