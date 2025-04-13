@@ -8,7 +8,7 @@ const ServicesSection: React.FC = () => {
     {
       icon: <Truck className="h-12 w-12 text-zim-green" />,
       title: "Drum Shipping",
-      description: "Our most popular service. We provide standardized drums for shipping your goods safely.",
+      description: "Our most popular service. We provide standardized drums for shipping your goods safely. Available in various sizes with a capacity of 200L-220L. Ideal for clothing, shoes, household item and groceries but not limited to this only.",
       link: "/services#drum-shipping"
     },
     {

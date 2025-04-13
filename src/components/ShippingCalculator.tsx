@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Ship, Package, ArrowRight } from 'lucide-react';
+import { Ship, Package, ArrowRight, MessageSquare, FileText, Sofa, Tv, Truck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useShipping } from '@/contexts/ShippingContext';
 
@@ -14,7 +14,8 @@ const ShippingCalculator: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>("drum");
   const [drumQuantity, setDrumQuantity] = useState<string>("1");
   const [paymentType, setPaymentType] = useState<string>("standard");
-  const [volume, setVolume] = useState<string>("1");
+  const [selectedItem, setSelectedItem] = useState<string>("");
+  const [itemCategory, setItemCategory] = useState<string>("furniture");
   const [additionalServices, setAdditionalServices] = useState({
     doorToDoor: false
   });
@@ -52,9 +53,23 @@ const ShippingCalculator: React.FC = () => {
         }
       }
     } else {
-      // For parcels, calculate based on volume (cubic meters)
-      const volumeValue = parseFloat(volume);
-      basePrice = Math.max(volumeValue * 15, 20); // £15 per cubic meter with £20 minimum
+      // For other items, we'll use a fixed price based on category instead of volume
+      switch(itemCategory) {
+        case "furniture":
+          basePrice = 150;
+          break;
+        case "appliances":
+          basePrice = 180;
+          break;
+        case "electronics":
+          basePrice = 120;
+          break;
+        case "building":
+          basePrice = 200;
+          break;
+        default:
+          basePrice = 150;
+      }
     }
     
     // Add price for additional services
@@ -78,7 +93,7 @@ const ShippingCalculator: React.FC = () => {
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold mb-4 dark:text-white">Calculate Shipping Cost</h2>
           <p className="text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            Get an instant estimate for your shipment from the UK to Zimbabwe.
+            Get an instant estimate for your shipment from the UK.
           </p>
         </div>
 
@@ -126,7 +141,7 @@ const ShippingCalculator: React.FC = () => {
                         <SelectValue placeholder="Select quantity" />
                       </SelectTrigger>
                       <SelectContent>
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 30, 40, 50, 75, 100].map(num => (
                           <SelectItem key={num} value={num.toString()}>
                             {num}
                           </SelectItem>
@@ -150,61 +165,89 @@ const ShippingCalculator: React.FC = () => {
                         <li>5+ Drums: {formatPrice(240)} each</li>
                       </ul>
                     )}
-                    <p className="mt-2 text-gray-500 dark:text-gray-300">Each drum has a capacity of 200L</p>
+                    <p className="mt-2 text-xs sm:text-sm text-gray-500 dark:text-gray-300">Each drum has a capacity of 200L-220L</p>
                   </div>
                 </TabsContent>
                 
                 <TabsContent value="other" className="space-y-6">
                   <div>
-                    <Label htmlFor="volume">Volume (cubic meters)</Label>
-                    <Select value={volume} onValueChange={setVolume}>
+                    <Label htmlFor="itemCategory">Item Category</Label>
+                    <Select value={itemCategory} onValueChange={setItemCategory}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select volume" />
+                        <SelectValue placeholder="Select item category" />
                       </SelectTrigger>
                       <SelectContent>
-                        {[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5].map(vol => (
-                          <SelectItem key={vol} value={vol.toString()}>
-                            {vol} m³
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="furniture">Furniture</SelectItem>
+                        <SelectItem value="appliances">Appliances</SelectItem>
+                        <SelectItem value="electronics">Electronics</SelectItem>
+                        <SelectItem value="building">Building Materials</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   
                   <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-md">
-                    <div className="font-medium mb-2 dark:text-white">Volume-Based Pricing:</div>
-                    <ul className="space-y-1 list-disc pl-5 dark:text-gray-200">
-                      <li>{formatPrice(15)} per cubic meter</li>
-                      <li>Minimum charge: {formatPrice(20)}</li>
-                    </ul>
-                    
-                    <h3 className="font-medium text-sm mt-4 mb-1 dark:text-white">Items We Ship:</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      <div>
-                        <h4 className="font-medium text-sm mb-1 dark:text-white">Household Items:</h4>
-                        <ul className="text-sm list-disc pl-5 dark:text-gray-200">
-                          <li>Furniture</li>
-                          <li>Appliances</li>
-                          <li>Electronics</li>
-                          <li>Personal effects</li>
-                        </ul>
+                    <div className="font-medium mb-2 dark:text-white">Items We Ship:</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div className="flex items-start space-x-3 p-3 bg-white dark:bg-gray-700 rounded-md shadow-sm">
+                        <Sofa className="h-5 w-5 text-zim-green mt-1" />
+                        <div>
+                          <h4 className="font-medium text-sm mb-1 dark:text-white">Furniture:</h4>
+                          <ul className="text-xs list-disc pl-5 dark:text-gray-200">
+                            <li>Sofas & Chairs</li>
+                            <li>Tables & Cabinets</li>
+                            <li>Beds & Mattresses</li>
+                            <li>Wardrobes & Dressers</li>
+                          </ul>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-medium text-sm mb-1 dark:text-white">Building Materials:</h4>
-                        <ul className="text-sm list-disc pl-5 dark:text-gray-200">
-                          <li>Door frames</li>
-                          <li>Windows</li>
-                          <li>Hardware</li>
-                          <li>Construction equipment</li>
-                        </ul>
+                      
+                      <div className="flex items-start space-x-3 p-3 bg-white dark:bg-gray-700 rounded-md shadow-sm">
+                        <Tv className="h-5 w-5 text-zim-green mt-1" />
+                        <div>
+                          <h4 className="font-medium text-sm mb-1 dark:text-white">Appliances & Electronics:</h4>
+                          <ul className="text-xs list-disc pl-5 dark:text-gray-200">
+                            <li>Refrigerators & Freezers</li>
+                            <li>Washing Machines</li>
+                            <li>Televisions & Computers</li>
+                            <li>Kitchen Appliances</li>
+                          </ul>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start space-x-3 p-3 bg-white dark:bg-gray-700 rounded-md shadow-sm">
+                        <FileText className="h-5 w-5 text-zim-green mt-1" />
+                        <div>
+                          <h4 className="font-medium text-sm mb-1 dark:text-white">Building Materials:</h4>
+                          <ul className="text-xs list-disc pl-5 dark:text-gray-200">
+                            <li>Door Frames & Windows</li>
+                            <li>Plumbing & Electrical</li>
+                            <li>Tools & Hardware</li>
+                            <li>Construction Equipment</li>
+                          </ul>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start space-x-3 p-3 bg-white dark:bg-gray-700 rounded-md shadow-sm">
+                        <Truck className="h-5 w-5 text-zim-green mt-1" />
+                        <div>
+                          <h4 className="font-medium text-sm mb-1 dark:text-white">Special Items:</h4>
+                          <ul className="text-xs list-disc pl-5 dark:text-gray-200">
+                            <li>Vehicles & Parts</li>
+                            <li>Musical Instruments</li>
+                            <li>Artwork & Antiques</li>
+                            <li>Special Equipment</li>
+                          </ul>
+                        </div>
                       </div>
                     </div>
-                    <p className="mt-4 text-sm dark:text-white">
-                      For custom quotes on specific items, please contact us directly.
-                    </p>
-                    <div className="mt-4">
-                      <Link to="/contact">
-                        <Button variant="outline" size="sm" className="text-sm">
+                    
+                    <div className="mt-4 flex flex-col items-center">
+                      <p className="text-center text-sm mb-3 dark:text-white">
+                        Need a precise quote for your specific items?
+                      </p>
+                      <Link to="/custom-quote">
+                        <Button variant="outline" size="sm" className="flex items-center">
+                          <MessageSquare className="mr-2 h-4 w-4" />
                           Request Custom Quote
                         </Button>
                       </Link>

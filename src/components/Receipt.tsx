@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Download, Printer, Mail } from 'lucide-react';
+import { Download, Printer, Mail, Info } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { formatDate } from '@/utils/formatters';
 import { supabase } from '@/integrations/supabase/client';
 import html2pdf from 'html2pdf.js';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface ReceiptProps {
   receipt: {
@@ -21,6 +22,7 @@ interface ReceiptProps {
     recipient_details: any;
     shipment_details: any;
     status: string;
+    payment_instructions?: string;
   };
   shipment?: {
     tracking_number: string;
@@ -117,6 +119,17 @@ const Receipt: React.FC<ReceiptProps> = ({ receipt, shipment }) => {
               text-align: center;
               font-size: 12px;
               color: #666;
+            }
+            .alert {
+              background-color: #f8f9fa;
+              border: 1px solid #dee2e6;
+              border-radius: 4px;
+              padding: 15px;
+              margin-top: 20px;
+            }
+            .alert-title {
+              font-weight: bold;
+              margin-bottom: 5px;
             }
             @media print {
               body {
@@ -233,17 +246,51 @@ const Receipt: React.FC<ReceiptProps> = ({ receipt, shipment }) => {
       case 'paypal':
         return 'PayPal';
       case 'bankTransfer':
+      case 'bank_transfer':
         return 'Bank Transfer';
+      case 'pay_later':
       case 'payLater':
         return '30-Day Payment Terms';
+      case 'cash':
+        return 'Cash Payment';
+      case 'cash_on_collection':
       case 'cashOnCollection':
         return 'Cash on Collection';
+      case 'goods_arriving':
       case 'payOnArrival':
         return 'Pay on Arrival';
+      case 'direct_debit':
+        return 'Direct Debit';
       default:
-        return method.charAt(0).toUpperCase() + method.slice(1);
+        return method.charAt(0).toUpperCase() + method.slice(1).replace(/_/g, ' ');
     }
   };
+
+  // Get payment instructions based on payment method if not provided directly
+  const getPaymentInstructions = () => {
+    if (receipt.payment_instructions) {
+      return receipt.payment_instructions;
+    }
+    
+    // Fallback instructions based on payment method
+    switch(receipt.payment_method) {
+      case 'standard':
+        return "Please go to our nearest office to make payment.";
+      case 'pay_later':
+      case 'payLater':
+        return "Please contact support at +44 7584 100552 with your tracking number to confirm payment option.";
+      case 'cash_on_collection':
+      case 'cashOnCollection':
+        return "Please contact support at +44 7584 100552 with your tracking number. Make sure you confirm your collection information.";
+      case 'goods_arriving':
+      case 'payOnArrival':
+        return "Please ensure payment is settled on arrival to avoid goods kept in our possession.";
+      default:
+        return "";
+    }
+  };
+
+  const paymentInstructions = getPaymentInstructions();
 
   return (
     <div className="container mx-auto px-2 sm:px-4 max-w-4xl">
@@ -354,6 +401,18 @@ Chelveston, Wellingborough, NN9 6AA</p>
               <p className="text-xs sm:text-sm text-gray-600 mt-1">Payment Status: {receipt.status === 'issued' ? 'Paid' : 'Pending'}</p>
             </div>
           </div>
+          
+          {paymentInstructions && (
+            <div className="mb-4 sm:mb-6">
+              <Alert className="bg-green-50 border-green-200">
+                <Info className="h-4 w-4 text-green-600" />
+                <AlertTitle className="text-green-800">Payment Instructions</AlertTitle>
+                <AlertDescription className="text-green-700">
+                  {paymentInstructions}
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
           
           {receipt.shipment_details.type === 'drum' && (
             <div className="mb-4 sm:mb-6">

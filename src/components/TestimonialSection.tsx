@@ -100,6 +100,54 @@ const TestimonialSection: React.FC = () => {
       rating: 4,
       text: 'Even though we\'re in a remote location, the delivery was still made on time. Impressive logistics and wonderful customer service throughout.',
       image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
+    },
+    {
+      id: 13,
+      name: 'Blessing Mukwara',
+      location: 'Harare',
+      rating: 5,
+      text: 'I've received multiple shipments of clothing and household items from my daughter in Manchester. The condition of all items was perfect and delivery was on time.',
+      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
+    },
+    {
+      id: 14,
+      name: 'Rumbidzai Dube',
+      location: 'Bulawayo',
+      rating: 5,
+      text: 'The tracking system is excellent - I could see exactly where my shipment was at all times. Communication from the staff was also top-notch.',
+      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
+    },
+    {
+      id: 15,
+      name: 'Tapiwa Gumbo',
+      location: 'Gweru',
+      rating: 5,
+      text: 'My brother ships business inventory to me regularly. The commercial shipping rates are very competitive and the service is reliable for my business needs.',
+      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
+    },
+    {
+      id: 16,
+      name: 'Tsitsi Moyo',
+      location: 'Mutare',
+      rating: 4,
+      text: 'I received a large shipment of construction materials for my new home. Everything was properly packed and arrived undamaged. Very satisfied with their service.',
+      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
+    },
+    {
+      id: 17,
+      name: 'Donald Zindi',
+      location: 'Masvingo',
+      rating: 5,
+      text: 'The flexibility in payment options really helped my situation. I was able to choose the pay-on-arrival option which worked perfectly for my family.',
+      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
+    },
+    {
+      id: 18,
+      name: 'Patience Ndlovu',
+      location: 'Harare',
+      rating: 5,
+      text: 'I received 10 drums of various household items and groceries. Everything was well-organized and intact. The door-to-door service was worth the extra cost.',
+      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
     }
   ];
 
