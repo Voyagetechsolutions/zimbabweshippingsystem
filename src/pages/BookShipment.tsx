@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -67,7 +66,7 @@ const BookShipment = () => {
           ...(data.doorToDoor ? [{ name: 'Door to Door Delivery', price: 25 }] : [])
         ],
         item_category: data.shipmentType === 'other' ? data.itemCategory : null,
-        item_description: data.shipmentType === 'other' ? data.itemDescription : null,
+        item_description: data.itemDescription,
       },
       paymentOption: data.paymentOption || 'standard',
       paymentMethod: data.paymentMethod || 'card',
@@ -149,7 +148,7 @@ const BookShipment = () => {
                 ...(data.doorToDoor ? [{ name: 'Door to Door Delivery', price: 25 }] : [])
               ],
               item_category: data.shipmentType === 'other' ? data.itemCategory : null,
-              item_description: data.shipmentType === 'other' ? data.itemDescription : null,
+              item_description: data.itemDescription,
             },
             status: 'pending',
             payment_id: null,

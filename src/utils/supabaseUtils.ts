@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 /**
@@ -54,4 +53,18 @@ export const hasShipmentAccess = async (userId: string): Promise<boolean> => {
   const isAdmin = await isUserAdmin();
   
   return isAdmin;
+};
+
+/**
+ * Helper function to get a valid user ID for database operations
+ * If the user is logged in, returns their ID. Otherwise, returns null.
+ */
+export const getValidUserId = async (): Promise<string | null> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    return user?.id || null;
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    return null;
+  }
 };
