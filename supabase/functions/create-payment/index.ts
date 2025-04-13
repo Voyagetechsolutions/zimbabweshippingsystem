@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@12.13.0?target=deno";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +13,12 @@ const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
   apiVersion: "2023-10-16",
 });
 
+// Initialize Supabase client with service role key to bypass RLS
+const supabaseClient = createClient(
+  Deno.env.get("SUPABASE_URL") || "",
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+);
+
 serve(async (req) => {
   // Handle preflight CORS
   if (req.method === "OPTIONS") {
@@ -20,6 +27,7 @@ serve(async (req) => {
 
   try {
     const { amount, bookingData, paymentMethod } = await req.json();
+    console.log("Creating payment session:", { amount, shipmentId: bookingData.shipment_id });
     
     // Create a Stripe checkout session
     const session = await stripe.checkout.sessions.create({
@@ -50,6 +58,8 @@ serve(async (req) => {
         payment_method: paymentMethod,
       },
     });
+
+    console.log("Created Stripe session:", { sessionId: session.id, url: session.url });
 
     return new Response(
       JSON.stringify({

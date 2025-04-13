@@ -24,7 +24,8 @@ import {
   AlertCircle, 
   ArrowLeftCircle, 
   CheckCircle2,
-  Building
+  Building,
+  CreditCard as PaypalIcon
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -240,6 +241,17 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
                     Credit/Debit Card
                   </Label>
                   <p className="text-sm text-gray-500">Pay securely using your credit or debit card</p>
+                </div>
+              </div>
+              
+              <div className={`flex items-start space-x-3 border rounded-md p-3 ${selectedPaymentMethod === 'paypal' && !isGoodsArriving ? 'bg-gray-50 border-zim-green' : ''}`}>
+                <RadioGroupItem value="paypal" id="paypal" disabled={isGoodsArriving} />
+                <div className="space-y-1">
+                  <Label htmlFor="paypal" className="flex items-center">
+                    <PaypalIcon className="h-5 w-5 mr-2" />
+                    PayPal
+                  </Label>
+                  <p className="text-sm text-gray-500">Pay quickly and securely using your PayPal account</p>
                 </div>
               </div>
               
