@@ -17,7 +17,7 @@ const TrackingInstructions = () => {
           <div>
             <p className="font-medium">Find your tracking number</p>
             <p className="text-sm text-gray-600">
-              Your tracking number can be found in your confirmation email or receipt from Zimbabwe Shipping.
+              Your tracking number can be found in your confirmation email or receipt.
             </p>
           </div>
         </div>
@@ -57,7 +57,7 @@ const TrackingInstructions = () => {
           <div>
             <p className="font-medium">Need Help?</p>
             <p className="text-sm text-gray-600">
-              If you need assistance tracking your shipment, please contact our customer support team at <span className="text-zim-green">support@zimbabweshipping.com</span> or call us at <span className="text-zim-green">+44 123 456 7890</span>.
+              If you need assistance tracking your shipment, please call us at <span className="text-zim-green">+44 7584 100552</span>.
             </p>
           </div>
         </div>

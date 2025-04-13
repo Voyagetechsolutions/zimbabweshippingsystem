@@ -224,6 +224,27 @@ const Receipt: React.FC<ReceiptProps> = ({ receipt, shipment }) => {
     }
   };
 
+  // Helper function to render payment method in a more user-friendly way
+  const getPaymentMethodDisplay = (method: string) => {
+    switch(method) {
+      case 'stripe':
+      case 'card':
+        return 'Credit/Debit Card';
+      case 'paypal':
+        return 'PayPal';
+      case 'bankTransfer':
+        return 'Bank Transfer';
+      case 'payLater':
+        return '30-Day Payment Terms';
+      case 'cashOnCollection':
+        return 'Cash on Collection';
+      case 'payOnArrival':
+        return 'Pay on Arrival';
+      default:
+        return method.charAt(0).toUpperCase() + method.slice(1);
+    }
+  };
+
   return (
     <div className="container mx-auto px-2 sm:px-4 max-w-4xl">
       <Card className="border-0 shadow-lg overflow-hidden">
@@ -234,7 +255,7 @@ const Receipt: React.FC<ReceiptProps> = ({ receipt, shipment }) => {
                 <Logo size={isMobile ? "small" : "medium"} />
               </div>
               <div>
-                <h1 className="text-lg sm:text-2xl font-bold text-zim-green">Zimbabwe Shipping</h1>
+                <h1 className="text-lg sm:text-2xl font-bold text-zim-green">UK Shipping Service</h1>
                 <p className="text-gray-600 text-xs sm:text-sm">Pastures Lodge Farm, Raunds Road
 Chelveston, Wellingborough, NN9 6AA</p>
               </div>
@@ -248,18 +269,18 @@ Chelveston, Wellingborough, NN9 6AA</p>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
             <div className="border rounded-md p-3 sm:p-4">
-              <h3 className="font-bold text-sm mb-1 sm:mb-2">From</h3>
-              <p className="text-sm">{receipt.sender_details.name}</p>
-              <p className="text-sm">{receipt.sender_details.address}</p>
-              <p className="text-sm">{receipt.sender_details.phone}</p>
-              <p className="text-sm">{receipt.sender_details.email}</p>
+              <h3 className="font-bold text-sm mb-1 sm:mb-2">Sender Details</h3>
+              <p className="text-sm"><span className="font-medium">Name:</span> {receipt.sender_details.name}</p>
+              <p className="text-sm"><span className="font-medium">Address:</span> {receipt.sender_details.address}</p>
+              <p className="text-sm"><span className="font-medium">Phone:</span> {receipt.sender_details.phone}</p>
+              <p className="text-sm"><span className="font-medium">Email:</span> {receipt.sender_details.email}</p>
             </div>
             
             <div className="border rounded-md p-3 sm:p-4">
-              <h3 className="font-bold text-sm mb-1 sm:mb-2">To</h3>
-              <p className="text-sm">{receipt.recipient_details.name}</p>
-              <p className="text-sm">{receipt.recipient_details.address}</p>
-              <p className="text-sm">{receipt.recipient_details.phone}</p>
+              <h3 className="font-bold text-sm mb-1 sm:mb-2">Reciever Details</h3>
+              <p className="text-sm"><span className="font-medium">Name:</span> {receipt.recipient_details.name}</p>
+              <p className="text-sm"><span className="font-medium">Address:</span> {receipt.recipient_details.address}</p>
+              <p className="text-sm"><span className="font-medium">Phone:</span> {receipt.recipient_details.phone}</p>
             </div>
           </div>
           
@@ -279,8 +300,10 @@ Chelveston, Wellingborough, NN9 6AA</p>
                     <td className="p-2 sm:p-3 text-xs sm:text-sm break-all sm:break-normal">{shipment?.tracking_number || receipt.shipment_details.tracking_number}</td>
                     <td className="p-2 sm:p-3 text-xs sm:text-sm">
                       {receipt.shipment_details.type === 'drum'
-                        ? `${receipt.shipment_details.quantity} x 200L Drums`
-                        : `Parcel (${receipt.shipment_details.weight}kg)`
+                        ? `${receipt.shipment_details.quantity} x 200L-220L Drums`
+                        : receipt.shipment_details.type === 'other' && receipt.shipment_details.item_category
+                        ? `${receipt.shipment_details.item_category} - ${receipt.shipment_details.item_description || 'No description'}`
+                        : `${receipt.shipment_details.type || 'Custom Item'}`
                       }
                     </td>
                     <td className="p-2 sm:p-3 text-xs sm:text-sm">{shipment?.status || receipt.status}</td>
@@ -291,16 +314,34 @@ Chelveston, Wellingborough, NN9 6AA</p>
           </div>
           
           <div className="mb-4 sm:mb-6">
+            <h3 className="font-bold text-sm mb-1 sm:mb-2">Collection & Delivery Information</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="border rounded-md p-3">
+                <p className="text-sm"><span className="font-medium">Pickup Address:</span> {shipment?.origin || receipt.sender_details.address}</p>
+              </div>
+              <div className="border rounded-md p-3">
+                <p className="text-sm"><span className="font-medium">Delivery Address:</span> {shipment?.destination || receipt.recipient_details.address}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mb-4 sm:mb-6">
+            <h3 className="font-bold text-sm mb-1 sm:mb-2">Payment Details</h3>
+            
             <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
               <span className="font-medium">Shipping Cost</span>
               <span>£{(receipt.amount * 0.9).toFixed(2)}</span>
             </div>
             
             {receipt.shipment_details.services && receipt.shipment_details.services.length > 0 && (
-              <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
-                <span className="font-medium">Additional Services</span>
-                <span>£{(receipt.amount * 0.1).toFixed(2)}</span>
-              </div>
+              <>
+                {receipt.shipment_details.services.map((service: any, index: number) => (
+                  <div key={index} className="flex justify-between py-2 sm:py-3 border-b text-sm">
+                    <span className="font-medium">{service.name}</span>
+                    <span>£{service.price.toFixed(2)}</span>
+                  </div>
+                ))}
+              </>
             )}
             
             <div className="flex justify-between py-3 sm:py-4 font-bold text-base sm:text-lg">
@@ -309,13 +350,35 @@ Chelveston, Wellingborough, NN9 6AA</p>
             </div>
             
             <div className="border rounded-md p-2 sm:p-3 bg-gray-50 mt-2">
-              <p className="font-medium text-sm">Payment Method: {receipt.payment_method === 'stripe' ? 'Credit Card' : receipt.payment_method === 'paypal' ? 'PayPal' : 'Pay Later'}</p>
+              <p className="font-medium text-sm">Payment Method: {getPaymentMethodDisplay(receipt.payment_method)}</p>
               <p className="text-xs sm:text-sm text-gray-600 mt-1">Payment Status: {receipt.status === 'issued' ? 'Paid' : 'Pending'}</p>
             </div>
           </div>
           
+          {receipt.shipment_details.type === 'drum' && (
+            <div className="mb-4 sm:mb-6">
+              <h3 className="font-bold text-sm mb-1 sm:mb-2">Drum Information</h3>
+              <div className="border rounded-md p-3">
+                <p className="text-sm"><span className="font-medium">Number of Drums:</span> {receipt.shipment_details.quantity}</p>
+                <p className="text-sm"><span className="font-medium">Drum Capacity:</span> 200L-220L</p>
+              </div>
+            </div>
+          )}
+          
+          {receipt.shipment_details.type === 'other' && (
+            <div className="mb-4 sm:mb-6">
+              <h3 className="font-bold text-sm mb-1 sm:mb-2">Item Information</h3>
+              <div className="border rounded-md p-3">
+                <p className="text-sm"><span className="font-medium">Item Category:</span> {receipt.shipment_details.item_category}</p>
+                {receipt.shipment_details.item_description && (
+                  <p className="text-sm"><span className="font-medium">Description:</span> {receipt.shipment_details.item_description}</p>
+                )}
+              </div>
+            </div>
+          )}
+          
           <div className="text-center text-gray-500 text-xs sm:text-sm mt-8 sm:mt-12 pt-3 sm:pt-4 border-t">
-            <p>Thank you for choosing Zimbabwe Shipping</p>
+            <p>Thank you for choosing our shipping service</p>
             <p>For any inquiries, please contact us at +44 7584 100552</p>
           </div>
         </div>

@@ -8,15 +8,15 @@ const TestimonialSection: React.FC = () => {
     {
       id: 1,
       name: 'Tatenda Moyo',
-      location: 'Harare, Zimbabwe',
+      location: 'Harare',
       rating: 5,
-      text: 'Zimbabwe Shipping made it so easy to receive my family\'s care package from the UK. Everything arrived intact and the drum shipping option was perfect for sending multiple items at once. Highly recommend!',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png' // placeholder, would be a user image
+      text: 'Made it so easy to receive my family\'s care package from the UK. Everything arrived intact and the drum shipping option was perfect for sending multiple items at once. Highly recommend!',
+      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png' 
     },
     {
       id: 2,
       name: 'Fungai Chikwava',
-      location: 'Bulawayo, Zimbabwe',
+      location: 'Bulawayo',
       rating: 5,
       text: 'I\'ve been using their services for over 2 years now to receive goods from my children in the UK. Their door-to-door delivery option saves me so much time and everything always arrives safely.',
       image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
@@ -24,7 +24,7 @@ const TestimonialSection: React.FC = () => {
     {
       id: 3,
       name: 'Kudzai Mutasa',
-      location: 'Mutare, Zimbabwe',
+      location: 'Mutare',
       rating: 4,
       text: 'Great pricing and reliable service. The tracking feature kept me informed about my package throughout the shipping process. Will definitely use their services again!',
       image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
@@ -32,25 +32,73 @@ const TestimonialSection: React.FC = () => {
     {
       id: 4,
       name: 'Tendai Nyamukapa',
-      location: 'Gweru, Zimbabwe',
+      location: 'Gweru',
       rating: 5,
-      text: 'My family sent me important medication and supplies through Zimbabwe Shipping and everything arrived quickly. The customer service team was very helpful when I had questions.',
+      text: 'My family sent me important medication and supplies and everything arrived quickly. The customer service team was very helpful when I had questions.',
       image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
     },
     {
       id: 5,
       name: 'Vimbai Chikomba',
-      location: 'Masvingo, Zimbabwe',
+      location: 'Masvingo',
       rating: 5,
-      text: 'As someone who regularly receives packages from relatives in the UK, I\'ve tried many shipping services, but Zimbabwe Shipping is by far the most reliable and affordable option.',
+      text: 'As someone who regularly receives packages from relatives in the UK, I\'ve tried many shipping services, but this is by far the most reliable and affordable option.',
       image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
     },
     {
       id: 6,
       name: 'Tanaka Manyika',
-      location: 'Chinhoyi, Zimbabwe',
+      location: 'Chinhoyi',
       rating: 5,
       text: 'The drum shipping option is brilliant! I was able to receive so many items from my family in the UK at once, saving a lot on individual shipping costs. Everything arrived safely and on time.',
+      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
+    },
+    {
+      id: 7,
+      name: 'Rudo Makoni',
+      location: 'Kadoma',
+      rating: 5,
+      text: 'My mother sent me drums full of groceries and clothing. The quality of service was exceptional - everything arrived in perfect condition.',
+      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
+    },
+    {
+      id: 8,
+      name: 'Simba Nyathi',
+      location: 'Harare',
+      rating: 5,
+      text: 'Used the service to ship a washing machine and refrigerator. The team handled the items with care and kept me updated throughout. Would definitely recommend for large appliances.',
+      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
+    },
+    {
+      id: 9,
+      name: 'Chipo Moyo',
+      location: 'Bulawayo',
+      rating: 4,
+      text: 'The pay-on-arrival option was perfect for our family arrangement. My son paid in the UK and I received the goods without any hassle. Very convenient service.',
+      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
+    },
+    {
+      id: 10,
+      name: 'Farai Dzonga',
+      location: 'Mutare',
+      rating: 5,
+      text: 'I shipped a drum containing assorted items for my sister\'s wedding. Everything arrived on time and intact. The special handling was worth every penny!',
+      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
+    },
+    {
+      id: 11,
+      name: 'Nyasha Chuma',
+      location: 'Gweru',
+      rating: 5,
+      text: 'As a business owner, I rely on regular shipments from the UK. Their commercial shipping service has never disappointed. Consistent quality service every time.',
+      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
+    },
+    {
+      id: 12,
+      name: 'Gift Moyana',
+      location: 'Victoria Falls',
+      rating: 4,
+      text: 'Even though we\'re in a remote location, the delivery was still made on time. Impressive logistics and wonderful customer service throughout.',
       image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
     }
   ];
@@ -70,7 +118,7 @@ const TestimonialSection: React.FC = () => {
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">What Our Customers Say</h2>
           <p className="text-gray-600 max-w-2xl mx-auto">
-            Hear from our satisfied customers in Zimbabwe who have experienced our reliable shipping services.
+            Hear from our satisfied customers who have experienced our reliable shipping services.
           </p>
         </div>
 
@@ -99,7 +147,12 @@ const TestimonialSection: React.FC = () => {
         </div>
 
         <div className="mt-12 text-center">
-          <p className="text-lg font-medium">Trusted by hundreds of Zimbabwean families for reliable UK-to-Zimbabwe shipping.</p>
+          <p className="text-lg font-medium">Trusted by hundreds of families for reliable UK shipping.</p>
+          <div className="mt-6">
+            <a href="/reviews" className="bg-zim-green hover:bg-zim-green/90 text-white px-6 py-3 rounded-lg font-medium">
+              Share Your Experience
+            </a>
+          </div>
         </div>
       </div>
     </section>

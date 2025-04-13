@@ -26,6 +26,9 @@ const Account = () => {
               <TabsTrigger value="profile">Profile</TabsTrigger>
               <TabsTrigger value="communication">Communication</TabsTrigger>
               <TabsTrigger value="security">Security</TabsTrigger>
+              {user?.is_admin && (
+                <TabsTrigger value="admin">Admin</TabsTrigger>
+              )}
             </TabsList>
             
             <TabsContent value="profile">
@@ -66,6 +69,20 @@ const Account = () => {
                 </div>
               </div>
             </TabsContent>
+            
+            {user?.is_admin && (
+              <TabsContent value="admin">
+                <div className="space-y-6">
+                  <div className="bg-white p-6 rounded-lg shadow-sm border">
+                    <h2 className="text-xl font-semibold mb-4">Admin Access</h2>
+                    <p className="text-gray-600 mb-6">You have administrator privileges. Access the admin dashboard to manage the application.</p>
+                    <a href="/admin" className="bg-zim-green hover:bg-zim-green/90 text-white py-2 px-4 rounded">
+                      Go to Admin Dashboard
+                    </a>
+                  </div>
+                </div>
+              </TabsContent>
+            )}
           </Tabs>
         </div>
       </main>

@@ -8,25 +8,25 @@ const ServicesSection: React.FC = () => {
     {
       icon: <Truck className="h-12 w-12 text-zim-green" />,
       title: "Drum Shipping",
-      description: "Our most popular service. We provide standardized drums for shipping your goods safely to Zimbabwe.",
+      description: "Our most popular service. We provide standardized drums for shipping your goods safely.",
       link: "/services#drum-shipping"
     },
     {
       icon: <Package className="h-12 w-12 text-zim-green" />,
-      title: "Other Items Shipping",
+      title: "Other Items",
       description: "Ship furniture, appliances, and other large items that don't fit in standard drums.",
       link: "/services#other-items"
     },
     {
       icon: <PoundSterling className="h-12 w-12 text-zim-green" />,
       title: "Commercial Shipping",
-      description: "Specialized services for businesses shipping commercial goods to Zimbabwe.",
+      description: "Specialized services for businesses shipping commercial goods.",
       link: "/services#commercial-shipping"
     },
     {
       icon: <Clock className="h-12 w-12 text-zim-green" />,
       title: "Flexible Payment Options",
-      description: "Choose from standard payment, 30-day terms, or pay on goods arriving in Zimbabwe.",
+      description: "Choose from standard payment, 30-day terms, cash on collection, or pay on arrival.",
       link: "/services#payment-options"
     },
     {
@@ -38,7 +38,7 @@ const ServicesSection: React.FC = () => {
     {
       icon: <HeartHandshake className="h-12 w-12 text-zim-green" />,
       title: "Door-to-Door Delivery",
-      description: "Optional service for direct delivery to the recipient's address in Zimbabwe.",
+      description: "Optional service for direct delivery to the reciever's address.",
       link: "/services#door-to-door"
     },
   ];

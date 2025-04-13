@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -63,7 +63,10 @@ import {
   Plug,
   Fan,
   PenTool,
-  Briefcase
+  Briefcase,
+  CreditCard,
+  Banknote,
+  Calendar
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
@@ -152,7 +155,7 @@ const formSchema = z.object({
   phone: z.string().min(10, 'Please enter a valid phone number'),
   pickupAddress: z.string().min(5, 'Address is required'),
   pickupPostcode: z.string().min(4, 'Postcode is required'),
-  recipientName: z.string().min(2, 'Recipient name is required'),
+  recipientName: z.string().min(2, 'Reciever name is required'),
   recipientPhone: z.string().min(10, 'Please enter a valid phone number'),
   deliveryAddress: z.string().min(5, 'Delivery address is required'),
   deliveryCity: z.string().min(2, 'City is required'),
@@ -165,7 +168,8 @@ const formSchema = z.object({
     message: 'You must agree to the terms and conditions',
   }),
   doorToDoor: z.boolean().optional(),
-  paymentOption: z.enum(['standard', 'payLater']).default('standard'),
+  paymentOption: z.enum(['standard', 'payLater', 'cashOnCollection', 'payOnArrival']).default('standard'),
+  paymentMethod: z.enum(['card', 'paypal', 'bankTransfer']).default('card'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -191,6 +195,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   
+  const [activeTab, setActiveTab] = useState('sender');
   const [collectionRoute, setCollectionRoute] = useState<string | null>(null);
   const [collectionArea, setCollectionArea] = useState<string[]>([]);
   const [collectionDate, setCollectionDate] = useState<string | null>(null);
@@ -220,6 +225,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       termsAgreed: false,
       doorToDoor: false,
       paymentOption: 'standard',
+      paymentMethod: 'card',
     },
   });
   
@@ -228,6 +234,35 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const watchPostcode = form.watch('pickupPostcode');
   const watchPaymentOption = form.watch('paymentOption');
   const watchDoorToDoor = form.watch('doorToDoor');
+  
+  // Try to pre-fill form with user data if available
+  useEffect(() => {
+    const loadUserData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      if (profile) {
+        // Be careful with optional chaining here to avoid TS errors
+        if (profile.full_name) {
+          const nameParts = profile.full_name.split(' ');
+          form.setValue('firstName', nameParts[0] || '');
+          form.setValue('lastName', nameParts.slice(1).join(' ') || '');
+        }
+        
+        if (profile.email) {
+          form.setValue('email', profile.email);
+        }
+      }
+    };
+    
+    loadUserData();
+  }, []);
   
   useEffect(() => {
     if (watchPostcode && watchPostcode.length >= 2) {
@@ -276,6 +311,41 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
   }, [watchShipmentType, watchDrumQuantity, watchPaymentOption, watchDoorToDoor]);
   
+  const handleTabChange = (value: string) => {
+    // Validate the current tab before moving to the next one
+    if (activeTab === 'sender' && value === 'recipient') {
+      const senderFields = ['firstName', 'lastName', 'email', 'phone', 'pickupAddress', 'pickupPostcode'];
+      const senderFieldsValid = senderFields.every(field => form.getFieldState(field as any).invalid !== true);
+      
+      if (!senderFieldsValid) {
+        // Trigger validation for all sender fields
+        senderFields.forEach(field => form.trigger(field as any));
+        return; // Don't proceed if any fields are invalid
+      }
+    } else if (activeTab === 'recipient' && value === 'shipment') {
+      const recipientFields = ['recipientName', 'recipientPhone', 'deliveryAddress', 'deliveryCity'];
+      const recipientFieldsValid = recipientFields.every(field => form.getFieldState(field as any).invalid !== true);
+      
+      if (!recipientFieldsValid) {
+        // Trigger validation for all recipient fields
+        recipientFields.forEach(field => form.trigger(field as any));
+        return; // Don't proceed if any fields are invalid
+      }
+    } else if (activeTab === 'shipment' && value === 'payment') {
+      const termsAccepted = form.getValues('termsAgreed');
+      if (!termsAccepted) {
+        toast({
+          title: "Terms and Conditions",
+          description: "Please accept the terms and conditions to proceed.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+    
+    setActiveTab(value);
+  };
+  
   const onSubmit = async (data: FormValues) => {
     try {
       setIsCalculating(true);
@@ -298,14 +368,16 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       
       const trackingNumber = `ZS${Date.now().toString().substring(5)}`;
       
+      // Get the user ID if logged in
+      const { data: { user } } = await supabase.auth.getUser();
+      
       const { data: shipmentData, error: shipmentError } = await supabase
         .from('shipments')
         .insert({
-          user_id: null,
-          status: 'pending_payment',
           tracking_number: trackingNumber,
           origin: `${data.pickupAddress}, ${data.pickupPostcode}`,
-          destination: `${data.deliveryAddress}, ${data.deliveryCity}, Zimbabwe`,
+          destination: `${data.deliveryAddress}, ${data.deliveryCity}`,
+          status: 'pending_payment',
           carrier: 'Zimbabwe Shipping',
           metadata: {
             sender_name: `${data.firstName} ${data.lastName}`,
@@ -316,15 +388,17 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             shipment_type: data.shipmentType,
             drum_quantity: data.shipmentType === 'drum' ? parseInt(data.drumQuantity || '1', 10) : null,
             item_category: data.shipmentType === 'other' ? data.itemCategory : null,
-            item_description: data.shipmentType === 'other' ? data.itemDescription : null,
+            item_description: data.itemDescription,
             amount: totalAmount,
             payment_option: data.paymentOption,
+            payment_method: data.paymentMethod,
             door_to_door: data.doorToDoor,
             metal_seal: true,
             special_instructions: data.specialInstructions || null,
             route: collectionRoute,
             collection_date: collectionDate
-          }
+          },
+          user_id: user?.id || null
         })
         .select('id')
         .single();
@@ -368,14 +442,27 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
   };
   
+  const goToNextTab = () => {
+    const tabOrder = ['sender', 'recipient', 'shipment', 'payment'];
+    const currentIndex = tabOrder.indexOf(activeTab);
+    
+    if (currentIndex < tabOrder.length - 1) {
+      handleTabChange(tabOrder[currentIndex + 1]);
+    } else {
+      // If we're on the last tab, submit the form
+      form.handleSubmit(onSubmit)();
+    }
+  };
+  
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <Tabs defaultValue="sender" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="sender">Sender Details</TabsTrigger>
-            <TabsTrigger value="recipient">Recipient Details</TabsTrigger>
+            <TabsTrigger value="recipient">Reciever Details</TabsTrigger>
             <TabsTrigger value="shipment">Shipment Details</TabsTrigger>
+            <TabsTrigger value="payment">Payment Method</TabsTrigger>
           </TabsList>
           
           <TabsContent value="sender" className="space-y-4 pt-4">
@@ -522,6 +609,16 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 )}
               </CardContent>
             </Card>
+            
+            <div className="flex justify-end mt-4">
+              <Button 
+                type="button" 
+                className="bg-zim-green hover:bg-zim-green/90 text-white"
+                onClick={goToNextTab}
+              >
+                Next
+              </Button>
+            </div>
           </TabsContent>
           
           <TabsContent value="recipient" className="space-y-4 pt-4">
@@ -530,7 +627,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               name="recipientName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Recipient Name</FormLabel>
+                  <FormLabel>Reciever Name</FormLabel>
                   <FormControl>
                     <Input placeholder="Jane Smith" {...field} />
                   </FormControl>
@@ -544,7 +641,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               name="recipientPhone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Recipient Phone Number</FormLabel>
+                  <FormLabel>Reciever Phone Number</FormLabel>
                   <FormControl>
                     <Input placeholder="+263 77 123 4567" {...field} />
                   </FormControl>
@@ -558,7 +655,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               name="deliveryAddress"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Delivery Address in Zimbabwe</FormLabel>
+                  <FormLabel>Delivery Address</FormLabel>
                   <FormControl>
                     <Textarea 
                       placeholder="Enter the delivery address" 
@@ -576,7 +673,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               name="deliveryCity"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>City/Town in Zimbabwe</FormLabel>
+                  <FormLabel>City/Town</FormLabel>
                   <FormControl>
                     <Input placeholder="Harare" {...field} />
                   </FormControl>
@@ -589,9 +686,26 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               <Info className="h-4 w-4" />
               <AlertTitle>Delivery Information</AlertTitle>
               <AlertDescription>
-                We deliver to all locations in Zimbabwe. Standard delivery time is 4-6 weeks from collection.
+                We deliver to all locations in the country. Standard delivery time is 4-6 weeks from collection.
               </AlertDescription>
             </Alert>
+            
+            <div className="flex justify-between mt-4">
+              <Button 
+                type="button" 
+                variant="outline"
+                onClick={() => handleTabChange('sender')}
+              >
+                Back
+              </Button>
+              <Button 
+                type="button" 
+                className="bg-zim-green hover:bg-zim-green/90 text-white"
+                onClick={goToNextTab}
+              >
+                Next
+              </Button>
+            </div>
           </TabsContent>
           
           <TabsContent value="shipment" className="space-y-4 pt-4">
@@ -643,6 +757,20 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                         <div>
                           <Label htmlFor="payLater" className="font-medium">30-Day Payment Terms</Label>
                           <p className="text-sm text-gray-500">Pay within 30 days of collection date</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2 p-3 border rounded-md">
+                        <RadioGroupItem value="cashOnCollection" id="cashOnCollection" />
+                        <div>
+                          <Label htmlFor="cashOnCollection" className="font-medium">Cash on Collection</Label>
+                          <p className="text-sm text-gray-500">Pay cash when we collect your shipment</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2 p-3 border rounded-md">
+                        <RadioGroupItem value="payOnArrival" id="payOnArrival" />
+                        <div>
+                          <Label htmlFor="payOnArrival" className="font-medium">Pay on Arrival</Label>
+                          <p className="text-sm text-gray-500">Reciever pays when goods arrive at destination</p>
                         </div>
                       </div>
                     </RadioGroup>
@@ -700,13 +828,23 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                          {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
                             <SelectItem key={num} value={num.toString()}>
                               {num}
                             </SelectItem>
                           ))}
+                          <SelectItem value="other">More than 20</SelectItem>
                         </SelectContent>
                       </Select>
+                      {field.value === 'other' && (
+                        <Input 
+                          type="number" 
+                          placeholder="Enter quantity" 
+                          className="mt-2" 
+                          min={21}
+                          onChange={(e) => field.onChange(e.target.value)}
+                        />
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
@@ -714,7 +852,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 
                 <div className="bg-gray-50 p-4 rounded-md">
                   <h4 className="font-medium mb-2">Pricing Information</h4>
-                  <p className="text-sm mb-3">Current payment option: <span className="font-medium">{watchPaymentOption === 'standard' ? 'Standard Payment' : '30-Day Payment Terms'}</span></p>
+                  <p className="text-sm mb-3">Current payment option: <span className="font-medium">{watchPaymentOption === 'standard' ? 'Standard Payment' : watchPaymentOption === 'payLater' ? '30-Day Payment Terms' : watchPaymentOption === 'cashOnCollection' ? 'Cash on Collection' : 'Pay on Arrival'}</span></p>
                   
                   {watchPaymentOption === 'standard' ? (
                     <ul className="space-y-1 list-disc pl-5 text-sm">
@@ -730,7 +868,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                     </ul>
                   )}
                   
-                  <p className="text-xs text-gray-500 mt-2">Each drum has a capacity of 200L</p>
+                  <p className="text-xs text-gray-500 mt-2">Each drum has a capacity of 200L-220L</p>
                 </div>
               </div>
             )}
@@ -804,164 +942,5 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 />
                 
                 <div className="bg-gray-50 p-4 rounded-md">
-                  <h4 className="font-medium mb-2">Volume-Based Pricing</h4>
-                  <p className="text-sm">We charge based on volume rather than weight:</p>
-                  <ul className="space-y-1 list-disc pl-5 text-sm mt-2">
-                    <li>Pricing varies by item size and type</li>
-                    <li>Please provide accurate item description</li>
-                    <li>We'll contact you with a price quote</li>
-                  </ul>
-                  
-                  <div className="mt-4">
-                    <Button 
-                      type="button"
-                      variant="outline"
-                      onClick={() => form.setValue('shipmentType', 'custom')}
-                    >
-                      Request Custom Quote
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {watchShipmentType === 'custom' && (
-              <div className="p-4 bg-blue-50 rounded-md">
-                <h3 className="font-medium text-blue-800 mb-2">Request Custom Quote</h3>
-                <p className="text-sm mb-4">
-                  For items that don't fit our standard categories, we offer custom quotes. 
-                  Submit your shipping details and we'll contact you with a personalized quote.
-                </p>
-                <p className="text-sm font-medium">
-                  Click "Continue" to proceed with your custom quote request.
-                </p>
-              </div>
-            )}
-            
-            <div className="space-y-4 p-4 border rounded-md">
-              <h3 className="font-semibold">Additional Services</h3>
-              
-              <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-md">
-                <Checkbox disabled checked />
-                <div>
-                  <Label className="font-medium">Mandatory Metal Seal</Label>
-                  <p className="text-sm text-gray-500">For increased security (£5.00)</p>
-                </div>
-              </div>
-              
-              <FormField
-                control={form.control}
-                name="doorToDoor"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 p-3 border rounded-md">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>
-                        Door-to-Door Delivery
-                      </FormLabel>
-                      <FormDescription>
-                        We'll deliver directly to the recipient's address (£25.00)
-                      </FormDescription>
-                    </div>
-                  </FormItem>
-                )}
-              />
-            </div>
-            
-            <FormField
-              control={form.control}
-              name="specialInstructions"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Special Instructions (Optional)</FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      placeholder="Add any special instructions for your shipment" 
-                      className="resize-none" 
-                      {...field} 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>Price Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex justify-between py-1">
-                  <span className="text-gray-600">
-                    {parseInt(watchDrumQuantity || '1', 10)} x Drum{parseInt(watchDrumQuantity || '1', 10) > 1 ? 's' : ''}
-                  </span>
-                  <span>£{parseInt(watchDrumQuantity || '1', 10) >= 5 
-                    ? (watchPaymentOption === 'standard' ? 220 : 240)
-                    : parseInt(watchDrumQuantity || '1', 10) >= 2
-                      ? (watchPaymentOption === 'standard' ? 240 : 260)
-                      : (watchPaymentOption === 'standard' ? 260 : 280)
-                    } x {parseInt(watchDrumQuantity || '1', 10)}
-                  </span>
-                </div>
-                <div className="flex justify-between py-1">
-                  <span className="text-gray-600">Mandatory Metal Seal</span>
-                  <span>£5.00</span>
-                </div>
-                {watchDoorToDoor && (
-                  <div className="flex justify-between py-1">
-                    <span className="text-gray-600">Door-to-Door Delivery</span>
-                    <span>£25.00</span>
-                  </div>
-                )}
-                <div className="flex justify-between py-2 border-t font-medium">
-                  <span>Total</span>
-                  <span className="text-zim-green">£{totalAmount.toFixed(2)}</span>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <FormField
-              control={form.control}
-              name="termsAgreed"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>
-                      I agree to the terms and conditions
-                    </FormLabel>
-                    <FormDescription>
-                      By checking this box, you confirm that you have read and agreed to our <a href="/terms" className="text-zim-green hover:underline">Terms and Conditions</a>.
-                    </FormDescription>
-                  </div>
-                </FormItem>
-              )}
-            />
-          </TabsContent>
-        </Tabs>
-        
-        <div className="flex justify-end">
-          <Button 
-            type="submit" 
-            className="bg-zim-green hover:bg-zim-green/90 text-white"
-            disabled={isCalculating}
-          >
-            {isCalculating ? 'Processing...' : watchShipmentType === 'custom' ? 'Continue to Custom Quote' : 'Continue to Payment'}
-          </Button>
-        </div>
-      </form>
-    </Form>
-  );
-};
-
-export default BookingForm;
+                  <h4 className="font-medium mb-2">Custom Pricing</h4>
+                  <p className="text-sm">Our team will review your item details and provide a custom quote.</p>

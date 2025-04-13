@@ -25,7 +25,7 @@ const BookShipment = () => {
 
   useEffect(() => {
     // Update the document title when the component mounts
-    document.title = 'Book a Shipment | UK to Zimbabwe Shipping';
+    document.title = 'Book a Shipment | UK Shipping Service';
   }, []);
 
   // Handle form submission to move to payment step
@@ -52,10 +52,10 @@ const BookShipment = () => {
         phone: data.phone,
         address: `${data.pickupAddress}, ${data.pickupPostcode}`,
       },
-      recipientDetails: {
+      recieverDetails: {
         name: data.recipientName,
         phone: data.recipientPhone,
-        address: `${data.deliveryAddress}, ${data.deliveryCity}, Zimbabwe`,
+        address: `${data.deliveryAddress}, ${data.deliveryCity}`,
       },
       shipmentDetails: {
         type: data.shipmentType,
@@ -70,13 +70,14 @@ const BookShipment = () => {
         item_description: data.shipmentType === 'other' ? data.itemDescription : null,
       },
       paymentOption: data.paymentOption || 'standard',
+      paymentMethod: data.paymentMethod || 'card',
     });
     
     setTotalAmount(finalAmount);
     
     if (data.shipmentType === 'custom') {
       setCurrentStep(BookingStep.CUSTOM_QUOTE);
-    } else {
+    } else if (data.paymentOption === 'standard') {
       setCurrentStep(BookingStep.PAYMENT);
       
       // After setting the booking data, fetch the tracking number from the database
@@ -104,6 +105,70 @@ const BookShipment = () => {
         console.log("Retrieved tracking number:", shipmentData.tracking_number);
       } catch (err) {
         console.error('Error fetching tracking number:', err);
+      }
+    } else {
+      // For non-standard payment options (pay later, cash on collection, pay on arrival)
+      // Create a receipt with appropriate status
+      const receiptNumber = `R${Date.now().toString().substring(6)}`;
+      
+      try {
+        const { data: receiptData, error: receiptError } = await supabase
+          .from('receipts')
+          .insert({
+            receipt_number: receiptNumber,
+            amount: finalAmount,
+            payment_method: data.paymentOption,
+            sender_details: {
+              name: `${data.firstName} ${data.lastName}`,
+              email: data.email,
+              phone: data.phone,
+              address: `${data.pickupAddress}, ${data.pickupPostcode}`,
+            },
+            recipient_details: {
+              name: data.recipientName,
+              phone: data.recipientPhone,
+              address: `${data.deliveryAddress}, ${data.deliveryCity}`,
+            },
+            shipment_details: {
+              type: data.shipmentType,
+              quantity: data.shipmentType === 'drum' ? parseInt(data.drumQuantity) : null,
+              tracking_number: '',
+              services: [
+                { name: 'Mandatory Metal Seal', price: 5 },
+                ...(data.doorToDoor ? [{ name: 'Door to Door Delivery', price: 25 }] : [])
+              ],
+              item_category: data.shipmentType === 'other' ? data.itemCategory : null,
+              item_description: data.shipmentType === 'other' ? data.itemDescription : null,
+            },
+            status: 'pending',
+            payment_id: null,
+            shipment_id: shipmentId
+          })
+          .select('id')
+          .single();
+          
+        if (receiptError) throw receiptError;
+        
+        // Update the shipment with the receipt info
+        await supabase
+          .from('shipments')
+          .update({ 
+            receipt_id: receiptData.id,
+            status: data.paymentOption === 'payLater' ? 'pending_payment' : 
+                   data.paymentOption === 'cashOnCollection' ? 'awaiting_collection' : 
+                   'awaiting_arrival'
+          })
+          .eq('id', shipmentId);
+        
+        // Navigate to the success page with the receipt ID
+        navigate(`/payment-success?receipt_id=${receiptData.id}`);
+      } catch (err: any) {
+        console.error('Error creating receipt:', err);
+        toast({
+          title: 'Error',
+          description: err.message || 'Failed to process your booking. Please try again.',
+          variant: 'destructive',
+        });
       }
     }
   };
@@ -182,7 +247,7 @@ const BookShipment = () => {
             </h1>
             <p className="text-gray-600 max-w-2xl">
               {currentStep === BookingStep.FORM 
-                ? 'Complete the form below to book your shipment from the UK to Zimbabwe.' 
+                ? 'Complete the form below to book your shipment from the UK.' 
                 : currentStep === BookingStep.PAYMENT
                 ? 'Choose your preferred payment method to complete your booking.'
                 : 'Tell us about your item so we can provide a custom shipping quote.'}
