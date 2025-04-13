@@ -20,7 +20,6 @@ interface ReceiptProps {
     sender_details: any;
     recipient_details: any;
     shipment_details: any;
-    payment_details?: any;
     status: string;
   };
   shipment?: {
@@ -225,36 +224,6 @@ const Receipt: React.FC<ReceiptProps> = ({ receipt, shipment }) => {
     }
   };
 
-  const getPaymentMethodText = (method: string) => {
-    switch(method) {
-      case 'cash-collection':
-        return 'Cash on Collection';
-      case '30-day':
-        return '30-Day Payment';
-      case 'goods-arriving':
-        return 'Pay on Goods Arriving';
-      case 'stripe':
-        return 'Credit Card';
-      case 'paypal':
-        return 'PayPal';
-      default:
-        return method;
-    }
-  };
-
-  const getPaymentTypeText = (type: string) => {
-    switch(type) {
-      case 'cash':
-        return 'Cash';
-      case 'bank-transfer':
-        return 'Bank Transfer';
-      case 'direct-debit':
-        return 'Direct Debit';
-      default:
-        return type;
-    }
-  };
-
   return (
     <div className="container mx-auto px-2 sm:px-4 max-w-4xl">
       <Card className="border-0 shadow-lg overflow-hidden">
@@ -311,9 +280,7 @@ Chelveston, Wellingborough, NN9 6AA</p>
                     <td className="p-2 sm:p-3 text-xs sm:text-sm">
                       {receipt.shipment_details.type === 'drum'
                         ? `${receipt.shipment_details.quantity} x 200L Drums`
-                        : receipt.shipment_details.type === 'parcel' 
-                          ? `Other Items (${receipt.shipment_details.weight}kg)`
-                          : `Custom Item: ${receipt.shipment_details.item_description || 'No description'}`
+                        : `Parcel (${receipt.shipment_details.weight}kg)`
                       }
                     </td>
                     <td className="p-2 sm:p-3 text-xs sm:text-sm">{shipment?.status || receipt.status}</td>
@@ -324,80 +291,27 @@ Chelveston, Wellingborough, NN9 6AA</p>
           </div>
           
           <div className="mb-4 sm:mb-6">
-            <h3 className="font-bold text-sm mb-1 sm:mb-2">Payment Details</h3>
-            <div className="border rounded-md p-3 sm:p-4 bg-gray-50 mb-4">
-              <p className="text-sm font-medium">
-                Payment Method: {getPaymentMethodText(receipt.payment_method)}
-                {receipt.payment_method === '30-day' && receipt.payment_details?.paymentType && 
-                  ` (${getPaymentTypeText(receipt.payment_details.paymentType)})`
-                }
-              </p>
-              
-              {receipt.payment_method === '30-day' && receipt.payment_details?.dueDate && (
-                <p className="text-sm text-gray-600 mt-1">
-                  Payment Due Date: {formatDate(receipt.payment_details.dueDate)}
-                </p>
-              )}
-              
-              <p className="text-sm text-gray-600 mt-1">
-                Payment Status: {receipt.status === 'issued' ? 'Paid' : 'Pending'}
-              </p>
+            <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
+              <span className="font-medium">Shipping Cost</span>
+              <span>£{(receipt.amount * 0.9).toFixed(2)}</span>
             </div>
             
-            {receipt.payment_details && (
-              <div className="mb-4">
-                <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
-                  <span className="font-medium">Base Amount</span>
-                  <span>£{(receipt.payment_details.baseAmount || receipt.amount).toFixed(2)}</span>
-                </div>
-                
-                {receipt.payment_details.additionalCost > 0 && (
-                  <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
-                    <span className="font-medium">
-                      {receipt.payment_method === 'goods-arriving' ? 'Pay on Arrival Premium (20%)' : 'Additional Charges'}
-                    </span>
-                    <span>£{receipt.payment_details.additionalCost.toFixed(2)}</span>
-                  </div>
-                )}
-                
-                {receipt.shipment_details.services && receipt.shipment_details.services.length > 0 && (
-                  <>
-                    {receipt.shipment_details.services.map((service: any, index: number) => (
-                      <div key={index} className="flex justify-between py-2 sm:py-3 border-b text-sm">
-                        <span className="font-medium">{service.name}</span>
-                        <span>£{service.price.toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </>
-                )}
-                
-                <div className="flex justify-between py-3 sm:py-4 font-bold text-base sm:text-lg">
-                  <span>Total</span>
-                  <span>£{receipt.amount.toFixed(2)}</span>
-                </div>
+            {receipt.shipment_details.services && receipt.shipment_details.services.length > 0 && (
+              <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
+                <span className="font-medium">Additional Services</span>
+                <span>£{(receipt.amount * 0.1).toFixed(2)}</span>
               </div>
             )}
             
-            {!receipt.payment_details && (
-              <div className="mb-4">
-                <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
-                  <span className="font-medium">Shipping Cost</span>
-                  <span>£{(receipt.amount * 0.9).toFixed(2)}</span>
-                </div>
-                
-                {receipt.shipment_details.services && receipt.shipment_details.services.length > 0 && (
-                  <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
-                    <span className="font-medium">Additional Services</span>
-                    <span>£{(receipt.amount * 0.1).toFixed(2)}</span>
-                  </div>
-                )}
-                
-                <div className="flex justify-between py-3 sm:py-4 font-bold text-base sm:text-lg">
-                  <span>Total</span>
-                  <span>£{receipt.amount.toFixed(2)}</span>
-                </div>
-              </div>
-            )}
+            <div className="flex justify-between py-3 sm:py-4 font-bold text-base sm:text-lg">
+              <span>Total</span>
+              <span>£{receipt.amount.toFixed(2)}</span>
+            </div>
+            
+            <div className="border rounded-md p-2 sm:p-3 bg-gray-50 mt-2">
+              <p className="font-medium text-sm">Payment Method: {receipt.payment_method === 'stripe' ? 'Credit Card' : receipt.payment_method === 'paypal' ? 'PayPal' : 'Pay Later'}</p>
+              <p className="text-xs sm:text-sm text-gray-600 mt-1">Payment Status: {receipt.status === 'issued' ? 'Paid' : 'Pending'}</p>
+            </div>
           </div>
           
           <div className="text-center text-gray-500 text-xs sm:text-sm mt-8 sm:mt-12 pt-3 sm:pt-4 border-t">

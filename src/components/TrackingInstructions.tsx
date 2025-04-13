@@ -57,7 +57,7 @@ const TrackingInstructions = () => {
           <div>
             <p className="font-medium">Need Help?</p>
             <p className="text-sm text-gray-600">
-              If you need assistance tracking your shipment, please call us at <span className="text-zim-green">+44 7584 100552</span>.
+              If you need assistance tracking your shipment, please contact our customer support team at <span className="text-zim-green">support@zimbabweshipping.com</span> or call us at <span className="text-zim-green">+44 123 456 7890</span>.
             </p>
           </div>
         </div>

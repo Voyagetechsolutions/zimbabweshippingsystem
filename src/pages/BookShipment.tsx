@@ -1,8 +1,10 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import BookingForm from '@/components/BookingForm';
+import PaymentProcessor from '@/components/PaymentProcessor';
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,12 +12,14 @@ import { supabase } from '@/integrations/supabase/client';
 // Define booking steps
 enum BookingStep {
   FORM,
+  PAYMENT,
   CUSTOM_QUOTE
 }
 
 const BookShipment = () => {
   const [currentStep, setCurrentStep] = useState<BookingStep>(BookingStep.FORM);
   const [bookingData, setBookingData] = useState<any>(null);
+  const [totalAmount, setTotalAmount] = useState<number>(0);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -24,7 +28,7 @@ const BookShipment = () => {
     document.title = 'Book a Shipment | UK to Zimbabwe Shipping';
   }, []);
 
-  // Handle form submission to move to receipt page
+  // Handle form submission to move to payment step
   const handleFormSubmit = async (data: any, shipmentId: string, amount: number) => {
     console.log("Form submitted with data:", { data, shipmentId, amount });
     
@@ -38,16 +42,7 @@ const BookShipment = () => {
     const doorToDoorCost = data.doorToDoor ? 25 : 0;
     const finalAmount = totalWithSeal + doorToDoorCost;
     
-    // Calculate any additional costs based on payment method
-    let paymentAdditionalCost = 0;
-    if (data.paymentMethod === 'goods-arriving') {
-      paymentAdditionalCost = finalAmount * 0.2; // 20% additional charge
-    }
-    
-    const totalWithPaymentMethod = finalAmount + paymentAdditionalCost;
-    
-    // Prepare booking data
-    const bookingDataToSave = {
+    setBookingData({
       ...data,
       shipment_id: shipmentId,
       user_id: user?.id || null,
@@ -74,25 +69,18 @@ const BookShipment = () => {
         item_category: data.shipmentType === 'other' ? data.itemCategory : null,
         item_description: data.shipmentType === 'other' ? data.itemDescription : null,
       },
-      paymentMethod: data.paymentMethod,
-      paymentDetails: {
-        baseAmount: finalAmount,
-        additionalCost: paymentAdditionalCost,
-        totalAmount: totalWithPaymentMethod,
-        ...(data.paymentMethod === '30-day' && {
-          paymentType: data.paymentType,
-          dueDate: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString()
-        })
-      }
-    };
+      paymentOption: data.paymentOption || 'standard',
+    });
     
-    setBookingData(bookingDataToSave);
+    setTotalAmount(finalAmount);
     
     if (data.shipmentType === 'custom') {
       setCurrentStep(BookingStep.CUSTOM_QUOTE);
     } else {
+      setCurrentStep(BookingStep.PAYMENT);
+      
+      // After setting the booking data, fetch the tracking number from the database
       try {
-        // Fetch the tracking number from the database
         const { data: shipmentData, error: shipmentError } = await supabase
           .from('shipments')
           .select('tracking_number')
@@ -105,44 +93,31 @@ const BookShipment = () => {
         }
         
         // Update the booking data with the tracking number
-        bookingDataToSave.shipmentDetails.tracking_number = shipmentData.tracking_number;
+        setBookingData(prev => ({
+          ...prev,
+          shipmentDetails: {
+            ...prev.shipmentDetails,
+            tracking_number: shipmentData.tracking_number
+          }
+        }));
         
         console.log("Retrieved tracking number:", shipmentData.tracking_number);
-        
-        // Create receipt
-        const { data: receiptData, error: receiptError } = await supabase
-          .from('receipts')
-          .insert({
-            shipment_id: shipmentId,
-            user_id: user?.id,
-            amount: totalWithPaymentMethod,
-            payment_method: data.paymentMethod,
-            status: 'issued',
-            sender_details: bookingDataToSave.senderDetails,
-            recipient_details: bookingDataToSave.recipientDetails,
-            shipment_details: bookingDataToSave.shipmentDetails,
-            payment_details: bookingDataToSave.paymentDetails
-          })
-          .select()
-          .single();
-          
-        if (receiptError) {
-          console.error('Error creating receipt:', receiptError);
-          throw receiptError;
-        }
-        
-        // Navigate to the success page with the receipt ID
-        navigate(`/payment-success?receipt_id=${receiptData.id}`);
-        
       } catch (err) {
-        console.error('Error processing booking:', err);
-        toast({
-          title: "Error",
-          description: "There was a problem processing your booking. Please try again.",
-          variant: "destructive",
-        });
+        console.error('Error fetching tracking number:', err);
       }
     }
+  };
+
+  // Handle payment completion
+  const handlePaymentComplete = (paymentId: string, receiptId: string) => {
+    console.log("Payment complete with:", { paymentId, receiptId });
+    // Navigate to the success page with the receipt ID
+    navigate(`/payment-success?receipt_id=${receiptId}`);
+  };
+
+  // Handle going back to the form step
+  const handleBackToForm = () => {
+    setCurrentStep(BookingStep.FORM);
   };
 
   // Handle custom quote submission
@@ -188,11 +163,6 @@ const BookShipment = () => {
     }
   };
 
-  // Handle going back to the form step
-  const handleBackToForm = () => {
-    setCurrentStep(BookingStep.FORM);
-  };
-
   return (
     <>
       <Navbar />
@@ -207,17 +177,27 @@ const BookShipment = () => {
             
             <h1 className="text-3xl md:text-4xl font-bold mt-4 mb-2">
               {currentStep === BookingStep.FORM ? 'Book Your Shipment' : 
+               currentStep === BookingStep.PAYMENT ? 'Complete Payment' :
                'Request Custom Quote'}
             </h1>
             <p className="text-gray-600 max-w-2xl">
               {currentStep === BookingStep.FORM 
                 ? 'Complete the form below to book your shipment from the UK to Zimbabwe.' 
+                : currentStep === BookingStep.PAYMENT
+                ? 'Choose your preferred payment method to complete your booking.'
                 : 'Tell us about your item so we can provide a custom shipping quote.'}
             </p>
           </div>
           
           {currentStep === BookingStep.FORM ? (
             <BookingForm onSubmitComplete={handleFormSubmit} />
+          ) : currentStep === BookingStep.PAYMENT ? (
+            <PaymentProcessor 
+              bookingData={bookingData}
+              totalAmount={totalAmount}
+              onPaymentComplete={handlePaymentComplete}
+              onCancel={handleBackToForm}
+            />
           ) : (
             <CustomQuoteForm 
               initialData={bookingData}

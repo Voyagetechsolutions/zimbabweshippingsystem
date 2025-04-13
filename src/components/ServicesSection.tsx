@@ -13,7 +13,7 @@ const ServicesSection: React.FC = () => {
     },
     {
       icon: <Package className="h-12 w-12 text-zim-green" />,
-      title: "Other Items",
+      title: "Other Items Shipping",
       description: "Ship furniture, appliances, and other large items that don't fit in standard drums.",
       link: "/services#other-items"
     },

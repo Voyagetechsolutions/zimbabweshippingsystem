@@ -1,373 +1,277 @@
 
-import React, { useState, useEffect } from 'react';
-import { Calculator, ArrowRight, Package, Truck } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from "@/components/ui/button";
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Ship, Package, ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useShipping } from '@/contexts/ShippingContext';
 
-const ShippingCalculator = () => {
-  const navigate = useNavigate();
-  const [shipmentType, setShipmentType] = useState("drum");
-  const [drumQuantity, setDrumQuantity] = useState("1");
-  const [weight, setWeight] = useState("1");
-  const [doorToDoor, setDoorToDoor] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("cash-collection");
-  const [otherItemType, setOtherItemType] = useState("");
-  const [totalCost, setTotalCost] = useState(0);
-  const [baseShipmentCost, setBaseShipmentCost] = useState(0);
-  const [additionalCost, setAdditionalCost] = useState(0);
-  
-  // List of common items that can be shipped
-  const otherItems = [
-    { id: "furniture", name: "Furniture", examples: "Beds, sofas, wardrobes, tables, chairs" },
-    { id: "appliances", name: "Appliances", examples: "TVs, fridges, freezers, washing machines" },
-    { id: "electronics", name: "Electronics", examples: "Computers, sound systems, gaming consoles" },
-    { id: "vehicles", name: "Vehicles & Parts", examples: "Cars, motorbikes, spare parts" },
-    { id: "medical", name: "Medical Equipment", examples: "Wheelchairs, hospital beds, supplies" },
-    { id: "books", name: "Books & Education", examples: "Textbooks, educational materials" },
-    { id: "tools", name: "Tools & Equipment", examples: "Power tools, machinery, gardening equipment" },
-    { id: "custom", name: "Other Items", examples: "Request custom quote for special items" }
-  ];
-  
-  // Calculate shipping cost whenever inputs change
-  useEffect(() => {
-    const calculateCost = () => {
-      let cost = 0;
-      
-      if (shipmentType === "drum") {
-        // £100 per drum
-        cost = parseInt(drumQuantity) * 100;
-        
-        // Apply cash on collection discount (10%)
-        if (paymentMethod === "cash-collection") {
-          cost = cost * 0.9; // 10% discount
-        }
-      } else if (shipmentType === "other") {
-        // £15 per kg with minimum charge of £20
-        const weightValue = parseFloat(weight);
-        cost = Math.max(weightValue * 15, 20);
-      }
-      
-      setBaseShipmentCost(cost);
-      
-      // Add door-to-door cost if selected
-      const doorToDoorCost = doorToDoor ? 25 : 0;
-      
-      // Calculate total before payment method adjustment
-      let totalBeforePaymentMethod = cost + doorToDoorCost;
-      
-      // Add metal seal cost (£5) for drums
-      if (shipmentType === "drum") {
-        totalBeforePaymentMethod += 5;
-      }
-      
-      // Calculate additional cost based on payment method
-      let additionalPaymentCost = 0;
-      if (paymentMethod === "goods-arriving") {
-        additionalPaymentCost = totalBeforePaymentMethod * 0.2; // 20% additional charge
-      }
-      
-      setAdditionalCost(additionalPaymentCost);
-      setTotalCost(totalBeforePaymentMethod + additionalPaymentCost);
-    };
+const ShippingCalculator: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<string>("drum");
+  const [drumQuantity, setDrumQuantity] = useState<string>("1");
+  const [paymentType, setPaymentType] = useState<string>("standard");
+  const [volume, setVolume] = useState<string>("1");
+  const [additionalServices, setAdditionalServices] = useState({
+    doorToDoor: false
+  });
+  const { formatPrice } = useShipping();
+
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = e.target;
+    setAdditionalServices(prev => ({ ...prev, [name]: checked }));
+  };
+
+  const calculatePrice = () => {
+    let basePrice = 0;
     
-    calculateCost();
-  }, [shipmentType, drumQuantity, weight, doorToDoor, paymentMethod]);
-  
-  // Handle booking button click
-  const handleBookNow = () => {
-    navigate('/book-shipment');
+    // Calculate base price based on service type
+    if (activeTab === 'drum') {
+      const qty = parseInt(drumQuantity);
+      
+      if (paymentType === "standard") {
+        // Standard payment prices
+        if (qty >= 5) {
+          basePrice = qty * 220;
+        } else if (qty >= 2) {
+          basePrice = qty * 240;
+        } else {
+          basePrice = 260;
+        }
+      } else {
+        // Pay later prices (30-day terms)
+        if (qty >= 5) {
+          basePrice = qty * 240;
+        } else if (qty >= 2) {
+          basePrice = qty * 260;
+        } else {
+          basePrice = 280;
+        }
+      }
+    } else {
+      // For parcels, calculate based on volume (cubic meters)
+      const volumeValue = parseFloat(volume);
+      basePrice = Math.max(volumeValue * 15, 20); // £15 per cubic meter with £20 minimum
+    }
+    
+    // Add price for additional services
+    let additionalCost = 0;
+    if (additionalServices.doorToDoor) {
+      additionalCost += 25;
+    }
+    
+    return {
+      basePrice,
+      additionalCost,
+      totalPrice: basePrice + additionalCost
+    };
   };
-  
-  // Handle custom quote button click
-  const handleCustomQuote = () => {
-    navigate('/book-shipment?type=custom');
-  };
+
+  const priceDetails = calculatePrice();
 
   return (
-    <section className="bg-white py-16">
+    <section className="py-16 bg-gray-50 dark:bg-gray-900 relative overflow-hidden">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-3">Shipping Calculator</h2>
-          <p className="text-gray-600 max-w-2xl mx-auto">
-            Calculate the cost of shipping your items from the UK to Zimbabwe. Choose between our popular 200L drums or get a quote for other items.
+          <h2 className="text-3xl md:text-4xl font-bold mb-4 dark:text-white">Calculate Shipping Cost</h2>
+          <p className="text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+            Get an instant estimate for your shipment from the UK to Zimbabwe.
           </p>
         </div>
-        
+
         <div className="max-w-4xl mx-auto">
-          <Tabs defaultValue="drum" onValueChange={(value) => setShipmentType(value)}>
-            <TabsList className="grid w-full grid-cols-2 mb-8">
-              <TabsTrigger value="drum" className="text-sm sm:text-base">
-                <Truck className="h-4 w-4 mr-2 hidden sm:inline" />
-                Drum Shipping
-              </TabsTrigger>
-              <TabsTrigger value="other" className="text-sm sm:text-base">
-                <Package className="h-4 w-4 mr-2 hidden sm:inline" />
-                Other Items
-              </TabsTrigger>
-            </TabsList>
-            
-            <Card className="border-t-0 rounded-t-none">
-              <CardContent className="p-6">
-                <TabsContent value="drum" className="mt-0">
-                  <div className="space-y-6">
-                    <div>
-                      <Label htmlFor="drumQuantity">Number of Drums</Label>
-                      <Select
-                        value={drumQuantity}
-                        onValueChange={setDrumQuantity}
-                      >
-                        <SelectTrigger id="drumQuantity" className="mt-1.5">
-                          <SelectValue placeholder="Select quantity" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
-                            <SelectItem key={num} value={num.toString()}>
-                              {num} {num === 1 ? 'drum' : 'drums'} (200L-220L)
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-sm text-gray-500 mt-1.5">
-                        Each drum has a capacity of 200L-220L and is ideal for clothing, shoes, household items and groceries.
-                      </p>
-                    </div>
-                    
-                    <div className="flex items-start space-x-2 mt-4">
-                      <div className="flex h-5 items-center">
-                        <input
-                          id="doorToDoor1"
-                          type="checkbox"
-                          className="h-4 w-4 rounded border-gray-300 text-zim-green focus:ring-zim-green"
-                          checked={doorToDoor}
-                          onChange={(e) => setDoorToDoor(e.target.checked)}
-                        />
-                      </div>
-                      <div className="ml-2">
-                        <Label htmlFor="doorToDoor1" className="cursor-pointer">Add Door-to-Door Delivery in Zimbabwe (+£25)</Label>
-                        <p className="text-sm text-gray-500">
-                          We'll deliver directly to the recipient's address
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-6">
-                      <Label>Payment Method</Label>
-                      <RadioGroup 
-                        value={paymentMethod} 
-                        onValueChange={setPaymentMethod}
-                        className="mt-2 space-y-3"
-                      >
-                        <div className="flex items-start space-x-2">
-                          <RadioGroupItem value="cash-collection" id="cash-collection1" className="mt-1" />
-                          <div>
-                            <Label htmlFor="cash-collection1" className="cursor-pointer font-medium">Cash on Collection</Label>
-                            <p className="text-sm text-gray-600">Pay with cash when we collect your items. <span className="text-green-600 font-medium">10% discount for drums!</span></p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-start space-x-2">
-                          <RadioGroupItem value="30-day" id="30-day1" className="mt-1" />
-                          <div>
-                            <Label htmlFor="30-day1" className="cursor-pointer font-medium">Pay Later (30 Days)</Label>
-                            <p className="text-sm text-gray-600">Pay within 30 days by cash, bank transfer, or direct debit</p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-start space-x-2">
-                          <RadioGroupItem value="goods-arriving" id="goods-arriving1" className="mt-1" />
-                          <div>
-                            <Label htmlFor="goods-arriving1" className="cursor-pointer font-medium">Pay on Goods Arriving</Label>
-                            <p className="text-sm text-gray-600">Pay when your goods arrive in Zimbabwe. <span className="text-yellow-600 font-medium">20% premium applies.</span></p>
-                          </div>
-                        </div>
-                      </RadioGroup>
-                    </div>
+          <Card className="border-gray-200 dark:border-gray-700 overflow-hidden dark:bg-gray-800 shadow-lg">
+            <CardHeader className="bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700">
+              <CardTitle className="text-2xl dark:text-white">Shipping Calculator</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="mb-6">
+                <Label htmlFor="paymentType" className="text-base font-medium block mb-2 dark:text-white">Payment Option</Label>
+                <RadioGroup 
+                  value={paymentType} 
+                  onValueChange={setPaymentType} 
+                  className="flex flex-col space-y-2 md:flex-row md:space-y-0 md:space-x-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="standard" id="standard" />
+                    <Label htmlFor="standard" className="font-medium dark:text-white">Standard Payment</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="payLater" id="payLater" />
+                    <Label htmlFor="payLater" className="font-medium dark:text-white">Pay Later (30 Days)</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-8">
+                  <TabsTrigger value="drum" className="flex items-center gap-2">
+                    <Ship className="h-4 w-4" />
+                    Drum Shipping
+                  </TabsTrigger>
+                  <TabsTrigger value="other" className="flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Other Items
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="drum" className="space-y-6">
+                  <div>
+                    <Label htmlFor="drumQuantity">Number of Drums</Label>
+                    <Select value={drumQuantity} onValueChange={setDrumQuantity}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select quantity" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+                          <SelectItem key={num} value={num.toString()}>
+                            {num}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-md text-sm">
+                    <div className="font-medium mb-2 dark:text-white">Pricing Tiers:</div>
+                    {paymentType === "standard" ? (
+                      <ul className="space-y-1 list-disc pl-5 dark:text-gray-200">
+                        <li>1 Drum: {formatPrice(260)} each</li>
+                        <li>2-4 Drums: {formatPrice(240)} each</li>
+                        <li>5+ Drums: {formatPrice(220)} each</li>
+                      </ul>
+                    ) : (
+                      <ul className="space-y-1 list-disc pl-5 dark:text-gray-200">
+                        <li>1 Drum: {formatPrice(280)} each</li>
+                        <li>2-4 Drums: {formatPrice(260)} each</li>
+                        <li>5+ Drums: {formatPrice(240)} each</li>
+                      </ul>
+                    )}
+                    <p className="mt-2 text-gray-500 dark:text-gray-300">Each drum has a capacity of 200L</p>
                   </div>
                 </TabsContent>
                 
-                <TabsContent value="other" className="mt-0">
-                  <div className="space-y-6">
-                    <div>
-                      <Label htmlFor="otherItemType">Item Type</Label>
-                      <Select
-                        value={otherItemType}
-                        onValueChange={setOtherItemType}
-                      >
-                        <SelectTrigger id="otherItemType" className="mt-1.5">
-                          <SelectValue placeholder="Select item type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {otherItems.map(item => (
-                            <SelectItem key={item.id} value={item.id}>
-                              {item.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {otherItemType && otherItemType !== "custom" && (
-                        <p className="text-sm text-gray-500 mt-1.5">
-                          Examples: {otherItems.find(item => item.id === otherItemType)?.examples}
-                        </p>
-                      )}
-                    </div>
+                <TabsContent value="other" className="space-y-6">
+                  <div>
+                    <Label htmlFor="volume">Volume (cubic meters)</Label>
+                    <Select value={volume} onValueChange={setVolume}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select volume" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5].map(vol => (
+                          <SelectItem key={vol} value={vol.toString()}>
+                            {vol} m³
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-md">
+                    <div className="font-medium mb-2 dark:text-white">Volume-Based Pricing:</div>
+                    <ul className="space-y-1 list-disc pl-5 dark:text-gray-200">
+                      <li>{formatPrice(15)} per cubic meter</li>
+                      <li>Minimum charge: {formatPrice(20)}</li>
+                    </ul>
                     
-                    {otherItemType && otherItemType !== "custom" ? (
-                      <>
-                        <div>
-                          <Label htmlFor="weight">Weight (kg)</Label>
-                          <Input
-                            id="weight"
-                            type="number"
-                            value={weight}
-                            onChange={(e) => setWeight(e.target.value)}
-                            min="1"
-                            step="0.1"
-                            className="mt-1.5"
-                          />
-                          <p className="text-sm text-gray-500 mt-1.5">
-                            Minimum charge applies for items under 1.5kg
-                          </p>
-                        </div>
-                        
-                        <div className="flex items-start space-x-2 mt-4">
-                          <div className="flex h-5 items-center">
-                            <input
-                              id="doorToDoor2"
-                              type="checkbox"
-                              className="h-4 w-4 rounded border-gray-300 text-zim-green focus:ring-zim-green"
-                              checked={doorToDoor}
-                              onChange={(e) => setDoorToDoor(e.target.checked)}
-                            />
-                          </div>
-                          <div className="ml-2">
-                            <Label htmlFor="doorToDoor2" className="cursor-pointer">Add Door-to-Door Delivery in Zimbabwe (+£25)</Label>
-                            <p className="text-sm text-gray-500">
-                              We'll deliver directly to the recipient's address
-                            </p>
-                          </div>
-                        </div>
-                        
-                        <div className="mt-6">
-                          <Label>Payment Method</Label>
-                          <RadioGroup 
-                            value={paymentMethod} 
-                            onValueChange={setPaymentMethod}
-                            className="mt-2 space-y-3"
-                          >
-                            <div className="flex items-start space-x-2">
-                              <RadioGroupItem value="cash-collection" id="cash-collection2" className="mt-1" />
-                              <div>
-                                <Label htmlFor="cash-collection2" className="cursor-pointer font-medium">Cash on Collection</Label>
-                                <p className="text-sm text-gray-600">Pay with cash when we collect your items</p>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-start space-x-2">
-                              <RadioGroupItem value="30-day" id="30-day2" className="mt-1" />
-                              <div>
-                                <Label htmlFor="30-day2" className="cursor-pointer font-medium">Pay Later (30 Days)</Label>
-                                <p className="text-sm text-gray-600">Pay within 30 days by cash, bank transfer, or direct debit</p>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-start space-x-2">
-                              <RadioGroupItem value="goods-arriving" id="goods-arriving2" className="mt-1" />
-                              <div>
-                                <Label htmlFor="goods-arriving2" className="cursor-pointer font-medium">Pay on Goods Arriving</Label>
-                                <p className="text-sm text-gray-600">Pay when your goods arrive in Zimbabwe. <span className="text-yellow-600 font-medium">20% premium applies.</span></p>
-                              </div>
-                            </div>
-                          </RadioGroup>
-                        </div>
-                      </>
-                    ) : otherItemType === "custom" ? (
-                      <div className="bg-blue-50 p-4 rounded-md">
-                        <h3 className="font-medium text-blue-800">Request a Custom Quote</h3>
-                        <p className="text-sm text-blue-700 mt-2">
-                          For special items, large furniture, vehicles, or anything that requires custom handling, please request a custom quote.
-                        </p>
-                        <Button 
-                          onClick={handleCustomQuote} 
-                          className="mt-4 bg-blue-600 hover:bg-blue-700"
-                        >
+                    <h3 className="font-medium text-sm mt-4 mb-1 dark:text-white">Items We Ship:</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      <div>
+                        <h4 className="font-medium text-sm mb-1 dark:text-white">Household Items:</h4>
+                        <ul className="text-sm list-disc pl-5 dark:text-gray-200">
+                          <li>Furniture</li>
+                          <li>Appliances</li>
+                          <li>Electronics</li>
+                          <li>Personal effects</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-sm mb-1 dark:text-white">Building Materials:</h4>
+                        <ul className="text-sm list-disc pl-5 dark:text-gray-200">
+                          <li>Door frames</li>
+                          <li>Windows</li>
+                          <li>Hardware</li>
+                          <li>Construction equipment</li>
+                        </ul>
+                      </div>
+                    </div>
+                    <p className="mt-4 text-sm dark:text-white">
+                      For custom quotes on specific items, please contact us directly.
+                    </p>
+                    <div className="mt-4">
+                      <Link to="/contact">
+                        <Button variant="outline" size="sm" className="text-sm">
                           Request Custom Quote
-                          <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
-                      </div>
-                    ) : null}
+                      </Link>
+                    </div>
                   </div>
                 </TabsContent>
                 
-                {((shipmentType === "drum") || 
-                  (shipmentType === "other" && otherItemType && otherItemType !== "custom")) && (
-                  <div className="mt-8 pt-6 border-t">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-gray-600">Base shipping cost:</span>
-                      <span className="font-medium">£{baseShipmentCost.toFixed(2)}</span>
+                <div className="mt-8">
+                  <p className="font-medium text-lg mb-3 dark:text-white">Additional Services</p>
+                  <div className="space-y-4">
+                    <div className="flex items-start space-x-3 p-4 border rounded-md dark:border-gray-700">
+                      <input
+                        type="checkbox"
+                        id="doorToDoor"
+                        name="doorToDoor"
+                        checked={additionalServices.doorToDoor}
+                        onChange={handleCheckboxChange}
+                        className="mt-1"
+                      />
+                      <div>
+                        <Label htmlFor="doorToDoor" className="cursor-pointer font-medium dark:text-white">
+                          Door-to-Door Delivery <span className="text-zim-green dark:text-zim-yellow ml-2">{formatPrice(25)}</span>
+                        </Label>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          We pick up from your address and deliver directly to recipient
+                        </p>
+                      </div>
                     </div>
-                    
-                    {doorToDoor && (
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-gray-600">Door-to-door delivery:</span>
-                        <span className="font-medium">£25.00</span>
-                      </div>
-                    )}
-                    
-                    {shipmentType === "drum" && (
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-gray-600">Mandatory metal seal:</span>
-                        <span className="font-medium">£5.00</span>
-                      </div>
-                    )}
-                    
-                    {paymentMethod === "cash-collection" && shipmentType === "drum" && (
-                      <div className="flex justify-between items-center mb-2 text-green-600">
-                        <span>Cash collection discount (10%):</span>
-                        <span>-£{(parseInt(drumQuantity) * 100 * 0.1).toFixed(2)}</span>
-                      </div>
-                    )}
-                    
-                    {paymentMethod === "goods-arriving" && (
-                      <div className="flex justify-between items-center mb-2 text-yellow-600">
-                        <span>Pay on arrival premium (20%):</span>
-                        <span>+£{additionalCost.toFixed(2)}</span>
-                      </div>
-                    )}
-                    
-                    <Separator className="my-3" />
-                    
-                    <div className="flex justify-between items-center mb-4">
-                      <span className="font-bold text-lg">Total:</span>
-                      <span className="font-bold text-lg">£{totalCost.toFixed(2)}</span>
-                    </div>
-                    
-                    <Button 
-                      onClick={handleBookNow} 
-                      className="w-full bg-zim-green hover:bg-zim-green/90"
-                    >
-                      Book Now
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </Tabs>
+                </div>
+              </Tabs>
+              
+              {(activeTab === 'drum' || activeTab === 'other') && (
+                <div className="mt-8 p-6 bg-gray-50 dark:bg-gray-800 rounded-lg border dark:border-gray-700">
+                  <div className="flex justify-between items-center pb-3 border-b dark:border-gray-700">
+                    <span className="font-medium dark:text-white">Base Shipping Cost:</span>
+                    <span className="text-lg dark:text-white">{formatPrice(priceDetails.basePrice)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-3 border-b dark:border-gray-700">
+                    <span className="font-medium dark:text-white">Additional Services:</span>
+                    <span className="dark:text-white">{formatPrice(priceDetails.additionalCost)}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-3 font-bold">
+                    <span className="dark:text-white">Total Estimated Cost:</span>
+                    <span className="text-2xl text-zim-green dark:text-zim-yellow">{formatPrice(priceDetails.totalPrice)}</span>
+                  </div>
+                </div>
+              )}
+              
+              <div className="mt-8 text-center">
+                <Link to="/book-shipment">
+                  <Button className="bg-zim-green hover:bg-zim-green/90 text-lg px-8">
+                    Book Now <ArrowRight className="ml-2" />
+                  </Button>
+                </Link>
+                <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                  This is an estimate. Final pricing may vary based on specific shipping details.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
+      
+      {/* Background decoration */}
+      <div className="absolute left-0 top-0 w-64 h-64 bg-zim-green/5 dark:bg-zim-green/10 rounded-full -translate-x-1/2 -translate-y-1/2 z-0"></div>
+      <div className="absolute right-0 bottom-0 w-80 h-80 bg-zim-yellow/5 dark:bg-zim-yellow/10 rounded-full translate-x-1/3 translate-y-1/3 z-0"></div>
     </section>
   );
 };

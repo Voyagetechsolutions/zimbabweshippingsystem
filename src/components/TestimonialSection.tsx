@@ -11,7 +11,7 @@ const TestimonialSection: React.FC = () => {
       location: 'Harare, Zimbabwe',
       rating: 5,
       text: 'Zimbabwe Shipping made it so easy to receive my family\'s care package from the UK. Everything arrived intact and the drum shipping option was perfect for sending multiple items at once. Highly recommend!',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
+      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png' // placeholder, would be a user image
     },
     {
       id: 2,
@@ -51,54 +51,6 @@ const TestimonialSection: React.FC = () => {
       location: 'Chinhoyi, Zimbabwe',
       rating: 5,
       text: 'The drum shipping option is brilliant! I was able to receive so many items from my family in the UK at once, saving a lot on individual shipping costs. Everything arrived safely and on time.',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 7,
-      name: 'Simba Chawapiwa',
-      location: 'Harare, Zimbabwe',
-      rating: 5,
-      text: 'I needed to send a large amount of clothing and household items to my family, and the 200L drum option was perfect. The cash on collection discount made it very affordable.',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 8,
-      name: 'Rumbidzai Mlambo',
-      location: 'Bulawayo, Zimbabwe',
-      rating: 5,
-      text: 'The 30-day payment option helped me manage my finances better. The team was very understanding of my situation and the shipment arrived in perfect condition.',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 9,
-      name: 'Blessing Mutasa',
-      location: 'Gweru, Zimbabwe',
-      rating: 4,
-      text: 'I shipped my medical equipment through Zimbabwe Shipping. The "pay on goods arriving" option was crucial for me, and though it cost a bit more, the peace of mind was worth it.',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 10,
-      name: 'Farai Nyathi',
-      location: 'Mutare, Zimbabwe',
-      rating: 5,
-      text: 'I used the door-to-door service for my elderly parents who couldn\'t travel to pick up their package. The delivery was prompt and the drivers were very respectful.',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 11,
-      name: 'Chido Macheke',
-      location: 'Marondera, Zimbabwe',
-      rating: 5,
-      text: 'As a student receiving books and supplies from family in the UK, I appreciate the affordable rates and reliable service. Everything arrived in time for the start of my semester.',
-      image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
-    },
-    {
-      id: 12,
-      name: 'Tinashe Madamombe',
-      location: 'Victoria Falls, Zimbabwe',
-      rating: 5,
-      text: 'Even though I\'m in a remote area, the shipment arrived perfectly. The tracking system kept me informed every step of the way, which I really appreciated.',
       image: '/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png'
     }
   ];

@@ -7,14 +7,9 @@ import CommunicationPreferences from '@/components/CommunicationPreferences';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import NotificationsPanel from '@/components/NotificationsPanel';
-import { useRole } from '@/contexts/RoleContext';
-import { Link } from 'react-router-dom';
-import { Shield } from 'lucide-react';
 
 const Account = () => {
   const { user } = useAuth();
-  const { role } = useRole();
-  const isAdmin = role === 'admin';
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -25,19 +20,6 @@ const Account = () => {
       <main className="flex-grow container mx-auto py-8 px-4">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl font-bold mb-6">Account Settings</h1>
-          
-          {isAdmin && (
-            <div className="mb-6 p-4 bg-zim-green/10 border border-zim-green/20 rounded-lg flex items-center">
-              <Shield className="h-5 w-5 text-zim-green mr-3" />
-              <div>
-                <h3 className="font-medium text-zim-green">Admin Access</h3>
-                <p className="text-sm text-gray-600">You have admin privileges.</p>
-              </div>
-              <Link to="/admin" className="ml-auto bg-zim-green text-white px-4 py-2 text-sm rounded-md hover:bg-zim-green/90">
-                Admin Panel
-              </Link>
-            </div>
-          )}
           
           <Tabs defaultValue="profile" className="w-full">
             <TabsList className="mb-6">
