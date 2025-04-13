@@ -22,7 +22,7 @@ const testimonials: Testimonial[] = [
     id: '2',
     name: 'Sarah Johnson',
     company: 'Global Imports',
-    testimonial: 'I've been using this service for my business shipments for over a year now. Reliable, efficient, and great customer service!',
+    testimonial: 'I\'ve been using this service for my business shipments for over a year now. Reliable, efficient, and great customer service!',
     imageUrl: '/lovable-uploads/91ced7e2-c45b-4edd-a64b-6853e014c0ce.png',
   },
   {
