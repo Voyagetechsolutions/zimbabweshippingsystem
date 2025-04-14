@@ -224,7 +224,7 @@ const Navbar = () => {
                   </Link>
                   
                   {isAdmin && (
-                    <>
+                    
                       <DropdownMenuSeparator />
                       <Link to="/admin">
                         <DropdownMenuItem className="cursor-pointer">
