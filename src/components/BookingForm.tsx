@@ -457,7 +457,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-full">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="sender">Sender Details</TabsTrigger>
