@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -252,8 +253,10 @@ const BookShipment = () => {
             <PaymentProcessor 
               bookingData={bookingData}
               totalAmount={totalAmount}
-              onPaymentComplete={handlePaymentComplete}
               onCancel={handleBackToForm}
+              // The onPaymentComplete prop is no longer needed since 
+              // PaymentProcessor now handles navigation directly
+              onPaymentComplete={() => {}}
             />
           ) : (
             <CustomQuoteForm 
