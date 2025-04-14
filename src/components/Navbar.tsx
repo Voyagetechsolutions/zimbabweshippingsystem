@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, ChevronDown, User, ShoppingBag, LogOut, Shield } from 'lucide-react';
@@ -30,8 +29,11 @@ const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const { user, signOut } = useAuth();
   const location = useLocation();
-  const { role } = useRole();
-  const isAdmin = role === 'admin';
+  const { role, hasPermission } = useRole();
+  
+  const isAdmin = hasPermission('admin');
+  
+  console.log('Navbar - User:', user?.id, 'Role:', role, 'isAdmin:', isAdmin);
 
   const handleReviewsClick = (e: React.MouseEvent) => {
     if (location.pathname === '/') {
@@ -227,7 +229,7 @@ const Navbar = () => {
                   {isAdmin && (
                     <>
                       <DropdownMenuSeparator />
-                      <Link to="/admindashboard">
+                      <Link to="/admin">
                         <DropdownMenuItem className="cursor-pointer">
                           <Shield className="mr-2 h-4 w-4" />
                           <span>Admin Panel</span>

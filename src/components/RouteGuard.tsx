@@ -53,10 +53,13 @@ export const RequireAuth = React.memo(({ children, requiredRole }: RequireAuthPr
 });
 
 export const RequireAdmin = React.memo(({ children }: { children: JSX.Element }) => {
-  const { user, isLoading: authLoading, isAdmin } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { role, isLoading: roleLoading, hasPermission } = useRole();
   const location = useLocation();
   const { toast } = useToast();
+
+  // Debugging log to check admin status
+  console.log('RequireAdmin check - User:', user?.id, 'Role:', role, 'isLoading:', authLoading || roleLoading);
 
   if (authLoading || roleLoading) {
     return (
@@ -75,8 +78,8 @@ export const RequireAdmin = React.memo(({ children }: { children: JSX.Element })
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
-  // Check both the original isAdmin flag (for backwards compatibility) and the new role system
-  if (!isAdmin && !hasPermission('admin')) {
+  // Use only role-based check for admin to be consistent
+  if (!hasPermission('admin')) {
     toast({
       title: "Access denied",
       description: "You don't have permission to access the admin area",
