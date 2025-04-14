@@ -19,8 +19,10 @@ import RoleElevationDialog from '@/components/RoleElevationDialog';
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const { role, isLoading } = useRole();
+  const { role, isLoading, hasPermission } = useRole();
   const navigate = useNavigate();
+  
+  console.log('Dashboard - User:', user?.id, 'Role:', role, 'isAdmin:', hasPermission('admin'));
   
   // Handle loading state
   if (isLoading) {
