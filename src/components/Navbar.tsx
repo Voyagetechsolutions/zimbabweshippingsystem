@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, ChevronDown, User, ShoppingBag, LogOut, Shield } from 'lucide-react';
@@ -224,7 +225,7 @@ const Navbar = () => {
                   </Link>
                   
                   {isAdmin && (
-                    
+                    <>
                       <DropdownMenuSeparator />
                       <Link to="/admin">
                         <DropdownMenuItem className="cursor-pointer">
