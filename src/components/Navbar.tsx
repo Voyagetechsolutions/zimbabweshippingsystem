@@ -316,7 +316,7 @@ const Navbar = () => {
               </Link>
               
               {isAdmin && (
-                <Link to="/admin" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
+                <Link to="/admindashboard" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
                   Admin Panel
                 </Link>
               )}
