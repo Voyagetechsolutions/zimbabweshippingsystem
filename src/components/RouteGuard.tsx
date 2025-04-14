@@ -59,7 +59,7 @@ export const RequireAdmin = React.memo(({ children }: { children: JSX.Element })
   const { toast } = useToast();
 
   // Debugging log to check admin status
-  console.log('RequireAdmin check - User:', user?.id, 'Role:', role, 'isLoading:', authLoading || roleLoading);
+  console.log('RequireAdmin check - User:', user?.id, 'Role:', role, 'hasPermission admin:', hasPermission('admin'));
 
   if (authLoading || roleLoading) {
     return (
