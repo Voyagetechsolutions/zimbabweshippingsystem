@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -52,7 +51,7 @@ const BookShipment = () => {
         phone: data.phone,
         address: `${data.pickupAddress}, ${data.pickupPostcode}`,
       },
-      recieverDetails: {
+      recipientDetails: {
         name: data.recipientName,
         phone: data.recipientPhone,
         address: `${data.deliveryAddress}, ${data.deliveryCity}`,
@@ -171,13 +170,6 @@ const BookShipment = () => {
         });
       }
     }
-  };
-
-  // Handle payment completion
-  const handlePaymentComplete = (paymentId: string, receiptId: string) => {
-    console.log("Payment complete with:", { paymentId, receiptId });
-    // Navigate to the success page with the receipt ID
-    navigate(`/payment-success?receipt_id=${receiptId}`);
   };
 
   // Handle going back to the form step

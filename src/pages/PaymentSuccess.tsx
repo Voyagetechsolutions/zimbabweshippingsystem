@@ -101,6 +101,28 @@ const PaymentSuccess = () => {
     fetchReceiptData();
   }, [searchParams, toast]);
 
+  // Helper function to get friendly payment method name
+  const getPaymentMethodDisplay = () => {
+    if (!receiptData || !receiptData.payment_method) return 'Standard Payment';
+    
+    const method = receiptData.payment_method;
+    
+    switch(method) {
+      case 'goods_arriving':
+        return 'Pay on Goods Arriving in Zimbabwe';
+      case 'cash_on_collection':
+        return 'Cash on Collection (Special Deal)';
+      case 'cash':
+        return 'Cash Payment (30-day terms)';
+      case 'bank_transfer':
+        return 'Bank Transfer (30-day terms)';
+      case 'direct_debit':
+        return 'Direct Debit (30-day terms)';
+      default:
+        return method.charAt(0).toUpperCase() + method.slice(1).replace('_', ' ');
+    }
+  };
+
   return (
     <>
       <Navbar />
@@ -130,13 +152,38 @@ const PaymentSuccess = () => {
               </div>
               
               <div className="text-center mb-6 md:mb-10">
-                <h1 className="text-2xl md:text-4xl font-bold mb-2">Payment Successful!</h1>
+                <h1 className="text-2xl md:text-4xl font-bold mb-2">Booking Successful!</h1>
                 <p className="text-gray-600 max-w-2xl mx-auto text-sm md:text-base">
-                  Thank you for your payment. Your shipment has been confirmed and is being processed.
+                  Thank you for your booking. Your shipment has been confirmed and is being processed.
                 </p>
                 <p className="text-gray-600 mt-2 text-sm md:text-base">
                   You can print, download or email your receipt below.
                 </p>
+                
+                {receiptData && receiptData.payment_method && (
+                  <div className="mt-4 bg-blue-50 border border-blue-100 rounded-md p-3 inline-block mx-auto">
+                    <p className="font-medium text-blue-800">
+                      Payment Method: {getPaymentMethodDisplay()}
+                    </p>
+                    {receiptData.payment_method === 'bank_transfer' && (
+                      <div className="mt-2 text-sm text-blue-700">
+                        <p>Please transfer to: Zimbabwe Shipping Ltd</p>
+                        <p>Account: 12345678 | Sort Code: 12-34-56</p>
+                        <p>Reference: {receiptData.receipt_number}</p>
+                      </div>
+                    )}
+                    {receiptData.payment_method === 'goods_arriving' && (
+                      <p className="mt-2 text-sm text-blue-700">
+                        You'll pay when your goods arrive in Zimbabwe (20% premium included).
+                      </p>
+                    )}
+                    {receiptData.payment_method === 'cash_on_collection' && (
+                      <p className="mt-2 text-sm text-blue-700">
+                        Please have cash ready when we collect your items. £15 discount applied!
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               
               {receiptData && <Receipt receipt={receiptData} shipment={shipmentData} />}

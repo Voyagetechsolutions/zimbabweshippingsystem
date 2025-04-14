@@ -149,8 +149,8 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
             : 'Your booking is confirmed with 30-day payment terms.',
       });
       
-      onPaymentComplete(paymentData.id, receiptData.id);
-      
+      // Navigate directly to payment success page with the receipt ID
+      navigate(`/payment-success?receipt_id=${receiptData.id}`);
     } catch (error: any) {
       console.error('Error processing payment selection:', error);
       toast({
