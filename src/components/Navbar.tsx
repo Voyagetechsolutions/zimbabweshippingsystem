@@ -229,7 +229,7 @@ const Navbar = () => {
                   {isAdmin && (
                     <>
                       <DropdownMenuSeparator />
-                      <Link to="/dashboards/admindashboard">
+                      <Link to="/dashboards/AdminDashboard">
                         <DropdownMenuItem className="cursor-pointer">
                           <Shield className="mr-2 h-4 w-4" />
                           <span>Admin Panel</span>
