@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, Controller } from 'react-hook-form';
@@ -185,6 +184,16 @@ const drumPricing = {
     single: 280,
     multiple: 260,
     bulk: 240
+  },
+  cashOnCollection: {
+    single: 280,
+    multiple: 260,
+    bulk: 240
+  },
+  payOnArrival: {
+    single: 280,
+    multiple: 260,
+    bulk: 240
   }
 };
 
@@ -236,7 +245,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const watchPaymentOption = form.watch('paymentOption');
   const watchDoorToDoor = form.watch('doorToDoor');
   
-  // Try to pre-fill form with user data if available
   useEffect(() => {
     const loadUserData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -249,7 +257,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         .single();
       
       if (profile) {
-        // Be careful with optional chaining here to avoid TS errors
         if (profile.full_name) {
           const nameParts = profile.full_name.split(' ');
           form.setValue('firstName', nameParts[0] || '');
@@ -290,14 +297,16 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   useEffect(() => {
     if (watchShipmentType === 'drum') {
       const quantity = parseInt(watchDrumQuantity || '1', 10);
+      const pricingOption = drumPricing[watchPaymentOption] || drumPricing.standard;
+      
       let basePrice;
       
       if (quantity >= 5) {
-        basePrice = drumPricing[watchPaymentOption].bulk;
+        basePrice = pricingOption.bulk;
       } else if (quantity >= 2) {
-        basePrice = drumPricing[watchPaymentOption].multiple;
+        basePrice = pricingOption.multiple;
       } else {
-        basePrice = drumPricing[watchPaymentOption].single;
+        basePrice = pricingOption.single;
       }
       
       const subtotal = basePrice * quantity;
@@ -313,24 +322,21 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   }, [watchShipmentType, watchDrumQuantity, watchPaymentOption, watchDoorToDoor]);
   
   const handleTabChange = (value: string) => {
-    // Validate the current tab before moving to the next one
     if (activeTab === 'sender' && value === 'recipient') {
       const senderFields = ['firstName', 'lastName', 'email', 'phone', 'pickupAddress', 'pickupPostcode'];
       const senderFieldsValid = senderFields.every(field => form.getFieldState(field as any).invalid !== true);
       
       if (!senderFieldsValid) {
-        // Trigger validation for all sender fields
         senderFields.forEach(field => form.trigger(field as any));
-        return; // Don't proceed if any fields are invalid
+        return;
       }
     } else if (activeTab === 'recipient' && value === 'shipment') {
       const recipientFields = ['recipientName', 'recipientPhone', 'deliveryAddress', 'deliveryCity'];
       const recipientFieldsValid = recipientFields.every(field => form.getFieldState(field as any).invalid !== true);
       
       if (!recipientFieldsValid) {
-        // Trigger validation for all recipient fields
         recipientFields.forEach(field => form.trigger(field as any));
-        return; // Don't proceed if any fields are invalid
+        return;
       }
     } else if (activeTab === 'shipment' && value === 'payment') {
       const termsAccepted = form.getValues('termsAgreed');
@@ -369,7 +375,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       
       const trackingNumber = `ZS${Date.now().toString().substring(5)}`;
       
-      // Get the user ID if logged in
       const { data: { user } } = await supabase.auth.getUser();
       
       const { data: shipmentData, error: shipmentError } = await supabase
@@ -450,7 +455,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     if (currentIndex < tabOrder.length - 1) {
       handleTabChange(tabOrder[currentIndex + 1]);
     } else {
-      // If we're on the last tab, submit the form
       form.handleSubmit(onSubmit)();
     }
   };
@@ -1180,4 +1184,3 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
 };
 
 export default BookingForm;
-
