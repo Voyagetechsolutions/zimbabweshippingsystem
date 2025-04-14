@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRole } from '@/contexts/RoleContext';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { 
@@ -116,10 +118,13 @@ const getStatusBadgeClass = (status: string) => {
 };
 
 const AdminDashboard = () => {
-  const { user, isAdmin } = useAuth();
+  const { user } = useAuth();
+  const { hasPermission } = useRole();
   const navigate = useNavigate();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const isMounted = useRef(true);
+  
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -138,6 +143,13 @@ const AdminDashboard = () => {
     quotes: 0,
   });
 
+  // Clean up useEffect to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
   const checkIfAdminExists = async () => {
     try {
       const { data, error } = await supabase.rpc('is_admin');
@@ -146,6 +158,8 @@ const AdminDashboard = () => {
         console.error('Error checking admin status:', error);
         return;
       }
+
+      if (!isMounted.current) return;
 
       if (data) {
         setAdminExists(true);
@@ -161,6 +175,7 @@ const AdminDashboard = () => {
           return;
         }
 
+        if (!isMounted.current) return;
         setAdminExists(profilesData && profilesData.length > 0);
       }
     } catch (error) {
@@ -170,13 +185,19 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     checkIfAdminExists();
-    if (isAdmin || adminExists) {
+    if (hasPermission('admin') || adminExists) {
       fetchShipments();
       fetchStats();
     }
+
+    return () => {
+      isMounted.current = false;
+    };
   }, [user, navigate]);
 
   const fetchStats = async () => {
+    if (!isMounted.current) return;
+
     try {
       const { data: quotesData, error: quotesError } = await supabase
         .from('custom_quotes')
@@ -184,16 +205,20 @@ const AdminDashboard = () => {
       
       if (quotesError) throw quotesError;
       
-      setStats(prev => ({
-        ...prev,
-        quotes: quotesData ? quotesData.length : 0
-      }));
+      if (isMounted.current) {
+        setStats(prev => ({
+          ...prev,
+          quotes: quotesData ? quotesData.length : 0
+        }));
+      }
     } catch (error) {
       console.error("Error fetching stats:", error);
     }
   };
 
   const fetchShipments = async () => {
+    if (!isMounted.current) return;
+    
     setLoading(true);
     try {
       console.log("Admin: Fetching all shipments");
@@ -207,7 +232,7 @@ const AdminDashboard = () => {
         throw error;
       }
 
-      if (data) {
+      if (data && isMounted.current) {
         console.log("Admin: Fetched shipments count:", data.length);
         setShipments(data as Shipment[]);
         const totalCount = data.length;
@@ -225,13 +250,17 @@ const AdminDashboard = () => {
       }
     } catch (error: any) {
       console.error("Error in fetchShipments:", error);
-      toast({
-        title: 'Error fetching shipments',
-        description: error.message,
-        variant: 'destructive',
-      });
+      if (isMounted.current) {
+        toast({
+          title: 'Error fetching shipments',
+          description: error.message,
+          variant: 'destructive',
+        });
+      }
     } finally {
-      setLoading(false);
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -253,22 +282,26 @@ const AdminDashboard = () => {
 
       if (error) throw error;
 
-      toast({
-        title: 'Status Updated',
-        description: `Shipment ${editingShipment.tracking_number} status updated to ${newStatus}`,
-      });
+      if (isMounted.current) {
+        toast({
+          title: 'Status Updated',
+          description: `Shipment ${editingShipment.tracking_number} status updated to ${newStatus}`,
+        });
 
-      fetchShipments();
-      
-      setEditingShipment(null);
-      setNewStatus('');
+        fetchShipments();
+        
+        setEditingShipment(null);
+        setNewStatus('');
+      }
       
     } catch (error: any) {
-      toast({
-        title: 'Error updating status',
-        description: error.message,
-        variant: 'destructive',
-      });
+      if (isMounted.current) {
+        toast({
+          title: 'Error updating status',
+          description: error.message,
+          variant: 'destructive',
+        });
+      }
     }
   };
 
