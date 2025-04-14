@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, ChevronDown, User, ShoppingBag, LogOut, Shield } from 'lucide-react';
@@ -29,11 +30,11 @@ const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const { user, signOut } = useAuth();
   const location = useLocation();
-  const { role, hasPermission } = useRole();
+  const { hasPermission } = useRole();
   
   const isAdmin = hasPermission('admin');
   
-  console.log('Navbar - User:', user?.id, 'Role:', role, 'isAdmin:', isAdmin);
+  console.log('Navbar - User:', user?.id, 'isAdmin:', isAdmin);
 
   const handleReviewsClick = (e: React.MouseEvent) => {
     if (location.pathname === '/') {
