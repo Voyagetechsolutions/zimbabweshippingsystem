@@ -4,6 +4,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useRole } from '@/contexts/RoleContext';
+import { UserRoleType } from '@/types/admin';
 
 interface AuthProps {
   children: React.ReactNode;
@@ -38,7 +39,7 @@ export const RequireAuth: React.FC<AuthProps> = ({ children }) => {
 
 export const RequireAdmin: React.FC<AuthProps> = ({ children }) => {
   const { user, loading } = useAuth();
-  const { hasPermission, loading: roleLoading } = useRole();
+  const { hasPermission, isLoading: roleLoading } = useRole();
   const { toast } = useToast();
   const [hasShownToast, setHasShownToast] = useState(false);
   
@@ -86,12 +87,12 @@ export const RedirectIfAuthenticated: React.FC<AuthProps> = ({ children }) => {
 
 interface RequireRoleProps {
   children: React.ReactNode;
-  requiredRole: string;
+  requiredRole: UserRoleType;
 }
 
 export const RequireRole: React.FC<RequireRoleProps> = ({ children, requiredRole }) => {
   const { user, loading } = useAuth();
-  const { hasPermission, loading: roleLoading } = useRole();
+  const { hasPermission, isLoading: roleLoading } = useRole();
   const { toast } = useToast();
   const [hasShownToast, setHasShownToast] = useState(false);
   
