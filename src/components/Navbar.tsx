@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, ChevronDown, User, ShoppingBag, LogOut, Shield } from 'lucide-react';
@@ -33,8 +32,6 @@ const Navbar = () => {
   const { hasPermission } = useRole();
   
   const isAdmin = hasPermission('admin');
-  
-  console.log('Navbar - User:', user?.id, 'isAdmin:', isAdmin);
 
   const handleReviewsClick = (e: React.MouseEvent) => {
     if (location.pathname === '/') {

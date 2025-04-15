@@ -1,156 +1,124 @@
 
-import { useAuth } from '@/contexts/AuthContext';
-import { useRole, UserRoleType } from '@/contexts/RoleContext';
-import { Navigate, useLocation } from 'react-router-dom';
 import React, { useEffect, useState } from 'react';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useRole } from '@/contexts/RoleContext';
 
-interface RequireAuthProps {
-  children: JSX.Element;
-  requiredRole?: UserRoleType;
+interface AuthProps {
+  children: React.ReactNode;
 }
 
-// Use React.memo to prevent unnecessary re-renders
-export const RequireAuth = React.memo(({ children, requiredRole }: RequireAuthProps) => {
-  const { user, isLoading: authLoading } = useAuth();
-  const { role, isLoading: roleLoading, hasPermission } = useRole();
-  const location = useLocation();
-  const { toast } = useToast();
-  const [shouldRedirect, setShouldRedirect] = useState(false);
-
-  useEffect(() => {
-    // Only show toast when we're sure the user isn't authenticated
-    if (!authLoading && !roleLoading && !user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to access this page",
-      });
-      setShouldRedirect(true);
-    }
-    
-    // Check permissions only if user is authenticated and a role is required
-    if (!authLoading && !roleLoading && user && requiredRole && !hasPermission(requiredRole)) {
-      toast({
-        title: "Access denied",
-        description: `You don't have ${requiredRole} permissions required to access this page`,
-        variant: "destructive",
-      });
-      setShouldRedirect(true);
-    }
-  }, [user, authLoading, roleLoading, requiredRole, hasPermission, toast]);
-
-  // Show loading state if auth or role is still being checked
-  if (authLoading || roleLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    // Redirect to login if not authenticated
-    return <Navigate to="/auth" state={{ from: location }} replace />;
-  }
-
-  // If a specific role is required, check permissions
-  if (requiredRole && !hasPermission(requiredRole)) {
-    // Redirect to dashboard if user doesn't have required role
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  return children;
-});
-
-export const RequireAdmin = React.memo(({ children }: { children: JSX.Element }) => {
-  const { user, isLoading: authLoading } = useAuth();
-  const { role, isLoading: roleLoading, hasPermission } = useRole();
-  const location = useLocation();
-  const { toast } = useToast();
-  const [shouldRedirect, setShouldRedirect] = useState(false);
-
-  // Debugging log to check admin status
-  console.log('RequireAdmin check - User:', user?.id, 'Role:', role, 'hasPermission admin:', hasPermission('admin'));
-
-  useEffect(() => {
-    // Only show toast when we're sure the user isn't authenticated
-    if (!authLoading && !roleLoading && !user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to access admin area",
-      });
-      setShouldRedirect(true);
-    }
-    
-    // Check admin permissions only if user is authenticated
-    if (!authLoading && !roleLoading && user && !hasPermission('admin')) {
-      toast({
-        title: "Access denied",
-        description: "You don't have permission to access the admin area",
-        variant: "destructive",
-      });
-      setShouldRedirect(true);
-    }
-  }, [user, authLoading, roleLoading, hasPermission, toast]);
-
-  if (authLoading || roleLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    // Redirect to login if not authenticated
-    return <Navigate to="/auth" state={{ from: location }} replace />;
-  }
-
-  // Use only role-based check for admin to be consistent
-  if (!hasPermission('admin')) {
-    // Redirect to dashboard if user is not an admin
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  return children;
-});
-
-export const RequireRole = React.memo(({ children, requiredRole }: { children: JSX.Element, requiredRole: UserRoleType }) => {
-  return <RequireAuth requiredRole={requiredRole}>{children}</RequireAuth>;
-});
-
-export const RedirectIfAuthenticated = React.memo(({ children }: { children: JSX.Element }) => {
-  const { user, isLoading } = useAuth();
-  const location = useLocation();
+export const RequireAuth: React.FC<AuthProps> = ({ children }) => {
+  const { user, loading } = useAuth();
   const { toast } = useToast();
   const [hasShownToast, setHasShownToast] = useState(false);
-  
-  // Get the intended destination from state, or default to home page
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
 
   useEffect(() => {
-    // Only show toast when needed and ensure it only happens once
-    if (!isLoading && user && !hasShownToast) {
+    if (!loading && !user && !hasShownToast) {
       toast({
-        title: "Already authenticated",
-        description: "Redirecting to dashboard",
+        title: "Authentication required",
+        description: "Please log in to access this page.",
+        variant: "destructive",
       });
       setHasShownToast(true);
     }
-  }, [user, isLoading, toast, hasShownToast]);
+  }, [user, loading, toast, hasShownToast]);
 
-  if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
-      </div>
-    );
+  if (loading) {
+    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+export const RequireAdmin: React.FC<AuthProps> = ({ children }) => {
+  const { user, loading } = useAuth();
+  const { hasPermission, loading: roleLoading } = useRole();
+  const { toast } = useToast();
+  const [hasShownToast, setHasShownToast] = useState(false);
+  
+  const isAdmin = hasPermission('admin');
+
+  useEffect(() => {
+    if (!loading && !roleLoading && !isAdmin && user && !hasShownToast) {
+      toast({
+        title: "Admin access required",
+        description: "You do not have permission to access this page.",
+        variant: "destructive",
+      });
+      setHasShownToast(true);
+    }
+  }, [user, loading, roleLoading, isAdmin, toast, hasShownToast]);
+
+  if (loading || roleLoading) {
+    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+export const RedirectIfAuthenticated: React.FC<AuthProps> = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-screen">Loading...</div>;
   }
 
   if (user) {
-    // Redirect to home if already authenticated
-    return <Navigate to={from} replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
-  return children;
-});
+  return <>{children}</>;
+};
+
+interface RequireRoleProps {
+  children: React.ReactNode;
+  requiredRole: string;
+}
+
+export const RequireRole: React.FC<RequireRoleProps> = ({ children, requiredRole }) => {
+  const { user, loading } = useAuth();
+  const { hasPermission, loading: roleLoading } = useRole();
+  const { toast } = useToast();
+  const [hasShownToast, setHasShownToast] = useState(false);
+  
+  const hasRequiredRole = hasPermission(requiredRole);
+
+  useEffect(() => {
+    if (!loading && !roleLoading && !hasRequiredRole && user && !hasShownToast) {
+      toast({
+        title: "Access denied",
+        description: `You need '${requiredRole}' role to access this page.`,
+        variant: "destructive",
+      });
+      setHasShownToast(true);
+    }
+  }, [user, loading, roleLoading, hasRequiredRole, requiredRole, toast, hasShownToast]);
+
+  if (loading || roleLoading) {
+    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  if (!hasRequiredRole) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+};

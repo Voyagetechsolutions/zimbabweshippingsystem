@@ -12,8 +12,6 @@ const AdminDashboard = () => {
   const { hasPermission } = useRole();
   const isAdmin = hasPermission('admin');
   
-  console.log('AdminDashboard Page - User:', user?.id, 'isAdmin:', isAdmin);
-
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />

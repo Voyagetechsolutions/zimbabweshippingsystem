@@ -7,6 +7,7 @@ import './App.css';
 // Pages
 import Index from './pages/Index';
 import Auth from './pages/Auth';
+import AuthCallback from './pages/AuthCallback';
 import Services from './pages/Services';
 import Gallery from './pages/Gallery';
 import Contact from './pages/Contact';
@@ -61,6 +62,7 @@ function App() {
                   {/* Public routes */}
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<RedirectIfAuthenticated><Auth /></RedirectIfAuthenticated>} />
+                  <Route path="/auth/callback" element={<AuthCallback />} />
                   <Route path="/services" element={<Services />} />
                   <Route path="/gallery" element={<Gallery />} />
                   <Route path="/contact" element={<Contact />} />
