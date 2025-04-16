@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -19,9 +18,7 @@ import { generateUniqueId } from '@/lib/utils';
 import { getDateByRoute, getIrelandCities } from '@/data/collectionSchedule';
 import CollectionInfo from '@/components/CollectionInfo';
 
-// Define the booking form schema
 const bookingFormSchema = z.object({
-  // Sender Information
   firstName: z.string().min(2, { message: 'First name must be at least 2 characters' }),
   lastName: z.string().min(2, { message: 'Last name must be at least 2 characters' }),
   email: z.string().email({ message: 'Please enter a valid email address' }),
@@ -31,13 +28,11 @@ const bookingFormSchema = z.object({
   pickupCity: z.string().optional(),
   pickupPostcode: z.string().optional(),
   
-  // Recipient Information
   recipientName: z.string().min(2, { message: 'Recipient name must be at least 2 characters' }),
   recipientPhone: z.string().min(10, { message: 'Please enter a valid phone number' }),
   deliveryAddress: z.string().min(5, { message: 'Please enter a valid address' }),
   deliveryCity: z.string().min(2, { message: 'Please enter a valid city' }),
   
-  // Shipment Details
   shipmentType: z.enum(['parcel', 'drum', 'other', 'custom']),
   weight: z.string().optional(),
   drumQuantity: z.string().optional(),
@@ -45,7 +40,6 @@ const bookingFormSchema = z.object({
   itemDescription: z.string().optional(),
   doorToDoor: z.boolean().default(false),
   
-  // Payment Options
   paymentOption: z.enum(['standard', 'payLater', 'cashOnCollection', 'payOnArrival']),
   paymentMethod: z.enum(['card', 'paypal']).optional(),
   terms: z.boolean().refine(val => val === true, {
@@ -67,12 +61,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const [showCollectionInfo, setShowCollectionInfo] = useState(false);
   const [irelandCities, setIrelandCities] = useState<string[]>([]);
   
-  // Get Ireland cities on component mount
   useEffect(() => {
     setIrelandCities(getIrelandCities());
   }, []);
 
-  // Initialize the form with defaults
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingFormSchema),
     defaultValues: {
@@ -99,8 +91,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       terms: false,
     },
   });
-  
-  // Watch form values for dynamic updates
+
   const watchShipmentType = form.watch('shipmentType');
   const watchPaymentOption = form.watch('paymentOption');
   const watchPickupPostcode = form.watch('pickupPostcode');
@@ -108,15 +99,62 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const watchPickupCity = form.watch('pickupCity');
   const watchWeight = form.watch('weight');
   const watchDrumQuantity = form.watch('drumQuantity');
-  
-  // Handle postal code check
+
+  const renderShipmentTypeOptions = () => {
+    return (
+      <RadioGroup
+        value={form.getValues('shipmentType')}
+        onValueChange={(value) => form.setValue('shipmentType', value as any)}
+        className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-2"
+      >
+        <div className={`border rounded-lg p-4 cursor-pointer transition-all ${form.getValues('shipmentType') === 'parcel' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
+          onClick={() => form.setValue('shipmentType', 'parcel')}
+        >
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="parcel" id="parcel" />
+            <FormLabel htmlFor="parcel" className="cursor-pointer font-medium">Parcel</FormLabel>
+          </div>
+          <p className="text-sm text-gray-500 mt-2">General shipments with weight-based pricing</p>
+        </div>
+        
+        <div className={`border rounded-lg p-4 cursor-pointer transition-all ${form.getValues('shipmentType') === 'drum' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
+          onClick={() => form.setValue('shipmentType', 'drum')}
+        >
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="drum" id="drum" />
+            <FormLabel htmlFor="drum" className="cursor-pointer font-medium">Drum</FormLabel>
+          </div>
+          <p className="text-sm text-gray-500 mt-2">Standard size drums (200L) for goods</p>
+        </div>
+        
+        <div className={`border rounded-lg p-4 cursor-pointer transition-all ${form.getValues('shipmentType') === 'other' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
+          onClick={() => form.setValue('shipmentType', 'other')}
+        >
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="other" id="other" />
+            <FormLabel htmlFor="other" className="cursor-pointer font-medium">Other Item</FormLabel>
+          </div>
+          <p className="text-sm text-gray-500 mt-2">Other standardized items with fixed pricing</p>
+        </div>
+        
+        <div className={`border rounded-lg p-4 cursor-pointer transition-all ${form.getValues('shipmentType') === 'custom' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
+          onClick={() => form.setValue('shipmentType', 'custom')}
+        >
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="custom" id="custom" />
+            <FormLabel htmlFor="custom" className="cursor-pointer font-medium">Request Quote</FormLabel>
+          </div>
+          <p className="text-sm text-gray-500 mt-2">For non-standard items requiring custom quote</p>
+        </div>
+      </RadioGroup>
+    );
+  };
+
   useEffect(() => {
     if (watchPickupCountry === 'England' && watchPickupPostcode?.trim().length > 0) {
-      // Check for restricted postal codes
       const isRestricted = isRestrictedPostalCode(watchPickupPostcode);
       setShowPostcodeWarning(isRestricted);
       
-      // Check for valid route
       const hasRoute = getRouteForPostalCode(watchPickupPostcode) !== null;
       setShowCollectionInfo(hasRoute);
     } else {
@@ -124,21 +162,18 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       setShowCollectionInfo(false);
     }
   }, [watchPickupPostcode, watchPickupCountry]);
-  
-  // Handle Ireland city selection
+
   useEffect(() => {
     if (watchPickupCountry === 'Ireland' && watchPickupCity?.trim().length > 0) {
       const hasRoute = getIrelandRouteForCity(watchPickupCity) !== null;
       setShowCollectionInfo(hasRoute);
     }
   }, [watchPickupCity, watchPickupCountry]);
-  
-  // Handle payment method visibility
+
   useEffect(() => {
     setShowPaymentMethods(watchPaymentOption === 'standard');
   }, [watchPaymentOption]);
-  
-  // Calculate price based on shipment type
+
   useEffect(() => {
     let calculatedPrice = 0;
     
@@ -165,18 +200,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     
     setPrice(calculatedPrice);
   }, [watchShipmentType, watchWeight, watchDrumQuantity]);
-  
-  // Handle form submission
+
   const onSubmit = async (data: BookingFormValues) => {
     setIsSubmitting(true);
     try {
-      // Generate tracking number
       const trackingNumber = `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
       
-      // Generate shipment ID
       const shipmentId = generateUniqueId('shp_');
       
-      // Create shipment record in database
       const { error } = await supabase.from('shipments').insert({
         id: shipmentId,
         tracking_number: trackingNumber,
@@ -197,7 +228,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         throw error;
       }
       
-      // Call the parent's onSubmitComplete handler
       onSubmitComplete(data, shipmentId, price);
     } catch (error) {
       console.error('Error submitting booking form:', error);
@@ -464,47 +494,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Shipment Type *</FormLabel>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-2">
-                  <div className={`border rounded-lg p-4 cursor-pointer transition-all ${field.value === 'parcel' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
-                    onClick={() => form.setValue('shipmentType', 'parcel')}
-                  >
-                    <div className="flex items-center gap-2">
-                      <RadioGroupItem value="parcel" id="parcel" checked={field.value === 'parcel'} />
-                      <FormLabel htmlFor="parcel" className="cursor-pointer font-medium">Parcel</FormLabel>
-                    </div>
-                    <p className="text-sm text-gray-500 mt-2">General shipments with weight-based pricing</p>
-                  </div>
-                  
-                  <div className={`border rounded-lg p-4 cursor-pointer transition-all ${field.value === 'drum' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
-                    onClick={() => form.setValue('shipmentType', 'drum')}
-                  >
-                    <div className="flex items-center gap-2">
-                      <RadioGroupItem value="drum" id="drum" checked={field.value === 'drum'} />
-                      <FormLabel htmlFor="drum" className="cursor-pointer font-medium">Drum</FormLabel>
-                    </div>
-                    <p className="text-sm text-gray-500 mt-2">Standard size drums (200L) for goods</p>
-                  </div>
-                  
-                  <div className={`border rounded-lg p-4 cursor-pointer transition-all ${field.value === 'other' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
-                    onClick={() => form.setValue('shipmentType', 'other')}
-                  >
-                    <div className="flex items-center gap-2">
-                      <RadioGroupItem value="other" id="other" checked={field.value === 'other'} />
-                      <FormLabel htmlFor="other" className="cursor-pointer font-medium">Other Item</FormLabel>
-                    </div>
-                    <p className="text-sm text-gray-500 mt-2">Other standardized items with fixed pricing</p>
-                  </div>
-                  
-                  <div className={`border rounded-lg p-4 cursor-pointer transition-all ${field.value === 'custom' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
-                    onClick={() => form.setValue('shipmentType', 'custom')}
-                  >
-                    <div className="flex items-center gap-2">
-                      <RadioGroupItem value="custom" id="custom" checked={field.value === 'custom'} />
-                      <FormLabel htmlFor="custom" className="cursor-pointer font-medium">Request Quote</FormLabel>
-                    </div>
-                    <p className="text-sm text-gray-500 mt-2">For non-standard items requiring custom quote</p>
-                  </div>
-                </div>
+                {renderShipmentTypeOptions()}
                 <FormControl>
                   <input type="hidden" {...field} />
                 </FormControl>
