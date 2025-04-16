@@ -229,7 +229,7 @@ export function getDateByRouteAndArea(routeName: string, areaName: string): stri
   return route?.date || "No date available";
 }
 
-// Update date for a specific route and sync with database
+// Update route date for a specific route and sync with database
 export async function updateRouteDate(routeName: string, newDate: string): Promise<boolean> {
   // Update in local array
   const index = collectionSchedules.findIndex(schedule => schedule.route === routeName);
@@ -253,7 +253,7 @@ export async function updateRouteDate(routeName: string, newDate: string): Promi
 }
 
 // Add a new route and sync with database
-export async function addRoute(route: string, date: string, areas: string[]): Promise<boolean> {
+export async function addRoute(route: string, date: string, areas: string[], country: string = 'England'): Promise<boolean> {
   // Check if route already exists
   if (collectionSchedules.some(schedule => schedule.route === route)) {
     return false;
@@ -263,7 +263,8 @@ export async function addRoute(route: string, date: string, areas: string[]): Pr
   collectionSchedules.push({
     route,
     date,
-    areas
+    areas,
+    country
   });
   
   // Sync with database using direct table insert
@@ -272,7 +273,8 @@ export async function addRoute(route: string, date: string, areas: string[]): Pr
     .insert({
       route: route,
       pickup_date: date,
-      areas: areas
+      areas: areas,
+      country: country
     });
   
   if (error) {
