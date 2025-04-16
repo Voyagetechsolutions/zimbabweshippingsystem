@@ -1,5 +1,6 @@
+
 import { supabase } from '@/integrations/supabase/client';
-import { postalCodeToRouteMap, restrictedPostalCodes, irelandRouteSchedules } from '@/utils/postalCodeUtils';
+import { postalCodeToRouteMap, restrictedPostalCodes } from '@/utils/postalCodeUtils';
 
 export interface RouteSchedule {
   route: string;
@@ -63,42 +64,6 @@ export const collectionSchedules: RouteSchedule[] = [
     route: "SCOTLAND ROUTE",
     date: "30th of April",
     areas: ["GLASSGOW", "EDINBURGH", "NECASTLE", "MIDDLESBROUGH", "PRESTON", "CARLLSLE"]
-  },
-  // Ireland Routes
-  {
-    route: "LONDONDERRY ROUTE",
-    date: "18th of April",
-    areas: ["LARNE", "BALLYCLARE", "BALLYMENA", "BALLYMONEY", "KILERA", "COLERAINE", "LONDONDERRY", "LIFFORD", "OMAGH", "COOKSTOWN", "CARRICKFERGUS"]
-  },
-  {
-    route: "BELFAST ROUTE",
-    date: "19th of April",
-    areas: ["BELFAST", "BANGOR", "COMBER", "LISBURN", "NEWRY", "COOKSTOWN", "NEWTOWNARDS", "DUNMURRY", "LURGAN", "PORTADOWN", "BANBRIDGE", "MOY", "DUNGANNON", "ARMAGH"]
-  },
-  {
-    route: "CAVAN ROUTE",
-    date: "21st of April",
-    areas: ["MAYNOOTH", "ASHBOURNE", "SWORDS", "SKERRIES", "DROGHEDA", "DUNDALK", "CAVAN", "VIRGINIA", "KELLS", "NAVAN", "TRIM"]
-  },
-  {
-    route: "ATHLONE ROUTE",
-    date: "23rd of April",
-    areas: ["MALIGURAR", "LONGFORD", "ROSECOMMON", "BOYLE", "SLIGO", "BALLINA", "SWINFORD", "CASTLEBAR", "TAURM", "GALWAY", "ATERNY", "ATHLONE"]
-  },
-  {
-    route: "LIMERICK ROUTE",
-    date: "24th of April",
-    areas: ["NEWBRIDGE", "PORTLAOISE", "ROSCREA", "LIMERICK", "ENNIS", "DOOLIN", "LOUGHREA", "BALLINASLOE", "TULLAMORE"]
-  },
-  {
-    route: "DUBLIN CITY ROUTE",
-    date: "26th of April",
-    areas: ["SANDFORD", "RIATO", "BALLYMOUNT", "CABRA", "BEAUMONT", "MALAHIDE", "PORTMANOCK", "DALKEY", "SHANDKILL", "BRAY"]
-  },
-  {
-    route: "CORK ROUTE",
-    date: "28th of April",
-    areas: ["PORTALOUSE", "CASHEL", "FERMOY", "CORK", "DUNGARVEAN", "WATERFORD", "NEW ROSS", "WEXFORD", "GOREY", "GREYSTONE"]
   }
 ];
 
