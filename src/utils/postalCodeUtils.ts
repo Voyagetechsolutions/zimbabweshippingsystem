@@ -75,6 +75,14 @@ export const postalCodeToRouteMap: Record<string, string> = {
   "UB": "LONDON ROUTE",
   "HA": "LONDON ROUTE",
   "WD": "LONDON ROUTE",
+  "E": "LONDON ROUTE",
+  "EC": "LONDON ROUTE",
+  "N": "LONDON ROUTE",
+  "NW": "LONDON ROUTE",
+  "SE": "LONDON ROUTE",
+  "SW": "LONDON ROUTE",
+  "W": "LONDON ROUTE",
+  "WC": "LONDON ROUTE",
   
   // Brighton Route
   "SL": "BRIGHTON ROUTE",
@@ -145,4 +153,105 @@ export function isRestrictedPostalCode(postalCode: string): boolean {
   if (!prefix) return false;
   
   return restrictedPostalCodes.includes(prefix[0]);
+}
+
+// Ireland city to route map
+export const irelandCityToRouteMap: Record<string, string> = {
+  // London Derry Route
+  "LARNE": "LONDON DERRY ROUTE",
+  "BALLYCLARE": "LONDON DERRY ROUTE",
+  "BALLYMENA": "LONDON DERRY ROUTE",
+  "BALLYMONEY": "LONDON DERRY ROUTE",
+  "KILERA": "LONDON DERRY ROUTE",
+  "COLERAINE": "LONDON DERRY ROUTE",
+  "LONDONDERRY": "LONDON DERRY ROUTE",
+  "LIFFORD": "LONDON DERRY ROUTE",
+  "OMAGH": "LONDON DERRY ROUTE",
+  "COOKSTOWN": "LONDON DERRY ROUTE",
+  "CARRICKFERGUS": "LONDON DERRY ROUTE",
+  
+  // Belfast Route
+  "BELFAST": "BELFAST ROUTE",
+  "BANGOR": "BELFAST ROUTE",
+  "COMBER": "BELFAST ROUTE",
+  "LISBURN": "BELFAST ROUTE",
+  "NEWRY": "BELFAST ROUTE",
+  "NEWTOWNARDS": "BELFAST ROUTE",
+  "DUNMURRY": "BELFAST ROUTE",
+  "LURGAN": "BELFAST ROUTE",
+  "PORTADOWN": "BELFAST ROUTE",
+  "BANBRIDGE": "BELFAST ROUTE",
+  "MOY": "BELFAST ROUTE",
+  "DUNGANNON": "BELFAST ROUTE",
+  "ARMAGH": "BELFAST ROUTE",
+  
+  // Cavan Route
+  "MAYNOOTH": "CAVAN ROUTE",
+  "ASHBOURNE": "CAVAN ROUTE",
+  "SWORDS": "CAVAN ROUTE",
+  "SKERRIES": "CAVAN ROUTE",
+  "DROGHEDA": "CAVAN ROUTE",
+  "DUNDALK": "CAVAN ROUTE",
+  "CAVAN": "CAVAN ROUTE",
+  "VIRGINIA": "CAVAN ROUTE",
+  "KELLS": "CAVAN ROUTE",
+  "NAVAN": "CAVAN ROUTE",
+  "TRIM": "CAVAN ROUTE",
+  
+  // Athlone Route
+  "MALIGURAR": "ATHLONE ROUTE",
+  "LONGFORD": "ATHLONE ROUTE",
+  "ROSECOMMON": "ATHLONE ROUTE",
+  "BOYLE": "ATHLONE ROUTE",
+  "SLIGO": "ATHLONE ROUTE",
+  "BALLINA": "ATHLONE ROUTE",
+  "SWINFORD": "ATHLONE ROUTE",
+  "CASTLEBAR": "ATHLONE ROUTE",
+  "TAURM": "ATHLONE ROUTE",
+  "GALWAY": "ATHLONE ROUTE",
+  "ATERNY": "ATHLONE ROUTE",
+  "ATHLONE": "ATHLONE ROUTE",
+  
+  // Limerick Route
+  "NEWBRIDGE": "LIMERICK ROUTE",
+  "PORTLAOISE": "LIMERICK ROUTE",
+  "ROSCREA": "LIMERICK ROUTE",
+  "LIMERICK": "LIMERICK ROUTE",
+  "ENNIS": "LIMERICK ROUTE",
+  "DOOLIN": "LIMERICK ROUTE",
+  "LOUGHREA": "LIMERICK ROUTE",
+  "BALLINASLOE": "LIMERICK ROUTE",
+  "TULLAMORE": "LIMERICK ROUTE",
+  
+  // Dublin City Route
+  "SANDFORD": "DUBLIN CITY ROUTE",
+  "RIATO": "DUBLIN CITY ROUTE",
+  "BALLYMOUNT": "DUBLIN CITY ROUTE",
+  "CABRA": "DUBLIN CITY ROUTE",
+  "BEAUMONT": "DUBLIN CITY ROUTE",
+  "MALAHIDE": "DUBLIN CITY ROUTE",
+  "PORTMANOCK": "DUBLIN CITY ROUTE",
+  "DALKEY": "DUBLIN CITY ROUTE",
+  "SHANDKILL": "DUBLIN CITY ROUTE",
+  "BRAY": "DUBLIN CITY ROUTE",
+  
+  // Cork Route
+  "PORTALOUSE": "CORK ROUTE",
+  "CASHEL": "CORK ROUTE",
+  "FERMOY": "CORK ROUTE",
+  "CORK": "CORK ROUTE",
+  "DUNGARVEAN": "CORK ROUTE",
+  "WATERFORD": "CORK ROUTE",
+  "NEW ROSS": "CORK ROUTE",
+  "WEXFORD": "CORK ROUTE",
+  "GOREY": "CORK ROUTE",
+  "GREYSTONE": "CORK ROUTE"
+};
+
+// Get Ireland route for a given city
+export function getIrelandRouteForCity(city: string): string | null {
+  if (!city) return null;
+  
+  const normalizedCity = city.trim().toUpperCase();
+  return irelandCityToRouteMap[normalizedCity] || null;
 }

@@ -25,6 +25,13 @@ import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   RouteSchedule,
   collectionSchedules,
   updateRouteDate,
@@ -32,7 +39,8 @@ import {
   removeRoute,
   addAreaToRoute,
   removeAreaFromRoute,
-  syncSchedulesWithDatabase
+  syncSchedulesWithDatabase,
+  getRoutesByCountry
 } from '@/data/collectionSchedule';
 
 const CollectionScheduleManagement: React.FC = () => {
@@ -42,9 +50,11 @@ const CollectionScheduleManagement: React.FC = () => {
   const [newRouteName, setNewRouteName] = useState('');
   const [newRouteDate, setNewRouteDate] = useState<Date | undefined>();
   const [newRouteAreas, setNewRouteAreas] = useState('');
+  const [newRouteCountry, setNewRouteCountry] = useState<string>('England');
   const [newArea, setNewArea] = useState('');
   const [addingNewRoute, setAddingNewRoute] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [countryFilter, setCountryFilter] = useState<string>('All');
   const { toast } = useToast();
 
   // Load schedules from database
@@ -68,6 +78,11 @@ const CollectionScheduleManagement: React.FC = () => {
     
     loadSchedules();
   }, [toast]);
+
+  // Filtered schedules based on country selection
+  const filteredSchedules = countryFilter === 'All' 
+    ? schedules
+    : schedules.filter(schedule => schedule.country === countryFilter);
 
   // Handle date selection for a route
   const handleDateSelect = async (route: string, date: Date | undefined) => {
@@ -195,7 +210,7 @@ const CollectionScheduleManagement: React.FC = () => {
     
     try {
       // Add the new route to the database
-      const success = await addRoute(newRouteName.toUpperCase(), formattedDate, areas);
+      const success = await addRoute(newRouteName.toUpperCase(), formattedDate, areas, newRouteCountry);
       
       if (success) {
         setSchedules([...collectionSchedules]);
@@ -203,6 +218,7 @@ const CollectionScheduleManagement: React.FC = () => {
         setNewRouteName('');
         setNewRouteDate(undefined);
         setNewRouteAreas('');
+        setNewRouteCountry('England');
         
         toast({
           title: "Route Added",
@@ -335,6 +351,21 @@ const CollectionScheduleManagement: React.FC = () => {
         </Button>
       </div>
 
+      {/* Country Filter */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium mb-1">Filter by Country</label>
+        <Select value={countryFilter} onValueChange={setCountryFilter}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Select country" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="All">All Countries</SelectItem>
+            <SelectItem value="England">England</SelectItem>
+            <SelectItem value="Ireland">Ireland</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Loading state */}
       {isLoading && (
         <div className="flex justify-center py-8">
@@ -351,6 +382,19 @@ const CollectionScheduleManagement: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="grid gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Country</label>
+                <Select value={newRouteCountry} onValueChange={setNewRouteCountry}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="England">England</SelectItem>
+                    <SelectItem value="Ireland">Ireland</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
               <div>
                 <label className="block text-sm font-medium mb-1">Route Name</label>
                 <Input 
@@ -390,7 +434,9 @@ const CollectionScheduleManagement: React.FC = () => {
                 <Input 
                   value={newRouteAreas} 
                   onChange={(e) => setNewRouteAreas(e.target.value)} 
-                  placeholder="e.g., CENTRAL LONDON, HEATHROW, EAST LONDON"
+                  placeholder={newRouteCountry === 'England' 
+                    ? "e.g., CENTRAL LONDON, HEATHROW, EAST LONDON" 
+                    : "e.g., DUBLIN, CORK, GALWAY"}
                 />
                 <p className="text-sm text-gray-500 mt-1">
                   Enter area names separated by commas
@@ -406,6 +452,7 @@ const CollectionScheduleManagement: React.FC = () => {
                 setNewRouteName('');
                 setNewRouteDate(undefined);
                 setNewRouteAreas('');
+                setNewRouteCountry('England');
               }}
               disabled={isLoading}
             >
@@ -428,15 +475,17 @@ const CollectionScheduleManagement: React.FC = () => {
           <TableHeader>
             <TableRow>
               <TableHead>Route</TableHead>
+              <TableHead>Country</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Areas</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {schedules.map((schedule) => (
+            {filteredSchedules.map((schedule) => (
               <TableRow key={schedule.route}>
                 <TableCell className="font-medium">{schedule.route}</TableCell>
+                <TableCell>{schedule.country || 'England'}</TableCell>
                 <TableCell>
                   {editingRoute === schedule.route ? (
                     <Popover>

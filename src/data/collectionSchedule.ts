@@ -1,11 +1,11 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { postalCodeToRouteMap, restrictedPostalCodes } from '@/utils/postalCodeUtils';
+import { postalCodeToRouteMap, restrictedPostalCodes, irelandCityToRouteMap } from '@/utils/postalCodeUtils';
 
 export interface RouteSchedule {
   route: string;
   date: string;
   areas: string[];
+  country?: string;
 }
 
 // Initial data that will be used until we load from the database
@@ -13,57 +13,110 @@ export const collectionSchedules: RouteSchedule[] = [
   {
     route: "CARDIFF ROUTE",
     date: "21st of April",
-    areas: ["CARDIFF", "GLOUCESTER", "BRISTOL", "SWINDON", "BATH", "SALISBURY"]
+    areas: ["CARDIFF", "GLOUCESTER", "BRISTOL", "SWINDON", "BATH", "SALISBURY"],
+    country: "England"
   },
   {
     route: "BOURNEMOUTH ROUTE",
     date: "22nd of April",
-    areas: ["SOUTHAMPTON", "OXFORD", "HAMPHIRE", "READING", "GUILFORD", "PORTSMOUTH"]
+    areas: ["SOUTHAMPTON", "OXFORD", "HAMPHIRE", "READING", "GUILFORD", "PORTSMOUTH"],
+    country: "England"
   },
   {
     route: "BIRMINGHAM ROUTE",
     date: "24th of April",
-    areas: ["WOLVEHAMPTON", "COVENTRY", "WARWICK", "DUDLEY", "WALSALL", "RUGBY"]
+    areas: ["WOLVEHAMPTON", "COVENTRY", "WARWICK", "DUDLEY", "WALSALL", "RUGBY"],
+    country: "England"
   },
   {
     route: "LONDON ROUTE",
     date: "19th of April",
-    areas: ["CENTRAL LONDON", "HEATHROW", "EAST LONDON", "ROMFORD", "ALL AREAS INSIDE M25"]
+    areas: ["CENTRAL LONDON", "HEATHROW", "EAST LONDON", "ROMFORD", "ALL AREAS INSIDE M25"],
+    country: "England"
   },
   {
     route: "LEEDS ROUTE",
     date: "17th of April",
-    areas: ["WAKEFIELD", "HALIFAX", "DONCASTER", "SHEFFIELD", "HUDDERSFIELD", "YORK"]
+    areas: ["WAKEFIELD", "HALIFAX", "DONCASTER", "SHEFFIELD", "HUDDERSFIELD", "YORK"],
+    country: "England"
   },
   {
     route: "NOTTINGHAM ROUTE",
     date: "18th of April",
-    areas: ["LIECESTER", "DERBY", "PETERSBOROUGH", "CORBY", "MARKET HARB"]
+    areas: ["LIECESTER", "DERBY", "PETERSBOROUGH", "CORBY", "MARKET HARB"],
+    country: "England"
   },
   {
     route: "MANCHESTER ROUTE",
     date: "26th of April",
-    areas: ["LIVERPOOL", "STOKE ON TRENT", "BOLTON", "WARRINGTON", "OLDHAM", "SHREWBURY"]
+    areas: ["LIVERPOOL", "STOKE ON TRENT", "BOLTON", "WARRINGTON", "OLDHAM", "SHREWBURY"],
+    country: "England"
   },
   {
     route: "BRIGHTON ROUTE",
     date: "28th of April",
-    areas: ["HIGH COMBE", "SLOUGH", "VRAWLEY", "LANCING", "EASTBOURNE", "CANTEBURY"]
+    areas: ["HIGH COMBE", "SLOUGH", "VRAWLEY", "LANCING", "EASTBOURNE", "CANTEBURY"],
+    country: "England"
   },
   {
     route: "SOUTHEND ROUTE",
     date: "29th of April",
-    areas: ["NORWICH", "IPSWICH", "COLCHESTER", "BRAINTREE", "CAMBRIDGE", "BASILDON"]
+    areas: ["NORWICH", "IPSWICH", "COLCHESTER", "BRAINTREE", "CAMBRIDGE", "BASILDON"],
+    country: "England"
   },
   {
     route: "NORTHAMPTON ROUTE",
     date: "16th of April",
-    areas: ["KETTERING", "BEDFORD", "MILTON KEYNES", "BANBURY", "AYLESBURY", "LUTON"]
+    areas: ["KETTERING", "BEDFORD", "MILTON KEYNES", "BANBURY", "AYLESBURY", "LUTON"],
+    country: "England"
   },
   {
     route: "SCOTLAND ROUTE",
     date: "30th of April",
-    areas: ["GLASSGOW", "EDINBURGH", "NECASTLE", "MIDDLESBROUGH", "PRESTON", "CARLLSLE"]
+    areas: ["GLASSGOW", "EDINBURGH", "NECASTLE", "MIDDLESBROUGH", "PRESTON", "CARLLSLE"],
+    country: "England"
+  },
+  {
+    route: "LONDON DERRY ROUTE",
+    date: "18th of April",
+    areas: ["LARNE", "BALLYCLARE", "BALLYMENA", "BALLYMONEY", "KILERA", "COLERAINE", "LONDONDERRY", "LIFFORD", "OMAGH", "COOKSTOWN", "CARRICKFERGUS"],
+    country: "Ireland"
+  },
+  {
+    route: "BELFAST ROUTE",
+    date: "19th of April",
+    areas: ["BELFAST", "BANGOR", "COMBER", "LISBURN", "NEWRY", "COOKSTOWN", "NEWTOWNARDS", "DUNMURRY", "LURGAN", "PORTADOWN", "BANBRIDGE", "MOY", "DUNGANNON", "ARMAGH"],
+    country: "Ireland"
+  },
+  {
+    route: "CAVAN ROUTE",
+    date: "21st of April",
+    areas: ["MAYNOOTH", "ASHBOURNE", "SWORDS", "SKERRIES", "DROGHEDA", "DUNDALK", "CAVAN", "VIRGINIA", "KELLS", "NAVAN", "TRIM"],
+    country: "Ireland"
+  },
+  {
+    route: "ATHLONE ROUTE",
+    date: "23rd of April",
+    areas: ["MALIGURAR", "LONGFORD", "ROSECOMMON", "BOYLE", "SLIGO", "BALLINA", "SWINFORD", "CASTLEBAR", "TAURM", "GALWAY", "ATERNY", "ATHLONE"],
+    country: "Ireland"
+  },
+  {
+    route: "LIMERICK ROUTE",
+    date: "24th of April",
+    areas: ["NEWBRIDGE", "PORTLAOISE", "ROSCREA", "LIMERICK", "ENNIS", "DOOLIN", "LOUGHREA", "BALLINASLOE", "TULLAMORE"],
+    country: "Ireland"
+  },
+  {
+    route: "DUBLIN CITY ROUTE",
+    date: "26th of April",
+    areas: ["SANDFORD", "RIATO", "BALLYMOUNT", "CABRA", "BEAUMONT", "MALAHIDE", "PORTMANOCK", "DALKEY", "SHANDKILL", "BRAY"],
+    country: "Ireland"
+  },
+  {
+    route: "CORK ROUTE",
+    date: "28th of April",
+    areas: ["PORTALOUSE", "CASHEL", "FERMOY", "CORK", "DUNGARVEAN", "WATERFORD", "NEW ROSS", "WEXFORD", "GOREY", "GREYSTONE"],
+    country: "Ireland"
   }
 ];
 
@@ -86,6 +139,7 @@ type CollectionSchedule = {
   areas: string[];
   created_at: string;
   updated_at: string;
+  country?: string;
 }
 
 // Sync collection schedules with Supabase
@@ -114,7 +168,8 @@ export async function syncSchedulesWithDatabase() {
         collectionSchedules.push({
           route: item.route,
           date: item.pickup_date,
-          areas: item.areas
+          areas: item.areas,
+          country: item.country || 'England'
         });
       });
       return true;
@@ -138,7 +193,8 @@ async function initializeCollectionSchedules() {
         .insert({
           route: schedule.route,
           pickup_date: schedule.date,
-          areas: schedule.areas
+          areas: schedule.areas,
+          country: schedule.country || 'England'
         });
     }
     return true;
@@ -347,4 +403,51 @@ export async function removeAreaFromRoute(routeName: string, area: string): Prom
     }
   }
   return false;
+}
+
+// Get all routes for a specific country
+export function getRoutesByCountry(country: string): string[] {
+  return collectionSchedules
+    .filter(schedule => schedule.country === country)
+    .map(schedule => schedule.route);
+}
+
+// Get Ireland cities list
+export function getIrelandCities(): string[] {
+  const cities: string[] = [];
+  
+  collectionSchedules
+    .filter(schedule => schedule.country === 'Ireland')
+    .forEach(schedule => {
+      schedule.areas.forEach(area => {
+        if (!cities.includes(area)) {
+          cities.push(area);
+        }
+      });
+    });
+  
+  return cities.sort();
+}
+
+// Get route for an Ireland city
+export function getRouteForIrelandCity(city: string): string | null {
+  const normalizedCity = city.trim().toUpperCase();
+  
+  for (const schedule of collectionSchedules) {
+    if (schedule.country === 'Ireland' && 
+        schedule.areas.includes(normalizedCity)) {
+      return schedule.route;
+    }
+  }
+  
+  return null;
+}
+
+// Get date for an Ireland city
+export function getDateForIrelandCity(city: string): string | null {
+  const route = getRouteForIrelandCity(city);
+  if (!route) return null;
+  
+  const schedule = collectionSchedules.find(s => s.route === route);
+  return schedule?.date || null;
 }
