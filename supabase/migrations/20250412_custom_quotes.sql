@@ -3,12 +3,16 @@
 CREATE TABLE IF NOT EXISTS custom_quotes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) NULL,
+  shipment_id UUID REFERENCES shipments(id) NULL,
   status TEXT NOT NULL DEFAULT 'pending',
   phone_number TEXT NOT NULL,
   description TEXT NOT NULL,
+  category TEXT NULL,
   image_urls TEXT[] NOT NULL DEFAULT '{}',
   quoted_amount NUMERIC NULL,
   admin_notes TEXT NULL,
+  sender_details JSONB NULL DEFAULT '{}',
+  recipient_details JSONB NULL DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

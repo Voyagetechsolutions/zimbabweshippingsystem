@@ -165,6 +165,7 @@ export type Database = {
           quoted_amount: number | null
           recipient_details: Json | null
           sender_details: Json | null
+          shipment_id: string | null
           status: string
           updated_at: string
           user_id: string | null
@@ -180,6 +181,7 @@ export type Database = {
           quoted_amount?: number | null
           recipient_details?: Json | null
           sender_details?: Json | null
+          shipment_id?: string | null
           status?: string
           updated_at?: string
           user_id?: string | null
@@ -195,11 +197,20 @@ export type Database = {
           quoted_amount?: number | null
           recipient_details?: Json | null
           sender_details?: Json | null
+          shipment_id?: string | null
           status?: string
           updated_at?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "custom_quotes_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       gallery: {
         Row: {

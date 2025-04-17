@@ -151,6 +151,13 @@ const BookShipment = () => {
   // Handle custom quote submission
   const handleCustomQuoteSubmit = async (customQuoteData: any) => {
     try {
+      console.log("Submitting custom quote with data:", {
+        ...customQuoteData,
+        shipment_id: bookingData.shipment_id,
+        user_id: bookingData.user_id,
+        category: bookingData.shipmentDetails.category
+      });
+      
       // Save custom quote to database
       const { data, error } = await supabase.from('custom_quotes').insert({
         user_id: bookingData.user_id,
