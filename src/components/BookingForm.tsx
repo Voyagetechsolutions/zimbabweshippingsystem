@@ -35,13 +35,13 @@ const bookingFormSchema = z.object({
   deliveryAddress: z.string().min(5, { message: 'Please enter a valid address' }),
   deliveryCity: z.string().min(2, { message: 'Please enter a valid city' }),
   
-  shipmentType: z.enum(['drum', 'other', 'custom']),
+  shipmentType: z.enum(['drum', 'other']),
   drumQuantity: z.string().optional(),
   itemCategory: z.string().optional(),
   itemDescription: z.string().optional(),
   doorToDoor: z.boolean().default(false),
   
-  paymentOption: z.enum(['standard', 'payLater', 'cashOnCollection', 'payOnArrival']),
+  paymentOption: z.enum(['standard', 'cashOnCollection', 'payOnArrival']),
   paymentMethod: z.enum(['card', 'paypal']).optional(),
   terms: z.boolean().refine(val => val === true, {
     message: 'You must agree to the terms and conditions',
@@ -64,6 +64,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const [currentTab, setCurrentTab] = useState('sender');
   const [originalPrice, setOriginalPrice] = useState<number>(0);
   const [discountApplied, setDiscountApplied] = useState(false);
+  const [redirectToCustomQuote, setRedirectToCustomQuote] = useState(false);
   
   useEffect(() => {
     setIrelandCities(getIrelandCities());
@@ -101,13 +102,15 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const watchPickupCountry = form.watch('pickupCountry');
   const watchPickupCity = form.watch('pickupCity');
   const watchDrumQuantity = form.watch('drumQuantity');
+  const watchItemCategory = form.watch('itemCategory');
+  const watchItemDescription = form.watch('itemDescription');
 
   const renderShipmentTypeOptions = () => {
     return (
       <RadioGroup
         value={form.getValues('shipmentType')}
         onValueChange={(value) => form.setValue('shipmentType', value as any)}
-        className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2"
+        className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2"
       >
         <div className={`border rounded-lg p-4 cursor-pointer transition-all ${form.getValues('shipmentType') === 'drum' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
           onClick={() => form.setValue('shipmentType', 'drum')}
@@ -126,17 +129,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             <RadioGroupItem value="other" id="other" />
             <FormLabel htmlFor="other" className="cursor-pointer font-medium">Other Item</FormLabel>
           </div>
-          <p className="text-sm text-gray-500 mt-2">Other standardized items with fixed pricing</p>
-        </div>
-        
-        <div className={`border rounded-lg p-4 cursor-pointer transition-all ${form.getValues('shipmentType') === 'custom' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
-          onClick={() => form.setValue('shipmentType', 'custom')}
-        >
-          <div className="flex items-center gap-2">
-            <RadioGroupItem value="custom" id="custom" />
-            <FormLabel htmlFor="custom" className="cursor-pointer font-medium">Request Quote</FormLabel>
-          </div>
-          <p className="text-sm text-gray-500 mt-2">For non-standard items requiring custom quote</p>
+          <p className="text-sm text-gray-500 mt-2">Other items requiring a custom quote</p>
         </div>
       </RadioGroup>
     );
@@ -162,9 +155,22 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
   }, [watchPickupCity, watchPickupCountry]);
 
+  // Detect when to show payment methods section
   useEffect(() => {
-    setShowPaymentMethods(watchPaymentOption === 'standard');
+    setShowPaymentMethods(false); // We're removing the Pay Now option so this is not needed
   }, [watchPaymentOption]);
+
+  // Check when to redirect to custom quote
+  useEffect(() => {
+    if (watchShipmentType === 'other' && 
+        watchItemCategory && 
+        watchItemDescription && 
+        watchItemDescription.length > 5) {
+      setRedirectToCustomQuote(true);
+    } else {
+      setRedirectToCustomQuote(false);
+    }
+  }, [watchShipmentType, watchItemCategory, watchItemDescription]);
 
   // New drum pricing logic
   useEffect(() => {
@@ -208,13 +214,28 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const goToNextTab = () => {
     if (currentTab === 'sender') setCurrentTab('recipient');
     else if (currentTab === 'recipient') setCurrentTab('shipment');
-    else if (currentTab === 'shipment') setCurrentTab('payment');
+    else if (currentTab === 'shipment') {
+      if (watchShipmentType === 'other') {
+        // Trigger custom quote flow in parent component
+        handleCustomQuoteRedirect();
+      } else {
+        setCurrentTab('payment');
+      }
+    }
   };
 
   const goToPreviousTab = () => {
     if (currentTab === 'payment') setCurrentTab('shipment');
     else if (currentTab === 'shipment') setCurrentTab('recipient');
     else if (currentTab === 'recipient') setCurrentTab('sender');
+  };
+
+  const handleCustomQuoteRedirect = () => {
+    const data = form.getValues();
+    const trackingNumber = `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+    const shipmentId = generateUniqueId('shp_');
+    
+    onSubmitComplete({...data, shipmentType: 'other'}, shipmentId, 0);
   };
 
   const onSubmit = async (data: BookingFormValues) => {
@@ -711,7 +732,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 />
               </div>
               
-              {watchShipmentType !== 'custom' && (
+              {watchShipmentType === 'drum' && (
                 <div className="mt-6 border-t pt-4">
                   <div className="flex justify-between items-center">
                     <span className="font-semibold">Estimated Shipping Cost:</span>
@@ -753,7 +774,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   disabled={!validateTab('shipment')}
                   className="bg-zim-green hover:bg-zim-green/90"
                 >
-                  Next: Payment
+                  {watchShipmentType === 'other' ? 'Request Custom Quote' : 'Next: Payment'}
                 </Button>
               </div>
             </Card>
@@ -779,17 +800,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                         <div className={`border rounded-lg p-4 cursor-pointer transition-all ${field.value === 'standard' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
                           <div className="flex items-center gap-2">
                             <RadioGroupItem value="standard" id="standard" />
-                            <FormLabel htmlFor="standard" className="cursor-pointer font-medium">Pay Now</FormLabel>
+                            <FormLabel htmlFor="standard" className="cursor-pointer font-medium">Standard Payment</FormLabel>
                           </div>
-                          <p className="text-sm text-gray-500 mt-2">Pay securely online to confirm your booking immediately</p>
-                        </div>
-                        
-                        <div className={`border rounded-lg p-4 cursor-pointer transition-all ${field.value === 'payLater' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                          <div className="flex items-center gap-2">
-                            <RadioGroupItem value="payLater" id="payLater" />
-                            <FormLabel htmlFor="payLater" className="cursor-pointer font-medium">Pay Later</FormLabel>
-                          </div>
-                          <p className="text-sm text-gray-500 mt-2">Make a bank transfer within 48 hours to secure your booking</p>
+                          <p className="text-sm text-gray-500 mt-2">Make a payment within 30 days</p>
                         </div>
                         
                         <div className={`border rounded-lg p-4 cursor-pointer transition-all ${field.value === 'cashOnCollection' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
@@ -818,44 +831,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   </FormItem>
                 )}
               />
-              
-              {showPaymentMethods && (
-                <div className="mt-4">
-                  <FormField
-                    control={form.control}
-                    name="paymentMethod"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Payment Method *</FormLabel>
-                        <FormControl>
-                          <RadioGroup
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                            className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2"
-                          >
-                            <div className={`border rounded-lg p-4 cursor-pointer transition-all ${field.value === 'card' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                              <div className="flex items-center gap-2">
-                                <RadioGroupItem value="card" id="card" />
-                                <FormLabel htmlFor="card" className="cursor-pointer font-medium">Credit/Debit Card</FormLabel>
-                              </div>
-                              <p className="text-sm text-gray-500 mt-2">Pay securely with your card</p>
-                            </div>
-                            
-                            <div className={`border rounded-lg p-4 cursor-pointer transition-all ${field.value === 'paypal' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                              <div className="flex items-center gap-2">
-                                <RadioGroupItem value="paypal" id="paypal" />
-                                <FormLabel htmlFor="paypal" className="cursor-pointer font-medium">PayPal</FormLabel>
-                              </div>
-                              <p className="text-sm text-gray-500 mt-2">Pay using your PayPal account</p>
-                            </div>
-                          </RadioGroup>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              )}
               
               <div className="mt-6">
                 <FormField

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -35,6 +36,36 @@ const BookShipment = () => {
       // Get user ID if logged in
       const { data: { user } } = await supabase.auth.getUser();
       
+      // Determine next step based on shipment type
+      if (data.shipmentType === 'other') {
+        // Go to custom quote step for "other" shipment type
+        setBookingData({
+          ...data,
+          shipment_id: shipmentId,
+          user_id: user?.id || null,
+          senderDetails: {
+            name: `${data.firstName} ${data.lastName}`,
+            email: data.email,
+            phone: data.phone,
+            address: `${data.pickupAddress}, ${data.pickupPostcode}`,
+          },
+          recipientDetails: {
+            name: data.recipientName,
+            phone: data.recipientPhone,
+            address: `${data.deliveryAddress}, ${data.deliveryCity}`,
+          },
+          shipmentDetails: {
+            type: data.shipmentType,
+            category: data.itemCategory,
+            description: data.itemDescription,
+            tracking_number: '', // Will be filled from the database
+          }
+        });
+        setCurrentStep(BookingStep.CUSTOM_QUOTE);
+        return;
+      }
+      
+      // For drums, proceed with standard flow
       // Add the mandatory metal seal cost (£5) to the total amount
       const totalWithSeal = amount + 5;
       
@@ -74,102 +105,33 @@ const BookShipment = () => {
       });
       
       setTotalAmount(finalAmount);
+      setCurrentStep(BookingStep.PAYMENT);
       
-      if (data.shipmentType === 'custom') {
-        setCurrentStep(BookingStep.CUSTOM_QUOTE);
-      } else if (data.paymentOption === 'standard') {
-        setCurrentStep(BookingStep.PAYMENT);
+      // After setting the booking data, fetch the tracking number from the database
+      try {
+        const { data: shipmentData, error: shipmentError } = await supabase
+          .from('shipments')
+          .select('tracking_number')
+          .eq('id', shipmentId)
+          .single();
         
-        // After setting the booking data, fetch the tracking number from the database
-        try {
-          const { data: shipmentData, error: shipmentError } = await supabase
-            .from('shipments')
-            .select('tracking_number')
-            .eq('id', shipmentId)
-            .single();
-          
-          if (shipmentError) {
-            console.error('Error fetching tracking number:', shipmentError);
-            throw shipmentError;
+        if (shipmentError) {
+          console.error('Error fetching tracking number:', shipmentError);
+          throw shipmentError;
+        }
+        
+        // Update the booking data with the tracking number
+        setBookingData(prev => ({
+          ...prev,
+          shipmentDetails: {
+            ...prev.shipmentDetails,
+            tracking_number: shipmentData.tracking_number
           }
-          
-          // Update the booking data with the tracking number
-          setBookingData(prev => ({
-            ...prev,
-            shipmentDetails: {
-              ...prev.shipmentDetails,
-              tracking_number: shipmentData.tracking_number
-            }
-          }));
-          
-          console.log("Retrieved tracking number:", shipmentData.tracking_number);
-        } catch (err) {
-          console.error('Error fetching tracking number:', err);
-        }
-      } else {
-        // For non-standard payment options (pay later, cash on collection, pay on arrival)
-        // Create a receipt with appropriate status
-        const receiptNumber = `R${Date.now().toString().substring(6)}`;
+        }));
         
-        try {
-          const { data: receiptData, error: receiptError } = await supabase
-            .from('receipts')
-            .insert({
-              receipt_number: receiptNumber,
-              amount: finalAmount,
-              payment_method: data.paymentOption,
-              sender_details: {
-                name: `${data.firstName} ${data.lastName}`,
-                email: data.email,
-                phone: data.phone,
-                address: `${data.pickupAddress}, ${data.pickupPostcode}`,
-              },
-              recipient_details: {
-                name: data.recipientName,
-                phone: data.recipientPhone,
-                address: `${data.deliveryAddress}, ${data.deliveryCity}`,
-              },
-              shipment_details: {
-                type: data.shipmentType,
-                quantity: data.shipmentType === 'drum' ? parseInt(data.drumQuantity) : null,
-                tracking_number: '',
-                services: [
-                  { name: 'Mandatory Metal Seal', price: 5 },
-                  ...(data.doorToDoor ? [{ name: 'Door to Door Delivery', price: 25 }] : [])
-                ],
-                item_category: data.shipmentType === 'other' ? data.itemCategory : null,
-                item_description: data.shipmentType === 'other' ? data.itemDescription : null,
-              },
-              status: 'pending',
-              payment_id: null,
-              shipment_id: shipmentId
-            })
-            .select('id')
-            .single();
-            
-          if (receiptError) throw receiptError;
-          
-          // Update the shipment with the receipt info
-          await supabase
-            .from('shipments')
-            .update({ 
-              receipt_id: receiptData.id,
-              status: data.paymentOption === 'payLater' ? 'pending_payment' : 
-                     data.paymentOption === 'cashOnCollection' ? 'awaiting_collection' : 
-                     'awaiting_arrival'
-            })
-            .eq('id', shipmentId);
-          
-          // Navigate to the success page with the receipt ID
-          navigate(`/payment-success?receipt_id=${receiptData.id}`);
-        } catch (err: any) {
-          console.error('Error creating receipt:', err);
-          toast({
-            title: 'Error',
-            description: err.message || 'Failed to process your booking. Please try again.',
-            variant: 'destructive',
-          });
-        }
+        console.log("Retrieved tracking number:", shipmentData.tracking_number);
+      } catch (err) {
+        console.error('Error fetching tracking number:', err);
       }
     } catch (error: any) {
       console.error('Error processing form submission:', error);
@@ -192,10 +154,14 @@ const BookShipment = () => {
       // Save custom quote to database
       const { data, error } = await supabase.from('custom_quotes').insert({
         user_id: bookingData.user_id,
-        phone_number: customQuoteData.phoneNumber,
-        description: customQuoteData.description,
+        shipment_id: bookingData.shipment_id,
+        phone_number: customQuoteData.phoneNumber || bookingData.senderDetails.phone,
+        description: customQuoteData.description || bookingData.shipmentDetails.description,
+        category: bookingData.shipmentDetails.category,
         image_urls: customQuoteData.imageUrls || [],
-        status: 'pending'
+        status: 'pending',
+        sender_details: bookingData.senderDetails,
+        recipient_details: bookingData.recipientDetails
       }).select().single();
       
       if (error) throw error;
@@ -210,7 +176,7 @@ const BookShipment = () => {
       await supabase.from('notifications').insert({
         user_id: bookingData.user_id || '00000000-0000-0000-0000-000000000000', // Use placeholder ID if not logged in
         title: 'New Custom Quote Request',
-        message: `A new custom quote request has been submitted for: ${customQuoteData.description.substring(0, 50)}...`,
+        message: `A new custom quote request has been submitted for: ${customQuoteData.description.substring(0, 50) || bookingData.shipmentDetails.description.substring(0, 50)}...`,
         type: 'custom_quote',
         related_id: data.id,
         is_read: false
@@ -288,7 +254,7 @@ interface CustomQuoteFormProps {
 
 const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({ initialData, onSubmit, onCancel }) => {
   const [phoneNumber, setPhoneNumber] = useState(initialData?.senderDetails?.phone || '');
-  const [description, setDescription] = useState('');
+  const [description, setDescription] = useState(initialData?.shipmentDetails?.description || '');
   const [images, setImages] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
