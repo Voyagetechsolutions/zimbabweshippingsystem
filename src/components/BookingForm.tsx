@@ -849,4 +849,3 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                             </div>
                           </RadioGroup>
                         </FormControl>
-                        <Form
