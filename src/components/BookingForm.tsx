@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -849,3 +850,68 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                             </div>
                           </RadioGroup>
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+              
+              <div className="mt-6">
+                <FormField
+                  control={form.control}
+                  name="terms"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>
+                          I agree to the <a href="#" className="text-zim-green hover:underline">terms and conditions</a> *
+                        </FormLabel>
+                        <FormDescription>
+                          By checking this box, you agree to our terms of service and privacy policy.
+                        </FormDescription>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="flex justify-between mt-6">
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={goToPreviousTab}
+                >
+                  Back
+                </Button>
+                <Button 
+                  type="submit"
+                  disabled={isSubmitting || !validateTab('payment')}
+                  className="bg-zim-green hover:bg-zim-green/90"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    'Complete Booking'
+                  )}
+                </Button>
+              </div>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </form>
+    </Form>
+  );
+};
+
+export default BookingForm;
