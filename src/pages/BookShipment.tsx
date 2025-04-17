@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -61,7 +60,7 @@ const BookShipment = () => {
         shipmentDetails: {
           type: data.shipmentType,
           quantity: data.shipmentType === 'drum' ? parseInt(data.drumQuantity) : null,
-          weight: null,
+          weight: data.shipmentType === 'parcel' ? parseFloat(data.weight) : null,
           tracking_number: '', // Will be filled from the database
           services: [
             { name: 'Mandatory Metal Seal', price: 5 },
@@ -108,7 +107,7 @@ const BookShipment = () => {
           console.error('Error fetching tracking number:', err);
         }
       } else {
-        // For non-standard payment options (cash on collection, pay on arrival)
+        // For non-standard payment options (pay later, cash on collection, pay on arrival)
         // Create a receipt with appropriate status
         const receiptNumber = `R${Date.now().toString().substring(6)}`;
         
@@ -155,7 +154,7 @@ const BookShipment = () => {
             .from('shipments')
             .update({ 
               receipt_id: receiptData.id,
-              status: data.paymentOption === 'standard' ? 'pending_payment' : 
+              status: data.paymentOption === 'payLater' ? 'pending_payment' : 
                      data.paymentOption === 'cashOnCollection' ? 'awaiting_collection' : 
                      'awaiting_arrival'
             })

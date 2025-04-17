@@ -47,7 +47,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('standard');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('pay_later');
   const [payLaterMethod, setPayLaterMethod] = useState<string>('cash');
   const [isGoodsArriving, setIsGoodsArriving] = useState<boolean>(false);
   const [isSpecialDeal, setIsSpecialDeal] = useState<boolean>(false);
@@ -88,7 +88,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       // Create payment record
       const paymentMethod = isGoodsArriving 
         ? 'goods_arriving' 
-        : (selectedPaymentMethod === 'standard' ? payLaterMethod : selectedPaymentMethod);
+        : (selectedPaymentMethod === 'pay_later' ? payLaterMethod : selectedPaymentMethod);
       
       const paymentStatus = 'pending'; // All payments are pending since no online payment
       
@@ -144,7 +144,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         title: 'Payment Method Selected',
         description: isGoodsArriving 
           ? 'You will pay when your goods arrive in Zimbabwe.' 
-          : selectedPaymentMethod === 'cashOnCollection'
+          : selectedPaymentMethod === 'cash_on_collection'
             ? 'You will pay cash on collection with our special discount.'
             : 'Your booking is confirmed with 30-day payment terms.',
       });
@@ -179,7 +179,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
               onValueChange={(value) => {
                 setSelectedPaymentMethod(value);
                 setIsGoodsArriving(value === 'goods_arriving');
-                setIsSpecialDeal(value === 'cashOnCollection');
+                setIsSpecialDeal(value === 'cash_on_collection');
               }}
               className="space-y-4"
             >
@@ -218,11 +218,11 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
               
               {/* Cash on Collection Special Deal */}
               {bookingData?.shipmentDetails?.type === 'drum' && (
-                <div className={`flex items-start space-x-3 border-2 rounded-md p-4 ${selectedPaymentMethod === 'cashOnCollection' ? 'bg-green-50 border-green-400' : 'border-dashed border-yellow-400'}`}>
-                  <RadioGroupItem value="cashOnCollection" id="cashOnCollection" />
+                <div className={`flex items-start space-x-3 border-2 rounded-md p-4 ${selectedPaymentMethod === 'cash_on_collection' ? 'bg-green-50 border-green-400' : 'border-dashed border-yellow-400'}`}>
+                  <RadioGroupItem value="cash_on_collection" id="cash_on_collection" />
                   <div className="space-y-2 w-full">
                     <div className="flex justify-between items-center">
-                      <Label htmlFor="cashOnCollection" className="flex items-center text-lg font-medium">
+                      <Label htmlFor="cash_on_collection" className="flex items-center text-lg font-medium">
                         <Tag className="h-5 w-5 mr-2 text-green-600" />
                         Special Deal: Cash on Collection
                       </Label>
@@ -232,7 +232,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
                       Pay cash when we collect your drums and receive a £15 discount on your shipment. Limited time offer!
                     </p>
                     
-                    {selectedPaymentMethod === 'cashOnCollection' && (
+                    {selectedPaymentMethod === 'cash_on_collection' && (
                       <div className="mt-3 p-3 bg-green-100 rounded-md">
                         <h4 className="font-medium flex items-center text-green-800">
                           <PoundSterling className="h-4 w-4 mr-1" /> 
@@ -254,19 +254,19 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
                 </div>
               )}
               
-              {/* Standard Payment */}
-              <div className={`flex items-start space-x-3 border rounded-md p-4 ${selectedPaymentMethod === 'standard' ? 'bg-gray-50 border-gray-300' : ''}`}>
-                <RadioGroupItem value="standard" id="standard" />
+              {/* 30-Day Payment */}
+              <div className={`flex items-start space-x-3 border rounded-md p-4 ${selectedPaymentMethod === 'pay_later' ? 'bg-gray-50 border-gray-300' : ''}`}>
+                <RadioGroupItem value="pay_later" id="pay_later" />
                 <div className="space-y-2 w-full">
-                  <Label htmlFor="standard" className="flex items-center text-lg font-medium">
+                  <Label htmlFor="pay_later" className="flex items-center text-lg font-medium">
                     <CalendarClock className="h-5 w-5 mr-2 text-gray-600" />
-                    Standard Payment
+                    30-Day Payment Terms
                   </Label>
                   <p className="text-sm text-gray-600">
-                    Make a payment within 30 days ({formatDate(paymentDeadline)}).
+                    Book now and pay within 30 days of collection date ({formatDate(paymentDeadline)}).
                   </p>
                   
-                  {selectedPaymentMethod === 'standard' && (
+                  {selectedPaymentMethod === 'pay_later' && (
                     <div className="mt-3 space-y-3">
                       <p className="text-sm font-medium text-gray-700">Select your preferred payment method:</p>
                       
