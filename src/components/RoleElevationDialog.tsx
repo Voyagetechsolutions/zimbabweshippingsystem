@@ -16,6 +16,7 @@ import { ShieldAlert } from "lucide-react";
 import { useRole } from '@/contexts/RoleContext';
 import { useToast } from '@/hooks/use-toast';
 import { getClientIP, handleAuthError } from '@/utils/securityUtils';
+import { supabase } from '@/integrations/supabase/client'; // Import supabase client
 
 const RoleElevationDialog = () => {
   const [open, setOpen] = useState(false);
