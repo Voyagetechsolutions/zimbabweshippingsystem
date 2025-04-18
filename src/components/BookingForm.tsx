@@ -241,12 +241,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const onSubmit = async (data: BookingFormValues) => {
     setIsSubmitting(true);
     try {
+      // Generate a tracking number with custom format (for display purposes)
       const trackingNumber = `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
       
-      const shipmentId = generateUniqueId('shp_');
+      // Generate a proper UUID for the database
+      const shipmentId = generateUniqueId();
       
       const { error } = await supabase.from('shipments').insert({
-        id: shipmentId,
+        id: shipmentId, // This is now a proper UUID
         tracking_number: trackingNumber,
         origin: `${data.pickupAddress}, ${data.pickupCountry === 'England' ? data.pickupPostcode : data.pickupCity}`,
         destination: `${data.deliveryAddress}, ${data.deliveryCity}`,

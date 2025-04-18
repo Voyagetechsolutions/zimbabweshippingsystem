@@ -74,7 +74,7 @@ const BookShipment = () => {
       
       setBookingData({
         ...data,
-        shipment_id: shipmentId,  // Make sure this is a valid UUID
+        shipment_id: shipmentId,
         user_id: user?.id || null,
         senderDetails: {
           name: `${data.firstName} ${data.lastName}`,
@@ -190,9 +190,8 @@ const BookShipment = () => {
         is_read: false
       });
       
-      // Navigate to home page
-      navigate('/');
-      
+      // Navigate to confirmation page
+      navigate('/quote-submitted');
     } catch (err: any) {
       console.error('Error submitting custom quote:', err);
       toast({

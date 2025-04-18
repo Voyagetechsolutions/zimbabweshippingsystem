@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -70,10 +69,8 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         ? 'goods_arriving' 
         : (selectedPaymentMethod === 'standard' ? payLaterMethod : selectedPaymentMethod);
       
-      // Generate a transaction ID with proper UUID format
       const transactionId = generateUniqueId('TX-');
       
-      // Create payment record
       const { data: paymentData, error: paymentError } = await supabase
         .from('payments')
         .insert({
@@ -90,10 +87,8 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       
       if (paymentError) throw paymentError;
       
-      // Generate receipt number
       const receiptNumber = `REC-${Date.now().toString().slice(-8)}`;
       
-      // Create receipt record
       const { data: receiptData, error: receiptError } = await supabase
         .from('receipts')
         .insert({
@@ -113,13 +108,11 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       
       if (receiptError) throw receiptError;
       
-      // Update shipment status
       await supabase
         .from('shipments')
         .update({ status: 'pending_payment' })
         .eq('id', bookingData.shipment_id);
       
-      // Show success toast
       toast({
         title: 'Payment Method Selected',
         description: isGoodsArriving 
@@ -129,7 +122,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
             : 'Your booking is confirmed with 30-day payment terms.',
       });
       
-      // Redirect to receipt page with receipt_id parameter
       console.log("Redirecting to receipt page with receipt ID:", receiptData.id);
       navigate(`/PaymentSuccess?receipt_id=${receiptData.id}`);
       

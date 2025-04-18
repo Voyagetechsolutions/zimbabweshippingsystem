@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -28,6 +27,7 @@ import Pricing from './pages/Pricing';
 import AboutUs from './pages/AboutUs';
 import CollectionSchedule from './pages/CollectionSchedule';
 import FAQ from './pages/FAQ';
+import QuoteSubmitted from '@/pages/QuoteSubmitted';
 
 // Components
 import { RequireAuth, RequireAdmin, RedirectIfAuthenticated, RequireRole } from './components/RouteGuard';
@@ -69,6 +69,7 @@ function App() {
                   <Route path="/track" element={<Track />} />
                   <Route path="/book-shipment" element={<BookShipment />} />
                   <Route path="/payment-success" element={<PaymentSuccess />} />
+                  <Route path="/quote-submitted" element={<QuoteSubmitted />} />
                   <Route path="/reviews" element={<Reviews />} />
                   <Route path="/support" element={<Support />} />
                   <Route path="/pricing" element={<Pricing />} />
