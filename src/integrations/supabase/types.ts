@@ -718,6 +718,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_and_log_failed_auth_attempt: {
+        Args: { ip_address: string }
+        Returns: boolean
+      }
       create_announcement: {
         Args: {
           p_title: string
@@ -772,6 +776,10 @@ export type Database = {
       }
       make_admin: {
         Args: { user_email: string }
+        Returns: boolean
+      }
+      update_admin_password: {
+        Args: { current_password: string; new_password: string }
         Returns: boolean
       }
       update_announcement: {
