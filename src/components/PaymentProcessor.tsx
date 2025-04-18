@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -17,7 +16,6 @@ import { Label } from '@/components/ui/label';
 import { 
   CalendarClock, 
   BanknoteIcon, 
-  ArrowRight, 
   PoundSterling, 
   Calendar, 
   AlertCircle, 
@@ -25,11 +23,8 @@ import {
   CheckCircle2,
   Building,
   Truck,
-  Wallet,
-  CreditCard,
-  Tag
+  CreditCard
 } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface PaymentProcessorProps {
   bookingData: any;
@@ -53,11 +48,9 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
   const [isSpecialDeal, setIsSpecialDeal] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   
-  // Calculate prices based on selections
   const premiumAmount = totalAmount * 0.2;
   const specialDealDiscount = bookingData?.shipmentDetails?.type === 'drum' ? 15 : 0;
   
-  // Calculate final amount
   let finalAmount = totalAmount;
   if (isGoodsArriving) {
     finalAmount += premiumAmount;
@@ -66,7 +59,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
     finalAmount -= specialDealDiscount;
   }
   
-  // Get collection date + 30 days for payment deadline
   const collectionDate = new Date();
   const paymentDeadline = new Date(collectionDate);
   paymentDeadline.setDate(paymentDeadline.getDate() + 30);
@@ -85,12 +77,9 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Create payment record
       const paymentMethod = isGoodsArriving 
         ? 'goods_arriving' 
         : (selectedPaymentMethod === 'standard' ? payLaterMethod : selectedPaymentMethod);
-      
-      const paymentStatus = 'pending'; // All payments are pending since no online payment
       
       const { data: paymentData, error: paymentError } = await supabase
         .from('payments')
@@ -100,7 +89,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
           amount: finalAmount,
           currency: 'GBP',
           payment_method: paymentMethod,
-          payment_status: paymentStatus,
+          payment_status: 'pending',
           transaction_id: `TX-${Date.now()}-${Math.floor(Math.random() * 1000)}`
         })
         .select()
@@ -108,10 +97,8 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       
       if (paymentError) throw paymentError;
       
-      // Generate receipt number
       const receiptNumber = `REC-${Date.now().toString().slice(-8)}`;
       
-      // Create receipt record
       const { data: receiptData, error: receiptError } = await supabase
         .from('receipts')
         .insert({
@@ -131,13 +118,9 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       
       if (receiptError) throw receiptError;
       
-      // Update shipment status
       await supabase
         .from('shipments')
-        .update({ 
-          status: 'pending_payment',
-          user_id: user?.id || bookingData.user_id || null
-        })
+        .update({ status: 'pending_payment' })
         .eq('id', bookingData.shipment_id);
       
       toast({
@@ -149,7 +132,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
             : 'Your booking is confirmed with 30-day payment terms.',
       });
       
-      // Navigate directly to payment success page with the receipt ID
       navigate(`/payment-success?receipt_id=${receiptData.id}`);
     } catch (error: any) {
       console.error('Error processing payment selection:', error);
@@ -173,7 +155,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
-            {/* Payment Options */}
             <RadioGroup
               value={selectedPaymentMethod}
               onValueChange={(value) => {
@@ -183,7 +164,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
               }}
               className="space-y-4"
             >
-              {/* Pay on Goods Arriving */}
               <div className={`flex items-start space-x-3 border rounded-md p-4 ${selectedPaymentMethod === 'goods_arriving' ? 'bg-blue-50 border-blue-300' : ''}`}>
                 <RadioGroupItem value="goods_arriving" id="goods_arriving" />
                 <div className="space-y-2 w-full">
@@ -216,7 +196,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
                 </div>
               </div>
               
-              {/* Cash on Collection Special Deal */}
               {bookingData?.shipmentDetails?.type === 'drum' && (
                 <div className={`flex items-start space-x-3 border-2 rounded-md p-4 ${selectedPaymentMethod === 'cashOnCollection' ? 'bg-green-50 border-green-400' : 'border-dashed border-yellow-400'}`}>
                   <RadioGroupItem value="cashOnCollection" id="cashOnCollection" />
@@ -254,7 +233,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
                 </div>
               )}
               
-              {/* Standard Payment */}
               <div className={`flex items-start space-x-3 border rounded-md p-4 ${selectedPaymentMethod === 'standard' ? 'bg-gray-50 border-gray-300' : ''}`}>
                 <RadioGroupItem value="standard" id="standard" />
                 <div className="space-y-2 w-full">
@@ -384,7 +362,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
             ) : (
               <>
                 <CheckCircle2 className="mr-2 h-4 w-4" />
-                Confirm Payment Method
+                Complete Payment
               </>
             )}
           </Button>
