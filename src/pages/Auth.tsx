@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import Logo from '@/components/Logo';
 import { Mail, Lock, User, ArrowRight, AlertCircle } from 'lucide-react';
+import { generateCSRFToken, validateCSRFToken } from '@/utils/csrf';
 
 const Auth = () => {
   const [email, setEmail] = useState('');
@@ -17,9 +17,14 @@ const Auth = () => {
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('login');
+  const [csrfToken, setCsrfToken] = useState('');
   const { toast } = useToast();
   const navigate = useNavigate();
   const { session } = useAuth();
+
+  useEffect(() => {
+    setCsrfToken(generateCSRFToken());
+  }, []);
 
   useEffect(() => {
     if (session) {
@@ -29,10 +34,38 @@ const Auth = () => {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateCSRFToken(csrfToken)) {
+      toast({
+        title: 'Security Error',
+        description: 'Invalid form submission. Please try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (!email || !password || !fullName) {
       toast({
         title: 'Missing Information',
         description: 'Please fill in all fields to sign up.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast({
+        title: 'Invalid Email',
+        description: 'Please enter a valid email address.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (password.length < 8) {
+      toast({
+        title: 'Weak Password',
+        description: 'Password must be at least 8 characters long.',
         variant: 'destructive',
       });
       return;
@@ -70,10 +103,29 @@ const Auth = () => {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateCSRFToken(csrfToken)) {
+      toast({
+        title: 'Security Error',
+        description: 'Invalid form submission. Please try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (!email || !password) {
       toast({
         title: 'Missing Information',
         description: 'Please enter both email and password.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast({
+        title: 'Invalid Email',
+        description: 'Please enter a valid email address.',
         variant: 'destructive',
       });
       return;
@@ -118,6 +170,7 @@ const Auth = () => {
 
             <TabsContent value="login" className="space-y-4">
               <form onSubmit={handleSignIn} className="space-y-4">
+                <input type="hidden" name="csrf_token" value={csrfToken} />
                 <div className="space-y-2">
                   <Label htmlFor="email">Email Address</Label>
                   <div className="relative">
