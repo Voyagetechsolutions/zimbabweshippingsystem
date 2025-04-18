@@ -69,6 +69,9 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         ? 'goods_arriving' 
         : (selectedPaymentMethod === 'standard' ? payLaterMethod : selectedPaymentMethod);
       
+      // Generate a transaction ID
+      const transactionId = `TX-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      
       // Create payment record
       const { data: paymentData, error: paymentError } = await supabase
         .from('payments')
@@ -79,7 +82,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
           currency: 'GBP',
           payment_method: paymentMethod,
           payment_status: 'pending',
-          transaction_id: `TX-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+          transaction_id: transactionId
         })
         .select()
         .single();
