@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,11 +30,13 @@ const PaymentSuccess = () => {
       setLoading(true);
       
       try {
-        // Get session_id and payment_intent from URL parameters (added by Stripe/PayPal redirect)
+        // Get parameters from URL 
         const sessionId = searchParams.get('session_id');
         const paymentIntent = searchParams.get('payment_intent');
         const paymentId = searchParams.get('payment_id');
         const receiptId = searchParams.get('receipt_id');
+        
+        console.log("URL parameters:", { sessionId, paymentIntent, paymentId, receiptId });
         
         if (!sessionId && !paymentIntent && !paymentId && !receiptId) {
           throw new Error('No payment information found');
@@ -45,6 +46,8 @@ const PaymentSuccess = () => {
         
         // If we have a receipt ID directly
         if (receiptId) {
+          console.log("Fetching receipt by ID:", receiptId);
+          
           // Use tableFrom helper to type-cast the table name
           const { data, error } = await supabase
             .from(tableFrom('receipts'))
@@ -52,9 +55,14 @@ const PaymentSuccess = () => {
             .eq('id', receiptId)
             .single();
           
-          if (error) throw error;
+          if (error) {
+            console.error("Error fetching receipt by ID:", error);
+            throw error;
+          }
+          
           receipt = data;
           setShipmentData(data.shipments);
+          console.log("Receipt data loaded:", data.id);
         }
         // Otherwise verify with the payment processor and get receipt
         else {

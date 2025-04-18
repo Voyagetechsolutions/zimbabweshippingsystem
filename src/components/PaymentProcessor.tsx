@@ -26,6 +26,7 @@ import {
   CreditCard,
   Tag
 } from 'lucide-react';
+import { generateUniqueId } from '@/lib/utils';
 
 interface PaymentProcessorProps {
   bookingData: any;
@@ -69,8 +70,8 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         ? 'goods_arriving' 
         : (selectedPaymentMethod === 'standard' ? payLaterMethod : selectedPaymentMethod);
       
-      // Generate a transaction ID
-      const transactionId = `TX-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      // Generate a transaction ID with proper UUID format
+      const transactionId = generateUniqueId('TX-');
       
       // Create payment record
       const { data: paymentData, error: paymentError } = await supabase
@@ -128,7 +129,8 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
             : 'Your booking is confirmed with 30-day payment terms.',
       });
       
-      // Redirect to receipt page
+      // Redirect to receipt page with receipt_id parameter
+      console.log("Redirecting to receipt page with receipt ID:", receiptData.id);
       navigate(`/PaymentSuccess?receipt_id=${receiptData.id}`);
       
     } catch (error: any) {

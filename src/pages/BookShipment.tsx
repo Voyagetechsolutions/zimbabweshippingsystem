@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -75,7 +74,7 @@ const BookShipment = () => {
       
       setBookingData({
         ...data,
-        shipment_id: shipmentId,
+        shipment_id: shipmentId,  // Make sure this is a valid UUID
         user_id: user?.id || null,
         senderDetails: {
           name: `${data.firstName} ${data.lastName}`,
@@ -106,6 +105,8 @@ const BookShipment = () => {
       
       setTotalAmount(finalAmount);
       setCurrentStep(BookingStep.PAYMENT);
+      
+      console.log("Transitioning to payment step with shipment ID:", shipmentId);
       
       // After setting the booking data, fetch the tracking number from the database
       try {
