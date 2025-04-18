@@ -304,8 +304,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             </TabsTrigger>
             <TabsTrigger value="recipient" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
-              <span className="hidden md:inline">Recipient Information</span>
-              <span className="inline md:hidden">Recipient</span>
+              <span className="hidden md:inline">Receicer Information</span>
+              <span className="inline md:hidden">Receicer</span>
             </TabsTrigger>
             <TabsTrigger value="shipment" className="flex items-center gap-2">
               <Package className="h-4 w-4" />
@@ -513,7 +513,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
           {/* Recipient Information Tab */}
           <TabsContent value="recipient">
             <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Recipient Information</h3>
+              <h3 className="text-lg font-semibold mb-4">Receicer Information</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
@@ -521,7 +521,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   name="recipientName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Recipient Name *</FormLabel>
+                      <FormLabel>Receicer Name *</FormLabel>
                       <FormControl>
                         <Input placeholder="Jane Smith" {...field} />
                       </FormControl>
@@ -535,7 +535,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   name="recipientPhone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Recipient Phone Number *</FormLabel>
+                      <FormLabel>Receicer Phone Number *</FormLabel>
                       <FormControl>
                         <Input placeholder="+1 234 567 8900" {...field} />
                       </FormControl>
