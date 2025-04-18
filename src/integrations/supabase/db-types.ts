@@ -1,4 +1,3 @@
-
 import { Database } from './types';
 import { Json } from './types';
 
@@ -8,7 +7,20 @@ export interface Tables {
   notifications: Database['public']['Tables']['notifications']['Row'];
   payments: Database['public']['Tables']['payments']['Row'];
   shipments: Database['public']['Tables']['shipments']['Row'];
-  profiles: Database['public']['Tables']['profiles']['Row'];
+  profiles: {
+    id: string;
+    email: string;
+    full_name: string | null;
+    avatar_url: string | null;
+    role: string | null;
+    created_at: string;
+    updated_at: string;
+    is_admin: boolean | null;
+    communication_preferences: Json;
+    mfa_enabled: boolean;
+    mfa_secret: string | null;
+    mfa_backup_codes: string[] | null;
+  };
   
   // Add the receipts table
   receipts: {

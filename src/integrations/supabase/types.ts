@@ -331,6 +331,9 @@ export type Database = {
           full_name: string | null
           id: string
           is_admin: boolean | null
+          mfa_backup_codes: string[] | null
+          mfa_enabled: boolean | null
+          mfa_secret: string | null
           role: string | null
           updated_at: string
         }
@@ -342,6 +345,9 @@ export type Database = {
           full_name?: string | null
           id: string
           is_admin?: boolean | null
+          mfa_backup_codes?: string[] | null
+          mfa_enabled?: boolean | null
+          mfa_secret?: string | null
           role?: string | null
           updated_at?: string
         }
@@ -353,6 +359,9 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_admin?: boolean | null
+          mfa_backup_codes?: string[] | null
+          mfa_enabled?: boolean | null
+          mfa_secret?: string | null
           role?: string | null
           updated_at?: string
         }
@@ -792,6 +801,10 @@ export type Database = {
           p_expiry_date?: string
         }
         Returns: Json
+      }
+      verify_mfa_login: {
+        Args: { user_id: string; token: string }
+        Returns: boolean
       }
     }
     Enums: {
