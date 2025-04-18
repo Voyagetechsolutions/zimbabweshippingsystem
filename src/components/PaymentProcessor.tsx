@@ -129,7 +129,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       });
       
       // Redirect to receipt page
-      navigate(`/payment-success?receipt_id=${receiptData.id}`);
+      navigate(`/PaymentSuccess?receipt_id=${receiptData.id}`);
       
     } catch (error: any) {
       console.error('Error processing payment selection:', error);
