@@ -80,7 +80,7 @@ interface SupportTicket {
   responses?: TicketResponse[];
 }
 
-// Interface for response data from database
+// Define a more flexible type for response data from database
 interface TicketResponseData {
   id: string;
   ticket_id: string;
@@ -90,6 +90,18 @@ interface TicketResponseData {
   created_at: string;
   notification_sent?: boolean;
   profiles?: ProfileData | null;
+}
+
+// Type for the actual raw response from Supabase
+type RawTicketResponseData = {
+  id: string;
+  ticket_id: string;
+  user_id: string;
+  message: string;
+  is_staff_response: boolean;
+  created_at: string;
+  notification_sent: boolean;
+  profiles: any; // Using any here as the structure may vary
 }
 
 const SupportDashboard = () => {
@@ -144,15 +156,19 @@ const SupportDashboard = () => {
           
           if (responsesError) throw responsesError;
           
-          const formattedResponses: TicketResponse[] = responsesData.map((response: TicketResponseData) => {
-            // Safely access the email and full_name from profiles data
-            const userEmail = response.profiles?.email || '';
-            const userName = response.profiles?.full_name || '';
-            
+          // Use type assertion to handle the raw data
+          const formattedResponses: TicketResponse[] = (responsesData as RawTicketResponseData[]).map((response) => {
             return {
-              ...response,
-              user_email: userEmail,
-              user_name: userName,
+              id: response.id,
+              ticket_id: response.ticket_id,
+              user_id: response.user_id,
+              message: response.message,
+              is_staff_response: response.is_staff_response,
+              created_at: response.created_at,
+              notification_sent: response.notification_sent,
+              // Safely extract user data, defaulting to empty strings
+              user_email: response.profiles?.email || '',
+              user_name: response.profiles?.full_name || '',
             };
           });
           
@@ -266,11 +282,21 @@ const SupportDashboard = () => {
       
       if (responseError) throw responseError;
       
-      // Format the new response, safely accessing profile data
+      // Type assertion to handle the raw response data
+      const rawResponse = responseData as RawTicketResponseData;
+      
+      // Create a properly formatted response object
       const newResponse: TicketResponse = {
-        ...responseData,
-        user_email: responseData.profiles?.email || '',
-        user_name: responseData.profiles?.full_name || '',
+        id: rawResponse.id,
+        ticket_id: rawResponse.ticket_id,
+        user_id: rawResponse.user_id,
+        message: rawResponse.message,
+        is_staff_response: rawResponse.is_staff_response,
+        created_at: rawResponse.created_at,
+        notification_sent: rawResponse.notification_sent,
+        // Safely extract profile data with fallbacks
+        user_email: rawResponse.profiles?.email || '',
+        user_name: rawResponse.profiles?.full_name || '',
       };
       
       // Update the ticket status to "In Progress" if it's currently "Open"
