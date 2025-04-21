@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -38,7 +37,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { 
+import {
   Package, 
   Truck, 
   Calendar, 
@@ -104,6 +103,23 @@ const getStatusBadgeClass = (status: string) => {
   }
 };
 
+// Interface for shipment with profiles
+interface ShipmentWithProfile {
+  id: string;
+  tracking_number: string;
+  origin: string;
+  destination: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  metadata?: any;
+  user_id?: string;
+  profiles?: {
+    email?: string;
+    full_name?: string;
+  } | null;
+}
+
 const LogisticsDashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -129,12 +145,12 @@ const LogisticsDashboard = () => {
     data: shipments = [], 
     isLoading: shipmentsLoading, 
     refetch: refetchShipments 
-  } = useQuery({
+  } = useQuery<ShipmentWithProfile[]>({
     queryKey: ['logistics-shipments'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('shipments')
-        .select('*, profiles:user_id(*)')
+        .select('*, profiles:user_id(email, full_name)')
         .order('created_at', { ascending: false });
       
       if (error) throw error;

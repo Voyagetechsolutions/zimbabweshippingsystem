@@ -45,6 +45,12 @@ import {
 } from 'lucide-react';
 import { RecentShipments } from '@/components/customer/RecentShipments';
 
+// Define type for shipment metadata to help TypeScript understand the structure
+interface ShipmentMetadata {
+  pickup_date?: string;
+  [key: string]: any;
+}
+
 // Helper function to get status badge styling
 const getStatusBadge = (status: string) => {
   const statusLower = status.toLowerCase();
@@ -139,6 +145,23 @@ const CustomerDashboard = () => {
   const pendingCollection = shipments?.filter(s => 
     s.status === 'Booking Confirmed' || s.status === 'Ready for Pickup'
   ).length || 0;
+
+  // Helper function to safely get pickup_date from metadata
+  const getPickupDate = (shipment: any): string | undefined => {
+    if (!shipment.metadata) return undefined;
+    
+    // Handle both string and object formats of metadata
+    if (typeof shipment.metadata === 'string') {
+      try {
+        const parsed = JSON.parse(shipment.metadata);
+        return parsed.pickup_date;
+      } catch {
+        return undefined;
+      }
+    }
+    
+    return shipment.metadata.pickup_date;
+  };
 
   // For skeleton loading
   const loadingArray = [1, 2, 3, 4, 5];
@@ -475,7 +498,7 @@ const CustomerDashboard = () => {
                 </div>
               ) : filteredShipments.filter(s => 
                 (s.status === 'Booking Confirmed' || s.status === 'Ready for Pickup') && 
-                s.metadata?.pickup_date
+                getPickupDate(s)
               ).length === 0 ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="text-center">
@@ -488,7 +511,7 @@ const CustomerDashboard = () => {
                   {filteredShipments
                     .filter(s => 
                       (s.status === 'Booking Confirmed' || s.status === 'Ready for Pickup') && 
-                      s.metadata?.pickup_date
+                      getPickupDate(s)
                     )
                     .map((shipment) => (
                       <div 
@@ -499,7 +522,7 @@ const CustomerDashboard = () => {
                           <p className="font-medium">{shipment.tracking_number}</p>
                           <div className="flex items-center gap-2 mt-1">
                             <Badge className="bg-green-100 text-green-800 border-green-300">
-                              {shipment.metadata?.pickup_date}
+                              {getPickupDate(shipment)}
                             </Badge>
                             <span className="text-sm text-gray-500">
                               {shipment.origin}

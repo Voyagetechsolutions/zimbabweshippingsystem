@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -69,6 +68,11 @@ interface TicketResponse {
   message: string;
   is_staff_response: boolean;
   created_at: string;
+  notification_sent?: boolean;
+  profiles?: {
+    email?: string;
+    full_name?: string;
+  } | null;
   user_email?: string;
   user_name?: string;
 }
@@ -305,7 +309,6 @@ const SupportDashboard = () => {
     }
   };
 
-  // Get status badge color
   const getStatusBadge = (status: string) => {
     switch (status.toLowerCase()) {
       case 'open':
@@ -319,7 +322,6 @@ const SupportDashboard = () => {
     }
   };
 
-  // Get priority badge color
   const getPriorityBadge = (priority: string) => {
     switch (priority.toLowerCase()) {
       case 'high':
@@ -335,7 +337,6 @@ const SupportDashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* Dashboard stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -380,9 +381,7 @@ const SupportDashboard = () => {
         </Card>
       </div>
 
-      {/* Main content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Tickets list */}
         <div className={selectedTicket && !isMobile ? "col-span-1" : "col-span-3"}>
           <Card>
             <CardHeader>
@@ -495,7 +494,6 @@ const SupportDashboard = () => {
             </CardContent>
           </Card>
           
-          {/* Mobile view for selected ticket */}
           {selectedTicket && isMobile && (
             <Card className="mt-6">
               <CardHeader>
@@ -528,7 +526,6 @@ const SupportDashboard = () => {
                   <p className="whitespace-pre-wrap">{selectedTicket.message}</p>
                 </div>
                 
-                {/* Responses */}
                 {selectedTicket.responses && selectedTicket.responses.length > 0 && (
                   <div className="space-y-4 pt-2">
                     <h3 className="text-sm font-medium text-gray-500">Conversation</h3>
@@ -555,7 +552,6 @@ const SupportDashboard = () => {
                   </div>
                 )}
                 
-                {/* Response form */}
                 {selectedTicket.status.toLowerCase() !== 'closed' && (
                   <div className="pt-4">
                     <Textarea
@@ -597,7 +593,6 @@ const SupportDashboard = () => {
           )}
         </div>
         
-        {/* Ticket details (desktop view) */}
         {selectedTicket && !isMobile && (
           <div className="col-span-2">
             <Card className="h-full flex flex-col">
@@ -636,40 +631,36 @@ const SupportDashboard = () => {
                   <p className="whitespace-pre-wrap">{selectedTicket.message}</p>
                 </div>
                 
-                {/* Responses */}
-                <div className="flex-grow overflow-y-auto mb-4 max-h-[300px]">
-                  {selectedTicket.responses && selectedTicket.responses.length > 0 ? (
-                    <div className="space-y-4">
-                      <h3 className="text-sm font-medium text-gray-500 mb-2">Conversation</h3>
-                      {selectedTicket.responses.map((response) => (
-                        <div 
-                          key={response.id} 
-                          className={`border rounded-md p-4 ${
-                            response.is_staff_response ? 'bg-blue-50 ml-8' : 'bg-gray-50 mr-8'
-                          }`}
-                        >
-                          <div className="flex justify-between items-start mb-2">
-                            <span className="text-sm font-medium">
-                              {response.is_staff_response 
-                                ? 'Support Agent' 
-                                : (response.user_name || response.user_email || 'Customer')}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {format(new Date(response.created_at), 'MMM d, yyyy HH:mm')}
-                            </span>
-                          </div>
-                          <p className="whitespace-pre-wrap">{response.message}</p>
+                {selectedTicket.responses && selectedTicket.responses.length > 0 ? (
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Conversation</h3>
+                    {selectedTicket.responses.map((response) => (
+                      <div 
+                        key={response.id} 
+                        className={`border rounded-md p-4 ${
+                          response.is_staff_response ? 'bg-blue-50 ml-8' : 'bg-gray-50 mr-8'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="text-sm font-medium">
+                            {response.is_staff_response 
+                              ? 'Support Agent' 
+                              : (response.user_name || response.user_email || 'Customer')}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {format(new Date(response.created_at), 'MMM d, yyyy HH:mm')}
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-4 text-gray-500">
-                      No responses yet
-                    </div>
-                  )}
-                </div>
+                        <p className="whitespace-pre-wrap">{response.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-gray-500">
+                    No responses yet
+                  </div>
+                )}
                 
-                {/* Response form */}
                 {selectedTicket.status.toLowerCase() !== 'closed' && (
                   <div className="mt-auto">
                     <Textarea
