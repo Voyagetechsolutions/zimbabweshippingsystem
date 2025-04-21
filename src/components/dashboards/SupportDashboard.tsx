@@ -48,6 +48,11 @@ import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 
+interface ProfileData {
+  email?: string;
+  full_name?: string;
+}
+
 interface TicketResponse {
   id: string;
   ticket_id: string;
@@ -84,7 +89,7 @@ interface TicketResponseData {
   is_staff_response: boolean;
   created_at: string;
   notification_sent?: boolean;
-  profiles?: any;
+  profiles?: ProfileData | null;
 }
 
 const SupportDashboard = () => {
@@ -139,11 +144,17 @@ const SupportDashboard = () => {
           
           if (responsesError) throw responsesError;
           
-          const formattedResponses: TicketResponse[] = responsesData.map((response: TicketResponseData) => ({
-            ...response,
-            user_email: response.profiles?.email,
-            user_name: response.profiles?.full_name,
-          }));
+          const formattedResponses: TicketResponse[] = responsesData.map((response: TicketResponseData) => {
+            // Safely access the email and full_name from profiles data
+            const userEmail = response.profiles?.email || '';
+            const userName = response.profiles?.full_name || '';
+            
+            return {
+              ...response,
+              user_email: userEmail,
+              user_name: userName,
+            };
+          });
           
           return {
             ...ticket,
@@ -255,11 +266,11 @@ const SupportDashboard = () => {
       
       if (responseError) throw responseError;
       
-      // Format the new response
+      // Format the new response, safely accessing profile data
       const newResponse: TicketResponse = {
         ...responseData,
-        user_email: responseData.profiles?.email,
-        user_name: responseData.profiles?.full_name,
+        user_email: responseData.profiles?.email || '',
+        user_name: responseData.profiles?.full_name || '',
       };
       
       // Update the ticket status to "In Progress" if it's currently "Open"
