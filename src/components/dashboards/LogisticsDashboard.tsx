@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Json } from '@/integrations/supabase/types';
 import {
   Tabs,
   TabsContent,
@@ -114,10 +116,36 @@ interface ShipmentWithProfile {
   updated_at: string;
   metadata?: any;
   user_id?: string;
+  weight?: number;
+  dimensions?: string;
+  carrier?: string;
+  can_cancel?: boolean;
+  can_modify?: boolean;
+  estimated_delivery?: string;
   profiles?: {
     email?: string;
     full_name?: string;
   } | null;
+}
+
+// Interface for database return type
+interface ShipmentQueryResult {
+  id: string;
+  tracking_number: string;
+  origin: string;
+  destination: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  metadata?: Json;
+  user_id?: string;
+  weight?: number | null;
+  dimensions?: string | null;
+  carrier?: string | null;
+  can_cancel?: boolean | null;
+  can_modify?: boolean | null;
+  estimated_delivery?: string | null;
+  profiles?: any;
 }
 
 const LogisticsDashboard = () => {
@@ -127,13 +155,13 @@ const LogisticsDashboard = () => {
 
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedShipment, setSelectedShipment] = useState<any>(null);
+  const [selectedShipment, setSelectedShipment] = useState<ShipmentWithProfile | null>(null);
   const [newStatus, setNewStatus] = useState<string>('');
   const [showStatusDialog, setShowStatusDialog] = useState(false);
   const [processingAction, setProcessingAction] = useState(false);
-  const [scheduledPickups, setScheduledPickups] = useState<any[]>([]);
-  const [warehouseItems, setWarehouseItems] = useState<any[]>([]);
-  const [inTransitItems, setInTransitItems] = useState<any[]>([]);
+  const [scheduledPickups, setScheduledPickups] = useState<ShipmentWithProfile[]>([]);
+  const [warehouseItems, setWarehouseItems] = useState<ShipmentWithProfile[]>([]);
+  const [inTransitItems, setInTransitItems] = useState<ShipmentWithProfile[]>([]);
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
@@ -154,7 +182,29 @@ const LogisticsDashboard = () => {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return data || [];
+      
+      // Transform the data to match our interface
+      return (data || []).map((item: ShipmentQueryResult): ShipmentWithProfile => ({
+        id: item.id,
+        tracking_number: item.tracking_number,
+        origin: item.origin,
+        destination: item.destination,
+        status: item.status,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        metadata: item.metadata,
+        user_id: item.user_id,
+        weight: item.weight || undefined,
+        dimensions: item.dimensions || undefined,
+        carrier: item.carrier || undefined,
+        can_cancel: item.can_cancel || undefined,
+        can_modify: item.can_modify || undefined,
+        estimated_delivery: item.estimated_delivery || undefined,
+        profiles: item.profiles?.email ? {
+          email: item.profiles.email,
+          full_name: item.profiles.full_name
+        } : null
+      }));
     },
   });
 
@@ -179,7 +229,7 @@ const LogisticsDashboard = () => {
 
   // Filter shipments by status groups
   useEffect(() => {
-    if (shipments) {
+    if (shipments && Array.isArray(shipments)) {
       // Scheduled for pickup
       const pickups = shipments.filter(s => 
         s.status === 'Booking Confirmed' || 
@@ -205,7 +255,7 @@ const LogisticsDashboard = () => {
   }, [shipments]);
 
   // Filtered shipments based on search and status
-  const filteredShipments = shipments.filter(shipment => {
+  const filteredShipments = Array.isArray(shipments) ? shipments.filter(shipment => {
     const matchesSearch = 
       searchQuery === '' ||
       shipment.tracking_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -218,7 +268,7 @@ const LogisticsDashboard = () => {
       shipment.status.toLowerCase() === statusFilter.toLowerCase();
     
     return matchesSearch && matchesStatus;
-  });
+  }) : [];
 
   // Handle status update
   const updateShipmentStatus = async () => {
@@ -297,7 +347,7 @@ const LogisticsDashboard = () => {
             .update({
               status: 'Ready for Pickup',
               metadata: {
-                ...shipment.metadata,
+                ...(shipment.metadata || {}),
                 pickup_date: selectedDate
               }
             })

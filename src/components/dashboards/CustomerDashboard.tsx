@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
+import { Json } from '@/integrations/supabase/types';
 import {
   Card,
   CardContent,
@@ -77,12 +78,56 @@ const getStatusBadge = (status: string) => {
   }
 };
 
+// Define an interface for a shipment with proper typing
+interface Shipment {
+  id: string;
+  tracking_number: string;
+  origin: string;
+  destination: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  can_cancel?: boolean;
+  can_modify?: boolean;
+  carrier?: string;
+  dimensions?: string;
+  estimated_delivery?: string;
+  metadata?: Json;
+  user_id?: string;
+  weight?: number;
+}
+
+// Define interface for notification
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  type: string;
+  related_id?: string;
+  user_id: string;
+}
+
+// Define interface for support ticket
+interface SupportTicket {
+  id: string;
+  subject: string;
+  message: string;
+  status: string;
+  priority: string;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  assigned_to?: string;
+}
+
 const CustomerDashboard = () => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
 
   // Fetch user's shipments
-  const { data: shipments, isLoading: shipmentLoading } = useQuery({
+  const { data: shipments, isLoading: shipmentLoading } = useQuery<Shipment[]>({
     queryKey: ['user-shipments', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -98,7 +143,7 @@ const CustomerDashboard = () => {
   });
 
   // Fetch user's notifications
-  const { data: notifications, isLoading: notificationsLoading } = useQuery({
+  const { data: notifications, isLoading: notificationsLoading } = useQuery<Notification[]>({
     queryKey: ['user-notifications', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -115,7 +160,7 @@ const CustomerDashboard = () => {
   });
 
   // Fetch user's support tickets
-  const { data: tickets, isLoading: ticketsLoading } = useQuery({
+  const { data: tickets, isLoading: ticketsLoading } = useQuery<SupportTicket[]>({
     queryKey: ['user-tickets', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -147,20 +192,22 @@ const CustomerDashboard = () => {
   ).length || 0;
 
   // Helper function to safely get pickup_date from metadata
-  const getPickupDate = (shipment: any): string | undefined => {
+  const getPickupDate = (shipment: Shipment): string | undefined => {
     if (!shipment.metadata) return undefined;
     
     // Handle both string and object formats of metadata
     if (typeof shipment.metadata === 'string') {
       try {
-        const parsed = JSON.parse(shipment.metadata);
+        const parsed = JSON.parse(shipment.metadata as string) as ShipmentMetadata;
         return parsed.pickup_date;
       } catch {
         return undefined;
       }
     }
     
-    return shipment.metadata.pickup_date;
+    // If metadata is already an object
+    const metadata = shipment.metadata as ShipmentMetadata;
+    return metadata.pickup_date;
   };
 
   // For skeleton loading

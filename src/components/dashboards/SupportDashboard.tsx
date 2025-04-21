@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
+  CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -46,6 +48,18 @@ import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 
+interface TicketResponse {
+  id: string;
+  ticket_id: string;
+  user_id: string;
+  message: string;
+  is_staff_response: boolean;
+  created_at: string;
+  notification_sent?: boolean;
+  user_email?: string;
+  user_name?: string;
+}
+
 interface SupportTicket {
   id: string;
   user_id: string;
@@ -61,7 +75,8 @@ interface SupportTicket {
   responses?: TicketResponse[];
 }
 
-interface TicketResponse {
+// Interface for response data from database
+interface TicketResponseData {
   id: string;
   ticket_id: string;
   user_id: string;
@@ -69,12 +84,7 @@ interface TicketResponse {
   is_staff_response: boolean;
   created_at: string;
   notification_sent?: boolean;
-  profiles?: {
-    email?: string;
-    full_name?: string;
-  } | null;
-  user_email?: string;
-  user_name?: string;
+  profiles?: any;
 }
 
 const SupportDashboard = () => {
@@ -112,7 +122,7 @@ const SupportDashboard = () => {
       if (ticketsError) throw ticketsError;
       
       // Format the tickets with user information
-      const formattedTickets = ticketsData.map((ticket: any) => ({
+      const formattedTickets: SupportTicket[] = ticketsData.map((ticket: any) => ({
         ...ticket,
         user_email: ticket.profiles?.email,
         user_name: ticket.profiles?.full_name,
@@ -129,7 +139,7 @@ const SupportDashboard = () => {
           
           if (responsesError) throw responsesError;
           
-          const formattedResponses = responsesData.map((response: any) => ({
+          const formattedResponses: TicketResponse[] = responsesData.map((response: TicketResponseData) => ({
             ...response,
             user_email: response.profiles?.email,
             user_name: response.profiles?.full_name,
@@ -246,7 +256,7 @@ const SupportDashboard = () => {
       if (responseError) throw responseError;
       
       // Format the new response
-      const newResponse = {
+      const newResponse: TicketResponse = {
         ...responseData,
         user_email: responseData.profiles?.email,
         user_name: responseData.profiles?.full_name,
