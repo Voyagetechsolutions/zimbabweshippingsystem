@@ -81,10 +81,26 @@ interface SupportTicket {
   assigned_to?: string | null;
   created_at: string;
   updated_at: string;
-  profiles?: ProfileData;
   user_email?: string;
   user_name?: string;
   responses?: TicketResponse[];
+  profiles?: ProfileData;
+}
+
+interface TicketWithProfile {
+  id: string;
+  user_id: string;
+  subject: string;
+  message: string;
+  status: string;
+  priority: string;
+  assigned_to?: string | null;
+  created_at: string;
+  updated_at: string;
+  user_profile?: {
+    email?: string;
+    full_name?: string;
+  };
 }
 
 // Define a more flexible type for response data from database
@@ -127,7 +143,7 @@ const SupportDashboard = () => {
   const { data: tickets, isLoading } = useQuery({
     queryKey: ['support-tickets'],
     queryFn: async () => {
-      // Fetch tickets with user profiles
+      // Fetch tickets with user profiles using a specific join hint
       const { data: ticketsData, error: ticketsError } = await supabase
         .from('support_tickets')
         .select(`
@@ -136,18 +152,18 @@ const SupportDashboard = () => {
             email,
             full_name
           )
-        `)
-        .order('created_at', { ascending: false });
+        `);
         
       if (ticketsError) throw ticketsError;
       
       console.log('Fetched support tickets:', ticketsData);
       
       // Process the tickets data to include user information
-      const processedTickets: SupportTicket[] = await Promise.all((ticketsData || []).map(async (ticket) => {
+      const processedTickets: SupportTicket[] = await Promise.all((ticketsData || []).map(async (ticket: any) => {
         // Safely extract profile data
-        const userEmail = ticket.profiles?.email || 'Unknown';
-        const userName = ticket.profiles?.full_name || 'Unknown User';
+        const userProfile = ticket.profiles as ProfileData | null;
+        const userEmail = userProfile?.email || 'Unknown';
+        const userName = userProfile?.full_name || 'Unknown User';
         
         // Fetch responses for each ticket
         const { data: responsesData, error: responsesError } = await supabase
@@ -165,7 +181,8 @@ const SupportDashboard = () => {
         if (responsesError) throw responsesError;
         
         // Use type assertion to handle the raw data
-        const formattedResponses: TicketResponse[] = (responsesData as RawTicketResponseData[]).map((response) => {
+        const formattedResponses: TicketResponse[] = (responsesData || []).map((response: any) => {
+          const respProfile = response.profiles as ProfileData | null;
           return {
             id: response.id,
             ticket_id: response.ticket_id,
@@ -175,8 +192,8 @@ const SupportDashboard = () => {
             created_at: response.created_at,
             notification_sent: response.notification_sent,
             // Safely extract user data, defaulting to empty strings
-            user_email: response.profiles?.email || '',
-            user_name: response.profiles?.full_name || '',
+            user_email: respProfile?.email || '',
+            user_name: respProfile?.full_name || '',
           };
         });
         
@@ -260,21 +277,19 @@ const SupportDashboard = () => {
       
       if (responseError) throw responseError;
       
-      // Type assertion to handle the raw response data
-      const rawResponse = responseData as RawTicketResponseData;
-      
       // Create a properly formatted response object
+      const respProfile = (responseData as any).profiles as ProfileData | null;
       const newResponse: TicketResponse = {
-        id: rawResponse.id,
-        ticket_id: rawResponse.ticket_id,
-        user_id: rawResponse.user_id,
-        message: rawResponse.message,
-        is_staff_response: rawResponse.is_staff_response,
-        created_at: rawResponse.created_at,
-        notification_sent: rawResponse.notification_sent,
+        id: responseData.id,
+        ticket_id: responseData.ticket_id,
+        user_id: responseData.user_id,
+        message: responseData.message,
+        is_staff_response: responseData.is_staff_response,
+        created_at: responseData.created_at,
+        notification_sent: responseData.notification_sent,
         // Safely extract profile data with fallbacks
-        user_email: rawResponse.profiles?.email || '',
-        user_name: rawResponse.profiles?.full_name || '',
+        user_email: respProfile?.email || '',
+        user_name: respProfile?.full_name || '',
       };
       
       // Update the ticket status to "In Progress" if it's currently "Open"
