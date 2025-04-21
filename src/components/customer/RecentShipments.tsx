@@ -15,7 +15,7 @@ export const RecentShipments = () => {
   const { user } = useAuth();
 
   const { data: shipments, isLoading } = useQuery({
-    queryKey: ['recentShipments'],
+    queryKey: ['recentShipments', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('shipments')
@@ -27,6 +27,7 @@ export const RecentShipments = () => {
       if (error) throw error;
       return data || [];
     },
+    enabled: !!user?.id,
   });
 
   if (isLoading) {
@@ -76,7 +77,17 @@ export const RecentShipments = () => {
       case 'in transit':
         return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200">{status}</Badge>;
       case 'processing':
+      case 'processing in warehouse (uk)':
+      case 'processing in warehouse (zw)':
+        return <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-200">{status}</Badge>;
+      case 'customs clearance':
+        return <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-200">{status}</Badge>;
+      case 'out for delivery':
+        return <Badge className="bg-teal-100 text-teal-800 hover:bg-teal-200">{status}</Badge>;
+      case 'ready for pickup':
         return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">{status}</Badge>;
+      case 'booking confirmed':
+        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200">{status}</Badge>;
       case 'delayed':
         return <Badge className="bg-red-100 text-red-800 hover:bg-red-200">{status}</Badge>;
       default:

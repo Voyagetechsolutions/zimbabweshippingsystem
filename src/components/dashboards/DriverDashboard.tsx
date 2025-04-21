@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Package, Truck, Calendar, AlertTriangle } from 'lucide-react';
 
-// Import our new components
+// Import our components
 import StatsCards from './driver/StatsCards';
 import DeliveryCard from './driver/DeliveryCard';
 import ScheduleCard from './driver/ScheduleCard';
@@ -39,7 +39,13 @@ const DriverDashboard = () => {
       // Fetch active deliveries - include all active statuses
       const { data: activeData, error: activeError } = await supabase
         .from('shipments')
-        .select('*')
+        .select(`
+          *,
+          profiles:user_id(
+            email,
+            full_name
+          )
+        `)
         .in('status', [
           'Booking Confirmed', 
           'Ready for Pickup', 
@@ -59,7 +65,13 @@ const DriverDashboard = () => {
       // Fetch completed deliveries
       const { data: completedData, error: completedError } = await supabase
         .from('shipments')
-        .select('*')
+        .select(`
+          *,
+          profiles:user_id(
+            email,
+            full_name
+          )
+        `)
         .eq('status', 'Delivered')
         .order('created_at', { ascending: false })
         .limit(5);
@@ -85,7 +97,13 @@ const DriverDashboard = () => {
         for (const schedule of scheduleData) {
           const { data: shipmentData, error: shipmentError } = await supabase
             .from('shipments')
-            .select('*')
+            .select(`
+              *,
+              profiles:user_id(
+                email,
+                full_name
+              )
+            `)
             .in('status', ['Booking Confirmed', 'Ready for Pickup'])
             .eq('can_modify', false) // Only confirmed bookings
             .contains('metadata', { pickup_date: schedule.pickup_date });
@@ -184,11 +202,14 @@ const DriverDashboard = () => {
         .getPublicUrl(`deliveries/${fileName}`);
         
       // Update the shipment with the image URL
+      const currentShipment = activeDeliveries.find(d => d.id === currentShipmentId);
+      const currentMetadata = currentShipment?.metadata || {};
+      
       const { error: updateError } = await supabase
         .from('shipments')
         .update({ 
           metadata: { 
-            ...activeDeliveries.find(d => d.id === currentShipmentId)?.metadata,
+            ...currentMetadata,
             delivery_image: urlData.publicUrl 
           }
         })
