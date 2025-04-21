@@ -1,29 +1,83 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { RecentShipments } from '@/components/customer/RecentShipments';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Package, Truck, MapPin, AlertTriangle, Calendar, ChevronRight, Download, Inbox } from 'lucide-react';
-import ShipmentExporter from '@/components/ShipmentExporter';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { 
+  Package, 
+  Truck, 
+  FileText, 
+  Bell, 
+  Search, 
+  PlusCircle, 
+  Eye,
+  CalendarCheck,
+  MessageSquare,
+  Clock,
+  ChevronRight
+} from 'lucide-react';
+import { RecentShipments } from '@/components/customer/RecentShipments';
+
+// Helper function to get status badge styling
+const getStatusBadge = (status: string) => {
+  const statusLower = status.toLowerCase();
+  
+  switch (true) {
+    case statusLower.includes('booking confirmed'):
+      return <Badge className="bg-blue-100 text-blue-800 border-blue-300">{status}</Badge>;
+    case statusLower.includes('ready for pickup'):
+      return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">{status}</Badge>;
+    case statusLower.includes('processing'):
+      return <Badge className="bg-orange-100 text-orange-800 border-orange-300">{status}</Badge>;
+    case statusLower.includes('customs'):
+      return <Badge className="bg-purple-100 text-purple-800 border-purple-300">{status}</Badge>;
+    case statusLower.includes('transit'):
+      return <Badge className="bg-blue-100 text-blue-800 border-blue-300">{status}</Badge>;
+    case statusLower.includes('out for delivery'):
+      return <Badge className="bg-indigo-100 text-indigo-800 border-indigo-300">{status}</Badge>;
+    case statusLower.includes('delivered'):
+      return <Badge className="bg-green-100 text-green-800 border-green-300">{status}</Badge>;
+    case statusLower.includes('cancelled'):
+      return <Badge className="bg-red-100 text-red-800 border-red-300">{status}</Badge>;
+    default:
+      return <Badge variant="outline">{status}</Badge>;
+  }
+};
 
 const CustomerDashboard = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const [selectedShipments, setSelectedShipments] = useState<string[]>([]);
-  const [selectAll, setSelectAll] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Fetch user's shipments
-  const { data: shipments, isLoading } = useQuery({
-    queryKey: ['customerShipments'],
+  const { data: shipments, isLoading: shipmentLoading } = useQuery({
+    queryKey: ['user-shipments', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('shipments')
@@ -34,341 +88,441 @@ const CustomerDashboard = () => {
       if (error) throw error;
       return data || [];
     },
+    enabled: !!user?.id,
   });
 
-  // Handle checkbox selection
-  const handleSelectShipment = (shipmentId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedShipments(prev => [...prev, shipmentId]);
-    } else {
-      setSelectedShipments(prev => prev.filter(id => id !== shipmentId));
-    }
-  };
+  // Fetch user's notifications
+  const { data: notifications, isLoading: notificationsLoading } = useQuery({
+    queryKey: ['user-notifications', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user?.id,
+  });
 
-  const handleSelectAll = (checked: boolean) => {
-    setSelectAll(checked);
-    if (checked && shipments) {
-      setSelectedShipments(shipments.map(s => s.id));
-    } else {
-      setSelectedShipments([]);
-    }
-  };
+  // Fetch user's support tickets
+  const { data: tickets, isLoading: ticketsLoading } = useQuery({
+    queryKey: ['user-tickets', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('support_tickets')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user?.id,
+  });
 
-  // Format status badge
-  const getStatusBadge = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'delivered':
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-200">{status}</Badge>;
-      case 'in transit':
-        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200">{status}</Badge>;
-      case 'processing':
-        return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">{status}</Badge>;
-      case 'delayed':
-        return <Badge className="bg-red-100 text-red-800 hover:bg-red-200">{status}</Badge>;
-      default:
-        return <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-200">{status}</Badge>;
-    }
-  };
+  // Filter shipments based on search query
+  const filteredShipments = shipments?.filter(shipment =>
+    searchQuery === '' ||
+    shipment.tracking_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    shipment.origin.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    shipment.destination.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    shipment.status.toLowerCase().includes(searchQuery.toLowerCase())
+  ) || [];
+
+  // Count shipments by status
+  const activeShipments = shipments?.filter(s => s.status !== 'Delivered' && s.status !== 'Cancelled').length || 0;
+  const deliveredShipments = shipments?.filter(s => s.status === 'Delivered').length || 0;
+  const pendingCollection = shipments?.filter(s => 
+    s.status === 'Booking Confirmed' || s.status === 'Ready for Pickup'
+  ).length || 0;
+
+  // For skeleton loading
+  const loadingArray = [1, 2, 3, 4, 5];
 
   return (
-    <div className="space-y-6">
-      {/* Announcements - temporarily disabled */}
-      {/* <AnnouncementsFeed /> */}
-      
-      {/* Quick Actions */}
+    <div className="space-y-8">
+      {/* Stats Section */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Book a Shipment</CardTitle>
-            <CardDescription>Create a new shipping request</CardDescription>
+            <CardTitle className="text-sm font-medium text-gray-500">Active Shipments</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-500">
-              Start a new shipping request from UK to Zimbabwe with our easy booking process.
-            </p>
+            <div className="flex items-center">
+              <Truck className="h-8 w-8 text-blue-500 mr-3" />
+              <div className="text-2xl font-bold">{activeShipments}</div>
+            </div>
           </CardContent>
-          <CardFooter>
-            <Button asChild className="w-full">
-              <Link to="/book-shipment">
-                Book Now <Package className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </CardFooter>
         </Card>
         
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Track Packages</CardTitle>
-            <CardDescription>Check your shipment status</CardDescription>
+            <CardTitle className="text-sm font-medium text-gray-500">Pending Collection</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-500">
-              Enter your tracking number to get real-time updates on your shipment's location.
-            </p>
+            <div className="flex items-center">
+              <Package className="h-8 w-8 text-yellow-500 mr-3" />
+              <div className="text-2xl font-bold">{pendingCollection}</div>
+            </div>
           </CardContent>
-          <CardFooter>
-            <Button asChild variant="outline" className="w-full">
-              <Link to="/track">
-                Track Now <Truck className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </CardFooter>
         </Card>
         
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Address Book</CardTitle>
-            <CardDescription>Manage your delivery addresses</CardDescription>
+            <CardTitle className="text-sm font-medium text-gray-500">Delivered</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-500">
-              View and update your saved addresses for faster checkout in the future.
-            </p>
+            <div className="flex items-center">
+              <Package className="h-8 w-8 text-green-500 mr-3" />
+              <div className="text-2xl font-bold">{deliveredShipments}</div>
+            </div>
           </CardContent>
-          <CardFooter>
-            <Button asChild variant="outline" className="w-full">
-              <Link to="/address-book">
-                Manage Addresses <MapPin className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </CardFooter>
         </Card>
       </div>
-      
-      {/* Shipments Tabs */}
-      <Tabs defaultValue="all" className="w-full">
-        <div className="flex justify-between items-center mb-4">
-          <TabsList>
-            <TabsTrigger value="all">All Shipments</TabsTrigger>
-            <TabsTrigger value="active">Active</TabsTrigger>
-            <TabsTrigger value="delivered">Delivered</TabsTrigger>
-          </TabsList>
-          
-          {/* Export functionality */}
-          {selectedShipments.length > 0 ? (
-            <ShipmentExporter shipmentIds={selectedShipments} />
-          ) : (
-            <ShipmentExporter all={false} />
-          )}
-        </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Button asChild className="bg-zim-green hover:bg-zim-green/90 h-auto py-3">
+          <Link to="/book-shipment">
+            <PlusCircle className="h-5 w-5 mr-2" />
+            Book New Shipment
+          </Link>
+        </Button>
         
-        <TabsContent value="all" className="mt-0">
+        <Button asChild variant="outline" className="h-auto py-3">
+          <Link to="/track">
+            <Truck className="h-5 w-5 mr-2" />
+            Track Shipment
+          </Link>
+        </Button>
+        
+        <Button asChild variant="outline" className="h-auto py-3">
+          <Link to="/support">
+            <MessageSquare className="h-5 w-5 mr-2" />
+            Contact Support
+          </Link>
+        </Button>
+      </div>
+
+      {/* Main Content */}
+      <Tabs defaultValue="shipments" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="shipments" className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            <span>My Shipments</span>
+          </TabsTrigger>
+          <TabsTrigger value="tickets" className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" />
+            <span>Support Tickets</span>
+          </TabsTrigger>
+          <TabsTrigger value="activity" className="flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            <span>Recent Activity</span>
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="shipments" className="space-y-4 mt-4">
           <Card>
-            <CardHeader className="pb-2">
-              <div className="flex justify-between items-center">
-                <CardTitle>Your Shipments</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Checkbox 
-                    id="select-all" 
-                    checked={selectAll}
-                    onCheckedChange={handleSelectAll}
+            <CardHeader>
+              <CardTitle>My Shipments</CardTitle>
+              <CardDescription>View and track all your shipments</CardDescription>
+              
+              <div className="flex justify-between items-center mt-3">
+                <div className="relative w-full md:w-96">
+                  <Input
+                    placeholder="Search by tracking #, status, or destination"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
                   />
-                  <label htmlFor="select-all" className="text-sm">Select All</label>
+                  <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
+              {shipmentLoading ? (
+                <div className="animate-pulse space-y-4">
+                  {loadingArray.map((i) => (
+                    <div key={i} className="h-12 bg-gray-100 rounded"></div>
+                  ))}
                 </div>
-              ) : shipments && shipments.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12"></TableHead>
-                      <TableHead>Tracking #</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="hidden md:table-cell">Origin</TableHead>
-                      <TableHead className="hidden md:table-cell">Destination</TableHead>
-                      <TableHead className="hidden lg:table-cell">Date</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {shipments.map((shipment) => (
-                      <TableRow key={shipment.id}>
-                        <TableCell>
-                          <Checkbox 
-                            checked={selectedShipments.includes(shipment.id)}
-                            onCheckedChange={(checked) => 
-                              handleSelectShipment(shipment.id, checked as boolean)
-                            }
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium">{shipment.tracking_number}</TableCell>
-                        <TableCell>{getStatusBadge(shipment.status)}</TableCell>
-                        <TableCell className="hidden md:table-cell">{shipment.origin}</TableCell>
-                        <TableCell className="hidden md:table-cell">{shipment.destination}</TableCell>
-                        <TableCell className="hidden lg:table-cell">
-                          {shipment.created_at ? format(new Date(shipment.created_at), 'MMM d, yyyy') : ''}
-                        </TableCell>
-                        <TableCell>
-                          <Button asChild variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <Link to={`/shipment/${shipment.id}`}>
-                              <span className="sr-only">View details</span>
-                              <ChevronRight className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
+              ) : filteredShipments.length === 0 ? (
                 <div className="text-center py-8">
-                  <Inbox className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold">No shipments found</h3>
-                  <p className="text-gray-500 mt-2">
-                    You don't have any shipments yet. Start by booking a new shipment.
+                  <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium">No shipments found</h3>
+                  <p className="text-gray-500 mb-6 mt-1">
+                    {searchQuery 
+                      ? "Try adjusting your search" 
+                      : "You don't have any shipments yet"}
                   </p>
-                  <Button asChild className="mt-4">
-                    <Link to="/book-shipment">Book a Shipment</Link>
+                  <Button asChild>
+                    <Link to="/book-shipment">Book Your First Shipment</Link>
                   </Button>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="active" className="mt-0">
-          <Card>
-            <CardHeader>
-              <CardTitle>Active Shipments</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
-                </div>
-              ) : shipments && shipments.filter(s => 
-                ['processing', 'in transit', 'delayed'].includes(s.status.toLowerCase())
-              ).length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12"></TableHead>
-                      <TableHead>Tracking #</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="hidden md:table-cell">Destination</TableHead>
-                      <TableHead className="hidden lg:table-cell">Est. Delivery</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {shipments
-                      .filter(s => ['processing', 'in transit', 'delayed'].includes(s.status.toLowerCase()))
-                      .map((shipment) => (
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tracking #</TableHead>
+                        <TableHead className="hidden md:table-cell">From</TableHead>
+                        <TableHead className="hidden md:table-cell">To</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="hidden md:table-cell">Date</TableHead>
+                        <TableHead className="text-right">View</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredShipments.map((shipment) => (
                         <TableRow key={shipment.id}>
-                          <TableCell>
-                            <Checkbox 
-                              checked={selectedShipments.includes(shipment.id)}
-                              onCheckedChange={(checked) => 
-                                handleSelectShipment(shipment.id, checked as boolean)
-                              }
-                            />
-                          </TableCell>
                           <TableCell className="font-medium">{shipment.tracking_number}</TableCell>
-                          <TableCell>{getStatusBadge(shipment.status)}</TableCell>
-                          <TableCell className="hidden md:table-cell">{shipment.destination}</TableCell>
-                          <TableCell className="hidden lg:table-cell">
-                            {shipment.estimated_delivery 
-                              ? format(new Date(shipment.estimated_delivery), 'MMM d, yyyy') 
-                              : 'TBD'}
+                          <TableCell className="hidden md:table-cell max-w-[180px] truncate">
+                            {shipment.origin}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell max-w-[180px] truncate">
+                            {shipment.destination}
                           </TableCell>
                           <TableCell>
-                            <Button asChild variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            {getStatusBadge(shipment.status)}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell text-sm text-gray-500">
+                            {format(new Date(shipment.created_at), 'MMM d, yyyy')}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button asChild variant="ghost" size="sm">
                               <Link to={`/shipment/${shipment.id}`}>
-                                <span className="sr-only">View details</span>
-                                <ChevronRight className="h-4 w-4" />
+                                <Eye className="h-4 w-4 mr-1" />
+                                Details
                               </Link>
                             </Button>
                           </TableCell>
                         </TableRow>
                       ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-8">
-                  <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold">No active shipments</h3>
-                  <p className="text-gray-500 mt-2">
-                    You don't have any active shipments at the moment.
-                  </p>
+                    </TableBody>
+                  </Table>
                 </div>
               )}
             </CardContent>
+            <CardFooter className="flex justify-center border-t pt-4">
+              <Button asChild variant="outline">
+                <Link to="/book-shipment">
+                  <PlusCircle className="h-4 w-4 mr-2" />
+                  Book New Shipment
+                </Link>
+              </Button>
+            </CardFooter>
           </Card>
         </TabsContent>
         
-        <TabsContent value="delivered" className="mt-0">
+        <TabsContent value="tickets" className="space-y-4 mt-4">
           <Card>
             <CardHeader>
-              <CardTitle>Delivered Shipments</CardTitle>
+              <CardTitle>Support Tickets</CardTitle>
+              <CardDescription>View and manage your support requests</CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
+              {ticketsLoading ? (
+                <div className="animate-pulse space-y-4">
+                  {loadingArray.map((i) => (
+                    <div key={i} className="h-12 bg-gray-100 rounded"></div>
+                  ))}
                 </div>
-              ) : shipments && shipments.filter(s => s.status.toLowerCase() === 'delivered').length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12"></TableHead>
-                      <TableHead>Tracking #</TableHead>
-                      <TableHead className="hidden md:table-cell">Origin</TableHead>
-                      <TableHead className="hidden md:table-cell">Destination</TableHead>
-                      <TableHead className="hidden lg:table-cell">Delivered Date</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {shipments
-                      .filter(s => s.status.toLowerCase() === 'delivered')
-                      .map((shipment) => (
-                        <TableRow key={shipment.id}>
-                          <TableCell>
-                            <Checkbox 
-                              checked={selectedShipments.includes(shipment.id)}
-                              onCheckedChange={(checked) => 
-                                handleSelectShipment(shipment.id, checked as boolean)
-                              }
-                            />
-                          </TableCell>
-                          <TableCell className="font-medium">{shipment.tracking_number}</TableCell>
-                          <TableCell className="hidden md:table-cell">{shipment.origin}</TableCell>
-                          <TableCell className="hidden md:table-cell">{shipment.destination}</TableCell>
-                          <TableCell className="hidden lg:table-cell">
-                            {shipment.estimated_delivery 
-                              ? format(new Date(shipment.estimated_delivery), 'MMM d, yyyy') 
-                              : format(new Date(shipment.created_at), 'MMM d, yyyy')}
-                          </TableCell>
-                          <TableCell>
-                            <Button asChild variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <Link to={`/shipment/${shipment.id}`}>
-                                <span className="sr-only">View details</span>
-                                <ChevronRight className="h-4 w-4" />
-                              </Link>
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-              ) : (
+              ) : tickets?.length === 0 ? (
                 <div className="text-center py-8">
-                  <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold">No delivered shipments</h3>
-                  <p className="text-gray-500 mt-2">
-                    You don't have any delivered shipments yet.
+                  <MessageSquare className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium">No support tickets</h3>
+                  <p className="text-gray-500 mb-6 mt-1">
+                    You don't have any support tickets yet
                   </p>
+                  <Button asChild>
+                    <Link to="/support">Contact Support</Link>
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {tickets?.map((ticket) => (
+                    <Card key={ticket.id}>
+                      <CardHeader className="p-4">
+                        <div className="flex justify-between">
+                          <CardTitle className="text-base">{ticket.subject}</CardTitle>
+                          <Badge 
+                            variant={
+                              ticket.status === 'Open' ? 'default' :
+                              ticket.status === 'In Progress' ? 'outline' : 'secondary'
+                            }
+                          >
+                            {ticket.status}
+                          </Badge>
+                        </div>
+                        <CardDescription className="flex items-center mt-1">
+                          <Clock className="h-3.5 w-3.5 mr-1" />
+                          {format(new Date(ticket.created_at), 'MMM d, yyyy')}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-0">
+                        <p className="text-sm text-gray-700 line-clamp-2">{ticket.message}</p>
+                      </CardContent>
+                      <CardFooter className="p-4 pt-0 flex justify-end">
+                        <Button asChild variant="ghost" size="sm">
+                          <Link to={`/support?ticket=${ticket.id}`}>
+                            View Ticket
+                            <ChevronRight className="h-4 w-4 ml-1" />
+                          </Link>
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  ))}
                 </div>
               )}
             </CardContent>
+            <CardFooter className="flex justify-center border-t pt-4">
+              <Button asChild variant="outline">
+                <Link to="/support">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Contact Support
+                </Link>
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="activity" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Activity</CardTitle>
+              <CardDescription>Your latest notifications and updates</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {notificationsLoading ? (
+                <div className="animate-pulse space-y-4">
+                  {loadingArray.map((i) => (
+                    <div key={i} className="h-12 bg-gray-100 rounded"></div>
+                  ))}
+                </div>
+              ) : notifications?.length === 0 ? (
+                <div className="text-center py-8">
+                  <Bell className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium">No activity yet</h3>
+                  <p className="text-gray-500 mt-1">
+                    You'll see notifications here once you have shipments
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {notifications?.map((notification) => (
+                    <div 
+                      key={notification.id} 
+                      className={`p-4 rounded-lg border ${notification.is_read ? 'bg-white' : 'bg-blue-50'}`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-medium text-sm">{notification.title}</h4>
+                          <p className="text-gray-600 text-sm mt-1">{notification.message}</p>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {notification.type}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between items-center mt-3">
+                        <span className="text-xs text-gray-500">
+                          {format(new Date(notification.created_at), 'MMM d, yyyy')}
+                        </span>
+                        {notification.related_id && (
+                          <Button asChild variant="ghost" size="sm">
+                            <Link to={`/shipment/${notification.related_id}`}>
+                              View Shipment
+                            </Link>
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+            <CardFooter className="flex justify-center border-t pt-4">
+              <Button asChild variant="outline">
+                <Link to="/notifications">
+                  <Bell className="h-4 w-4 mr-2" />
+                  View All Notifications
+                </Link>
+              </Button>
+            </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>
+      
+      {/* Additional Widgets */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Upcoming Collections</CardTitle>
+              <CardDescription>
+                Scheduled pickup dates for your shipments
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {shipmentLoading ? (
+                <div className="animate-pulse space-y-4">
+                  {[1, 2].map((i) => (
+                    <div key={i} className="h-16 bg-gray-100 rounded"></div>
+                  ))}
+                </div>
+              ) : filteredShipments.filter(s => 
+                (s.status === 'Booking Confirmed' || s.status === 'Ready for Pickup') && 
+                s.metadata?.pickup_date
+              ).length === 0 ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-center">
+                    <CalendarCheck className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+                    <p className="text-gray-500">No scheduled collections</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredShipments
+                    .filter(s => 
+                      (s.status === 'Booking Confirmed' || s.status === 'Ready for Pickup') && 
+                      s.metadata?.pickup_date
+                    )
+                    .map((shipment) => (
+                      <div 
+                        key={shipment.id} 
+                        className="flex justify-between items-center border-b pb-4"
+                      >
+                        <div>
+                          <p className="font-medium">{shipment.tracking_number}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge className="bg-green-100 text-green-800 border-green-300">
+                              {shipment.metadata?.pickup_date}
+                            </Badge>
+                            <span className="text-sm text-gray-500">
+                              {shipment.origin}
+                            </span>
+                          </div>
+                        </div>
+                        <Button asChild variant="ghost" size="sm">
+                          <Link to={`/shipment/${shipment.id}`}>
+                            Details
+                          </Link>
+                        </Button>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+        
+        <div>
+          <RecentShipments />
+        </div>
+      </div>
     </div>
   );
 };

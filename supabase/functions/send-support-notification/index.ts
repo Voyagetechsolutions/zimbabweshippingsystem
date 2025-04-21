@@ -1,90 +1,89 @@
 
-import { serve } from "https://deno.land/std@0.182.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.21.0";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+interface RequestBody {
+  ticketId: string;
+  userId: string;
+  messagePreview: string;
+}
 
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
   try {
-    const { ticketId, responseId } = await req.json();
-
-    // Create a Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "https://oncsaunsqtekwwbzvvyh.supabase.co";
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    // Create Supabase client
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get ticket and response details
-    const { data: responseData, error: responseError } = await supabase
-      .from("ticket_responses")
-      .select("*, support_tickets(*)")
-      .eq("id", responseId)
+    // Get request payload
+    const { ticketId, userId, messagePreview } = await req.json() as RequestBody;
+
+    if (!ticketId || !userId) {
+      return new Response(JSON.stringify({ error: "Missing required parameters" }), { 
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    console.log(`Creating notification for ticket ${ticketId}, user ${userId}`);
+
+    // Get ticket information
+    const { data: ticketData, error: ticketError } = await supabase
+      .from("support_tickets")
+      .select("subject")
+      .eq("id", ticketId)
       .single();
 
-    if (responseError) throw responseError;
-    if (!responseData) throw new Error("Response not found");
+    if (ticketError) {
+      console.error("Error fetching ticket:", ticketError.message);
+      return new Response(JSON.stringify({ error: ticketError.message }), { 
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
-    // Get ticket user details to send email
-    const { data: userData, error: userError } = await supabase
-      .from("profiles")
-      .select("email, full_name")
-      .eq("id", responseData.support_tickets.user_id)
-      .single();
-
-    if (userError) throw userError;
-    if (!userData) throw new Error("User not found");
-
-    // Create a notification in the database
-    const { error: notificationError } = await supabase
+    // Create notification
+    const { data: notificationData, error: notificationError } = await supabase
       .from("notifications")
       .insert({
-        user_id: responseData.support_tickets.user_id,
-        title: "Support Ticket Response",
-        message: `Your support ticket "${responseData.support_tickets.subject}" has received a response.`,
+        user_id: userId,
+        title: "Support Ticket Update",
+        message: `New response on ticket: "${ticketData.subject}" - ${messagePreview}`,
         type: "support",
         related_id: ticketId,
-        is_read: false,
+        is_read: false
+      })
+      .select()
+      .single();
+
+    if (notificationError) {
+      console.error("Error creating notification:", notificationError.message);
+      return new Response(JSON.stringify({ error: notificationError.message }), { 
+        status: 500,
+        headers: { "Content-Type": "application/json" },
       });
+    }
 
-    if (notificationError) throw notificationError;
-
-    // Mark the response as notification sent
-    const { error: updateError } = await supabase
+    // Update the ticket_responses to indicate notification was sent
+    await supabase
       .from("ticket_responses")
       .update({ notification_sent: true })
-      .eq("id", responseId);
+      .eq("ticket_id", ticketId)
+      .order("created_at", { ascending: false })
+      .limit(1);
 
-    if (updateError) throw updateError;
-
-    // Normally here we would also send an email using a service like Resend, SendGrid, etc.
-    // For now, we'll just log the information
-    console.log(`Support notification sent to ${userData.email} for ticket ${ticketId}`);
-
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: "Notification sent successfully" 
-      }),
-      { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200 
-      }
-    );
+    return new Response(JSON.stringify({ 
+      success: true, 
+      notification: notificationData 
+    }), { 
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (error) {
-    console.error("Error sending notification:", error);
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
-      }
-    );
+    console.error("Unexpected error:", error.message);
+    return new Response(JSON.stringify({ error: error.message }), { 
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 });
