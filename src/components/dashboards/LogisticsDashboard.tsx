@@ -44,7 +44,8 @@ import {
   Search,
   Warehouse,
   Filter,
-  Clock
+  Clock,
+  RefreshCw
 } from 'lucide-react';
 import { Json } from '@/integrations/supabase/types';
 
@@ -78,32 +79,64 @@ const LogisticsDashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Fetch all shipments with user profiles
   const { data: shipments, isLoading, refetch } = useQuery({
     queryKey: ['logistics-shipments'],
     queryFn: async () => {
-      // First, fetch the shipments
-      const { data: shipmentsData, error: shipmentsError } = await supabase
-        .from('shipments')
-        .select(`
-          *,
-          profiles:user_id(
-            email,
-            full_name
-          )
-        `)
-        .order('created_at', { ascending: false });
+      try {
+        // First, fetch the shipments
+        const { data: shipmentsData, error: shipmentsError } = await supabase
+          .from('shipments')
+          .select(`
+            *,
+            profiles:user_id(
+              email,
+              full_name
+            )
+          `)
+          .order('created_at', { ascending: false });
+          
+        if (shipmentsError) {
+          console.error('Error fetching shipments:', shipmentsError);
+          throw shipmentsError;
+        }
         
-      if (shipmentsError) {
-        console.error('Error fetching shipments:', shipmentsError);
-        throw shipmentsError;
+        console.log('Fetched shipments with profiles:', shipmentsData?.length);
+        return shipmentsData as Shipment[];
+      } catch (error: any) {
+        console.error('Error in query function:', error);
+        toast({
+          title: 'Error fetching shipments',
+          description: error.message,
+          variant: 'destructive'
+        });
+        return [];
       }
-      
-      console.log('Fetched shipments with profiles:', shipmentsData);
-      return shipmentsData as Shipment[];
     },
+    refetchInterval: 30000, // Auto refresh every 30 seconds
   });
+
+  // Manual refresh function
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+      toast({
+        title: 'Data refreshed',
+        description: 'Shipment data has been updated',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Refresh failed',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Filter shipments by status, date and search query
   const getFilteredShipments = () => {
@@ -229,7 +262,7 @@ const LogisticsDashboard = () => {
 
   // Get next status options based on current status
   const getNextStatusOptions = (currentStatus: string) => {
-    const statusFlow = {
+    const statusFlow: Record<string, string[]> = {
       'Booking Confirmed': ['Ready for Pickup', 'Processing in Warehouse (UK)'],
       'Ready for Pickup': ['Processing in Warehouse (UK)'],
       'Processing in Warehouse (UK)': ['In Transit', 'Customs Clearance'],
@@ -240,7 +273,7 @@ const LogisticsDashboard = () => {
       'Delivered': [],
     };
     
-    return statusFlow[currentStatus as keyof typeof statusFlow] || [];
+    return statusFlow[currentStatus] || [];
   };
 
   return (
@@ -299,8 +332,22 @@ const LogisticsDashboard = () => {
       {/* Shipments Management */}
       <Card>
         <CardHeader>
-          <CardTitle>Shipment Management</CardTitle>
-          <CardDescription>View and update shipment status throughout the logistics chain</CardDescription>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div>
+              <CardTitle>Shipment Management</CardTitle>
+              <CardDescription>View and update shipment status throughout the logistics chain</CardDescription>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleRefresh} 
+              disabled={isRefreshing}
+              className="w-full sm:w-auto"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh Data
+            </Button>
+          </div>
           
           <div className="flex flex-col sm:flex-row gap-4 mt-4">
             <div className="relative flex-1">
@@ -313,9 +360,9 @@ const LogisticsDashboard = () => {
               />
             </div>
             
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-col sm:flex-row">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <Filter className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
@@ -333,7 +380,7 @@ const LogisticsDashboard = () => {
               </Select>
               
               <Select value={dateFilter} onValueChange={setDateFilter}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <Clock className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Time Period" />
                 </SelectTrigger>

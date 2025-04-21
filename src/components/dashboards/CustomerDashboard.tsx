@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -45,6 +44,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { RecentShipments } from '@/components/customer/RecentShipments';
+import { useToast } from '@/hooks/use-toast';
 
 // Define type for shipment metadata to help TypeScript understand the structure
 interface ShipmentMetadata {
@@ -125,19 +125,31 @@ interface SupportTicket {
 const CustomerDashboard = () => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
+  const { toast } = useToast();
 
   // Fetch user's shipments
-  const { data: shipments, isLoading: shipmentLoading } = useQuery<Shipment[]>({
+  const { data: shipments, isLoading: shipmentLoading, refetch: refetchShipments } = useQuery<Shipment[]>({
     queryKey: ['user-shipments', user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('shipments')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data || [];
+      try {
+        const { data, error } = await supabase
+          .from('shipments')
+          .select('*')
+          .eq('user_id', user?.id)
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        console.log('Fetched customer shipments:', data?.length);
+        return data || [];
+      } catch (error: any) {
+        console.error('Error fetching shipments:', error.message);
+        toast({
+          title: 'Error fetching shipments',
+          description: error.message,
+          variant: 'destructive'
+        });
+        return [];
+      }
     },
     enabled: !!user?.id,
   });
@@ -174,6 +186,17 @@ const CustomerDashboard = () => {
     },
     enabled: !!user?.id,
   });
+
+  // Periodically refetch shipments to keep data up to date
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (user?.id) {
+        refetchShipments();
+      }
+    }, 30000); // Check for new shipments every 30 seconds
+    
+    return () => clearInterval(interval);
+  }, [user?.id, refetchShipments]);
 
   // Filter shipments based on search query
   const filteredShipments = shipments?.filter(shipment =>

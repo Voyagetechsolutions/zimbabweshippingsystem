@@ -30,6 +30,13 @@ const DriverDashboard = () => {
 
   useEffect(() => {
     fetchDriverData();
+    
+    // Set up a periodic refresh interval
+    const refreshInterval = setInterval(() => {
+      fetchDriverData();
+    }, 60000); // Refresh every minute
+    
+    return () => clearInterval(refreshInterval);
   }, []);
 
   const fetchDriverData = async () => {
@@ -74,7 +81,7 @@ const DriverDashboard = () => {
         `)
         .eq('status', 'Delivered')
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(10);
 
       if (completedError) throw completedError;
       console.log("Completed deliveries fetched:", completedData?.length);
@@ -259,6 +266,11 @@ const DriverDashboard = () => {
     ['In Transit', 'Out for Delivery', 'Customs Clearance', 'Processing in Warehouse (ZW)'].includes(d.status)
   );
 
+  // Total number of shipments for all schedules
+  const totalScheduledShipments = Object.values(scheduleShipments).reduce(
+    (total, shipments) => total + shipments.length, 0
+  );
+
   return (
     <div className="space-y-6">
       <StatsCards 
@@ -272,7 +284,14 @@ const DriverDashboard = () => {
         <TabsList className="grid w-full grid-cols-3 mb-4">
           <TabsTrigger value="uk-collections">UK Collections</TabsTrigger>
           <TabsTrigger value="zim-deliveries">Zimbabwe Deliveries</TabsTrigger>
-          <TabsTrigger value="schedules">Schedules</TabsTrigger>
+          <TabsTrigger value="schedules">
+            Schedules
+            {totalScheduledShipments > 0 && (
+              <span className="ml-1.5 bg-blue-100 text-blue-800 text-xs px-1.5 py-0.5 rounded-full">
+                {totalScheduledShipments}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
         
         <TabsContent value="uk-collections" className="space-y-4">
