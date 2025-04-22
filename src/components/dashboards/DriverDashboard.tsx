@@ -277,16 +277,22 @@ const DriverDashboard = () => {
         
       // Update the shipment with the image URL
       const currentShipment = activeDeliveries.find(d => d.id === currentShipmentId);
-      const currentMetadata = currentShipment?.metadata || {};
+      let updatedMetadata = {};
+      
+      // Fix: Check if metadata exists and is an object before spreading
+      if (currentShipment?.metadata && typeof currentShipment.metadata === 'object') {
+        updatedMetadata = { 
+          ...currentShipment.metadata,
+          delivery_image: urlData.publicUrl 
+        };
+      } else {
+        // If metadata doesn't exist or isn't an object, create a new object
+        updatedMetadata = { delivery_image: urlData.publicUrl };
+      }
       
       const { error: updateError } = await supabase
         .from('shipments')
-        .update({ 
-          metadata: { 
-            ...currentMetadata,
-            delivery_image: urlData.publicUrl 
-          }
-        })
+        .update({ metadata: updatedMetadata })
         .eq('id', currentShipmentId);
         
       if (updateError) throw updateError;
