@@ -105,32 +105,6 @@ const Pricing = () => {
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-2xl">Standard Payment</CardTitle>
-                      <CardDescription>Pay at time of booking</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex justify-between items-center pb-2 border-b">
-                        <span className="font-medium">1 Drum</span>
-                        <span className="text-xl font-bold">£260</span>
-                      </div>
-                      <div className="flex justify-between items-center pb-2 border-b">
-                        <span className="font-medium">2-4 Drums</span>
-                        <span className="text-xl font-bold">£240 <span className="text-sm font-normal">per drum</span></span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">5+ Drums</span>
-                        <span className="text-xl font-bold">£220 <span className="text-sm font-normal">per drum</span></span>
-                      </div>
-                    </CardContent>
-                    <CardFooter>
-                      <Link to="/book-shipment" className="w-full">
-                        <Button className="w-full bg-zim-green hover:bg-zim-green/90">Book Now</Button>
-                      </Link>
-                    </CardFooter>
-                  </Card>
-                  
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-2xl">30-Day Payment Terms</CardTitle>
                       <CardDescription>Pay within 30 days of collection</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -153,6 +127,8 @@ const Pricing = () => {
                       </Link>
                     </CardFooter>
                   </Card>
+                  
+                
                 </div>
                 
                 <Card>
@@ -174,7 +150,7 @@ const Pricing = () => {
                         <div className="text-lg font-medium mb-2">1 Drum</div>
                         <div className="flex justify-between items-center text-sm pb-2 border-b">
                           <span>Base Price</span>
-                          <span>£260</span>
+                          <span>£280</span>
                         </div>
                         <div className="flex justify-between items-center text-sm pb-2 border-b">
                           <span>Premium (20%)</span>
@@ -190,7 +166,7 @@ const Pricing = () => {
                         <div className="text-lg font-medium mb-2">2-4 Drums</div>
                         <div className="flex justify-between items-center text-sm pb-2 border-b">
                           <span>Base Price</span>
-                          <span>£240 per drum</span>
+                          <span>£260 per drum</span>
                         </div>
                         <div className="flex justify-between items-center text-sm pb-2 border-b">
                           <span>Premium (20%)</span>
@@ -206,7 +182,7 @@ const Pricing = () => {
                         <div className="text-lg font-medium mb-2">5+ Drums</div>
                         <div className="flex justify-between items-center text-sm pb-2 border-b">
                           <span>Base Price</span>
-                          <span>£220 per drum</span>
+                          <span>£240 per drum</span>
                         </div>
                         <div className="flex justify-between items-center text-sm pb-2 border-b">
                           <span>Premium (20%)</span>
@@ -340,10 +316,10 @@ const Pricing = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
               <Card>
                 <CardHeader>
-                  <CardTitle>Mandatory Metal Seal</CardTitle>
+                  <CardTitle>Mandatory Metal Coded Seal</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="mb-4">For increased security, all shipments include a mandatory metal seal.</p>
+                  <p className="mb-4">For increased security, all drums and suitcases include a metal coded seal.</p>
                   <div className="flex justify-between items-center font-medium">
                     <span>Price per shipment</span>
                     <span>£5.00</span>
@@ -358,8 +334,8 @@ const Pricing = () => {
                 <CardContent>
                   <p className="mb-4">Optional service for direct delivery to recipient's address in Zimbabwe.</p>
                   <div className="flex justify-between items-center font-medium">
-                    <span>Price per shipment</span>
-                    <span>£25.00</span>
+                    <span>Price per address</span>
+                    <span>£20.00</span>
                   </div>
                 </CardContent>
               </Card>
