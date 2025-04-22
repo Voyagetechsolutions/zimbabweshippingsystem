@@ -187,7 +187,7 @@ const PaymentSuccess = () => {
                     )}
                     {receiptData.payment_method === 'cash_on_collection' && (
                       <p className="mt-2 text-sm text-blue-700">
-                        Please have cash ready when we collect your items. £15 discount applied!
+                        Please have cash ready when we collect your items. £20 discount applied on each drum!
                       </p>
                     )}
                   </div>
