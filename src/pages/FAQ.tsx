@@ -202,7 +202,7 @@ const FAQ = () => {
         },
         {
           question: 'Do you offer any assistance with packing?',
-          answer: 'We don\'t offer packing services at your location, but we provide comprehensive packing guidelines on our website. For drum shipping, we can provide drums for an additional fee if you don\'t have your own.'
+          answer: 'We don\'t offer packing services at your location, however we consider elderly people who are unable package bigger items or home removal at an additional cost (rate per hour). We provide comprehensive packing guidelines on our website. For drum shipping, we can provide drums for an additional fee if you don\'t have your own.'
         }
       ]
     }
