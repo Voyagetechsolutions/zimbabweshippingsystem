@@ -64,7 +64,7 @@ const FAQ = () => {
         },
         {
           question: 'Can I pay in Zimbabwean currency?',
-          answer: 'Currently, all payments must be made in British Pounds (GBP). However, we are working on implementing local payment options for recipients in Zimbabwe for certain services.'
+          answer: 'Currently, all payments must be made in British Pounds (GBP) and United States Dollar (USD). However, we are working on implementing local payment options for recipients in Zimbabwe for certain services.'
         }
       ]
     },
