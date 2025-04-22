@@ -148,7 +148,7 @@ const FAQ = () => {
         },
         {
           question: 'Are there customs duties and taxes for shipments to Zimbabwe?',
-          answer: 'Yes, importation of goods to Zimbabwe may be subject to duties and taxes. These are determined by Zimbabwean customs authorities based on the type and value of the items. The recipient is responsible for paying any applicable duties and taxes upon arrival.'
+          answer: 'Yes, importation of goods to Zimbabwe may be subject to duties and taxes. These are determined by Zimbabwean customs authorities based on the type and value of the items. The recipient is responsible for paying any applicable duties and taxes upon arrival. We pay 50% of the charg'
         },
         {
           question: 'How do you handle customs clearance?',
