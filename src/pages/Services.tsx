@@ -328,18 +328,14 @@ const Services = () => {
                     <li className="flex items-start">
                       <AlertTriangle className="h-5 w-5 text-orange-500 mr-2 mt-0.5 flex-shrink-0" />
                       <span><strong>Perfumes:</strong> Limited quantities (max 100ml per bottle, 2 bottles total). Must be declared.</span>
+                    </li>{/* move to allowed */}
+                    <li className="flex items-start">
+                      <AlertTriangle className="h-5 w-5 text-orange-500 mr-2 mt-0.5 flex-shrink-0" />
+                      <span><strong>Liquids:</strong> Must be securely sealed and proper packaging required to prevent leakage.</span>
                     </li>
                     <li className="flex items-start">
                       <AlertTriangle className="h-5 w-5 text-orange-500 mr-2 mt-0.5 flex-shrink-0" />
-                      <span><strong>Liquids:</strong> Must be securely sealed and limited to 1L total. Proper packaging required to prevent leakage.</span>
-                    </li>
-                    <li className="flex items-start">
-                      <AlertTriangle className="h-5 w-5 text-orange-500 mr-2 mt-0.5 flex-shrink-0" />
-                      <span><strong>Prescription Medicines:</strong> Limited quantities for personal use only. Documentation required.</span>
-                    </li>
-                    <li className="flex items-start">
-                      <AlertTriangle className="h-5 w-5 text-orange-500 mr-2 mt-0.5 flex-shrink-0" />
-                      <span><strong>Valuable Items:</strong> Jewelry, watches, and high-value electronics must be declared and insured.</span>
+                      <span><strong>Valuable Items:</strong> Jewelry, watches, and high-value goods must be declared and insured.</span>
                     </li>
                     <li className="flex items-start">
                       <AlertTriangle className="h-5 w-5 text-orange-500 mr-2 mt-0.5 flex-shrink-0" />
@@ -377,7 +373,7 @@ const Services = () => {
                     </li>
                     <li className="flex items-start">
                       <XCircle className="h-5 w-5 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
-                      <span><strong>Weapons & Ammunition:</strong> Firearms, ammunition, knives, explosives, or weapon parts.</span>
+                      <span><strong>Weapons & Ammunition:</strong> Firearms, ammunition, explosives, or weapon parts.</span>
                     </li>
                     <li className="flex items-start">
                       <XCircle className="h-5 w-5 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
@@ -386,7 +382,7 @@ const Services = () => {
                     <li className="flex items-start">
                       <XCircle className="h-5 w-5 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
                       <span><strong>Aerosols:</strong> Spray paints, insecticides, hair sprays, deodorants.</span>
-                    </li>
+                    </li>{/* move to allowed */}
                     <li className="flex items-start">
                       <XCircle className="h-5 w-5 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
                       <span><strong>Perishable Foods:</strong> Fresh fruits, vegetables, meat, fish, dairy products.</span>
