@@ -68,7 +68,7 @@ const DriverDashboard = () => {
       
       // Fetch user details separately
       if (activeData && activeData.length > 0) {
-        for (const shipment of activeData) {
+        for (const shipment of activeData as Shipment[]) {
           if (shipment.user_id) {
             const { data: userData, error: userError } = await supabase
               .from('profiles')
@@ -84,7 +84,7 @@ const DriverDashboard = () => {
       }
       
       console.log("Active deliveries fetched:", activeData?.length);
-      setActiveDeliveries(activeData || []);
+      setActiveDeliveries(activeData as Shipment[] || []);
       
       // Fetch completed deliveries - Fix: Use direct query
       const { data: completedData, error: completedError } = await supabase
@@ -101,7 +101,7 @@ const DriverDashboard = () => {
       
       // Fetch user details for completed deliveries
       if (completedData && completedData.length > 0) {
-        for (const shipment of completedData) {
+        for (const shipment of completedData as Shipment[]) {
           if (shipment.user_id) {
             const { data: userData, error: userError } = await supabase
               .from('profiles')
@@ -117,7 +117,7 @@ const DriverDashboard = () => {
       }
       
       console.log("Completed deliveries fetched:", completedData?.length);
-      setCompletedDeliveries(completedData || []);
+      setCompletedDeliveries(completedData as Shipment[] || []);
 
       // Fetch collection schedules
       const { data: scheduleData, error: scheduleError } = await supabase
@@ -148,7 +148,7 @@ const DriverDashboard = () => {
             console.error(`Error fetching shipments for schedule ${schedule.id}:`, shipmentError);
           } else if (shipmentData && shipmentData.length > 0) {
             // Fetch user details for schedule shipments
-            for (const shipment of shipmentData) {
+            for (const shipment of shipmentData as Shipment[]) {
               if (shipment.user_id) {
                 const { data: userData, error: userError } = await supabase
                   .from('profiles')
@@ -161,7 +161,7 @@ const DriverDashboard = () => {
                 }
               }
             }
-            schedulesWithShipments[schedule.id] = shipmentData || [];
+            schedulesWithShipments[schedule.id] = shipmentData as Shipment[] || [];
             console.log(`Schedule ${schedule.id} has ${shipmentData?.length || 0} shipments`);
           } else {
             schedulesWithShipments[schedule.id] = [];

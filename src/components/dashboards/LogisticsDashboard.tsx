@@ -75,7 +75,7 @@ const LogisticsDashboard = () => {
         
         // Fetch user details separately for each shipment
         if (shipmentsData && shipmentsData.length > 0) {
-          for (const shipment of shipmentsData) {
+          for (const shipment of shipmentsData as Shipment[]) {
             if (shipment.user_id) {
               const { data: userData, error: userError } = await supabase
                 .from('profiles')
