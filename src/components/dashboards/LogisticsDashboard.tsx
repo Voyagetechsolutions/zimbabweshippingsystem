@@ -87,21 +87,32 @@ const LogisticsDashboard = () => {
       try {
         console.log('Fetching all shipments for logistics dashboard');
         
-        // Modified query: Changed the join approach to avoid user_id relationship error
+        // Fix: Use direct query without join to avoid relationship error
         const { data: shipmentsData, error: shipmentsError } = await supabase
           .from('shipments')
-          .select(`
-            *,
-            profiles:profiles!inner(
-              email,
-              full_name
-            )
-          `)
+          .select('*')
           .order('created_at', { ascending: false });
           
         if (shipmentsError) {
           console.error('Error fetching shipments:', shipmentsError);
           throw shipmentsError;
+        }
+        
+        // Fetch user details separately for each shipment
+        if (shipmentsData && shipmentsData.length > 0) {
+          for (const shipment of shipmentsData) {
+            if (shipment.user_id) {
+              const { data: userData, error: userError } = await supabase
+                .from('profiles')
+                .select('email, full_name')
+                .eq('id', shipment.user_id)
+                .single();
+                
+              if (!userError && userData) {
+                shipment.profiles = userData;
+              }
+            }
+          }
         }
         
         console.log('Fetched shipments with profiles:', shipmentsData?.length);

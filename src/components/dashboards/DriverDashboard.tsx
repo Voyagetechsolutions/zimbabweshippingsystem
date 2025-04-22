@@ -45,13 +45,10 @@ const DriverDashboard = () => {
       setLoading(true);
       
       // Fetch active deliveries - include all active statuses
-      // Modified query: Changed the join approach to avoid user_id relationship error
+      // Fix: Use direct query without join to avoid relationship error
       const { data: activeData, error: activeError } = await supabase
         .from('shipments')
-        .select(`
-          *,
-          profiles:profiles!inner(email, full_name)
-        `)
+        .select('*')
         .in('status', [
           'Booking Confirmed', 
           'Ready for Pickup', 
@@ -67,16 +64,31 @@ const DriverDashboard = () => {
         console.error('Error fetching active deliveries:', activeError);
         throw activeError;
       }
+      
+      // Fetch user details separately
+      if (activeData && activeData.length > 0) {
+        for (const shipment of activeData) {
+          if (shipment.user_id) {
+            const { data: userData, error: userError } = await supabase
+              .from('profiles')
+              .select('email, full_name')
+              .eq('id', shipment.user_id)
+              .single();
+              
+            if (!userError && userData) {
+              shipment.profiles = userData;
+            }
+          }
+        }
+      }
+      
       console.log("Active deliveries fetched:", activeData?.length);
       setActiveDeliveries(activeData || []);
       
-      // Fetch completed deliveries - Modified query approach
+      // Fetch completed deliveries - Fix: Use direct query
       const { data: completedData, error: completedError } = await supabase
         .from('shipments')
-        .select(`
-          *,
-          profiles:profiles!inner(email, full_name)
-        `)
+        .select('*')
         .eq('status', 'Delivered')
         .order('created_at', { ascending: false })
         .limit(10);
@@ -85,6 +97,24 @@ const DriverDashboard = () => {
         console.error('Error fetching completed deliveries:', completedError);
         throw completedError;
       }
+      
+      // Fetch user details for completed deliveries
+      if (completedData && completedData.length > 0) {
+        for (const shipment of completedData) {
+          if (shipment.user_id) {
+            const { data: userData, error: userError } = await supabase
+              .from('profiles')
+              .select('email, full_name')
+              .eq('id', shipment.user_id)
+              .single();
+              
+            if (!userError && userData) {
+              shipment.profiles = userData;
+            }
+          }
+        }
+      }
+      
       console.log("Completed deliveries fetched:", completedData?.length);
       setCompletedDeliveries(completedData || []);
 
@@ -101,26 +131,39 @@ const DriverDashboard = () => {
       setCollectionSchedules(scheduleData || []);
       console.log("Collection schedules fetched:", scheduleData?.length);
       
-      // Fetch shipments for each schedule - Modified query approach
+      // Fetch shipments for each schedule - Fix: Use direct query
       if (scheduleData && scheduleData.length > 0) {
         const schedulesWithShipments: {[key: string]: any[]} = {};
         
         for (const schedule of scheduleData) {
           const { data: shipmentData, error: shipmentError } = await supabase
             .from('shipments')
-            .select(`
-              *,
-              profiles:profiles!inner(email, full_name)
-            `)
+            .select('*')
             .in('status', ['Booking Confirmed', 'Ready for Pickup'])
             .eq('can_modify', false) // Only confirmed bookings
             .contains('metadata', { pickup_date: schedule.pickup_date });
             
           if (shipmentError) {
             console.error(`Error fetching shipments for schedule ${schedule.id}:`, shipmentError);
-          } else {
+          } else if (shipmentData && shipmentData.length > 0) {
+            // Fetch user details for schedule shipments
+            for (const shipment of shipmentData) {
+              if (shipment.user_id) {
+                const { data: userData, error: userError } = await supabase
+                  .from('profiles')
+                  .select('email, full_name')
+                  .eq('id', shipment.user_id)
+                  .single();
+                  
+                if (!userError && userData) {
+                  shipment.profiles = userData;
+                }
+              }
+            }
             schedulesWithShipments[schedule.id] = shipmentData || [];
             console.log(`Schedule ${schedule.id} has ${shipmentData?.length || 0} shipments`);
+          } else {
+            schedulesWithShipments[schedule.id] = [];
           }
         }
         
@@ -139,7 +182,6 @@ const DriverDashboard = () => {
     }
   };
 
-  // Manual refresh function
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
