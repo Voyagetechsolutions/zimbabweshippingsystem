@@ -179,13 +179,13 @@ const FAQ = () => {
         },
         {
           question: 'How do I set up a business account?',
-          answer: 'To set up a business account, please contact our business team at business@zimbabweshipping.com or call us at +44 7584 100552. We\'ll assess your shipping needs and set up an appropriate account structure with competitive rates.'
+          answer: 'To set up a business account, please contact our support team at +44 7584 100552. We\'ll assess your shipping needs and set up an appropriate account structure with competitive rates.'
         }
       ]
     },
     {
       id: 'general',
-      title: 'General Questions',
+      title: 'General',
       icon: <HelpCircle className="h-5 w-5 text-zim-yellow" />,
       questions: [
         {
