@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Package, Truck, Calendar, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Shipment } from '@/types/shipment';
 
 // Import our components
 import StatsCards from './driver/StatsCards';
@@ -14,11 +15,11 @@ import ImageUploadDialog from './driver/ImageUploadDialog';
 import EmptyState from './driver/EmptyState';
 
 const DriverDashboard = () => {
-  const [activeDeliveries, setActiveDeliveries] = useState<any[]>([]);
-  const [completedDeliveries, setCompletedDeliveries] = useState<any[]>([]);
+  const [activeDeliveries, setActiveDeliveries] = useState<Shipment[]>([]);
+  const [completedDeliveries, setCompletedDeliveries] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [collectionSchedules, setCollectionSchedules] = useState<any[]>([]);
-  const [scheduleShipments, setScheduleShipments] = useState<{[key: string]: any[]}>({});
+  const [scheduleShipments, setScheduleShipments] = useState<{[key: string]: Shipment[]}>({});
   const [showImageUpload, setShowImageUpload] = useState(false);
   const [currentShipmentId, setCurrentShipmentId] = useState<string>('');
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -133,7 +134,7 @@ const DriverDashboard = () => {
       
       // Fetch shipments for each schedule - Fix: Use direct query
       if (scheduleData && scheduleData.length > 0) {
-        const schedulesWithShipments: {[key: string]: any[]} = {};
+        const schedulesWithShipments: {[key: string]: Shipment[]} = {};
         
         for (const schedule of scheduleData) {
           const { data: shipmentData, error: shipmentError } = await supabase

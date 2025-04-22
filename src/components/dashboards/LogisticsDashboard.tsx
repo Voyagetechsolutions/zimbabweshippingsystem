@@ -46,32 +46,7 @@ import {
   Clock,
   RefreshCw
 } from 'lucide-react';
-import { Json } from '@/integrations/supabase/types';
-
-// Define interfaces for our data types
-interface ShipmentProfile {
-  email?: string;
-  full_name?: string;
-}
-
-interface Shipment {
-  id: string;
-  tracking_number: string;
-  origin: string;
-  destination: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  user_id?: string;
-  can_cancel?: boolean;
-  can_modify?: boolean;
-  carrier?: string;
-  dimensions?: string;
-  estimated_delivery?: string;
-  metadata?: Json;
-  weight?: number;
-  profiles?: ShipmentProfile;
-}
+import { Shipment } from '@/types/shipment';
 
 const LogisticsDashboard = () => {
   const { toast } = useToast();
