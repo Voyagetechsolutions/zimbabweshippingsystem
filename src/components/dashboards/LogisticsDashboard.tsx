@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -86,6 +86,8 @@ const LogisticsDashboard = () => {
     queryKey: ['logistics-shipments'],
     queryFn: async () => {
       try {
+        console.log('Fetching all shipments for logistics dashboard');
+        
         // First, fetch the shipments
         const { data: shipmentsData, error: shipmentsError } = await supabase
           .from('shipments')
@@ -209,6 +211,8 @@ const LogisticsDashboard = () => {
   // Update shipment status
   const updateShipmentStatus = async (id: string, newStatus: string) => {
     try {
+      console.log(`Updating shipment ${id} to status ${newStatus}`);
+      
       const { error } = await supabase
         .from('shipments')
         .update({ 
@@ -217,7 +221,10 @@ const LogisticsDashboard = () => {
         })
         .eq('id', id);
         
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating shipment status:', error);
+        throw error;
+      }
       
       toast({
         title: 'Status Updated',

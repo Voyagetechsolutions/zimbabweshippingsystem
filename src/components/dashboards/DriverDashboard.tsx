@@ -4,7 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Package, Truck, Calendar, AlertTriangle } from 'lucide-react';
+import { Package, Truck, Calendar, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 // Import our components
 import StatsCards from './driver/StatsCards';
@@ -25,6 +26,7 @@ const DriverDashboard = () => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [expandedSchedule, setExpandedSchedule] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -65,7 +67,10 @@ const DriverDashboard = () => {
         .eq('can_modify', false) // Only confirmed bookings
         .order('created_at', { ascending: false });
 
-      if (activeError) throw activeError;
+      if (activeError) {
+        console.error('Error fetching active deliveries:', activeError);
+        throw activeError;
+      }
       console.log("Active deliveries fetched:", activeData?.length);
       setActiveDeliveries(activeData || []);
       
@@ -83,7 +88,10 @@ const DriverDashboard = () => {
         .order('created_at', { ascending: false })
         .limit(10);
 
-      if (completedError) throw completedError;
+      if (completedError) {
+        console.error('Error fetching completed deliveries:', completedError);
+        throw completedError;
+      }
       console.log("Completed deliveries fetched:", completedData?.length);
       setCompletedDeliveries(completedData || []);
 
@@ -93,7 +101,10 @@ const DriverDashboard = () => {
         .select('*')
         .order('pickup_date', { ascending: true });
 
-      if (scheduleError) throw scheduleError;
+      if (scheduleError) {
+        console.error('Error fetching collection schedules:', scheduleError);
+        throw scheduleError;
+      }
       setCollectionSchedules(scheduleData || []);
       console.log("Collection schedules fetched:", scheduleData?.length);
       
@@ -115,7 +126,9 @@ const DriverDashboard = () => {
             .eq('can_modify', false) // Only confirmed bookings
             .contains('metadata', { pickup_date: schedule.pickup_date });
             
-          if (!shipmentError) {
+          if (shipmentError) {
+            console.error(`Error fetching shipments for schedule ${schedule.id}:`, shipmentError);
+          } else {
             schedulesWithShipments[schedule.id] = shipmentData || [];
             console.log(`Schedule ${schedule.id} has ${shipmentData?.length || 0} shipments`);
           }
@@ -133,6 +146,27 @@ const DriverDashboard = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Manual refresh function
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchDriverData();
+      toast({
+        title: 'Data refreshed',
+        description: 'Driver data has been updated',
+      });
+    } catch (error: any) {
+      console.error('Error refreshing data:', error);
+      toast({
+        title: 'Refresh failed',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -273,12 +307,24 @@ const DriverDashboard = () => {
 
   return (
     <div className="space-y-6">
-      <StatsCards 
-        pendingCount={pendingCollections.length}
-        inTransitCount={inTransitDeliveries.length}
-        completedCount={completedDeliveries.length}
-        isMobile={isMobile}
-      />
+      <div className="flex justify-between items-center">
+        <StatsCards 
+          pendingCount={pendingCollections.length}
+          inTransitCount={inTransitDeliveries.length}
+          completedCount={completedDeliveries.length}
+          isMobile={isMobile}
+        />
+        <Button 
+          variant="outline" 
+          onClick={handleRefresh} 
+          disabled={isRefreshing || loading}
+          size="sm"
+          className="ml-auto hidden md:flex"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+          Refresh Data
+        </Button>
+      </div>
       
       <Tabs defaultValue="uk-collections" className="w-full">
         <TabsList className="grid w-full grid-cols-3 mb-4">
@@ -305,6 +351,18 @@ const DriverDashboard = () => {
                 </p>
               </div>
             </div>
+          </div>
+          
+          <div className="flex md:hidden justify-end mb-2">
+            <Button 
+              variant="outline" 
+              onClick={handleRefresh} 
+              disabled={isRefreshing || loading}
+              size="sm"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
           </div>
           
           {loading ? (

@@ -41,18 +41,17 @@ import {
   CalendarCheck,
   MessageSquare,
   Clock,
-  ChevronRight
+  ChevronRight,
+  RefreshCw
 } from 'lucide-react';
 import { RecentShipments } from '@/components/customer/RecentShipments';
 import { useToast } from '@/hooks/use-toast';
 
-// Define type for shipment metadata to help TypeScript understand the structure
 interface ShipmentMetadata {
   pickup_date?: string;
   [key: string]: any;
 }
 
-// Helper function to get status badge styling
 const getStatusBadge = (status: string) => {
   const statusLower = status.toLowerCase();
   
@@ -78,7 +77,6 @@ const getStatusBadge = (status: string) => {
   }
 };
 
-// Define an interface for a shipment with proper typing
 interface Shipment {
   id: string;
   tracking_number: string;
@@ -97,7 +95,6 @@ interface Shipment {
   weight?: number;
 }
 
-// Define interface for notification
 interface Notification {
   id: string;
   title: string;
@@ -109,7 +106,6 @@ interface Notification {
   user_id: string;
 }
 
-// Define interface for support ticket
 interface SupportTicket {
   id: string;
   subject: string;
@@ -126,23 +122,34 @@ const CustomerDashboard = () => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Fetch user's shipments
   const { data: shipments, isLoading: shipmentLoading, refetch: refetchShipments } = useQuery<Shipment[]>({
     queryKey: ['user-shipments', user?.id],
     queryFn: async () => {
       try {
+        if (!user?.id) {
+          console.error('No user ID available for fetching shipments');
+          return [];
+        }
+        
+        console.log('Fetching shipments for user ID:', user.id);
+        
         const { data, error } = await supabase
           .from('shipments')
           .select('*')
-          .eq('user_id', user?.id)
+          .eq('user_id', user.id)
           .order('created_at', { ascending: false });
         
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching shipments:', error);
+          throw error;
+        }
+        
         console.log('Fetched customer shipments:', data?.length);
         return data || [];
       } catch (error: any) {
-        console.error('Error fetching shipments:', error.message);
+        console.error('Error in shipments query function:', error.message);
         toast({
           title: 'Error fetching shipments',
           description: error.message,
@@ -154,7 +161,26 @@ const CustomerDashboard = () => {
     enabled: !!user?.id,
   });
 
-  // Fetch user's notifications
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetchShipments();
+      toast({
+        title: 'Data refreshed',
+        description: 'Shipment data has been updated',
+      });
+    } catch (error: any) {
+      console.error('Error refreshing shipments:', error);
+      toast({
+        title: 'Refresh failed',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const { data: notifications, isLoading: notificationsLoading } = useQuery<Notification[]>({
     queryKey: ['user-notifications', user?.id],
     queryFn: async () => {
@@ -171,7 +197,6 @@ const CustomerDashboard = () => {
     enabled: !!user?.id,
   });
 
-  // Fetch user's support tickets
   const { data: tickets, isLoading: ticketsLoading } = useQuery<SupportTicket[]>({
     queryKey: ['user-tickets', user?.id],
     queryFn: async () => {
@@ -187,7 +212,6 @@ const CustomerDashboard = () => {
     enabled: !!user?.id,
   });
 
-  // Periodically refetch shipments to keep data up to date
   useEffect(() => {
     const interval = setInterval(() => {
       if (user?.id) {
@@ -198,7 +222,6 @@ const CustomerDashboard = () => {
     return () => clearInterval(interval);
   }, [user?.id, refetchShipments]);
 
-  // Filter shipments based on search query
   const filteredShipments = shipments?.filter(shipment =>
     searchQuery === '' ||
     shipment.tracking_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -207,18 +230,15 @@ const CustomerDashboard = () => {
     shipment.status.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
 
-  // Count shipments by status
   const activeShipments = shipments?.filter(s => s.status !== 'Delivered' && s.status !== 'Cancelled').length || 0;
   const deliveredShipments = shipments?.filter(s => s.status === 'Delivered').length || 0;
   const pendingCollection = shipments?.filter(s => 
     s.status === 'Booking Confirmed' || s.status === 'Ready for Pickup'
   ).length || 0;
 
-  // Helper function to safely get pickup_date from metadata
   const getPickupDate = (shipment: Shipment): string | undefined => {
     if (!shipment.metadata) return undefined;
     
-    // Handle both string and object formats of metadata
     if (typeof shipment.metadata === 'string') {
       try {
         const parsed = JSON.parse(shipment.metadata as string) as ShipmentMetadata;
@@ -228,17 +248,14 @@ const CustomerDashboard = () => {
       }
     }
     
-    // If metadata is already an object
     const metadata = shipment.metadata as ShipmentMetadata;
     return metadata.pickup_date;
   };
 
-  // For skeleton loading
   const loadingArray = [1, 2, 3, 4, 5];
 
   return (
     <div className="space-y-8">
-      {/* Stats Section */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -277,7 +294,6 @@ const CustomerDashboard = () => {
         </Card>
       </div>
 
-      {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Button asChild className="bg-zim-green hover:bg-zim-green/90 h-auto py-3">
           <Link to="/book-shipment">
@@ -301,7 +317,6 @@ const CustomerDashboard = () => {
         </Button>
       </div>
 
-      {/* Main Content */}
       <Tabs defaultValue="shipments" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="shipments" className="flex items-center gap-2">
@@ -321,19 +336,31 @@ const CustomerDashboard = () => {
         <TabsContent value="shipments" className="space-y-4 mt-4">
           <Card>
             <CardHeader>
-              <CardTitle>My Shipments</CardTitle>
-              <CardDescription>View and track all your shipments</CardDescription>
-              
-              <div className="flex justify-between items-center mt-3">
-                <div className="relative w-full md:w-96">
-                  <Input
-                    placeholder="Search by tracking #, status, or destination"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                  <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                <div>
+                  <CardTitle>My Shipments</CardTitle>
+                  <CardDescription>View and track all your shipments</CardDescription>
                 </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleRefresh} 
+                  disabled={isRefreshing}
+                  className="w-full sm:w-auto"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  Refresh Data
+                </Button>
+              </div>
+              
+              <div className="relative w-full md:w-96 mt-3">
+                <Input
+                  placeholder="Search by tracking #, status, or destination"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+                <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
               </div>
             </CardHeader>
             <CardContent>
@@ -549,7 +576,6 @@ const CustomerDashboard = () => {
         </TabsContent>
       </Tabs>
       
-      {/* Additional Widgets */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2">
           <Card>
