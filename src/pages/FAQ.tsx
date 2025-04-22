@@ -129,7 +129,7 @@ const FAQ = () => {
         },
         {
           question: 'What happens if no one is available to receive the delivery?',
-          answer: 'If no one is available at the delivery address, our driver will leave a notification and attempt delivery once more. After two failed attempts, the shipment will be held at our nearest depot for collection.'
+          answer: 'If no one is available at the delivery address, our driver will leave a notification and attempt delivery once more. After two failed attempts, the shipment will be held at our nearest depot for collection. You can also add or change the receiptant if the main receiptant is not available this is done by contacting support.'
         },
         {
           question: 'Is there a depot collection option in Zimbabwe?',
