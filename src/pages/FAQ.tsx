@@ -29,7 +29,7 @@ const FAQ = () => {
       questions: [
         {
           question: 'How long does shipping from the UK to Zimbabwe take?',
-          answer: 'Our standard shipping time from the UK to Zimbabwe is approximately 2-3 weeks for drum shipping and 10-14 days for parcel delivery. Transit times may vary slightly depending on customs clearance and local delivery conditions in Zimbabwe.'
+          answer: 'Our standard shipping time from the UK to Zimbabwe is approximately 6 weeks. 10-14 days for parcel delivery. Transit times may vary slightly depending on customs clearance and local delivery conditions in Zimbabwe.'
         },
         {
           question: 'What items can I ship to Zimbabwe?',
@@ -41,7 +41,7 @@ const FAQ = () => {
         },
         {
           question: 'Is insurance included in the shipping cost?',
-          answer: 'Basic coverage is included in all our shipping rates. Additional insurance is available for purchase to cover the full declared value of your shipment. We recommend getting additional insurance for high-value items.'
+          answer: 'Basic coverage is included in all our shipping rates. Zimbabwe Shipping does not provide insurance. We recommodate purchasing to cover the full declared value of your shipment.'
         }
       ]
     },
@@ -52,7 +52,7 @@ const FAQ = () => {
       questions: [
         {
           question: 'What payment methods do you accept?',
-          answer: 'We accept credit/debit cards (Visa, Mastercard), PayPal, bank transfers, and mobile payment options. All payment methods are secure and encrypted for your protection.'
+          answer: 'We accept cash payment, PayPal, bank transfers, payment in zimbabwe and mobile payment options. All payment methods are secure and encrypted for your protection.'
         },
         {
           question: 'When do I need to pay for my shipment?',
