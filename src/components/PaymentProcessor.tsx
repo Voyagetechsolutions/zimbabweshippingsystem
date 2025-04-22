@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -295,7 +296,8 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
           <Button
             onClick={handleConfirm}
             disabled={isProcessing}
-            className="bg-zim-green hover:bg-zim-green/90 text-white flex items-center"
+            className="bg-zim-green hover:bg-zim-green/90 text-white flex items-center w-full md:w-auto"
+            type="button"
           >
             {isProcessing ? (
               <>Processing...</>

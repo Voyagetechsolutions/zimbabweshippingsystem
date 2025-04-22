@@ -7,14 +7,16 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 export const RecentShipments = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
 
-  const { data: shipments, isLoading } = useQuery({
+  const { data: shipments, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['recentShipments', user?.id],
     queryFn: async () => {
       if (!user?.id) {
@@ -38,7 +40,25 @@ export const RecentShipments = () => {
       return data || [];
     },
     enabled: !!user?.id,
+    refetchInterval: 60000, // Auto-refresh every minute
   });
+
+  const handleRefresh = async () => {
+    try {
+      await refetch();
+      toast({
+        title: "Refreshed",
+        description: "Your shipment list has been updated",
+      });
+    } catch (error) {
+      console.error('Error refreshing shipments:', error);
+      toast({
+        title: "Refresh failed",
+        description: "Could not refresh your shipments",
+        variant: "destructive",
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -66,8 +86,11 @@ export const RecentShipments = () => {
   if (!shipments || shipments.length === 0) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Recent Shipments</CardTitle>
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefetching}>
+            <RefreshCw className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
+          </Button>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-gray-500">No recent shipments found.</p>
@@ -101,7 +124,8 @@ export const RecentShipments = () => {
       case 'delayed':
         return <Badge className="bg-red-100 text-red-800 hover:bg-red-200">{status}</Badge>;
       case 'paid':
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-200">{status}</Badge>;
+      case 'pending_payment':
+        return <Badge className="bg-green-100 text-green-800 hover:bg-green-200">Payment Complete</Badge>;
       default:
         return <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-200">{status}</Badge>;
     }
@@ -109,8 +133,11 @@ export const RecentShipments = () => {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Recent Shipments</CardTitle>
+        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefetching}>
+          <RefreshCw className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
+        </Button>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">

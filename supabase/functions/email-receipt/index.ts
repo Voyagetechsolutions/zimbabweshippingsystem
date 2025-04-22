@@ -10,7 +10,7 @@ const corsHeaders = {
 interface EmailReceiptRequest {
   receiptId: string;
   email: string;
-  receiptData: {
+  receiptData?: {
     receipt_number: string;
     created_at: string;
     amount: number;
@@ -97,9 +97,6 @@ serve(async (req) => {
       paymentMethod: receipt.payment_method,
       createdAt: receipt.created_at,
     })}`);
-    
-    // In the future, implement actual email sending logic here
-    // using a service like Resend.com API
     
     // Log the activity as a notification
     if (shipment?.user_id) {
