@@ -197,8 +197,8 @@ const FAQ = () => {
           answer: 'Yes, you can cancel or modify your shipment up to 24 hours before the scheduled collection date. Please contact our customer service team as soon as possible to make any changes to your booking.'
         },
         {
-          question: 'What is the difference between drum shipping and parcel delivery?',
-          answer: 'Drum shipping involves sending items in a large 200L plastic drum, ideal for multiple items or bulky goods. Parcel delivery is for smaller packages and is charged by weight. Drum shipping is more cost-effective for larger volumes, while parcel delivery may be better for smaller, urgent shipments.'
+          question: 'What is the difference between drum shipping and other items?',
+          answer: 'Drum shipping involves sending items in a large 200L - 220L drums, ideal for multiple items or bulky goods. Other items involves small parcels to palletes and is charged by volume/size. Drum shipping is more cost-effective for larger volumes, while parcel shipping may be better for smaller, urgent shipments.'
         },
         {
           question: 'Do you offer any assistance with packing?',
