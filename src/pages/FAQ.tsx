@@ -198,7 +198,7 @@ const FAQ = () => {
         },
         {
           question: 'What is the difference between drum shipping and other items?',
-          answer: 'Drum shipping involves sending items in a large 200L - 220L drums, ideal for multiple items or bulky goods. Other items involves small parcels to palletes and is charged by volume/size. Drum shipping is more cost-effective for larger volumes, while parcel shipping may be better for smaller, urgent shipments.'
+          answer: 'Drum shipping involves sending items in a large 200L - 220L drums, ideal for multiple items or bulky goods. Other items involves small parcels to palletes and is charged by volume/size/value. Drum shipping is more cost-effective for larger volumes, while parcel shipping may be better for smaller, urgent shipments.'
         },
         {
           question: 'Do you offer any assistance with packing?',
