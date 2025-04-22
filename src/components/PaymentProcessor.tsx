@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -66,9 +65,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      const paymentMethod = isGoodsArriving 
-        ? 'goods_arriving' 
-        : (selectedPaymentMethod === 'standard' ? payLaterMethod : selectedPaymentMethod);
+      const paymentMethod = selectedPaymentMethod === 'standard' ? payLaterMethod : selectedPaymentMethod;
       
       const transactionId = generateUniqueId('TX-');
       
@@ -111,20 +108,21 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       
       await supabase
         .from('shipments')
-        .update({ status: 'pending_payment' })
+        .update({ 
+          status: 'pending_collection',
+          metadata: {
+            ...bookingData.shipmentDetails,
+            payment_status: 'pending'
+          }
+        })
         .eq('id', bookingData.shipment_id);
       
       toast({
-        title: 'Payment Method Selected',
-        description: isGoodsArriving 
-          ? 'You will pay when your goods arrive in Zimbabwe.' 
-          : selectedPaymentMethod === 'cashOnCollection'
-            ? 'You will pay cash on collection with our special discount.'
-            : 'Your booking is confirmed with 30-day payment terms.',
+        title: 'Booking Confirmed',
+        description: 'Your shipment has been booked successfully.',
       });
       
-      console.log("Redirecting to receipt page with receipt ID:", receiptData.id);
-      navigate(`/PaymentSuccess?receipt_id=${receiptData.id}`);
+      navigate(`/receipt/${receiptData.id}`);
       
     } catch (error: any) {
       console.error('Error processing payment selection:', error);

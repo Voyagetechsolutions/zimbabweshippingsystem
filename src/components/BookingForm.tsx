@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -61,7 +60,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const [price, setPrice] = useState<number>(0);
   const [showCollectionInfo, setShowCollectionInfo] = useState(false);
   const [irelandCities, setIrelandCities] = useState<string[]>([]);
-  const [currentTab, setCurrentTab] = useState('sender');
+  const [currentTab, setCurrentTab] = useState<string>('sender');
   const [originalPrice, setOriginalPrice] = useState<number>(0);
   const [discountApplied, setDiscountApplied] = useState(false);
   const [redirectToCustomQuote, setRedirectToCustomQuote] = useState(false);
@@ -155,12 +154,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
   }, [watchPickupCity, watchPickupCountry]);
 
-  // Detect when to show payment methods section
   useEffect(() => {
-    setShowPaymentMethods(false); // We're removing the Pay Now option so this is not needed
+    setShowPaymentMethods(false);
   }, [watchPaymentOption]);
 
-  // Check when to redirect to custom quote
   useEffect(() => {
     if (watchShipmentType === 'other' && 
         watchItemCategory && 
@@ -172,7 +169,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
   }, [watchShipmentType, watchItemCategory, watchItemDescription]);
 
-  // New drum pricing logic
   useEffect(() => {
     if (watchShipmentType === 'drum') {
       const quantity = parseInt(watchDrumQuantity || '1', 10);
@@ -185,12 +181,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       } else if (quantity >= 5) {
         basePrice = 240 * quantity;
       } else {
-        basePrice = 280; // Default to single drum price
+        basePrice = 280;
       }
       
       setOriginalPrice(basePrice);
       
-      // Apply discount if cash on collection is selected
       if (watchPaymentOption === 'cashOnCollection') {
         const discountedPrice = basePrice - (20 * quantity);
         setPrice(discountedPrice);
@@ -201,7 +196,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       }
     } else if (watchShipmentType === 'other') {
       setOriginalPrice(95);
-      setPrice(95); // Base price for other items
+      setPrice(95);
       setDiscountApplied(false);
     } else {
       setOriginalPrice(0);
@@ -210,13 +205,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
   }, [watchShipmentType, watchDrumQuantity, watchPaymentOption]);
 
-  // Handle form navigation
   const goToNextTab = () => {
     if (currentTab === 'sender') setCurrentTab('recipient');
     else if (currentTab === 'recipient') setCurrentTab('shipment');
     else if (currentTab === 'shipment') {
       if (watchShipmentType === 'other') {
-        // Trigger custom quote flow in parent component
         handleCustomQuoteRedirect();
       } else {
         setCurrentTab('payment');
@@ -241,14 +234,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const onSubmit = async (data: BookingFormValues) => {
     setIsSubmitting(true);
     try {
-      // Generate a tracking number with custom format (for display purposes)
       const trackingNumber = `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
-      
-      // Generate a proper UUID for the database
       const shipmentId = generateUniqueId();
       
       const { error } = await supabase.from('shipments').insert({
-        id: shipmentId, // This is now a proper UUID
+        id: shipmentId,
         tracking_number: trackingNumber,
         origin: `${data.pickupAddress}, ${data.pickupCountry === 'England' ? data.pickupPostcode : data.pickupCity}`,
         destination: `${data.deliveryAddress}, ${data.deliveryCity}`,
@@ -274,7 +264,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
   };
 
-  // Validate current tab to enable/disable Next button
   const validateTab = (tab: string): boolean => {
     const fields = {
       sender: ['firstName', 'lastName', 'email', 'phone', 'pickupCountry', 'pickupAddress'],
@@ -306,8 +295,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             </TabsTrigger>
             <TabsTrigger value="recipient" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
-              <span className="hidden md:inline">Receicer Information</span>
-              <span className="inline md:hidden">Receicer</span>
+              <span className="hidden md:inline">Receiver Information</span>
+              <span className="inline md:hidden">Receiver</span>
             </TabsTrigger>
             <TabsTrigger value="shipment" className="flex items-center gap-2">
               <Package className="h-4 w-4" />
@@ -316,12 +305,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             </TabsTrigger>
             <TabsTrigger value="payment" className="flex items-center gap-2">
               <CreditCard className="h-4 w-4" />
-              <span className="hidden md:inline">Payment Options</span>
+              <span className="hidden md:inline">Payment Method</span>
               <span className="inline md:hidden">Payment</span>
             </TabsTrigger>
           </TabsList>
-          
-          {/* Sender Information Tab */}
+
           <TabsContent value="sender">
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4">Sender Information</h3>
@@ -511,11 +499,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               </div>
             </Card>
           </TabsContent>
-          
-          {/* Recipient Information Tab */}
+
           <TabsContent value="recipient">
             <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Receicer Information</h3>
+              <h3 className="text-lg font-semibold mb-4">Receiver Information</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
@@ -602,8 +589,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               </div>
             </Card>
           </TabsContent>
-          
-          {/* Shipment Details Tab */}
+
           <TabsContent value="shipment">
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4">Shipment Details</h3>
@@ -781,18 +767,16 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               </div>
             </Card>
           </TabsContent>
-          
-          {/* Payment Options Tab */}
+
           <TabsContent value="payment">
             <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Payment Options</h3>
+              <h3 className="text-lg font-semibold mb-4">Payment Method</h3>
               
               <FormField
                 control={form.control}
                 name="paymentOption"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Choose Payment Option *</FormLabel>
                     <FormControl>
                       <RadioGroup
                         onValueChange={field.onChange}
@@ -833,7 +817,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   </FormItem>
                 )}
               />
-              
+
               <div className="mt-6">
                 <FormField
                   control={form.control}
@@ -859,7 +843,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   )}
                 />
               </div>
-              
+
               <div className="flex justify-between mt-6">
                 <Button 
                   type="button" 
@@ -871,7 +855,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 <Button 
                   type="submit"
                   disabled={isSubmitting || !validateTab('payment')}
-                  className="bg-zim-green hover:bg-zim-green/90"
+                  className="bg-zim-green hover:bg-zim-green/90 w-full md:w-auto"
                 >
                   {isSubmitting ? (
                     <>
