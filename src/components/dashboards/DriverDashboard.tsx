@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -50,10 +49,8 @@ const DriverDashboard = () => {
         .from('shipments')
         .select(`
           *,
-          profiles:user_id(
-            email,
-            full_name
-          )
+          user_id,
+          profiles:user_id(email, full_name)
         `)
         .in('status', [
           'Booking Confirmed', 
@@ -64,8 +61,7 @@ const DriverDashboard = () => {
           'In Transit', 
           'Out for Delivery'
         ])
-        .eq('can_modify', false) // Only confirmed bookings
-        .order('created_at', { ascending: false });
+        .eq('can_modify', false); // Only confirmed bookings
 
       if (activeError) {
         console.error('Error fetching active deliveries:', activeError);
@@ -79,10 +75,8 @@ const DriverDashboard = () => {
         .from('shipments')
         .select(`
           *,
-          profiles:user_id(
-            email,
-            full_name
-          )
+          user_id,
+          profiles:user_id(email, full_name)
         `)
         .eq('status', 'Delivered')
         .order('created_at', { ascending: false })
@@ -117,10 +111,8 @@ const DriverDashboard = () => {
             .from('shipments')
             .select(`
               *,
-              profiles:user_id(
-                email,
-                full_name
-              )
+              user_id,
+              profiles:user_id(email, full_name)
             `)
             .in('status', ['Booking Confirmed', 'Ready for Pickup'])
             .eq('can_modify', false) // Only confirmed bookings

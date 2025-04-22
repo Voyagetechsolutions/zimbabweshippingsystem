@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -42,7 +43,8 @@ import {
   MessageSquare,
   Clock,
   ChevronRight,
-  RefreshCw
+  RefreshCw,
+  Receipt
 } from 'lucide-react';
 import { RecentShipments } from '@/components/customer/RecentShipments';
 import { useToast } from '@/hooks/use-toast';
@@ -72,6 +74,8 @@ const getStatusBadge = (status: string) => {
       return <Badge className="bg-green-100 text-green-800 border-green-300">{status}</Badge>;
     case statusLower.includes('cancelled'):
       return <Badge className="bg-red-100 text-red-800 border-red-300">{status}</Badge>;
+    case statusLower.includes('paid'):
+      return <Badge className="bg-green-100 text-green-800 border-green-300">{status}</Badge>;
     default:
       return <Badge variant="outline">{status}</Badge>;
   }
@@ -93,6 +97,18 @@ interface Shipment {
   metadata?: Json;
   user_id?: string;
   weight?: number;
+}
+
+interface Receipt {
+  id: string;
+  payment_id: string;
+  shipment_id: string;
+  receipt_number: string;
+  amount: number;
+  currency: string;
+  payment_method: string;
+  status: string;
+  created_at: string;
 }
 
 interface Notification {
@@ -161,16 +177,71 @@ const CustomerDashboard = () => {
     enabled: !!user?.id,
   });
 
+  // Fetch receipts for this user
+  const { data: receipts, isLoading: receiptsLoading, refetch: refetchReceipts } = useQuery<Receipt[]>({
+    queryKey: ['user-receipts', user?.id],
+    queryFn: async () => {
+      try {
+        if (!user?.id) {
+          console.error('No user ID available for fetching receipts');
+          return [];
+        }
+        
+        // First get all shipments for this user
+        const { data: userShipments, error: shipmentError } = await supabase
+          .from('shipments')
+          .select('id')
+          .eq('user_id', user.id);
+        
+        if (shipmentError) {
+          console.error('Error fetching user shipments for receipts:', shipmentError);
+          throw shipmentError;
+        }
+        
+        if (!userShipments || userShipments.length === 0) {
+          return [];
+        }
+        
+        // Get shipment IDs
+        const shipmentIds = userShipments.map(s => s.id);
+        
+        // Now fetch receipts for those shipments
+        const { data, error } = await supabase
+          .from('receipts')
+          .select('*')
+          .in('shipment_id', shipmentIds)
+          .order('created_at', { ascending: false });
+        
+        if (error) {
+          console.error('Error fetching receipts:', error);
+          throw error;
+        }
+        
+        console.log('Fetched customer receipts:', data?.length);
+        return data || [];
+      } catch (error: any) {
+        console.error('Error in receipts query function:', error.message);
+        toast({
+          title: 'Error fetching receipts',
+          description: error.message,
+          variant: 'destructive'
+        });
+        return [];
+      }
+    },
+    enabled: !!user?.id,
+  });
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await refetchShipments();
+      await Promise.all([refetchShipments(), refetchReceipts()]);
       toast({
         title: 'Data refreshed',
-        description: 'Shipment data has been updated',
+        description: 'Shipment and receipt data has been updated',
       });
     } catch (error: any) {
-      console.error('Error refreshing shipments:', error);
+      console.error('Error refreshing data:', error);
       toast({
         title: 'Refresh failed',
         description: error.message,
@@ -216,11 +287,12 @@ const CustomerDashboard = () => {
     const interval = setInterval(() => {
       if (user?.id) {
         refetchShipments();
+        refetchReceipts();
       }
-    }, 30000); // Check for new shipments every 30 seconds
+    }, 30000); // Check for new data every 30 seconds
     
     return () => clearInterval(interval);
-  }, [user?.id, refetchShipments]);
+  }, [user?.id, refetchShipments, refetchReceipts]);
 
   const filteredShipments = shipments?.filter(shipment =>
     searchQuery === '' ||
@@ -318,10 +390,14 @@ const CustomerDashboard = () => {
       </div>
 
       <Tabs defaultValue="shipments" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="shipments" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
             <span>My Shipments</span>
+          </TabsTrigger>
+          <TabsTrigger value="receipts" className="flex items-center gap-2">
+            <Receipt className="h-4 w-4" />
+            <span>Receipts</span>
           </TabsTrigger>
           <TabsTrigger value="tickets" className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4" />
@@ -435,6 +511,74 @@ const CustomerDashboard = () => {
                 </Link>
               </Button>
             </CardFooter>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="receipts" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                <div>
+                  <CardTitle>My Receipts</CardTitle>
+                  <CardDescription>View and download payment receipts</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {receiptsLoading ? (
+                <div className="animate-pulse space-y-4">
+                  {loadingArray.map((i) => (
+                    <div key={i} className="h-12 bg-gray-100 rounded"></div>
+                  ))}
+                </div>
+              ) : receipts && receipts.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Receipt #</TableHead>
+                        <TableHead className="hidden md:table-cell">Amount</TableHead>
+                        <TableHead className="hidden md:table-cell">Payment Method</TableHead>
+                        <TableHead className="hidden md:table-cell">Date</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {receipts.map((receipt) => (
+                        <TableRow key={receipt.id}>
+                          <TableCell className="font-medium">{receipt.receipt_number}</TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            {receipt.currency} {receipt.amount.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell capitalize">
+                            {receipt.payment_method}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell text-sm text-gray-500">
+                            {format(new Date(receipt.created_at), 'MMM d, yyyy')}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button asChild variant="ghost" size="sm">
+                              <Link to={`/receipt/${receipt.id}`}>
+                                <FileText className="h-4 w-4 mr-1" />
+                                View
+                              </Link>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium">No receipts found</h3>
+                  <p className="text-gray-500 mt-1">
+                    Your payment receipts will appear here once you've made a payment.
+                  </p>
+                </div>
+              )}
+            </CardContent>
           </Card>
         </TabsContent>
         

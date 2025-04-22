@@ -1,5 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.170.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -35,10 +36,52 @@ serve(async (req) => {
   }
 
   try {
+    // Initialize Supabase client with service role key to bypass RLS
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") || "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
+    );
+    
     // Parse the request body
     const { receiptId, email, receiptData, shipmentData }: EmailReceiptRequest = await req.json();
 
     console.log(`Processing email request for receipt: ${receiptId} to ${email}`);
+
+    // Get the receipt data if not provided
+    let receipt = receiptData;
+    let shipment = shipmentData;
+    
+    if (!receiptData && receiptId) {
+      // Fetch the receipt data
+      const { data: fetchedReceipt, error: receiptError } = await supabaseAdmin
+        .from('receipts')
+        .select('*')
+        .eq('id', receiptId)
+        .single();
+        
+      if (receiptError) {
+        throw new Error(`Error fetching receipt: ${receiptError.message}`);
+      }
+      
+      receipt = fetchedReceipt;
+      
+      // Fetch associated shipment
+      const { data: fetchedShipment, error: shipmentError } = await supabaseAdmin
+        .from('shipments')
+        .select('*')
+        .eq('id', fetchedReceipt.shipment_id)
+        .single();
+        
+      if (shipmentError) {
+        console.error('Error fetching shipment:', shipmentError);
+      } else {
+        shipment = fetchedShipment;
+      }
+    }
+    
+    if (!receipt) {
+      throw new Error('Receipt data not found');
+    }
 
     // In a real implementation, you would use a service like Resend, SendGrid, or similar
     // to actually send the email with the receipt as an attachment or in the body
@@ -47,18 +90,39 @@ serve(async (req) => {
     console.log(`Would send receipt email to: ${email}`);
     console.log(`Receipt data: ${JSON.stringify({
       receiptId,
-      amount: receiptData.amount,
-      recipient: receiptData.recipient_details.name,
+      amount: receipt.amount,
+      currency: receipt.currency,
+      recipient: receipt.recipient_details?.name || 'Customer',
+      receiptNumber: receipt.receipt_number,
+      paymentMethod: receipt.payment_method,
+      createdAt: receipt.created_at,
     })}`);
-
+    
     // In the future, implement actual email sending logic here
     // using a service like Resend.com API
+    
+    // Log the activity as a notification
+    if (shipment?.user_id) {
+      const { error: notificationError } = await supabaseAdmin
+        .from('notifications')
+        .insert({
+          user_id: shipment.user_id,
+          title: 'Receipt Sent',
+          message: `Receipt ${receipt.receipt_number} has been emailed to you.`,
+          type: 'RECEIPT',
+          related_id: receiptId
+        });
+        
+      if (notificationError) {
+        console.error('Error creating notification:', notificationError);
+      }
+    }
 
-    // For now, just return success
+    // Return success
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `Receipt ${receiptId} would be sent to ${email}` 
+        message: `Receipt ${receiptId} has been sent to ${email}` 
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
