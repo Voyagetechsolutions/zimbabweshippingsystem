@@ -79,11 +79,11 @@ const FAQ = () => {
         },
         {
           question: 'What if I\'m not available on my area\'s collection date?',
-          answer: 'If you\'re not available on your area\'s scheduled collection date, you can either drop off your items at our depot, or wait for the next collection date in your area (typically every 2-4 weeks).'
+          answer: 'If you\'re not available on your area\'s scheduled collection date, you can either drop off your items at our depot, or wait for the next collection date in your area (typically every 2-4 weeks) or instruct us on how to access your goods'
         },
         {
           question: 'Do you collect from all areas in the UK?',
-          answer: 'We cover most areas across the UK. However, some remote or rural areas have limited collection schedules or may require additional fees. Check our collection schedule or enter your postal code during booking to confirm service availability.'
+          answer: 'We cover most areas across the UK. However, some remote have limited collection schedules or may require additional fees. Check our collection schedule or enter your postal code during booking to confirm service availability.'
         },
         {
           question: 'What happens if my postal code is in a restricted area?',
