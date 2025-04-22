@@ -45,12 +45,12 @@ const DriverDashboard = () => {
       setLoading(true);
       
       // Fetch active deliveries - include all active statuses
+      // Modified query: Changed the join approach to avoid user_id relationship error
       const { data: activeData, error: activeError } = await supabase
         .from('shipments')
         .select(`
           *,
-          user_id,
-          profiles:user_id(email, full_name)
+          profiles:profiles!inner(email, full_name)
         `)
         .in('status', [
           'Booking Confirmed', 
@@ -70,13 +70,12 @@ const DriverDashboard = () => {
       console.log("Active deliveries fetched:", activeData?.length);
       setActiveDeliveries(activeData || []);
       
-      // Fetch completed deliveries
+      // Fetch completed deliveries - Modified query approach
       const { data: completedData, error: completedError } = await supabase
         .from('shipments')
         .select(`
           *,
-          user_id,
-          profiles:user_id(email, full_name)
+          profiles:profiles!inner(email, full_name)
         `)
         .eq('status', 'Delivered')
         .order('created_at', { ascending: false })
@@ -102,7 +101,7 @@ const DriverDashboard = () => {
       setCollectionSchedules(scheduleData || []);
       console.log("Collection schedules fetched:", scheduleData?.length);
       
-      // Fetch shipments for each schedule
+      // Fetch shipments for each schedule - Modified query approach
       if (scheduleData && scheduleData.length > 0) {
         const schedulesWithShipments: {[key: string]: any[]} = {};
         
@@ -111,8 +110,7 @@ const DriverDashboard = () => {
             .from('shipments')
             .select(`
               *,
-              user_id,
-              profiles:user_id(email, full_name)
+              profiles:profiles!inner(email, full_name)
             `)
             .in('status', ['Booking Confirmed', 'Ready for Pickup'])
             .eq('can_modify', false) // Only confirmed bookings

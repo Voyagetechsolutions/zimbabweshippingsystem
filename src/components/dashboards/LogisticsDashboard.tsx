@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -88,12 +87,12 @@ const LogisticsDashboard = () => {
       try {
         console.log('Fetching all shipments for logistics dashboard');
         
-        // First, fetch the shipments
+        // Modified query: Changed the join approach to avoid user_id relationship error
         const { data: shipmentsData, error: shipmentsError } = await supabase
           .from('shipments')
           .select(`
             *,
-            profiles:user_id(
+            profiles:profiles!inner(
               email,
               full_name
             )
