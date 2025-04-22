@@ -125,7 +125,7 @@ const FAQ = () => {
         },
         {
           question: 'How does door-to-door delivery work in Zimbabwe?',
-          answer: 'Our door-to-door service delivers your shipment directly to your recipient\'s address in Zimbabwe. We contact the recipient to inform them about the delivery time. A small additional fee applies for this service.'
+          answer: 'Our door-to-door service delivers your shipment directly to your recipient\'s address in Zimbabwe. We contact the recipient to inform them about the delivery. A small additional fee applies for this service.'
         },
         {
           question: 'What happens if no one is available to receive the delivery?',
