@@ -49,7 +49,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   
   const premiumAmount = totalAmount * 0.2;
-  const specialDealDiscount = bookingData?.shipmentDetails?.type === 'drum' ? 15 : 0;
+  const specialDealDiscount = bookingData?.shipmentDetails?.type === 'drum' ? 20 : 0;
   
   let finalAmount = totalAmount;
   if (isGoodsArriving) {
@@ -198,7 +198,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
                     <span className="bg-yellow-400 text-yellow-800 text-xs font-bold px-2 py-1 rounded-full">SAVE £15</span>
                   </div>
                   <p className="text-sm text-gray-600">
-                    Pay cash when we collect your drums and receive a £15 discount on your shipment.
+                    Pay cash when we collect your drums and receive a £20 discount on each drum from your shipment.
                   </p>
                   
                   {selectedPaymentMethod === 'cashOnCollection' && (
