@@ -118,7 +118,7 @@ const PaymentSuccess = () => {
     switch(method) {
       case 'goods_arriving':
         return 'Pay on Goods Arriving in Zimbabwe';
-      case 'cash_on_collection':
+      case 'cashOnCollection':
         return 'Cash on Collection (Special Deal)';
       case 'cash':
         return 'Cash Payment (30-day terms)';

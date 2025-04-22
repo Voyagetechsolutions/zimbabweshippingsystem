@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -47,6 +47,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
   const [isGoodsArriving, setIsGoodsArriving] = useState<boolean>(false);
   const [isSpecialDeal, setIsSpecialDeal] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [userId, setUserId] = useState<string | null>(null);
   
   const premiumAmount = totalAmount * 0.2;
   const specialDealDiscount = bookingData?.shipmentDetails?.type === 'drum' ? 20 : 0;
@@ -59,6 +60,15 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
     finalAmount -= specialDealDiscount;
   }
   
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserId(user?.id || null);
+    };
+    
+    checkUser();
+  }, []);
+  
   const handleConfirm = async () => {
     setIsProcessing(true);
     
@@ -69,10 +79,12 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       
       const transactionId = generateUniqueId('TX-');
       
+      const currentUserId = user?.id || userId || bookingData.user_id || null;
+      
       const { data: paymentData, error: paymentError } = await supabase
         .from('payments')
         .insert({
-          user_id: user?.id || bookingData.user_id || null,
+          user_id: currentUserId,
           shipment_id: bookingData.shipment_id,
           amount: finalAmount,
           currency: 'GBP',
@@ -83,7 +95,10 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         .select()
         .single();
       
-      if (paymentError) throw paymentError;
+      if (paymentError) {
+        console.error('Payment error:', paymentError);
+        throw paymentError;
+      }
       
       const receiptNumber = `REC-${Date.now().toString().slice(-8)}`;
       
@@ -104,12 +119,16 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         .select()
         .single();
       
-      if (receiptError) throw receiptError;
+      if (receiptError) {
+        console.error('Receipt error:', receiptError);
+        throw receiptError;
+      }
       
       await supabase
         .from('shipments')
         .update({ 
           status: 'pending_collection',
+          user_id: currentUserId,
           metadata: {
             ...bookingData.shipmentDetails,
             payment_status: 'pending'
@@ -122,7 +141,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         description: 'Your shipment has been booked successfully.',
       });
       
-      navigate(`/receipt/${receiptData.id}`);
+      navigate(`/payment-success?receipt_id=${receiptData.id}`);
       
     } catch (error: any) {
       console.error('Error processing payment selection:', error);
@@ -154,7 +173,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
             }}
             className="space-y-4"
           >
-            {/* Goods Arriving Option */}
             <div className={`flex items-start space-x-3 border rounded-md p-4 ${selectedPaymentMethod === 'goods_arriving' ? 'bg-blue-50 border-blue-300' : ''}`}>
               <RadioGroupItem value="goods_arriving" id="goods_arriving" />
               <div className="space-y-2 w-full">
@@ -185,7 +203,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
               </div>
             </div>
             
-            {/* Special Deal Option (for drums only) */}
             {bookingData?.shipmentDetails?.type === 'drum' && (
               <div className={`flex items-start space-x-3 border-2 rounded-md p-4 ${selectedPaymentMethod === 'cashOnCollection' ? 'bg-green-50 border-green-400' : 'border-dashed border-yellow-400'}`}>
                 <RadioGroupItem value="cashOnCollection" id="cashOnCollection" />
@@ -221,7 +238,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
               </div>
             )}
             
-            {/* Standard Payment Option */}
             <div className={`flex items-start space-x-3 border rounded-md p-4 ${selectedPaymentMethod === 'standard' ? 'bg-gray-50 border-gray-300' : ''}`}>
               <RadioGroupItem value="standard" id="standard" />
               <div className="space-y-2 w-full">
@@ -309,7 +325,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         </CardFooter>
       </Card>
 
-      {/* Order Summary Card */}
       <Card>
         <CardHeader>
           <CardTitle>Order Summary</CardTitle>
