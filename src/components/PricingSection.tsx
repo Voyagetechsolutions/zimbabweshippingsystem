@@ -127,8 +127,8 @@ const PricingSection: React.FC = () => {
 
         <Tabs defaultValue="standard" className="w-full">
           <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8">
-            <TabsTrigger value="standard">Standard Payment</TabsTrigger>
-            <TabsTrigger value="payLater">Pay Later (30 Days)</TabsTrigger>
+            <TabsTrigger value="standard">Discounted Rate</TabsTrigger>
+            <TabsTrigger value="payLater">Standard Rates</TabsTrigger>
           </TabsList>
 
           <TabsContent value="standard">
