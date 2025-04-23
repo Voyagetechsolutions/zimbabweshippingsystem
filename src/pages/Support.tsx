@@ -44,8 +44,8 @@ const Support = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-gray-600 mb-2">UK Phone: +44 7123 456789</p>
-                    <p className="text-gray-600">Zimbabwe Phone: +263 771 234567</p>
+                    <p className="text-gray-600 mb-2">UK Phone: +44 7984 099041</p>
+                    <p className="text-gray-600">Zimbabwe Phone: +263 71 274 3178</p>
                   </CardContent>
                 </Card>
                 
@@ -58,7 +58,7 @@ const Support = () => {
                   </CardHeader>
                   <CardContent>
                     <p className="text-gray-600 mb-2">General Inquiries: info@zimshipping.com</p>
-                    <p className="text-gray-600 mb-2">Support: support@zimshipping.com</p>
+                   
                     <div className="mt-4 pt-3 border-t border-gray-100">
                       <p className="text-sm text-gray-600 flex items-center">
                         <ArrowRight className="h-4 w-4 text-zim-green mr-2" />
@@ -94,7 +94,7 @@ const Support = () => {
                       <AccordionItem value="item-1">
                         <AccordionTrigger className="text-sm font-medium">How long does shipping take?</AccordionTrigger>
                         <AccordionContent className="text-gray-600 text-sm">
-                          Standard shipping takes approximately 3-4 weeks from the UK to Zimbabwe.
+                          Standard shipping takes approximately 6 weeks from the UK to Zimbabwe.
                         </AccordionContent>
                       </AccordionItem>
                       <AccordionItem value="item-2">
