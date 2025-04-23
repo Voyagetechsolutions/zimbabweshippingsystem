@@ -621,7 +621,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                           <Input 
                             type="number" 
                             min="1" 
-                            max="10" 
+                            max="1000" 
                             step="1" 
                             placeholder="Enter number of drums" 
                             {...field} 
