@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -149,7 +150,7 @@ const BookShipment = () => {
     setCurrentStep(BookingStep.FORM);
   };
 
-  // Handle custom quote submission - Fixed UUID format issue
+  // Handle custom quote submission
   const handleCustomQuoteSubmit = async (customQuoteData: any) => {
     try {
       console.log("Submitting custom quote with data:", {
@@ -159,16 +160,16 @@ const BookShipment = () => {
         category: bookingData.shipmentDetails.category
       });
       
-      // Extract shipment_id without the "shp_" prefix if present
-      let cleanShipmentId = bookingData.shipment_id;
-      if (typeof cleanShipmentId === 'string' && cleanShipmentId.startsWith('shp_')) {
-        cleanShipmentId = cleanShipmentId.substring(4);
+      // Extract UUID from the shipment_id by removing the "shp_" prefix if it exists
+      let shipmentUuid = bookingData.shipment_id;
+      if (shipmentUuid && shipmentUuid.startsWith('shp_')) {
+        shipmentUuid = shipmentUuid.substring(4); // Remove the "shp_" prefix
       }
       
-      // Save custom quote to database with the clean UUID
+      // Save custom quote to database
       const { data, error } = await supabase.from('custom_quotes').insert({
         user_id: bookingData.user_id,
-        shipment_id: cleanShipmentId,
+        shipment_id: shipmentUuid,
         phone_number: customQuoteData.phoneNumber || bookingData.senderDetails.phone,
         description: customQuoteData.description || bookingData.shipmentDetails.description,
         category: bookingData.shipmentDetails.category,

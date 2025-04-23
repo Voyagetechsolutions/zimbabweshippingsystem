@@ -22,7 +22,6 @@ import {
   ArrowLeftCircle, 
   CheckCircle2,
   Building,
-  Truck,
   CreditCard,
   Tag
 } from 'lucide-react';
@@ -45,21 +44,15 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
   
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('standard');
   const [payLaterMethod, setPayLaterMethod] = useState<string>('cash');
-  const [isGoodsArriving, setIsGoodsArriving] = useState<boolean>(false);
   const [isSpecialDeal, setIsSpecialDeal] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [userId, setUserId] = useState<string | null>(null);
   
-  const premiumAmount = totalAmount * 0.2;
-  
-  // Calculate special deal discount based on drum quantity
-  const drumQuantity = bookingData?.shipmentDetails?.quantity || 1;
-  const specialDealDiscount = bookingData?.shipmentDetails?.type === 'drum' ? 20 * drumQuantity : 0;
+  // Calculate the discount amount based on the number of drums
+  const drumQuantity = bookingData?.shipmentDetails?.type === 'drum' ? bookingData.shipmentDetails.quantity : 0;
+  const specialDealDiscount = bookingData?.shipmentDetails?.type === 'drum' ? drumQuantity * 20 : 0;
   
   let finalAmount = totalAmount;
-  if (isGoodsArriving) {
-    finalAmount += premiumAmount;
-  }
   if (isSpecialDeal && bookingData?.shipmentDetails?.type === 'drum') {
     finalAmount -= specialDealDiscount;
   }
@@ -85,17 +78,11 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       
       const currentUserId = user?.id || userId || bookingData.user_id || null;
       
-      // Clean up shipment_id to ensure it's a valid UUID
-      let shipmentId = bookingData.shipment_id;
-      if (typeof shipmentId === 'string' && shipmentId.startsWith('shp_')) {
-        shipmentId = shipmentId.substring(4);
-      }
-      
       const { data: paymentData, error: paymentError } = await supabase
         .from('payments')
         .insert({
           user_id: currentUserId,
-          shipment_id: shipmentId,
+          shipment_id: bookingData.shipment_id,
           amount: finalAmount,
           currency: 'GBP',
           payment_method: paymentMethod,
@@ -115,7 +102,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       const { data: receiptData, error: receiptError } = await supabase
         .from('receipts')
         .insert({
-          shipment_id: shipmentId,
+          shipment_id: bookingData.shipment_id,
           payment_id: paymentData.id,
           receipt_number: receiptNumber,
           amount: finalAmount,
@@ -144,7 +131,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
             payment_status: 'pending'
           }
         })
-        .eq('id', shipmentId);
+        .eq('id', bookingData.shipment_id);
       
       toast({
         title: 'Booking Confirmed',
@@ -178,41 +165,10 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
             value={selectedPaymentMethod}
             onValueChange={(value) => {
               setSelectedPaymentMethod(value);
-              setIsGoodsArriving(value === 'goods_arriving');
               setIsSpecialDeal(value === 'cashOnCollection');
             }}
             className="space-y-4"
           >
-            <div className={`flex items-start space-x-3 border rounded-md p-4 ${selectedPaymentMethod === 'goods_arriving' ? 'bg-blue-50 border-blue-300' : ''}`}>
-              <RadioGroupItem value="goods_arriving" id="goods_arriving" />
-              <div className="space-y-2 w-full">
-                <Label htmlFor="goods_arriving" className="flex items-center text-lg font-medium">
-                  <Truck className="h-5 w-5 mr-2 text-blue-600" />
-                  Pay on Goods Arriving (20% premium)
-                </Label>
-                <p className="text-sm text-gray-600">
-                  Pay when your goods arrive in Zimbabwe. A 20% premium is added to the standard shipping cost.
-                </p>
-                
-                {selectedPaymentMethod === 'goods_arriving' && (
-                  <div className="mt-3 p-3 bg-blue-100 rounded-md">
-                    <h4 className="font-medium flex items-center text-blue-800">
-                      <AlertCircle className="h-4 w-4 mr-1" /> 
-                      Price Calculation
-                    </h4>
-                    <div className="grid grid-cols-2 gap-1 mt-2 text-sm">
-                      <span className="text-blue-700">Base Amount:</span>
-                      <span className="text-right font-medium">£{totalAmount.toFixed(2)}</span>
-                      <span className="text-blue-700">20% Premium:</span>
-                      <span className="text-right font-medium">£{premiumAmount.toFixed(2)}</span>
-                      <span className="text-blue-800 font-medium pt-1 border-t border-blue-200">Total:</span>
-                      <span className="text-right font-bold pt-1 border-t border-blue-200">£{(totalAmount + premiumAmount).toFixed(2)}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            
             {bookingData?.shipmentDetails?.type === 'drum' && (
               <div className={`flex items-start space-x-3 border-2 rounded-md p-4 ${selectedPaymentMethod === 'cashOnCollection' ? 'bg-green-50 border-green-400' : 'border-dashed border-yellow-400'}`}>
                 <RadioGroupItem value="cashOnCollection" id="cashOnCollection" />
@@ -222,9 +178,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
                       <Tag className="h-5 w-5 mr-2 text-green-600" />
                       Special Deal: Cash on Collection
                     </Label>
-                    <span className="bg-yellow-400 text-yellow-800 text-xs font-bold px-2 py-1 rounded-full">
-                      SAVE £{specialDealDiscount}
-                    </span>
+                    <span className="bg-yellow-400 text-yellow-800 text-xs font-bold px-2 py-1 rounded-full">SAVE £{specialDealDiscount}</span>
                   </div>
                   <p className="text-sm text-gray-600">
                     Pay cash when we collect your drums and receive a £20 discount on each drum from your shipment.
@@ -364,16 +318,9 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
               <span>£{totalAmount.toFixed(2)}</span>
             </div>
             
-            {isGoodsArriving && (
-              <div className="flex justify-between">
-                <span className="text-gray-600">Arrival Payment Premium (20%)</span>
-                <span>£{premiumAmount.toFixed(2)}</span>
-              </div>
-            )}
-            
             {isSpecialDeal && bookingData?.shipmentDetails?.type === 'drum' && (
               <div className="flex justify-between">
-                <span className="text-green-600">Cash on Collection Discount ({drumQuantity} x £20)</span>
+                <span className="text-green-600">Cash on Collection Discount</span>
                 <span className="text-green-600">-£{specialDealDiscount.toFixed(2)}</span>
               </div>
             )}
