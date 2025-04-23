@@ -132,7 +132,7 @@ const PricingSection: React.FC = () => {
           </TabsList>
 
           <TabsContent value="standard">
-            <h3 className="text-2xl font-semibold mb-6 text-center text-color=red">Cash on Collection</h3>            
+            <h3 className="text-2xl font-semibold mb-6 text-center text-color-red">Cash on Collection</h3>            
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
               {standardPricingOptions.map((option, index) => (
                 <div key={index} className="relative flex flex-col h-full transition-transform duration-300 hover:translate-y-[-8px]">
