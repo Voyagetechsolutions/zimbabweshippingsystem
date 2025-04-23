@@ -293,7 +293,7 @@ export type Database = {
           receipt_url: string | null
           shipment_id: string | null
           transaction_id: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           amount: number
@@ -305,7 +305,7 @@ export type Database = {
           receipt_url?: string | null
           shipment_id?: string | null
           transaction_id?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           amount?: number
@@ -317,7 +317,7 @@ export type Database = {
           receipt_url?: string | null
           shipment_id?: string | null
           transaction_id?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
