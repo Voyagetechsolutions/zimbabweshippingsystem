@@ -104,30 +104,37 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const watchItemCategory = form.watch('itemCategory');
   const watchItemDescription = form.watch('itemDescription');
 
+  // Fixed shipment type selection to properly clear and set fields
   const renderShipmentTypeOptions = () => {
     return (
       <RadioGroup
         value={form.getValues('shipmentType')}
         onValueChange={(value) => {
-          form.setValue('shipmentType', value as any);
+          form.setValue('shipmentType', value as 'drum' | 'other');
+          
+          // Handle field clearing and appropriate defaults
           if (value === 'drum') {
-            if (!form.getValues('drumQuantity')) {
+            if (!form.getValues('drumQuantity') || form.getValues('drumQuantity') === '0') {
               form.setValue('drumQuantity', '1');
             }
+            // Clear "other" fields
             form.setValue('itemCategory', '');
             form.setValue('itemDescription', '');
           } else if (value === 'other') {
-            form.setValue('drumQuantity', '1');
+            // Set a default drum quantity but we won't use it
+            form.setValue('drumQuantity', '1'); 
           }
         }}
         className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2"
       >
-        <div className={`border rounded-lg p-4 cursor-pointer transition-all ${form.getValues('shipmentType') === 'drum' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
+        <div 
+          className={`border rounded-lg p-4 cursor-pointer transition-all ${form.getValues('shipmentType') === 'drum' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
           onClick={() => {
             form.setValue('shipmentType', 'drum');
-            if (!form.getValues('drumQuantity')) {
+            if (!form.getValues('drumQuantity') || form.getValues('drumQuantity') === '0') {
               form.setValue('drumQuantity', '1');
             }
+            // Clear "other" fields
             form.setValue('itemCategory', '');
             form.setValue('itemDescription', '');
           }}
@@ -139,9 +146,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
           <p className="text-sm text-gray-500 mt-2">Standard size drums (200L-220L) for goods</p>
         </div>
         
-        <div className={`border rounded-lg p-4 cursor-pointer transition-all ${form.getValues('shipmentType') === 'other' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
+        <div 
+          className={`border rounded-lg p-4 cursor-pointer transition-all ${form.getValues('shipmentType') === 'other' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
           onClick={() => {
             form.setValue('shipmentType', 'other');
+            // Set a default drum quantity but we won't use it
             form.setValue('drumQuantity', '1');
           }}
         >
@@ -299,16 +308,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       return fieldValue !== undefined && fieldValue !== '';
     });
   };
-
-  useEffect(() => {
-    if (form.getValues('shipmentType') === 'drum') {
-      form.setValue('itemCategory', '');
-      form.setValue('itemDescription', '');
-    }
-    if (form.getValues('shipmentType') === 'other') {
-      form.setValue('drumQuantity', '1');
-    }
-  }, [form.getValues('shipmentType')]);
 
   return (
     <Form {...form}>

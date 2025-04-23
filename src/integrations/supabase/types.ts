@@ -204,6 +204,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "custom_quote_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "custom_quotes_shipment_id_fkey"
             columns: ["shipment_id"]
             isOneToOne: false

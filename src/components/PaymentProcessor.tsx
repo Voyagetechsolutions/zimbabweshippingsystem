@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -81,22 +80,31 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       }
 
       const transactionId = generateUniqueId('TX-');
-      // Ensure we have a user ID or null, not undefined
+      
+      // Create a placeholder user ID for anonymous users
+      // With our new RLS policy, anonymous inserts are allowed
       const currentUserId = user?.id || userId || bookingData.user_id || null;
       
-      // Ensure shipment_id is a valid UUID (remove 'shp_' prefix if it exists)
+      // Clean up shipment ID to ensure it's a valid UUID
       let shipmentUuid = bookingData.shipment_id;
       if (shipmentUuid && typeof shipmentUuid === 'string' && shipmentUuid.startsWith('shp_')) {
         shipmentUuid = shipmentUuid.substring(4);
       }
       
-      // Validate that shipmentUuid looks like a valid UUID
+      // Validate the UUID format against a strict regex
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!shipmentUuid || !uuidRegex.test(shipmentUuid)) {
         console.error('Invalid shipment ID format:', shipmentUuid);
         throw new Error('Invalid shipment ID format');
       }
 
+      // Create the payment record - this should work now with our "Anyone can create payments" policy
+      console.log("Creating payment record with data:", { 
+        user_id: currentUserId, 
+        shipment_id: shipmentUuid,
+        amount: finalAmount 
+      });
+      
       const { data: paymentData, error: paymentError } = await supabase
         .from('payments')
         .insert({
@@ -116,7 +124,11 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         throw paymentError;
       }
 
+      console.log("Successfully created payment:", paymentData);
+
       const receiptNumber = `REC-${Date.now().toString().slice(-8)}`;
+      
+      // Create receipt - should work with our "Anyone can create receipts" policy
       const { data: receiptData, error: receiptError } = await supabase
         .from('receipts')
         .insert({
@@ -139,6 +151,9 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         throw receiptError;
       }
 
+      console.log("Successfully created receipt:", receiptData);
+
+      // Update the shipment status
       await supabase
         .from('shipments')
         .update({ 

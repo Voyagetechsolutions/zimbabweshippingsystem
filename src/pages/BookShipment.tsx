@@ -141,16 +141,18 @@ const BookShipment = () => {
         category: bookingData.shipmentDetails.category
       });
       
-      let shipmentUuid = bookingData.shipment_id;
-      if (shipmentUuid && typeof shipmentUuid === 'string' && shipmentUuid.startsWith('shp_')) {
-        shipmentUuid = shipmentUuid.substring(4);
-      }
+      let shipmentUuid = null;
+      if (bookingData.shipment_id) {
+        shipmentUuid = bookingData.shipment_id;
+        if (typeof shipmentUuid === 'string' && shipmentUuid.startsWith('shp_')) {
+          shipmentUuid = shipmentUuid.substring(4);
+        }
       
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      
-      if (shipmentUuid && !uuidRegex.test(shipmentUuid)) {
-        console.log('Invalid shipment UUID format, setting to null:', shipmentUuid);
-        shipmentUuid = null;
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(shipmentUuid)) {
+          console.log('Invalid UUID format for shipment, setting to null');
+          shipmentUuid = null;
+        }
       }
       
       const { data, error } = await supabase.from('custom_quotes').insert({
