@@ -105,7 +105,33 @@ const Pricing = () => {
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-2xl">Discounted Offer</CardTitle>
-                      <CardDescription>Standard Payment</CardDescription>
+                      <CardDescription>Only Available for cash on collection option</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex justify-between items-center pb-2 border-b">
+                        <span className="font-medium">1 Drum</span>
+                        <span className="text-xl font-bold">£260</span>
+                      </div>
+                      <div className="flex justify-between items-center pb-2 border-b">
+                        <span className="font-medium">2-4 Drums</span>
+                        <span className="text-xl font-bold">£240 <span className="text-sm font-normal">per drum</span></span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">5+ Drums</span>
+                        <span className="text-xl font-bold">£220 <span className="text-sm font-normal">per drum</span></span>
+                      </div>
+                    </CardContent>
+                    <CardFooter>
+                      <Link to="/book-shipment" className="w-full">
+                        <Button className="w-full bg-zim-green hover:bg-zim-green/90">Book Now</Button>
+                      </Link>
+                    </CardFooter>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-2xl">Standard Rates </CardTitle>
+                      <CardDescription>Drum prices</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="flex justify-between items-center pb-2 border-b">
