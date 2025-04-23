@@ -132,7 +132,7 @@ const PricingSection: React.FC = () => {
           </TabsList>
 
           <TabsContent value="standard">
-            <h3 className="text-2xl font-semibold mb-6 text-center">Standard Payment Options</h3>
+            <h3 className="text-2xl font-semibold mb-6 text-center">Discounted Options</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
               {standardPricingOptions.map((option, index) => (
                 <div key={index} className="relative flex flex-col h-full transition-transform duration-300 hover:translate-y-[-8px]">
@@ -181,7 +181,7 @@ const PricingSection: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="payLater">
-            <h3 className="text-2xl font-semibold mb-6 text-center">Pay Later Options (30-Day Terms)</h3>
+            <h3 className="text-2xl font-semibold mb-6 text-center">Standard Rates</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
               {payLaterPricingOptions.map((option, index) => (
                 <div key={index} className="relative flex flex-col h-full transition-transform duration-300 hover:translate-y-[-8px]">
