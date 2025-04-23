@@ -145,7 +145,11 @@ const BookShipment = () => {
       if (shipmentUuid && typeof shipmentUuid === 'string' && shipmentUuid.startsWith('shp_')) {
         shipmentUuid = shipmentUuid.substring(4);
       }
-      if (shipmentUuid && shipmentUuid.length !== 36) {
+      
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      
+      if (shipmentUuid && !uuidRegex.test(shipmentUuid)) {
+        console.log('Invalid shipment UUID format, setting to null:', shipmentUuid);
         shipmentUuid = null;
       }
       

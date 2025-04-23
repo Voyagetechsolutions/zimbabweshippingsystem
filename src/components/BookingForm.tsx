@@ -108,11 +108,29 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     return (
       <RadioGroup
         value={form.getValues('shipmentType')}
-        onValueChange={(value) => form.setValue('shipmentType', value as any)}
+        onValueChange={(value) => {
+          form.setValue('shipmentType', value as any);
+          if (value === 'drum') {
+            if (!form.getValues('drumQuantity')) {
+              form.setValue('drumQuantity', '1');
+            }
+            form.setValue('itemCategory', '');
+            form.setValue('itemDescription', '');
+          } else if (value === 'other') {
+            form.setValue('drumQuantity', '1');
+          }
+        }}
         className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2"
       >
         <div className={`border rounded-lg p-4 cursor-pointer transition-all ${form.getValues('shipmentType') === 'drum' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
-          onClick={() => form.setValue('shipmentType', 'drum')}
+          onClick={() => {
+            form.setValue('shipmentType', 'drum');
+            if (!form.getValues('drumQuantity')) {
+              form.setValue('drumQuantity', '1');
+            }
+            form.setValue('itemCategory', '');
+            form.setValue('itemDescription', '');
+          }}
         >
           <div className="flex items-center gap-2">
             <RadioGroupItem value="drum" id="drum" />
@@ -122,7 +140,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         </div>
         
         <div className={`border rounded-lg p-4 cursor-pointer transition-all ${form.getValues('shipmentType') === 'other' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
-          onClick={() => form.setValue('shipmentType', 'other')}
+          onClick={() => {
+            form.setValue('shipmentType', 'other');
+            form.setValue('drumQuantity', '1');
+          }}
         >
           <div className="flex items-center gap-2">
             <RadioGroupItem value="other" id="other" />
@@ -280,7 +301,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   };
 
   useEffect(() => {
-    // clear drum-specific and other-specific fields when switching type
     if (form.getValues('shipmentType') === 'drum') {
       form.setValue('itemCategory', '');
       form.setValue('itemDescription', '');

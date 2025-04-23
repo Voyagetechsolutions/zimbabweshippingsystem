@@ -81,13 +81,27 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       }
 
       const transactionId = generateUniqueId('TX-');
+      // Ensure we have a user ID or null, not undefined
       const currentUserId = user?.id || userId || bookingData.user_id || null;
+      
+      // Ensure shipment_id is a valid UUID (remove 'shp_' prefix if it exists)
+      let shipmentUuid = bookingData.shipment_id;
+      if (shipmentUuid && typeof shipmentUuid === 'string' && shipmentUuid.startsWith('shp_')) {
+        shipmentUuid = shipmentUuid.substring(4);
+      }
+      
+      // Validate that shipmentUuid looks like a valid UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!shipmentUuid || !uuidRegex.test(shipmentUuid)) {
+        console.error('Invalid shipment ID format:', shipmentUuid);
+        throw new Error('Invalid shipment ID format');
+      }
 
       const { data: paymentData, error: paymentError } = await supabase
         .from('payments')
         .insert({
           user_id: currentUserId,
-          shipment_id: bookingData.shipment_id,
+          shipment_id: shipmentUuid,
           amount: finalAmount,
           currency: 'GBP',
           payment_method: paymentMethod,
@@ -106,7 +120,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       const { data: receiptData, error: receiptError } = await supabase
         .from('receipts')
         .insert({
-          shipment_id: bookingData.shipment_id,
+          shipment_id: shipmentUuid,
           payment_id: paymentData.id,
           receipt_number: receiptNumber,
           amount: finalAmount,
@@ -135,7 +149,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
             payment_status: 'pending'
           }
         })
-        .eq('id', bookingData.shipment_id);
+        .eq('id', shipmentUuid);
 
       toast({
         title: 'Booking Confirmed',
