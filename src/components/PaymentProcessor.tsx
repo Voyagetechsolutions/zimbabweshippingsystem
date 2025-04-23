@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -50,7 +51,10 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
   const [userId, setUserId] = useState<string | null>(null);
   
   const premiumAmount = totalAmount * 0.2;
-  const specialDealDiscount = bookingData?.shipmentDetails?.type === 'drum' ? 20 : 0;
+  
+  // Calculate special deal discount based on drum quantity
+  const drumQuantity = bookingData?.shipmentDetails?.quantity || 1;
+  const specialDealDiscount = bookingData?.shipmentDetails?.type === 'drum' ? 20 * drumQuantity : 0;
   
   let finalAmount = totalAmount;
   if (isGoodsArriving) {
@@ -81,11 +85,17 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       
       const currentUserId = user?.id || userId || bookingData.user_id || null;
       
+      // Clean up shipment_id to ensure it's a valid UUID
+      let shipmentId = bookingData.shipment_id;
+      if (typeof shipmentId === 'string' && shipmentId.startsWith('shp_')) {
+        shipmentId = shipmentId.substring(4);
+      }
+      
       const { data: paymentData, error: paymentError } = await supabase
         .from('payments')
         .insert({
           user_id: currentUserId,
-          shipment_id: bookingData.shipment_id,
+          shipment_id: shipmentId,
           amount: finalAmount,
           currency: 'GBP',
           payment_method: paymentMethod,
@@ -105,7 +115,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       const { data: receiptData, error: receiptError } = await supabase
         .from('receipts')
         .insert({
-          shipment_id: bookingData.shipment_id,
+          shipment_id: shipmentId,
           payment_id: paymentData.id,
           receipt_number: receiptNumber,
           amount: finalAmount,
@@ -134,7 +144,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
             payment_status: 'pending'
           }
         })
-        .eq('id', bookingData.shipment_id);
+        .eq('id', shipmentId);
       
       toast({
         title: 'Booking Confirmed',
@@ -212,7 +222,9 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
                       <Tag className="h-5 w-5 mr-2 text-green-600" />
                       Special Deal: Cash on Collection
                     </Label>
-                    <span className="bg-yellow-400 text-yellow-800 text-xs font-bold px-2 py-1 rounded-full">SAVE £15</span>
+                    <span className="bg-yellow-400 text-yellow-800 text-xs font-bold px-2 py-1 rounded-full">
+                      SAVE £{specialDealDiscount}
+                    </span>
                   </div>
                   <p className="text-sm text-gray-600">
                     Pay cash when we collect your drums and receive a £20 discount on each drum from your shipment.
@@ -361,7 +373,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
             
             {isSpecialDeal && bookingData?.shipmentDetails?.type === 'drum' && (
               <div className="flex justify-between">
-                <span className="text-green-600">Cash on Collection Discount</span>
+                <span className="text-green-600">Cash on Collection Discount ({drumQuantity} x £20)</span>
                 <span className="text-green-600">-£{specialDealDiscount.toFixed(2)}</span>
               </div>
             )}

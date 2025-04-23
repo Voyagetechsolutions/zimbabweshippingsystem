@@ -149,7 +149,7 @@ const BookShipment = () => {
     setCurrentStep(BookingStep.FORM);
   };
 
-  // Handle custom quote submission
+  // Handle custom quote submission - Fixed UUID format issue
   const handleCustomQuoteSubmit = async (customQuoteData: any) => {
     try {
       console.log("Submitting custom quote with data:", {
@@ -159,10 +159,16 @@ const BookShipment = () => {
         category: bookingData.shipmentDetails.category
       });
       
-      // Save custom quote to database
+      // Extract shipment_id without the "shp_" prefix if present
+      let cleanShipmentId = bookingData.shipment_id;
+      if (typeof cleanShipmentId === 'string' && cleanShipmentId.startsWith('shp_')) {
+        cleanShipmentId = cleanShipmentId.substring(4);
+      }
+      
+      // Save custom quote to database with the clean UUID
       const { data, error } = await supabase.from('custom_quotes').insert({
         user_id: bookingData.user_id,
-        shipment_id: bookingData.shipment_id,
+        shipment_id: cleanShipmentId,
         phone_number: customQuoteData.phoneNumber || bookingData.senderDetails.phone,
         description: customQuoteData.description || bookingData.shipmentDetails.description,
         category: bookingData.shipmentDetails.category,
