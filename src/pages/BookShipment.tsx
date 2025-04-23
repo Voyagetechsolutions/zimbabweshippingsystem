@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -9,7 +8,6 @@ import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
-// Define booking steps
 enum BookingStep {
   FORM,
   PAYMENT,
@@ -24,21 +22,16 @@ const BookShipment = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Update the document title when the component mounts
     document.title = 'Book a Shipment | UK Shipping Service';
   }, []);
 
-  // Handle form submission to move to payment step
   const handleFormSubmit = async (data: any, shipmentId: string, amount: number) => {
     console.log("Form submitted with data:", { data, shipmentId, amount });
     
     try {
-      // Get user ID if logged in
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Determine next step based on shipment type
       if (data.shipmentType === 'other') {
-        // Go to custom quote step for "other" shipment type
         setBookingData({
           ...data,
           shipment_id: shipmentId,
@@ -58,18 +51,14 @@ const BookShipment = () => {
             type: data.shipmentType,
             category: data.itemCategory,
             description: data.itemDescription,
-            tracking_number: '', // Will be filled from the database
+            tracking_number: '',
           }
         });
         setCurrentStep(BookingStep.CUSTOM_QUOTE);
         return;
       }
       
-      // For drums, proceed with standard flow
-      // Add the mandatory metal seal cost (£5) to the total amount
       const totalWithSeal = amount + 5;
-      
-      // Add door-to-door delivery cost if selected
       const doorToDoorCost = data.doorToDoor ? 25 : 0;
       const finalAmount = totalWithSeal + doorToDoorCost;
       
@@ -92,7 +81,7 @@ const BookShipment = () => {
           type: data.shipmentType,
           quantity: data.shipmentType === 'drum' ? parseInt(data.drumQuantity) : null,
           weight: data.shipmentType === 'parcel' ? parseFloat(data.weight) : null,
-          tracking_number: '', // Will be filled from the database
+          tracking_number: '',
           services: [
             { name: 'Mandatory Metal Seal', price: 5 },
             ...(data.doorToDoor ? [{ name: 'Door to Door Delivery', price: 25 }] : [])
@@ -107,9 +96,6 @@ const BookShipment = () => {
       setTotalAmount(finalAmount);
       setCurrentStep(BookingStep.PAYMENT);
       
-      console.log("Transitioning to payment step with shipment ID:", shipmentId);
-      
-      // After setting the booking data, fetch the tracking number from the database
       try {
         const { data: shipmentData, error: shipmentError } = await supabase
           .from('shipments')
@@ -122,7 +108,6 @@ const BookShipment = () => {
           throw shipmentError;
         }
         
-        // Update the booking data with the tracking number
         setBookingData(prev => ({
           ...prev,
           shipmentDetails: {
@@ -130,8 +115,6 @@ const BookShipment = () => {
             tracking_number: shipmentData.tracking_number
           }
         }));
-        
-        console.log("Retrieved tracking number:", shipmentData.tracking_number);
       } catch (err) {
         console.error('Error fetching tracking number:', err);
       }
@@ -145,12 +128,10 @@ const BookShipment = () => {
     }
   };
 
-  // Handle going back to the form step
   const handleBackToForm = () => {
     setCurrentStep(BookingStep.FORM);
   };
 
-  // Handle custom quote submission
   const handleCustomQuoteSubmit = async (customQuoteData: any) => {
     try {
       console.log("Submitting custom quote with data:", {
@@ -160,13 +141,14 @@ const BookShipment = () => {
         category: bookingData.shipmentDetails.category
       });
       
-      // Extract UUID from the shipment_id by removing the "shp_" prefix if it exists
       let shipmentUuid = bookingData.shipment_id;
-      if (shipmentUuid && shipmentUuid.startsWith('shp_')) {
-        shipmentUuid = shipmentUuid.substring(4); // Remove the "shp_" prefix
+      if (shipmentUuid && typeof shipmentUuid === 'string' && shipmentUuid.startsWith('shp_')) {
+        shipmentUuid = shipmentUuid.substring(4);
+      }
+      if (shipmentUuid && shipmentUuid.length !== 36) {
+        shipmentUuid = null;
       }
       
-      // Save custom quote to database
       const { data, error } = await supabase.from('custom_quotes').insert({
         user_id: bookingData.user_id,
         shipment_id: shipmentUuid,
@@ -181,15 +163,13 @@ const BookShipment = () => {
       
       if (error) throw error;
       
-      // Show success message
       toast({
         title: "Custom Quote Submitted",
         description: "We'll contact you shortly with a price for your shipment.",
       });
       
-      // Create notification for admin
       await supabase.from('notifications').insert({
-        user_id: bookingData.user_id || '00000000-0000-0000-0000-000000000000', // Use placeholder ID if not logged in
+        user_id: bookingData.user_id || '00000000-0000-0000-0000-000000000000',
         title: 'New Custom Quote Request',
         message: `A new custom quote request has been submitted for: ${customQuoteData.description.substring(0, 50) || bookingData.shipmentDetails.description.substring(0, 50)}...`,
         type: 'custom_quote',
@@ -197,7 +177,6 @@ const BookShipment = () => {
         is_read: false
       });
       
-      // Navigate to confirmation page
       navigate('/quote-submitted');
     } catch (err: any) {
       console.error('Error submitting custom quote:', err);
@@ -259,7 +238,6 @@ const BookShipment = () => {
   );
 };
 
-// Custom Quote Form Component
 interface CustomQuoteFormProps {
   initialData: any;
   onSubmit: (data: any) => void;
@@ -298,7 +276,6 @@ const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({ initialData, onSubmit
     try {
       const urls: string[] = [];
       
-      // Upload images if any
       if (images.length > 0) {
         for (const file of images) {
           const fileName = `${Date.now()}-${file.name}`;
@@ -308,7 +285,6 @@ const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({ initialData, onSubmit
           
           if (uploadError) throw uploadError;
           
-          // Get public URL
           const { data: publicUrlData } = supabase.storage
             .from('custom-quotes')
             .getPublicUrl(fileName);
@@ -317,7 +293,6 @@ const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({ initialData, onSubmit
         }
       }
       
-      // Submit form with image URLs
       onSubmit({
         phoneNumber,
         description,

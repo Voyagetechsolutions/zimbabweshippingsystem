@@ -279,6 +279,17 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     });
   };
 
+  useEffect(() => {
+    // clear drum-specific and other-specific fields when switching type
+    if (form.getValues('shipmentType') === 'drum') {
+      form.setValue('itemCategory', '');
+      form.setValue('itemDescription', '');
+    }
+    if (form.getValues('shipmentType') === 'other') {
+      form.setValue('drumQuantity', '1');
+    }
+  }, [form.getValues('shipmentType')]);
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
