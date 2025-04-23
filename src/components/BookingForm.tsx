@@ -788,29 +788,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                             <RadioGroupItem value="standard" id="standard" />
                             <FormLabel htmlFor="standard" className="cursor-pointer font-medium">Standard Payment</FormLabel>
                           </div>
-                          <p className="text-sm text-gray-500 mt-2">Make a payment within 30 days</p>
-                        </div>
+                          <p className="text-sm text-gray-500 mt-2">Make a payment instantly, within 30 days, pay when goods arrive or pay at collection</p>
+                        </div>                        
                         
-                        <div className={`border rounded-lg p-4 cursor-pointer transition-all ${field.value === 'cashOnCollection' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                          <div className="flex items-center gap-2">
-                            <RadioGroupItem value="cashOnCollection" id="cashOnCollection" />
-                            <FormLabel htmlFor="cashOnCollection" className="cursor-pointer font-medium">Cash on Collection</FormLabel>
-                          </div>
-                          <p className="text-sm text-gray-500 mt-2">Pay in cash when we collect your item</p>
-                          {watchShipmentType === 'drum' && (
-                            <p className="text-sm text-green-600 font-semibold mt-1">
-                              Special offer: £20 discount per drum!
-                            </p>
-                          )}
-                        </div>
-                        
-                        <div className={`border rounded-lg p-4 cursor-pointer transition-all ${field.value === 'payOnArrival' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                          <div className="flex items-center gap-2">
-                            <RadioGroupItem value="payOnArrival" id="payOnArrival" />
-                            <FormLabel htmlFor="payOnArrival" className="cursor-pointer font-medium">Pay on Arrival</FormLabel>
-                          </div>
-                          <p className="text-sm text-gray-500 mt-2">Recipient pays for the shipment upon delivery in Zimbabwe</p>
-                        </div>
                       </RadioGroup>
                     </FormControl>
                     <FormMessage />
