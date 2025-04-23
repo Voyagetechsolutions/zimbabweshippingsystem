@@ -300,14 +300,16 @@ const Services = () => {
                       <CheckCircle2 className="h-5 w-5 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
                       <span><strong>Tools:</strong> Hand tools, small power tools, and gardening equipment (no fuel-powered tools) etc.</span>
                     </li>
+
                     <li className="flex items-start">
-                      <AlertTriangle className="h-5 w-5 text-orange-500 mr-2 mt-0.5 flex-shrink-0" />
+                      <CheckCircle2 className="h-5 w-5 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
                       <span><strong>Perfumes</strong> </span>
                     </li>
-                    <li className="flex items-start">
-                      <XCircle className="h-5 w-5 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
+                   <li className="flex items-start">
+                      <CheckCircle2 className="h-5 w-5 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
                       <span><strong>Aerosols:</strong> Spray paints, insecticides, hair sprays, deodorants.</span>
                     </li>
+                    
                   </ul>
                 </CardContent>
               </Card>
