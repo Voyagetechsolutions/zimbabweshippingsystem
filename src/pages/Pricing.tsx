@@ -104,8 +104,8 @@ const Pricing = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-2xl">Standard Payment</CardTitle>
-                      <CardDescription>Pay within 30 days of collection</CardDescription>
+                      <CardTitle className="text-2xl">Discounted Offer</CardTitle>
+                      <CardDescription>Standard Payment</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="flex justify-between items-center pb-2 border-b">
@@ -210,7 +210,7 @@ const Pricing = () => {
                   <Info className="h-4 w-4" />
                   <AlertTitle>Volume-Based Pricing</AlertTitle>
                   <AlertDescription>
-                    Pricing for other items is based on volume rather than weight. Contact us for a custom quote or use our booking system.
+                    Pricing for other items is based on volume/size. Contact us for a custom quote at +44 7584 100552.
                   </AlertDescription>
                 </Alert>
                 
@@ -335,7 +335,7 @@ const Pricing = () => {
                   <p className="mb-4">Optional service for direct delivery to recipient's address in Zimbabwe.</p>
                   <div className="flex justify-between items-center font-medium">
                     <span>Price per address</span>
-                    <span>£20.00</span>
+                    <span>£25.00</span>
                   </div>
                 </CardContent>
               </Card>
