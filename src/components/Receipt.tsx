@@ -255,7 +255,7 @@ const Receipt: React.FC<ReceiptProps> = ({ receipt, shipment }) => {
                 <Logo size={isMobile ? "small" : "medium"} />
               </div>
               <div>
-                <h1 className="text-lg sm:text-2xl font-bold text-zim-green">UK Shipping Service</h1>
+                <h1 className="text-lg sm:text-2xl font-bold text-zim-green">Zimbabwe Shipping</h1>
                 <p className="text-gray-600 text-xs sm:text-sm">Pastures Lodge Farm, Raunds Road
 Chelveston, Wellingborough, NN9 6AA</p>
               </div>
