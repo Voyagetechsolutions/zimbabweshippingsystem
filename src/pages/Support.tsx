@@ -94,7 +94,7 @@ const Support = () => {
                       <AccordionItem value="item-1">
                         <AccordionTrigger className="text-sm font-medium">How long does shipping take?</AccordionTrigger>
                         <AccordionContent className="text-gray-600 text-sm">
-                          Standard shipping takes approximately 6 weeks from the UK to Zimbabwe.
+                          Our standard shipping time from the UK to Zimbabwe is approximately 6 weeks. 10-14 days for parcel delivery. Transit times may vary slightly depending on customs clearance and local delivery conditions in Zimbabwe.
                         </AccordionContent>
                       </AccordionItem>
                       <AccordionItem value="item-2">
@@ -112,7 +112,7 @@ const Support = () => {
                       <AccordionItem value="item-4">
                         <AccordionTrigger className="text-sm font-medium">How do I get a response to my support ticket?</AccordionTrigger>
                         <AccordionContent className="text-gray-600 text-sm">
-                          Our support team typically responds within 24 hours. You'll receive updates via email.
+                          Our support team typically responds within 24 hours. You'll receive updates via text.
                         </AccordionContent>
                       </AccordionItem>
                     </Accordion>
