@@ -97,11 +97,11 @@ const ShippingCalculator: React.FC = () => {
                 >
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="standard" id="standard" />
-                    <Label htmlFor="standard" className="font-medium dark:text-white">Standard Payment</Label>
+                    <Label htmlFor="standard" className="font-medium dark:text-white">Discount Deal</Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="payLater" id="payLater" />
-                    <Label htmlFor="payLater" className="font-medium dark:text-white">Pay Later (30 Days)</Label>
+                    <Label htmlFor="payLater" className="font-medium dark:text-white">Standard rate</Label>
                   </div>
                 </RadioGroup>
               </div>
@@ -156,27 +156,13 @@ const ShippingCalculator: React.FC = () => {
                 
                 <TabsContent value="other" className="space-y-6">
                   <div>
-                    <Label htmlFor="volume">Volume (cubic meters)</Label>
-                    <Select value={volume} onValueChange={setVolume}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select volume" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5].map(vol => (
-                          <SelectItem key={vol} value={vol.toString()}>
-                            {vol} m³
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="volume">Measured in volume</Label>
+                    
                   </div>
                   
                   <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-md">
                     <div className="font-medium mb-2 dark:text-white">Volume-Based Pricing:</div>
-                    <ul className="space-y-1 list-disc pl-5 dark:text-gray-200">
-                      <li>{formatPrice(15)} per cubic meter</li>
-                      <li>Minimum charge: {formatPrice(20)}</li>
-                    </ul>
+                  
                     
                     <h3 className="font-medium text-sm mt-4 mb-1 dark:text-white">Items We Ship:</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
