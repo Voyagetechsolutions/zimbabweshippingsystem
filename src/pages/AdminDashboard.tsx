@@ -6,6 +6,7 @@ import AdminDashboardContent from '@/components/admin/AdminDashboardContent';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/contexts/RoleContext';
 import { SetupAdmin } from '@/components/SetupAdmin';
+import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -18,7 +19,12 @@ const AdminDashboard = () => {
       <main className="flex-grow py-8 bg-gray-50">
         <div className="container mx-auto px-4">
           {isAdmin ? (
-            <AdminDashboardContent />
+            <>
+              <AdminDashboardContent />
+              <div className="mt-8">
+                <CustomQuoteManagement />
+              </div>
+            </>
           ) : (
             <div className="max-w-md mx-auto">
               <SetupAdmin />
