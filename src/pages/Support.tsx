@@ -45,6 +45,7 @@ const Support = () => {
                   </CardHeader>
                   <CardContent>
                     <p className="text-gray-600 mb-2">UK Phone: +44 7984 099041</p>
+                    <p className="text-gray-600">Ireland Phone: +353 8719 54910</p>
                     <p className="text-gray-600">Zimbabwe Phone: +263 71 274 3178</p>
                   </CardContent>
                 </Card>
