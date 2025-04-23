@@ -84,15 +84,15 @@ const Services = () => {
                     </li>
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
-                      <span>Ideal for clothing, shoes, household items and groceries</span>
+                      <span>Ideal for clothing, shoes, household items and groceries etc</span>
                     </li>
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
-                      <span>Secure packaging and weatherproof</span>
+                      <span>Secure packaging with metal coded seal</span>
                     </li>
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
-                      <span>Regular scheduled departures</span>
+                      <span>Monthly scheduled departures</span>
                     </li>
                   </ul>
                 </CardContent>
@@ -157,10 +157,6 @@ const Services = () => {
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
                       <span>Delivery to any location in Zimbabwe except rural areas</span>
-                    </li>
-                    <li className="flex items-start">
-                      <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
-                      <span>No need to visit our depot</span>
                     </li>
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-zim-green mr-2 mt-0.5 flex-shrink-0" />
@@ -278,31 +274,39 @@ const Services = () => {
                   <ul className="space-y-3">
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
-                      <span><strong>Clothing & Textiles:</strong> All types of clothing, shoes, bags, bedding, towels, and fabrics.</span>
+                      <span><strong>Clothing & Textiles:</strong> All types of clothing, shoes, bags, bedding, towels, and fabrics etc.</span>
                     </li>
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
-                      <span><strong>Food Items:</strong> Non-perishable, commercially packaged food (canned goods, dried foods, pasta, etc.) with clear labeling.</span>
+                      <span><strong>Food Items:</strong> Non-perishable, commercially packaged food (canned goods, dried foods, pasta, etc.) with clear labeling etc.</span>
                     </li>
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
-                      <span><strong>Household Goods:</strong> Kitchenware, small appliances, decor items, toys, books, and stationery.</span>
+                      <span><strong>Household Goods:</strong> Kitchenware, small appliances, decor items, toys, books, and stationery etc.</span>
                     </li>
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
-                      <span><strong>Electronics:</strong> Phones, laptops, tablets, cameras, and other personal electronics (for personal use only).</span>
+                      <span><strong>Electronics:</strong> Phones, laptops, tablets, cameras, and other personal electronics (for personal use only) etc.</span>
                     </li>
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
-                      <span><strong>Personal Care:</strong> Toiletries, cosmetics (non-aerosol), and hygiene products (in original packaging).</span>
+                      <span><strong>Personal Care:</strong> Toiletries, cosmetics (non-aerosol), and hygiene products (in original packaging) etc.</span>
                     </li>
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
-                      <span><strong>Medical Items:</strong> Non-prescription medicines, first aid supplies, vitamins, and supplements (in original packaging).</span>
+                      <span><strong>Medical Items:</strong> Non-prescription medicines, first aid supplies, vitamins, and supplements (in original packaging) etc.</span>
                     </li>
                     <li className="flex items-start">
                       <CheckCircle2 className="h-5 w-5 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
-                      <span><strong>Tools:</strong> Hand tools, small power tools, and gardening equipment (no fuel-powered tools).</span>
+                      <span><strong>Tools:</strong> Hand tools, small power tools, and gardening equipment (no fuel-powered tools) etc.</span>
+                    </li>
+                    <li className="flex items-start">
+                      <AlertTriangle className="h-5 w-5 text-orange-500 mr-2 mt-0.5 flex-shrink-0" />
+                      <span><strong>Perfumes</strong> </span>
+                    </li>
+                    <li className="flex items-start">
+                      <XCircle className="h-5 w-5 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
+                      <span><strong>Aerosols:</strong> Spray paints, insecticides, hair sprays, deodorants.</span>
                     </li>
                   </ul>
                 </CardContent>
@@ -327,10 +331,6 @@ const Services = () => {
                     </li>
                     <li className="flex items-start">
                       <AlertTriangle className="h-5 w-5 text-orange-500 mr-2 mt-0.5 flex-shrink-0" />
-                      <span><strong>Perfumes:</strong> Limited quantities (max 100ml per bottle, 2 bottles total). Must be declared.</span>
-                    </li>{/* move to allowed */}
-                    <li className="flex items-start">
-                      <AlertTriangle className="h-5 w-5 text-orange-500 mr-2 mt-0.5 flex-shrink-0" />
                       <span><strong>Liquids:</strong> Must be securely sealed and proper packaging required to prevent leakage.</span>
                     </li>
                     <li className="flex items-start">
@@ -343,7 +343,7 @@ const Services = () => {
                     </li>
                     <li className="flex items-start">
                       <AlertTriangle className="h-5 w-5 text-orange-500 mr-2 mt-0.5 flex-shrink-0" />
-                      <span><strong>Auto Parts:</strong> Limited quantities allowed. Must be declared and properly packaged.</span>
+                      <span><strong>Auto Parts:</strong> Must be declared and properly packaged.</span>
                     </li>
                   </ul>
                   <div className="mt-4 bg-orange-50 p-4 rounded-md">
@@ -379,10 +379,7 @@ const Services = () => {
                       <XCircle className="h-5 w-5 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
                       <span><strong>Flammable Materials:</strong> Fuels, lighter fluid, matches, certain chemicals.</span>
                     </li>
-                    <li className="flex items-start">
-                      <XCircle className="h-5 w-5 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
-                      <span><strong>Aerosols:</strong> Spray paints, insecticides, hair sprays, deodorants.</span>
-                    </li>{/* move to allowed */}
+                    {/* move to allowed */}
                     <li className="flex items-start">
                       <XCircle className="h-5 w-5 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
                       <span><strong>Perishable Foods:</strong> Fresh fruits, vegetables, meat, fish, dairy products.</span>
