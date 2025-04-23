@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -160,16 +159,10 @@ const BookShipment = () => {
         category: bookingData.shipmentDetails.category
       });
       
-      // Extract UUID from the shipment_id by removing the "shp_" prefix if it exists
-      let shipmentUuid = bookingData.shipment_id;
-      if (shipmentUuid && shipmentUuid.startsWith('shp_')) {
-        shipmentUuid = shipmentUuid.substring(4); // Remove the "shp_" prefix
-      }
-      
       // Save custom quote to database
       const { data, error } = await supabase.from('custom_quotes').insert({
         user_id: bookingData.user_id,
-        shipment_id: shipmentUuid,
+        shipment_id: bookingData.shipment_id,
         phone_number: customQuoteData.phoneNumber || bookingData.senderDetails.phone,
         description: customQuoteData.description || bookingData.shipmentDetails.description,
         category: bookingData.shipmentDetails.category,
