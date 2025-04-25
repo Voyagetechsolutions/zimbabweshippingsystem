@@ -864,7 +864,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 </Button>
                 <Button 
                   type="submit"
-                  disabled={isSubmitting || !validateTab('payment')}
+                  disabled={isSubmitting || !validateTab('paymentprocessor')}
                   className="bg-zim-green hover:bg-zim-green/90 w-full md:w-auto"
                 >
                   {isSubmitting ? (
