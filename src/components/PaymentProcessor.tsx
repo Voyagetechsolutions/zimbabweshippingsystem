@@ -305,11 +305,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
                     </RadioGroup>
                     {payLaterMethod === 'bank_transfer' && (
                       <div className="mt-2 p-3 bg-gray-100 rounded text-sm">
-                        <p className="font-medium">Bank Transfer Details:</p>
-                        <p>Account Name: Zimbabwe Shipping Ltd</p>
-                        <p>Account Number: 12345678</p>
-                        <p>Sort Code: 12-34-56</p>
-                        <p>Reference: Your tracking number</p>
+                        <p className="font-medium">For Bank Transfer Details please contact Mr Moyo at +44 7984 099041. Reference: Your tracking number or Surname and Initials </p>                        
                       </div>
                     )}
                   </div>
