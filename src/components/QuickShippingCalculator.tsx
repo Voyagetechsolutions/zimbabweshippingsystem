@@ -11,13 +11,17 @@ const QuickShippingCalculator = () => {
   const [drums, setDrums] = useState<string>("1");
   const [quote, setQuote] = useState<number | null>(null);
 
-  // Simple and fast calculation - no delay
   const calculateShippingCost = () => {
     const drumCount = parseInt(drums);
     let pricePerDrum = 240; // Default to single drum price
     
-    if (drumCount >= 5) {
+    // Enhanced volume discounts
+    if (drumCount >= 10) {
+      pricePerDrum = 200;
+    } else if (drumCount >= 5) {
       pricePerDrum = 220;
+    } else if (drumCount >= 2) {
+      pricePerDrum = 230;
     }
     
     const totalPrice = drumCount * pricePerDrum;
@@ -53,20 +57,30 @@ const QuickShippingCalculator = () => {
             </Select>
           </div>
           
+          <div className="bg-gray-50 p-3 rounded-md text-sm space-y-2">
+            <p className="font-medium">Volume Discounts:</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>1 Drum: £240 each</li>
+              <li>2-4 Drums: £230 each</li>
+              <li>5-9 Drums: £220 each</li>
+              <li>10+ Drums: £200 each</li>
+            </ul>
+          </div>
+          
           <Button 
             onClick={calculateShippingCost}
-            className="w-full"
+            className="w-full bg-zim-green hover:bg-zim-green/90"
           >
             Calculate Shipping
           </Button>
         </div>
         
         {quote !== null && (
-          <div className="mt-4 p-3 bg-gray-50 rounded-md">
+          <div className="mt-4 p-4 bg-gray-50 rounded-md border border-gray-200">
             <p className="text-sm text-gray-600">Estimated Shipping Cost:</p>
-            <p className="text-xl font-bold text-zim-green">£{quote.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-zim-green">£{quote.toFixed(2)}</p>
             <p className="text-xs text-gray-500 mt-1">
-              *Prices are estimates only
+              *Final price may vary based on specific requirements
             </p>
           </div>
         )}
