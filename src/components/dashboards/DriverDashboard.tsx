@@ -7,7 +7,6 @@ import { Package, Truck, Calendar, AlertTriangle, RefreshCw } from 'lucide-react
 import { Button } from '@/components/ui/button';
 import { Shipment } from '@/types/shipment';
 
-// Import our components
 import StatsCards from './driver/StatsCards';
 import DeliveryCard from './driver/DeliveryCard';
 import ScheduleCard from './driver/ScheduleCard';
@@ -17,9 +16,9 @@ import EmptyState from './driver/EmptyState';
 const DriverDashboard = () => {
   const [activeDeliveries, setActiveDeliveries] = useState<Shipment[]>([]);
   const [completedDeliveries, setCompletedDeliveries] = useState<Shipment[]>([]);
-  const [loading, setLoading] = useState(true);
   const [collectionSchedules, setCollectionSchedules] = useState<any[]>([]);
-  const [scheduleShipments, setScheduleShipments] = useState<{[key: string]: Shipment[]}>({});
+  const [scheduleShipments, setScheduleShipments] = useState<Record<string, Shipment[]>>({});
+  const [loading, setLoading] = useState(true);
   const [showImageUpload, setShowImageUpload] = useState(false);
   const [currentShipmentId, setCurrentShipmentId] = useState<string>('');
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -27,156 +26,98 @@ const DriverDashboard = () => {
   const [uploadLoading, setUploadLoading] = useState(false);
   const [expandedSchedule, setExpandedSchedule] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
   useEffect(() => {
     fetchDriverData();
-    
-    // Set up a periodic refresh interval
-    const refreshInterval = setInterval(() => {
-      fetchDriverData();
-    }, 60000); // Refresh every minute
-    
-    return () => clearInterval(refreshInterval);
+    const interval = setInterval(fetchDriverData, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchDriverData = async () => {
     try {
       setLoading(true);
-      
-      // Fetch active deliveries - include all active statuses
-      // Fix: Use direct query without join to avoid relationship error
-      const { data: activeData, error: activeError } = await supabase
-        .from('shipments')
-        .select('*')
-        .in('status', [
-          'Booking Confirmed', 
-          'Ready for Pickup', 
-          'Processing in Warehouse (UK)', 
-          'Customs Clearance', 
-          'Processing in Warehouse (ZW)', 
-          'In Transit', 
-          'Out for Delivery'
-        ])
-        .eq('can_modify', false); // Only confirmed bookings
 
-      if (activeError) {
-        console.error('Error fetching active deliveries:', activeError);
-        throw activeError;
-      }
-      
-      // Fetch user details separately
-      if (activeData && activeData.length > 0) {
-        for (const shipment of activeData as Shipment[]) {
+      const [activeDeliveriesRes, completedDeliveriesRes, scheduleRes] = await Promise.all([
+        supabase
+          .from('shipments')
+          .select('*')
+          .in('status', [
+            'Booking Confirmed',
+            'Ready for Pickup',
+            'Processing in Warehouse (UK)',
+            'Customs Clearance',
+            'Processing in Warehouse (ZW)',
+            'In Transit',
+            'Out for Delivery',
+          ])
+          .eq('can_modify', false),
+
+        supabase
+          .from('shipments')
+          .select('*')
+          .eq('status', 'Delivered')
+          .order('created_at', { ascending: false })
+          .limit(10),
+
+        supabase
+          .from('collection_schedules')
+          .select('*')
+          .order('pickup_date', { ascending: true }),
+      ]);
+
+      if (activeDeliveriesRes.error) throw activeDeliveriesRes.error;
+      if (completedDeliveriesRes.error) throw completedDeliveriesRes.error;
+      if (scheduleRes.error) throw scheduleRes.error;
+
+      const enrichShipments = async (shipments: Shipment[]) => {
+        const userFetches = shipments.map(async (shipment) => {
           if (shipment.user_id) {
-            const { data: userData, error: userError } = await supabase
+            const { data: userData } = await supabase
               .from('profiles')
               .select('email, full_name')
               .eq('id', shipment.user_id)
               .single();
-              
-            if (!userError && userData) {
-              shipment.profiles = userData;
-            }
+            if (userData) shipment.profiles = userData;
           }
-        }
-      }
-      
-      console.log("Active deliveries fetched:", activeData?.length);
-      setActiveDeliveries(activeData as Shipment[] || []);
-      
-      // Fetch completed deliveries - Fix: Use direct query
-      const { data: completedData, error: completedError } = await supabase
-        .from('shipments')
-        .select('*')
-        .eq('status', 'Delivered')
-        .order('created_at', { ascending: false })
-        .limit(10);
+          return shipment;
+        });
+        return await Promise.all(userFetches);
+      };
 
-      if (completedError) {
-        console.error('Error fetching completed deliveries:', completedError);
-        throw completedError;
-      }
-      
-      // Fetch user details for completed deliveries
-      if (completedData && completedData.length > 0) {
-        for (const shipment of completedData as Shipment[]) {
-          if (shipment.user_id) {
-            const { data: userData, error: userError } = await supabase
-              .from('profiles')
-              .select('email, full_name')
-              .eq('id', shipment.user_id)
-              .single();
-              
-            if (!userError && userData) {
-              shipment.profiles = userData;
-            }
-          }
-        }
-      }
-      
-      console.log("Completed deliveries fetched:", completedData?.length);
-      setCompletedDeliveries(completedData as Shipment[] || []);
+      const [enrichedActive, enrichedCompleted] = await Promise.all([
+        enrichShipments(activeDeliveriesRes.data || []),
+        enrichShipments(completedDeliveriesRes.data || []),
+      ]);
 
-      // Fetch collection schedules
-      const { data: scheduleData, error: scheduleError } = await supabase
-        .from('collection_schedules')
-        .select('*')
-        .order('pickup_date', { ascending: true });
+      setActiveDeliveries(enrichedActive);
+      setCompletedDeliveries(enrichedCompleted);
+      setCollectionSchedules(scheduleRes.data || []);
 
-      if (scheduleError) {
-        console.error('Error fetching collection schedules:', scheduleError);
-        throw scheduleError;
+      const schedulesWithShipments: Record<string, Shipment[]> = {};
+
+      for (const schedule of scheduleRes.data || []) {
+        const { data: shipments, error } = await supabase
+          .from('shipments')
+          .select('*')
+          .in('status', ['Booking Confirmed', 'Ready for Pickup'])
+          .eq('can_modify', false)
+          .contains('metadata', { pickup_date: schedule.pickup_date });
+
+        if (error) continue;
+        schedulesWithShipments[schedule.id] = shipments?.length
+          ? await enrichShipments(shipments)
+          : [];
       }
-      setCollectionSchedules(scheduleData || []);
-      console.log("Collection schedules fetched:", scheduleData?.length);
-      
-      // Fetch shipments for each schedule - Fix: Use direct query
-      if (scheduleData && scheduleData.length > 0) {
-        const schedulesWithShipments: {[key: string]: Shipment[]} = {};
-        
-        for (const schedule of scheduleData) {
-          const { data: shipmentData, error: shipmentError } = await supabase
-            .from('shipments')
-            .select('*')
-            .in('status', ['Booking Confirmed', 'Ready for Pickup'])
-            .eq('can_modify', false) // Only confirmed bookings
-            .contains('metadata', { pickup_date: schedule.pickup_date });
-            
-          if (shipmentError) {
-            console.error(`Error fetching shipments for schedule ${schedule.id}:`, shipmentError);
-          } else if (shipmentData && shipmentData.length > 0) {
-            // Fetch user details for schedule shipments
-            for (const shipment of shipmentData as Shipment[]) {
-              if (shipment.user_id) {
-                const { data: userData, error: userError } = await supabase
-                  .from('profiles')
-                  .select('email, full_name')
-                  .eq('id', shipment.user_id)
-                  .single();
-                  
-                if (!userError && userData) {
-                  shipment.profiles = userData;
-                }
-              }
-            }
-            schedulesWithShipments[schedule.id] = shipmentData as Shipment[] || [];
-            console.log(`Schedule ${schedule.id} has ${shipmentData?.length || 0} shipments`);
-          } else {
-            schedulesWithShipments[schedule.id] = [];
-          }
-        }
-        
-        setScheduleShipments(schedulesWithShipments);
-      }
-      
+
+      setScheduleShipments(schedulesWithShipments);
     } catch (error: any) {
-      console.error('Error fetching driver data:', error.message);
       toast({
         title: 'Error loading data',
         description: error.message,
-        variant: 'destructive'
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -187,16 +128,12 @@ const DriverDashboard = () => {
     setIsRefreshing(true);
     try {
       await fetchDriverData();
-      toast({
-        title: 'Data refreshed',
-        description: 'Driver data has been updated',
-      });
+      toast({ title: 'Data refreshed', description: 'Driver data has been updated' });
     } catch (error: any) {
-      console.error('Error refreshing data:', error);
       toast({
         title: 'Refresh failed',
         description: error.message,
-        variant: 'destructive'
+        variant: 'destructive',
       });
     } finally {
       setIsRefreshing(false);
@@ -209,22 +146,14 @@ const DriverDashboard = () => {
         .from('shipments')
         .update({ status: newStatus, updated_at: new Date().toISOString() })
         .eq('id', id);
-
       if (error) throw error;
-      
-      toast({
-        title: 'Status Updated',
-        description: `Shipment status updated to ${newStatus}`,
-      });
-      
-      // Refresh data after status update
-      fetchDriverData();
-      
+      toast({ title: 'Status Updated', description: `Shipment updated to ${newStatus}` });
+      await fetchDriverData();
     } catch (error: any) {
       toast({
         title: 'Error updating status',
         description: error.message,
-        variant: 'destructive'
+        variant: 'destructive',
       });
     }
   };
@@ -240,8 +169,7 @@ const DriverDashboard = () => {
     const file = e.target.files?.[0];
     if (file) {
       setImageFile(file);
-      const imageUrl = URL.createObjectURL(file);
-      setImagePreview(imageUrl);
+      setImagePreview(URL.createObjectURL(file));
     }
   };
 
@@ -258,91 +186,44 @@ const DriverDashboard = () => {
 
   const handleUploadDeliveryImage = async () => {
     if (!imageFile || !currentShipmentId) return;
-    
+
     try {
       setUploadLoading(true);
-      
-      // Upload the image to storage
       const fileName = `delivery-${currentShipmentId}-${Date.now()}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('images')
         .upload(`deliveries/${fileName}`, imageFile);
-        
+
       if (uploadError) throw uploadError;
-      
-      // Get the public URL
+
       const { data: urlData } = await supabase.storage
         .from('images')
         .getPublicUrl(`deliveries/${fileName}`);
-        
-      // Update the shipment with the image URL
-      const currentShipment = activeDeliveries.find(d => d.id === currentShipmentId);
-      let updatedMetadata = {};
-      
-      // Fix: Check if metadata exists and is an object before spreading
-      if (currentShipment?.metadata && typeof currentShipment.metadata === 'object') {
-        updatedMetadata = { 
-          ...currentShipment.metadata,
-          delivery_image: urlData.publicUrl 
-        };
-      } else {
-        // If metadata doesn't exist or isn't an object, create a new object
-        updatedMetadata = { delivery_image: urlData.publicUrl };
-      }
-      
+
+      const shipment = activeDeliveries.find((s) => s.id === currentShipmentId);
+      const metadata = typeof shipment?.metadata === 'object' ? { ...shipment.metadata } : {};
+
       const { error: updateError } = await supabase
         .from('shipments')
-        .update({ metadata: updatedMetadata })
+        .update({ metadata: { ...metadata, delivery_image: urlData.publicUrl } })
         .eq('id', currentShipmentId);
-        
+
       if (updateError) throw updateError;
-      
-      toast({
-        title: 'Image Uploaded',
-        description: 'Delivery image has been successfully uploaded',
-      });
-      
-      // Close modal and reset state
-      setShowImageUpload(false);
-      setImageFile(null);
-      setImagePreview(null);
-      
-      // Update the shipment status to Delivered
+
+      toast({ title: 'Image Uploaded', description: 'Delivery image uploaded successfully' });
+
+      handleCloseImageUpload();
       await handleUpdateStatus(currentShipmentId, 'Delivered');
-      
     } catch (error: any) {
       toast({
         title: 'Error uploading image',
         description: error.message,
-        variant: 'destructive'
+        variant: 'destructive',
       });
     } finally {
       setUploadLoading(false);
     }
   };
-
-  const toggleScheduleDetails = (scheduleId: string) => {
-    if (expandedSchedule === scheduleId) {
-      setExpandedSchedule(null);
-    } else {
-      setExpandedSchedule(scheduleId);
-    }
-  };
-  
-  // Filter for pending collections (Ready for Pickup status only)
-  const pendingCollections = activeDeliveries.filter(d => 
-    d.status === 'Ready for Pickup'
-  );
-  
-  // Filter for in-transit deliveries (all delivery-related statuses)
-  const inTransitDeliveries = activeDeliveries.filter(d => 
-    ['In Transit', 'Out for Delivery', 'Customs Clearance', 'Processing in Warehouse (ZW)'].includes(d.status)
-  );
-
-  // Total number of shipments for all schedules
-  const totalScheduledShipments = Object.values(scheduleShipments).reduce(
-    (total, shipments) => total + shipments.length, 0
-  );
 
   return (
     <div className="space-y-6">
