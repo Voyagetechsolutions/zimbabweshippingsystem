@@ -768,7 +768,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   <div className="text-sm text-gray-500 mt-1">
                     <p>Additional mandatory costs:</p>
                     <ul className="list-disc pl-5">
-                      <li>Metal seal: £5</li>
+                      <li>Metal coded seal: £5</li>
                       {form.getValues('doorToDoor') && (
                         <li>Door-to-door delivery: £25</li>
                       )}
@@ -867,9 +867,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 <Button 
                   type="submit"
                   disabled={isSubmitting || !validateTab('payment')}
-                  className="bg-zim-green hover:bg-zim-green/90 w-full md:w-auto"                  
-                  onClick={'/paymentprocessor'}                  
-                  className="bg-zim-green hover:bg-zim-green/90"
+                  className="bg-zim-green hover:bg-zim-green/90 w-full md:w-auto"
+                  onClick={(e) => {
+                    e.preventDefault(); // Prevent form submission (if any)
+                    // Redirect to payment processor page
+                    router.push('paymentprocessor'); // Replace with the actual payment page route
+                  }}
                   >
                   {isSubmitting ? (
                     <>

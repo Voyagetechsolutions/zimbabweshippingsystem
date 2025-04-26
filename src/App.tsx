@@ -35,6 +35,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import { RequireAuth, RequireAdmin, RedirectIfAuthenticated, RequireRole } from './components/RouteGuard';
 import { Toaster } from './components/ui/toaster';
 import WhatsAppButton from './components/WhatsAppButton';
+//import PaymentProce
 
 // Contexts
 import { AuthProvider } from './contexts/AuthContext';
