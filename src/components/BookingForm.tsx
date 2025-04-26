@@ -288,23 +288,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
   };
 
-  const goToNextTab = () => {
-    // Logic for switching to the next tab
-    console.log("Go to next tab!");
-  };
-
-  // Optional: to auto-scroll to the top when switching tabs
-  useEffect(() => {
-    if (firstInputRef.current) {
-      firstInputRef.current.focus();
-    }
-  }, []);
-
-  const onSubmit = (data) => {
-    // Handle form submission
-    console.log("Form submitted:", data);
-  };
-
   const validateTab = (tab: string): boolean => {
     const fields = {
       sender: ['firstName', 'lastName', 'email', 'phone', 'pickupCountry', 'pickupAddress'],
@@ -358,7 +341,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="sender">
+          <TabsContent value="sender" forceMount>
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4">Sender Information</h3>
               
@@ -548,7 +531,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="recipient">
+          <TabsContent value="recipient" forceMount>
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4">Receiver Information</h3>
               
@@ -638,7 +621,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="shipment">
+          <TabsContent value="shipment" forceMount>
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4">Shipment Details</h3>
               
@@ -816,7 +799,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="payment">
+          <TabsContent value="payment" forceMount>
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4">Payment Method</h3>
               
