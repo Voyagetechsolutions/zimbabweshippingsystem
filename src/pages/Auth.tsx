@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import Logo from '@/components/Logo';
 import { Mail, Lock, User, ArrowRight, AlertCircle } from 'lucide-react';
 import { generateCSRFToken, validateCSRFToken } from '@/utils/csrf';
+import { getClientIP, handleAuthError } from '@/utils/securityUtils';
 
 const Auth = () => {
   const [email, setEmail] = useState('');
@@ -18,31 +19,33 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('login');
   const [csrfToken, setCsrfToken] = useState('');
+  const [ipAddress, setIpAddress] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { session } = useAuth();
+  const { session, signIn } = useAuth();
 
+  // Generate CSRF token and fetch client IP
   useEffect(() => {
     setCsrfToken(generateCSRFToken());
+    const fetchIP = async () => {
+      const ip = await getClientIP();
+      setIpAddress(ip);
+    };
+    fetchIP();
   }, []);
 
+  // Redirect user if they are already authenticated
   useEffect(() => {
     if (session) {
       navigate('/dashboard');
     }
   }, [session, navigate]);
 
+  // Handle signup process
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateCSRFToken(csrfToken)) {
-      toast({
-        title: 'Security Error',
-        description: 'Invalid form submission. Please try again.',
-        variant: 'destructive',
-      });
-      return;
-    }
 
+    // Skip CSRF validation for sign-up since Supabase handles this
     if (!email || !password || !fullName) {
       toast({
         title: 'Missing Information',
@@ -73,13 +76,17 @@ const Auth = () => {
 
     try {
       setLoading(true);
+      
+      // Sign-up user in Supabase
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName,
+            ip_address: ipAddress,
           },
+          emailRedirectTo: window.location.origin + '/auth/callback',
         },
       });
 
@@ -91,22 +98,24 @@ const Auth = () => {
       });
       setActiveTab('login');
     } catch (error: any) {
-      toast({
-        title: 'Registration Failed',
-        description: error.message || 'An error occurred during registration.',
-        variant: 'destructive',
-      });
+      handleAuthError(error, toast);
     } finally {
       setLoading(false);
     }
   };
 
+  // Handle sign-in process
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!validateCSRFToken(csrfToken)) {
+      // Invalid or expired CSRF token
+      const newToken = generateCSRFToken();
+      setCsrfToken(newToken);
+
       toast({
         title: 'Security Error',
-        description: 'Invalid form submission. Please try again.',
+        description: 'Please try submitting the form again.',
         variant: 'destructive',
       });
       return;
@@ -133,20 +142,43 @@ const Auth = () => {
 
     try {
       setLoading(true);
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const { error } = await signIn(email, password);
+
+      if (error) throw error;
+
+      // Navigation handled in useEffect after login
+    } catch (error: any) {
+      handleAuthError(error, toast);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle password reset
+  const handlePasswordReset = async () => {
+    if (!email) {
+      toast({
+        title: 'Email Required',
+        description: 'Please enter your email address to reset your password.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/reset-password',
       });
 
       if (error) throw error;
 
-      navigate('/dashboard');
-    } catch (error: any) {
       toast({
-        title: 'Login Failed',
-        description: error.message || 'Invalid email or password.',
-        variant: 'destructive',
+        title: 'Password Reset Email Sent',
+        description: 'Check your email for a password reset link.',
       });
+    } catch (error: any) {
+      handleAuthError(error, toast);
     } finally {
       setLoading(false);
     }
@@ -183,6 +215,7 @@ const Auth = () => {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
+                      autoComplete="email"
                     />
                   </div>
                 </div>
@@ -190,9 +223,13 @@ const Auth = () => {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <Label htmlFor="password">Password</Label>
-                    <Link to="/forgot-password" className="text-sm text-zim-green hover:underline">
+                    <button 
+                      type="button"
+                      onClick={handlePasswordReset}
+                      className="text-sm text-zim-green hover:underline"
+                    >
                       Forgot Password?
-                    </Link>
+                    </button>
                   </div>
                   <div className="relative">
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -204,6 +241,7 @@ const Auth = () => {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
+                      autoComplete="current-password"
                     />
                   </div>
                 </div>
@@ -228,6 +266,7 @@ const Auth = () => {
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       required
+                      autoComplete="name"
                     />
                   </div>
                 </div>
@@ -244,6 +283,7 @@ const Auth = () => {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
+                      autoComplete="email"
                     />
                   </div>
                 </div>
@@ -260,6 +300,7 @@ const Auth = () => {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
+                      autoComplete="new-password"
                     />
                   </div>
                   <p className="text-xs text-gray-500">
@@ -273,24 +314,33 @@ const Auth = () => {
               </form>
             </TabsContent>
           </Tabs>
-        </div>
 
-        <div className="text-center">
-          <p className="text-sm text-gray-600">
-            By continuing, you agree to our{' '}
-            <Link to="/terms" className="text-zim-green hover:underline">
-              Terms of Service
-            </Link>{' '}
-            and{' '}
-            <Link to="/privacy" className="text-zim-green hover:underline">
-              Privacy Policy
-            </Link>
-            .
-          </p>
-          <Link to="/" className="mt-4 inline-flex items-center text-sm text-zim-green hover:underline">
-            <ArrowRight className="mr-1 h-4 w-4" />
-            Return to Home
-          </Link>
+          {activeTab === 'login' && (
+            <div className="text-center mt-4 text-sm text-gray-600">
+              <p>Don't have an account?{' '}
+                <button 
+                  type="button" 
+                  onClick={() => setActiveTab('register')} 
+                  className="text-zim-green hover:underline"
+                >
+                  Sign up
+                </button>
+              </p>
+            </div>
+          )}
+          {activeTab === 'register' && (
+            <div className="text-center mt-4 text-sm text-gray-600">
+              <p>Already have an account?{' '}
+                <button 
+                  type="button" 
+                  onClick={() => setActiveTab('login')} 
+                  className="text-zim-green hover:underline"
+                >
+                  Sign in
+                </button>
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

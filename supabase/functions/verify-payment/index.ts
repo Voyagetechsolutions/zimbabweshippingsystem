@@ -1,17 +1,10 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@12.13.0?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-// Initialize Stripe
-const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-  apiVersion: "2023-10-16",
-});
 
 // Initialize Supabase client with service role key to bypass RLS
 const supabaseClient = createClient(
@@ -26,8 +19,8 @@ serve(async (req) => {
   }
 
   try {
-    const { session_id, payment_intent, payment_id } = await req.json();
-    console.log("Received payment verification request:", { session_id, payment_intent, payment_id });
+    const { payment_intent, payment_id } = await req.json();
+    console.log("Received payment verification request:", { payment_intent, payment_id });
     
     // If we already have a payment_id and have processed it, return that receipt
     if (payment_id) {
@@ -40,7 +33,7 @@ serve(async (req) => {
       
       if (paymentError) {
         console.error("Error looking up payment:", paymentError);
-        throw paymentError;
+        throw new Error(`Payment lookup failed: ${paymentError.message}`);
       }
       
       // Look up the receipt for this payment
@@ -52,7 +45,7 @@ serve(async (req) => {
       
       if (receiptError) {
         console.error("Error looking up receipt:", receiptError);
-        throw receiptError;
+        throw new Error(`Receipt lookup failed: ${receiptError.message}`);
       }
       
       return new Response(
@@ -69,31 +62,10 @@ serve(async (req) => {
     }
     
     let paymentInfo;
-    let paymentMethod = 'stripe';
+    let paymentMethod = 'paypal';
     
-    // Verify Stripe payment
-    if (session_id) {
-      console.log("Verifying Stripe payment:", session_id);
-      const session = await stripe.checkout.sessions.retrieve(session_id);
-      
-      if (session.payment_status !== 'paid') {
-        console.error("Payment not completed:", session.payment_status);
-        throw new Error('Payment not completed');
-      }
-      
-      paymentInfo = {
-        amount: session.amount_total ? session.amount_total / 100 : 0, // Convert from cents to dollars/pounds
-        currency: session.currency,
-        shipment_id: session.client_reference_id || session.metadata?.shipment_id,
-        payment_method: 'stripe',
-        transaction_id: session.payment_intent as string,
-        status: 'completed'
-      };
-      
-      console.log("Stripe payment verified:", paymentInfo);
-    }
     // Verify PayPal payment (simplified, would need more robust validation in production)
-    else if (payment_intent) {
+    if (payment_intent) {
       console.log("Verifying PayPal payment:", payment_intent);
       // In a real implementation, you would validate with the PayPal API
       // This is simplified for the example
@@ -105,7 +77,6 @@ serve(async (req) => {
         transaction_id: payment_intent,
         status: 'completed'
       };
-      paymentMethod = 'paypal';
       console.log("PayPal payment info:", paymentInfo);
     } else {
       console.error("No payment identifier provided");
@@ -123,7 +94,7 @@ serve(async (req) => {
       
       if (shipmentError) {
         console.error("Error looking up shipment:", shipmentError);
-        throw shipmentError;
+        throw new Error(`Shipment lookup failed: ${shipmentError.message}`);
       }
       
       console.log("Retrieved shipment data:", shipmentData.id);
@@ -146,7 +117,7 @@ serve(async (req) => {
       
       if (paymentError) {
         console.error("Error creating payment record:", paymentError);
-        throw paymentError;
+        throw new Error(`Payment record creation failed: ${paymentError.message}`);
       }
       
       console.log("Created payment record:", paymentData.id);
@@ -192,7 +163,7 @@ serve(async (req) => {
       
       if (receiptError) {
         console.error("Error creating receipt record:", receiptError);
-        throw receiptError;
+        throw new Error(`Receipt record creation failed: ${receiptError.message}`);
       }
       
       console.log("Created receipt record:", receiptData.id);
@@ -206,7 +177,7 @@ serve(async (req) => {
       
       if (updateError) {
         console.error("Error updating shipment status:", updateError);
-        throw updateError;
+        throw new Error(`Shipment status update failed: ${updateError.message}`);
       }
       
       console.log("Updated shipment status to Paid");

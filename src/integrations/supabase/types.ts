@@ -632,44 +632,6 @@ export type Database = {
         }
         Relationships: []
       }
-      ticket_responses: {
-        Row: {
-          created_at: string
-          id: string
-          is_staff_response: boolean
-          message: string
-          notification_sent: boolean | null
-          ticket_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          is_staff_response?: boolean
-          message: string
-          notification_sent?: boolean | null
-          ticket_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          is_staff_response?: boolean
-          message?: string
-          notification_sent?: boolean | null
-          ticket_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ticket_responses_ticket_id_fkey"
-            columns: ["ticket_id"]
-            isOneToOne: false
-            referencedRelation: "support_tickets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       user_role_assignments: {
         Row: {
           assigned_by: string | null
@@ -729,6 +691,24 @@ export type Database = {
         }
         Relationships: []
       }
+      users: {
+        Row: {
+          id: string
+          is_admin: boolean | null
+          username: string
+        }
+        Insert: {
+          id: string
+          is_admin?: boolean | null
+          username: string
+        }
+        Update: {
+          id?: string
+          is_admin?: boolean | null
+          username?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -739,14 +719,23 @@ export type Database = {
         Returns: boolean
       }
       create_announcement: {
-        Args: {
-          p_title: string
-          p_content: string
-          p_category: string
-          p_is_active: boolean
-          p_created_by: string
-          p_expiry_date?: string
-        }
+        Args:
+          | {
+              p_title: string
+              p_content: string
+              p_category: string
+              p_is_active: boolean
+              p_created_by: string
+              p_expiry_date: string
+            }
+          | {
+              p_title: string
+              p_content: string
+              p_category: string
+              p_is_active: boolean
+              p_created_by: string
+              p_expiry_date: string
+            }
         Returns: Json
       }
       delete_announcement: {
@@ -797,17 +786,6 @@ export type Database = {
       update_admin_password: {
         Args: { current_password: string; new_password: string }
         Returns: boolean
-      }
-      update_announcement: {
-        Args: {
-          p_id: string
-          p_title: string
-          p_content: string
-          p_category: string
-          p_is_active: boolean
-          p_expiry_date?: string
-        }
-        Returns: Json
       }
       verify_mfa_login: {
         Args: { user_id: string; token: string }
