@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -25,8 +24,8 @@ const Auth = () => {
   const navigate = useNavigate();
   const { session, signIn } = useAuth();
 
+  // Generate CSRF token and fetch client IP
   useEffect(() => {
-    // Generate a new CSRF token for each page load
     setCsrfToken(generateCSRFToken());
     const fetchIP = async () => {
       const ip = await getClientIP();
@@ -35,18 +34,18 @@ const Auth = () => {
     fetchIP();
   }, []);
 
+  // Redirect user if they are already authenticated
   useEffect(() => {
     if (session) {
       navigate('/dashboard');
     }
   }, [session, navigate]);
 
+  // Handle signup process
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Skip CSRF validation during sign up since we're hitting Supabase directly
-    // which has its own security measures
-    
+
+    // Skip CSRF validation for sign-up since Supabase handles this
     if (!email || !password || !fullName) {
       toast({
         title: 'Missing Information',
@@ -78,15 +77,14 @@ const Auth = () => {
     try {
       setLoading(true);
       
-      // The issue is in this part - we need to make sure Supabase can create the user
-      // without hitting permission issues in the profiles table
+      // Sign-up user in Supabase
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             full_name: fullName,
-            ip_address: ipAddress
+            ip_address: ipAddress,
           },
           emailRedirectTo: window.location.origin + '/auth/callback',
         },
@@ -106,14 +104,15 @@ const Auth = () => {
     }
   };
 
+  // Handle sign-in process
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateCSRFToken(csrfToken)) {
-      // Get a new token since this one is invalid or expired
+      // Invalid or expired CSRF token
       const newToken = generateCSRFToken();
       setCsrfToken(newToken);
-      
+
       toast({
         title: 'Security Error',
         description: 'Please try submitting the form again.',
@@ -147,7 +146,7 @@ const Auth = () => {
 
       if (error) throw error;
 
-      // Navigation is handled in the useEffect watching the session
+      // Navigation handled in useEffect after login
     } catch (error: any) {
       handleAuthError(error, toast);
     } finally {
@@ -155,6 +154,7 @@ const Auth = () => {
     }
   };
 
+  // Handle password reset
   const handlePasswordReset = async () => {
     if (!email) {
       toast({
@@ -254,7 +254,6 @@ const Auth = () => {
 
             <TabsContent value="register" className="space-y-4">
               <form onSubmit={handleSignUp} className="space-y-4">
-                {/* Removed CSRF token validation for signup since we use Supabase directly */}
                 <div className="space-y-2">
                   <Label htmlFor="fullName">Full Name</Label>
                   <div className="relative">
@@ -321,46 +320,27 @@ const Auth = () => {
               <p>Don't have an account?{' '}
                 <button 
                   type="button" 
-                  onClick={() => setActiveTab('register')}
-                  className="text-zim-green hover:underline font-medium"
+                  onClick={() => setActiveTab('register')} 
+                  className="text-zim-green hover:underline"
                 >
-                  Register
+                  Sign up
                 </button>
               </p>
             </div>
           )}
-          
           {activeTab === 'register' && (
             <div className="text-center mt-4 text-sm text-gray-600">
               <p>Already have an account?{' '}
                 <button 
                   type="button" 
-                  onClick={() => setActiveTab('login')}
-                  className="text-zim-green hover:underline font-medium"
+                  onClick={() => setActiveTab('login')} 
+                  className="text-zim-green hover:underline"
                 >
-                  Log in
+                  Sign in
                 </button>
               </p>
             </div>
           )}
-        </div>
-
-        <div className="text-center">
-          <p className="text-sm text-gray-600">
-            By continuing, you agree to our{' '}
-            <Link to="/terms" className="text-zim-green hover:underline">
-              Terms of Service
-            </Link>{' '}
-            and{' '}
-            <Link to="/privacy" className="text-zim-green hover:underline">
-              Privacy Policy
-            </Link>
-            .
-          </p>
-          <Link to="/" className="mt-4 inline-flex items-center text-sm text-zim-green hover:underline">
-            <ArrowRight className="mr-1 h-4 w-4" />
-            Return to Home
-          </Link>
         </div>
       </div>
     </div>
