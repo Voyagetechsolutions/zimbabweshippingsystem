@@ -869,17 +869,14 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 >
                   Back
                 </Button>
-                <Button 
-  type="submit"
-  disabled={isSubmitting || !validateTab('payment')}
-  className="bg-zim-green hover:bg-zim-green/90 w-full md:w-auto"
-  onClick={(e) => {
-    e.preventDefault();
-    navigate('/paymentprocessor'); 
-  }}
->
-  {isSubmitting ? (
-    <>
+                <Button
+                type="submit"
+                disabled={isSubmitting || !validateTab('payment')}
+                className="bg-zim-green hover:bg-zim-green/90 w-full md:w-auto"
+                onClick={'payment-processor'}}
+                >
+                {isSubmitting ? (
+          <>
       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
       Processing...
     </>
