@@ -1,5 +1,6 @@
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { createHmac } from 'https://deno.land/std@0.177.0/hash/sha1.ts'
+
+import { serve } from 'https://deno.land/std@0.190.0/http/server.ts'
+import { createHash } from 'https://deno.land/std@0.190.0/crypto/mod.ts'
 
 // CORS headers to allow browser access
 const corsHeaders = {
@@ -38,22 +39,30 @@ const calculateTOTP = (secret: string, counter: number): string => {
   }
 
   // Generate HMAC-SHA1
-  const hmac = createHmac('sha1', decodedSecret);
-  hmac.update(new Uint8Array(buffer));
-  const hash = new Uint8Array(hmac.digest());
+  const key = new TextEncoder().encode(decodedSecret);
+  const data = new Uint8Array(buffer);
+  const hmac = createHmacSha1(key, data);
 
   // Extract the dynamic binary code (4-byte)
-  const offset = hash[hash.length - 1] & 0xf;
-  const binaryCode = (hash[offset] & 0x7f) << 24 |
-                     (hash[offset + 1] & 0xff) << 16 |
-                     (hash[offset + 2] & 0xff) << 8 |
-                     (hash[offset + 3] & 0xff);
+  const offset = hmac[hmac.length - 1] & 0xf;
+  const binaryCode = (hmac[offset] & 0x7f) << 24 |
+                     (hmac[offset + 1] & 0xff) << 16 |
+                     (hmac[offset + 2] & 0xff) << 8 |
+                     (hmac[offset + 3] & 0xff);
 
   // Get a 6-digit code
   const code = Math.abs(binaryCode) % 1000000;
 
   return code.toString().padStart(6, '0');
 };
+
+// Create HMAC-SHA1 implementation using the modern Deno crypto API
+function createHmacSha1(key: Uint8Array, data: Uint8Array): Uint8Array {
+  const hmac = createHash('sha1');
+  hmac.update(key);
+  hmac.update(data);
+  return new Uint8Array(hmac.digest());
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
