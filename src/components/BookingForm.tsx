@@ -288,6 +288,23 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
   };
 
+  const goToNextTab = () => {
+    // Logic for switching to the next tab
+    console.log("Go to next tab!");
+  };
+
+  // Optional: to auto-scroll to the top when switching tabs
+  useEffect(() => {
+    if (firstInputRef.current) {
+      firstInputRef.current.focus();
+    }
+  }, []);
+
+  const onSubmit = (data) => {
+    // Handle form submission
+    console.log("Form submitted:", data);
+  };
+
   const validateTab = (tab: string): boolean => {
     const fields = {
       sender: ['firstName', 'lastName', 'email', 'phone', 'pickupCountry', 'pickupAddress'],
