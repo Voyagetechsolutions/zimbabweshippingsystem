@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 
@@ -16,6 +15,11 @@ interface AuthEmailRequest {
   redirect_to?: string;
 }
 
+const validateEmail = (email: string) => {
+  const regex = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/;
+  return regex.test(email);
+};
+
 const sendAuthEmail = async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -23,6 +27,11 @@ const sendAuthEmail = async (req: Request) => {
 
   try {
     const { type, email, token, redirect_to }: AuthEmailRequest = await req.json();
+
+    // Validate email format
+    if (!validateEmail(email)) {
+      throw new Error("Invalid email format");
+    }
 
     let subject = '';
     let html = '';
