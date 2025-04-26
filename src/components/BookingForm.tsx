@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useForm, Controller } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Card } from '@/components/ui/card';
@@ -20,7 +19,6 @@ import { getRouteForPostalCode, isRestrictedPostalCode, getIrelandRouteForCity }
 import { generateUniqueId } from '@/lib/utils';
 import { getDateByRoute, getIrelandCities } from '@/data/collectionSchedule';
 import CollectionInfo from '@/components/CollectionInfo';
-
 
 const bookingFormSchema = z.object({
   firstName: z.string().min(2, { message: 'First name must be at least 2 characters' }),
@@ -55,9 +53,6 @@ type BookingFormValues = z.infer<typeof bookingFormSchema>;
 interface BookingFormProps {
   onSubmitComplete: (data: BookingFormValues, shipmentId: string, amount: number) => void;
 }
-
-const navigate = useNavigate();
-
 
 const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -773,7 +768,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   <div className="text-sm text-gray-500 mt-1">
                     <p>Additional mandatory costs:</p>
                     <ul className="list-disc pl-5">
-                      <li>Metal coded seal: £5</li>
+                      <li>Metal seal: £5</li>
                       {form.getValues('doorToDoor') && (
                         <li>Door-to-door delivery: £25</li>
                       )}
@@ -870,24 +865,24 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   Back
                 </Button>
                 <Button 
-  type="submit"
-  disabled={isSubmitting || !validateTab('payment')}
-  className="bg-zim-green hover:bg-zim-green/90 w-full md:w-auto"
-  onClick={(e) => {
-    e.preventDefault();
-    navigate('/paymentprocessor'); 
-  }}
->
-  {isSubmitting ? (
-    <>
-      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-      Processing...
-    </>
-  ) : (
-    'Complete Booking'
-  )}
-</Button>
-
+                  type="submit"
+                  disabled={isSubmitting || !validateTab('payment')}
+                  className="bg-zim-green hover:bg-zim-green/90 w-full md:w-auto"
+                  onClick={(e) => {
+                    e.preventDefault(); // Prevent form submission (if any)
+                    // Redirect to payment processor page
+                    router.push('/paymentprocessor'); // Replace with the actual payment page route
+                  }}
+                  >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    'Complete Booking'
+                  )}
+                </Button>
               </div>
             </Card>
           </TabsContent>

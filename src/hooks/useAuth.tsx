@@ -1,25 +1,23 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export const useAuth = () => {
-  const [session, setSession] = useState<any>(null); // Type according to the expected session data
-  const [user, setUser] = useState<any>(null); // Type accordingly
-  const [loading, setLoading] = useState<boolean>(true);
+  const [session, setSession] = useState(null);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Function to fetch initial session data
-    const fetchSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
-    };
+    });
 
-    fetchSession();
-
-    // Listen for changes to authentication state
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -29,7 +27,6 @@ export const useAuth = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Sign-in method
   const signIn = async (email: string, password: string) => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -64,32 +61,10 @@ export const useAuth = () => {
     }
   };
 
-  // Sign-out method
-  const signOut = async () => {
-    try {
-      await supabase.auth.signOut();
-      setSession(null);
-      setUser(null);
-      toast({
-        title: 'Logged Out',
-        description: 'You have been logged out successfully.',
-        variant: 'success',
-      });
-    } catch (error) {
-      console.error('Error:', error);
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
-    }
-  };
-
   return {
     session,
     user,
     loading,
     signIn,
-    signOut, // Exposing signOut function
   };
 };
