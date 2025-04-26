@@ -81,7 +81,7 @@ function App() {
                   <Route path="/faq" element={<FAQ />} />
                   <Route path="/terms" element={<TermsAndConditions />} />
                   <Route path="/privacy" element={<PrivacyPolicy />} />
-                  <Route path="/payment-processor" element={<PaymentProcessor />} />
+                  {/*<Route path="/payment-processor" element={<PaymentProcessor />} />*/}
 
                   {/* Protected routes - any authenticated user */}
                   <Route
