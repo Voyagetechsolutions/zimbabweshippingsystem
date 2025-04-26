@@ -871,7 +871,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   onClick={(e) => {
                     e.preventDefault(); // Prevent form submission (if any)
                     // Redirect to payment processor page
-                    router.push('/PaymentProcessor'); // Replace with the actual payment page route
+                    router.push('/paymentprocessor'); // Replace with the actual payment page route
                   }}
                   >
                   {isSubmitting ? (
