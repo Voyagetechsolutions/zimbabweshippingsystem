@@ -875,7 +875,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   className="bg-zim-green hover:bg-zim-green/90 w-full md:w-auto"
   onClick={(e) => {
     e.preventDefault();
-    navigate('/payment-processor'); 
+    navigate('/paymentprocessor'); 
   }}
 >
   {isSubmitting ? (
