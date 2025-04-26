@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -29,6 +30,20 @@ const DriverDashboard = () => {
 
   const { toast } = useToast();
   const isMobile = useIsMobile();
+
+  // Define pendingCollections and inTransitDeliveries based on activeDeliveries
+  const pendingCollections = activeDeliveries.filter(shipment => 
+    ['Booking Confirmed', 'Ready for Pickup'].includes(shipment.status)
+  );
+  
+  const inTransitDeliveries = activeDeliveries.filter(shipment => 
+    ['Processing in Warehouse (UK)', 'Customs Clearance', 'Processing in Warehouse (ZW)', 'In Transit', 'Out for Delivery'].includes(shipment.status)
+  );
+
+  // Function to toggle schedule details expanded/collapsed state
+  const toggleScheduleDetails = (id: string) => {
+    setExpandedSchedule(expandedSchedule === id ? null : id);
+  };
 
   useEffect(() => {
     fetchDriverData();
@@ -224,6 +239,12 @@ const DriverDashboard = () => {
       setUploadLoading(false);
     }
   };
+
+  // Calculate total scheduled shipments for the badge
+  const totalScheduledShipments = Object.values(scheduleShipments).reduce(
+    (total, shipments) => total + shipments.length, 
+    0
+  );
 
   return (
     <div className="space-y-6">
