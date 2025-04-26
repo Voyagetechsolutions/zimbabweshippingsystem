@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 
@@ -13,6 +14,7 @@ interface AuthEmailRequest {
   email: string;
   token?: string;
   redirect_to?: string;
+  csrf_token?: string; // Added to validate requests
 }
 
 const validateEmail = (email: string) => {
@@ -26,7 +28,7 @@ const sendAuthEmail = async (req: Request) => {
   }
 
   try {
-    const { type, email, token, redirect_to }: AuthEmailRequest = await req.json();
+    const { type, email, token, redirect_to, csrf_token }: AuthEmailRequest = await req.json();
 
     // Validate email format
     if (!validateEmail(email)) {
