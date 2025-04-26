@@ -180,11 +180,11 @@ const Pricing = () => {
                         </div>
                         <div className="flex justify-between items-center text-sm pb-2 border-b">
                           <span>Premium (20%)</span>
-                          <span>£56</span>
+                          <span>£52</span>
                         </div>
                         <div className="flex justify-between items-center font-bold pt-1">
                           <span>Total</span>
-                          <span>£336</span>
+                          <span>£312</span>
                         </div>
                       </div>
                       
@@ -196,11 +196,11 @@ const Pricing = () => {
                         </div>
                         <div className="flex justify-between items-center text-sm pb-2 border-b">
                           <span>Premium (20%)</span>
-                          <span>£52 per drum</span>
+                          <span>£48 per drum</span>
                         </div>
                         <div className="flex justify-between items-center font-bold pt-1">
                           <span>Total</span>
-                          <span>£312 per drum</span>
+                          <span>£288 per drum</span>
                         </div>
                       </div>
                       
@@ -212,11 +212,11 @@ const Pricing = () => {
                         </div>
                         <div className="flex justify-between items-center text-sm pb-2 border-b">
                           <span>Premium (20%)</span>
-                          <span>£48 per drum</span>
+                          <span>£44 per drum</span>
                         </div>
                         <div className="flex justify-between items-center font-bold pt-1">
                           <span>Total</span>
-                          <span>£288 per drum</span>
+                          <span>£264 per drum</span>
                         </div>
                       </div>
                     </div>
@@ -347,7 +347,7 @@ const Pricing = () => {
                 <CardContent>
                   <p className="mb-4">For increased security, all drums and suitcases include a metal coded seal.</p>
                   <div className="flex justify-between items-center font-medium">
-                    <span>Price per coded seal</span>
+                    <span>Price per shipment</span>
                     <span>£5.00</span>
                   </div>
                 </CardContent>

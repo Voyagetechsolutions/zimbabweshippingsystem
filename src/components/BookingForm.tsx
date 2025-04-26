@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -105,6 +104,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const watchItemCategory = form.watch('itemCategory');
   const watchItemDescription = form.watch('itemDescription');
 
+  // Fixed shipment type selection to properly clear and set fields
   const renderShipmentTypeOptions = () => {
     return (
       <RadioGroup
@@ -112,13 +112,16 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         onValueChange={(value) => {
           form.setValue('shipmentType', value as 'drum' | 'other');
           
+          // Handle field clearing and appropriate defaults
           if (value === 'drum') {
             if (!form.getValues('drumQuantity') || form.getValues('drumQuantity') === '0') {
               form.setValue('drumQuantity', '1');
             }
+            // Clear "other" fields
             form.setValue('itemCategory', '');
             form.setValue('itemDescription', '');
           } else if (value === 'other') {
+            // Set a default drum quantity but we won't use it
             form.setValue('drumQuantity', '1'); 
           }
         }}
@@ -131,6 +134,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             if (!form.getValues('drumQuantity') || form.getValues('drumQuantity') === '0') {
               form.setValue('drumQuantity', '1');
             }
+            // Clear "other" fields
             form.setValue('itemCategory', '');
             form.setValue('itemDescription', '');
           }}
@@ -146,6 +150,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
           className={`border rounded-lg p-4 cursor-pointer transition-all ${form.getValues('shipmentType') === 'other' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
           onClick={() => {
             form.setValue('shipmentType', 'other');
+            // Set a default drum quantity but we won't use it
             form.setValue('drumQuantity', '1');
           }}
         >
@@ -297,14 +302,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       payment: ['paymentOption', 'terms']
     };
     
-    const tabKey = tab === 'paymentprocessor' ? 'payment' : tab;
-    const currentFields = fields[tabKey as keyof typeof fields];
-    
-    if (!currentFields) {
-      console.warn(`No validation fields defined for tab: ${tab}`);
-      return true;
-    }
-    
+    const currentFields = fields[tab as keyof typeof fields];
     return currentFields.every(field => {
       const fieldValue = form.getValues(field as any);
       return fieldValue !== undefined && fieldValue !== '';
@@ -868,12 +866,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   type="submit"
                   disabled={isSubmitting || !validateTab('payment')}
                   className="bg-zim-green hover:bg-zim-green/90 w-full md:w-auto"
-                  onClick={(e) => {
-                    e.preventDefault(); // Prevent form submission (if any)
-                    // Redirect to payment processor page
-                    router.push('paymentprocessor'); // Replace with the actual payment page route
-                  }}
-                  >
+                >
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />

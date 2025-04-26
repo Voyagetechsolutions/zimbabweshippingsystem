@@ -1,41 +1,207 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { RefreshCw } from 'lucide-react';
+import { Package, Truck, Calendar, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Shipment } from '@/types/shipment';
 
-import { useDriverData } from '@/hooks/useDriverData';
+// Import our components
 import StatsCards from './driver/StatsCards';
+import DeliveryCard from './driver/DeliveryCard';
+import ScheduleCard from './driver/ScheduleCard';
 import ImageUploadDialog from './driver/ImageUploadDialog';
-import UKCollectionsTab from './driver/UKCollectionsTab';
-import ZimbabweDeliveriesTab from './driver/ZimbabweDeliveriesTab';
-import SchedulesTab from './driver/SchedulesTab';
+import EmptyState from './driver/EmptyState';
 
 const DriverDashboard = () => {
+  const [activeDeliveries, setActiveDeliveries] = useState<Shipment[]>([]);
+  const [completedDeliveries, setCompletedDeliveries] = useState<Shipment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [collectionSchedules, setCollectionSchedules] = useState<any[]>([]);
+  const [scheduleShipments, setScheduleShipments] = useState<{[key: string]: Shipment[]}>({});
   const [showImageUpload, setShowImageUpload] = useState(false);
   const [currentShipmentId, setCurrentShipmentId] = useState<string>('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [expandedSchedule, setExpandedSchedule] = useState<string | null>(null);
-
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
-  const {
-    loading,
-    isRefreshing,
-    pendingCollections,
-    inTransitDeliveries,
-    completedDeliveries,
-    collectionSchedules,
-    scheduleShipments,
-    handleRefresh,
-    fetchDriverData
-  } = useDriverData();
+  useEffect(() => {
+    fetchDriverData();
+    
+    // Set up a periodic refresh interval
+    const refreshInterval = setInterval(() => {
+      fetchDriverData();
+    }, 60000); // Refresh every minute
+    
+    return () => clearInterval(refreshInterval);
+  }, []);
+
+  const fetchDriverData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch active deliveries - include all active statuses
+      // Fix: Use direct query without join to avoid relationship error
+      const { data: activeData, error: activeError } = await supabase
+        .from('shipments')
+        .select('*')
+        .in('status', [
+          'Booking Confirmed', 
+          'Ready for Pickup', 
+          'Processing in Warehouse (UK)', 
+          'Customs Clearance', 
+          'Processing in Warehouse (ZW)', 
+          'In Transit', 
+          'Out for Delivery'
+        ])
+        .eq('can_modify', false); // Only confirmed bookings
+
+      if (activeError) {
+        console.error('Error fetching active deliveries:', activeError);
+        throw activeError;
+      }
+      
+      // Fetch user details separately
+      if (activeData && activeData.length > 0) {
+        for (const shipment of activeData as Shipment[]) {
+          if (shipment.user_id) {
+            const { data: userData, error: userError } = await supabase
+              .from('profiles')
+              .select('email, full_name')
+              .eq('id', shipment.user_id)
+              .single();
+              
+            if (!userError && userData) {
+              shipment.profiles = userData;
+            }
+          }
+        }
+      }
+      
+      console.log("Active deliveries fetched:", activeData?.length);
+      setActiveDeliveries(activeData as Shipment[] || []);
+      
+      // Fetch completed deliveries - Fix: Use direct query
+      const { data: completedData, error: completedError } = await supabase
+        .from('shipments')
+        .select('*')
+        .eq('status', 'Delivered')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (completedError) {
+        console.error('Error fetching completed deliveries:', completedError);
+        throw completedError;
+      }
+      
+      // Fetch user details for completed deliveries
+      if (completedData && completedData.length > 0) {
+        for (const shipment of completedData as Shipment[]) {
+          if (shipment.user_id) {
+            const { data: userData, error: userError } = await supabase
+              .from('profiles')
+              .select('email, full_name')
+              .eq('id', shipment.user_id)
+              .single();
+              
+            if (!userError && userData) {
+              shipment.profiles = userData;
+            }
+          }
+        }
+      }
+      
+      console.log("Completed deliveries fetched:", completedData?.length);
+      setCompletedDeliveries(completedData as Shipment[] || []);
+
+      // Fetch collection schedules
+      const { data: scheduleData, error: scheduleError } = await supabase
+        .from('collection_schedules')
+        .select('*')
+        .order('pickup_date', { ascending: true });
+
+      if (scheduleError) {
+        console.error('Error fetching collection schedules:', scheduleError);
+        throw scheduleError;
+      }
+      setCollectionSchedules(scheduleData || []);
+      console.log("Collection schedules fetched:", scheduleData?.length);
+      
+      // Fetch shipments for each schedule - Fix: Use direct query
+      if (scheduleData && scheduleData.length > 0) {
+        const schedulesWithShipments: {[key: string]: Shipment[]} = {};
+        
+        for (const schedule of scheduleData) {
+          const { data: shipmentData, error: shipmentError } = await supabase
+            .from('shipments')
+            .select('*')
+            .in('status', ['Booking Confirmed', 'Ready for Pickup'])
+            .eq('can_modify', false) // Only confirmed bookings
+            .contains('metadata', { pickup_date: schedule.pickup_date });
+            
+          if (shipmentError) {
+            console.error(`Error fetching shipments for schedule ${schedule.id}:`, shipmentError);
+          } else if (shipmentData && shipmentData.length > 0) {
+            // Fetch user details for schedule shipments
+            for (const shipment of shipmentData as Shipment[]) {
+              if (shipment.user_id) {
+                const { data: userData, error: userError } = await supabase
+                  .from('profiles')
+                  .select('email, full_name')
+                  .eq('id', shipment.user_id)
+                  .single();
+                  
+                if (!userError && userData) {
+                  shipment.profiles = userData;
+                }
+              }
+            }
+            schedulesWithShipments[schedule.id] = shipmentData as Shipment[] || [];
+            console.log(`Schedule ${schedule.id} has ${shipmentData?.length || 0} shipments`);
+          } else {
+            schedulesWithShipments[schedule.id] = [];
+          }
+        }
+        
+        setScheduleShipments(schedulesWithShipments);
+      }
+      
+    } catch (error: any) {
+      console.error('Error fetching driver data:', error.message);
+      toast({
+        title: 'Error loading data',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchDriverData();
+      toast({
+        title: 'Data refreshed',
+        description: 'Driver data has been updated',
+      });
+    } catch (error: any) {
+      console.error('Error refreshing data:', error);
+      toast({
+        title: 'Refresh failed',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {
     try {
@@ -43,14 +209,22 @@ const DriverDashboard = () => {
         .from('shipments')
         .update({ status: newStatus, updated_at: new Date().toISOString() })
         .eq('id', id);
+
       if (error) throw error;
-      toast({ title: 'Status Updated', description: `Shipment updated to ${newStatus}` });
-      await fetchDriverData();
+      
+      toast({
+        title: 'Status Updated',
+        description: `Shipment status updated to ${newStatus}`,
+      });
+      
+      // Refresh data after status update
+      fetchDriverData();
+      
     } catch (error: any) {
       toast({
         title: 'Error updating status',
         description: error.message,
-        variant: 'destructive',
+        variant: 'destructive'
       });
     }
   };
@@ -66,7 +240,8 @@ const DriverDashboard = () => {
     const file = e.target.files?.[0];
     if (file) {
       setImageFile(file);
-      setImagePreview(URL.createObjectURL(file));
+      const imageUrl = URL.createObjectURL(file);
+      setImagePreview(imageUrl);
     }
   };
 
@@ -83,51 +258,90 @@ const DriverDashboard = () => {
 
   const handleUploadDeliveryImage = async () => {
     if (!imageFile || !currentShipmentId) return;
-
+    
     try {
       setUploadLoading(true);
+      
+      // Upload the image to storage
       const fileName = `delivery-${currentShipmentId}-${Date.now()}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('images')
         .upload(`deliveries/${fileName}`, imageFile);
-
+        
       if (uploadError) throw uploadError;
-
+      
+      // Get the public URL
       const { data: urlData } = await supabase.storage
         .from('images')
         .getPublicUrl(`deliveries/${fileName}`);
-
+        
+      // Update the shipment with the image URL
+      const currentShipment = activeDeliveries.find(d => d.id === currentShipmentId);
+      let updatedMetadata = {};
+      
+      // Fix: Check if metadata exists and is an object before spreading
+      if (currentShipment?.metadata && typeof currentShipment.metadata === 'object') {
+        updatedMetadata = { 
+          ...currentShipment.metadata,
+          delivery_image: urlData.publicUrl 
+        };
+      } else {
+        // If metadata doesn't exist or isn't an object, create a new object
+        updatedMetadata = { delivery_image: urlData.publicUrl };
+      }
+      
       const { error: updateError } = await supabase
         .from('shipments')
-        .update({
-          metadata: { delivery_image: urlData.publicUrl },
-          status: 'Delivered'
-        })
+        .update({ metadata: updatedMetadata })
         .eq('id', currentShipmentId);
-
+        
       if (updateError) throw updateError;
-
-      toast({ title: 'Image Uploaded', description: 'Delivery image uploaded successfully' });
-      handleCloseImageUpload();
-      await fetchDriverData();
+      
+      toast({
+        title: 'Image Uploaded',
+        description: 'Delivery image has been successfully uploaded',
+      });
+      
+      // Close modal and reset state
+      setShowImageUpload(false);
+      setImageFile(null);
+      setImagePreview(null);
+      
+      // Update the shipment status to Delivered
+      await handleUpdateStatus(currentShipmentId, 'Delivered');
+      
     } catch (error: any) {
       toast({
         title: 'Error uploading image',
         description: error.message,
-        variant: 'destructive',
+        variant: 'destructive'
       });
     } finally {
       setUploadLoading(false);
     }
   };
 
-  const toggleScheduleDetails = (id: string) => {
-    setExpandedSchedule(expandedSchedule === id ? null : id);
+  const toggleScheduleDetails = (scheduleId: string) => {
+    if (expandedSchedule === scheduleId) {
+      setExpandedSchedule(null);
+    } else {
+      setExpandedSchedule(scheduleId);
+    }
   };
+  
+  // Filter for pending collections (Ready for Pickup status only)
+  const pendingCollections = activeDeliveries.filter(d => 
+    d.status === 'Ready for Pickup'
+  );
+  
+  // Filter for in-transit deliveries (all delivery-related statuses)
+  const inTransitDeliveries = activeDeliveries.filter(d => 
+    ['In Transit', 'Out for Delivery', 'Customs Clearance', 'Processing in Warehouse (ZW)'].includes(d.status)
+  );
 
+  // Total number of shipments for all schedules
   const totalScheduledShipments = Object.values(scheduleShipments).reduce(
-    (total, shipments) => total + shipments.length, 
-    0
+    (total, shipments) => total + shipments.length, 0
   );
 
   return (
@@ -165,34 +379,118 @@ const DriverDashboard = () => {
           </TabsTrigger>
         </TabsList>
         
-        <TabsContent value="uk-collections">
-          <UKCollectionsTab
-            loading={loading}
-            isRefreshing={isRefreshing}
-            pendingCollections={pendingCollections}
-            onRefresh={handleRefresh}
-            onStatusUpdate={handleUpdateStatus}
-            onUploadImage={openImageUploadModal}
-          />
+        <TabsContent value="uk-collections" className="space-y-4">
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-md">
+            <div className="flex items-start">
+              <AlertTriangle className="h-5 w-5 text-yellow-500 mr-2 mt-0.5" />
+              <div>
+                <h3 className="font-medium text-yellow-800">Collection Instructions</h3>
+                <p className="text-sm text-yellow-700">
+                  Call the customer at least 30 minutes before arrival. Verify all package details upon collection.
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex md:hidden justify-end mb-2">
+            <Button 
+              variant="outline" 
+              onClick={handleRefresh} 
+              disabled={isRefreshing || loading}
+              size="sm"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+          
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
+            </div>
+          ) : pendingCollections.length > 0 ? (
+            <div className="space-y-4">
+              {pendingCollections.map((shipment) => (
+                <DeliveryCard
+                  key={shipment.id}
+                  shipment={shipment}
+                  type="collection"
+                  onStatusUpdate={handleUpdateStatus}
+                  onUploadImage={openImageUploadModal}
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              icon={<Package className="h-12 w-12 text-gray-300" />}
+              title="No collections pending"
+              description="There are no confirmed packages ready for collection at the moment."
+            />
+          )}
         </TabsContent>
         
-        <TabsContent value="zim-deliveries">
-          <ZimbabweDeliveriesTab
-            loading={loading}
-            inTransitDeliveries={inTransitDeliveries}
-            onStatusUpdate={handleUpdateStatus}
-            onUploadImage={openImageUploadModal}
-          />
+        <TabsContent value="zim-deliveries" className="space-y-4">
+          <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-md">
+            <div className="flex items-start">
+              <Truck className="h-5 w-5 text-blue-500 mr-2 mt-0.5" />
+              <div>
+                <h3 className="font-medium text-blue-800">Delivery Instructions</h3>
+                <p className="text-sm text-blue-700">
+                  Take photos of all delivered packages as proof of delivery. Get recipient signatures when possible.
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
+            </div>
+          ) : inTransitDeliveries.length > 0 ? (
+            <div className="space-y-4">
+              {inTransitDeliveries.map((shipment) => (
+                <DeliveryCard
+                  key={shipment.id}
+                  shipment={shipment}
+                  type="delivery"
+                  onStatusUpdate={handleUpdateStatus}
+                  onUploadImage={openImageUploadModal}
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              icon={<Truck className="h-12 w-12 text-gray-300" />}
+              title="No deliveries pending"
+              description="There are no packages to be delivered at the moment."
+            />
+          )}
         </TabsContent>
         
-        <TabsContent value="schedules">
-          <SchedulesTab
-            loading={loading}
-            collectionSchedules={collectionSchedules}
-            scheduleShipments={scheduleShipments}
-            expandedSchedule={expandedSchedule}
-            onToggleDetails={toggleScheduleDetails}
-          />
+        <TabsContent value="schedules" className="space-y-4">
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
+            </div>
+          ) : collectionSchedules.length > 0 ? (
+            <div className="space-y-4">
+              {collectionSchedules.map((schedule) => (
+                <ScheduleCard
+                  key={schedule.id}
+                  schedule={schedule}
+                  shipments={scheduleShipments[schedule.id] || []}
+                  isExpanded={expandedSchedule === schedule.id}
+                  onToggleDetails={toggleScheduleDetails}
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              icon={<Calendar className="h-12 w-12 text-gray-300" />}
+              title="No schedules available"
+              description="There are no collection schedules at the moment."
+            />
+          )}
         </TabsContent>
       </Tabs>
       

@@ -1,8 +1,6 @@
-
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { Session, User, AuthResponse } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 
 interface AuthContextType {
   session: Session | null;
@@ -30,7 +28,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const { toast } = useToast();
 
   useEffect(() => {
     // Check active session
@@ -47,11 +44,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (error) {
         console.error("Error getting initial session:", error);
-        toast({
-          title: "Authentication Error",
-          description: "Failed to retrieve your session. Please try logging in again.",
-          variant: "destructive"
-        });
       } finally {
         setLoading(false);
       }
@@ -62,7 +54,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set up auth state change listener
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
-        console.log("Auth state changed:", event, newSession ? "Session exists" : "No session");
         setSession(newSession);
         setUser(newSession?.user || null);
         setLoading(false);
@@ -78,7 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [toast]);
+  }, []);
 
   const checkAdminStatus = async (userId: string) => {
     try {
@@ -98,48 +89,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signIn = async (email: string, password: string) => {
-    try {
-      const response = await supabase.auth.signInWithPassword({ email, password });
-      
-      if (response.error) {
-        toast({
-          title: "Login Failed",
-          description: response.error.message,
-          variant: "destructive"
-        });
-      } else if (response.data.user) {
-        toast({
-          title: "Login Successful",
-          description: `Welcome back, ${response.data.user.email}!`,
-        });
-      }
-      
-      return response;
-    } catch (error: any) {
-      toast({
-        title: "Login Error",
-        description: error.message || "An unexpected error occurred during login",
-        variant: "destructive"
-      });
-      throw error;
-    }
+    return await supabase.auth.signInWithPassword({ email, password });
   };
 
   const signOut = async () => {
-    try {
-      await supabase.auth.signOut();
-      setIsAdmin(false);
-      toast({
-        title: "Signed Out",
-        description: "You have been successfully logged out.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Sign Out Error",
-        description: error.message || "Failed to sign out properly",
-        variant: "destructive"
-      });
-    }
+    await supabase.auth.signOut();
+    setIsAdmin(false);
   };
 
   const value = {

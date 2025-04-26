@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -28,8 +29,6 @@ import AboutUs from './pages/AboutUs';
 import CollectionSchedule from './pages/CollectionSchedule';
 import FAQ from './pages/FAQ';
 import QuoteSubmitted from '@/pages/QuoteSubmitted';
-import TermsAndConditions from './pages/TermsAndConditions';
-import PrivacyPolicy from './pages/PrivacyPolicy';
 
 // Components
 import { RequireAuth, RequireAdmin, RedirectIfAuthenticated, RequireRole } from './components/RouteGuard';
@@ -78,8 +77,6 @@ function App() {
                   <Route path="/about-us" element={<AboutUs />} />
                   <Route path="/collection-schedule" element={<CollectionSchedule />} />
                   <Route path="/faq" element={<FAQ />} />
-                  <Route path="/terms" element={<TermsAndConditions />} />
-                  <Route path="/privacy" element={<PrivacyPolicy />} />
 
                   {/* Protected routes - any authenticated user */}
                   <Route

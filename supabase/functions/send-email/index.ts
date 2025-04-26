@@ -14,13 +14,7 @@ interface AuthEmailRequest {
   email: string;
   token?: string;
   redirect_to?: string;
-  csrf_token?: string; // Added to validate requests
 }
-
-const validateEmail = (email: string) => {
-  const regex = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/;
-  return regex.test(email);
-};
 
 const sendAuthEmail = async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -28,12 +22,7 @@ const sendAuthEmail = async (req: Request) => {
   }
 
   try {
-    const { type, email, token, redirect_to, csrf_token }: AuthEmailRequest = await req.json();
-
-    // Validate email format
-    if (!validateEmail(email)) {
-      throw new Error("Invalid email format");
-    }
+    const { type, email, token, redirect_to }: AuthEmailRequest = await req.json();
 
     let subject = '';
     let html = '';
@@ -47,19 +36,7 @@ const sendAuthEmail = async (req: Request) => {
         html = `
           <h1>Welcome to Zimbabwe Shipping!</h1>
           <p>Click the link below to confirm your account:</p>
-          <a href="${linkWithToken}" style="
-            background-color: #4CAF50;
-            color: white;
-            padding: 14px 20px;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            border-radius: 4px;
-            margin: 10px 0;
-          ">Confirm Account</a>
-          <p>If you didn't create this account, you can safely ignore this email.</p>
-          <hr>
-          <p style="font-size: 12px; color: #666;">Zimbabwe Shipping Ltd, UK</p>
+          <a href="${linkWithToken}">Confirm Account</a>
         `;
         break;
 
@@ -68,20 +45,7 @@ const sendAuthEmail = async (req: Request) => {
         html = `
           <h1>Login to Zimbabwe Shipping</h1>
           <p>Click the link below to log in:</p>
-          <a href="${linkWithToken}" style="
-            background-color: #4CAF50;
-            color: white;
-            padding: 14px 20px;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            border-radius: 4px;
-            margin: 10px 0;
-          ">Login Now</a>
-          <p>This link will expire in 24 hours.</p>
-          <p>If you didn't request this login link, you can safely ignore this email.</p>
-          <hr>
-          <p style="font-size: 12px; color: #666;">Zimbabwe Shipping Ltd, UK</p>
+          <a href="${linkWithToken}">Login Now</a>
         `;
         break;
 
@@ -90,20 +54,7 @@ const sendAuthEmail = async (req: Request) => {
         html = `
           <h1>Reset Your Password</h1>
           <p>Click the link below to reset your password:</p>
-          <a href="${linkWithToken}" style="
-            background-color: #4CAF50;
-            color: white;
-            padding: 14px 20px;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            border-radius: 4px;
-            margin: 10px 0;
-          ">Reset Password</a>
-          <p>This link will expire in 24 hours.</p>
-          <p>If you didn't request a password reset, you can safely ignore this email.</p>
-          <hr>
-          <p style="font-size: 12px; color: #666;">Zimbabwe Shipping Ltd, UK</p>
+          <a href="${linkWithToken}">Reset Password</a>
         `;
         break;
 

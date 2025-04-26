@@ -31,26 +31,6 @@ const testimonials: Testimonial[] = [
     testimonial: 'Shipping to Zimbabwe has never been easier. The tracking system is very accurate and gives me peace of mind.',
     imageUrl: '/lovable-uploads/9c6e5aa8-fd5f-45ee-8e2e-80e1bfeae1b5.png',
   },
-  {
-    id: '4',
-    name: 'Grace Moyo',
-    company: 'Family Shop',
-    testimonial: 'Incredible door-to-door service! They handled my drums with care and delivered right to my family in Harare.',
-    imageUrl: '/lovable-uploads/8aba4bb5-76cc-4202-a81d-e765192b2dbc.png',
-  },
-  {
-    id: '5',
-    name: 'David Chen',
-    company: 'Import Export Co.',
-    testimonial: 'Best shipping rates I\'ve found for UK to Zimbabwe. The customer service team is always helpful and responsive.',
-    imageUrl: '/lovable-uploads/28deab65-7859-4a23-8d21-37afd6bcda2a.png',
-  },
-  {
-    id: '6',
-    name: 'Emily Williams',
-    testimonial: 'Used their service to send care packages to family. Everything arrived safely and the tracking updates were great!',
-    imageUrl: '/lovable-uploads/27c10d33-77e5-440a-ad90-8cc4b2daad65.png',
-  }
 ];
 
 const TestimonialSection = () => {
