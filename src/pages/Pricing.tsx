@@ -184,7 +184,7 @@ const Pricing = () => {
                         </div>
                         <div className="flex justify-between items-center font-bold pt-1">
                           <span>Total</span>
-                          <span>£316</span>
+                          <span>£336</span>
                         </div>
                       </div>
                       
@@ -200,7 +200,7 @@ const Pricing = () => {
                         </div>
                         <div className="flex justify-between items-center font-bold pt-1">
                           <span>Total</span>
-                          <span>£292 per drum</span>
+                          <span>£312 per drum</span>
                         </div>
                       </div>
                       
@@ -216,7 +216,7 @@ const Pricing = () => {
                         </div>
                         <div className="flex justify-between items-center font-bold pt-1">
                           <span>Total</span>
-                          <span>£270 per drum</span>
+                          <span>£288 per drum</span>
                         </div>
                       </div>
                     </div>
