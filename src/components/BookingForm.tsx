@@ -341,7 +341,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="sender" forceMount>
+          <TabsContent value="sender">
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4">Sender Information</h3>
               
@@ -531,7 +531,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="recipient" forceMount>
+          <TabsContent value="recipient">
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4">Receiver Information</h3>
               
@@ -621,7 +621,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="shipment" forceMount>
+          <TabsContent value="shipment">
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4">Shipment Details</h3>
               
@@ -799,7 +799,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="payment" forceMount>
+          <TabsContent value="payment">
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4">Payment Method</h3>
               
