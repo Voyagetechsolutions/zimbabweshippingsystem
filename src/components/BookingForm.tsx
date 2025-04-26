@@ -864,19 +864,25 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   Back
                 </Button>
                 <Button 
-                  type="submit"
-                  disabled={isSubmitting || !validateTab('payment')}
-                  className="bg-zim-green hover:bg-zim-green/90 w-full md:w-auto"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    'Complete Booking'
-                  )}
-                </Button>
+  type="submit"
+  disabled={isSubmitting || !validateTab('payment')}
+  className="bg-zim-green hover:bg-zim-green/90 w-full md:w-auto"
+  onClick={(e) => {
+    e.preventDefault(); // Prevent form submission (if any)
+    
+    // Redirect to payment processor page
+    router.push('/payment-processor'); // Replace with the actual payment page route
+  }}
+>
+  {isSubmitting ? (
+    <>
+      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+      Processing...
+    </>
+  ) : (
+    'Complete Booking'
+  )}
+</Button>
               </div>
             </Card>
           </TabsContent>
