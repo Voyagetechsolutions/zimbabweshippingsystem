@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -864,25 +865,24 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   Back
                 </Button>
                 <Button 
-  type="submit"
-  disabled={isSubmitting || !validateTab('payment')}
-  className="bg-zim-green hover:bg-zim-green/90 w-full md:w-auto"
-  onClick={(e) => {
-    e.preventDefault(); // Prevent form submission (if any)
-    
-    // Redirect to payment processor page
-    router.push('/payment-processor'); // Replace with the actual payment page route
-  }}
->
-  {isSubmitting ? (
-    <>
-      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-      Processing...
-    </>
-  ) : (
-    'Complete Booking'
-  )}
-</Button>
+                  type="submit"
+                  disabled={isSubmitting || !validateTab('payment')}
+                  className="bg-zim-green hover:bg-zim-green/90 w-full md:w-auto"
+                  onClick={(e) => {
+                    e.preventDefault(); // Prevent form submission (if any)
+                    // Redirect to payment processor page
+                    router.push('/payment-processor'); // Replace with the actual payment page route
+                  }}
+                  >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    'Complete Booking'
+                  )}
+                </Button>
               </div>
             </Card>
           </TabsContent>
