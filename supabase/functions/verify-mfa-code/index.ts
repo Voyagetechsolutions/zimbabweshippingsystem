@@ -1,5 +1,5 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { createHmac } from 'https://deno.land/std@0.177.0/hash/sha1.ts'
 
 // CORS headers to allow browser access
 const corsHeaders = {
@@ -7,39 +7,51 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Calculate TOTP token
+// Base32 decoder (simplified version for this example, use a proper one in production)
+const base32Decode = (str) => {
+  const base32chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = '';
+  let buffer = '';
+  for (let i = 0; i < str.length; i++) {
+    const index = base32chars.indexOf(str[i].toUpperCase());
+    if (index === -1) continue;  // Skip invalid characters
+    bits += index.toString(2).padStart(5, '0');
+  }
+
+  while (bits.length >= 8) {
+    buffer += String.fromCharCode(parseInt(bits.slice(0, 8), 2));
+    bits = bits.slice(8);
+  }
+  return buffer;
+}
+
+// Calculate TOTP token using HMAC-SHA1 and base32-decoded secret
 const calculateTOTP = (secret: string, counter: number): string => {
-  // This is a simplified TOTP calculation for the example
-  // In production, use a full TOTP library with proper HMAC-SHA1
-  
-  // Convert the counter to a buffer
+  const decodedSecret = base32Decode(secret);  // Decode the base32 secret
   const buffer = new ArrayBuffer(8);
   const view = new DataView(buffer);
   
-  // Counter needs to be a big-endian unsigned 64-bit integer
+  // Convert the counter to a buffer (big-endian 64-bit integer)
   for (let i = 0; i < 8; i++) {
     view.setUint8(7 - i, counter & 0xff);
     counter = counter >> 8;
   }
-  
-  // In a real implementation, we would:
-  // 1. Decode the base32 secret
-  // 2. Use HMAC-SHA1 to generate a hash
-  // 3. Extract a 4-byte dynamic binary code using the hash
-  // 4. Convert to a 6-digit number
-  
-  // For demo purposes, we're just using a deterministic algorithm
-  // based on the secret and counter to generate a 6-digit code
-  let hash = 0;
-  for (let i = 0; i < secret.length; i++) {
-    hash = ((hash << 5) - hash) + secret.charCodeAt(i) + counter;
-    hash |= 0; // Convert to 32bit integer
-  }
-  
-  // Generate a positive 6-digit number
-  const code = Math.abs(hash) % 1000000;
-  
-  // Pad with leading zeros to ensure 6 digits
+
+  // Generate HMAC-SHA1
+  const hmac = createHmac('sha1', decodedSecret);
+  hmac.update(new Uint8Array(buffer));
+  const hash = new Uint8Array(hmac.digest());
+
+  // Extract the dynamic binary code (4-byte)
+  const offset = hash[hash.length - 1] & 0xf;
+  const binaryCode = (hash[offset] & 0x7f) << 24 |
+                     (hash[offset + 1] & 0xff) << 16 |
+                     (hash[offset + 2] & 0xff) << 8 |
+                     (hash[offset + 3] & 0xff);
+
+  // Get a 6-digit code
+  const code = Math.abs(binaryCode) % 1000000;
+
   return code.toString().padStart(6, '0');
 };
 
@@ -68,10 +80,6 @@ serve(async (req) => {
       });
     }
     
-    // In a real implementation, we would:
-    // 1. Get the current time step (usually 30 seconds)
-    // 2. Check the token against the current time step and possibly adjacent ones for tolerance
-    
     // Get current 30-second counter
     const timeStep = 30;
     const counter = Math.floor(Date.now() / 1000 / timeStep);
@@ -98,4 +106,4 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
-})
+});
