@@ -48,10 +48,8 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [userId, setUserId] = useState<string | null>(null);
 
-  // Calculate the discount amount based on the number of drums
   const drumQuantity = bookingData?.shipmentDetails?.type === 'drum' ? bookingData.shipmentDetails.quantity : 0;
   const specialDealDiscount = bookingData?.shipmentDetails?.type === 'drum' ? drumQuantity * 20 : 0;
-  // Calculate pay-on-arrival premium
   const payOnArrivalPremium = bookingData?.shipmentDetails?.type === 'drum' ? totalAmount * 0.2 : 0;
 
   let finalAmount = totalAmount;
@@ -81,30 +79,19 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
 
       const transactionId = generateUniqueId('TX-');
       
-      // Create a placeholder user ID for anonymous users
-      // With our new RLS policy, anonymous inserts are allowed
       const currentUserId = user?.id || userId || bookingData.user_id || null;
       
-      // Clean up shipment ID to ensure it's a valid UUID
       let shipmentUuid = bookingData.shipment_id;
       if (shipmentUuid && typeof shipmentUuid === 'string' && shipmentUuid.startsWith('shp_')) {
         shipmentUuid = shipmentUuid.substring(4);
       }
       
-      // Validate the UUID format against a strict regex
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!shipmentUuid || !uuidRegex.test(shipmentUuid)) {
         console.error('Invalid shipment ID format:', shipmentUuid);
         throw new Error('Invalid shipment ID format');
       }
 
-      // Create the payment record - this should work now with our "Anyone can create payments" policy
-      console.log("Creating payment record with data:", { 
-        user_id: currentUserId, 
-        shipment_id: shipmentUuid,
-        amount: finalAmount 
-      });
-      
       const { data: paymentData, error: paymentError } = await supabase
         .from('payments')
         .insert({
@@ -124,11 +111,8 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         throw paymentError;
       }
 
-      console.log("Successfully created payment:", paymentData);
-
       const receiptNumber = `REC-${Date.now().toString().slice(-8)}`;
       
-      // Create receipt - should work with our "Anyone can create receipts" policy
       const { data: receiptData, error: receiptError } = await supabase
         .from('receipts')
         .insert({
@@ -151,10 +135,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         throw receiptError;
       }
 
-      console.log("Successfully created receipt:", receiptData);
-
-      // Update the shipment status
-      await supabase
+      const { error: shipmentError } = await supabase
         .from('shipments')
         .update({ 
           status: 'pending_collection',
@@ -165,6 +146,21 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
           }
         })
         .eq('id', shipmentUuid);
+
+      if (shipmentError) {
+        console.error('Shipment update error:', shipmentError);
+        throw shipmentError;
+      }
+
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: '00000000-0000-0000-0000-000000000000',
+          title: 'New Shipment Ready for Collection',
+          message: `New shipment ${receiptNumber} is ready for collection.`,
+          type: 'shipment_collection',
+          related_id: shipmentUuid
+        });
 
       toast({
         title: 'Booking Confirmed',
