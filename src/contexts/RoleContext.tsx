@@ -92,6 +92,15 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const elevateToAdmin = async (password: string): Promise<boolean> => {
+    if (!user) {
+      toast({
+        title: 'Authentication Required',
+        description: 'You must be logged in to perform this action.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+    
     try {
       const { data, error } = await supabase.rpc('elevate_to_admin', {
         admin_password: password
@@ -132,17 +141,26 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const setUserRole = async (userId: string, newRole: UserRoleType): Promise<boolean> => {
-    try {
-      if (!hasPermission('admin')) {
-        toast({
-          title: 'Permission Denied',
-          description: 'Only administrators can change user roles.',
-          variant: 'destructive',
-        });
-        return false;
-      }
+    if (!hasPermission('admin')) {
+      toast({
+        title: 'Permission Denied',
+        description: 'Only administrators can change user roles.',
+        variant: 'destructive',
+      });
+      return false;
+    }
 
-      const { data, error } = await supabase
+    try {
+      // Log the action before attempting the update for audit purposes
+      await supabase.from('audit_logs').insert({
+        user_id: user?.id,
+        action: 'ROLE_CHANGE_ATTEMPT',
+        entity_type: 'USER',
+        entity_id: userId,
+        details: { current_role: role, new_role: newRole }
+      });
+
+      const { error } = await supabase
         .from('profiles')
         .update({ role: newRole })
         .eq('id', userId);
@@ -153,8 +171,27 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
           description: error.message,
           variant: 'destructive',
         });
+        
+        // Log the failure
+        await supabase.from('audit_logs').insert({
+          user_id: user?.id,
+          action: 'ROLE_CHANGE_FAILED',
+          entity_type: 'USER',
+          entity_id: userId,
+          details: { error: error.message }
+        });
+        
         return false;
       }
+
+      // Log the successful change
+      await supabase.from('audit_logs').insert({
+        user_id: user?.id,
+        action: 'ROLE_CHANGED',
+        entity_type: 'USER',
+        entity_id: userId,
+        details: { new_role: newRole }
+      });
 
       toast({
         title: 'Role Updated',

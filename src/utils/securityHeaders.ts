@@ -32,7 +32,8 @@ export const getSecurityHeaders = () => {
     'X-Frame-Options': 'DENY',
     'X-XSS-Protection': '1; mode=block',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
-    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()'
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+    'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload'
   };
 };
 
@@ -45,4 +46,37 @@ export const configureSecurityHeaders = () => {
     meta.content = getContentSecurityPolicy()['Content-Security-Policy'];
     document.head.appendChild(meta);
   }
+};
+
+// Cache control headers for different content types
+export const getCacheControlHeaders = (contentType: 'static' | 'dynamic' | 'api') => {
+  switch (contentType) {
+    case 'static':
+      return {
+        'Cache-Control': 'public, max-age=31536000, immutable'
+      };
+    case 'dynamic':
+      return {
+        'Cache-Control': 'public, max-age=600, must-revalidate'
+      };
+    case 'api':
+      return {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'Surrogate-Control': 'no-store'
+      };
+    default:
+      return {
+        'Cache-Control': 'no-store, no-cache, must-revalidate'
+      };
+  }
+};
+
+// Function to apply security headers on API responses
+export const applySecurityHeaders = (headers: Headers) => {
+  const securityHeaders = getSecurityHeaders();
+  Object.entries(securityHeaders).forEach(([key, value]) => {
+    headers.set(key, value);
+  });
 };

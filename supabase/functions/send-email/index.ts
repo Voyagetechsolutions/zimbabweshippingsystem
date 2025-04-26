@@ -36,7 +36,19 @@ const sendAuthEmail = async (req: Request) => {
         html = `
           <h1>Welcome to Zimbabwe Shipping!</h1>
           <p>Click the link below to confirm your account:</p>
-          <a href="${linkWithToken}">Confirm Account</a>
+          <a href="${linkWithToken}" style="
+            background-color: #4CAF50;
+            color: white;
+            padding: 14px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            border-radius: 4px;
+            margin: 10px 0;
+          ">Confirm Account</a>
+          <p>If you didn't create this account, you can safely ignore this email.</p>
+          <hr>
+          <p style="font-size: 12px; color: #666;">Zimbabwe Shipping Ltd, UK</p>
         `;
         break;
 
@@ -45,7 +57,20 @@ const sendAuthEmail = async (req: Request) => {
         html = `
           <h1>Login to Zimbabwe Shipping</h1>
           <p>Click the link below to log in:</p>
-          <a href="${linkWithToken}">Login Now</a>
+          <a href="${linkWithToken}" style="
+            background-color: #4CAF50;
+            color: white;
+            padding: 14px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            border-radius: 4px;
+            margin: 10px 0;
+          ">Login Now</a>
+          <p>This link will expire in 24 hours.</p>
+          <p>If you didn't request this login link, you can safely ignore this email.</p>
+          <hr>
+          <p style="font-size: 12px; color: #666;">Zimbabwe Shipping Ltd, UK</p>
         `;
         break;
 
@@ -54,7 +79,20 @@ const sendAuthEmail = async (req: Request) => {
         html = `
           <h1>Reset Your Password</h1>
           <p>Click the link below to reset your password:</p>
-          <a href="${linkWithToken}">Reset Password</a>
+          <a href="${linkWithToken}" style="
+            background-color: #4CAF50;
+            color: white;
+            padding: 14px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            border-radius: 4px;
+            margin: 10px 0;
+          ">Reset Password</a>
+          <p>This link will expire in 24 hours.</p>
+          <p>If you didn't request a password reset, you can safely ignore this email.</p>
+          <hr>
+          <p style="font-size: 12px; color: #666;">Zimbabwe Shipping Ltd, UK</p>
         `;
         break;
 
