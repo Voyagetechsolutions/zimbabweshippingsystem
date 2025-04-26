@@ -26,7 +26,6 @@ import Support from './pages/Support';
 import Pricing from './pages/Pricing';
 import AboutUs from './pages/AboutUs';
 import CollectionSchedule from './pages/CollectionSchedule';
-import PaymentProcessorPage from './pages/PaymentProcessorPage';
 import FAQ from './pages/FAQ';
 import QuoteSubmitted from '@/pages/QuoteSubmitted';
 import TermsAndConditions from './pages/TermsAndConditions';
@@ -82,8 +81,8 @@ function App() {
                   <Route path="/faq" element={<FAQ />} />
                   <Route path="/terms" element={<TermsAndConditions />} />
                   <Route path="/privacy" element={<PrivacyPolicy />} />
-                  <Route path="/paymentprocessor" element={<PaymentProcessorPage />} />
-                  
+                  {/*<Route path="/payment-processor" element={<PaymentProcessor />} />*/}
+
                   {/* Protected routes - any authenticated user */}
                   <Route
                     path="/dashboard"
