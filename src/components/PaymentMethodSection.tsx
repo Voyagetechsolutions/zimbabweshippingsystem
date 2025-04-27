@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -6,6 +5,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { ArrowLeftCircle, Tag, PoundSterling, CalendarClock, BanknoteIcon, Building, CreditCard, CheckCircle2 } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 interface PaymentMethodSectionProps {
   bookingData: any;
@@ -51,14 +51,23 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
       };
 
       await onComplete(paymentData);
+      
       navigate('/receipt', { 
         state: { 
-          bookingData,
-          paymentData
+          bookingData: {
+            ...bookingData,
+            payment: paymentData,
+            totalAmount: finalAmount
+          }
         }
       });
     } catch (error) {
       console.error('Payment processing error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to process payment. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsProcessing(false);
     }

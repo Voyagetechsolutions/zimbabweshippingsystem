@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -254,7 +253,6 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
   }, [watchShipmentType, watchItemCategory, watchSpecificItem, form]);
 
-  // Calculate drum price based on quantity and payment option
   useEffect(() => {
     if (watchShipmentType === 'drum') {
       const quantity = parseInt(watchDrumQuantity || '1', 10);
@@ -272,11 +270,9 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       
       setOriginalPrice(basePrice);
       
-      // Calculate metal seal cost
       const sealPrice = watchWantMetalSeal ? 5 * quantity : 0;
       setSealCost(sealPrice);
       
-      // Calculate door-to-door cost (£25 per address, including main address if selected)
       const addressCount = watchDoorToDoor ? 1 + additionalAddresses.length : 0;
       const doorCost = addressCount * 25;
       setDoorToDoorCost(doorCost);
@@ -353,7 +349,6 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     const trackingNumber = `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
     const shipmentId = generateUniqueId('shp_');
     
-    // Add additional addresses to form data
     data.additionalDeliveryAddresses = additionalAddresses;
     
     onSubmitComplete({...data, shipmentType: 'other'}, shipmentId, 0);
@@ -365,11 +360,7 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       const trackingNumber = `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
       const shipmentId = generateUniqueId();
       
-      // Add additional addresses to form data
       data.additionalDeliveryAddresses = additionalAddresses;
-      
-      // Calculate total amount with all costs
-      const totalAmount = price + sealCost + doorToDoorCost;
       
       const { error } = await supabase.from('shipments').insert({
         id: shipmentId,
@@ -384,7 +375,7 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
           doorToDoor: data.doorToDoor,
           wantMetalSeal: data.wantMetalSeal,
           additionalDeliveryAddresses: data.additionalDeliveryAddresses,
-          amountPaid: totalAmount,
+          amountPaid: price,
           basePrice: price,
           sealCost: sealCost,
           doorToDoorCost: doorToDoorCost
@@ -396,7 +387,7 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         throw error;
       }
       
-      onSubmitComplete(data, shipmentId, totalAmount);
+      onSubmitComplete(data, shipmentId, price);
     } catch (error: any) {
       console.error('Error submitting booking form:', error);
       toast({
@@ -408,44 +399,6 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
   };
 
-  const validateTab = (tab: string): boolean => {
-    const fields: Record<string, string[]> = {
-      'sender': ['firstName', 'lastName', 'email', 'phone', 'pickupCountry', 'pickupAddress'],
-      'recipient': ['recipientName', 'recipientPhone', 'deliveryAddress', 'deliveryCity'],
-      'shipment': ['shipmentType'],
-      'payment': ['paymentOption', 'terms']
-    };
-    
-    // Add country-specific fields
-    if (watchPickupCountry === 'England') {
-      fields.sender.push('pickupPostcode');
-    } else if (watchPickupCountry === 'Ireland') {
-      fields.sender.push('pickupCity');
-    }
-    
-    const currentFields = fields[tab];
-    
-    if (!currentFields) {
-      return true;
-    }
-    
-    let isValid = true;
-    
-    currentFields.forEach(field => {
-      const fieldValue = form.getValues(field as any);
-      if (fieldValue === undefined || fieldValue === '') {
-        form.setError(field as any, { 
-          type: 'manual', 
-          message: `This field is required` 
-        });
-        isValid = false;
-      }
-    });
-    
-    return isValid;
-  };
-
-  // Add new function to handle payment completion
   const handlePaymentComplete = async (paymentData: any) => {
     try {
       const data = form.getValues();
@@ -484,7 +437,42 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
   };
 
-  // Update the TabsContent for payment
+  const validateTab = (tab: string): boolean => {
+    const fields: Record<string, string[]> = {
+      'sender': ['firstName', 'lastName', 'email', 'phone', 'pickupCountry', 'pickupAddress'],
+      'recipient': ['recipientName', 'recipientPhone', 'deliveryAddress', 'deliveryCity'],
+      'shipment': ['shipmentType'],
+      'payment': ['paymentOption', 'terms']
+    };
+    
+    if (watchPickupCountry === 'England') {
+      fields.sender.push('pickupPostcode');
+    } else if (watchPickupCountry === 'Ireland') {
+      fields.sender.push('pickupCity');
+    }
+    
+    const currentFields = fields[tab];
+    
+    if (!currentFields) {
+      return true;
+    }
+    
+    let isValid = true;
+    
+    currentFields.forEach(field => {
+      const fieldValue = form.getValues(field as any);
+      if (fieldValue === undefined || fieldValue === '') {
+        form.setError(field as any, { 
+          type: 'manual', 
+          message: `This field is required` 
+        });
+        isValid = false;
+      }
+    });
+    
+    return isValid;
+  };
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
@@ -590,7 +578,6 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                       <Select 
                         onValueChange={(value) => {
                           field.onChange(value);
-                          // Reset pickup postcode/city when country changes
                           if (value === 'England') {
                             form.setValue('pickupCity', '');
                           } else {
@@ -747,7 +734,6 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 />
               </div>
 
-              {/* Additional Phone Number Option */}
               <div className="mt-4">
                 <div className="flex items-center mb-2">
                   <Checkbox 
