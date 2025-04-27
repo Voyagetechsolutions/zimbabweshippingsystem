@@ -62,21 +62,17 @@ function App() {
                   <Route path="/collection-schedule" element={<CollectionSchedule />} />
                   
                   {/* Protected Routes */}
-                  <Route element={<RequireAuth />}>
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/notifications" element={<Notifications />} />
-                    <Route path="/account" element={<Account />} />
-                    <Route path="/shipment/:id" element={<ShipmentDetails />} />
-                    <Route path="/address-book" element={<AddressBook />} />
-                    <Route path="/payment-success" element={<PaymentSuccess />} />
-                  </Route>
+                  <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
+                  <Route path="/notifications" element={<RequireAuth><Notifications /></RequireAuth>} />
+                  <Route path="/account" element={<RequireAuth><Account /></RequireAuth>} />
+                  <Route path="/shipment/:id" element={<RequireAuth><ShipmentDetails /></RequireAuth>} />
+                  <Route path="/address-book" element={<RequireAuth><AddressBook /></RequireAuth>} />
+                  <Route path="/payment-success" element={<RequireAuth><PaymentSuccess /></RequireAuth>} />
                   
                   {/* Admin Routes */}
-                  <Route element={<RequireAdmin />}>
-                    <Route path="/admin" element={<AdminDashboard />} />
-                    <Route path="/gallery-admin" element={<GalleryAdmin />} />
-                    <Route path="/tasks" element={<TaskManagement />} />
-                  </Route>
+                  <Route path="/admin" element={<RequireAdmin><AdminDashboard /></RequireAdmin>} />
+                  <Route path="/gallery-admin" element={<RequireAdmin><GalleryAdmin /></RequireAdmin>} />
+                  <Route path="/tasks" element={<RequireAdmin><TaskManagement /></RequireAdmin>} />
                   
                   {/* Fallback */}
                   <Route path="*" element={<NotFound />} />

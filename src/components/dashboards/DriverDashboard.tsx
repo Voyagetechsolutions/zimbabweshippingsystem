@@ -100,7 +100,10 @@ const DriverDashboard = () => {
       const { error: updateError } = await supabase
         .from('shipments')
         .update({
-          metadata: { delivery_image: urlData.publicUrl },
+          metadata: { 
+            ...pendingCollections.find(s => s.id === currentShipmentId)?.metadata, 
+            delivery_image: urlData.publicUrl 
+          },
           status: 'Delivered'
         })
         .eq('id', currentShipmentId);
@@ -137,7 +140,6 @@ const DriverDashboard = () => {
           pendingCount={pendingCollections.length}
           inTransitCount={inTransitDeliveries.length}
           completedCount={completedDeliveries.length}
-          isMobile={isMobile}
         />
         <Button 
           variant="outline" 

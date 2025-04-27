@@ -57,7 +57,7 @@ export const useDriverData = () => {
       if (completedDeliveriesRes.error) throw completedDeliveriesRes.error;
       if (scheduleRes.error) throw scheduleRes.error;
 
-      const enrichShipments = async (shipments: Shipment[]) => {
+      const enrichShipments = async (shipments: any[]): Promise<Shipment[]> => {
         const userFetches = shipments.map(async (shipment) => {
           if (shipment.user_id) {
             const { data: userData } = await supabase
@@ -67,7 +67,7 @@ export const useDriverData = () => {
               .single();
             if (userData) shipment.profiles = userData;
           }
-          return shipment;
+          return shipment as Shipment;
         });
         return await Promise.all(userFetches);
       };

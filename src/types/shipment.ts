@@ -57,6 +57,7 @@ export interface ShipmentMetadata {
   notes?: string;
   pickup_date?: string;
   collection_type?: string;
+  [key: string]: any; // Allow for additional properties to handle Json type compatibility
 }
 
 export interface ShipmentWithRelations extends Shipment {
