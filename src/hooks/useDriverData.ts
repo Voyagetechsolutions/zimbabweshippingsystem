@@ -62,7 +62,7 @@ export const useDriverData = () => {
           if (shipment.user_id) {
             const { data: userData } = await supabase
               .from('profiles')
-              .select('email, full_name')
+              .select('id, email, full_name')
               .eq('id', shipment.user_id)
               .single();
             if (userData) shipment.profiles = userData;

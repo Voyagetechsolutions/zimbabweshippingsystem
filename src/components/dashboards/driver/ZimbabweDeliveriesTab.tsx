@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Truck } from 'lucide-react';
 import { Shipment } from '@/types/shipment';
@@ -8,14 +9,14 @@ export interface ZimbabweDeliveriesTabProps {
   loading: boolean;
   inTransitDeliveries: any[];
   onStatusUpdate: (id: string, newStatus: string) => Promise<void>;
-  onUploadImage: (id: string, imageUrl: string) => Promise<void>;
+  onUploadImage: (id: string) => void;
 }
 
 const ZimbabweDeliveriesTab: React.FC<ZimbabweDeliveriesTabProps> = ({
   loading,
   inTransitDeliveries,
   onStatusUpdate,
-  onUploadImage = async () => {}
+  onUploadImage = () => {}
 }) => {
   return (
     <div className="space-y-4">

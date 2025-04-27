@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { AlertTriangle, Package, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,7 @@ export interface UKCollectionsTabProps {
   onStatusUpdate: (id: string, newStatus: string) => Promise<void>;
   isRefreshing: boolean;
   onRefresh: () => void;
-  onUploadImage: (id: string, imageUrl: string) => Promise<void>;
+  onUploadImage: (id: string) => void;
 }
 
 const UKCollectionsTab: React.FC<UKCollectionsTabProps> = ({
@@ -20,7 +21,7 @@ const UKCollectionsTab: React.FC<UKCollectionsTabProps> = ({
   onStatusUpdate,
   isRefreshing = false,
   onRefresh = () => {},
-  onUploadImage = async () => {}
+  onUploadImage = () => {}
 }) => {
   return (
     <div className="space-y-4">

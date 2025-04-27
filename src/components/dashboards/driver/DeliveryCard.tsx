@@ -8,7 +8,7 @@ import { MapPin, User, Phone, Truck, Package, Camera, CheckCircle2 } from 'lucid
 interface DeliveryCardProps {
   shipment: any;
   type: 'collection' | 'delivery';
-  onStatusUpdate: (id: string, newStatus: string) => void;
+  onStatusUpdate: (id: string, newStatus: string) => Promise<void>;
   onUploadImage: (id: string) => void;
 }
 
