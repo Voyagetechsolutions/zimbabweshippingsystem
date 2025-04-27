@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -5,7 +6,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { ArrowLeftCircle, Tag, PoundSterling, CalendarClock, BanknoteIcon, Building, CreditCard, CheckCircle2 } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { useToast } from '@/hooks/use-toast';  // Updated import
 
 interface PaymentMethodSectionProps {
   bookingData: any;
@@ -21,6 +22,7 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
   onComplete
 }) => {
   const navigate = useNavigate();
+  const { toast } = useToast();  // Updated to use shadcn toast
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('standard');
   const [payLaterMethod, setPayLaterMethod] = useState('cash');
@@ -276,3 +278,4 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
     </div>
   );
 };
+
