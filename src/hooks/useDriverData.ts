@@ -60,12 +60,12 @@ export const useDriverData = () => {
 
       const enrichShipments = async (shipments: any[]): Promise<Shipment[]> => {
         const userFetches = shipments.map(async (shipment) => {
-          // Ensure metadata is properly typed as ShipmentMetadata
-          const metadata = shipment.metadata as unknown;
+          // Convert the JSON metadata to ShipmentMetadata with index signature
+          const metadata = shipment.metadata as unknown as ShipmentMetadata;
           
           const enrichedShipment: Shipment = { 
             ...shipment,
-            metadata: metadata as ShipmentMetadata
+            metadata
           };
           
           if (shipment.user_id) {
