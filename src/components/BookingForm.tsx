@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
+import { useNavigate, Link } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { InfoIcon, Loader2, PackageCheck, Truck, User, Users, Package, CreditCard } from 'lucide-react';
+import { InfoIcon, Loader2, PackageCheck, Truck, User, Users, Package, CreditCard, Plus, Trash } from 'lucide-react';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -21,6 +21,7 @@ import { getDateByRoute, getIrelandCities } from '@/data/collectionSchedule';
 import CollectionInfo from '@/components/CollectionInfo';
 
 const bookingFormSchema = z.object({
+  // Sender information
   firstName: z.string().min(2, { message: 'First name must be at least 2 characters' }),
   lastName: z.string().min(2, { message: 'Last name must be at least 2 characters' }),
   email: z.string().email({ message: 'Please enter a valid email address' }),
@@ -30,17 +31,29 @@ const bookingFormSchema = z.object({
   pickupCity: z.string().optional(),
   pickupPostcode: z.string().optional(),
   
+  // Recipient information
   recipientName: z.string().min(2, { message: 'Recipient name must be at least 2 characters' }),
   recipientPhone: z.string().min(10, { message: 'Please enter a valid phone number' }),
+  additionalPhone: z.string().optional(),
   deliveryAddress: z.string().min(5, { message: 'Please enter a valid address' }),
   deliveryCity: z.string().min(2, { message: 'Please enter a valid city' }),
+  deliveryAddresses: z.array(
+    z.object({
+      address: z.string().min(5, { message: 'Please enter a valid address' }),
+      city: z.string().min(2, { message: 'Please enter a valid city' }),
+    })
+  ).optional(),
   
+  // Shipment details
   shipmentType: z.enum(['drum', 'other']),
   drumQuantity: z.string().optional(),
+  needMetalSeals: z.boolean().default(false),
+  
   itemCategory: z.string().optional(),
   itemDescription: z.string().optional(),
   doorToDoor: z.boolean().default(false),
   
+  // Payment details
   paymentOption: z.enum(['standard', 'cashOnCollection', 'payOnArrival']),
   paymentMethod: z.enum(['card', 'paypal']).optional(),
   terms: z.boolean().refine(val => val === true, {
@@ -54,7 +67,42 @@ interface BookingFormProps {
   onSubmitComplete: (data: BookingFormValues, shipmentId: string, amount: number) => void;
 }
 
-const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
+const itemCategories = [
+  { value: 'furniture', label: 'Furniture', items: [
+    'Sofa', 'Chair', 'Dining Table and Chairs', 'Coffee Table', 'Bed', 'Mattress', 
+    'Dismantled Wardrobe', 'Chest of Drawers', 'Dressing Unit', 'Home Furniture', 'Office Furniture'
+  ]},
+  { value: 'appliances', label: 'Appliances', items: [
+    'Washing Machine', 'Dishwasher', 'Dryer', 'American Fridge', 'Standard Fridge', 
+    'Freezer', 'Deep Freezer', 'TV'
+  ]},
+  { value: 'outdoor', label: 'Outdoor/Garden', items: [
+    'Garden Tools', 'Lawn Mower', 'Trampoline', 'Ladder'
+  ]},
+  { value: 'mobility', label: 'Mobility Aids', items: [
+    'Wheelchair', 'Adult Walking Aid', 'Mobility Scooter', 'Kids Push Chair'
+  ]},
+  { value: 'automotive', label: 'Automotive', items: [
+    'Car Wheels/Tyres', 'Vehicle Parts', 'Engines'
+  ]},
+  { value: 'household', label: 'Household Items', items: [
+    'Bicycle', 'Bin', 'Plastic Tubs', 'Ironing Board', 'Rugs', 'Carpets', 'Internal Doors',
+    'External Doors', 'Wall Frame', 'Mirrors', 'Bathroom Equipment'
+  ]},
+  { value: 'equipment', label: 'Equipment', items: [
+    'Tool Box', 'Air Compressor', 'Generator', 'Solar Panel', 'Water Pump', 'Pool Pump',
+    'Heater', 'Air Conditioner'
+  ]},
+  { value: 'containers', label: 'Containers & Bags', items: [
+    'Boxes', 'Bags', 'Suitcase', 'Pallets', 'Amazon Bag', 'China Bags'
+  ]},
+  { value: 'construction', label: 'Construction', items: [
+    'Building Materials', 'Home Deco'
+  ]},
+  { value: 'other', label: 'Other', items: ['Other']}
+];
+
+const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPaymentMethods, setShowPaymentMethods] = useState(false);
   const [showPostcodeWarning, setShowPostcodeWarning] = useState(false);
@@ -64,7 +112,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const [currentTab, setCurrentTab] = useState<string>('sender');
   const [originalPrice, setOriginalPrice] = useState<number>(0);
   const [discountApplied, setDiscountApplied] = useState(false);
-  const [redirectToCustomQuote, setRedirectToCustomQuote] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [categoryItems, setCategoryItems] = useState<string[]>([]);
+  const [selectedItem, setSelectedItem] = useState<string>('');
+  const navigate = useNavigate();
   
   useEffect(() => {
     setIrelandCities(getIrelandCities());
@@ -83,13 +134,16 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       pickupCity: '',
       recipientName: '',
       recipientPhone: '',
+      additionalPhone: '',
       deliveryAddress: '',
       deliveryCity: '',
       shipmentType: 'drum',
       drumQuantity: '1',
+      needMetalSeals: false,
       itemCategory: '',
       itemDescription: '',
       doorToDoor: false,
+      deliveryAddresses: [],
       paymentOption: 'standard',
       paymentMethod: 'card',
       terms: false,
@@ -102,8 +156,19 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const watchPickupCountry = form.watch('pickupCountry');
   const watchPickupCity = form.watch('pickupCity');
   const watchDrumQuantity = form.watch('drumQuantity');
-  const watchItemCategory = form.watch('itemCategory');
-  const watchItemDescription = form.watch('itemDescription');
+  const watchNeedMetalSeals = form.watch('needMetalSeals');
+  const watchDoorToDoor = form.watch('doorToDoor');
+  const watchDeliveryAddresses = form.watch('deliveryAddresses') || [];
+
+  useEffect(() => {
+    if (selectedCategory) {
+      const category = itemCategories.find(cat => cat.value === selectedCategory);
+      setCategoryItems(category?.items || []);
+      setSelectedItem('');
+    } else {
+      setCategoryItems([]);
+    }
+  }, [selectedCategory]);
 
   const renderShipmentTypeOptions = () => {
     return (
@@ -119,7 +184,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             form.setValue('itemCategory', '');
             form.setValue('itemDescription', '');
           } else if (value === 'other') {
-            form.setValue('drumQuantity', '1'); 
+            form.setValue('drumQuantity', '1');
           }
         }}
         className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2"
@@ -137,7 +202,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         >
           <div className="flex items-center gap-2">
             <RadioGroupItem value="drum" id="drum" />
-            <FormLabel htmlFor="drum" className="cursor-pointer font-medium">Drum</FormLabel>
+            <FormLabel htmlFor="drum" className="cursor-pointer font-medium">Drum (Standard Size)</FormLabel>
           </div>
           <p className="text-sm text-gray-500 mt-2">Standard size drums (200L-220L) for goods</p>
         </div>
@@ -184,17 +249,6 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   }, [watchPaymentOption]);
 
   useEffect(() => {
-    if (watchShipmentType === 'other' && 
-        watchItemCategory && 
-        watchItemDescription && 
-        watchItemDescription.length > 5) {
-      setRedirectToCustomQuote(true);
-    } else {
-      setRedirectToCustomQuote(false);
-    }
-  }, [watchShipmentType, watchItemCategory, watchItemDescription]);
-
-  useEffect(() => {
     if (watchShipmentType === 'drum') {
       const quantity = parseInt(watchDrumQuantity || '1', 10);
       let basePrice;
@@ -234,11 +288,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     if (currentTab === 'sender') setCurrentTab('recipient');
     else if (currentTab === 'recipient') setCurrentTab('shipment');
     else if (currentTab === 'shipment') {
-      if (watchShipmentType === 'other') {
-        handleCustomQuoteRedirect();
-      } else {
-        setCurrentTab('payment');
-      }
+      setCurrentTab('payment');
     }
   };
 
@@ -248,12 +298,18 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     else if (currentTab === 'recipient') setCurrentTab('sender');
   };
 
-  const handleCustomQuoteRedirect = () => {
-    const data = form.getValues();
-    const trackingNumber = `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
-    const shipmentId = generateUniqueId('shp_');
-    
-    onSubmitComplete({...data, shipmentType: 'other'}, shipmentId, 0);
+  const addDeliveryAddress = () => {
+    const currentAddresses = form.getValues('deliveryAddresses') || [];
+    form.setValue('deliveryAddresses', [
+      ...currentAddresses,
+      { address: '', city: '' }
+    ]);
+  };
+
+  const removeDeliveryAddress = (index: number) => {
+    const currentAddresses = [...watchDeliveryAddresses];
+    currentAddresses.splice(index, 1);
+    form.setValue('deliveryAddresses', currentAddresses);
   };
 
   const onSubmit = async (data: BookingFormValues) => {
@@ -273,13 +329,43 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
           shipmentType: data.shipmentType,
           pickupCountry: data.pickupCountry,
           doorToDoor: data.doorToDoor,
-          amountPaid: price
-        }
+          amountPaid: price,
+          itemCategory: selectedCategory,
+          specificItem: selectedItem,
+        },
+        user_id: (await supabase.auth.getUser()).data.user?.id
       });
       
       if (error) {
         console.error('Error creating shipment:', error);
         throw error;
+      }
+      
+      // Store driver collection data in shipments table instead with a specific status
+      try {
+        // Create a shipping record for driver collection
+        await supabase.from('shipments').insert({
+          id: generateUniqueId(),
+          tracking_number: `DC-${trackingNumber}`,
+          origin: `${data.pickupAddress}, ${data.pickupCountry === 'England' ? data.pickupPostcode : data.pickupCity}`,
+          destination: `${data.deliveryAddress}, ${data.deliveryCity}`,
+          status: 'pending_collection',
+          metadata: {
+            shipment_id: shipmentId,
+            customer_name: `${data.firstName} ${data.lastName}`,
+            contact_number: data.phone,
+            shipment_type: data.shipmentType,
+            notes: data.shipmentType === 'drum' ? `${data.drumQuantity} drum(s)` : 'Custom item',
+            pickup_date: new Date().toISOString().split('T')[0],
+            collection_type: 'driver',
+          },
+          user_id: (await supabase.auth.getUser()).data.user?.id
+        }).then(null, err => {
+          // Log but don't throw to allow the booking to continue
+          console.error('Failed to create driver collection record:', err);
+        });
+      } catch (err) {
+        console.error('Failed to add to driver collections:', err);
       }
       
       onSubmitComplete(data, shipmentId, price);
@@ -297,8 +383,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       payment: ['paymentOption', 'terms']
     };
     
-    const tabKey = tab === 'paymentprocessor' ? 'payment' : tab;
-    const currentFields = fields[tabKey as keyof typeof fields];
+    const tabKey = tab as keyof typeof fields;
+    const currentFields = fields[tabKey];
     
     if (!currentFields) {
       console.warn(`No validation fields defined for tab: ${tab}`);
@@ -310,6 +396,18 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       return fieldValue !== undefined && fieldValue !== '';
     });
   };
+  
+  const calculateAdditionalCosts = () => {
+    const drumCount = parseInt(watchDrumQuantity || '1', 10);
+    const metalSealsCount = watchNeedMetalSeals ? drumCount : 0;
+    const metalSealsCost = metalSealsCount * 5;
+    const doorToDoorCost = watchDoorToDoor ? 25 * Math.max(1, watchDeliveryAddresses.length) : 0;
+    
+    return { metalSealsCost, doorToDoorCost };
+  };
+  
+  const { metalSealsCost, doorToDoorCost } = calculateAdditionalCosts();
+  const totalCost = price + metalSealsCost + doorToDoorCost;
 
   return (
     <Form {...form}>
@@ -343,7 +441,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
           </TabsList>
 
           <TabsContent value="sender">
-            <Card className="p-6">
+            <Card className="p-4 sm:p-6">
               <h3 className="text-lg font-semibold mb-4">Sender Information</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -533,7 +631,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
           </TabsContent>
 
           <TabsContent value="recipient">
-            <Card className="p-6">
+            <Card className="p-4 sm:p-6">
               <h3 className="text-lg font-semibold mb-4">Receiver Information</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -542,7 +640,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   name="recipientName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Receicer Name *</FormLabel>
+                      <FormLabel>Receiver Name *</FormLabel>
                       <FormControl>
                         <Input placeholder="Jane Smith" {...field} />
                       </FormControl>
@@ -556,7 +654,23 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   name="recipientPhone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Receicer Phone Number *</FormLabel>
+                      <FormLabel>Receiver Phone Number *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="+1 234 567 8900" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="mt-4">
+                <FormField
+                  control={form.control}
+                  name="additionalPhone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Additional Phone Number (Optional)</FormLabel>
                       <FormControl>
                         <Input placeholder="+1 234 567 8900" {...field} />
                       </FormControl>
@@ -596,6 +710,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                       <FormControl>
                         <Input placeholder="E.g. Harare" {...field} />
                       </FormControl>
+                      <FormDescription>
+                        We deliver in major towns and cities except rural areas.
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -623,7 +740,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
           </TabsContent>
 
           <TabsContent value="shipment">
-            <Card className="p-6">
+            <Card className="p-4 sm:p-6">
               <h3 className="text-lg font-semibold mb-4">Shipment Details</h3>
               
               <FormField
@@ -642,88 +759,145 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               />
               
               {watchShipmentType === 'drum' && (
-                <div className="mt-4">
-                  <FormField
-                    control={form.control}
-                    name="drumQuantity"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Number of Drums *</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            min="1" 
-                            max="1000" 
-                            step="1" 
-                            placeholder="Enter number of drums" 
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          <div className="text-sm text-gray-500 mt-1">
-                            <p className="font-medium">Drum pricing (per drum):</p>
-                            <ul className="list-disc pl-5 space-y-1 mt-1">
-                              <li>1 drum: £280 each</li>
-                              <li>2-4 drums: £260 each</li>
-                              <li>5+ drums: £240 each</li>
-                            </ul>
-                            <p className="mt-2 text-green-600 font-semibold">
-                              Special offer: £20 discount per drum when selecting "Cash on Collection" payment option!
-                            </p>
+                <>
+                  <div className="mt-4">
+                    <FormField
+                      control={form.control}
+                      name="drumQuantity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Number of Drums *</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min="1" 
+                              max="1000" 
+                              step="1" 
+                              placeholder="Enter number of drums" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            <div className="text-sm text-gray-500 mt-1">
+                              <p className="font-medium">Drum pricing (per drum):</p>
+                              <ul className="list-disc pl-5 space-y-1 mt-1">
+                                <li>1 drum: £280 each</li>
+                                <li>2-4 drums: £260 each</li>
+                                <li>5+ drums: £240 each</li>
+                              </ul>
+                              <p className="mt-2 text-green-600 font-semibold">
+                                Special offer: £20 discount per drum when selecting "Cash on Collection" payment option!
+                              </p>
+                            </div>
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <div className="mt-4">
+                    <FormField
+                      control={form.control}
+                      name="needMetalSeals"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>
+                              Metal Seals (£5 per drum)
+                            </FormLabel>
+                            <FormDescription>
+                              Add metal seals for security (one seal per drum)
+                            </FormDescription>
                           </div>
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </>
               )}
               
               {watchShipmentType === 'other' && (
                 <div className="space-y-4 mt-4">
-                  <FormField
-                    control={form.control}
-                    name="itemCategory"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Item Category *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select category" />
-                            </SelectTrigger>
-                          </FormControl>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Item Category *
+                      </label>
+                      <Select 
+                        onValueChange={(value) => {
+                          setSelectedCategory(value);
+                          form.setValue('itemCategory', value);
+                        }}
+                        value={selectedCategory}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {itemCategories.map(cat => (
+                            <SelectItem key={cat.value} value={cat.value}>
+                              {cat.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {selectedCategory && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Specific Item *
+                        </label>
+                        <Select 
+                          onValueChange={(value) => {
+                            setSelectedItem(value);
+                            form.setValue('itemDescription', value);
+                          }}
+                          value={selectedItem}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select item" />
+                          </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="electronics">Electronics</SelectItem>
-                            <SelectItem value="clothing">Clothing</SelectItem>
-                            <SelectItem value="documents">Documents</SelectItem>
-                            <SelectItem value="food">Food Items</SelectItem>
-                            <SelectItem value="household">Household Goods</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
+                            {categoryItems.map(item => (
+                              <SelectItem key={item} value={item}>
+                                {item}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
-                        <FormMessage />
-                      </FormItem>
+                      </div>
                     )}
-                  />
+                  </div>
                   
-                  <FormField
-                    control={form.control}
-                    name="itemDescription"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Item Description *</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Describe your item in detail"
-                            className="resize-none"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {selectedItem === 'Other' && (
+                    <div>
+                      <FormField
+                        control={form.control}
+                        name="itemDescription"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Item Description *</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                placeholder="Describe your item in detail"
+                                className="resize-none"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
               
@@ -736,15 +910,20 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                       <FormControl>
                         <Checkbox
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onCheckedChange={(checked) => {
+                            field.onChange(checked);
+                            if (!checked) {
+                              form.setValue('deliveryAddresses', []);
+                            }
+                          }}
                         />
                       </FormControl>
                       <div className="space-y-1 leading-none">
                         <FormLabel>
-                          Door-to-Door Delivery (add £25)
+                          Door-to-Door Delivery (£25 per address)
                         </FormLabel>
                         <FormDescription>
-                          Add this option for direct delivery to the recipient's doorstep
+                          Add this option for direct delivery to multiple recipient addresses
                         </FormDescription>
                       </div>
                     </FormItem>
@@ -752,10 +931,78 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 />
               </div>
               
+              {watchDoorToDoor && (
+                <div className="mt-4 border p-4 rounded-md">
+                  <h4 className="font-medium mb-2">Additional Delivery Addresses</h4>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Add additional delivery addresses (£25 charge per address)
+                  </p>
+                  
+                  {watchDeliveryAddresses.map((address, index) => (
+                    <div key={index} className="mb-4 p-3 border rounded-md relative">
+                      <button
+                        type="button"
+                        onClick={() => removeDeliveryAddress(index)}
+                        className="absolute top-2 right-2 text-gray-500 hover:text-red-500"
+                      >
+                        <Trash className="h-4 w-4" />
+                      </button>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Address {index + 1} *
+                          </label>
+                          <Input
+                            placeholder="Enter address"
+                            value={address.address}
+                            onChange={(e) => {
+                              const updatedAddresses = [...watchDeliveryAddresses];
+                              updatedAddresses[index] = {
+                                ...updatedAddresses[index],
+                                address: e.target.value,
+                              };
+                              form.setValue('deliveryAddresses', updatedAddresses);
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            City *
+                          </label>
+                          <Input
+                            placeholder="Enter city"
+                            value={address.city}
+                            onChange={(e) => {
+                              const updatedAddresses = [...watchDeliveryAddresses];
+                              updatedAddresses[index] = {
+                                ...updatedAddresses[index],
+                                city: e.target.value,
+                              };
+                              form.setValue('deliveryAddresses', updatedAddresses);
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addDeliveryAddress}
+                    className="w-full mt-2"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Another Address
+                  </Button>
+                </div>
+              )}
+              
               {watchShipmentType === 'drum' && (
                 <div className="mt-6 border-t pt-4">
                   <div className="flex justify-between items-center">
-                    <span className="font-semibold">Estimated Shipping Cost:</span>
+                    <span className="font-semibold">Base Shipping Cost:</span>
                     {discountApplied ? (
                       <div className="text-right">
                         <span className="text-xl font-bold">£{price}</span>
@@ -765,16 +1012,23 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                       <span className="text-xl font-bold">£{price}</span>
                     )}
                   </div>
+                  
                   <div className="text-sm text-gray-500 mt-1">
-                    <p>Additional mandatory costs:</p>
+                    <p>Additional costs:</p>
                     <ul className="list-disc pl-5">
-                      <li>Metal seal: £5</li>
-                      {form.getValues('doorToDoor') && (
-                        <li>Door-to-door delivery: £25</li>
+                      {watchNeedMetalSeals && (
+                        <li>Metal seal{parseInt(watchDrumQuantity || '1') > 1 ? 's' : ''} (£5 x {watchDrumQuantity || 1}): 
+                          £{metalSealsCost}
+                        </li>
+                      )}
+                      {watchDoorToDoor && (
+                        <li>Door-to-door delivery ({Math.max(watchDeliveryAddresses.length, 1)} address{watchDeliveryAddresses.length !== 1 ? 'es' : ''}): 
+                          £{doorToDoorCost}
+                        </li>
                       )}
                     </ul>
-                    <p className="font-medium mt-2">
-                      Total: £{price + 5 + (form.getValues('doorToDoor') ? 25 : 0)}
+                    <p className="font-medium mt-2 text-base">
+                      Total: £{totalCost}
                     </p>
                   </div>
                 </div>
@@ -791,17 +1045,17 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 <Button 
                   type="button" 
                   onClick={goToNextTab}
-                  disabled={!validateTab('shipment')}
+                  disabled={!validateTab('shipment') || (watchShipmentType === 'other' && (!selectedCategory || !selectedItem))}
                   className="bg-zim-green hover:bg-zim-green/90"
                 >
-                  {watchShipmentType === 'other' ? 'Request Custom Quote' : 'Next: Payment'}
+                  Next: Payment
                 </Button>
               </div>
             </Card>
           </TabsContent>
 
           <TabsContent value="payment">
-            <Card className="p-6">
+            <Card className="p-4 sm:p-6">
               <h3 className="text-lg font-semibold mb-4">Payment Method</h3>
               
               <FormField
@@ -813,7 +1067,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                       <RadioGroup
                         onValueChange={field.onChange}
                         defaultValue={field.value}
-                        className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2"
+                        className="grid grid-cols-1 gap-4 mt-2"
                       >
                         <div className={`border rounded-lg p-4 cursor-pointer transition-all ${field.value === 'standard' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
                           <div className="flex items-center gap-2">
@@ -821,8 +1075,23 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                             <FormLabel htmlFor="standard" className="cursor-pointer font-medium">Standard Payment</FormLabel>
                           </div>
                           <p className="text-sm text-gray-500 mt-2">Make a payment instantly, within 30 days, pay when goods arrive or pay at collection</p>
-                        </div>                        
+                        </div>
                         
+                        <div className={`border rounded-lg p-4 cursor-pointer transition-all ${field.value === 'cashOnCollection' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                          <div className="flex items-center gap-2">
+                            <RadioGroupItem value="cashOnCollection" id="cashOnCollection" />
+                            <FormLabel htmlFor="cashOnCollection" className="cursor-pointer font-medium">Cash on Collection</FormLabel>
+                          </div>
+                          <p className="text-sm text-gray-500 mt-2">Pay with cash when your items are collected (£20 discount per drum)</p>
+                        </div>
+                        
+                        <div className={`border rounded-lg p-4 cursor-pointer transition-all ${field.value === 'payOnArrival' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                          <div className="flex items-center gap-2">
+                            <RadioGroupItem value="payOnArrival" id="payOnArrival" />
+                            <FormLabel htmlFor="payOnArrival" className="cursor-pointer font-medium">Pay on Arrival</FormLabel>
+                          </div>
+                          <p className="text-sm text-gray-500 mt-2">Pay when your items arrive at their destination</p>
+                        </div>
                       </RadioGroup>
                     </FormControl>
                     <FormMessage />
@@ -844,10 +1113,10 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                       </FormControl>
                       <div className="space-y-1 leading-none">
                         <FormLabel>
-                          I agree to the <a href="#" className="text-zim-green hover:underline">terms and conditions</a> *
+                          I agree to the <Link to="/terms-and-conditions" className="text-zim-green hover:underline" target="_blank" rel="noopener noreferrer">terms and conditions</Link> *
                         </FormLabel>
                         <FormDescription>
-                          By checking this box, you agree to our terms of service and privacy policy.
+                          By checking this box, you agree to our <Link to="/terms-and-conditions" className="text-zim-green hover:underline" target="_blank" rel="noopener noreferrer">terms of service</Link> and <Link to="/privacy-policy" className="text-zim-green hover:underline" target="_blank" rel="noopener noreferrer">privacy policy</Link>.
                         </FormDescription>
                       </div>
                       <FormMessage />
@@ -868,12 +1137,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   type="submit"
                   disabled={isSubmitting || !validateTab('payment')}
                   className="bg-zim-green hover:bg-zim-green/90 w-full md:w-auto"
-                  onClick={(e) => {
-                    e.preventDefault(); // Prevent form submission (if any)
-                    // Redirect to payment processor page
-                    router.push('paymentprocessor'); // Replace with the actual payment page route
-                  }}
-                  >
+                >
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
