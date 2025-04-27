@@ -908,10 +908,10 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                           </FormControl>
                           <div className="space-y-1 leading-none">
                             <FormLabel>
-                              Add Metal Seal (£5 per drum)
+                              Add Metal coded Seal (£5 per drum)
                             </FormLabel>
                             <FormDescription>
-                              Metal seals provide extra security for your shipment
+                              Metal coded seals provide extra security for your shipment
                             </FormDescription>
                           </div>
                         </FormItem>
