@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import {
@@ -10,7 +10,10 @@ import {
   CalculatorIcon,
   HeartIcon,
 } from 'lucide-react';
-import HeroImage from '@/assets/hero.webp';
+// Replace the local import with a public URL image
+// Instead of: import HeroImage from '@/assets/hero.webp';
+const HeroImage = 'https://images.unsplash.com/photo-1617239180008-6948ac2c7309?q=80&w=1920&auto=format&fit=crop';
+
 import WhatsAppButton from '@/components/WhatsAppButton';
 import AnnouncementsFeed from '@/components/AnnouncementsFeed';
 import PersonalizedTestimonials from '@/components/PersonalizedTestimonials';
@@ -18,9 +21,9 @@ import QuickShippingCalculator from '@/components/QuickShippingCalculator';
 import ShippingNewsTicker from '@/components/ShippingNewsTicker';
 
 const Home = () => {
-  const [isVisible, setIsVisible] = React.useState(false);
+  const [isVisible, setIsVisible] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     // Simple fade-in animation on component mount
     const timer = setTimeout(() => {
       setIsVisible(true);
