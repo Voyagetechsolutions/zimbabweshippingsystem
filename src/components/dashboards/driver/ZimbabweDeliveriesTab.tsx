@@ -5,10 +5,10 @@ import { Shipment } from '@/types/shipment';
 import DeliveryCard from './DeliveryCard';
 import EmptyState from './EmptyState';
 
-export interface ZimbabweDeliveriesTabProps {
+interface ZimbabweDeliveriesTabProps {
   loading: boolean;
-  inTransitDeliveries: any[];
-  onStatusUpdate: (id: string, newStatus: string) => Promise<void>;
+  inTransitDeliveries: Shipment[];
+  onStatusUpdate: (id: string, newStatus: string) => void;
   onUploadImage: (id: string) => void;
 }
 
@@ -16,7 +16,7 @@ const ZimbabweDeliveriesTab: React.FC<ZimbabweDeliveriesTabProps> = ({
   loading,
   inTransitDeliveries,
   onStatusUpdate,
-  onUploadImage = () => {}
+  onUploadImage
 }) => {
   return (
     <div className="space-y-4">

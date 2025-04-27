@@ -6,7 +6,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Json } from '@/integrations/supabase/types';
 
 import { useDriverData } from '@/hooks/useDriverData';
 import StatsCards from './driver/StatsCards';
@@ -14,7 +13,6 @@ import ImageUploadDialog from './driver/ImageUploadDialog';
 import UKCollectionsTab from './driver/UKCollectionsTab';
 import ZimbabweDeliveriesTab from './driver/ZimbabweDeliveriesTab';
 import SchedulesTab from './driver/SchedulesTab';
-import { ShipmentMetadata } from '@/types/shipment';
 
 const DriverDashboard = () => {
   const [showImageUpload, setShowImageUpload] = useState(false);
@@ -57,8 +55,8 @@ const DriverDashboard = () => {
     }
   };
 
-  const openImageUploadModal = (id: string) => {
-    setCurrentShipmentId(id);
+  const openImageUploadModal = (shipmentId: string) => {
+    setCurrentShipmentId(shipmentId);
     setShowImageUpload(true);
     setImageFile(null);
     setImagePreview(null);
@@ -99,19 +97,10 @@ const DriverDashboard = () => {
         .from('images')
         .getPublicUrl(`deliveries/${fileName}`);
 
-      const shipment = pendingCollections.find(s => s.id === currentShipmentId);
-      const currentMetadata = shipment?.metadata || {};
-      
-      // Create updated metadata with the new delivery_image property
-      const updatedMetadata: ShipmentMetadata = {
-        ...currentMetadata,
-        delivery_image: urlData.publicUrl
-      };
-      
       const { error: updateError } = await supabase
         .from('shipments')
         .update({
-          metadata: updatedMetadata,
+          metadata: { delivery_image: urlData.publicUrl },
           status: 'Delivered'
         })
         .eq('id', currentShipmentId);

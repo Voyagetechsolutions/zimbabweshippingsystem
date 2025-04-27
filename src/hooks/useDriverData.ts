@@ -2,8 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Shipment, ShipmentMetadata } from '@/types/shipment';
-import { Json } from '@/integrations/supabase/types';
+import { Shipment } from '@/types/shipment';
 
 export const useDriverData = () => {
   const [activeDeliveries, setActiveDeliveries] = useState<Shipment[]>([]);
@@ -58,25 +57,17 @@ export const useDriverData = () => {
       if (completedDeliveriesRes.error) throw completedDeliveriesRes.error;
       if (scheduleRes.error) throw scheduleRes.error;
 
-      const enrichShipments = async (shipments: any[]): Promise<Shipment[]> => {
+      const enrichShipments = async (shipments: Shipment[]) => {
         const userFetches = shipments.map(async (shipment) => {
-          // Convert the JSON metadata to ShipmentMetadata with index signature
-          const metadata = shipment.metadata as unknown as ShipmentMetadata;
-          
-          const enrichedShipment: Shipment = { 
-            ...shipment,
-            metadata
-          };
-          
           if (shipment.user_id) {
             const { data: userData } = await supabase
               .from('profiles')
-              .select('id, email, full_name')
+              .select('email, full_name')
               .eq('id', shipment.user_id)
               .single();
-            if (userData) enrichedShipment.profiles = userData;
+            if (userData) shipment.profiles = userData;
           }
-          return enrichedShipment;
+          return shipment;
         });
         return await Promise.all(userFetches);
       };

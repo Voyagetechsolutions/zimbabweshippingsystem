@@ -79,7 +79,7 @@ const LogisticsDashboard = () => {
             if (shipment.user_id) {
               const { data: userData, error: userError } = await supabase
                 .from('profiles')
-                .select('id, email, full_name')
+                .select('email, full_name')
                 .eq('id', shipment.user_id)
                 .single();
                 

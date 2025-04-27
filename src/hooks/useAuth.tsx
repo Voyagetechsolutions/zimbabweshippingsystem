@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -54,7 +53,7 @@ export const useAuth = () => {
       });
 
       return data;
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error:', error);
       toast({
         title: 'Error',
@@ -74,9 +73,9 @@ export const useAuth = () => {
       toast({
         title: 'Logged Out',
         description: 'You have been logged out successfully.',
-        variant: 'default',
+        variant: 'success',
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error:', error);
       toast({
         title: 'Error',

@@ -6,22 +6,22 @@ import { Shipment } from '@/types/shipment';
 import DeliveryCard from './DeliveryCard';
 import EmptyState from './EmptyState';
 
-export interface UKCollectionsTabProps {
+interface UKCollectionsTabProps {
   loading: boolean;
-  pendingCollections: any[];
-  onStatusUpdate: (id: string, newStatus: string) => Promise<void>;
   isRefreshing: boolean;
+  pendingCollections: Shipment[];
   onRefresh: () => void;
+  onStatusUpdate: (id: string, newStatus: string) => void;
   onUploadImage: (id: string) => void;
 }
 
 const UKCollectionsTab: React.FC<UKCollectionsTabProps> = ({
   loading,
+  isRefreshing,
   pendingCollections,
+  onRefresh,
   onStatusUpdate,
-  isRefreshing = false,
-  onRefresh = () => {},
-  onUploadImage = () => {}
+  onUploadImage
 }) => {
   return (
     <div className="space-y-4">

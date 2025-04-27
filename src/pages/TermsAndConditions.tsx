@@ -1,13 +1,9 @@
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
 const TermsAndConditions = () => {
-  useEffect(() => {
-    document.title = 'Terms and Conditions | Zimbabwe Shipping';
-  }, []);
-  
   return (
     <>
       <Navbar />
@@ -43,37 +39,6 @@ const TermsAndConditions = () => {
           <p className="mb-4">
             Certain items are prohibited from shipping. Please refer to our prohibited items list
             before shipping.
-          </p>
-          
-          <h2 className="text-xl font-semibold mt-6 mb-4">6. Liability</h2>
-          <p className="mb-4">
-            Zimbabwe Shipping shall not be liable for any loss, damage, delay, or failure to perform caused by 
-            events beyond our reasonable control including but not limited to acts of government, natural disasters, 
-            and civil unrest.
-          </p>
-          
-          <h2 className="text-xl font-semibold mt-6 mb-4">7. Insurance</h2>
-          <p className="mb-4">
-            We recommend that customers obtain appropriate insurance coverage for their shipments. 
-            Zimbabwe Shipping offers limited liability coverage as specified in our shipping agreement.
-          </p>
-          
-          <h2 className="text-xl font-semibold mt-6 mb-4">8. Claims</h2>
-          <p className="mb-4">
-            All claims for damaged or lost shipments must be submitted within 7 days of the delivery date. 
-            Claims must include supporting documentation including photos of damaged items.
-          </p>
-          
-          <h2 className="text-xl font-semibold mt-6 mb-4">9. Changes to Terms</h2>
-          <p className="mb-4">
-            Zimbabwe Shipping reserves the right to modify these terms and conditions at any time. 
-            Continued use of our services following such changes constitutes acceptance of the new terms.
-          </p>
-          
-          <h2 className="text-xl font-semibold mt-6 mb-4">10. Contact Information</h2>
-          <p className="mb-4">
-            For questions regarding these terms and conditions, please contact our customer service team at the 
-            provided contact information on our website.
           </p>
         </div>
       </main>

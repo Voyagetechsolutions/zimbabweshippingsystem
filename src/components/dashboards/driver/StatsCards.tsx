@@ -1,55 +1,61 @@
 
 import React from 'react';
-import { 
-  Package, 
-  Truck, 
-  CheckCircle2 
-} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Package, Truck, CheckCircle2 } from 'lucide-react';
 
-export interface StatsCardsProps {
+interface StatsCardsProps {
   pendingCount: number;
   inTransitCount: number;
   completedCount: number;
-  isMobile?: boolean;
+  isMobile: boolean;
 }
 
-const StatsCards: React.FC<StatsCardsProps> = ({ 
-  pendingCount, 
-  inTransitCount, 
+const StatsCards: React.FC<StatsCardsProps> = ({
+  pendingCount,
+  inTransitCount,
   completedCount,
-  isMobile = false
+  isMobile
 }) => {
   return (
-    <div className={`grid ${isMobile ? 'grid-cols-1 gap-2' : 'grid-cols-3 gap-4'}`}>
-      <div className="bg-white p-3 rounded-lg border border-gray-200 flex items-center">
-        <div className="bg-blue-100 p-2 rounded-md mr-3">
-          <Package className="h-5 w-5 text-blue-500" />
-        </div>
-        <div>
-          <p className="text-sm text-gray-500">Pending Collections</p>
-          <p className="text-lg font-semibold">{pendingCount}</p>
-        </div>
-      </div>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <Card>
+        <CardHeader className={`flex flex-row items-center justify-between pb-2 ${isMobile ? 'space-y-0' : ''}`}>
+          <CardTitle className="text-sm font-medium text-gray-500">
+            Pending Collections
+          </CardTitle>
+          <Package className="h-4 w-4 text-yellow-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{pendingCount}</div>
+          <p className="text-xs text-gray-500">Packages to collect</p>
+        </CardContent>
+      </Card>
       
-      <div className="bg-white p-3 rounded-lg border border-gray-200 flex items-center">
-        <div className="bg-amber-100 p-2 rounded-md mr-3">
-          <Truck className="h-5 w-5 text-amber-500" />
-        </div>
-        <div>
-          <p className="text-sm text-gray-500">In Transit</p>
-          <p className="text-lg font-semibold">{inTransitCount}</p>
-        </div>
-      </div>
+      <Card>
+        <CardHeader className={`flex flex-row items-center justify-between pb-2 ${isMobile ? 'space-y-0' : ''}`}>
+          <CardTitle className="text-sm font-medium text-gray-500">
+            In Transit
+          </CardTitle>
+          <Truck className="h-4 w-4 text-blue-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{inTransitCount}</div>
+          <p className="text-xs text-gray-500">Packages in transit</p>
+        </CardContent>
+      </Card>
       
-      <div className="bg-white p-3 rounded-lg border border-gray-200 flex items-center">
-        <div className="bg-green-100 p-2 rounded-md mr-3">
-          <CheckCircle2 className="h-5 w-5 text-green-500" />
-        </div>
-        <div>
-          <p className="text-sm text-gray-500">Completed</p>
-          <p className="text-lg font-semibold">{completedCount}</p>
-        </div>
-      </div>
+      <Card>
+        <CardHeader className={`flex flex-row items-center justify-between pb-2 ${isMobile ? 'space-y-0' : ''}`}>
+          <CardTitle className="text-sm font-medium text-gray-500">
+            Completed
+          </CardTitle>
+          <CheckCircle2 className="h-4 w-4 text-green-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{completedCount}</div>
+          <p className="text-xs text-gray-500">Recently delivered</p>
+        </CardContent>
+      </Card>
     </div>
   );
 };
