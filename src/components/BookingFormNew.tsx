@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -879,3 +880,301 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                           </FormControl>
                           <FormDescription>
                             <div className="text-sm text-gray-500 mt-1">
+                              <div className="font-medium">Pricing Per Drum:</div>
+                              <ul className="list-disc pl-5 mt-1">
+                                <li>1 Drum: £280 each</li>
+                                <li>2-4 Drums: £260 each</li>
+                                <li>5+ Drums: £240 each</li>
+                              </ul>
+                            </div>
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <div className="mt-4">
+                    <FormField
+                      control={form.control}
+                      name="wantMetalSeal"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>
+                              Add Metal Seal (£5 per drum)
+                            </FormLabel>
+                            <FormDescription>
+                              Metal seals provide extra security for your shipment
+                            </FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <div className="mt-4">
+                    <FormField
+                      control={form.control}
+                      name="doorToDoor"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>
+                              Door-to-Door Delivery (£25 per address)
+                            </FormLabel>
+                            <FormDescription>
+                              We'll deliver directly to the recipient's door
+                            </FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  {watchDoorToDoor && (
+                    <>
+                      <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                        <h4 className="font-medium mb-2">Additional Delivery Addresses</h4>
+                        <p className="text-sm text-gray-500 mb-4">
+                          Each additional address incurs a £25 delivery fee
+                        </p>
+                        
+                        {additionalAddresses.map((address, index) => (
+                          <div key={index} className="mb-4 p-4 border rounded-md">
+                            <div className="flex justify-between items-center mb-2">
+                              <h5 className="font-medium">Address #{index + 1}</h5>
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => removeDeliveryAddress(index)}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            
+                            <div className="space-y-3">
+                              <div>
+                                <label className="text-sm font-medium block mb-1">Recipient Name</label>
+                                <Input
+                                  value={address.recipientName}
+                                  onChange={(e) => updateDeliveryAddress(index, 'recipientName', e.target.value)}
+                                  placeholder="Recipient Name"
+                                />
+                              </div>
+                              
+                              <div>
+                                <label className="text-sm font-medium block mb-1">Recipient Phone Number</label>
+                                <Input
+                                  value={address.recipientPhone}
+                                  onChange={(e) => updateDeliveryAddress(index, 'recipientPhone', e.target.value)}
+                                  placeholder="Phone Number"
+                                />
+                              </div>
+                              
+                              <div>
+                                <label className="text-sm font-medium block mb-1">Delivery Address</label>
+                                <Textarea
+                                  value={address.address}
+                                  onChange={(e) => updateDeliveryAddress(index, 'address', e.target.value)}
+                                  placeholder="Full Address"
+                                  className="resize-none"
+                                />
+                              </div>
+                              
+                              <div>
+                                <label className="text-sm font-medium block mb-1">City</label>
+                                <Input
+                                  value={address.city}
+                                  onChange={(e) => updateDeliveryAddress(index, 'city', e.target.value)}
+                                  placeholder="City"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={addNewDeliveryAddress}
+                          className="w-full mt-2"
+                        >
+                          <Plus className="h-4 w-4 mr-2" /> Add Another Address
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+              
+              {watchShipmentType === 'other' && (
+                <>
+                  <div className="mt-4">
+                    <FormField
+                      control={form.control}
+                      name="itemCategory"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Item Category *</FormLabel>
+                          <Select 
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              setSelectedCategory(value);
+                              form.setValue('specificItem', '');
+                            }} 
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select category" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {Object.keys(itemCategories).map((category) => (
+                                <SelectItem key={category} value={category}>
+                                  {category.charAt(0).toUpperCase() + category.slice(1)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  {selectedCategory && (
+                    <div className="mt-4">
+                      <FormField
+                        control={form.control}
+                        name="specificItem"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Specific Item *</FormLabel>
+                            <Select 
+                              onValueChange={field.onChange} 
+                              value={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select item" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {selectedCategory && itemCategories[selectedCategory as keyof typeof itemCategories].map((item) => (
+                                  <SelectItem key={item} value={item}>
+                                    {item}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  )}
+                  
+                  {watchSpecificItem === 'Other Item' && (
+                    <div className="mt-4">
+                      <FormField
+                        control={form.control}
+                        name="otherItemDescription"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Item Description *</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                placeholder="Please provide a detailed description of your item"
+                                className="resize-none"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Include dimensions, weight, and any other relevant details
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+              
+              <div className="mt-6 pt-6 border-t flex justify-between">
+                <div>
+                  <h4 className="font-medium">Estimated Cost</h4>
+                  <div className="text-2xl font-bold mt-2 text-zim-green">
+                    £{(price + sealCost + doorToDoorCost).toFixed(2)}
+                  </div>
+                  {discountApplied && (
+                    <div className="mt-1 text-sm text-green-600">
+                      Includes £{(originalPrice - price).toFixed(2)} savings!
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-end gap-3">
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={goToPreviousTab}
+                  >
+                    Back
+                  </Button>
+                  <Button 
+                    type="button" 
+                    onClick={goToNextTab}
+                    className="bg-zim-green hover:bg-zim-green/90"
+                  >
+                    Next: Payment
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="payment">
+            <PaymentMethodSection
+              bookingData={{
+                shipmentDetails: {
+                  type: watchShipmentType,
+                  quantity: parseInt(watchDrumQuantity || '1'),
+                  services: [
+                    ...(watchWantMetalSeal ? [{
+                      name: `Metal Seal${parseInt(watchDrumQuantity || '1') > 1 ? 's' : ''} (${parseInt(watchDrumQuantity || '1')} x £5)`,
+                      price: sealCost
+                    }] : []),
+                    ...(watchDoorToDoor ? [{
+                      name: `Door to Door Delivery (${1 + additionalAddresses.length} address${(1 + additionalAddresses.length) > 1 ? 'es' : ''})`,
+                      price: doorToDoorCost
+                    }] : [])
+                  ],
+                }
+              }}
+              totalAmount={price + sealCost + doorToDoorCost}
+              onCancel={goToPreviousTab}
+              onComplete={handlePaymentComplete}
+            />
+          </TabsContent>
+        </Tabs>
+      </form>
+    </Form>
+  );
+};
+
+export default BookingFormNew;
