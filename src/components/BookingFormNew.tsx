@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
@@ -342,20 +341,32 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         throw error;
       }
       
-      // Add record to driver dashboard collections
-      await supabase.from('driver_collections').insert({
-        shipment_id: shipmentId,
-        origin_address: `${data.pickupAddress}, ${data.pickupCountry === 'England' ? data.pickupPostcode : data.pickupCity}`,
-        pickup_date: new Date().toISOString().split('T')[0],
-        customer_name: `${data.firstName} ${data.lastName}`,
-        status: 'pending',
-        contact_number: data.phone,
-        shipment_type: data.shipmentType,
-        notes: data.shipmentType === 'drum' ? `${data.drumQuantity} drum(s)` : 'Custom item'
-      }).catch(err => {
-        // Don't throw error, just log it
+      // Store driver collection data in shipments table instead with a specific status
+      try {
+        // Create a shipping record for driver collection
+        await supabase.from('shipments').insert({
+          id: generateUniqueId(),
+          tracking_number: `DC-${trackingNumber}`,
+          origin: `${data.pickupAddress}, ${data.pickupCountry === 'England' ? data.pickupPostcode : data.pickupCity}`,
+          destination: `${data.deliveryAddress}, ${data.deliveryCity}`,
+          status: 'pending_collection',
+          metadata: {
+            shipment_id: shipmentId,
+            customer_name: `${data.firstName} ${data.lastName}`,
+            contact_number: data.phone,
+            shipment_type: data.shipmentType,
+            notes: data.shipmentType === 'drum' ? `${data.drumQuantity} drum(s)` : 'Custom item',
+            pickup_date: new Date().toISOString().split('T')[0],
+            collection_type: 'driver',
+          },
+          user_id: (await supabase.auth.getUser()).data.user?.id
+        }).catch(err => {
+          // Log but don't throw to allow the booking to continue
+          console.error('Failed to create driver collection record:', err);
+        });
+      } catch (err) {
         console.error('Failed to add to driver collections:', err);
-      });
+      }
       
       onSubmitComplete(data, shipmentId, price);
     } catch (error) {
@@ -386,7 +397,6 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     });
   };
   
-  // Calculate additional costs
   const calculateAdditionalCosts = () => {
     const drumCount = parseInt(watchDrumQuantity || '1', 10);
     const metalSealsCount = watchNeedMetalSeals ? drumCount : 0;

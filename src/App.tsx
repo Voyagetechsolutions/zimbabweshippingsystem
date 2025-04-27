@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
@@ -30,7 +31,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import GalleryAdmin from './pages/GalleryAdmin';
 import TaskManagement from './pages/TaskManagement';
 import NotFound from './pages/NotFound';
-import RouteGuard from './components/RouteGuard';
+import { RouteGuard } from './components/RouteGuard';
 import { Toaster } from '@/components/ui/toaster';
 import WhatsAppButton from './components/WhatsAppButton';
 
