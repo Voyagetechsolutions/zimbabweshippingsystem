@@ -1,11 +1,10 @@
-
 import React from 'react';
 import { Truck } from 'lucide-react';
 import { Shipment } from '@/types/shipment';
 import DeliveryCard from './DeliveryCard';
 import EmptyState from './EmptyState';
 
-interface ZimbabweDeliveriesTabProps {
+export interface ZimbabweDeliveriesTabProps {
   loading: boolean;
   inTransitDeliveries: Shipment[];
   onStatusUpdate: (id: string, newStatus: string) => void;

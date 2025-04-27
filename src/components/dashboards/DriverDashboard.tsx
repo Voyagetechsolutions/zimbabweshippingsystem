@@ -78,6 +78,9 @@ const DriverDashboard = () => {
   const handleCloseImageUpload = () => {
     setShowImageUpload(false);
     setImageFile(null);
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+    }
     setImagePreview(null);
   };
 
@@ -97,6 +100,7 @@ const DriverDashboard = () => {
         .from('images')
         .getPublicUrl(`deliveries/${fileName}`);
 
+      // Update shipment with metadata containing the delivery_image URL
       const { error: updateError } = await supabase
         .from('shipments')
         .update({

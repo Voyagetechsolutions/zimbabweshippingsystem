@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
+import { useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -55,6 +55,7 @@ interface BookingFormProps {
 }
 
 const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
+  const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPaymentMethods, setShowPaymentMethods] = useState(false);
   const [showPostcodeWarning, setShowPostcodeWarning] = useState(false);
@@ -309,6 +310,11 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       const fieldValue = form.getValues(field as any);
       return fieldValue !== undefined && fieldValue !== '';
     });
+  };
+
+  const handleCompleteBooking = (e: React.MouseEvent) => {
+    e.preventDefault();
+    navigate('/paymentprocessor');
   };
 
   return (
@@ -868,12 +874,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                   type="submit"
                   disabled={isSubmitting || !validateTab('payment')}
                   className="bg-zim-green hover:bg-zim-green/90 w-full md:w-auto"
-                  onClick={(e) => {
-                    e.preventDefault(); // Prevent form submission (if any)
-                    // Redirect to payment processor page
-                    router.push('paymentprocessor'); // Replace with the actual payment page route
-                  }}
-                  >
+                  onClick={handleCompleteBooking}
+                >
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />

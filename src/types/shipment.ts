@@ -6,6 +6,16 @@ export interface ShipmentProfile {
   full_name?: string;
 }
 
+// Interface to properly type the metadata field
+export interface ShipmentMetadata {
+  [key: string]: any; // Add index signature to allow for dynamic properties like 'delivery_image'
+  // Add specific properties that we know will exist
+  doorToDoor?: boolean;
+  amountPaid?: number;
+  pickupCountry?: string;
+  shipmentType?: string;
+}
+
 export interface Shipment {
   id: string;
   tracking_number: string;
@@ -20,7 +30,7 @@ export interface Shipment {
   carrier?: string;
   dimensions?: string;
   estimated_delivery?: string;
-  metadata?: Json;
+  metadata?: ShipmentMetadata | Json;
   weight?: number;
   // Add the profiles property that we attach after fetching
   profiles?: ShipmentProfile;

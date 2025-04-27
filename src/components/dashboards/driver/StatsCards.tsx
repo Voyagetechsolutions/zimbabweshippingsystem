@@ -8,13 +8,21 @@ interface StatsCardsProps {
   inTransitCount: number;
   completedCount: number;
   isMobile: boolean;
+  // Add the missing properties from the error:
+  collectionsCount?: number;
+  deliveriesCount?: number;
+  schedulesCount?: number;
 }
 
 const StatsCards: React.FC<StatsCardsProps> = ({
   pendingCount,
   inTransitCount,
   completedCount,
-  isMobile
+  isMobile,
+  // Add optional props with default values
+  collectionsCount = 0,
+  deliveriesCount = 0,
+  schedulesCount = 0
 }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

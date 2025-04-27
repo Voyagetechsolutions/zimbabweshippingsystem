@@ -6,7 +6,7 @@ import { Shipment } from '@/types/shipment';
 import DeliveryCard from './DeliveryCard';
 import EmptyState from './EmptyState';
 
-interface UKCollectionsTabProps {
+export interface UKCollectionsTabProps {
   loading: boolean;
   isRefreshing: boolean;
   pendingCollections: Shipment[];
@@ -68,8 +68,8 @@ const UKCollectionsTab: React.FC<UKCollectionsTabProps> = ({
       ) : (
         <EmptyState
           icon={<Package className="h-12 w-12 text-gray-300" />}
-          title="No collections pending"
-          description="There are no confirmed packages ready for collection at the moment."
+          title="No pending collections"
+          description="There are no packages waiting to be collected at this time."
         />
       )}
     </div>
