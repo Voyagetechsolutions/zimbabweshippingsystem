@@ -57,8 +57,8 @@ const DriverDashboard = () => {
     }
   };
 
-  const openImageUploadModal = (shipmentId: string) => {
-    setCurrentShipmentId(shipmentId);
+  const openImageUploadModal = (id: string) => {
+    setCurrentShipmentId(id);
     setShowImageUpload(true);
     setImageFile(null);
     setImagePreview(null);
@@ -102,11 +102,11 @@ const DriverDashboard = () => {
       const shipment = pendingCollections.find(s => s.id === currentShipmentId);
       const currentMetadata = shipment?.metadata || {};
       
-      // Type casting to handle the Json type properly
-      const updatedMetadata = {
+      // Create updated metadata with the new delivery_image property
+      const updatedMetadata: ShipmentMetadata = {
         ...currentMetadata,
         delivery_image: urlData.publicUrl
-      } as ShipmentMetadata;
+      };
       
       const { error: updateError } = await supabase
         .from('shipments')

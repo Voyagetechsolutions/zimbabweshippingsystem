@@ -60,11 +60,13 @@ export const useDriverData = () => {
 
       const enrichShipments = async (shipments: any[]): Promise<Shipment[]> => {
         const userFetches = shipments.map(async (shipment) => {
-          const enrichedShipment = { 
+          // Ensure metadata is properly typed as ShipmentMetadata
+          const metadata = shipment.metadata as unknown;
+          
+          const enrichedShipment: Shipment = { 
             ...shipment,
-            // Ensure metadata is properly typed
-            metadata: shipment.metadata as ShipmentMetadata
-          } as Shipment;
+            metadata: metadata as ShipmentMetadata
+          };
           
           if (shipment.user_id) {
             const { data: userData } = await supabase
