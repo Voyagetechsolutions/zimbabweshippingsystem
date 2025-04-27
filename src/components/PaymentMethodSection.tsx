@@ -54,6 +54,7 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
 
       await onComplete(paymentData);
       
+      // Navigate to the receipt page with combined booking and payment data
       navigate('/receipt', { 
         state: { 
           bookingData: {
@@ -278,4 +279,3 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
     </div>
   );
 };
-

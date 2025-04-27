@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,15 +28,26 @@ const itemCategories = {
 };
 
 const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({ initialData, onSubmit, onCancel }) => {
+  // Pre-populate with data from the initial booking form
   const [phoneNumber, setPhoneNumber] = useState(initialData?.senderDetails?.phone || '');
-  const [category, setCategory] = useState(initialData?.itemCategory || '');
-  const [specificItem, setSpecificItem] = useState(initialData?.specificItem || '');
-  const [otherDescription, setOtherDescription] = useState(initialData?.otherItemDescription || '');
+  const [category, setCategory] = useState(initialData?.shipmentDetails?.category || initialData?.itemCategory || '');
+  const [specificItem, setSpecificItem] = useState(initialData?.shipmentDetails?.specificItem || initialData?.specificItem || '');
+  const [otherDescription, setOtherDescription] = useState(initialData?.shipmentDetails?.description || initialData?.otherItemDescription || '');
   const [images, setImages] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
   const { toast } = useToast();
+
+  // Pre-populate fields when initialData changes
+  useEffect(() => {
+    if (initialData) {
+      setPhoneNumber(initialData?.senderDetails?.phone || '');
+      setCategory(initialData?.shipmentDetails?.category || initialData?.itemCategory || '');
+      setSpecificItem(initialData?.shipmentDetails?.specificItem || initialData?.specificItem || '');
+      setOtherDescription(initialData?.shipmentDetails?.description || initialData?.otherItemDescription || '');
+    }
+  }, [initialData]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length) {

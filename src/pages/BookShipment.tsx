@@ -58,6 +58,7 @@ const BookShipment = () => {
             tracking_number: '',
           }
         });
+        // Send user directly to custom quote form for "other" items
         setCurrentStep(BookingStep.CUSTOM_QUOTE);
         return;
       }
@@ -206,9 +207,9 @@ const BookShipment = () => {
     }
   };
 
-  const handlePaymentComplete = () => {
-    // Could navigate to a receipt page or show success message
-    // This will be handled by the PaymentProcessor component for now
+  const handlePaymentComplete = (paymentData: any) => {
+    // Payment is complete, data will be used in navigation handled by PaymentMethodSection
+    console.log("Payment completed with data:", paymentData);
   };
 
   return (
