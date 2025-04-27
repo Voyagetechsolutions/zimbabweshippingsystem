@@ -7,14 +7,18 @@ import ZimbabweDeliveriesTab from './ZimbabweDeliveriesTab';
 import SchedulesTab from './SchedulesTab';
 import StatsCards from './StatsCards';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const DriverDashboard = () => {
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [pendingCollections, setPendingCollections] = useState([]);
   const [inTransitDeliveries, setInTransitDeliveries] = useState([]);
+  const [completedDeliveries, setCompletedDeliveries] = useState([]);
   const [collectionSchedules, setCollectionSchedules] = useState([]);
   const [expandedSchedule, setExpandedSchedule] = useState(null);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const fetchShipments = async () => {
     try {
@@ -34,8 +38,18 @@ const DriverDashboard = () => {
 
       if (deliveriesError) throw deliveriesError;
 
+      // Fetch completed deliveries
+      const { data: completed, error: completedError } = await supabase
+        .from('shipments')
+        .select('*')
+        .eq('status', 'delivered')
+        .limit(10);
+
+      if (completedError) throw completedError;
+
       setPendingCollections(collections || []);
       setInTransitDeliveries(deliveries || []);
+      setCompletedDeliveries(completed || []);
     } catch (error) {
       console.error('Error fetching shipments:', error);
       toast({
@@ -43,6 +57,8 @@ const DriverDashboard = () => {
         description: 'Failed to fetch shipments',
         variant: 'destructive',
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -59,6 +75,21 @@ const DriverDashboard = () => {
       subscription.unsubscribe();
     };
   }, []);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchShipments();
+      toast({
+        title: 'Success',
+        description: 'Shipment data refreshed successfully',
+      });
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleStatusUpdate = async (id: string, newStatus: string) => {
     try {
@@ -85,9 +116,19 @@ const DriverDashboard = () => {
     }
   };
 
+  const handleUploadImage = async (id: string) => {
+    // This is a placeholder function that will be implemented in the future
+    console.log('Upload image for shipment:', id);
+    // The actual implementation would involve opening a modal or navigating to an upload page
+  };
+
   return (
     <div className="space-y-6">
       <StatsCards 
+        pendingCount={pendingCollections.length}
+        inTransitCount={inTransitDeliveries.length}
+        completedCount={completedDeliveries.length}
+        isMobile={isMobile}
         collectionsCount={pendingCollections.length}
         deliveriesCount={inTransitDeliveries.length}
         schedulesCount={collectionSchedules.length}
@@ -103,8 +144,11 @@ const DriverDashboard = () => {
         <TabsContent value="collections">
           <UKCollectionsTab
             loading={loading}
+            isRefreshing={isRefreshing}
             pendingCollections={pendingCollections}
             onStatusUpdate={handleStatusUpdate}
+            onRefresh={handleRefresh}
+            onUploadImage={handleUploadImage}
           />
         </TabsContent>
 
@@ -113,6 +157,7 @@ const DriverDashboard = () => {
             loading={loading}
             inTransitDeliveries={inTransitDeliveries}
             onStatusUpdate={handleStatusUpdate}
+            onUploadImage={handleUploadImage}
           />
         </TabsContent>
 
