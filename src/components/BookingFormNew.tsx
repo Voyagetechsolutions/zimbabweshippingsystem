@@ -176,7 +176,7 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             form.setValue('otherItemDescription', '');
           }}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center space-x-2">
             <RadioGroupItem value="drum" id="drum" />
             <FormLabel htmlFor="drum" className="cursor-pointer font-medium">Drum (Standard Size)</FormLabel>
           </div>
@@ -190,7 +190,7 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             setSelectedCategory('');
           }}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center space-x-2">
             <RadioGroupItem value="other" id="other" />
             <FormLabel htmlFor="other" className="cursor-pointer font-medium">Other Item</FormLabel>
           </div>
