@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
@@ -9,9 +10,27 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { InfoIcon } from 'lucide-react';
 
+interface FormData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  pickupAddress: string;
+  pickupPostcode: string;
+  recipientName: string;
+  recipientPhone: string;
+  deliveryAddress: string;
+  deliveryCity: string;
+  shipmentType: string;
+  weight: string;
+  itemCategory: string;
+  itemDescription: string;
+  terms: boolean;
+}
+
 const BookingForm = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     firstName: '',
     lastName: '',
     email: '',
@@ -29,19 +48,33 @@ const BookingForm = () => {
     terms: false,
   });
 
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPostcodeWarning, setShowPostcodeWarning] = useState(false);
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: value
+    }));
+  };
+
+  const handleCheckboxChange = (checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      terms: checked
+    }));
+  };
+
+  const handleSelectChange = (value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      shipmentType: value
     }));
   };
 
   const validate = () => {
-    let tempErrors = {};
+    let tempErrors: Record<string, string> = {};
     tempErrors.firstName = formData.firstName ? "" : "First name is required";
     tempErrors.lastName = formData.lastName ? "" : "Last name is required";
     tempErrors.email = /\S+@\S+\.\S+/.test(formData.email) ? "" : "Email is not valid";
@@ -72,7 +105,7 @@ const BookingForm = () => {
     }
   };
 
-  const checkPostcode = (postcode) => {
+  const checkPostcode = (postcode: string) => {
     const restrictedPostcodes = ['PO1', 'PO2', 'PO3']; // Example restricted postcodes
     const isRestricted = restrictedPostcodes.includes(postcode.toUpperCase());
     setShowPostcodeWarning(isRestricted);
@@ -242,7 +275,8 @@ const BookingForm = () => {
           Shipment Type *
         </label>
         <Select
-          onValueChange={(value) => setFormData(prev => ({ ...prev, shipmentType: value }))}
+          onValueChange={handleSelectChange}
+          defaultValue={formData.shipmentType}
         >
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Select shipment type" />
@@ -301,7 +335,7 @@ const BookingForm = () => {
           <Checkbox
             name="terms"
             checked={formData.terms}
-            onCheckedChange={(checked) => setFormData(prev => ({ ...prev, terms: checked }))}
+            onCheckedChange={handleCheckboxChange}
             className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
           />
           <span className="ml-2 block text-sm text-gray-900">

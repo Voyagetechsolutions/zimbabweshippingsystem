@@ -15,6 +15,12 @@ export interface Shipment {
   updated_at: string;
   metadata?: any;
   user_id?: string;
+  // Add profiles property to fix LogisticsDashboard errors
+  profiles?: {
+    id: string;
+    full_name?: string;
+    email?: string;
+  };
 }
 
 export interface ShipmentMetadata {

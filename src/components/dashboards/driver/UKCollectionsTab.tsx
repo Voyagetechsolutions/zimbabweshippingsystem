@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { AlertTriangle, Package, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,22 +5,22 @@ import { Shipment } from '@/types/shipment';
 import DeliveryCard from './DeliveryCard';
 import EmptyState from './EmptyState';
 
-interface UKCollectionsTabProps {
+export interface UKCollectionsTabProps {
   loading: boolean;
+  pendingCollections: any[];
+  onStatusUpdate: (id: string, newStatus: string) => Promise<void>;
   isRefreshing: boolean;
-  pendingCollections: Shipment[];
   onRefresh: () => void;
-  onStatusUpdate: (id: string, newStatus: string) => void;
-  onUploadImage: (id: string) => void;
+  onUploadImage: (id: string, imageUrl: string) => Promise<void>;
 }
 
 const UKCollectionsTab: React.FC<UKCollectionsTabProps> = ({
   loading,
-  isRefreshing,
   pendingCollections,
-  onRefresh,
   onStatusUpdate,
-  onUploadImage
+  isRefreshing = false,
+  onRefresh = () => {},
+  onUploadImage = async () => {}
 }) => {
   return (
     <div className="space-y-4">

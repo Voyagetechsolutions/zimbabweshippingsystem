@@ -31,7 +31,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import GalleryAdmin from './pages/GalleryAdmin';
 import TaskManagement from './pages/TaskManagement';
 import NotFound from './pages/NotFound';
-import { RouteGuard } from './components/RouteGuard';
+import { RequireAuth, RequireAdmin, RedirectIfAuthenticated, RequireRole } from './components/RouteGuard';
 import { Toaster } from '@/components/ui/toaster';
 import WhatsAppButton from './components/WhatsAppButton';
 
@@ -62,7 +62,7 @@ function App() {
                   <Route path="/collection-schedule" element={<CollectionSchedule />} />
                   
                   {/* Protected Routes */}
-                  <Route element={<RouteGuard allowedRoles={['customer', 'admin', 'driver', 'support']} />}>
+                  <Route element={<RequireAuth />}>
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/notifications" element={<Notifications />} />
                     <Route path="/account" element={<Account />} />
@@ -72,7 +72,7 @@ function App() {
                   </Route>
                   
                   {/* Admin Routes */}
-                  <Route element={<RouteGuard allowedRoles={['admin']} />}>
+                  <Route element={<RequireAdmin />}>
                     <Route path="/admin" element={<AdminDashboard />} />
                     <Route path="/gallery-admin" element={<GalleryAdmin />} />
                     <Route path="/tasks" element={<TaskManagement />} />

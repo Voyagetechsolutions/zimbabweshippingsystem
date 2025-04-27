@@ -360,7 +360,7 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             collection_type: 'driver',
           },
           user_id: (await supabase.auth.getUser()).data.user?.id
-        }).catch(err => {
+        }).then(null, err => {
           // Log but don't throw to allow the booking to continue
           console.error('Failed to create driver collection record:', err);
         });

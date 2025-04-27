@@ -7,14 +7,26 @@ export interface StatsCardsProps {
   inTransitCount: number;
   completedCount: number;
   isMobile: boolean;
+  // Add these new prop types to match what's passed in DriverDashboard.tsx
+  collectionsCount?: number;
+  deliveriesCount?: number;
+  schedulesCount?: number;
 }
 
 const StatsCards: React.FC<StatsCardsProps> = ({
   pendingCount,
   inTransitCount,
   completedCount,
+  collectionsCount,
+  deliveriesCount,
+  schedulesCount,
   isMobile
 }) => {
+  // Use the new props if they're provided, otherwise use the original props
+  const pendingValue = collectionsCount !== undefined ? collectionsCount : pendingCount;
+  const inTransitValue = deliveriesCount !== undefined ? deliveriesCount : inTransitCount;
+  const completedValue = schedulesCount !== undefined ? schedulesCount : completedCount;
+
   return (
     <div className={`grid ${isMobile ? 'grid-cols-3 gap-2' : 'grid-cols-3 gap-4'} w-full`}>
       <div className="bg-white shadow-sm rounded-lg p-3 border border-gray-100">
@@ -24,9 +36,9 @@ const StatsCards: React.FC<StatsCardsProps> = ({
           </div>
           <div>
             <p className={`text-xs text-gray-500 ${!isMobile ? 'mb-0.5' : ''}`}>
-              Pending
+              {collectionsCount !== undefined ? 'Collections' : 'Pending'}
             </p>
-            <p className="font-bold text-lg">{pendingCount}</p>
+            <p className="font-bold text-lg">{pendingValue}</p>
           </div>
         </div>
       </div>
@@ -38,9 +50,9 @@ const StatsCards: React.FC<StatsCardsProps> = ({
           </div>
           <div>
             <p className={`text-xs text-gray-500 ${!isMobile ? 'mb-0.5' : ''}`}>
-              In Transit
+              {deliveriesCount !== undefined ? 'Deliveries' : 'In Transit'}
             </p>
-            <p className="font-bold text-lg">{inTransitCount}</p>
+            <p className="font-bold text-lg">{inTransitValue}</p>
           </div>
         </div>
       </div>
@@ -52,9 +64,9 @@ const StatsCards: React.FC<StatsCardsProps> = ({
           </div>
           <div>
             <p className={`text-xs text-gray-500 ${!isMobile ? 'mb-0.5' : ''}`}>
-              Completed
+              {schedulesCount !== undefined ? 'Schedules' : 'Completed'}
             </p>
-            <p className="font-bold text-lg">{completedCount}</p>
+            <p className="font-bold text-lg">{completedValue}</p>
           </div>
         </div>
       </div>
