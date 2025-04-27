@@ -41,7 +41,7 @@ const FAQ = () => {
         },
         {
           question: 'Is insurance included in the shipping cost?',
-          answer: 'Basic coverage is included in all our shipping rates. Zimbabwe Shipping does not provide insurance. We recommodate purchasing to cover the full declared value of your shipment.'
+          answer: 'Basic coverage is included in all our shipping rates. Zimbabwe Shipping does not provide insurance. We recommend purchasing it elsewhere to cover the full declared value of your shipment.'
         }
       ]
     },
@@ -125,7 +125,7 @@ const FAQ = () => {
         },
         {
           question: 'How does door-to-door delivery work in Zimbabwe?',
-          answer: 'Our door-to-door service delivers your shipment directly to your recipient\'s address in Zimbabwe. We contact the recipient to inform them about the delivery. A small additional fee applies for this service.'
+          answer: 'Our door-to-door service delivers your shipment directly to your recipient\'s address in Zimbabwe. We contact the recipient to inform them about the delivery day. A small additional fee applies for this service.'
         },
         {
           question: 'What happens if no one is available to receive the delivery?',
@@ -148,7 +148,7 @@ const FAQ = () => {
         },
         {
           question: 'Are there customs duties and taxes for shipments to Zimbabwe?',
-          answer: 'Yes, importation of goods to Zimbabwe may be subject to duties and taxes. These are determined by Zimbabwean customs authorities based on the type and value of the items. The recipient is responsible for paying any applicable duties and taxes upon arrival. We pay 50% of the charg'
+          answer: 'Yes, importation of goods to Zimbabwe may be subject to duties and taxes. These are determined by Zimbabwean customs authorities based on the type and value of the items. The recipient is responsible for paying any applicable duties and taxes upon arrival. We pay 50% of the charge.'
         },
         {
           question: 'How do you handle customs clearance?',
