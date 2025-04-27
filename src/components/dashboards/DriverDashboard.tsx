@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Json } from '@/integrations/supabase/types';
 
 import { useDriverData } from '@/hooks/useDriverData';
 import StatsCards from './driver/StatsCards';
@@ -13,6 +14,7 @@ import ImageUploadDialog from './driver/ImageUploadDialog';
 import UKCollectionsTab from './driver/UKCollectionsTab';
 import ZimbabweDeliveriesTab from './driver/ZimbabweDeliveriesTab';
 import SchedulesTab from './driver/SchedulesTab';
+import { ShipmentMetadata } from '@/types/shipment';
 
 const DriverDashboard = () => {
   const [showImageUpload, setShowImageUpload] = useState(false);
@@ -100,13 +102,16 @@ const DriverDashboard = () => {
       const shipment = pendingCollections.find(s => s.id === currentShipmentId);
       const currentMetadata = shipment?.metadata || {};
       
+      // Type casting to handle the Json type properly
+      const updatedMetadata = {
+        ...currentMetadata,
+        delivery_image: urlData.publicUrl
+      } as ShipmentMetadata;
+      
       const { error: updateError } = await supabase
         .from('shipments')
         .update({
-          metadata: { 
-            ...currentMetadata, 
-            delivery_image: urlData.publicUrl 
-          },
+          metadata: updatedMetadata,
           status: 'Delivered'
         })
         .eq('id', currentShipmentId);

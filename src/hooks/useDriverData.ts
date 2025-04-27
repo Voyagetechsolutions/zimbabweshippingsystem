@@ -2,7 +2,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Shipment } from '@/types/shipment';
+import { Shipment, ShipmentMetadata } from '@/types/shipment';
+import { Json } from '@/integrations/supabase/types';
 
 export const useDriverData = () => {
   const [activeDeliveries, setActiveDeliveries] = useState<Shipment[]>([]);
@@ -59,15 +60,21 @@ export const useDriverData = () => {
 
       const enrichShipments = async (shipments: any[]): Promise<Shipment[]> => {
         const userFetches = shipments.map(async (shipment) => {
+          const enrichedShipment = { 
+            ...shipment,
+            // Ensure metadata is properly typed
+            metadata: shipment.metadata as ShipmentMetadata
+          } as Shipment;
+          
           if (shipment.user_id) {
             const { data: userData } = await supabase
               .from('profiles')
               .select('id, email, full_name')
               .eq('id', shipment.user_id)
               .single();
-            if (userData) shipment.profiles = userData;
+            if (userData) enrichedShipment.profiles = userData;
           }
-          return shipment as Shipment;
+          return enrichedShipment;
         });
         return await Promise.all(userFetches);
       };
