@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -8,11 +9,13 @@ import PaymentProcessor from '@/components/PaymentProcessor';
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import ReceiptNew from '@/components/ReceiptNew';
 
 enum BookingStep {
   FORM,
   PAYMENT,
-  CUSTOM_QUOTE
+  CUSTOM_QUOTE,
+  RECEIPT
 }
 
 const BookShipment = () => {
@@ -206,13 +209,7 @@ const BookShipment = () => {
       });
       
       if (bookingData.paymentCompleted) {
-        navigate('/receipt', { 
-          state: { 
-            bookingData,
-            paymentData: bookingData.paymentData,
-            customQuoteData: data
-          }
-        });
+        setCurrentStep(BookingStep.RECEIPT);
       } else {
         navigate('/quote-submitted');
       }
@@ -237,12 +234,7 @@ const BookShipment = () => {
     if (bookingData.shipmentDetails.includeOtherItems) {
       setCurrentStep(BookingStep.CUSTOM_QUOTE);
     } else {
-      navigate('/receipt', { 
-        state: { 
-          bookingData: updatedBookingData,
-          paymentData
-        }
-      });
+      setCurrentStep(BookingStep.RECEIPT);
     }
   };
 
@@ -252,25 +244,27 @@ const BookShipment = () => {
       
       <main className="min-h-screen bg-gray-50 py-12 px-4">
         <div className="container mx-auto max-w-4xl">
-          <div className="mb-8">
-            <Link to="/" className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900">
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              Back to Home
-            </Link>
-            
-            <h1 className="text-3xl md:text-4xl font-bold mt-4 mb-2">
-              {currentStep === BookingStep.FORM ? 'Book Your Shipment' : 
-               currentStep === BookingStep.PAYMENT ? 'Complete Payment' :
-               'Request Custom Quote'}
-            </h1>
-            <p className="text-gray-600 max-w-2xl">
-              {currentStep === BookingStep.FORM 
-                ? 'Complete the form below to book your shipment from the UK.' 
-                : currentStep === BookingStep.PAYMENT
-                ? 'Choose your preferred payment method to complete your booking.'
-                : 'Tell us about your item so we can provide a custom shipping quote.'}
-            </p>
-          </div>
+          {currentStep !== BookingStep.RECEIPT && (
+            <div className="mb-8">
+              <Link to="/" className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900">
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back to Home
+              </Link>
+              
+              <h1 className="text-3xl md:text-4xl font-bold mt-4 mb-2">
+                {currentStep === BookingStep.FORM ? 'Book Your Shipment' : 
+                currentStep === BookingStep.PAYMENT ? 'Complete Payment' :
+                'Request Custom Quote'}
+              </h1>
+              <p className="text-gray-600 max-w-2xl">
+                {currentStep === BookingStep.FORM 
+                  ? 'Complete the form below to book your shipment from the UK.' 
+                  : currentStep === BookingStep.PAYMENT
+                  ? 'Choose your preferred payment method to complete your booking.'
+                  : 'Tell us about your item so we can provide a custom shipping quote.'}
+              </p>
+            </div>
+          )}
           
           {currentStep === BookingStep.FORM ? (
             <BookingFormNew onSubmitComplete={handleFormSubmit} />
@@ -281,11 +275,17 @@ const BookShipment = () => {
               onCancel={handleBackToForm}
               onPaymentComplete={handlePaymentComplete}
             />
-          ) : (
+          ) : currentStep === BookingStep.CUSTOM_QUOTE ? (
             <CustomQuoteForm 
               initialData={bookingData}
               onSubmit={handleCustomQuoteSubmit}
               onCancel={handleBackToForm}
+            />
+          ) : (
+            <ReceiptNew 
+              bookingData={bookingData}
+              paymentData={bookingData.paymentData}
+              customQuote={bookingData.shipmentDetails.includeOtherItems ? bookingData.customQuoteData : null}
             />
           )}
         </div>

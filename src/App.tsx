@@ -30,6 +30,7 @@ import FAQ from './pages/FAQ';
 import QuoteSubmitted from '@/pages/QuoteSubmitted';
 import TermsAndConditions from './pages/TermsAndConditions';
 import PrivacyPolicy from './pages/PrivacyPolicy';
+import ReceiptNew from './pages/ReceiptNew';
 
 // Components
 import { RequireAuth, RequireAdmin, RedirectIfAuthenticated, RequireRole } from './components/RouteGuard';
@@ -80,6 +81,7 @@ function App() {
                   <Route path="/faq" element={<FAQ />} />
                   <Route path="/terms" element={<TermsAndConditions />} />
                   <Route path="/privacy" element={<PrivacyPolicy />} />
+                  <Route path="/receipt" element={<ReceiptNew />} />
 
                   {/* Protected routes - any authenticated user */}
                   <Route

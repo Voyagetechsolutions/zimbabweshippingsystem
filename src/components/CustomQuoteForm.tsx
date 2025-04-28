@@ -1,5 +1,5 @@
 
-import React, { useState, ChangeEvent } from 'react';
+import React, { useState, ChangeEvent, FormEvent } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +29,11 @@ const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<{
+    description?: string;
+    category?: string;
+    phoneNumber?: string;
+  }>({});
   const { toast } = useToast();
   
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -56,9 +61,44 @@ const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({
     newFiles.splice(index, 1);
     setUploads(newFiles);
   };
+
+  const validateForm = (): boolean => {
+    const errors: {
+      description?: string;
+      category?: string;
+      phoneNumber?: string;
+    } = {};
+
+    if (!description.trim()) {
+      errors.description = "Please provide a description of your item";
+    }
+
+    if (!category) {
+      errors.category = "Please select a category";
+    }
+
+    if (!phoneNumber.trim()) {
+      errors.phoneNumber = "Please provide a contact phone number";
+    } else if (!/^\+?[0-9\s\-()]{8,20}$/.test(phoneNumber.trim())) {
+      errors.phoneNumber = "Please enter a valid phone number";
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
   
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields correctly.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsLoading(true);
     setError(null);
     
@@ -117,12 +157,17 @@ const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({
       
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <Label htmlFor="category">Item Category</Label>
+          <Label htmlFor="category" className={validationErrors.category ? "text-destructive" : ""}>
+            Item Category*
+          </Label>
           <Select 
             value={category} 
-            onValueChange={setCategory}
+            onValueChange={(value) => {
+              setCategory(value);
+              setValidationErrors(prev => ({ ...prev, category: undefined }));
+            }}
           >
-            <SelectTrigger>
+            <SelectTrigger className={validationErrors.category ? "border-destructive" : ""}>
               <SelectValue placeholder="Select a category" />
             </SelectTrigger>
             <SelectContent>
@@ -134,30 +179,51 @@ const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({
               <SelectItem value="other">Other</SelectItem>
             </SelectContent>
           </Select>
+          {validationErrors.category && (
+            <p className="text-destructive text-sm mt-1">{validationErrors.category}</p>
+          )}
         </div>
         
         <div>
-          <Label htmlFor="description">Description</Label>
+          <Label htmlFor="description" className={validationErrors.description ? "text-destructive" : ""}>
+            Description*
+          </Label>
           <Textarea
             id="description"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(e) => {
+              setDescription(e.target.value);
+              setValidationErrors(prev => ({ ...prev, description: undefined }));
+            }}
             placeholder="Please describe your item including dimensions and weight if possible"
             rows={5}
+            className={validationErrors.description ? "border-destructive" : ""}
             required
           />
+          {validationErrors.description && (
+            <p className="text-destructive text-sm mt-1">{validationErrors.description}</p>
+          )}
         </div>
         
         <div>
-          <Label htmlFor="phoneNumber">Contact Phone Number</Label>
+          <Label htmlFor="phoneNumber" className={validationErrors.phoneNumber ? "text-destructive" : ""}>
+            Contact Phone Number*
+          </Label>
           <Input
             id="phoneNumber"
             type="tel"
             value={phoneNumber}
-            onChange={(e) => setPhoneNumber(e.target.value)}
+            onChange={(e) => {
+              setPhoneNumber(e.target.value);
+              setValidationErrors(prev => ({ ...prev, phoneNumber: undefined }));
+            }}
             placeholder="Enter your phone number"
+            className={validationErrors.phoneNumber ? "border-destructive" : ""}
             required
           />
+          {validationErrors.phoneNumber && (
+            <p className="text-destructive text-sm mt-1">{validationErrors.phoneNumber}</p>
+          )}
         </div>
         
         <div>

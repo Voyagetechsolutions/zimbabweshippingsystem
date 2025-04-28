@@ -1,1201 +1,709 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, Controller } from 'react-hook-form';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Info, Loader2, Plus, User, Users, Package, CreditCard, X } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { getRouteForPostalCode, isRestrictedPostalCode, getIrelandRouteForCity } from '@/utils/postalCodeUtils';
-import { generateUniqueId } from '@/lib/utils';
-import { getDateByRoute, getIrelandCities } from '@/data/collectionSchedule';
-import CollectionInfo from '@/components/CollectionInfo';
-import { PaymentMethodSection } from '@/components/PaymentMethodSection';
-
-const bookingFormSchema = z.object({
-  firstName: z.string().min(2, { message: 'First name must be at least 2 characters' }),
-  lastName: z.string().min(2, { message: 'Last name must be at least 2 characters' }),
-  email: z.string().email({ message: 'Please enter a valid email address' }),
-  phone: z.string().min(10, { message: 'Please enter a valid phone number' }),
-  pickupCountry: z.string().min(1, { message: 'Please select a country' }),
-  pickupAddress: z.string().min(5, { message: 'Please enter a valid address' }),
-  pickupCity: z.string().optional(),
-  pickupPostcode: z.string().optional(),
-  
-  recipientName: z.string().min(2, { message: 'Recipient name must be at least 2 characters' }),
-  recipientPhone: z.string().min(10, { message: 'Please enter a valid phone number' }),
-  additionalRecipientPhone: z.string().optional(),
-  deliveryAddress: z.string().min(5, { message: 'Please enter a valid address' }),
-  deliveryCity: z.string().min(2, { message: 'Please enter a valid city' }),
-  
-  includeDrums: z.boolean().default(false),
-  includeOtherItems: z.boolean().default(false),
-  
-  drumQuantity: z.string().optional(),
-  wantMetalSeal: z.boolean().default(true),
-  itemCategory: z.string().optional(),
-  specificItem: z.string().optional(),
-  otherItemDescription: z.string().optional(),
-  doorToDoor: z.boolean().default(false),
-  additionalDeliveryAddresses: z.array(z.object({
-    address: z.string().min(5, { message: 'Please enter a valid address' }),
-    city: z.string().min(2, { message: 'Please enter a valid city' }),
-    recipientName: z.string().min(2, { message: 'Recipient name must be at least 2 characters' }),
-    recipientPhone: z.string().min(10, { message: 'Please enter a valid phone number' })
-  })).optional(),
-  
-  paymentOption: z.enum(['standard', 'cashOnCollection', 'payOnArrival']),
-  paymentMethod: z.enum(['card', 'paypal']).optional(),
-  terms: z.boolean().refine(val => val === true, {
-    message: 'You must agree to the terms and conditions',
-  }),
-});
-
-type BookingFormValues = z.infer<typeof bookingFormSchema>;
+import { generateUniqueId } from '@/utils/generators';
+import { supabase } from '@/integrations/supabase/client';
 
 interface BookingFormProps {
-  onSubmitComplete: (data: BookingFormValues, shipmentId: string, amount: number) => void;
+  onSubmitComplete: (data: any, shipmentId: string, amount: number) => void;
 }
 
-const itemCategories = {
-  'furniture': ['Sofa', 'Chair', 'Dining Table & Chairs', 'Coffee Table', 'Bed', 'Mattress', 'Wardrobe (dismantled)', 'Chest of Drawers', 'Dressing Unit', 'Wall Frame', 'Mirror', 'Home Furniture (other)', 'Office Furniture'],
-  'appliances': ['Washing Machine', 'Dishwasher', 'Dryer', 'American Fridge', 'Standard Fridge', 'Freezer', 'Deep Freezer', 'TV', 'Air Conditioner', 'Heater'],
-  'garden': ['Garden Tools', 'Lawn Mower', 'Trampoline'],
-  'transportation': ['Bicycle', 'Car Wheels/Tyres', 'Vehicle Parts', 'Engine', 'Mobility Scooter'],
-  'household': ['Plastic Tubs', 'Bin', 'Ironing Board', 'Rugs', 'Carpets', 'Internal Doors', 'External Doors', 'Bathroom Equipment'],
-  'mobility': ['Wheelchair', 'Adult Walking Aid', 'Kids Push Chair'],
-  'storage': ['Boxes', 'Bags', 'Suitcase', 'Amazon Bag', 'China Bags', 'Pallets'],
-  'equipment': ['Tool Box', 'Air Compressor', 'Generator', 'Solar Panel', 'Water Pump', 'Pool Pump'],
-  'building': ['Building Materials', 'Home Decor', 'Ladders'],
-  'other': ['Other Item']
-};
+const steps = [
+  'Pickup Details',
+  'Delivery Details',
+  'Shipment Details',
+  'Additional Services',
+  'Payment Options'
+];
 
 const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [formData, setFormData] = useState({});
+  const [shipmentId, setShipmentId] = useState(generateUniqueId('shp_'));
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showPaymentMethods, setShowPaymentMethods] = useState(false);
-  const [showPostcodeWarning, setShowPostcodeWarning] = useState(false);
-  const [price, setPrice] = useState<number>(0);
-  const [sealCost, setSealCost] = useState<number>(0);
-  const [doorToDoorCost, setDoorToDoorCost] = useState<number>(0);
-  const [showCollectionInfo, setShowCollectionInfo] = useState(false);
-  const [irelandCities, setIrelandCities] = useState<string[]>([]);
-  const [currentTab, setCurrentTab] = useState<string>('sender');
-  const [originalPrice, setOriginalPrice] = useState<number>(0);
-  const [discountApplied, setDiscountApplied] = useState(false);
-  const [redirectToCustomQuote, setRedirectToCustomQuote] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [additionalAddresses, setAdditionalAddresses] = useState<Array<{address: string, city: string, recipientName: string, recipientPhone: string}>>([]);
-  const [hasAdditionalPhone, setHasAdditionalPhone] = useState(false);
-  
-  const navigate = useNavigate();
   const { toast } = useToast();
-  
+  const [additionalDeliveryAddresses, setAdditionalDeliveryAddresses] = useState([]);
+  const [weight, setWeight] = useState('');
+  const [amount, setAmount] = useState(0);
+  const [validationErrors, setValidationErrors] = useState({});
+
   useEffect(() => {
-    setIrelandCities(getIrelandCities());
-  }, []);
+    const createShipmentRecord = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('shipments')
+          .insert({
+            id: shipmentId.substring(4),
+            tracking_number: generateUniqueId('ZIM-'),
+            status: 'pending',
+          })
+          .select()
+          .single();
 
-  const form = useForm<BookingFormValues>({
-    resolver: zodResolver(bookingFormSchema),
-    defaultValues: {
-      firstName: '',
-      lastName: '',
-      email: '',
-      phone: '',
-      pickupCountry: 'England',
-      pickupAddress: '',
-      pickupPostcode: '',
-      pickupCity: '',
-      recipientName: '',
-      recipientPhone: '',
-      additionalRecipientPhone: '',
-      deliveryAddress: '',
-      deliveryCity: '',
-      includeDrums: false,
-      includeOtherItems: false,
-      drumQuantity: '1',
-      wantMetalSeal: true,
-      itemCategory: '',
-      specificItem: '',
-      otherItemDescription: '',
-      doorToDoor: false,
-      additionalDeliveryAddresses: [],
-      paymentOption: 'standard',
-      paymentMethod: 'card',
-      terms: false,
-    },
-  });
+        if (error) {
+          console.error('Error creating shipment record:', error);
+          toast({
+            title: 'Error',
+            description: 'Failed to create shipment record. Please try again.',
+            variant: 'destructive',
+          });
+        } else {
+          console.log('Shipment record created successfully:', data);
+        }
+      } catch (error) {
+        console.error('Error creating shipment record:', error);
+        toast({
+          title: 'Error',
+          description: 'An unexpected error occurred. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    };
 
-  const watchIncludeDrums = form.watch('includeDrums');
-  const watchIncludeOtherItems = form.watch('includeOtherItems');
-  const watchPaymentOption = form.watch('paymentOption');
-  const watchPickupPostcode = form.watch('pickupPostcode');
-  const watchPickupCountry = form.watch('pickupCountry');
-  const watchPickupCity = form.watch('pickupCity');
-  const watchDrumQuantity = form.watch('drumQuantity');
-  const watchWantMetalSeal = form.watch('wantMetalSeal');
-  const watchDoorToDoor = form.watch('doorToDoor');
-  const watchItemCategory = form.watch('itemCategory');
-  const watchSpecificItem = form.watch('specificItem');
+    createShipmentRecord();
+  }, [shipmentId, toast]);
 
-  const renderShipmentTypeOptions = () => {
-    return (
-      <div className="grid grid-cols-1 gap-4 mt-2">
-        <div className="flex flex-col space-y-2">
-          <div className="flex items-start space-x-3">
-            <Checkbox 
-              id="includeDrums" 
-              checked={form.getValues('includeDrums')}
-              onCheckedChange={(checked) => {
-                form.setValue('includeDrums', checked === true);
-                if (checked && !form.getValues('drumQuantity')) {
-                  form.setValue('drumQuantity', '1');
-                }
-              }}
-            />
-            <div>
-              <label 
-                htmlFor="includeDrums" 
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Drums (Standard 220L)
-              </label>
-              <p className="text-sm text-gray-500 mt-1">Standard size drums (200L-220L) for goods</p>
-            </div>
-          </div>
-          
-          <div className="flex items-start space-x-3">
-            <Checkbox 
-              id="includeOtherItems" 
-              checked={form.getValues('includeOtherItems')}
-              onCheckedChange={(checked) => {
-                form.setValue('includeOtherItems', checked === true);
-              }}
-            />
-            <div>
-              <label 
-                htmlFor="includeOtherItems" 
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Other Items
-              </label>
-              <p className="text-sm text-gray-500 mt-1">Other items requiring a custom quote</p>
-            </div>
-          </div>
-        </div>
-        
-        {(!form.getValues('includeDrums') && !form.getValues('includeOtherItems')) && (
-          <div className="mt-2 text-amber-600 text-sm">
-            Please select at least one shipping option
-          </div>
-        )}
-      </div>
-    );
+  useEffect(() => {
+    if (weight && formData.shipmentType === 'parcel') {
+      const parsedWeight = parseFloat(weight);
+      if (!isNaN(parsedWeight)) {
+        let calculatedAmount = 50;
+        if (parsedWeight > 10) {
+          calculatedAmount += (parsedWeight - 10) * 5;
+        }
+        setAmount(calculatedAmount);
+      } else {
+        setAmount(0);
+      }
+    } else {
+      setAmount(0);
+    }
+  }, [weight, formData.shipmentType]);
+
+  const validateStep = (currentStep, formData) => {
+    const errors = {};
+
+    if (currentStep === 0) {
+      if (!formData.firstName?.trim()) errors.firstName = "First name is required";
+      if (!formData.lastName?.trim()) errors.lastName = "Last name is required";
+      if (!formData.email?.trim()) errors.email = "Email address is required";
+      if (formData.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+        errors.email = "Please enter a valid email address";
+      }
+      if (!formData.phone?.trim()) errors.phone = "Phone number is required";
+      if (!formData.pickupAddress?.trim()) errors.pickupAddress = "Pickup address is required";
+      if (formData.pickupCountry === "England" && !formData.pickupPostcode?.trim()) {
+        errors.pickupPostcode = "Postcode is required for England";
+      }
+      if (formData.pickupCountry !== "England" && !formData.pickupCity?.trim()) {
+        errors.pickupCity = "City is required";
+      }
+    } else if (currentStep === 1) {
+      if (!formData.recipientName?.trim()) errors.recipientName = "Recipient name is required";
+      if (!formData.recipientPhone?.trim()) errors.recipientPhone = "Recipient phone is required";
+      if (!formData.deliveryAddress?.trim()) errors.deliveryAddress = "Delivery address is required";
+      if (!formData.deliveryCity?.trim()) errors.deliveryCity = "Delivery city is required";
+    } else if (currentStep === 2) {
+      if (formData.includeDrums) {
+        if (!formData.drumQuantity || parseInt(formData.drumQuantity) < 1) {
+          errors.drumQuantity = "Please specify the number of drums";
+        }
+      }
+
+      if (formData.includeOtherItems) {
+        if (!formData.itemCategory) errors.itemCategory = "Please select a category";
+        if (!formData.specificItem?.trim()) errors.specificItem = "Please specify the item";
+        if (!formData.otherItemDescription?.trim()) errors.otherItemDescription = "Please provide a description";
+      }
+
+      if (!formData.includeDrums && !formData.includeOtherItems) {
+        errors.generalShipment = "Please select at least one type of shipment";
+      }
+    }
+
+    return errors;
   };
 
-  const addNewDeliveryAddress = () => {
-    setAdditionalAddresses([
-      ...additionalAddresses, 
-      {address: '', city: '', recipientName: '', recipientPhone: ''}
+  const isStepValid = (errors) => {
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleInputChange = (name, value) => {
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (validationErrors[name]) {
+      setValidationErrors((prev) => {
+        const { [name]: _, ...rest } = prev;
+        return rest;
+      });
+    }
+  };
+
+  const handleCheckboxChange = (name) => {
+    setFormData(prev => ({ ...prev, [name]: !prev[name] }));
+  };
+
+  const handleNext = () => {
+    const errors = validateStep(currentStep, formData);
+
+    if (isStepValid(errors)) {
+      if (currentStep < steps.length - 1) {
+        setCurrentStep(currentStep + 1);
+        window.scrollTo(0, 0);
+      }
+    } else {
+      setValidationErrors(errors);
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+      window.scrollTo(0, 0);
+    }
+  };
+
+  const addDeliveryAddress = () => {
+    setAdditionalDeliveryAddresses([
+      ...additionalDeliveryAddresses,
+      { id: generateUniqueId('addr_'), address: '', city: '' }
     ]);
   };
 
-  const removeDeliveryAddress = (index: number) => {
-    const newAddresses = [...additionalAddresses];
-    newAddresses.splice(index, 1);
-    setAdditionalAddresses(newAddresses);
+  const updateDeliveryAddress = (id, field, value) => {
+    const updatedAddresses = additionalDeliveryAddresses.map(addr =>
+      addr.id === id ? { ...addr, [field]: value } : addr
+    );
+    setAdditionalDeliveryAddresses(updatedAddresses);
+    setFormData({ ...formData, additionalDeliveryAddresses: updatedAddresses });
   };
 
-  const updateDeliveryAddress = (index: number, field: string, value: string) => {
-    const newAddresses = [...additionalAddresses];
-    newAddresses[index] = { ...newAddresses[index], [field]: value };
-    setAdditionalAddresses(newAddresses);
+  const removeDeliveryAddress = (id) => {
+    const updatedAddresses = additionalDeliveryAddresses.filter(addr => addr.id !== id);
+    setAdditionalDeliveryAddresses(updatedAddresses);
+    setFormData({ ...formData, additionalDeliveryAddresses: updatedAddresses });
   };
 
-  useEffect(() => {
-    if (watchPickupCountry === 'England' && watchPickupPostcode?.trim().length > 0) {
-      const isRestricted = isRestrictedPostalCode(watchPickupPostcode);
-      setShowPostcodeWarning(isRestricted);
-      
-      const hasRoute = getRouteForPostalCode(watchPickupPostcode) !== null;
-      setShowCollectionInfo(hasRoute);
-    } else {
-      setShowPostcodeWarning(false);
-      setShowCollectionInfo(false);
-    }
-  }, [watchPickupPostcode, watchPickupCountry]);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  useEffect(() => {
-    if (watchPickupCountry === 'Ireland' && watchPickupCity?.trim().length > 0) {
-      const hasRoute = getIrelandRouteForCity(watchPickupCity) !== null;
-      setShowCollectionInfo(hasRoute);
-    }
-  }, [watchPickupCity, watchPickupCountry]);
-
-  useEffect(() => {
-    setShowPaymentMethods(false);
-  }, [watchPaymentOption]);
-
-  useEffect(() => {
-    if (watchIncludeOtherItems && !watchIncludeDrums && 
-        watchItemCategory && 
-        (watchSpecificItem || form.getValues('otherItemDescription'))) {
-      setRedirectToCustomQuote(true);
-    } else {
-      setRedirectToCustomQuote(false);
-    }
-  }, [watchIncludeDrums, watchIncludeOtherItems, watchItemCategory, watchSpecificItem, form]);
-
-  useEffect(() => {
-    let basePrice = 0;
-    
-    if (watchIncludeDrums) {
-      const quantity = parseInt(watchDrumQuantity || '1', 10);
-      
-      if (quantity === 1) {
-        basePrice = 280;
-      } else if (quantity >= 2 && quantity <= 4) {
-        basePrice = 260 * quantity;
-      } else if (quantity >= 5) {
-        basePrice = 240 * quantity;
-      } else {
-        basePrice = 280;
-      }
-      
-      const sealPrice = watchWantMetalSeal ? 5 * quantity : 0;
-      setSealCost(sealPrice);
-    } else {
-      setSealCost(0);
-    }
-    
-    setOriginalPrice(basePrice);
-    
-    const addressCount = watchDoorToDoor ? 1 + additionalAddresses.length : 0;
-    const doorCost = addressCount * 25;
-    setDoorToDoorCost(doorCost);
-    
-    if (watchPaymentOption === 'cashOnCollection' && watchIncludeDrums) {
-      const quantity = parseInt(watchDrumQuantity || '1', 10);
-      const discountedPrice = basePrice - (20 * quantity);
-      setPrice(discountedPrice);
-      setDiscountApplied(true);
-    } else {
-      setPrice(basePrice);
-      setDiscountApplied(false);
-    }
-  }, [watchIncludeDrums, watchDrumQuantity, watchPaymentOption, watchWantMetalSeal, watchDoorToDoor, additionalAddresses.length]);
-
-  const goToNextTab = () => {
-    if (currentTab === 'sender') {
-      if (validateTab('sender')) {
-        setCurrentTab('recipient');
-      } else {
-        toast({
-          title: "Missing Information",
-          description: "Please fill in all required sender information fields.",
-          variant: "destructive",
-        });
-      }
-    } else if (currentTab === 'recipient') {
-      if (validateTab('recipient')) {
-        setCurrentTab('shipment');
-      } else {
-        toast({
-          title: "Missing Information",
-          description: "Please fill in all required recipient information fields.",
-          variant: "destructive",
-        });
-      }
-    } else if (currentTab === 'shipment') {
-      if (validateTab('shipment')) {
-        // If only other items and no drums selected, redirect to custom quote
-        if (!watchIncludeDrums && watchIncludeOtherItems && redirectToCustomQuote) {
-          handleCustomQuoteRedirect();
-        } else {
-          setCurrentTab('payment');
-        }
-      } else {
-        toast({
-          title: "Missing Information",
-          description: "Please fill in all required shipment details.",
-          variant: "destructive",
-        });
-      }
-    }
-  };
-
-  const goToPreviousTab = () => {
-    if (currentTab === 'payment') setCurrentTab('shipment');
-    else if (currentTab === 'shipment') setCurrentTab('recipient');
-    else if (currentTab === 'recipient') setCurrentTab('sender');
-  };
-
-  const handleCustomQuoteRedirect = () => {
-    const data = form.getValues();
-    const trackingNumber = `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
-    const shipmentId = generateUniqueId('shp_');
-    
-    data.additionalDeliveryAddresses = additionalAddresses;
-    
-    onSubmitComplete({...data}, shipmentId, 0);
-  };
-
-  const handlePaymentComplete = (paymentData: any) => {
-    // Submit the form with the payment data
-    onSubmit(form.getValues());
-  };
-
-  const onSubmit = async (data: BookingFormValues) => {
-    // Validate that at least one shipment type is selected
-    if (!data.includeDrums && !data.includeOtherItems) {
+    const errors = validateStep(currentStep, formData);
+    if (!isStepValid(errors)) {
+      setValidationErrors(errors);
       toast({
         title: "Missing Information",
-        description: "Please select at least one shipment type (Drums or Other Items).",
+        description: "Please fill in all required fields.",
         variant: "destructive",
       });
       return;
     }
-    
-    // Additional validation for other items
-    if (data.includeOtherItems && (!data.itemCategory || (data.itemCategory !== 'other' && !data.specificItem))) {
-      toast({
-        title: "Missing Information",
-        description: "Please select a category and specific item for your other items.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Additional validation for drums
-    if (data.includeDrums && (!data.drumQuantity || parseInt(data.drumQuantity) < 1)) {
-      toast({
-        title: "Missing Information",
-        description: "Please specify the number of drums.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
+
     setIsSubmitting(true);
     try {
-      const trackingNumber = `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
-      const shipmentId = generateUniqueId();
-      
-      data.additionalDeliveryAddresses = additionalAddresses;
-      
-      const { error } = await supabase.from('shipments').insert({
-        id: shipmentId,
-        tracking_number: trackingNumber,
-        origin: `${data.pickupAddress}, ${data.pickupCountry === 'England' ? data.pickupPostcode : data.pickupCity}`,
-        destination: `${data.deliveryAddress}, ${data.deliveryCity}`,
-        status: 'pending',
-        metadata: {
-          ...data,
-          includeDrums: data.includeDrums,
-          includeOtherItems: data.includeOtherItems,
-          pickupCountry: data.pickupCountry,
-          doorToDoor: data.doorToDoor,
-          wantMetalSeal: data.wantMetalSeal,
-          additionalDeliveryAddresses: data.additionalDeliveryAddresses,
-          amountPaid: price,
-          basePrice: price,
-          sealCost: sealCost,
-          doorToDoorCost: doorToDoorCost
-        }
-      });
-      
-      if (error) {
-        console.error('Error creating shipment:', error);
-        throw error;
-      }
-      
-      onSubmitComplete(data, shipmentId, price);
-    } catch (error: any) {
-      console.error('Error submitting booking form:', error);
+      const finalFormData = {
+        ...formData,
+        additionalDeliveryAddresses,
+      };
+
+      onSubmitComplete(finalFormData, shipmentId, amount);
+    } catch (error) {
+      console.error('Form submission error:', error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to submit booking. Please try again.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to submit the form. Please try again.',
+        variant: 'destructive',
       });
+    } finally {
       setIsSubmitting(false);
     }
   };
 
-  const validateTab = (tab: string): boolean => {
-    const fields: Record<string, string[]> = {
-      'sender': ['firstName', 'lastName', 'email', 'phone', 'pickupCountry', 'pickupAddress'],
-      'recipient': ['recipientName', 'recipientPhone', 'deliveryAddress', 'deliveryCity'],
-      'shipment': [],
-      'payment': ['paymentOption', 'terms']
-    };
-    
-    if (watchPickupCountry === 'England') {
-      fields.sender.push('pickupPostcode');
-    } else if (watchPickupCountry === 'Ireland') {
-      fields.sender.push('pickupCity');
-    }
-    
-    const currentFields = fields[tab];
-    
-    if (!currentFields) {
-      return true;
-    }
-    
-    let isValid = true;
-    
-    currentFields.forEach(field => {
-      const fieldValue = form.getValues(field as any);
-      if (fieldValue === undefined || fieldValue === '') {
-        form.setError(field as any, { 
-          type: 'manual', 
-          message: `This field is required` 
-        });
-        isValid = false;
-      }
-    });
-    
-    if (tab === 'shipment') {
-      // Make sure at least one option is selected
-      if (!watchIncludeDrums && !watchIncludeOtherItems) {
-        isValid = false;
-        toast({
-          title: "Missing Information",
-          description: "Please select at least one shipment type (Drums or Other Items).",
-          variant: "destructive",
-        });
-      }
-      
-      // Check required fields based on selection
-      if (watchIncludeDrums && (!watchDrumQuantity || parseInt(watchDrumQuantity || '0') < 1)) {
-        isValid = false;
-        form.setError('drumQuantity', {
-          type: 'manual',
-          message: 'Please enter the number of drums'
-        });
-      }
-      
-      if (watchIncludeOtherItems) {
-        if (!watchItemCategory) {
-          isValid = false;
-          form.setError('itemCategory', {
-            type: 'manual',
-            message: 'Please select a category'
-          });
-        } else if (watchItemCategory !== 'other' && !watchSpecificItem) {
-          isValid = false;
-          form.setError('specificItem', {
-            type: 'manual',
-            message: 'Please select a specific item'
-          });
-        } else if (watchSpecificItem === 'Other' && !form.getValues('otherItemDescription')) {
-          isValid = false;
-          form.setError('otherItemDescription', {
-            type: 'manual',
-            message: 'Please provide a description'
-          });
-        }
-      }
-    }
-    
-    return isValid;
-  };
+  const finalAmount = amount;
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <Tabs 
-          value={currentTab} 
-          onValueChange={setCurrentTab}
-          className="w-full"
-        >
-          <TabsList className="grid grid-cols-4 mb-6">
-            <TabsTrigger value="sender" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              <span className="hidden md:inline">Sender Information</span>
-              <span className="inline md:hidden">Sender</span>
-            </TabsTrigger>
-            <TabsTrigger value="recipient" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              <span className="hidden md:inline">Receiver Information</span>
-              <span className="inline md:hidden">Receiver</span>
-            </TabsTrigger>
-            <TabsTrigger value="shipment" className="flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              <span className="hidden md:inline">Shipment Details</span>
-              <span className="inline md:hidden">Shipment</span>
-            </TabsTrigger>
-            <TabsTrigger value="payment" className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              <span className="hidden md:inline">Payment Method</span>
-              <span className="inline md:hidden">Payment</span>
-            </TabsTrigger>
-          </TabsList>
+    <Card className="p-6">
+      <h2 className="text-2xl font-semibold mb-4">
+        {steps[currentStep]}
+      </h2>
 
-          <TabsContent value="sender">
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Sender Information</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="firstName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>First Name *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="John" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="lastName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Last Name *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Doe" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="john.doe@example.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone Number *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="+44 7123 456789" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="mt-4">
-                <FormField
-                  control={form.control}
-                  name="pickupCountry"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Pick Up Country *</FormLabel>
-                      <Select 
-                        onValueChange={(value) => {
-                          field.onChange(value);
-                          if (value === 'England') {
-                            form.setValue('pickupCity', '');
-                          } else {
-                            form.setValue('pickupPostcode', '');
-                          }
-                        }} 
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select country" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="England">England</SelectItem>
-                          <SelectItem value="Ireland">Ireland</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="mt-4">
-                <FormField
-                  control={form.control}
-                  name="pickupAddress"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Pick Up Address *</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Enter your full address"
-                          className="resize-none"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              {watchPickupCountry === 'England' ? (
-                <div className="mt-4">
-                  <FormField
-                    control={form.control}
-                    name="pickupPostcode"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Postal Code *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="E.g. SW1A 1AA" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              ) : (
-                <div className="mt-4">
-                  <FormField
-                    control={form.control}
-                    name="pickupCity"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>City *</FormLabel>
-                        <Select 
-                          onValueChange={field.onChange} 
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select city" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {irelandCities.map((city) => (
-                              <SelectItem key={city} value={city}>
-                                {city}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {currentStep === 0 && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="firstName" className={validationErrors.firstName ? "text-destructive" : ""}>First Name*</Label>
+              <Input
+                id="firstName"
+                value={formData.firstName || ''}
+                onChange={(e) => handleInputChange('firstName', e.target.value)}
+                className={validationErrors.firstName ? "border-destructive" : ""}
+                required
+              />
+              {validationErrors.firstName && (
+                <p className="text-destructive text-sm">{validationErrors.firstName}</p>
               )}
-              
-              {showPostcodeWarning && (
-                <Alert className="mt-4 bg-amber-50 border-amber-200">
-                  <Info className="h-4 w-4 text-amber-500" />
-                  <AlertTitle className="text-amber-800">Restricted Area</AlertTitle>
-                  <AlertDescription className="text-amber-700">
-                    Your postal code is in a restricted area. Contact our support team to make special arrangements before booking.
-                  </AlertDescription>
-                </Alert>
-              )}
-              
-              {showCollectionInfo && (
-                <CollectionInfo 
-                  country={watchPickupCountry}
-                  postalCode={watchPickupPostcode}
-                  city={watchPickupCity}
-                />
-              )}
-              
-              <div className="flex justify-end mt-6">
-                <Button 
-                  type="button" 
-                  onClick={goToNextTab}
-                  className="bg-zim-green hover:bg-zim-green/90"
-                >
-                  Next: Recipient
-                </Button>
-              </div>
-            </Card>
-          </TabsContent>
+            </div>
 
-          <TabsContent value="recipient">
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Receiver Information</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="recipientName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Receiver Name *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Jane Smith" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="recipientPhone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Receiver Phone Number *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="+1 234 567 8900" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="lastName" className={validationErrors.lastName ? "text-destructive" : ""}>Last Name*</Label>
+              <Input
+                id="lastName"
+                value={formData.lastName || ''}
+                onChange={(e) => handleInputChange('lastName', e.target.value)}
+                className={validationErrors.lastName ? "border-destructive" : ""}
+                required
+              />
+              {validationErrors.lastName && (
+                <p className="text-destructive text-sm">{validationErrors.lastName}</p>
+              )}
+            </div>
 
-              <div className="mt-4">
-                <div className="flex items-center mb-2">
-                  <Checkbox 
-                    id="additionalPhone" 
-                    checked={hasAdditionalPhone}
-                    onCheckedChange={(checked) => {
-                      setHasAdditionalPhone(!!checked);
-                      if (!checked) {
-                        form.setValue('additionalRecipientPhone', '');
+            <div className="space-y-2">
+              <Label htmlFor="email" className={validationErrors.email ? "text-destructive" : ""}>Email*</Label>
+              <Input
+                type="email"
+                id="email"
+                value={formData.email || ''}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                className={validationErrors.email ? "border-destructive" : ""}
+                required
+              />
+              {validationErrors.email && (
+                <p className="text-destructive text-sm">{validationErrors.email}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone" className={validationErrors.phone ? "text-destructive" : ""}>Phone Number*</Label>
+              <Input
+                type="tel"
+                id="phone"
+                value={formData.phone || ''}
+                onChange={(e) => handleInputChange('phone', e.target.value)}
+                className={validationErrors.phone ? "border-destructive" : ""}
+                required
+              />
+              {validationErrors.phone && (
+                <p className="text-destructive text-sm">{validationErrors.phone}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pickupAddress" className={validationErrors.pickupAddress ? "text-destructive" : ""}>Pickup Address*</Label>
+              <Input
+                id="pickupAddress"
+                value={formData.pickupAddress || ''}
+                onChange={(e) => handleInputChange('pickupAddress', e.target.value)}
+                className={validationErrors.pickupAddress ? "border-destructive" : ""}
+                required
+              />
+              {validationErrors.pickupAddress && (
+                <p className="text-destructive text-sm">{validationErrors.pickupAddress}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pickupCountry">Pickup Country</Label>
+              <Select
+                value={formData.pickupCountry || 'England'}
+                onValueChange={(value) => handleInputChange('pickupCountry', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a country" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="England">England</SelectItem>
+                  <SelectItem value="Zimbabwe">Zimbabwe</SelectItem>
+                  <SelectItem value="South Africa">South Africa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {formData.pickupCountry === 'England' ? (
+              <div className="space-y-2">
+                <Label htmlFor="pickupPostcode" className={validationErrors.pickupPostcode ? "text-destructive" : ""}>Pickup Postcode*</Label>
+                <Input
+                  id="pickupPostcode"
+                  value={formData.pickupPostcode || ''}
+                  onChange={(e) => handleInputChange('pickupPostcode', e.target.value)}
+                  className={validationErrors.pickupPostcode ? "border-destructive" : ""}
+                  required
+                />
+                {validationErrors.pickupPostcode && (
+                  <p className="text-destructive text-sm">{validationErrors.pickupPostcode}</p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="pickupCity" className={validationErrors.pickupCity ? "text-destructive" : ""}>Pickup City*</Label>
+                <Input
+                  id="pickupCity"
+                  value={formData.pickupCity || ''}
+                  onChange={(e) => handleInputChange('pickupCity', e.target.value)}
+                  className={validationErrors.pickupCity ? "border-destructive" : ""}
+                  required
+                />
+                {validationErrors.pickupCity && (
+                  <p className="text-destructive text-sm">{validationErrors.pickupCity}</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {currentStep === 1 && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="recipientName" className={validationErrors.recipientName ? "text-destructive" : ""}>Recipient Name*</Label>
+              <Input
+                id="recipientName"
+                value={formData.recipientName || ''}
+                onChange={(e) => handleInputChange('recipientName', e.target.value)}
+                className={validationErrors.recipientName ? "border-destructive" : ""}
+                required
+              />
+              {validationErrors.recipientName && (
+                <p className="text-destructive text-sm">{validationErrors.recipientName}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="recipientPhone" className={validationErrors.recipientPhone ? "text-destructive" : ""}>Recipient Phone*</Label>
+              <Input
+                type="tel"
+                id="recipientPhone"
+                value={formData.recipientPhone || ''}
+                onChange={(e) => handleInputChange('recipientPhone', e.target.value)}
+                className={validationErrors.recipientPhone ? "border-destructive" : ""}
+                required
+              />
+              {validationErrors.recipientPhone && (
+                <p className="text-destructive text-sm">{validationErrors.recipientPhone}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="additionalRecipientPhone">Additional Recipient Phone</Label>
+              <Input
+                type="tel"
+                id="additionalRecipientPhone"
+                value={formData.additionalRecipientPhone || ''}
+                onChange={(e) => handleInputChange('additionalRecipientPhone', e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="deliveryAddress" className={validationErrors.deliveryAddress ? "text-destructive" : ""}>Delivery Address*</Label>
+              <Input
+                id="deliveryAddress"
+                value={formData.deliveryAddress || ''}
+                onChange={(e) => handleInputChange('deliveryAddress', e.target.value)}
+                className={validationErrors.deliveryAddress ? "border-destructive" : ""}
+                required
+              />
+              {validationErrors.deliveryAddress && (
+                <p className="text-destructive text-sm">{validationErrors.deliveryAddress}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="deliveryCity" className={validationErrors.deliveryCity ? "text-destructive" : ""}>Delivery City*</Label>
+              <Input
+                id="deliveryCity"
+                value={formData.deliveryCity || ''}
+                onChange={(e) => handleInputChange('deliveryCity', e.target.value)}
+                className={validationErrors.deliveryCity ? "border-destructive" : ""}
+                required
+              />
+              {validationErrors.deliveryCity && (
+                <p className="text-destructive text-sm">{validationErrors.deliveryCity}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {currentStep === 2 && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Shipment Type*</Label>
+              <div className="flex flex-col space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="includeDrums"
+                    checked={formData.includeDrums || false}
+                    onCheckedChange={() => {
+                      handleCheckboxChange('includeDrums');
+                      if (validationErrors.generalShipment) {
+                        setValidationErrors(prev => {
+                          const { generalShipment, ...rest } = prev;
+                          return rest;
+                        });
                       }
                     }}
                   />
-                  <label htmlFor="additionalPhone" className="ml-2 text-sm font-medium text-gray-700 cursor-pointer">
-                    Add another receiver phone number
-                  </label>
+                  <Label htmlFor="includeDrums">Include Drums</Label>
                 </div>
-                
-                {hasAdditionalPhone && (
-                  <FormField
-                    control={form.control}
-                    name="additionalRecipientPhone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Additional Phone Number</FormLabel>
-                        <FormControl>
-                          <Input placeholder="+1 234 567 8900" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="includeOtherItems"
+                    checked={formData.includeOtherItems || false}
+                    onCheckedChange={() => {
+                      handleCheckboxChange('includeOtherItems');
+                      if (validationErrors.generalShipment) {
+                        setValidationErrors(prev => {
+                          const { generalShipment, ...rest } = prev;
+                          return rest;
+                        });
+                      }
+                    }}
                   />
+                  <Label htmlFor="includeOtherItems">Include Other Items</Label>
+                </div>
+              </div>
+              {validationErrors.generalShipment && (
+                <p className="text-destructive text-sm">{validationErrors.generalShipment}</p>
+              )}
+            </div>
+
+            {formData.includeDrums && (
+              <div className="space-y-2">
+                <Label htmlFor="drumQuantity" className={validationErrors.drumQuantity ? "text-destructive" : ""}>Number of Drums*</Label>
+                <Input
+                  type="number"
+                  id="drumQuantity"
+                  value={formData.drumQuantity || ''}
+                  onChange={(e) => handleInputChange('drumQuantity', e.target.value)}
+                  className={validationErrors.drumQuantity ? "border-destructive" : ""}
+                  required={formData.includeDrums}
+                />
+                {validationErrors.drumQuantity && (
+                  <p className="text-destructive text-sm">{validationErrors.drumQuantity}</p>
                 )}
               </div>
-              
-              <div className="mt-4">
-                <FormField
-                  control={form.control}
-                  name="deliveryAddress"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Delivery Address *</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Enter recipient's full address"
-                          className="resize-none"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="mt-4">
-                <FormField
-                  control={form.control}
-                  name="deliveryCity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Delivery City *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="E.g. Harare" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        We deliver in major towns and cities except rural areas
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="flex justify-between mt-6">
-                <Button 
-                  type="button" 
-                  variant="outline"
-                  onClick={goToPreviousTab}
-                >
-                  Back
-                </Button>
-                <Button 
-                  type="button" 
-                  onClick={goToNextTab}
-                  className="bg-zim-green hover:bg-zim-green/90"
-                >
-                  Next: Shipment
-                </Button>
-              </div>
-            </Card>
-          </TabsContent>
+            )}
 
-          <TabsContent value="shipment">
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Shipment Details</h3>
-              
-              <div className="mb-6">
-                <FormLabel className="block mb-3">What would you like to ship? *</FormLabel>
-                {renderShipmentTypeOptions()}
-              </div>
-              
-              {watchIncludeDrums && (
-                <div className="border-t pt-6 mb-6">
-                  <h4 className="font-medium text-lg mb-4">Drum Details</h4>
-                  <div className="mt-4">
-                    <FormField
-                      control={form.control}
-                      name="drumQuantity"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Number of Drums *</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              min="1" 
-                              max="1000" 
-                              step="1" 
-                              placeholder="Enter number of drums" 
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            <div className="text-sm text-gray-500 mt-1">
-                              <div className="font-medium">Pricing Per Drum:</div>
-                              <ul className="list-disc pl-5 mt-1">
-                                <li>1 Drum: £280 each</li>
-                                <li>2-4 Drums: £260 each</li>
-                                <li>5+ Drums: £240 each</li>
-                              </ul>
-                            </div>
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <div className="mt-4">
-                    <FormField
-                      control={form.control}
-                      name="wantMetalSeal"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>
-                              Add Metal coded Seal (£5 per drum)
-                            </FormLabel>
-                            <FormDescription>
-                              Metal coded seals provide extra security for your shipment
-                            </FormDescription>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <div className="mt-4">
-                    <FormField
-                      control={form.control}
-                      name="doorToDoor"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>
-                              Door-to-Door Delivery (£25 per address)
-                            </FormLabel>
-                            <FormDescription>
-                              We'll deliver directly to the recipient's door
-                            </FormDescription>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  {watchDoorToDoor && (
-                    <>
-                      <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium mb-2">Additional Delivery Addresses</h4>
-                        <p className="text-sm text-gray-500 mb-4">
-                          Each additional address incurs a £25 delivery fee
-                        </p>
-                        
-                        {additionalAddresses.map((address, index) => (
-                          <div key={index} className="mb-4 p-4 border rounded-md">
-                            <div className="flex justify-between items-center mb-2">
-                              <h5 className="font-medium">Address #{index + 1}</h5>
-                              <Button
-                                type="button"
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => removeDeliveryAddress(index)}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                            
-                            <div className="space-y-3">
-                              <div>
-                                <label className="text-sm font-medium block mb-1">Recipient Name</label>
-                                <Input
-                                  value={address.recipientName}
-                                  onChange={(e) => updateDeliveryAddress(index, 'recipientName', e.target.value)}
-                                  placeholder="Recipient Name"
-                                />
-                              </div>
-                              
-                              <div>
-                                <label className="text-sm font-medium block mb-1">Recipient Phone Number</label>
-                                <Input
-                                  value={address.recipientPhone}
-                                  onChange={(e) => updateDeliveryAddress(index, 'recipientPhone', e.target.value)}
-                                  placeholder="Phone Number"
-                                />
-                              </div>
-                              
-                              <div>
-                                <label className="text-sm font-medium block mb-1">Delivery Address</label>
-                                <Textarea
-                                  value={address.address}
-                                  onChange={(e) => updateDeliveryAddress(index, 'address', e.target.value)}
-                                  placeholder="Full Address"
-                                  className="resize-none"
-                                />
-                              </div>
-                              
-                              <div>
-                                <label className="text-sm font-medium block mb-1">City</label>
-                                <Input
-                                  value={address.city}
-                                  onChange={(e) => updateDeliveryAddress(index, 'city', e.target.value)}
-                                  placeholder="City"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                        
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={addNewDeliveryAddress}
-                          className="w-full mt-2"
-                        >
-                          <Plus className="h-4 w-4 mr-2" /> Add Another Address
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-              
-              {watchIncludeOtherItems && (
-                <div className={`${watchIncludeDrums ? 'border-t pt-6' : ''} mb-6`}>
-                  <h4 className="font-medium text-lg mb-4">Other Item Details</h4>
-                  <div className="mt-4">
-                    <FormField
-                      control={form.control}
-                      name="itemCategory"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Item Category *</FormLabel>
-                          <Select 
-                            onValueChange={(value) => {
-                              field.onChange(value);
-                              setSelectedCategory(value);
-                              form.setValue('specificItem', '');
-                            }} 
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select category" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {Object.keys(itemCategories).map((category) => (
-                                <SelectItem key={category} value={category}>
-                                  {category.charAt(0).toUpperCase() + category.slice(1)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  {selectedCategory && (
-                    <div className="mt-4">
-                      <FormField
-                        control={form.control}
-                        name="specificItem"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Specific Item *</FormLabel>
-                            <Select 
-                              onValueChange={field.onChange} 
-                              value={field.value}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select item" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {selectedCategory && itemCategories[selectedCategory as keyof typeof itemCategories].map((item) => (
-                                  <SelectItem key={item} value={item}>
-                                    {item}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  )}
-                  
-                  {watchSpecificItem === 'Other Item' && (
-                    <div className="mt-4">
-                      <FormField
-                        control={form.control}
-                        name="otherItemDescription"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Item Description *</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                placeholder="Please provide a detailed description of your item"
-                                className="resize-none"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormDescription>
-                              Include dimensions, weight, and any other relevant details
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              <div className="mt-6 pt-6 border-t flex justify-between">
-                <div>
-                  {watchIncludeDrums && (
-                    <>
-                      <h4 className="font-medium">Estimated Cost</h4>
-                      <div className="text-2xl font-bold mt-2 text-zim-green">
-                        £{(price + sealCost + doorToDoorCost).toFixed(2)}
-                      </div>
-                      {discountApplied && (
-                        <div className="mt-1 text-sm text-green-600">
-                          Includes £{(originalPrice - price).toFixed(2)} savings!
-                        </div>
-                      )}
-                    </>
-                  )}
-                  {watchIncludeOtherItems && !watchIncludeDrums && (
-                    <div className="text-md">
-                      Custom quote will be provided after submission
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-end gap-3">
-                  <Button 
-                    type="button" 
-                    variant="outline"
-                    onClick={goToPreviousTab}
+            {formData.includeOtherItems && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="itemCategory" className={validationErrors.itemCategory ? "text-destructive" : ""}>Item Category*</Label>
+                  <Select
+                    value={formData.itemCategory || ''}
+                    onValueChange={(value) => {
+                      handleInputChange('itemCategory', value);
+                      if (validationErrors.itemCategory) {
+                        setValidationErrors(prev => {
+                          const { itemCategory, ...rest } = prev;
+                          return rest;
+                        });
+                      }
+                    }}
                   >
-                    Back
-                  </Button>
-                  <Button 
-                    type="button" 
-                    onClick={goToNextTab}
-                    className="bg-zim-green hover:bg-zim-green/90"
-                  >
-                    {(!watchIncludeDrums && watchIncludeOtherItems) ? 'Request Quote' : 'Next: Payment'}
-                  </Button>
+                    <SelectTrigger className={validationErrors.itemCategory ? "border-destructive" : ""}>
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="furniture">Furniture</SelectItem>
+                      <SelectItem value="appliances">Appliances</SelectItem>
+                      <SelectItem value="electronics">Electronics</SelectItem>
+                      <SelectItem value="vehicles">Vehicle Parts</SelectItem>
+                      <SelectItem value="equipment">Equipment</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {validationErrors.itemCategory && (
+                    <p className="text-destructive text-sm">{validationErrors.itemCategory}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="specificItem" className={validationErrors.specificItem ? "text-destructive" : ""}>Specific Item*</Label>
+                  <Input
+                    id="specificItem"
+                    value={formData.specificItem || ''}
+                    onChange={(e) => handleInputChange('specificItem', e.target.value)}
+                    className={validationErrors.specificItem ? "border-destructive" : ""}
+                    required={formData.includeOtherItems}
+                  />
+                  {validationErrors.specificItem && (
+                    <p className="text-destructive text-sm">{validationErrors.specificItem}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="otherItemDescription" className={validationErrors.otherItemDescription ? "text-destructive" : ""}>Item Description*</Label>
+                  <Textarea
+                    id="otherItemDescription"
+                    value={formData.otherItemDescription || ''}
+                    onChange={(e) => handleInputChange('otherItemDescription', e.target.value)}
+                    className={validationErrors.otherItemDescription ? "border-destructive" : ""}
+                    required={formData.includeOtherItems}
+                  />
+                  {validationErrors.otherItemDescription && (
+                    <p className="text-destructive text-sm">{validationErrors.otherItemDescription}</p>
+                  )}
                 </div>
               </div>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="payment">
-            <PaymentMethodSection
-              bookingData={{
-                shipmentDetails: {
-                  type: watchIncludeDrums ? 'drum' : 'other',
-                  quantity: parseInt(watchDrumQuantity || '1'),
-                  services: [
-                    ...(watchWantMetalSeal && watchIncludeDrums ? [{
-                      name: `Metal Seal${parseInt(watchDrumQuantity || '1') > 1 ? 's' : ''} (${parseInt(watchDrumQuantity || '1')} x £5)`,
-                      price: sealCost
-                    }] : []),
-                    ...(watchDoorToDoor ? [{
-                      name: `Door to Door Delivery (${1 + additionalAddresses.length} address${(1 + additionalAddresses.length) > 1 ? 'es' : ''})`,
-                      price: doorToDoorCost
-                    }] : [])
-                  ],
-                }
-              }}
-              totalAmount={price + sealCost + doorToDoorCost}
-              onCancel={goToPreviousTab}
-              onComplete={handlePaymentComplete}
-            />
-          </TabsContent>
-        </Tabs>
+            )}
+
+            {formData.includeOtherItems && formData.itemCategory === 'parcel' && (
+              <div className="space-y-2">
+                <Label htmlFor="weight">Weight (kg)</Label>
+                <Input
+                  type="number"
+                  id="weight"
+                  value={weight}
+                  onChange={(e) => setWeight(e.target.value)}
+                  placeholder="Enter weight in kg"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {currentStep === 3 && (
+          <div className="space-y-4">
+            {formData.includeDrums && (
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="wantMetalSeal"
+                  checked={formData.wantMetalSeal || false}
+                  onCheckedChange={() => handleCheckboxChange('wantMetalSeal')}
+                />
+                <Label htmlFor="wantMetalSeal">Want Metal Coded Seals (£5 per drum)</Label>
+              </div>
+            )}
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="doorToDoor"
+                checked={formData.doorToDoor || false}
+                onCheckedChange={() => handleCheckboxChange('doorToDoor')}
+              />
+              <Label htmlFor="doorToDoor">Door-to-door delivery (£25 per address)</Label>
+            </div>
+
+            {formData.doorToDoor && (
+              <div className="space-y-4">
+                {additionalDeliveryAddresses.map(addr => (
+                  <div key={addr.id} className="border rounded-md p-4 space-y-2">
+                    <div className="space-y-1">
+                      <Label htmlFor={`address-${addr.id}`}>Address</Label>
+                      <Input
+                        type="text"
+                        id={`address-${addr.id}`}
+                        value={addr.address}
+                        onChange={(e) => updateDeliveryAddress(addr.id, 'address', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor={`city-${addr.id}`}>City</Label>
+                      <Input
+                        type="text"
+                        id={`city-${addr.id}`}
+                        value={addr.city}
+                        onChange={(e) => updateDeliveryAddress(addr.id, 'city', e.target.value)}
+                      />
+                    </div>
+                    <Button type="button" variant="destructive" size="sm" onClick={() => removeDeliveryAddress(addr.id)}>
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+                <Button type="button" variant="secondary" size="sm" onClick={addDeliveryAddress}>
+                  Add Additional Delivery Address
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {currentStep === 4 && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="paymentOption">Payment Option</Label>
+              <Select
+                value={formData.paymentOption || 'standard'}
+                onValueChange={(value) => handleInputChange('paymentOption', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a payment option" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="standard">Standard</SelectItem>
+                  <SelectItem value="cashOnCollection">Cash on Collection</SelectItem>
+                  <SelectItem value="payOnArrival">Pay on Arrival</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="paymentMethod">Payment Method</Label>
+              <Select
+                value={formData.paymentMethod || 'card'}
+                onValueChange={(value) => handleInputChange('paymentMethod', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a payment method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="bankTransfer">Bank Transfer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-between">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleBack}
+            disabled={currentStep === 0}
+          >
+            <ChevronLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+
+          {currentStep < steps.length - 1 ? (
+            <Button
+              type="button"
+              onClick={handleNext}
+              disabled={isSubmitting}
+            >
+              Next
+              <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              className="bg-zim-green hover:bg-zim-green/90"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                'Book Shipment'
+              )}
+            </Button>
+          )}
+        </div>
       </form>
-    </Form>
+    </Card>
   );
 };
 
