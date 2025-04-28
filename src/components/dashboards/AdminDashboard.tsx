@@ -509,6 +509,10 @@ const AdminDashboard = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[120px]">Tracking #</TableHead>
+                      <TableHead>Sender Name</TableHead>
+                      <TableHead>Receiver Name</TableHead>
+                      <TableHead>Sender number</TableHead>
+                      <TableHead>Receiver Number</TableHead>
                       <TableHead>Origin</TableHead>
                       <TableHead>Destination</TableHead>
                       <TableHead>Status</TableHead>
