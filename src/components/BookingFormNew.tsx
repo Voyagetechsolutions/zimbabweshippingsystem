@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -423,6 +422,11 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       });
       setIsSubmitting(false);
     }
+  };
+
+  const handlePaymentComplete = (paymentData: any) => {
+    // Submit the form with the payment data
+    onSubmit(form.getValues());
   };
 
   const validateTab = (tab: string): boolean => {

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { CheckCircle2, AlertCircle, CreditCard, Wallet, CalendarClock } from 'lucide-react';
+import { CheckCircle2, AlertCircle, CreditCard, Wallet, CalendarClock, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface PaymentMethodSectionProps {
@@ -25,17 +25,14 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  // Calculate special deal price (£20 off per drum for cash on collection)
   const isSpecialDeal = selectedPaymentMethod === 'cashOnCollection';
   const drumQuantity = bookingData?.shipmentDetails?.type === 'drum' ? (bookingData?.shipmentDetails?.quantity || 1) : 0;
   const specialDealDiscount = isSpecialDeal ? (20 * drumQuantity) : 0;
   
-  // Calculate pay on arrival premium (20% extra)
   const isPayOnArrival = selectedPaymentMethod === 'payOnArrival';
   const baseAmount = totalAmount - specialDealDiscount;
   const payOnArrivalPremium = isPayOnArrival ? (baseAmount * 0.20) : 0;
   
-  // Calculate final amount
   const finalAmount = isSpecialDeal ? (totalAmount - specialDealDiscount) : 
                       isPayOnArrival ? (totalAmount + payOnArrivalPremium) : 
                       totalAmount;
@@ -56,8 +53,7 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
 
       await onComplete(paymentData);
       
-      // Navigation to Receipt page is now handled by the parent component
-      // after handling any additional custom quote submissions if needed
+      navigate('/receipt');
     } catch (error) {
       console.error('Payment processing error:', error);
       toast({

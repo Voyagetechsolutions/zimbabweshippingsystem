@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -46,13 +45,11 @@ const Receipt: React.FC<ReceiptProps> = ({
   const isMobile = useIsMobile();
   const location = useLocation();
   
-  // Use data from props or from location state
   const stateData = location.state || {};
   const bookingData = propBookingData || stateData.bookingData || {};
   const paymentData = propPaymentData || stateData.paymentData || {};
   const customQuoteData = propCustomQuote || stateData.customQuoteData || {};
   
-  // Create a combined receipt object from booking and payment data if needed
   const receipt = propReceipt || {
     receipt_number: `ZIM-${Date.now().toString().substring(8)}`,
     created_at: new Date().toISOString(),
@@ -73,13 +70,14 @@ const Receipt: React.FC<ReceiptProps> = ({
   };
 
   useEffect(() => {
-    // Save receipt to Supabase if we have booking data and payment data but no receipt ID
     const createReceiptRecord = async () => {
       if (bookingData && paymentData && !propReceipt && bookingData.shipment_id) {
         try {
-          // Create the receipt in the database
+          const paymentId = generateUniqueId('pmt_');
+          
           await supabase.from('receipts').insert({
             receipt_number: receipt.receipt_number,
+            payment_id: paymentId,
             amount: paymentData.finalAmount,
             currency: 'GBP',
             payment_method: getPaymentMethodValue(paymentData.method, paymentData.payLaterMethod),
@@ -90,9 +88,8 @@ const Receipt: React.FC<ReceiptProps> = ({
             status: 'issued'
           });
 
-          // Also update the admin dashboard with a notification
           await supabase.from('notifications').insert({
-            user_id: '00000000-0000-0000-0000-000000000000', // Admin notification
+            user_id: '00000000-0000-0000-0000-000000000000',
             title: 'New Shipment Booked',
             message: `A new shipment has been booked with tracking number: ${shipment.tracking_number}`,
             type: 'shipment',
@@ -108,6 +105,10 @@ const Receipt: React.FC<ReceiptProps> = ({
     createReceiptRecord();
   }, [bookingData, paymentData, propReceipt]);
   
+  const generateUniqueId = (prefix: string = '') => {
+    return `${prefix}${Date.now().toString(36)}${Math.random().toString(36).substring(2, 7)}`;
+  };
+
   const handlePrint = () => {
     const content = receiptRef.current;
     if (!content) return;
@@ -122,7 +123,6 @@ const Receipt: React.FC<ReceiptProps> = ({
       return;
     }
     
-    // Apply print-specific styling
     printWindow.document.write(`
       <html>
         <head>
@@ -231,7 +231,6 @@ const Receipt: React.FC<ReceiptProps> = ({
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
       
-      // Wait for PDF to be generated and downloaded
       await html2pdf().from(content).set(options).save();
       
       toast({
@@ -255,11 +254,9 @@ const Receipt: React.FC<ReceiptProps> = ({
     });
     
     try {
-      // Get the user's email from sender_details or fall back to a prompt
       let email = receipt.sender_details?.email;
       
       if (!email) {
-        // If email is not available in receipt, prompt the user
         const userEmail = window.prompt("Please enter your email address to receive the receipt:");
         if (!userEmail) {
           toast({
@@ -271,7 +268,6 @@ const Receipt: React.FC<ReceiptProps> = ({
         email = userEmail;
       }
       
-      // Call the Supabase Edge Function to send the email
       const { data, error } = await supabase.functions.invoke('email-receipt', {
         body: { 
           receiptId: receipt.receipt_number,
@@ -297,7 +293,6 @@ const Receipt: React.FC<ReceiptProps> = ({
     }
   };
 
-  // Helper function to render payment method in a more user-friendly way
   const getPaymentMethodDisplay = (method: string) => {
     switch(method) {
       case 'stripe':
@@ -318,7 +313,6 @@ const Receipt: React.FC<ReceiptProps> = ({
     }
   };
   
-  // Convert the payment method selection to the stored value
   const getPaymentMethodValue = (method: string, payLaterMethod?: string) => {
     if (method === 'standard' && payLaterMethod) {
       return payLaterMethod;
