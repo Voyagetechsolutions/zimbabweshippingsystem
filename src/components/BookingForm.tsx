@@ -19,6 +19,7 @@ import { getRouteForPostalCode, isRestrictedPostalCode, getIrelandRouteForCity }
 import { generateUniqueId } from '@/lib/utils';
 import { getDateByRoute, getIrelandCities } from '@/data/collectionSchedule';
 import CollectionInfo from '@/components/CollectionInfo';
+import Receipt from '@/components/Receipt';
 
 const bookingFormSchema = z.object({
   firstName: z.string().min(2, { message: 'First name must be at least 2 characters' }),
