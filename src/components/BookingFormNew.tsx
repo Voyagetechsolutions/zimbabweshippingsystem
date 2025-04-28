@@ -348,6 +348,11 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     onSubmitComplete({...data}, shipmentId, 0);
   };
 
+  const handlePaymentComplete = (paymentData: any) => {
+    // Submit the form with the payment data
+    onSubmit(form.getValues());
+  };
+
   const onSubmit = async (data: BookingFormValues) => {
     // Validate that at least one shipment type is selected
     if (!data.includeDrums && !data.includeOtherItems) {
@@ -422,11 +427,6 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       });
       setIsSubmitting(false);
     }
-  };
-
-  const handlePaymentComplete = (paymentData: any) => {
-    // Submit the form with the payment data
-    onSubmit(form.getValues());
   };
 
   const validateTab = (tab: string): boolean => {

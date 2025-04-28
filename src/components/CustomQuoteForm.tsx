@@ -1,312 +1,259 @@
 
-import React, { useState, useEffect } from 'react';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from '@/hooks/use-toast';
-import { Upload, X } from 'lucide-react';
+import React, { useState, ChangeEvent } from 'react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, Upload, X, Image as ImageIcon, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface CustomQuoteFormProps {
-  initialData: any;
+  initialData?: any;
   onSubmit: (data: any) => void;
   onCancel: () => void;
 }
 
-const itemCategories = {
-  'furniture': ['Sofa', 'Chair', 'Dining Table & Chairs', 'Coffee Table', 'Bed', 'Mattress', 'Wardrobe (dismantled)', 'Chest of Drawers', 'Dressing Unit', 'Wall Frame', 'Mirror', 'Home Furniture (other)', 'Office Furniture'],
-  'appliances': ['Washing Machine', 'Dishwasher', 'Dryer', 'American Fridge', 'Standard Fridge', 'Freezer', 'Deep Freezer', 'TV', 'Air Conditioner', 'Heater'],
-  'garden': ['Garden Tools', 'Lawn Mower', 'Trampoline'],
-  'transportation': ['Bicycle', 'Car Wheels/Tyres', 'Vehicle Parts', 'Engine', 'Mobility Scooter'],
-  'household': ['Plastic Tubs', 'Bin', 'Ironing Board', 'Rugs', 'Carpets', 'Internal Doors', 'External Doors', 'Bathroom Equipment'],
-  'mobility': ['Wheelchair', 'Adult Walking Aid', 'Kids Push Chair'],
-  'storage': ['Boxes', 'Bags', 'Suitcase', 'Amazon Bag', 'China Bags', 'Pallets'],
-  'equipment': ['Tool Box', 'Air Compressor', 'Generator', 'Solar Panel', 'Water Pump', 'Pool Pump'],
-  'building': ['Building Materials', 'Home Decor', 'Ladders'],
-  'other': ['Other Item']
-};
-
-const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({ initialData, onSubmit, onCancel }) => {
-  // Pre-populate with data from the initial booking form
-  const [phoneNumber, setPhoneNumber] = useState(initialData?.senderDetails?.phone || '');
-  const [category, setCategory] = useState(initialData?.shipmentDetails?.category || initialData?.itemCategory || '');
-  const [specificItem, setSpecificItem] = useState(initialData?.shipmentDetails?.specificItem || initialData?.specificItem || '');
-  const [otherDescription, setOtherDescription] = useState(initialData?.shipmentDetails?.description || initialData?.otherItemDescription || '');
-  const [images, setImages] = useState<File[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [imageUrls, setImageUrls] = useState<string[]>([]);
-  const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
+const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({
+  initialData,
+  onSubmit,
+  onCancel
+}) => {
+  const [description, setDescription] = useState<string>(initialData?.shipmentDetails?.description || '');
+  const [category, setCategory] = useState<string>(initialData?.shipmentDetails?.category || '');
+  const [phoneNumber, setPhoneNumber] = useState<string>(initialData?.senderDetails?.phone || '');
+  const [uploads, setUploads] = useState<File[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-
-  // Pre-populate fields when initialData changes
-  useEffect(() => {
-    if (initialData) {
-      setPhoneNumber(initialData?.senderDetails?.phone || '');
-      setCategory(initialData?.shipmentDetails?.category || initialData?.itemCategory || '');
-      setSpecificItem(initialData?.shipmentDetails?.specificItem || initialData?.specificItem || '');
-      setOtherDescription(initialData?.shipmentDetails?.description || initialData?.otherItemDescription || '');
+  
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList) return;
+    
+    // Convert FileList to array and filter for image files
+    const newFiles = Array.from(fileList).filter(file => 
+      file.type.startsWith('image/') && file.size < 10 * 1024 * 1024 // Less than 10MB
+    );
+    
+    if (newFiles.length < fileList.length) {
+      toast({
+        title: "Some files were not added",
+        description: "Only image files under 10MB are accepted.",
+        variant: "destructive",
+      });
     }
-  }, [initialData]);
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length) {
-      const newFiles = Array.from(e.target.files);
-      setImages(prev => [...prev, ...newFiles]);
-      
-      // Create preview URLs for the images
-      const newPreviewUrls = newFiles.map(file => URL.createObjectURL(file));
-      setImagePreviewUrls(prev => [...prev, ...newPreviewUrls]);
-    }
+    
+    setUploads([...uploads, ...newFiles]);
   };
-
-  const removeImage = (index: number) => {
-    const newImages = [...images];
-    const newPreviewUrls = [...imagePreviewUrls];
-    
-    // Revoke the object URL to avoid memory leaks
-    URL.revokeObjectURL(newPreviewUrls[index]);
-    
-    newImages.splice(index, 1);
-    newPreviewUrls.splice(index, 1);
-    
-    setImages(newImages);
-    setImagePreviewUrls(newPreviewUrls);
+  
+  const removeFile = (index: number) => {
+    const newFiles = [...uploads];
+    newFiles.splice(index, 1);
+    setUploads(newFiles);
   };
-
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!phoneNumber) {
-      toast({
-        title: "Missing information",
-        description: "Please provide your phone number.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    if (!category || (category !== 'other' && !specificItem) || (specificItem === 'Other' && !otherDescription)) {
-      toast({
-        title: "Missing information",
-        description: "Please specify your item details.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setUploading(true);
+    setIsLoading(true);
+    setError(null);
     
     try {
-      const urls: string[] = [];
+      // Upload any images first
+      const uploadedImageUrls = [...uploadedFiles];
       
-      if (images.length > 0) {
-        for (const file of images) {
-          const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-          const { data: uploadData, error: uploadError } = await supabase.storage
+      if (uploads.length > 0) {
+        for (const file of uploads) {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+          
+          const { error: uploadError, data } = await supabase.storage
             .from('custom-quotes')
             .upload(fileName, file);
           
-          if (uploadError) throw uploadError;
+          if (uploadError) {
+            throw new Error(`Error uploading file: ${uploadError.message}`);
+          }
           
-          const { data: publicUrlData } = supabase.storage
+          const { data: { publicUrl } } = supabase.storage
             .from('custom-quotes')
             .getPublicUrl(fileName);
           
-          urls.push(publicUrlData.publicUrl);
+          uploadedImageUrls.push(publicUrl);
         }
       }
       
-      // Clean up preview URLs to avoid memory leaks
-      imagePreviewUrls.forEach(url => URL.revokeObjectURL(url));
-      
-      const description = specificItem === 'Other' ? otherDescription : specificItem;
-      
-      onSubmit({
-        phoneNumber,
-        category,
-        specificItem,
+      const quoteData = {
         description,
-        imageUrls: urls
-      });
+        category,
+        phoneNumber,
+        imageUrls: uploadedImageUrls
+      };
       
-    } catch (error: any) {
-      console.error('Error uploading images:', error);
-      toast({
-        title: 'Upload Error',
-        description: error.message || 'Failed to upload images. Please try again.',
-        variant: 'destructive',
-      });
-      setUploading(false);
+      onSubmit(quoteData);
+    } catch (err: any) {
+      console.error('Error submitting form:', err);
+      setError(err.message || 'An error occurred. Please try again.');
+      setIsLoading(false);
     }
   };
-
+  
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <div className="mb-6 p-4 border-l-4 border-blue-500 bg-blue-50">
-        <h3 className="font-semibold text-blue-800 mb-2">How Custom Quotes Work</h3>
-        <ol className="list-decimal ml-5 space-y-2">
-          <li>Enter your phone number so we can contact you with the quote</li>
-          <li>Select the category and specific item you want to ship</li>
-          <li>Upload photos of your item(s) to help us provide an accurate quote</li>
-          <li>Submit your request and our team will contact you within 24 hours</li>
-        </ol>
-      </div>
-
+    <Card className="p-6">
+      <h3 className="text-xl font-semibold mb-4">Request Custom Quote</h3>
+      <p className="text-gray-600 mb-6">
+        Please provide details about the items you want to ship so we can give you an accurate quote.
+      </p>
+      
+      {error && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">
-            Phone Number *
-          </label>
-          <Input
-            type="tel"
-            id="phoneNumber"
-            value={phoneNumber}
-            onChange={(e) => setPhoneNumber(e.target.value)}
-            className="w-full"
-            placeholder="+44 7123 456789"
-            required
-          />
-        </div>
-        
-        <div>
-          <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
-            Item Category *
-          </label>
+          <Label htmlFor="category">Item Category</Label>
           <Select 
             value={category} 
-            onValueChange={(value) => {
-              setCategory(value);
-              setSpecificItem('');
-            }}
+            onValueChange={setCategory}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select category" />
+              <SelectValue placeholder="Select a category" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="furniture">Furniture</SelectItem>
               <SelectItem value="appliances">Appliances</SelectItem>
-              <SelectItem value="garden">Garden Items</SelectItem>
-              <SelectItem value="transportation">Transportation</SelectItem>
-              <SelectItem value="household">Household Items</SelectItem>
-              <SelectItem value="mobility">Mobility Aids</SelectItem>
-              <SelectItem value="storage">Storage Items</SelectItem>
+              <SelectItem value="electronics">Electronics</SelectItem>
+              <SelectItem value="vehicles">Vehicle Parts</SelectItem>
               <SelectItem value="equipment">Equipment</SelectItem>
-              <SelectItem value="building">Building Materials</SelectItem>
               <SelectItem value="other">Other</SelectItem>
             </SelectContent>
           </Select>
         </div>
         
-        {category && category !== 'other' && (
-          <div>
-            <label htmlFor="specificItem" className="block text-sm font-medium text-gray-700 mb-1">
-              Specific Item *
-            </label>
-            <Select 
-              value={specificItem} 
-              onValueChange={setSpecificItem}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select item" />
-              </SelectTrigger>
-              <SelectContent>
-                {itemCategories[category as keyof typeof itemCategories]?.map((item) => (
-                  <SelectItem key={item} value={item}>{item}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-        
-        {(category === 'other' || specificItem === 'Other') && (
-          <div>
-            <label htmlFor="otherDescription" className="block text-sm font-medium text-gray-700 mb-1">
-              Item Description *
-            </label>
-            <Textarea
-              id="otherDescription"
-              value={otherDescription}
-              onChange={(e) => setOtherDescription(e.target.value)}
-              className="w-full resize-none"
-              rows={4}
-              placeholder="Please provide details about the item(s) including size, weight, condition, etc."
-              required
-            />
-          </div>
-        )}
+        <div>
+          <Label htmlFor="description">Description</Label>
+          <Textarea
+            id="description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Please describe your item including dimensions and weight if possible"
+            rows={5}
+            required
+          />
+        </div>
         
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">
-            Upload Images *
-          </label>
+          <Label htmlFor="phoneNumber">Contact Phone Number</Label>
+          <Input
+            id="phoneNumber"
+            type="tel"
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            placeholder="Enter your phone number"
+            required
+          />
+        </div>
+        
+        <div>
+          <Label className="block mb-2">Upload Images (Optional)</Label>
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+            <input
+              type="file"
+              id="imageUpload"
+              accept="image/*"
+              multiple
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <label 
+              htmlFor="imageUpload" 
+              className="flex flex-col items-center justify-center cursor-pointer"
+            >
+              <Upload className="h-10 w-10 text-gray-400 mb-2" />
+              <p className="text-sm text-gray-600">Click to upload images</p>
+              <p className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 10MB</p>
+            </label>
+          </div>
           
-          {/* Image preview area */}
-          {imagePreviewUrls.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4">
-              {imagePreviewUrls.map((url, index) => (
-                <div key={index} className="relative border rounded-md overflow-hidden h-24">
-                  <img 
-                    src={url} 
-                    alt={`Preview ${index}`} 
-                    className="w-full h-full object-cover"
-                  />
+          {uploads.length > 0 && (
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {uploads.map((file, index) => (
+                <div key={index} className="relative rounded-md border overflow-hidden group">
+                  <div className="w-full h-20 bg-gray-100 flex items-center justify-center">
+                    {file.type.startsWith('image/') ? (
+                      <img 
+                        src={URL.createObjectURL(file)} 
+                        alt={`Upload ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <ImageIcon className="h-8 w-8 text-gray-400" />
+                    )}
+                  </div>
                   <button
                     type="button"
-                    onClick={() => removeImage(index)}
-                    className="absolute top-1 right-1 bg-black bg-opacity-50 text-white rounded-full p-1 hover:bg-opacity-70"
+                    onClick={() => removeFile(index)}
+                    className="absolute top-1 right-1 bg-white rounded-full p-0.5 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-4 w-4 text-gray-700" />
                   </button>
+                  <div className="text-xs truncate py-1 px-2 bg-gray-50">
+                    {file.name}
+                  </div>
                 </div>
               ))}
             </div>
           )}
           
-          <div className="flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md bg-gray-50">
-            <div className="space-y-1 text-center">
-              <Upload className="mx-auto h-12 w-12 text-gray-400" />
-              <div className="flex text-sm text-gray-600 justify-center">
-                <label
-                  htmlFor="file-upload"
-                  className="relative cursor-pointer bg-white rounded-md font-medium text-zim-green hover:text-zim-green/80 focus-within:outline-none px-3 py-2 border border-gray-300"
-                >
-                  <span>Upload Images</span>
-                  <input
-                    id="file-upload"
-                    name="file-upload"
-                    type="file"
-                    className="sr-only"
-                    onChange={handleImageChange}
-                    accept="image/*"
-                    multiple
-                    required={images.length === 0}
-                  />
-                </label>
+          {uploadedFiles.length > 0 && (
+            <div className="mt-4">
+              <p className="text-sm font-medium mb-2">Previously Uploaded Images</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {uploadedFiles.map((url, index) => (
+                  <div key={index} className="relative rounded-md border overflow-hidden">
+                    <div className="w-full h-20 bg-gray-100">
+                      <img 
+                        src={url} 
+                        alt={`Uploaded ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="absolute top-1 right-1 bg-green-100 rounded-full p-0.5 text-green-600">
+                      <Check className="h-3 w-3" />
+                    </div>
+                  </div>
+                ))}
               </div>
-              <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
             </div>
-          </div>
+          )}
         </div>
         
-        <div className="flex justify-end space-x-3 pt-4">
-          <Button
-            type="button"
-            onClick={onCancel}
-            variant="outline"
-          >
+        <div className="flex justify-between pt-4">
+          <Button type="button" variant="outline" onClick={onCancel}>
             Back
           </Button>
-          <Button
-            type="submit"
-            disabled={uploading}
+          
+          <Button 
+            type="submit" 
             className="bg-zim-green hover:bg-zim-green/90"
+            disabled={isLoading}
           >
-            {uploading ? 'Uploading...' : 'Submit Quote Request'}
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Submitting...
+              </>
+            ) : 'Submit Quote Request'}
           </Button>
         </div>
       </form>
-    </div>
+    </Card>
   );
 };
 

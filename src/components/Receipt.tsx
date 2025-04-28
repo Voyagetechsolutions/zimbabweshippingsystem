@@ -69,6 +69,10 @@ const Receipt: React.FC<ReceiptProps> = ({
     status: 'Pending'
   };
 
+  const generateUniqueId = (prefix: string = '') => {
+    return `${prefix}${Date.now().toString(36)}${Math.random().toString(36).substring(2, 7)}`;
+  };
+
   useEffect(() => {
     const createReceiptRecord = async () => {
       if (bookingData && paymentData && !propReceipt && bookingData.shipment_id) {
@@ -105,10 +109,6 @@ const Receipt: React.FC<ReceiptProps> = ({
     createReceiptRecord();
   }, [bookingData, paymentData, propReceipt]);
   
-  const generateUniqueId = (prefix: string = '') => {
-    return `${prefix}${Date.now().toString(36)}${Math.random().toString(36).substring(2, 7)}`;
-  };
-
   const handlePrint = () => {
     const content = receiptRef.current;
     if (!content) return;
