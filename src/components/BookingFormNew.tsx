@@ -21,6 +21,7 @@ import { getDateByRoute, getIrelandCities } from '@/data/collectionSchedule';
 import CollectionInfo from '@/components/CollectionInfo';
 import { PaymentMethodSection } from '@/components/PaymentMethodSection';
 
+
 const bookingFormSchema = z.object({
   firstName: z.string().min(2, { message: 'First name must be at least 2 characters' }),
   lastName: z.string().min(2, { message: 'Last name must be at least 2 characters' }),
