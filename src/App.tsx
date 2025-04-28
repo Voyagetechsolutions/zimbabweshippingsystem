@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -30,7 +31,7 @@ import FAQ from './pages/FAQ';
 import QuoteSubmitted from '@/pages/QuoteSubmitted';
 import TermsAndConditions from './pages/TermsAndConditions';
 import PrivacyPolicy from './pages/PrivacyPolicy';
-import ReceiptNew from './pages/ReceiptNew';
+import ReceiptNew from './components/ReceiptNew';
 
 // Components
 import { RequireAuth, RequireAdmin, RedirectIfAuthenticated, RequireRole } from './components/RouteGuard';

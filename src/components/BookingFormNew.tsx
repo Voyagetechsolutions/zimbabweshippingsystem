@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,60 @@ interface BookingFormProps {
   onSubmitComplete: (data: any, shipmentId: string, amount: number) => void;
 }
 
+interface FormData {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  pickupAddress?: string;
+  pickupCountry?: string;
+  pickupPostcode?: string;
+  pickupCity?: string;
+  recipientName?: string;
+  recipientPhone?: string;
+  additionalRecipientPhone?: string;
+  deliveryAddress?: string;
+  deliveryCity?: string;
+  includeDrums?: boolean;
+  includeOtherItems?: boolean;
+  drumQuantity?: string;
+  itemCategory?: string;
+  specificItem?: string;
+  otherItemDescription?: string;
+  shipmentType?: string;
+  wantMetalSeal?: boolean;
+  doorToDoor?: boolean;
+  paymentOption?: string;
+  paymentMethod?: string;
+  [key: string]: any;
+}
+
+interface ValidationErrors {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  pickupAddress?: string;
+  pickupPostcode?: string;
+  pickupCity?: string;
+  recipientName?: string;
+  recipientPhone?: string;
+  deliveryAddress?: string;
+  deliveryCity?: string;
+  drumQuantity?: string;
+  itemCategory?: string;
+  specificItem?: string;
+  otherItemDescription?: string;
+  generalShipment?: string;
+  [key: string]: string | undefined;
+}
+
+interface DeliveryAddress {
+  id: string;
+  address: string;
+  city: string;
+}
+
 const steps = [
   'Pickup Details',
   'Delivery Details',
@@ -25,24 +80,29 @@ const steps = [
 
 const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
-  const [formData, setFormData] = useState({});
+  const [formData, setFormData] = useState<FormData>({});
   const [shipmentId, setShipmentId] = useState(generateUniqueId('shp_'));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const [additionalDeliveryAddresses, setAdditionalDeliveryAddresses] = useState([]);
+  const [additionalDeliveryAddresses, setAdditionalDeliveryAddresses] = useState<DeliveryAddress[]>([]);
   const [weight, setWeight] = useState('');
   const [amount, setAmount] = useState(0);
-  const [validationErrors, setValidationErrors] = useState({});
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
 
   useEffect(() => {
     const createShipmentRecord = async () => {
       try {
+        // Extract the UUID part from the shipment ID (remove the 'shp_' prefix)
+        const uuid = shipmentId.substring(4);
+        
         const { data, error } = await supabase
           .from('shipments')
           .insert({
-            id: shipmentId.substring(4),
+            id: uuid,
             tracking_number: generateUniqueId('ZIM-'),
             status: 'pending',
+            origin: 'To be determined',  // Adding required fields
+            destination: 'To be determined'  // Adding required fields
           })
           .select()
           .single();
@@ -87,8 +147,8 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
   }, [weight, formData.shipmentType]);
 
-  const validateStep = (currentStep, formData) => {
-    const errors = {};
+  const validateStep = (currentStep: number, formData: FormData): ValidationErrors => {
+    const errors: ValidationErrors = {};
 
     if (currentStep === 0) {
       if (!formData.firstName?.trim()) errors.firstName = "First name is required";
@@ -131,11 +191,11 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     return errors;
   };
 
-  const isStepValid = (errors) => {
+  const isStepValid = (errors: ValidationErrors): boolean => {
     return Object.keys(errors).length === 0;
   };
 
-  const handleInputChange = (name, value) => {
+  const handleInputChange = (name: string, value: any) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (validationErrors[name]) {
       setValidationErrors((prev) => {
@@ -145,7 +205,7 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
   };
 
-  const handleCheckboxChange = (name) => {
+  const handleCheckboxChange = (name: string) => {
     setFormData(prev => ({ ...prev, [name]: !prev[name] }));
   };
 
@@ -181,7 +241,7 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     ]);
   };
 
-  const updateDeliveryAddress = (id, field, value) => {
+  const updateDeliveryAddress = (id: string, field: string, value: string) => {
     const updatedAddresses = additionalDeliveryAddresses.map(addr =>
       addr.id === id ? { ...addr, [field]: value } : addr
     );
@@ -189,13 +249,13 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     setFormData({ ...formData, additionalDeliveryAddresses: updatedAddresses });
   };
 
-  const removeDeliveryAddress = (id) => {
+  const removeDeliveryAddress = (id: string) => {
     const updatedAddresses = additionalDeliveryAddresses.filter(addr => addr.id !== id);
     setAdditionalDeliveryAddresses(updatedAddresses);
     setFormData({ ...formData, additionalDeliveryAddresses: updatedAddresses });
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const errors = validateStep(currentStep, formData);

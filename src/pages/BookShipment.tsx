@@ -125,7 +125,7 @@ const BookShipment = () => {
         const { data: shipmentData, error: shipmentError } = await supabase
           .from('shipments')
           .select('tracking_number')
-          .eq('id', shipmentId)
+          .eq('id', shipmentId.substring(4))
           .single();
         
         if (shipmentError) {

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Download, Printer, Mail, Drum, Package, PackageCheck } from 'lucide-react';
+import { Download, Printer, Mail, Drum, Package, PackageCheck, Home, Search } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { formatDate } from '@/utils/formatters';
 import { supabase } from '@/integrations/supabase/client';
@@ -398,7 +398,7 @@ Chelveston, Wellingborough, NN9 6AA</p>
                 </thead>
                 <tbody>
                   <tr className="border-t">
-                    <td className="p-2 sm:p-3 text-xs sm:text-sm break-all sm:break-normal">{shipment.tracking_number || receipt.shipment_details.tracking_number || 'Pending'}</td>
+                    <td className="p-2 sm:p-3 text-xs sm:text-sm break-all sm:break-normal">{shipment.tracking_number || receipt.shipment_details?.tracking_number || 'Pending'}</td>
                     <td className="p-2 sm:p-3 text-xs sm:text-sm">
                       <div className="flex flex-col">
                         {receipt.shipment_details.includeDrums && (
@@ -530,7 +530,8 @@ Chelveston, Wellingborough, NN9 6AA</p>
         <div className="bg-gray-50 p-3 sm:p-4 flex flex-wrap justify-between items-center">
           <div className="flex gap-2 sm:gap-3 mb-2 sm:mb-0">
             <Button variant="outline" size="sm" className="flex items-center" onClick={handleGoHome}>
-              Home
+              <Home className="mr-1 sm:mr-2 h-3 sm:h-4 w-3 sm:w-4" />
+              <span className={isMobile ? "text-xs" : ""}>Home</span>
             </Button>
             <Button 
               variant="outline" 
@@ -539,7 +540,8 @@ Chelveston, Wellingborough, NN9 6AA</p>
               onClick={handleTrackShipment}
               disabled={!shipment.tracking_number || shipment.tracking_number === 'Pending'}
             >
-              Track Shipment
+              <Search className="mr-1 sm:mr-2 h-3 sm:h-4 w-3 sm:w-4" />
+              <span className={isMobile ? "text-xs" : ""}>Track Shipment</span>
             </Button>
           </div>
           
