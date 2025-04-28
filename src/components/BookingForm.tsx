@@ -315,7 +315,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
 
   const handleCompleteBooking = (e: React.MouseEvent) => {
     e.preventDefault();
-    navigate('/paymentprocessor');
+    navigate('/receipt');
   };
 
   return (
