@@ -148,13 +148,13 @@ const Navbar = () => {
                   </NavigationMenuContent>
                 </NavigationMenuItem>
                 
-                <NavigationMenuItem>
+                {/*<NavigationMenuItem>  //First update the gallery features
                   <Link to="/gallery">
                     <NavigationMenuLink className={navigationMenuTriggerStyle()}>
                       Gallery
                     </NavigationMenuLink>
                   </Link>
-                </NavigationMenuItem>
+                </NavigationMenuItem>*/}
                 
                 <NavigationMenuItem>
                   <Link to="/" onClick={handleReviewsClick}>
