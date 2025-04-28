@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -11,7 +12,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Info, Loader2, Plus, User, Users, Package, CreditCard, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -38,7 +38,9 @@ const bookingFormSchema = z.object({
   deliveryAddress: z.string().min(5, { message: 'Please enter a valid address' }),
   deliveryCity: z.string().min(2, { message: 'Please enter a valid city' }),
   
-  shipmentType: z.enum(['drum', 'other']),
+  includeDrums: z.boolean().default(false),
+  includeOtherItems: z.boolean().default(false),
+  
   drumQuantity: z.string().optional(),
   wantMetalSeal: z.boolean().default(true),
   itemCategory: z.string().optional(),
@@ -118,7 +120,8 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       additionalRecipientPhone: '',
       deliveryAddress: '',
       deliveryCity: '',
-      shipmentType: 'drum',
+      includeDrums: false,
+      includeOtherItems: false,
       drumQuantity: '1',
       wantMetalSeal: true,
       itemCategory: '',
@@ -132,7 +135,8 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     },
   });
 
-  const watchShipmentType = form.watch('shipmentType');
+  const watchIncludeDrums = form.watch('includeDrums');
+  const watchIncludeOtherItems = form.watch('includeOtherItems');
   const watchPaymentOption = form.watch('paymentOption');
   const watchPickupPostcode = form.watch('pickupPostcode');
   const watchPickupCountry = form.watch('pickupCountry');
@@ -145,58 +149,56 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
 
   const renderShipmentTypeOptions = () => {
     return (
-      <RadioGroup
-        value={form.getValues('shipmentType')}
-        onValueChange={(value) => {
-          form.setValue('shipmentType', value as 'drum' | 'other');
-          
-          if (value === 'drum') {
-            if (!form.getValues('drumQuantity') || form.getValues('drumQuantity') === '0') {
-              form.setValue('drumQuantity', '1');
-            }
-            form.setValue('itemCategory', '');
-            form.setValue('specificItem', '');
-            form.setValue('otherItemDescription', '');
-          } else if (value === 'other') {
-            form.setValue('drumQuantity', '1');
-            setSelectedCategory('');
-          }
-        }}
-        className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2"
-      >
-        <div 
-          className={`border rounded-lg p-4 cursor-pointer transition-all ${form.getValues('shipmentType') === 'drum' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
-          onClick={() => {
-            form.setValue('shipmentType', 'drum');
-            if (!form.getValues('drumQuantity') || form.getValues('drumQuantity') === '0') {
-              form.setValue('drumQuantity', '1');
-            }
-            form.setValue('itemCategory', '');
-            form.setValue('specificItem', '');
-            form.setValue('otherItemDescription', '');
-          }}
-        >
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="drum" id="drum" />
-            <FormLabel htmlFor="drum" className="cursor-pointer font-medium">Drum (Standard Size)</FormLabel>
+      <div className="grid grid-cols-1 gap-4 mt-2">
+        <div className="flex flex-col space-y-2">
+          <div className="flex items-start space-x-3">
+            <Checkbox 
+              id="includeDrums" 
+              checked={form.getValues('includeDrums')}
+              onCheckedChange={(checked) => {
+                form.setValue('includeDrums', checked === true);
+                if (checked && !form.getValues('drumQuantity')) {
+                  form.setValue('drumQuantity', '1');
+                }
+              }}
+            />
+            <div>
+              <label 
+                htmlFor="includeDrums" 
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Drums (Standard 220L)
+              </label>
+              <p className="text-sm text-gray-500 mt-1">Standard size drums (200L-220L) for goods</p>
+            </div>
           </div>
-          <p className="text-sm text-gray-500 mt-2">Standard size drums (200L-220L) for goods</p>
+          
+          <div className="flex items-start space-x-3">
+            <Checkbox 
+              id="includeOtherItems" 
+              checked={form.getValues('includeOtherItems')}
+              onCheckedChange={(checked) => {
+                form.setValue('includeOtherItems', checked === true);
+              }}
+            />
+            <div>
+              <label 
+                htmlFor="includeOtherItems" 
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Other Items
+              </label>
+              <p className="text-sm text-gray-500 mt-1">Other items requiring a custom quote</p>
+            </div>
+          </div>
         </div>
         
-        <div 
-          className={`border rounded-lg p-4 cursor-pointer transition-all ${form.getValues('shipmentType') === 'other' ? 'border-zim-green bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
-          onClick={() => {
-            form.setValue('shipmentType', 'other');
-            setSelectedCategory('');
-          }}
-        >
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="other" id="other" />
-            <FormLabel htmlFor="other" className="cursor-pointer font-medium">Other Item</FormLabel>
+        {(!form.getValues('includeDrums') && !form.getValues('includeOtherItems')) && (
+          <div className="mt-2 text-amber-600 text-sm">
+            Please select at least one shipping option
           </div>
-          <p className="text-sm text-gray-500 mt-2">Other items requiring a custom quote</p>
-        </div>
-      </RadioGroup>
+        )}
+      </div>
     );
   };
 
@@ -244,19 +246,20 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   }, [watchPaymentOption]);
 
   useEffect(() => {
-    if (watchShipmentType === 'other' && 
+    if (watchIncludeOtherItems && !watchIncludeDrums && 
         watchItemCategory && 
         (watchSpecificItem || form.getValues('otherItemDescription'))) {
       setRedirectToCustomQuote(true);
     } else {
       setRedirectToCustomQuote(false);
     }
-  }, [watchShipmentType, watchItemCategory, watchSpecificItem, form]);
+  }, [watchIncludeDrums, watchIncludeOtherItems, watchItemCategory, watchSpecificItem, form]);
 
   useEffect(() => {
-    if (watchShipmentType === 'drum') {
+    let basePrice = 0;
+    
+    if (watchIncludeDrums) {
       const quantity = parseInt(watchDrumQuantity || '1', 10);
-      let basePrice;
       
       if (quantity === 1) {
         basePrice = 280;
@@ -268,37 +271,28 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         basePrice = 280;
       }
       
-      setOriginalPrice(basePrice);
-      
       const sealPrice = watchWantMetalSeal ? 5 * quantity : 0;
       setSealCost(sealPrice);
-      
-      const addressCount = watchDoorToDoor ? 1 + additionalAddresses.length : 0;
-      const doorCost = addressCount * 25;
-      setDoorToDoorCost(doorCost);
-      
-      if (watchPaymentOption === 'cashOnCollection') {
-        const discountedPrice = basePrice - (20 * quantity);
-        setPrice(discountedPrice);
-        setDiscountApplied(true);
-      } else {
-        setPrice(basePrice);
-        setDiscountApplied(false);
-      }
-    } else if (watchShipmentType === 'other') {
-      setOriginalPrice(95);
-      setPrice(95);
-      setSealCost(0);
-      setDoorToDoorCost(0);
-      setDiscountApplied(false);
     } else {
-      setOriginalPrice(0);
-      setPrice(0);
       setSealCost(0);
-      setDoorToDoorCost(0);
+    }
+    
+    setOriginalPrice(basePrice);
+    
+    const addressCount = watchDoorToDoor ? 1 + additionalAddresses.length : 0;
+    const doorCost = addressCount * 25;
+    setDoorToDoorCost(doorCost);
+    
+    if (watchPaymentOption === 'cashOnCollection' && watchIncludeDrums) {
+      const quantity = parseInt(watchDrumQuantity || '1', 10);
+      const discountedPrice = basePrice - (20 * quantity);
+      setPrice(discountedPrice);
+      setDiscountApplied(true);
+    } else {
+      setPrice(basePrice);
       setDiscountApplied(false);
     }
-  }, [watchShipmentType, watchDrumQuantity, watchPaymentOption, watchWantMetalSeal, watchDoorToDoor, additionalAddresses.length]);
+  }, [watchIncludeDrums, watchDrumQuantity, watchPaymentOption, watchWantMetalSeal, watchDoorToDoor, additionalAddresses.length]);
 
   const goToNextTab = () => {
     if (currentTab === 'sender') {
@@ -323,7 +317,8 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       }
     } else if (currentTab === 'shipment') {
       if (validateTab('shipment')) {
-        if (watchShipmentType === 'other' && redirectToCustomQuote) {
+        // If only other items and no drums selected, redirect to custom quote
+        if (!watchIncludeDrums && watchIncludeOtherItems && redirectToCustomQuote) {
           handleCustomQuoteRedirect();
         } else {
           setCurrentTab('payment');
@@ -351,10 +346,40 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     
     data.additionalDeliveryAddresses = additionalAddresses;
     
-    onSubmitComplete({...data, shipmentType: 'other'}, shipmentId, 0);
+    onSubmitComplete({...data}, shipmentId, 0);
   };
 
   const onSubmit = async (data: BookingFormValues) => {
+    // Validate that at least one shipment type is selected
+    if (!data.includeDrums && !data.includeOtherItems) {
+      toast({
+        title: "Missing Information",
+        description: "Please select at least one shipment type (Drums or Other Items).",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Additional validation for other items
+    if (data.includeOtherItems && (!data.itemCategory || (data.itemCategory !== 'other' && !data.specificItem))) {
+      toast({
+        title: "Missing Information",
+        description: "Please select a category and specific item for your other items.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Additional validation for drums
+    if (data.includeDrums && (!data.drumQuantity || parseInt(data.drumQuantity) < 1)) {
+      toast({
+        title: "Missing Information",
+        description: "Please specify the number of drums.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsSubmitting(true);
     try {
       const trackingNumber = `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
@@ -370,7 +395,8 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         status: 'pending',
         metadata: {
           ...data,
-          shipmentType: data.shipmentType,
+          includeDrums: data.includeDrums,
+          includeOtherItems: data.includeOtherItems,
           pickupCountry: data.pickupCountry,
           doorToDoor: data.doorToDoor,
           wantMetalSeal: data.wantMetalSeal,
@@ -399,49 +425,11 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
   };
 
-  const handlePaymentComplete = async (paymentData: any) => {
-    try {
-      const data = form.getValues();
-      const trackingNumber = `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
-      const shipmentId = generateUniqueId();
-      
-      data.additionalDeliveryAddresses = additionalAddresses;
-      
-      const { error } = await supabase.from('shipments').insert({
-        id: shipmentId,
-        tracking_number: trackingNumber,
-        origin: `${data.pickupAddress}, ${data.pickupCountry === 'England' ? data.pickupPostcode : data.pickupCity}`,
-        destination: `${data.deliveryAddress}, ${data.deliveryCity}`,
-        status: 'pending',
-        metadata: {
-          ...data,
-          shipmentType: data.shipmentType,
-          pickupCountry: data.pickupCountry,
-          doorToDoor: data.doorToDoor,
-          wantMetalSeal: data.wantMetalSeal,
-          additionalDeliveryAddresses: data.additionalDeliveryAddresses,
-          payment: paymentData
-        }
-      });
-      
-      if (error) throw error;
-      
-      onSubmitComplete(data, shipmentId, paymentData.finalAmount);
-    } catch (error) {
-      console.error('Error processing payment:', error);
-      toast({
-        title: "Error",
-        description: "Failed to process payment. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
   const validateTab = (tab: string): boolean => {
     const fields: Record<string, string[]> = {
       'sender': ['firstName', 'lastName', 'email', 'phone', 'pickupCountry', 'pickupAddress'],
       'recipient': ['recipientName', 'recipientPhone', 'deliveryAddress', 'deliveryCity'],
-      'shipment': ['shipmentType'],
+      'shipment': [],
       'payment': ['paymentOption', 'terms']
     };
     
@@ -469,6 +457,49 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         isValid = false;
       }
     });
+    
+    if (tab === 'shipment') {
+      // Make sure at least one option is selected
+      if (!watchIncludeDrums && !watchIncludeOtherItems) {
+        isValid = false;
+        toast({
+          title: "Missing Information",
+          description: "Please select at least one shipment type (Drums or Other Items).",
+          variant: "destructive",
+        });
+      }
+      
+      // Check required fields based on selection
+      if (watchIncludeDrums && (!watchDrumQuantity || parseInt(watchDrumQuantity || '0') < 1)) {
+        isValid = false;
+        form.setError('drumQuantity', {
+          type: 'manual',
+          message: 'Please enter the number of drums'
+        });
+      }
+      
+      if (watchIncludeOtherItems) {
+        if (!watchItemCategory) {
+          isValid = false;
+          form.setError('itemCategory', {
+            type: 'manual',
+            message: 'Please select a category'
+          });
+        } else if (watchItemCategory !== 'other' && !watchSpecificItem) {
+          isValid = false;
+          form.setError('specificItem', {
+            type: 'manual',
+            message: 'Please select a specific item'
+          });
+        } else if (watchSpecificItem === 'Other' && !form.getValues('otherItemDescription')) {
+          isValid = false;
+          form.setError('otherItemDescription', {
+            type: 'manual',
+            message: 'Please provide a description'
+          });
+        }
+      }
+    }
     
     return isValid;
   };
@@ -830,23 +861,14 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4">Shipment Details</h3>
               
-              <FormField
-                control={form.control}
-                name="shipmentType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Shipment Type *</FormLabel>
-                    {renderShipmentTypeOptions()}
-                    <FormControl>
-                      <input type="hidden" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="mb-6">
+                <FormLabel className="block mb-3">What would you like to ship? *</FormLabel>
+                {renderShipmentTypeOptions()}
+              </div>
               
-              {watchShipmentType === 'drum' && (
-                <>
+              {watchIncludeDrums && (
+                <div className="border-t pt-6 mb-6">
+                  <h4 className="font-medium text-lg mb-4">Drum Details</h4>
                   <div className="mt-4">
                     <FormField
                       control={form.control}
@@ -1004,11 +1026,12 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                       </div>
                     </>
                   )}
-                </>
+                </div>
               )}
               
-              {watchShipmentType === 'other' && (
-                <>
+              {watchIncludeOtherItems && (
+                <div className={`${watchIncludeDrums ? 'border-t pt-6' : ''} mb-6`}>
+                  <h4 className="font-medium text-lg mb-4">Other Item Details</h4>
                   <div className="mt-4">
                     <FormField
                       control={form.control}
@@ -1099,18 +1122,27 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                       />
                     </div>
                   )}
-                </>
+                </div>
               )}
               
               <div className="mt-6 pt-6 border-t flex justify-between">
                 <div>
-                  <h4 className="font-medium">Estimated Cost</h4>
-                  <div className="text-2xl font-bold mt-2 text-zim-green">
-                    £{(price + sealCost + doorToDoorCost).toFixed(2)}
-                  </div>
-                  {discountApplied && (
-                    <div className="mt-1 text-sm text-green-600">
-                      Includes £{(originalPrice - price).toFixed(2)} savings!
+                  {watchIncludeDrums && (
+                    <>
+                      <h4 className="font-medium">Estimated Cost</h4>
+                      <div className="text-2xl font-bold mt-2 text-zim-green">
+                        £{(price + sealCost + doorToDoorCost).toFixed(2)}
+                      </div>
+                      {discountApplied && (
+                        <div className="mt-1 text-sm text-green-600">
+                          Includes £{(originalPrice - price).toFixed(2)} savings!
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {watchIncludeOtherItems && !watchIncludeDrums && (
+                    <div className="text-md">
+                      Custom quote will be provided after submission
                     </div>
                   )}
                 </div>
@@ -1127,7 +1159,7 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                     onClick={goToNextTab}
                     className="bg-zim-green hover:bg-zim-green/90"
                   >
-                    Next: Payment
+                    {(!watchIncludeDrums && watchIncludeOtherItems) ? 'Request Quote' : 'Next: Payment'}
                   </Button>
                 </div>
               </div>
@@ -1138,10 +1170,10 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             <PaymentMethodSection
               bookingData={{
                 shipmentDetails: {
-                  type: watchShipmentType,
+                  type: watchIncludeDrums ? 'drum' : 'other',
                   quantity: parseInt(watchDrumQuantity || '1'),
                   services: [
-                    ...(watchWantMetalSeal ? [{
+                    ...(watchWantMetalSeal && watchIncludeDrums ? [{
                       name: `Metal Seal${parseInt(watchDrumQuantity || '1') > 1 ? 's' : ''} (${parseInt(watchDrumQuantity || '1')} x £5)`,
                       price: sealCost
                     }] : []),

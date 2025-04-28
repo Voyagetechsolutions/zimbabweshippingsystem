@@ -1,17 +1,18 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Download, Printer, Mail } from 'lucide-react';
+import { Download, Printer, Mail, Drum, Package, PackageCheck } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { formatDate } from '@/utils/formatters';
 import { supabase } from '@/integrations/supabase/client';
 import html2pdf from 'html2pdf.js';
+import { useLocation } from 'react-router-dom';
 
 interface ReceiptProps {
-  receipt: {
+  receipt?: {
     receipt_number: string;
     created_at: string;
     amount: number;
@@ -28,12 +29,84 @@ interface ReceiptProps {
     destination: string;
     status: string;
   };
+  customQuote?: any;
+  bookingData?: any;
+  paymentData?: any;
 }
 
-const Receipt: React.FC<ReceiptProps> = ({ receipt, shipment }) => {
+const Receipt: React.FC<ReceiptProps> = ({ 
+  receipt: propReceipt, 
+  shipment: propShipment,
+  customQuote: propCustomQuote,
+  bookingData: propBookingData,
+  paymentData: propPaymentData
+}) => {
   const { toast } = useToast();
   const receiptRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+  const location = useLocation();
+  
+  // Use data from props or from location state
+  const stateData = location.state || {};
+  const bookingData = propBookingData || stateData.bookingData || {};
+  const paymentData = propPaymentData || stateData.paymentData || {};
+  const customQuoteData = propCustomQuote || stateData.customQuoteData || {};
+  
+  // Create a combined receipt object from booking and payment data if needed
+  const receipt = propReceipt || {
+    receipt_number: `ZIM-${Date.now().toString().substring(8)}`,
+    created_at: new Date().toISOString(),
+    amount: paymentData.finalAmount || 0,
+    currency: 'GBP',
+    payment_method: paymentData.method || 'standard',
+    sender_details: bookingData.senderDetails || {},
+    recipient_details: bookingData.recipientDetails || {},
+    shipment_details: bookingData.shipmentDetails || {},
+    status: 'issued'
+  };
+  
+  const shipment = propShipment || {
+    tracking_number: bookingData.shipmentDetails?.tracking_number || 'Pending',
+    origin: bookingData.senderDetails?.address || 'Not specified',
+    destination: bookingData.recipientDetails?.address || 'Not specified',
+    status: 'Pending'
+  };
+
+  useEffect(() => {
+    // Save receipt to Supabase if we have booking data and payment data but no receipt ID
+    const createReceiptRecord = async () => {
+      if (bookingData && paymentData && !propReceipt && bookingData.shipment_id) {
+        try {
+          // Create the receipt in the database
+          await supabase.from('receipts').insert({
+            receipt_number: receipt.receipt_number,
+            amount: paymentData.finalAmount,
+            currency: 'GBP',
+            payment_method: getPaymentMethodValue(paymentData.method, paymentData.payLaterMethod),
+            shipment_id: bookingData.shipment_id,
+            sender_details: bookingData.senderDetails,
+            recipient_details: bookingData.recipientDetails,
+            shipment_details: bookingData.shipmentDetails,
+            status: 'issued'
+          });
+
+          // Also update the admin dashboard with a notification
+          await supabase.from('notifications').insert({
+            user_id: '00000000-0000-0000-0000-000000000000', // Admin notification
+            title: 'New Shipment Booked',
+            message: `A new shipment has been booked with tracking number: ${shipment.tracking_number}`,
+            type: 'shipment',
+            related_id: bookingData.shipment_id,
+            is_read: false
+          });
+        } catch (error) {
+          console.error('Error saving receipt:', error);
+        }
+      }
+    };
+
+    createReceiptRecord();
+  }, [bookingData, paymentData, propReceipt]);
   
   const handlePrint = () => {
     const content = receiptRef.current;
@@ -244,6 +317,14 @@ const Receipt: React.FC<ReceiptProps> = ({ receipt, shipment }) => {
         return method.charAt(0).toUpperCase() + method.slice(1);
     }
   };
+  
+  // Convert the payment method selection to the stored value
+  const getPaymentMethodValue = (method: string, payLaterMethod?: string) => {
+    if (method === 'standard' && payLaterMethod) {
+      return payLaterMethod;
+    }
+    return method;
+  };
 
   return (
     <div className="container mx-auto px-2 sm:px-4 max-w-4xl">
@@ -277,10 +358,13 @@ Chelveston, Wellingborough, NN9 6AA</p>
             </div>
             
             <div className="border rounded-md p-3 sm:p-4">
-              <h3 className="font-bold text-sm mb-1 sm:mb-2">Reciever Details</h3>
+              <h3 className="font-bold text-sm mb-1 sm:mb-2">Receiver Details</h3>
               <p className="text-sm"><span className="font-medium">Name:</span> {receipt.recipient_details.name}</p>
               <p className="text-sm"><span className="font-medium">Address:</span> {receipt.recipient_details.address}</p>
               <p className="text-sm"><span className="font-medium">Phone:</span> {receipt.recipient_details.phone}</p>
+              {receipt.recipient_details.additionalPhone && (
+                <p className="text-sm"><span className="font-medium">Additional Phone:</span> {receipt.recipient_details.additionalPhone}</p>
+              )}
             </div>
           </div>
           
@@ -297,16 +381,31 @@ Chelveston, Wellingborough, NN9 6AA</p>
                 </thead>
                 <tbody>
                   <tr className="border-t">
-                    <td className="p-2 sm:p-3 text-xs sm:text-sm break-all sm:break-normal">{shipment?.tracking_number || receipt.shipment_details.tracking_number}</td>
+                    <td className="p-2 sm:p-3 text-xs sm:text-sm break-all sm:break-normal">{shipment.tracking_number || receipt.shipment_details.tracking_number}</td>
                     <td className="p-2 sm:p-3 text-xs sm:text-sm">
-                      {receipt.shipment_details.type === 'drum'
-                        ? `${receipt.shipment_details.quantity} x 200L-220L Drums`
-                        : receipt.shipment_details.type === 'other' && receipt.shipment_details.item_category
-                        ? `${receipt.shipment_details.item_category} - ${receipt.shipment_details.item_description || 'No description'}`
-                        : `${receipt.shipment_details.type || 'Custom Item'}`
-                      }
+                      <div className="flex flex-col">
+                        {receipt.shipment_details.includeDrums && (
+                          <div className="flex items-center mb-1">
+                            <Drum className="h-4 w-4 mr-1 text-zim-green" />
+                            {receipt.shipment_details.quantity} x 200L-220L Drums
+                          </div>
+                        )}
+                        {receipt.shipment_details.includeOtherItems && (
+                          <div className="flex items-center">
+                            <Package className="h-4 w-4 mr-1 text-zim-green" />
+                            {receipt.shipment_details.category && receipt.shipment_details.specificItem ? (
+                              `${receipt.shipment_details.category} - ${receipt.shipment_details.specificItem}`
+                            ) : (
+                              `Custom Item - ${customQuoteData.description || receipt.shipment_details.description || 'Pending quote'}`
+                            )}
+                          </div>
+                        )}
+                        {!receipt.shipment_details.includeDrums && !receipt.shipment_details.includeOtherItems && (
+                          `${receipt.shipment_details.type || 'Custom Item'}`
+                        )}
+                      </div>
                     </td>
-                    <td className="p-2 sm:p-3 text-xs sm:text-sm">{shipment?.status || receipt.status}</td>
+                    <td className="p-2 sm:p-3 text-xs sm:text-sm">{shipment.status || receipt.status}</td>
                   </tr>
                 </tbody>
               </table>
@@ -317,61 +416,91 @@ Chelveston, Wellingborough, NN9 6AA</p>
             <h3 className="font-bold text-sm mb-1 sm:mb-2">Collection & Delivery Information</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="border rounded-md p-3">
-                <p className="text-sm"><span className="font-medium">Pickup Address:</span> {shipment?.origin || receipt.sender_details.address}</p>
+                <p className="text-sm"><span className="font-medium">Pickup Address:</span> {shipment.origin || receipt.sender_details.address}</p>
               </div>
               <div className="border rounded-md p-3">
-                <p className="text-sm"><span className="font-medium">Delivery Address:</span> {shipment?.destination || receipt.recipient_details.address}</p>
+                <p className="text-sm"><span className="font-medium">Delivery Address:</span> {shipment.destination || receipt.recipient_details.address}</p>
               </div>
             </div>
           </div>
           
-          <div className="mb-4 sm:mb-6">
-            <h3 className="font-bold text-sm mb-1 sm:mb-2">Payment Details</h3>
-            
-            <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
-              <span className="font-medium">Shipping Cost</span>
-              <span>£{(receipt.amount * 0.9).toFixed(2)}</span>
+          {receipt.shipment_details.includeDrums && (
+            <div className="mb-4 sm:mb-6">
+              <h3 className="font-bold text-sm mb-1 sm:mb-2">Payment Details</h3>
+              
+              <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
+                <span className="font-medium">Shipping Cost</span>
+                <span>£{(receipt.amount * 0.9).toFixed(2)}</span>
+              </div>
+              
+              {receipt.shipment_details.services && receipt.shipment_details.services.length > 0 && (
+                <>
+                  {receipt.shipment_details.services.map((service: any, index: number) => (
+                    <div key={index} className="flex justify-between py-2 sm:py-3 border-b text-sm">
+                      <span className="font-medium">{service.name}</span>
+                      <span>£{service.price.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+              
+              {paymentData && paymentData.discount > 0 && (
+                <div className="flex justify-between py-2 sm:py-3 border-b text-sm text-green-600">
+                  <span className="font-medium">Cash Discount</span>
+                  <span>-£{paymentData.discount.toFixed(2)}</span>
+                </div>
+              )}
+              
+              {paymentData && paymentData.premium > 0 && (
+                <div className="flex justify-between py-2 sm:py-3 border-b text-sm text-amber-600">
+                  <span className="font-medium">Pay on Arrival Premium (20%)</span>
+                  <span>+£{paymentData.premium.toFixed(2)}</span>
+                </div>
+              )}
+              
+              <div className="flex justify-between py-3 sm:py-4 font-bold text-base sm:text-lg">
+                <span>Total</span>
+                <span>£{receipt.amount.toFixed(2)}</span>
+              </div>
+              
+              <div className="border rounded-md p-2 sm:p-3 bg-gray-50 mt-2">
+                <p className="font-medium text-sm">Payment Method: {getPaymentMethodDisplay(receipt.payment_method)}</p>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1">Payment Status: {receipt.status === 'issued' ? 'Paid' : 'Pending'}</p>
+              </div>
             </div>
-            
-            {receipt.shipment_details.services && receipt.shipment_details.services.length > 0 && (
-              <>
-                {receipt.shipment_details.services.map((service: any, index: number) => (
-                  <div key={index} className="flex justify-between py-2 sm:py-3 border-b text-sm">
-                    <span className="font-medium">{service.name}</span>
-                    <span>£{service.price.toFixed(2)}</span>
-                  </div>
-                ))}
-              </>
-            )}
-            
-            <div className="flex justify-between py-3 sm:py-4 font-bold text-base sm:text-lg">
-              <span>Total</span>
-              <span>£{receipt.amount.toFixed(2)}</span>
-            </div>
-            
-            <div className="border rounded-md p-2 sm:p-3 bg-gray-50 mt-2">
-              <p className="font-medium text-sm">Payment Method: {getPaymentMethodDisplay(receipt.payment_method)}</p>
-              <p className="text-xs sm:text-sm text-gray-600 mt-1">Payment Status: {receipt.status === 'issued' ? 'Paid' : 'Pending'}</p>
-            </div>
-          </div>
+          )}
           
-          {receipt.shipment_details.type === 'drum' && (
+          {receipt.shipment_details.includeDrums && (
             <div className="mb-4 sm:mb-6">
               <h3 className="font-bold text-sm mb-1 sm:mb-2">Drum Information</h3>
               <div className="border rounded-md p-3">
                 <p className="text-sm"><span className="font-medium">Number of Drums:</span> {receipt.shipment_details.quantity}</p>
                 <p className="text-sm"><span className="font-medium">Drum Capacity:</span> 200L-220L</p>
+                {receipt.shipment_details.wantMetalSeal && (
+                  <p className="text-sm"><span className="font-medium">Security:</span> Metal Coded Seals</p>
+                )}
               </div>
             </div>
           )}
           
-          {receipt.shipment_details.type === 'other' && (
+          {(receipt.shipment_details.includeOtherItems || customQuoteData.id) && (
             <div className="mb-4 sm:mb-6">
-              <h3 className="font-bold text-sm mb-1 sm:mb-2">Item Information</h3>
+              <h3 className="font-bold text-sm mb-1 sm:mb-2">Other Item Details</h3>
               <div className="border rounded-md p-3">
-                <p className="text-sm"><span className="font-medium">Item Category:</span> {receipt.shipment_details.item_category}</p>
-                {receipt.shipment_details.item_description && (
-                  <p className="text-sm"><span className="font-medium">Description:</span> {receipt.shipment_details.item_description}</p>
+                {receipt.shipment_details.category && (
+                  <p className="text-sm"><span className="font-medium">Item Category:</span> {receipt.shipment_details.category}</p>
+                )}
+                {receipt.shipment_details.specificItem && (
+                  <p className="text-sm"><span className="font-medium">Specific Item:</span> {receipt.shipment_details.specificItem}</p>
+                )}
+                {(receipt.shipment_details.description || customQuoteData.description) && (
+                  <p className="text-sm"><span className="font-medium">Description:</span> {customQuoteData.description || receipt.shipment_details.description}</p>
+                )}
+                {customQuoteData.id && (
+                  <div className="mt-2 flex items-center text-sm text-green-600">
+                    <PackageCheck className="h-4 w-4 mr-1.5" />
+                    <span>Custom quote request submitted successfully</span>
+                  </div>
                 )}
               </div>
             </div>

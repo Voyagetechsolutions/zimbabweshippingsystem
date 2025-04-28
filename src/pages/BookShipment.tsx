@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -33,7 +32,7 @@ const BookShipment = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      if (data.shipmentType === 'other') {
+      if (data.shipmentType === 'other' && !data.includeDrums) {
         setBookingData({
           ...data,
           shipment_id: shipmentId,
@@ -51,20 +50,18 @@ const BookShipment = () => {
             address: `${data.deliveryAddress}, ${data.deliveryCity}`,
           },
           shipmentDetails: {
-            type: data.shipmentType,
+            type: 'other',
             category: data.itemCategory,
             specificItem: data.specificItem,
             description: data.otherItemDescription,
             tracking_number: '',
           }
         });
-        // Send user directly to custom quote form for "other" items
         setCurrentStep(BookingStep.CUSTOM_QUOTE);
         return;
       }
       
-      // Calculate total amount with all costs
-      const metalSealCost = data.wantMetalSeal ? (5 * parseInt(data.drumQuantity || '1')) : 0;
+      const metalSealCost = data.wantMetalSeal ? (5 * parseInt(data.drumQuantity || '0')) : 0;
       const doorToDoorAddresses = data.doorToDoor ? (1 + (data.additionalDeliveryAddresses?.length || 0)) : 0;
       const doorToDoorCost = doorToDoorAddresses * 25;
       const finalAmount = amount + metalSealCost + doorToDoorCost;
@@ -86,12 +83,17 @@ const BookShipment = () => {
           address: `${data.deliveryAddress}, ${data.deliveryCity}`,
         },
         shipmentDetails: {
-          type: data.shipmentType,
-          quantity: data.shipmentType === 'drum' ? parseInt(data.drumQuantity) : null,
+          includeDrums: data.includeDrums,
+          includeOtherItems: data.includeOtherItems,
+          type: data.includeDrums ? 'drum' : 'other',
+          quantity: data.includeDrums ? parseInt(data.drumQuantity) : null,
           weight: data.shipmentType === 'parcel' ? parseFloat(data.weight) : null,
           tracking_number: '',
+          category: data.includeOtherItems ? data.itemCategory : null,
+          specificItem: data.includeOtherItems ? data.specificItem : null,
+          description: data.includeOtherItems ? data.otherItemDescription : null,
           services: [
-            ...(data.wantMetalSeal ? [{
+            ...(data.wantMetalSeal && data.includeDrums ? [{
               name: `Metal Seal${parseInt(data.drumQuantity) > 1 ? 's' : ''} (${parseInt(data.drumQuantity)} x £5)`,
               price: metalSealCost
             }] : []),
@@ -107,7 +109,14 @@ const BookShipment = () => {
       });
       
       setTotalAmount(finalAmount);
-      setCurrentStep(BookingStep.PAYMENT);
+      
+      if (data.includeOtherItems && data.includeDrums) {
+        setCurrentStep(BookingStep.PAYMENT);
+      } else if (data.includeDrums) {
+        setCurrentStep(BookingStep.PAYMENT);
+      } else {
+        setCurrentStep(BookingStep.CUSTOM_QUOTE);
+      }
       
       try {
         const { data: shipmentData, error: shipmentError } = await supabase
@@ -196,7 +205,17 @@ const BookShipment = () => {
         is_read: false
       });
       
-      navigate('/quote-submitted');
+      if (bookingData.paymentCompleted) {
+        navigate('/receipt', { 
+          state: { 
+            bookingData,
+            paymentData: bookingData.paymentData,
+            customQuoteData: data
+          }
+        });
+      } else {
+        navigate('/quote-submitted');
+      }
     } catch (err: any) {
       console.error('Error submitting custom quote:', err);
       toast({
@@ -208,8 +227,23 @@ const BookShipment = () => {
   };
 
   const handlePaymentComplete = (paymentData: any) => {
-    // Payment is complete, data will be used in navigation handled by PaymentMethodSection
-    console.log("Payment completed with data:", paymentData);
+    const updatedBookingData = {
+      ...bookingData,
+      paymentCompleted: true,
+      paymentData
+    };
+    setBookingData(updatedBookingData);
+    
+    if (bookingData.shipmentDetails.includeOtherItems) {
+      setCurrentStep(BookingStep.CUSTOM_QUOTE);
+    } else {
+      navigate('/receipt', { 
+        state: { 
+          bookingData: updatedBookingData,
+          paymentData
+        }
+      });
+    }
   };
 
   return (
