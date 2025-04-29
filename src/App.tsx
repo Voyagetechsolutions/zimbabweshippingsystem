@@ -30,6 +30,7 @@ import FAQ from './pages/FAQ';
 import QuoteSubmitted from '@/pages/QuoteSubmitted';
 import TermsAndConditions from './pages/TermsAndConditions';
 import PrivacyPolicy from './pages/PrivacyPolicy';
+import ReceiptNew from './pages/ReceiptNew';
 
 // Components
 import { RequireAuth, RequireAdmin, RedirectIfAuthenticated, RequireRole } from './components/RouteGuard';
@@ -72,6 +73,7 @@ function App() {
                   <Route path="/book-shipment" element={<BookShipment />} />
                   <Route path="/payment-success" element={<PaymentSuccess />} />
                   <Route path="/quote-submitted" element={<QuoteSubmitted />} />
+                  <Route path="/receipt" element={<ReceiptNew />} />
                   <Route path="/reviews" element={<Reviews />} />
                   <Route path="/support" element={<Support />} />
                   <Route path="/pricing" element={<Pricing />} />

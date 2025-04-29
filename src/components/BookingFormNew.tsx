@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -12,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Info, Loader2, Plus, User, Users, Package, CreditCard, X } from 'lucide-react';
+import { Info, Loader2, Plus, User, Users, Package, CreditCard, X, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getRouteForPostalCode, isRestrictedPostalCode, getIrelandRouteForCity } from '@/utils/postalCodeUtils';
@@ -20,7 +21,7 @@ import { generateUniqueId } from '@/lib/utils';
 import { getDateByRoute, getIrelandCities } from '@/data/collectionSchedule';
 import CollectionInfo from '@/components/CollectionInfo';
 import { PaymentMethodSection } from '@/components/PaymentMethodSection';
-
+import { isValidEmail, isValidPhoneNumber } from '@/utils/formValidation';
 
 const bookingFormSchema = z.object({
   firstName: z.string().min(2, { message: 'First name must be at least 2 characters' }),
@@ -96,6 +97,7 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [additionalAddresses, setAdditionalAddresses] = useState<Array<{address: string, city: string, recipientName: string, recipientPhone: string}>>([]);
   const [hasAdditionalPhone, setHasAdditionalPhone] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string[]>>({});
   
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -133,6 +135,7 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       paymentMethod: 'card',
       terms: false,
     },
+    mode: 'onBlur',
   });
 
   const watchIncludeDrums = form.watch('includeDrums');
@@ -146,6 +149,7 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   const watchDoorToDoor = form.watch('doorToDoor');
   const watchItemCategory = form.watch('itemCategory');
   const watchSpecificItem = form.watch('specificItem');
+  const watchTerms = form.watch('terms');
 
   const renderShipmentTypeOptions = () => {
     return (
@@ -298,6 +302,7 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     if (currentTab === 'sender') {
       if (validateTab('sender')) {
         setCurrentTab('recipient');
+        setValidationErrors({});
       } else {
         toast({
           title: "Missing Information",
@@ -308,6 +313,7 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     } else if (currentTab === 'recipient') {
       if (validateTab('recipient')) {
         setCurrentTab('shipment');
+        setValidationErrors({});
       } else {
         toast({
           title: "Missing Information",
@@ -317,6 +323,7 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       }
     } else if (currentTab === 'shipment') {
       if (validateTab('shipment')) {
+        setValidationErrors({});
         // If only other items and no drums selected, redirect to custom quote
         if (!watchIncludeDrums && watchIncludeOtherItems && redirectToCustomQuote) {
           handleCustomQuoteRedirect();
@@ -327,6 +334,17 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         toast({
           title: "Missing Information",
           description: "Please fill in all required shipment details.",
+          variant: "destructive",
+        });
+      }
+    } else if (currentTab === 'payment') {
+      if (validateTab('payment')) {
+        setValidationErrors({});
+        handleFormSubmit();
+      } else {
+        toast({
+          title: "Missing Information",
+          description: "Please agree to the terms and conditions before proceeding.",
           variant: "destructive",
         });
       }
@@ -354,6 +372,48 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     onSubmit(form.getValues());
   };
 
+  const handleFormSubmit = () => {
+    const isValid = form.trigger();
+    
+    if (isValid) {
+      onSubmit(form.getValues());
+    } else {
+      validateAllTabs();
+      
+      // Find which tab has errors and switch to it
+      const errors = form.formState.errors;
+      const senderFields = ['firstName', 'lastName', 'email', 'phone', 'pickupCountry', 'pickupAddress', 'pickupPostcode', 'pickupCity'];
+      const recipientFields = ['recipientName', 'recipientPhone', 'deliveryAddress', 'deliveryCity', 'additionalRecipientPhone'];
+      const shipmentFields = ['includeDrums', 'includeOtherItems', 'drumQuantity', 'itemCategory', 'specificItem', 'otherItemDescription'];
+      const paymentFields = ['paymentOption', 'paymentMethod', 'terms'];
+      
+      const tabsWithErrors = {
+        sender: senderFields.some(field => errors[field as keyof typeof errors]),
+        recipient: recipientFields.some(field => errors[field as keyof typeof errors]),
+        shipment: shipmentFields.some(field => errors[field as keyof typeof errors]),
+        payment: paymentFields.some(field => errors[field as keyof typeof errors]),
+      };
+      
+      if (tabsWithErrors.sender) {
+        setCurrentTab('sender');
+      } else if (tabsWithErrors.recipient) {
+        setCurrentTab('recipient');
+      } else if (tabsWithErrors.shipment) {
+        setCurrentTab('shipment');
+      } else if (tabsWithErrors.payment) {
+        setCurrentTab('payment');
+      }
+    }
+  };
+
+  const validateAllTabs = () => {
+    // Force validation on all fields
+    validateTab('sender');
+    validateTab('recipient');
+    validateTab('shipment');
+    validateTab('payment');
+  };
+
   const onSubmit = async (data: BookingFormValues) => {
     // Validate that at least one shipment type is selected
     if (!data.includeDrums && !data.includeOtherItems) {
@@ -362,30 +422,23 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
         description: "Please select at least one shipment type (Drums or Other Items).",
         variant: "destructive",
       });
+      setCurrentTab('shipment');
       return;
     }
     
-    // Additional validation for other items
-    if (data.includeOtherItems && (!data.itemCategory || (data.itemCategory !== 'other' && !data.specificItem))) {
+    // Check terms
+    if (!data.terms) {
       toast({
-        title: "Missing Information",
-        description: "Please select a category and specific item for your other items.",
+        title: "Terms and Conditions",
+        description: "You must agree to the terms and conditions to proceed.",
         variant: "destructive",
       });
-      return;
-    }
-    
-    // Additional validation for drums
-    if (data.includeDrums && (!data.drumQuantity || parseInt(data.drumQuantity) < 1)) {
-      toast({
-        title: "Missing Information",
-        description: "Please specify the number of drums.",
-        variant: "destructive",
-      });
+      setCurrentTab('payment');
       return;
     }
     
     setIsSubmitting(true);
+    
     try {
       const trackingNumber = `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
       const shipmentId = generateUniqueId();
@@ -435,7 +488,7 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       'sender': ['firstName', 'lastName', 'email', 'phone', 'pickupCountry', 'pickupAddress'],
       'recipient': ['recipientName', 'recipientPhone', 'deliveryAddress', 'deliveryCity'],
       'shipment': [],
-      'payment': ['paymentOption', 'terms']
+      'payment': ['terms']
     };
     
     if (watchPickupCountry === 'England') {
@@ -451,14 +504,39 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     }
     
     let isValid = true;
+    const errors: Record<string, string[]> = {};
     
     currentFields.forEach(field => {
       const fieldValue = form.getValues(field as any);
-      if (fieldValue === undefined || fieldValue === '') {
+      if (fieldValue === undefined || fieldValue === '' || (field === 'terms' && fieldValue !== true)) {
         form.setError(field as any, { 
           type: 'manual', 
           message: `This field is required` 
         });
+        
+        if (!errors[tab]) errors[tab] = [];
+        errors[tab].push(`${field} is required`);
+        
+        isValid = false;
+      } else if (field === 'email' && !isValidEmail(fieldValue)) {
+        form.setError(field as any, {
+          type: 'manual',
+          message: 'Please enter a valid email address'
+        });
+        
+        if (!errors[tab]) errors[tab] = [];
+        errors[tab].push(`Email is invalid`);
+        
+        isValid = false;
+      } else if ((field === 'phone' || field === 'recipientPhone') && !isValidPhoneNumber(fieldValue)) {
+        form.setError(field as any, {
+          type: 'manual',
+          message: 'Please enter a valid phone number'
+        });
+        
+        if (!errors[tab]) errors[tab] = [];
+        errors[tab].push(`Phone number is invalid`);
+        
         isValid = false;
       }
     });
@@ -467,6 +545,10 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       // Make sure at least one option is selected
       if (!watchIncludeDrums && !watchIncludeOtherItems) {
         isValid = false;
+        
+        if (!errors[tab]) errors[tab] = [];
+        errors[tab].push(`Select at least one shipment type`);
+        
         toast({
           title: "Missing Information",
           description: "Please select at least one shipment type (Drums or Other Items).",
@@ -481,6 +563,9 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
           type: 'manual',
           message: 'Please enter the number of drums'
         });
+        
+        if (!errors[tab]) errors[tab] = [];
+        errors[tab].push(`Drum quantity is required`);
       }
       
       if (watchIncludeOtherItems) {
@@ -490,28 +575,79 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
             type: 'manual',
             message: 'Please select a category'
           });
+          
+          if (!errors[tab]) errors[tab] = [];
+          errors[tab].push(`Item category is required`);
         } else if (watchItemCategory !== 'other' && !watchSpecificItem) {
           isValid = false;
           form.setError('specificItem', {
             type: 'manual',
             message: 'Please select a specific item'
           });
+          
+          if (!errors[tab]) errors[tab] = [];
+          errors[tab].push(`Specific item is required`);
         } else if (watchSpecificItem === 'Other' && !form.getValues('otherItemDescription')) {
           isValid = false;
           form.setError('otherItemDescription', {
             type: 'manual',
             message: 'Please provide a description'
           });
+          
+          if (!errors[tab]) errors[tab] = [];
+          errors[tab].push(`Item description is required`);
         }
       }
+      
+      // Validate additional addresses if door-to-door is selected
+      if (watchDoorToDoor && additionalAddresses.length > 0) {
+        additionalAddresses.forEach((address, index) => {
+          if (!address.address || address.address.length < 5) {
+            isValid = false;
+            if (!errors[tab]) errors[tab] = [];
+            errors[tab].push(`Address ${index + 1} is incomplete`);
+          }
+          
+          if (!address.city || address.city.length < 2) {
+            isValid = false;
+            if (!errors[tab]) errors[tab] = [];
+            errors[tab].push(`City for address ${index + 1} is required`);
+          }
+          
+          if (!address.recipientName || address.recipientName.length < 2) {
+            isValid = false;
+            if (!errors[tab]) errors[tab] = [];
+            errors[tab].push(`Recipient name for address ${index + 1} is required`);
+          }
+          
+          if (!address.recipientPhone || !isValidPhoneNumber(address.recipientPhone)) {
+            isValid = false;
+            if (!errors[tab]) errors[tab] = [];
+            errors[tab].push(`Valid phone number for address ${index + 1} is required`);
+          }
+        });
+      }
     }
+    
+    if (tab === 'payment' && !watchTerms) {
+      isValid = false;
+      form.setError('terms', {
+        type: 'manual',
+        message: 'You must agree to the terms and conditions'
+      });
+      
+      if (!errors[tab]) errors[tab] = [];
+      errors[tab].push('Agreement to terms and conditions is required');
+    }
+    
+    setValidationErrors(prev => ({...prev, ...errors}));
     
     return isValid;
   };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+      <form onSubmit={(e) => { e.preventDefault(); handleFormSubmit(); }} className="space-y-8">
         <Tabs 
           value={currentTab} 
           onValueChange={setCurrentTab}
@@ -539,6 +675,20 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
               <span className="inline md:hidden">Payment</span>
             </TabsTrigger>
           </TabsList>
+
+          {validationErrors[currentTab] && validationErrors[currentTab].length > 0 && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Validation Errors</AlertTitle>
+              <AlertDescription>
+                <ul className="list-disc pl-5 mt-2">
+                  {validationErrors[currentTab].map((error, index) => (
+                    <li key={index}>{error}</li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
 
           <TabsContent value="sender">
             <Card className="p-6">
@@ -1172,27 +1322,81 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
           </TabsContent>
           
           <TabsContent value="payment">
-            <PaymentMethodSection
-              bookingData={{
-                shipmentDetails: {
-                  type: watchIncludeDrums ? 'drum' : 'other',
-                  quantity: parseInt(watchDrumQuantity || '1'),
-                  services: [
-                    ...(watchWantMetalSeal && watchIncludeDrums ? [{
-                      name: `Metal Seal${parseInt(watchDrumQuantity || '1') > 1 ? 's' : ''} (${parseInt(watchDrumQuantity || '1')} x £5)`,
-                      price: sealCost
-                    }] : []),
-                    ...(watchDoorToDoor ? [{
-                      name: `Door to Door Delivery (${1 + additionalAddresses.length} address${(1 + additionalAddresses.length) > 1 ? 'es' : ''})`,
-                      price: doorToDoorCost
-                    }] : [])
-                  ],
-                }
-              }}
-              totalAmount={price + sealCost + doorToDoorCost}
-              onCancel={goToPreviousTab}
-              onComplete={handlePaymentComplete}
-            />
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold mb-4">Payment & Terms</h3>
+              
+              <PaymentMethodSection
+                bookingData={{
+                  shipmentDetails: {
+                    type: watchIncludeDrums ? 'drum' : 'other',
+                    quantity: parseInt(watchDrumQuantity || '1'),
+                    services: [
+                      ...(watchWantMetalSeal && watchIncludeDrums ? [{
+                        name: `Metal Seal${parseInt(watchDrumQuantity || '1') > 1 ? 's' : ''} (${parseInt(watchDrumQuantity || '1')} x £5)`,
+                        price: sealCost
+                      }] : []),
+                      ...(watchDoorToDoor ? [{
+                        name: `Door to Door Delivery (${1 + additionalAddresses.length} address${(1 + additionalAddresses.length) > 1 ? 'es' : ''})`,
+                        price: doorToDoorCost
+                      }] : [])
+                    ],
+                  }
+                }}
+                totalAmount={price + sealCost + doorToDoorCost}
+                onCancel={goToPreviousTab}
+                onComplete={handlePaymentComplete}
+              />
+              
+              <div className="mt-6 border-t pt-6">
+                <FormField
+                  control={form.control}
+                  name="terms"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>
+                          I agree to the <a href="/terms" target="_blank" className="text-blue-600 hover:underline">Terms & Conditions</a>*
+                        </FormLabel>
+                        <FormDescription>
+                          By checking this box, you agree to our terms of service and privacy policy.
+                        </FormDescription>
+                        <FormMessage />
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="flex justify-between mt-6">
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={goToPreviousTab}
+                >
+                  Back
+                </Button>
+                <Button 
+                  type="submit" 
+                  className="bg-zim-green hover:bg-zim-green/90"
+                  disabled={isSubmitting || !watchTerms}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    'Complete Booking'
+                  )}
+                </Button>
+              </div>
+            </Card>
           </TabsContent>
         </Tabs>
       </form>
