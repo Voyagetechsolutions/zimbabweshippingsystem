@@ -61,14 +61,14 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
     sender_details: bookingData.senderDetails || {},
     recipient_details: bookingData.recipientDetails || {},
     shipment_details: bookingData.shipmentDetails || {},
-    status: 'issued'
+    status: 'Pending Payment'  // Changed to "Pending Payment"
   };
   
   const shipment = propShipment || {
     tracking_number: bookingData.shipmentDetails?.tracking_number || 'Pending',
     origin: bookingData.senderDetails?.address || 'Not specified',
     destination: bookingData.recipientDetails?.address || 'Not specified',
-    status: 'Pending'
+    status: 'Pending Payment'  // Changed to "Pending Payment"
   };
 
   const generateUniqueId = (prefix: string = '') => {
@@ -93,7 +93,7 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
             sender_details: bookingData.senderDetails,
             recipient_details: bookingData.recipientDetails,
             shipment_details: bookingData.shipmentDetails,
-            status: 'issued'
+            status: 'Pending Payment'  // Changed to "Pending Payment"
           });
 
           await supabase.from('notifications').insert({
@@ -460,6 +460,12 @@ Chelveston, Wellingborough, NN9 6AA</p>
                 <p className="text-sm"><span className="font-medium">Delivery Address:</span> {shipment.destination || receipt.recipient_details.address}</p>
               </div>
             </div>
+            
+            {/* Collection Date Information */}
+            <div className="border rounded-md p-3 mt-3">
+              <p className="text-sm"><span className="font-medium">Collection Date:</span> {bookingData.collectionDate || "To be scheduled"}</p>
+              <p className="text-sm"><span className="font-medium">Collection Location:</span> {bookingData.senderDetails?.address || shipment.origin}</p>
+            </div>
           </div>
           
           {receipt.shipment_details.includeDrums && (
@@ -503,7 +509,7 @@ Chelveston, Wellingborough, NN9 6AA</p>
               
               <div className="border rounded-md p-2 sm:p-3 bg-gray-50 mt-2">
                 <p className="font-medium text-sm">Payment Method: {getPaymentMethodDisplay(receipt.payment_method)}</p>
-                <p className="text-xs sm:text-sm text-gray-600 mt-1">Payment Status: {receipt.status === 'issued' ? 'Paid' : 'Pending'}</p>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1">Payment Status: {receipt.status}</p>
               </div>
             </div>
           )}
