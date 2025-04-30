@@ -40,19 +40,7 @@ export const useAuth = () => {
 
       if (error) throw error;
 
-      // Trigger welcome email
-      await fetch('https://oncsaunsqtekwwbzvvyh.supabase.co/functions/v1/send-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({
-          type: 'welcome',
-          email: email,
-        }),
-      });
-
+      // No custom email - using Supabase's built-in email service
       return data;
     } catch (error) {
       console.error('Error:', error);
@@ -74,7 +62,7 @@ export const useAuth = () => {
       toast({
         title: 'Logged Out',
         description: 'You have been logged out successfully.',
-        variant: 'default', // Changed from 'success' to 'default' as per the error
+        variant: 'default',
       });
     } catch (error) {
       console.error('Error:', error);

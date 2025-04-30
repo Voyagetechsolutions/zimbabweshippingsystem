@@ -169,7 +169,8 @@ export const submitCustomQuote = async (quoteData: {
         category: quoteData.category || null,
         specific_item: quoteData.specific_item || null,
         image_urls: quoteData.image_urls || [],
-        status: 'pending'
+        status: 'pending',
+        shipment_id: null // Explicitly set to null to avoid foreign key constraint issues
       })
       .select('id')
       .single();

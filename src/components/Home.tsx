@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -15,6 +16,7 @@ import AnnouncementsFeed from '@/components/AnnouncementsFeed';
 import PersonalizedTestimonials from '@/components/PersonalizedTestimonials';
 import QuickShippingCalculator from '@/components/QuickShippingCalculator';
 import ShippingNewsTicker from '@/components/ShippingNewsTicker';
+import ShippingGallerySlideshow from '@/components/ShippingGallerySlideshow';
 
 const Home = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -102,6 +104,9 @@ const Home = () => {
       <section className="py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <AnnouncementsFeed />
       </section>
+
+      {/* Shipping Gallery Slideshow */}
+      <ShippingGallerySlideshow />
 
       {/* Quick Calculator and Services Section */}
       <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto bg-gray-50">

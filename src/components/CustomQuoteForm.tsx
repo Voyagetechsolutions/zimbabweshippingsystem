@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Upload, X, Image as ImageIcon, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { submitCustomQuote } from '@/utils/supabaseUtils';
 
 interface CustomQuoteFormProps {
   initialData?: any;
@@ -24,6 +25,7 @@ const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({
 }) => {
   const [description, setDescription] = useState<string>(initialData?.shipmentDetails?.description || '');
   const [category, setCategory] = useState<string>(initialData?.shipmentDetails?.category || '');
+  const [specificItem, setSpecificItem] = useState<string>(initialData?.shipmentDetails?.specific_item || '');
   const [phoneNumber, setPhoneNumber] = useState<string>(initialData?.senderDetails?.phone || '');
   const [uploads, setUploads] = useState<File[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
@@ -63,6 +65,11 @@ const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({
     setError(null);
     
     try {
+      // Validate required fields
+      if (!description || !category || !phoneNumber || !specificItem) {
+        throw new Error('Please fill in all required fields');
+      }
+      
       // Upload any images first
       const uploadedImageUrls = [...uploadedFiles];
       
@@ -90,14 +97,39 @@ const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({
       const quoteData = {
         description,
         category,
-        phoneNumber,
-        imageUrls: uploadedImageUrls
+        specific_item: specificItem,
+        phone_number: phoneNumber,
+        image_urls: uploadedImageUrls
       };
       
+      // Use the submitCustomQuote utility function
+      const result = await submitCustomQuote({
+        phone_number: phoneNumber,
+        description: description,
+        category: category,
+        specific_item: specificItem,
+        image_urls: uploadedImageUrls
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to submit quote request');
+      }
+      
       onSubmit(quoteData);
+      
+      toast({
+        title: "Quote Request Submitted",
+        description: "Your custom quote request has been submitted successfully.",
+      });
     } catch (err: any) {
       console.error('Error submitting form:', err);
       setError(err.message || 'An error occurred. Please try again.');
+      toast({
+        title: "Error",
+        description: err.message || "Failed to submit custom quote request.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
     }
   };
@@ -117,10 +149,11 @@ const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({
       
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <Label htmlFor="category">Item Category</Label>
+          <Label htmlFor="category">Item Category <span className="text-red-500">*</span></Label>
           <Select 
             value={category} 
             onValueChange={setCategory}
+            required
           >
             <SelectTrigger>
               <SelectValue placeholder="Select a category" />
@@ -137,7 +170,18 @@ const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({
         </div>
         
         <div>
-          <Label htmlFor="description">Description</Label>
+          <Label htmlFor="specificItem">Specific Item <span className="text-red-500">*</span></Label>
+          <Input
+            id="specificItem"
+            value={specificItem}
+            onChange={(e) => setSpecificItem(e.target.value)}
+            placeholder="e.g., Sofa, Refrigerator, TV, etc."
+            required
+          />
+        </div>
+        
+        <div>
+          <Label htmlFor="description">Description <span className="text-red-500">*</span></Label>
           <Textarea
             id="description"
             value={description}
@@ -149,7 +193,7 @@ const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({
         </div>
         
         <div>
-          <Label htmlFor="phoneNumber">Contact Phone Number</Label>
+          <Label htmlFor="phoneNumber">Contact Phone Number <span className="text-red-500">*</span></Label>
           <Input
             id="phoneNumber"
             type="tel"

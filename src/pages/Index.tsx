@@ -12,7 +12,7 @@ import WhatsAppButton from '@/components/WhatsAppButton';
 import ReviewsSection from '@/components/reviews/ReviewsSection';
 import { Button } from "@/components/ui/button";
 import { Link } from 'react-router-dom';
-import { Image, Clock, ArrowRight, Truck } from 'lucide-react';
+import { Clock, ArrowRight, Truck, Package } from 'lucide-react';
 
 const Index = () => {
   return (
@@ -44,14 +44,14 @@ const Index = () => {
               <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
                 <div className="flex items-center mb-4">
                   <div className="w-12 h-12 rounded-full bg-zim-yellow/10 flex items-center justify-center mr-4">
-                    <Image className="h-6 w-6 text-zim-yellow" />
+                    <Package className="h-6 w-6 text-zim-yellow" />
                   </div>
-                  <h3 className="text-xl font-bold">Our Gallery</h3>
+                  <h3 className="text-xl font-bold">Custom Quotes</h3>
                 </div>
-                <p className="text-gray-600 mb-4">Explore photos of our facilities, shipments, team members, and happy customers.</p>
-                <Link to="/gallery">
+                <p className="text-gray-600 mb-4">Request custom quotes for special items, oversized cargo, or bulk shipments.</p>
+                <Link to="/custom-quote">
                   <Button variant="outline" className="w-full">
-                    View Gallery <ArrowRight className="ml-2 h-4 w-4" />
+                    Get Quote <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
               </div>
