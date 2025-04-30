@@ -104,6 +104,9 @@ export const userHasRole = async (userId: string, requiredRole: string): Promise
     // Admin role has access to everything
     if (data.role === 'admin') return true;
     
+    // For now, only check admin or customer roles
+    if (requiredRole !== 'admin' && requiredRole !== 'customer') return false;
+    
     // Check specific role
     return data.role === requiredRole;
   } catch (error) {
@@ -139,5 +142,46 @@ export const getUserProfile = async (userId?: string): Promise<any> => {
   } catch (error) {
     console.error('Error getting user profile:', error);
     return null;
+  }
+};
+
+/**
+ * Submit a custom quote request
+ * @param quoteData Data for the custom quote
+ * @returns Result of the operation with the created quote ID if successful
+ */
+export const submitCustomQuote = async (quoteData: {
+  phone_number: string;
+  description: string;
+  category?: string;
+  specific_item?: string;
+  image_urls?: string[];
+}): Promise<{ success: boolean; quoteId?: string; error?: string }> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    const { data, error } = await supabase
+      .from('custom_quotes')
+      .insert({
+        user_id: user?.id || null,
+        phone_number: quoteData.phone_number,
+        description: quoteData.description,
+        category: quoteData.category || null,
+        specific_item: quoteData.specific_item || null,
+        image_urls: quoteData.image_urls || [],
+        status: 'pending'
+      })
+      .select('id')
+      .single();
+      
+    if (error) {
+      console.error('Error submitting custom quote:', error);
+      return { success: false, error: error.message };
+    }
+    
+    return { success: true, quoteId: data.id };
+  } catch (error: any) {
+    console.error('Error in submitCustomQuote:', error);
+    return { success: false, error: error.message || 'An unexpected error occurred' };
   }
 };

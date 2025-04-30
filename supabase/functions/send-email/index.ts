@@ -10,7 +10,7 @@ const corsHeaders = {
 };
 
 interface AuthEmailRequest {
-  type: 'signup' | 'magic_link' | 'password_reset';
+  type: 'signup' | 'magic_link' | 'password_reset' | 'welcome';
   email: string;
   token?: string;
   redirect_to?: string;
@@ -102,6 +102,34 @@ const sendAuthEmail = async (req: Request) => {
           ">Reset Password</a>
           <p>This link will expire in 24 hours.</p>
           <p>If you didn't request a password reset, you can safely ignore this email.</p>
+          <hr>
+          <p style="font-size: 12px; color: #666;">Zimbabwe Shipping Ltd, UK</p>
+        `;
+        break;
+        
+      case 'welcome':
+        subject = 'Welcome to Zimbabwe Shipping!';
+        html = `
+          <h1>Thank you for joining Zimbabwe Shipping!</h1>
+          <p>We're excited to have you as a customer. Your account is now ready to use!</p>
+          <p>With Zimbabwe Shipping, you can:</p>
+          <ul>
+            <li>Book shipments to and from Zimbabwe</li>
+            <li>Track your parcels in real-time</li>
+            <li>Request custom quotes for special items</li>
+            <li>Access your shipping history</li>
+          </ul>
+          <p>If you have any questions, feel free to contact our support team.</p>
+          <a href="${safeRedirect}/dashboard" style="
+            background-color: #4CAF50;
+            color: white;
+            padding: 14px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            border-radius: 4px;
+            margin: 10px 0;
+          ">Go to Dashboard</a>
           <hr>
           <p style="font-size: 12px; color: #666;">Zimbabwe Shipping Ltd, UK</p>
         `;

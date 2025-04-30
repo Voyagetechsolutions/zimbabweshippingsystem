@@ -55,7 +55,13 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setRole('customer');
           }
         } else if (data && 'role' in data) {
-          setRole(data.role as UserRoleType);
+          // Temporarily restrict roles to only 'admin' and 'customer'
+          const userRole = data.role as UserRoleType;
+          if (userRole !== 'admin') {
+            setRole('customer');
+          } else {
+            setRole(userRole);
+          }
         } else {
           setRole('customer');
         }
@@ -75,18 +81,14 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     if (role === 'admin' || isAdmin) return true;
 
+    // Temporarily only check for 'admin' or 'customer' role
     switch (requiredRole) {
       case 'admin':
         return false; // Only admin roles can access admin features
-      case 'logistics':
-        return role === 'logistics';
-      case 'driver':
-        return role === 'logistics' || role === 'driver';
-      case 'support':
-        return role === 'logistics' || role === 'support';
       case 'customer':
         return true; // Everyone has customer access
       default:
+        // Temporarily disable logistics, driver, and support roles
         return false;
     }
   };
@@ -141,6 +143,16 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const setUserRole = async (userId: string, newRole: UserRoleType): Promise<boolean> => {
+    // Temporarily restrict role changes to only 'admin' and 'customer'
+    if (newRole !== 'admin' && newRole !== 'customer') {
+      toast({
+        title: 'Role Change Failed',
+        description: 'Only admin and customer roles are currently supported.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
     if (!hasPermission('admin')) {
       toast({
         title: 'Permission Denied',

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -92,6 +93,27 @@ const Auth = () => {
 
       if (error) throw error;
 
+      // Send verification email using the email function
+      try {
+        await fetch('https://oncsaunsqtekwwbzvvyh.supabase.co/functions/v1/send-email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            type: 'signup',
+            email: email,
+            token: data.session?.access_token,
+            redirect_to: window.location.origin + '/auth/callback',
+            csrf_token: csrfToken
+          }),
+        });
+      } catch (emailError) {
+        console.error("Failed to send verification email:", emailError);
+        // Continue with signup flow even if email sending fails
+      }
+
       toast({
         title: 'Registration Successful',
         description: 'Please check your email to verify your account.',
@@ -173,6 +195,26 @@ const Auth = () => {
 
       if (error) throw error;
 
+      // Send password reset email using the email function
+      try {
+        await fetch('https://oncsaunsqtekwwbzvvyh.supabase.co/functions/v1/send-email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            type: 'password_reset',
+            email: email,
+            redirect_to: window.location.origin + '/reset-password',
+            csrf_token: csrfToken
+          }),
+        });
+      } catch (emailError) {
+        console.error("Failed to send password reset email:", emailError);
+        // Continue with password reset flow even if email sending fails
+      }
+
       toast({
         title: 'Password Reset Email Sent',
         description: 'Check your email for a password reset link.',
@@ -183,6 +225,9 @@ const Auth = () => {
       setLoading(false);
     }
   };
+
+  // Extract SUPABASE_PUBLISHABLE_KEY from environment or constant
+  const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9uY3NhdW5zcXRla3d3Ynp2dnloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM2MjY4NDEsImV4cCI6MjA1OTIwMjg0MX0.pzj7yFjXaCgAETrVauXF3JgtAI_-N9DPP-sF1i1QfAA";
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50">

@@ -1,3 +1,4 @@
+
 import { Database } from './types';
 import { Json } from './types';
 
@@ -150,7 +151,7 @@ export interface Tables {
     updated_at: string;
   };
   
-  // Add the custom_quotes table
+  // Updated custom_quotes table with new fields
   custom_quotes: {
     id: string;
     user_id: string | null;
@@ -159,6 +160,7 @@ export interface Tables {
     phone_number: string;
     description: string;
     category: string | null;
+    specific_item: string | null; // Added specific_item field
     image_urls: string[];
     quoted_amount: number | null;
     admin_notes: string | null;
