@@ -166,6 +166,7 @@ export type Database = {
           recipient_details: Json | null
           sender_details: Json | null
           shipment_id: string | null
+          specific_item: string | null
           status: string
           updated_at: string
           user_id: string | null
@@ -182,6 +183,7 @@ export type Database = {
           recipient_details?: Json | null
           sender_details?: Json | null
           shipment_id?: string | null
+          specific_item?: string | null
           status?: string
           updated_at?: string
           user_id?: string | null
@@ -198,6 +200,7 @@ export type Database = {
           recipient_details?: Json | null
           sender_details?: Json | null
           shipment_id?: string | null
+          specific_item?: string | null
           status?: string
           updated_at?: string
           user_id?: string | null

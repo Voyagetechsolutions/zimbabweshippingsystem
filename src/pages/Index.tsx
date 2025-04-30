@@ -10,6 +10,7 @@ import PricingSection from '@/components/PricingSection';
 import CallToAction from '@/components/CallToAction';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import ReviewsSection from '@/components/reviews/ReviewsSection';
+import ShippingGallerySlideshow from '@/components/ShippingGallerySlideshow';
 import { Button } from "@/components/ui/button";
 import { Link } from 'react-router-dom';
 import { Clock, ArrowRight, Truck, Package } from 'lucide-react';
@@ -77,6 +78,7 @@ const Index = () => {
         <TrackingSection />
         <PricingSection />
         <ShippingCalculator />
+        <ShippingGallerySlideshow />
         <section id="reviews" className="py-16 bg-gray-50 reviews-section">
           <div className="container mx-auto px-4">
             <h2 className="text-3xl font-bold text-center mb-12">What Our Customers Say</h2>

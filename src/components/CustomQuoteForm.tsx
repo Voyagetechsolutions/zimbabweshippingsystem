@@ -1,302 +1,283 @@
 
-import React, { useState, ChangeEvent } from 'react';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Upload, X, Image as ImageIcon, Check } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { submitCustomQuote } from '@/utils/supabaseUtils';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { submitCustomQuote } from "@/utils/supabaseUtils";
 
-interface CustomQuoteFormProps {
-  initialData?: any;
-  onSubmit: (data: any) => void;
-  onCancel: () => void;
-}
+// Define the form schema with zod
+const formSchema = z.object({
+  phone_number: z.string().min(1, "Phone number is required"),
+  category: z.string().optional(),
+  specific_item: z.string().optional(),
+  description: z.string().min(10, "Please provide a detailed description of your shipment"),
+});
 
-const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({
-  initialData,
-  onSubmit,
-  onCancel
-}) => {
-  const [description, setDescription] = useState<string>(initialData?.shipmentDetails?.description || '');
-  const [category, setCategory] = useState<string>(initialData?.shipmentDetails?.category || '');
-  const [specificItem, setSpecificItem] = useState<string>(initialData?.shipmentDetails?.specific_item || '');
-  const [phoneNumber, setPhoneNumber] = useState<string>(initialData?.senderDetails?.phone || '');
-  const [uploads, setUploads] = useState<File[]>([]);
-  const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+const categories = [
+  { value: "automotive", label: "Automotive Parts & Vehicles" },
+  { value: "electronics", label: "Electronics & Appliances" },
+  { value: "furniture", label: "Furniture" },
+  { value: "medical", label: "Medical Equipment" },
+  { value: "personal", label: "Personal Effects" },
+  { value: "commercial", label: "Commercial Goods" },
+  { value: "construction", label: "Construction Materials" },
+  { value: "agricultural", label: "Agricultural Equipment" },
+  { value: "other", label: "Other" }
+];
+
+const specificItems = {
+  automotive: [
+    { value: "car", label: "Car" },
+    { value: "truck", label: "Truck" },
+    { value: "parts", label: "Vehicle Parts" },
+    { value: "motorcycle", label: "Motorcycle" },
+    { value: "other", label: "Other Automotive Item" }
+  ],
+  electronics: [
+    { value: "tv", label: "Television" },
+    { value: "fridge", label: "Refrigerator" },
+    { value: "freezer", label: "Freezer" },
+    { value: "washer", label: "Washing Machine" },
+    { value: "generator", label: "Generator" },
+    { value: "other", label: "Other Electronics" }
+  ],
+  furniture: [
+    { value: "sofa", label: "Sofa/Couch" },
+    { value: "bed", label: "Bed" },
+    { value: "cabinet", label: "Cabinets/Wardrobes" },
+    { value: "table", label: "Tables/Chairs" },
+    { value: "other", label: "Other Furniture" }
+  ],
+  medical: [
+    { value: "equipment", label: "Medical Equipment" },
+    { value: "supplies", label: "Medical Supplies" },
+    { value: "other", label: "Other Medical Item" }
+  ],
+  personal: [
+    { value: "clothing", label: "Clothing" },
+    { value: "books", label: "Books" },
+    { value: "housewares", label: "Housewares" },
+    { value: "other", label: "Other Personal Items" }
+  ],
+  commercial: [
+    { value: "inventory", label: "Shop Inventory" },
+    { value: "equipment", label: "Business Equipment" },
+    { value: "other", label: "Other Commercial Goods" }
+  ],
+  construction: [
+    { value: "tools", label: "Tools & Equipment" },
+    { value: "materials", label: "Building Materials" },
+    { value: "other", label: "Other Construction Items" }
+  ],
+  agricultural: [
+    { value: "tractor", label: "Tractor" },
+    { value: "tools", label: "Farming Tools" },
+    { value: "equipment", label: "Farming Equipment" },
+    { value: "other", label: "Other Agricultural Items" }
+  ],
+  other: [
+    { value: "custom", label: "Custom Item (Specify in Description)" }
+  ]
+};
+
+const CustomQuoteForm = () => {
   const { toast } = useToast();
-  
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const fileList = e.target.files;
-    if (!fileList) return;
-    
-    // Convert FileList to array and filter for image files
-    const newFiles = Array.from(fileList).filter(file => 
-      file.type.startsWith('image/') && file.size < 10 * 1024 * 1024 // Less than 10MB
-    );
-    
-    if (newFiles.length < fileList.length) {
-      toast({
-        title: "Some files were not added",
-        description: "Only image files under 10MB are accepted.",
-        variant: "destructive",
-      });
-    }
-    
-    setUploads([...uploads, ...newFiles]);
-  };
-  
-  const removeFile = (index: number) => {
-    const newFiles = [...uploads];
-    newFiles.splice(index, 1);
-    setUploads(newFiles);
-  };
-  
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      phone_number: "",
+      category: "",
+      specific_item: "",
+      description: "",
+    },
+  });
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    setLoading(true);
     
     try {
-      // Validate required fields
-      if (!description || !category || !phoneNumber || !specificItem) {
-        throw new Error('Please fill in all required fields');
-      }
-      
-      // Upload any images first
-      const uploadedImageUrls = [...uploadedFiles];
-      
-      if (uploads.length > 0) {
-        for (const file of uploads) {
-          const fileExt = file.name.split('.').pop();
-          const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-          
-          const { error: uploadError, data } = await supabase.storage
-            .from('custom-quotes')
-            .upload(fileName, file);
-          
-          if (uploadError) {
-            throw new Error(`Error uploading file: ${uploadError.message}`);
-          }
-          
-          const { data: { publicUrl } } = supabase.storage
-            .from('custom-quotes')
-            .getPublicUrl(fileName);
-          
-          uploadedImageUrls.push(publicUrl);
-        }
-      }
-      
       const quoteData = {
-        description,
-        category,
-        specific_item: specificItem,
-        phone_number: phoneNumber,
-        image_urls: uploadedImageUrls
+        phone_number: values.phone_number,
+        category: values.category || null,
+        specific_item: values.specific_item || null,
+        description: values.description,
       };
+
+      const result = await submitCustomQuote(quoteData);
       
-      // Use the submitCustomQuote utility function
-      const result = await submitCustomQuote({
-        phone_number: phoneNumber,
-        description: description,
-        category: category,
-        specific_item: specificItem,
-        image_urls: uploadedImageUrls
-      });
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to submit quote request');
+      if (result.success) {
+        toast({
+          title: "Quote Request Submitted",
+          description: "We'll review your request and get back to you soon.",
+        });
+        
+        // Navigate to receipt or confirmation page with the quote data
+        navigate("/custom-quote-confirmation", {
+          state: { 
+            customQuoteData: {
+              id: result.quoteId,
+              ...quoteData
+            }
+          }
+        });
+      } else {
+        throw new Error(result.error || "Failed to submit quote");
       }
-      
-      onSubmit(quoteData);
-      
-      toast({
-        title: "Quote Request Submitted",
-        description: "Your custom quote request has been submitted successfully.",
-      });
-    } catch (err: any) {
-      console.error('Error submitting form:', err);
-      setError(err.message || 'An error occurred. Please try again.');
+    } catch (error: any) {
+      console.error("Error submitting custom quote:", error);
       toast({
         title: "Error",
-        description: err.message || "Failed to submit custom quote request.",
+        description: error.message || "Something went wrong. Please try again later.",
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
-  
+
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategory(category);
+    form.setValue("category", category);
+    form.setValue("specific_item", "");
+  };
+
   return (
-    <Card className="p-6">
-      <h3 className="text-xl font-semibold mb-4">Request Custom Quote</h3>
-      <p className="text-gray-600 mb-6">
-        Please provide details about the items you want to ship so we can give you an accurate quote.
-      </p>
-      
-      {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-      
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <Label htmlFor="category">Item Category <span className="text-red-500">*</span></Label>
-          <Select 
-            value={category} 
-            onValueChange={setCategory}
-            required
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select a category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="furniture">Furniture</SelectItem>
-              <SelectItem value="appliances">Appliances</SelectItem>
-              <SelectItem value="electronics">Electronics</SelectItem>
-              <SelectItem value="vehicles">Vehicle Parts</SelectItem>
-              <SelectItem value="equipment">Equipment</SelectItem>
-              <SelectItem value="other">Other</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        
-        <div>
-          <Label htmlFor="specificItem">Specific Item <span className="text-red-500">*</span></Label>
-          <Input
-            id="specificItem"
-            value={specificItem}
-            onChange={(e) => setSpecificItem(e.target.value)}
-            placeholder="e.g., Sofa, Refrigerator, TV, etc."
-            required
-          />
-        </div>
-        
-        <div>
-          <Label htmlFor="description">Description <span className="text-red-500">*</span></Label>
-          <Textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Please describe your item including dimensions and weight if possible"
-            rows={5}
-            required
-          />
-        </div>
-        
-        <div>
-          <Label htmlFor="phoneNumber">Contact Phone Number <span className="text-red-500">*</span></Label>
-          <Input
-            id="phoneNumber"
-            type="tel"
-            value={phoneNumber}
-            onChange={(e) => setPhoneNumber(e.target.value)}
-            placeholder="Enter your phone number"
-            required
-          />
-        </div>
-        
-        <div>
-          <Label className="block mb-2">Upload Images (Optional)</Label>
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-            <input
-              type="file"
-              id="imageUpload"
-              accept="image/*"
-              multiple
-              onChange={handleFileChange}
-              className="hidden"
+    <Card className="w-full max-w-2xl mx-auto">
+      <CardHeader>
+        <CardTitle>Request a Custom Quote</CardTitle>
+        <CardDescription>
+          Need to ship something special? Tell us about your item and we'll provide a custom quote.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <FormField
+              control={form.control}
+              name="phone_number"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="+44 7123 456789" {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    We'll contact you on this number with your quote.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            <label 
-              htmlFor="imageUpload" 
-              className="flex flex-col items-center justify-center cursor-pointer"
-            >
-              <Upload className="h-10 w-10 text-gray-400 mb-2" />
-              <p className="text-sm text-gray-600">Click to upload images</p>
-              <p className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 10MB</p>
-            </label>
-          </div>
-          
-          {uploads.length > 0 && (
-            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {uploads.map((file, index) => (
-                <div key={index} className="relative rounded-md border overflow-hidden group">
-                  <div className="w-full h-20 bg-gray-100 flex items-center justify-center">
-                    {file.type.startsWith('image/') ? (
-                      <img 
-                        src={URL.createObjectURL(file)} 
-                        alt={`Upload ${index + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <ImageIcon className="h-8 w-8 text-gray-400" />
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeFile(index)}
-                    className="absolute top-1 right-1 bg-white rounded-full p-0.5 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+            
+            <FormField
+              control={form.control}
+              name="category"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Item Category (Optional)</FormLabel>
+                  <Select 
+                    onValueChange={(value) => handleCategoryChange(value)} 
+                    value={field.value}
                   >
-                    <X className="h-4 w-4 text-gray-700" />
-                  </button>
-                  <div className="text-xs truncate py-1 px-2 bg-gray-50">
-                    {file.name}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          
-          {uploadedFiles.length > 0 && (
-            <div className="mt-4">
-              <p className="text-sm font-medium mb-2">Previously Uploaded Images</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {uploadedFiles.map((url, index) => (
-                  <div key={index} className="relative rounded-md border overflow-hidden">
-                    <div className="w-full h-20 bg-gray-100">
-                      <img 
-                        src={url} 
-                        alt={`Uploaded ${index + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="absolute top-1 right-1 bg-green-100 rounded-full p-0.5 text-green-600">
-                      <Check className="h-3 w-3" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-        
-        <div className="flex justify-between pt-4">
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Back
-          </Button>
-          
-          <Button 
-            type="submit" 
-            className="bg-zim-green hover:bg-zim-green/90"
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Submitting...
-              </>
-            ) : 'Submit Quote Request'}
-          </Button>
-        </div>
-      </form>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem key={category.value} value={category.value}>
+                          {category.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            {selectedCategory && (
+              <FormField
+                control={form.control}
+                name="specific_item"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Specific Item (Optional)</FormLabel>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      value={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select specific item" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {specificItems[selectedCategory as keyof typeof specificItems]?.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Please describe your item, including dimensions, weight, and any special handling requirements." 
+                      {...field}
+                      rows={5}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    The more detail you provide, the more accurate our quote will be.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Submitting..." : "Submit Request"}
+            </Button>
+          </form>
+        </Form>
+      </CardContent>
+      <CardFooter className="flex justify-between text-sm text-gray-500 flex-wrap">
+        <p>We aim to respond to all quote requests within 24 hours.</p>
+      </CardFooter>
     </Card>
   );
 };
