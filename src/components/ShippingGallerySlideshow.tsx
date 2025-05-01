@@ -98,19 +98,19 @@ const ShippingGallerySlideshow: React.FC = () => {
         
         <div className="relative max-w-5xl mx-auto">
           {/* Increased height for the slideshow container */}
-          <div className="aspect-w-16 aspect-h-9 bg-gray-800 overflow-hidden rounded-lg" style={{ minHeight: '450px', height: '60vh', maxHeight: '600px' }}>
+          <div className="aspect-w-16 aspect-h-9 bg-gray-800 overflow-hidden rounded-lg" style={{ minHeight: '400px', height: 'calc(50vh)' }}>
             {images.map((image, index) => (
               <div 
                 key={index}
-                className={`absolute inset-0 transition-opacity duration-1000 flex items-center justify-center ${
+                className={`absolute inset-0 transition-opacity duration-1000 ${
                   index === currentIndex ? "opacity-100" : "opacity-0"
                 }`}
               >
                 <img
                   src={image.src}
                   alt={image.alt}
-                  className="max-w-full max-h-full object-contain"
-                  style={{ width: 'auto', height: 'auto', maxWidth: '90%', maxHeight: '90%' }}
+                  className="object-contain w-full h-full"
+                  style={{ maxHeight: '100%', margin: '0 auto' }}
                   onLoad={handleImageLoad}
                 />
                 <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 p-4 text-white">
