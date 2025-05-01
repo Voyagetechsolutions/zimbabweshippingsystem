@@ -1,283 +1,273 @@
+import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertCircle, Upload, X, Plus, Loader2 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
-import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { submitCustomQuote } from "@/utils/supabaseUtils";
+interface CustomQuoteFormProps {
+  initialData: any;
+  onSubmit: (customQuoteData: any) => Promise<void>;
+  onCancel: () => void;
+}
 
-// Define the form schema with zod
-const formSchema = z.object({
-  phone_number: z.string().min(1, "Phone number is required"),
-  category: z.string().optional(),
-  specific_item: z.string().optional(),
-  description: z.string().min(10, "Please provide a detailed description of your shipment"),
-});
-
-const categories = [
-  { value: "automotive", label: "Automotive Parts & Vehicles" },
-  { value: "electronics", label: "Electronics & Appliances" },
-  { value: "furniture", label: "Furniture" },
-  { value: "medical", label: "Medical Equipment" },
-  { value: "personal", label: "Personal Effects" },
-  { value: "commercial", label: "Commercial Goods" },
-  { value: "construction", label: "Construction Materials" },
-  { value: "agricultural", label: "Agricultural Equipment" },
-  { value: "other", label: "Other" }
-];
-
-const specificItems = {
-  automotive: [
-    { value: "car", label: "Car" },
-    { value: "truck", label: "Truck" },
-    { value: "parts", label: "Vehicle Parts" },
-    { value: "motorcycle", label: "Motorcycle" },
-    { value: "other", label: "Other Automotive Item" }
-  ],
-  electronics: [
-    { value: "tv", label: "Television" },
-    { value: "fridge", label: "Refrigerator" },
-    { value: "freezer", label: "Freezer" },
-    { value: "washer", label: "Washing Machine" },
-    { value: "generator", label: "Generator" },
-    { value: "other", label: "Other Electronics" }
-  ],
-  furniture: [
-    { value: "sofa", label: "Sofa/Couch" },
-    { value: "bed", label: "Bed" },
-    { value: "cabinet", label: "Cabinets/Wardrobes" },
-    { value: "table", label: "Tables/Chairs" },
-    { value: "other", label: "Other Furniture" }
-  ],
-  medical: [
-    { value: "equipment", label: "Medical Equipment" },
-    { value: "supplies", label: "Medical Supplies" },
-    { value: "other", label: "Other Medical Item" }
-  ],
-  personal: [
-    { value: "clothing", label: "Clothing" },
-    { value: "books", label: "Books" },
-    { value: "housewares", label: "Housewares" },
-    { value: "other", label: "Other Personal Items" }
-  ],
-  commercial: [
-    { value: "inventory", label: "Shop Inventory" },
-    { value: "equipment", label: "Business Equipment" },
-    { value: "other", label: "Other Commercial Goods" }
-  ],
-  construction: [
-    { value: "tools", label: "Tools & Equipment" },
-    { value: "materials", label: "Building Materials" },
-    { value: "other", label: "Other Construction Items" }
-  ],
-  agricultural: [
-    { value: "tractor", label: "Tractor" },
-    { value: "tools", label: "Farming Tools" },
-    { value: "equipment", label: "Farming Equipment" },
-    { value: "other", label: "Other Agricultural Items" }
-  ],
-  other: [
-    { value: "custom", label: "Custom Item (Specify in Description)" }
-  ]
-};
-
-const CustomQuoteForm = () => {
+const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({ initialData, onSubmit, onCancel }) => {
+  const [category, setCategory] = useState(initialData?.shipmentDetails?.category || '');
+  const [specificItem, setSpecificItem] = useState(initialData?.shipmentDetails?.specificItem || '');
+  const [description, setDescription] = useState(initialData?.shipmentDetails?.description || '');
+  const [phoneNumber, setPhoneNumber] = useState(initialData?.senderDetails?.phone || '');
+  const [images, setImages] = useState<File[]>([]);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
   const { toast } = useToast();
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      phone_number: "",
-      category: "",
-      specific_item: "",
-      description: "",
-    },
-  });
+  const categories = [
+    { value: 'electronics', label: 'Electronics' },
+    { value: 'furniture', label: 'Furniture' },
+    { value: 'clothing', label: 'Clothing' },
+    { value: 'appliances', label: 'Appliances' },
+    { value: 'vehicles', label: 'Vehicles or Parts' },
+    { value: 'medical', label: 'Medical Equipment' },
+    { value: 'construction', label: 'Construction Materials' },
+    { value: 'other', label: 'Other' },
+  ];
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    setLoading(true);
-    
-    try {
-      const quoteData = {
-        phone_number: values.phone_number,
-        category: values.category || null,
-        specific_item: values.specific_item || null,
-        description: values.description,
-      };
-
-      const result = await submitCustomQuote(quoteData);
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const selectedFiles = Array.from(e.target.files);
       
-      if (result.success) {
+      // Check file size (limit to 5MB per file)
+      const oversizedFiles = selectedFiles.filter(file => file.size > 5 * 1024 * 1024);
+      if (oversizedFiles.length > 0) {
         toast({
-          title: "Quote Request Submitted",
-          description: "We'll review your request and get back to you soon.",
+          title: "File too large",
+          description: "Images must be less than 5MB each",
+          variant: "destructive"
         });
-        
-        // Navigate to receipt or confirmation page with the quote data
-        navigate("/custom-quote-confirmation", {
-          state: { 
-            customQuoteData: {
-              id: result.quoteId,
-              ...quoteData
-            }
-          }
-        });
-      } else {
-        throw new Error(result.error || "Failed to submit quote");
+        return;
       }
-    } catch (error: any) {
-      console.error("Error submitting custom quote:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Something went wrong. Please try again later.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+      
+      // Limit to 5 images total
+      if (images.length + selectedFiles.length > 5) {
+        toast({
+          title: "Too many images",
+          description: "You can upload a maximum of 5 images",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      setImages(prev => [...prev, ...selectedFiles]);
     }
   };
 
-  const handleCategoryChange = (category: string) => {
-    setSelectedCategory(category);
-    form.setValue("category", category);
-    form.setValue("specific_item", "");
+  const removeImage = (index: number) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadImages = async (): Promise<string[]> => {
+    if (images.length === 0) return [];
+    
+    setUploading(true);
+    const uploadedUrls: string[] = [];
+    
+    try {
+      for (const image of images) {
+        const fileExt = image.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+        const filePath = `custom_quotes/${initialData.shipment_id || 'unassigned'}/${fileName}`;
+        
+        const { data, error } = await supabase.storage
+          .from('shipment-images')
+          .upload(filePath, image);
+          
+        if (error) {
+          throw error;
+        }
+        
+        const { data: urlData } = supabase.storage
+          .from('shipment-images')
+          .getPublicUrl(filePath);
+          
+        uploadedUrls.push(urlData.publicUrl);
+      }
+      
+      return uploadedUrls;
+    } catch (error: any) {
+      toast({
+        title: "Upload failed",
+        description: error.message || "Failed to upload images",
+        variant: "destructive"
+      });
+      return [];
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!category || !description) {
+      setError('Please provide a category and description for your item');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    setError('');
+    
+    try {
+      // Upload images if any
+      const urls = await uploadImages();
+      
+      // Combine with any existing image URLs
+      const allImageUrls = [...imageUrls, ...urls];
+      
+      await onSubmit({
+        category,
+        specificItem,
+        description,
+        phoneNumber,
+        imageUrls: allImageUrls
+      });
+    } catch (error: any) {
+      setError(error.message || 'Failed to submit custom quote request');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle>Request a Custom Quote</CardTitle>
-        <CardDescription>
-          Need to ship something special? Tell us about your item and we'll provide a custom quote.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="phone_number"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phone Number</FormLabel>
-                  <FormControl>
-                    <Input placeholder="+44 7123 456789" {...field} />
-                  </FormControl>
-                  <FormDescription>
-                    We'll contact you on this number with your quote.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+    <Card>
+      <CardContent className="pt-6">
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="category">Item Category</Label>
+              <Select 
+                value={category} 
+                onValueChange={setCategory}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(cat => (
+                    <SelectItem key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             
-            <FormField
-              control={form.control}
-              name="category"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Item Category (Optional)</FormLabel>
-                  <Select 
-                    onValueChange={(value) => handleCategoryChange(value)} 
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a category" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category.value} value={category.value}>
-                          {category.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            {selectedCategory && (
-              <FormField
-                control={form.control}
-                name="specific_item"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Specific Item (Optional)</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select specific item" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {specificItems[selectedCategory as keyof typeof specificItems]?.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
-                            {item.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+            <div>
+              <Label htmlFor="specificItem">Specific Item (Optional)</Label>
+              <Input
+                id="specificItem"
+                value={specificItem}
+                onChange={(e) => setSpecificItem(e.target.value)}
+                placeholder="e.g. Samsung TV, Sofa Set, etc."
               />
-            )}
+            </div>
             
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      placeholder="Please describe your item, including dimensions, weight, and any special handling requirements." 
-                      {...field}
-                      rows={5}
+            <div>
+              <Label htmlFor="description">Item Description</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Please provide details about your item including dimensions, weight, and any special handling requirements"
+                rows={4}
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="phoneNumber">Contact Phone Number</Label>
+              <Input
+                id="phoneNumber"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="+44 123 456 7890"
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                We'll contact you on this number with your custom quote
+              </p>
+            </div>
+            
+            <div>
+              <Label>Upload Images (Optional)</Label>
+              <div className="mt-2 flex flex-wrap gap-4">
+                {images.map((image, index) => (
+                  <div key={index} className="relative w-24 h-24 border rounded overflow-hidden">
+                    <img
+                      src={URL.createObjectURL(image)}
+                      alt={`Item preview ${index + 1}`}
+                      className="w-full h-full object-cover"
                     />
-                  </FormControl>
-                  <FormDescription>
-                    The more detail you provide, the more accurate our quote will be.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Submitting..." : "Submit Request"}
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute top-1 right-1 bg-black bg-opacity-50 rounded-full p-1"
+                    >
+                      <X className="h-4 w-4 text-white" />
+                    </button>
+                  </div>
+                ))}
+                
+                {images.length < 5 && (
+                  <label className="w-24 h-24 border-2 border-dashed rounded flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50">
+                    <Plus className="h-6 w-6 text-gray-400" />
+                    <span className="text-xs text-gray-500 mt-1">Add Image</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Max 5 images, 5MB each. Images help us provide an accurate quote.
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex justify-between pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              disabled={isSubmitting || uploading}
+            >
+              Back
             </Button>
-          </form>
-        </Form>
+            <Button
+              type="submit"
+              disabled={isSubmitting || uploading}
+            >
+              {(isSubmitting || uploading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSubmitting ? 'Submitting...' : uploading ? 'Uploading Images...' : 'Submit Request'}
+            </Button>
+          </div>
+        </form>
       </CardContent>
-      <CardFooter className="flex justify-between text-sm text-gray-500 flex-wrap">
-        <p>We aim to respond to all quote requests within 24 hours.</p>
-      </CardFooter>
     </Card>
   );
 };

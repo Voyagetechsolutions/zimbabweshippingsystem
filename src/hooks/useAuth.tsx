@@ -2,10 +2,17 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { AuthError, Session } from '@supabase/supabase-js';
+
+// Define return type for signIn function
+interface SignInResponse {
+  data: any;
+  error: AuthError | null;
+}
 
 export const useAuth = () => {
-  const [session, setSession] = useState<any>(null); // Type according to the expected session data
-  const [user, setUser] = useState<any>(null); // Type accordingly
+  const [session, setSession] = useState<any>(null); 
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const { toast } = useToast();
 
@@ -31,25 +38,25 @@ export const useAuth = () => {
   }, []);
 
   // Sign-in method
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<SignInResponse> => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const response = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) throw error;
+      if (response.error) throw response.error;
 
       // No custom email - using Supabase's built-in email service
-      return data;
-    } catch (error) {
+      return response;
+    } catch (error: any) {
       console.error('Error:', error);
       toast({
         title: 'Error',
         description: error.message,
         variant: 'destructive',
       });
-      throw error;
+      return { data: null, error };
     }
   };
 
@@ -64,7 +71,7 @@ export const useAuth = () => {
         description: 'You have been logged out successfully.',
         variant: 'default',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error:', error);
       toast({
         title: 'Error',

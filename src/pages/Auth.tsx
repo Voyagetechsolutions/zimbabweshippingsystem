@@ -142,9 +142,11 @@ const Auth = () => {
 
     try {
       setLoading(true);
-      const { error } = await signIn(email, password);
+      const response = await signIn(email, password);
 
-      if (error) throw error;
+      if (response.error) {
+        throw response.error;
+      }
 
       // Navigation handled in useEffect after login
     } catch (error: any) {
