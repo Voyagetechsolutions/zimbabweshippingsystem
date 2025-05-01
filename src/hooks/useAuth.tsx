@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { AuthError } from '@supabase/supabase-js';
 
 export const useAuth = () => {
   const [session, setSession] = useState<any>(null); // Type according to the expected session data
@@ -30,7 +31,7 @@ export const useAuth = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Sign-in method
+  // Sign-in method with proper return type that includes error property
   const signIn = async (email: string, password: string) => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -41,15 +42,15 @@ export const useAuth = () => {
       if (error) throw error;
 
       // No custom email - using Supabase's built-in email service
-      return data;
-    } catch (error) {
+      return { data, error: null };
+    } catch (error: any) {
       console.error('Error:', error);
       toast({
         title: 'Error',
         description: error.message,
         variant: 'destructive',
       });
-      throw error;
+      return { data: null, error };
     }
   };
 
@@ -64,7 +65,7 @@ export const useAuth = () => {
         description: 'You have been logged out successfully.',
         variant: 'default',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error:', error);
       toast({
         title: 'Error',

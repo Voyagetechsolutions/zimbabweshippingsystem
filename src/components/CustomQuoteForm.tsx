@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -97,23 +96,31 @@ const specificItems = {
   ]
 };
 
-const CustomQuoteForm = () => {
+interface CustomQuoteFormProps {
+  initialData?: any;
+  onSubmit: (values: any) => Promise<void> | void;
+  onCancel?: () => void;
+}
+
+const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({ initialData, onSubmit, onCancel }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(
+    initialData?.shipmentDetails?.category || initialData?.category || null
+  );
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      phone_number: "",
-      category: "",
-      specific_item: "",
-      description: "",
+      phone_number: initialData?.senderDetails?.phone || initialData?.phone_number || "",
+      category: initialData?.shipmentDetails?.category || initialData?.category || "",
+      specific_item: initialData?.shipmentDetails?.specificItem || initialData?.specific_item || "",
+      description: initialData?.shipmentDetails?.description || initialData?.description || "",
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const handleFormSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     
     try {
@@ -124,25 +131,31 @@ const CustomQuoteForm = () => {
         description: values.description,
       };
 
-      const result = await submitCustomQuote(quoteData);
-      
-      if (result.success) {
-        toast({
-          title: "Quote Request Submitted",
-          description: "We'll review your request and get back to you soon.",
-        });
-        
-        // Navigate to receipt or confirmation page with the quote data
-        navigate("/custom-quote-confirmation", {
-          state: { 
-            customQuoteData: {
-              id: result.quoteId,
-              ...quoteData
-            }
-          }
-        });
+      // If user-provided onSubmit function is passed, use that
+      if (onSubmit) {
+        await onSubmit(quoteData);
       } else {
-        throw new Error(result.error || "Failed to submit quote");
+        // Otherwise use the default behavior
+        const result = await submitCustomQuote(quoteData);
+        
+        if (result.success) {
+          toast({
+            title: "Quote Request Submitted",
+            description: "We'll review your request and get back to you soon.",
+          });
+          
+          // Navigate to receipt or confirmation page with the quote data
+          navigate("/custom-quote-confirmation", {
+            state: { 
+              customQuoteData: {
+                id: result.quoteId,
+                ...quoteData
+              }
+            }
+          });
+        } else {
+          throw new Error(result.error || "Failed to submit quote");
+        }
       }
     } catch (error: any) {
       console.error("Error submitting custom quote:", error);
@@ -172,7 +185,7 @@ const CustomQuoteForm = () => {
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
             <FormField
               control={form.control}
               name="phone_number"
@@ -269,9 +282,16 @@ const CustomQuoteForm = () => {
               )}
             />
             
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Submitting..." : "Submit Request"}
-            </Button>
+            <div className="flex space-x-2 justify-end">
+              {onCancel && (
+                <Button type="button" variant="outline" onClick={onCancel}>
+                  Cancel
+                </Button>
+              )}
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Submitting..." : "Submit Request"}
+              </Button>
+            </div>
           </form>
         </Form>
       </CardContent>

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -181,7 +180,7 @@ const BookShipment = () => {
       const { data, error } = await supabase.from('custom_quotes').insert({
         user_id: bookingData.user_id,
         shipment_id: shipmentUuid,
-        phone_number: customQuoteData.phoneNumber || bookingData.senderDetails.phone,
+        phone_number: customQuoteData.phone_number || bookingData.senderDetails.phone,
         description: customQuoteData.description || bookingData.shipmentDetails.description,
         category: customQuoteData.category || bookingData.shipmentDetails.category,
         image_urls: customQuoteData.imageUrls || [],
@@ -200,7 +199,7 @@ const BookShipment = () => {
       await supabase.from('notifications').insert({
         user_id: bookingData.user_id || '00000000-0000-0000-0000-000000000000',
         title: 'New Custom Quote Request',
-        message: `A new custom quote request has been submitted for: ${customQuoteData.specificItem || customQuoteData.description}`,
+        message: `A new custom quote request has been submitted for: ${customQuoteData.specific_item || customQuoteData.description}`,
         type: 'custom_quote',
         related_id: data.id,
         is_read: false

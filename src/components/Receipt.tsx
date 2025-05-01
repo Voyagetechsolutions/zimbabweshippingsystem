@@ -52,30 +52,33 @@ const Receipt: React.FC<ReceiptProps> = ({
   const paymentData = propPaymentData || stateData.paymentData || {};
   const customQuoteData = propCustomQuote || stateData.customQuoteData || {};
   
-  console.log("Receipt component data:", {
+  console.log("Receipt component mounted with data:", {
     locationState: location.state,
+    stateData,
     bookingData,
     paymentData,
-    customQuoteData
+    customQuoteData,
+    propReceipt,
+    propShipment
   });
   
   // Create default receipt data if not provided
   const receipt = propReceipt || {
     receipt_number: `ZIM-${Date.now().toString().substring(8)}`,
     created_at: new Date().toISOString(),
-    amount: paymentData.finalAmount || 0,
+    amount: paymentData?.finalAmount || paymentData?.amount || 0,
     currency: 'GBP',
-    payment_method: paymentData.method || 'standard',
-    sender_details: bookingData.senderDetails || {},
-    recipient_details: bookingData.recipientDetails || {},
-    shipment_details: bookingData.shipmentDetails || {},
+    payment_method: paymentData?.method || 'standard',
+    sender_details: bookingData?.senderDetails || {},
+    recipient_details: bookingData?.recipientDetails || {},
+    shipment_details: bookingData?.shipmentDetails || {},
     status: 'issued'
   };
   
   const shipment = propShipment || {
-    tracking_number: bookingData.shipmentDetails?.tracking_number || 'Pending',
-    origin: bookingData.senderDetails?.address || 'Not specified',
-    destination: bookingData.recipientDetails?.address || 'Not specified',
+    tracking_number: bookingData?.shipmentDetails?.tracking_number || 'Pending',
+    origin: bookingData?.senderDetails?.address || 'Not specified',
+    destination: bookingData?.recipientDetails?.address || 'Not specified',
     status: 'Pending'
   };
 
@@ -85,7 +88,7 @@ const Receipt: React.FC<ReceiptProps> = ({
 
   useEffect(() => {
     // Log the data to help debug
-    console.log("Receipt details:", {
+    console.log("Receipt processed details:", {
       receipt,
       shipment,
       senderDetails: receipt.sender_details,
@@ -101,7 +104,7 @@ const Receipt: React.FC<ReceiptProps> = ({
           await supabase.from('receipts').insert({
             receipt_number: receipt.receipt_number,
             payment_id: paymentId,
-            amount: paymentData.finalAmount,
+            amount: paymentData.finalAmount || paymentData.amount,
             currency: 'GBP',
             payment_method: getPaymentMethodValue(paymentData.method, paymentData.payLaterMethod),
             shipment_id: bookingData.shipment_id,
@@ -119,9 +122,18 @@ const Receipt: React.FC<ReceiptProps> = ({
             related_id: bookingData.shipment_id,
             is_read: false
           });
+
+          console.log("Receipt record created successfully");
         } catch (error) {
           console.error('Error saving receipt:', error);
         }
+      } else {
+        console.log("Skipping receipt creation due to missing data", { 
+          hasBookingData: !!bookingData, 
+          hasPaymentData: !!paymentData, 
+          hasPropReceipt: !!propReceipt,
+          hasShipmentId: bookingData?.shipment_id 
+        });
       }
     };
 
@@ -340,9 +352,9 @@ const Receipt: React.FC<ReceiptProps> = ({
   };
 
   // Safeguard against undefined properties
-  const senderDetails = receipt.sender_details || {};
-  const recipientDetails = receipt.recipient_details || {};
-  const shipmentDetails = receipt.shipment_details || {};
+  const senderDetails = receipt?.sender_details || {};
+  const recipientDetails = receipt?.recipient_details || {};
+  const shipmentDetails = receipt?.shipment_details || {};
 
   return (
     <div className="container mx-auto px-2 sm:px-4 max-w-4xl">
@@ -425,7 +437,7 @@ Chelveston, Wellingborough, NN9 6AA</p>
                         )}
                       </div>
                     </td>
-                    <td className="p-2 sm:p-3 text-xs sm:text-sm">{shipment.status || receipt.status}</td>
+                    <td className="p-2 sm:p-3 text-xs sm:text-sm">{shipment.status || receipt.status || "Pending"}</td>
                   </tr>
                 </tbody>
               </table>
