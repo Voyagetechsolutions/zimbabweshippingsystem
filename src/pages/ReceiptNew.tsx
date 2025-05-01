@@ -47,11 +47,20 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
   const location = useLocation();
   const navigate = useNavigate();
   
+  // Ensure we properly extract data from props or location state
   const stateData = location.state || {};
   const bookingData = propBookingData || stateData.bookingData || {};
   const paymentData = propPaymentData || stateData.paymentData || {};
   const customQuoteData = propCustomQuote || stateData.customQuoteData || {};
   
+  console.log("ReceiptNew component data:", {
+    locationState: location.state,
+    bookingData,
+    paymentData,
+    customQuoteData
+  });
+  
+  // Create default receipt data if not provided
   const receipt = propReceipt || {
     receipt_number: `ZIM-${Date.now().toString().substring(8)}`,
     created_at: new Date().toISOString(),
@@ -61,14 +70,14 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
     sender_details: bookingData.senderDetails || {},
     recipient_details: bookingData.recipientDetails || {},
     shipment_details: bookingData.shipmentDetails || {},
-    status: 'Pending Payment'  // Changed to "Pending Payment"
+    status: 'Pending Payment'
   };
   
   const shipment = propShipment || {
     tracking_number: bookingData.shipmentDetails?.tracking_number || 'Pending',
     origin: bookingData.senderDetails?.address || 'Not specified',
     destination: bookingData.recipientDetails?.address || 'Not specified',
-    status: 'Pending Payment'  // Changed to "Pending Payment"
+    status: 'Pending Payment'
   };
 
   const generateUniqueId = (prefix: string = '') => {
@@ -77,6 +86,15 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
 
   useEffect(() => {
     document.title = `Receipt ${receipt.receipt_number} | Zimbabwe Shipping`;
+    
+    // Log the data to help debug
+    console.log("Receipt details:", {
+      receipt,
+      shipment,
+      senderDetails: receipt.sender_details,
+      recipientDetails: receipt.recipient_details,
+      shipmentDetails: receipt.shipment_details
+    });
 
     const createReceiptRecord = async () => {
       if (bookingData && paymentData && !propReceipt && bookingData.shipment_id) {
@@ -93,7 +111,7 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
             sender_details: bookingData.senderDetails,
             recipient_details: bookingData.recipientDetails,
             shipment_details: bookingData.shipmentDetails,
-            status: 'Pending Payment'  // Changed to "Pending Payment"
+            status: 'Pending Payment'
           });
 
           await supabase.from('notifications').insert({
@@ -298,7 +316,7 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
   };
 
   const handleTrackShipment = () => {
-    const trackingNumber = shipment.tracking_number || receipt.shipment_details.tracking_number;
+    const trackingNumber = shipment.tracking_number || receipt.shipment_details?.tracking_number;
     if (trackingNumber && trackingNumber !== 'Pending') {
       navigate('/track', { state: { trackingNumber } });
     } else {
@@ -335,6 +353,11 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
     }
     return method;
   };
+
+  // Safeguard against undefined properties
+  const senderDetails = receipt.sender_details || {};
+  const recipientDetails = receipt.recipient_details || {};
+  const shipmentDetails = receipt.shipment_details || {};
 
   return (
     <div className="container mx-auto px-2 sm:px-4 max-w-4xl py-6">
@@ -389,19 +412,19 @@ Chelveston, Wellingborough, NN9 6AA</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
             <div className="border rounded-md p-3 sm:p-4">
               <h3 className="font-bold text-sm mb-1 sm:mb-2">Sender Details</h3>
-              <p className="text-sm"><span className="font-medium">Name:</span> {receipt.sender_details.name}</p>
-              <p className="text-sm"><span className="font-medium">Address:</span> {receipt.sender_details.address}</p>
-              <p className="text-sm"><span className="font-medium">Phone:</span> {receipt.sender_details.phone}</p>
-              <p className="text-sm"><span className="font-medium">Email:</span> {receipt.sender_details.email}</p>
+              <p className="text-sm"><span className="font-medium">Name:</span> {senderDetails.name || "Not provided"}</p>
+              <p className="text-sm"><span className="font-medium">Address:</span> {senderDetails.address || "Not provided"}</p>
+              <p className="text-sm"><span className="font-medium">Phone:</span> {senderDetails.phone || "Not provided"}</p>
+              <p className="text-sm"><span className="font-medium">Email:</span> {senderDetails.email || "Not provided"}</p>
             </div>
             
             <div className="border rounded-md p-3 sm:p-4">
               <h3 className="font-bold text-sm mb-1 sm:mb-2">Receiver Details</h3>
-              <p className="text-sm"><span className="font-medium">Name:</span> {receipt.recipient_details.name}</p>
-              <p className="text-sm"><span className="font-medium">Address:</span> {receipt.recipient_details.address}</p>
-              <p className="text-sm"><span className="font-medium">Phone:</span> {receipt.recipient_details.phone}</p>
-              {receipt.recipient_details.additionalPhone && (
-                <p className="text-sm"><span className="font-medium">Additional Phone:</span> {receipt.recipient_details.additionalPhone}</p>
+              <p className="text-sm"><span className="font-medium">Name:</span> {recipientDetails.name || "Not provided"}</p>
+              <p className="text-sm"><span className="font-medium">Address:</span> {recipientDetails.address || "Not provided"}</p>
+              <p className="text-sm"><span className="font-medium">Phone:</span> {recipientDetails.phone || "Not provided"}</p>
+              {recipientDetails.additionalPhone && (
+                <p className="text-sm"><span className="font-medium">Additional Phone:</span> {recipientDetails.additionalPhone}</p>
               )}
             </div>
           </div>
@@ -419,27 +442,29 @@ Chelveston, Wellingborough, NN9 6AA</p>
                 </thead>
                 <tbody>
                   <tr className="border-t">
-                    <td className="p-2 sm:p-3 text-xs sm:text-sm break-all sm:break-normal">{shipment.tracking_number || receipt.shipment_details.tracking_number}</td>
+                    <td className="p-2 sm:p-3 text-xs sm:text-sm break-all sm:break-normal">
+                      {shipment.tracking_number || shipmentDetails.tracking_number || "Pending"}
+                    </td>
                     <td className="p-2 sm:p-3 text-xs sm:text-sm">
                       <div className="flex flex-col">
-                        {receipt.shipment_details.includeDrums && (
+                        {shipmentDetails.includeDrums && (
                           <div className="flex items-center mb-1">
                             <Drum className="h-4 w-4 mr-1 text-zim-green" />
-                            {receipt.shipment_details.quantity} x 200L-220L Drums
+                            {shipmentDetails.quantity || 0} x 200L-220L Drums
                           </div>
                         )}
-                        {receipt.shipment_details.includeOtherItems && (
+                        {shipmentDetails.includeOtherItems && (
                           <div className="flex items-center">
                             <Package className="h-4 w-4 mr-1 text-zim-green" />
-                            {receipt.shipment_details.category && receipt.shipment_details.specificItem ? (
-                              `${receipt.shipment_details.category} - ${receipt.shipment_details.specificItem}`
+                            {shipmentDetails.category && shipmentDetails.specificItem ? (
+                              `${shipmentDetails.category} - ${shipmentDetails.specificItem}`
                             ) : (
-                              `Custom Item - ${customQuoteData.description || receipt.shipment_details.description || 'Pending quote'}`
+                              `Custom Item - ${customQuoteData.description || shipmentDetails.description || 'Pending quote'}`
                             )}
                           </div>
                         )}
-                        {!receipt.shipment_details.includeDrums && !receipt.shipment_details.includeOtherItems && (
-                          `${receipt.shipment_details.type || 'Custom Item'}`
+                        {!shipmentDetails.includeDrums && !shipmentDetails.includeOtherItems && (
+                          `${shipmentDetails.type || 'Custom Item'}`
                         )}
                       </div>
                     </td>
@@ -454,32 +479,32 @@ Chelveston, Wellingborough, NN9 6AA</p>
             <h3 className="font-bold text-sm mb-1 sm:mb-2">Collection & Delivery Information</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="border rounded-md p-3">
-                <p className="text-sm"><span className="font-medium">Pickup Address:</span> {shipment.origin || receipt.sender_details.address}</p>
+                <p className="text-sm"><span className="font-medium">Pickup Address:</span> {shipment.origin || senderDetails.address || "Not specified"}</p>
               </div>
               <div className="border rounded-md p-3">
-                <p className="text-sm"><span className="font-medium">Delivery Address:</span> {shipment.destination || receipt.recipient_details.address}</p>
+                <p className="text-sm"><span className="font-medium">Delivery Address:</span> {shipment.destination || recipientDetails.address || "Not specified"}</p>
               </div>
             </div>
             
             {/* Collection Date Information */}
             <div className="border rounded-md p-3 mt-3">
               <p className="text-sm"><span className="font-medium">Collection Date:</span> {bookingData.collectionDate || "To be scheduled"}</p>
-              <p className="text-sm"><span className="font-medium">Collection Location:</span> {bookingData.senderDetails?.address || shipment.origin}</p>
+              <p className="text-sm"><span className="font-medium">Collection Location:</span> {bookingData.senderDetails?.address || shipment.origin || "Not specified"}</p>
             </div>
           </div>
           
-          {receipt.shipment_details.includeDrums && (
+          {shipmentDetails.includeDrums && (
             <div className="mb-4 sm:mb-6">
               <h3 className="font-bold text-sm mb-1 sm:mb-2">Payment Details</h3>
               
               <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
                 <span className="font-medium">Shipping Cost</span>
-                <span>£{(receipt.amount * 0.9).toFixed(2)}</span>
+                <span>£{((receipt.amount || 0) * 0.9).toFixed(2)}</span>
               </div>
               
-              {receipt.shipment_details.services && receipt.shipment_details.services.length > 0 && (
+              {shipmentDetails.services && shipmentDetails.services.length > 0 && (
                 <>
-                  {receipt.shipment_details.services.map((service: any, index: number) => (
+                  {shipmentDetails.services.map((service: any, index: number) => (
                     <div key={index} className="flex justify-between py-2 sm:py-3 border-b text-sm">
                       <span className="font-medium">{service.name}</span>
                       <span>£{service.price.toFixed(2)}</span>
@@ -504,7 +529,7 @@ Chelveston, Wellingborough, NN9 6AA</p>
               
               <div className="flex justify-between py-3 sm:py-4 font-bold text-base sm:text-lg">
                 <span>Total</span>
-                <span>£{receipt.amount.toFixed(2)}</span>
+                <span>£{(receipt.amount || 0).toFixed(2)}</span>
               </div>
               
               <div className="border rounded-md p-2 sm:p-3 bg-gray-50 mt-2">
@@ -514,33 +539,33 @@ Chelveston, Wellingborough, NN9 6AA</p>
             </div>
           )}
           
-          {receipt.shipment_details.includeDrums && (
+          {shipmentDetails.includeDrums && (
             <div className="mb-4 sm:mb-6">
               <h3 className="font-bold text-sm mb-1 sm:mb-2">Drum Information</h3>
               <div className="border rounded-md p-3">
-                <p className="text-sm"><span className="font-medium">Number of Drums:</span> {receipt.shipment_details.quantity}</p>
+                <p className="text-sm"><span className="font-medium">Number of Drums:</span> {shipmentDetails.quantity || 0}</p>
                 <p className="text-sm"><span className="font-medium">Drum Capacity:</span> 200L-220L</p>
-                {receipt.shipment_details.wantMetalSeal && (
+                {shipmentDetails.wantMetalSeal && (
                   <p className="text-sm"><span className="font-medium">Security:</span> Metal Coded Seals</p>
                 )}
               </div>
             </div>
           )}
           
-          {(receipt.shipment_details.includeOtherItems || customQuoteData.id) && (
+          {(shipmentDetails.includeOtherItems || (customQuoteData && customQuoteData.id)) && (
             <div className="mb-4 sm:mb-6">
               <h3 className="font-bold text-sm mb-1 sm:mb-2">Other Item Details</h3>
               <div className="border rounded-md p-3">
-                {receipt.shipment_details.category && (
-                  <p className="text-sm"><span className="font-medium">Item Category:</span> {receipt.shipment_details.category}</p>
+                {shipmentDetails.category && (
+                  <p className="text-sm"><span className="font-medium">Item Category:</span> {shipmentDetails.category}</p>
                 )}
-                {receipt.shipment_details.specificItem && (
-                  <p className="text-sm"><span className="font-medium">Specific Item:</span> {receipt.shipment_details.specificItem}</p>
+                {shipmentDetails.specificItem && (
+                  <p className="text-sm"><span className="font-medium">Specific Item:</span> {shipmentDetails.specificItem}</p>
                 )}
-                {(receipt.shipment_details.description || customQuoteData.description) && (
-                  <p className="text-sm"><span className="font-medium">Description:</span> {customQuoteData.description || receipt.shipment_details.description}</p>
+                {(shipmentDetails.description || (customQuoteData && customQuoteData.description)) && (
+                  <p className="text-sm"><span className="font-medium">Description:</span> {(customQuoteData && customQuoteData.description) || shipmentDetails.description}</p>
                 )}
-                {customQuoteData.id && (
+                {customQuoteData && customQuoteData.id && (
                   <div className="mt-2 flex items-center text-sm text-green-600">
                     <PackageCheck className="h-4 w-4 mr-1.5" />
                     <span>Custom quote request submitted successfully</span>

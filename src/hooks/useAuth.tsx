@@ -30,8 +30,11 @@ export const useAuth = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Sign-in method
-  const signIn = async (email: string, password: string) => {
+  // Sign-in method with error handling
+  const signIn = async (email: string, password: string): Promise<{
+    data?: any;
+    error?: any;
+  }> => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -40,16 +43,15 @@ export const useAuth = () => {
 
       if (error) throw error;
 
-      // No custom email - using Supabase's built-in email service
-      return data;
+      return { data };
     } catch (error) {
       console.error('Error:', error);
       toast({
-        title: 'Error',
+        title: "Error",
         description: error.message,
-        variant: 'destructive',
+        variant: "destructive",
       });
-      throw error;
+      return { error };
     }
   };
 
