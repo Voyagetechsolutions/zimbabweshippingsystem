@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from '@/hooks/use-toast';
@@ -46,6 +46,7 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
   const isMobile = useIsMobile();
   const location = useLocation();
   const navigate = useNavigate();
+  const [dataLoaded, setDataLoaded] = useState(false);
   
   // Ensure we properly extract data from props or location state
   const stateData = location.state || {};
@@ -88,18 +89,40 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
     document.title = `Receipt ${receipt.receipt_number} | Zimbabwe Shipping`;
     
     // Log the data to help debug
-    console.log("Receipt details:", {
+    console.log("Receipt detailed data:", {
       receipt,
       shipment,
       senderDetails: receipt.sender_details,
       recipientDetails: receipt.recipient_details,
-      shipmentDetails: receipt.shipment_details
+      shipmentDetails: receipt.shipment_details,
+      bookingData
     });
+
+    // Check if we have actual data loaded
+    if (Object.keys(bookingData).length > 0) {
+      setDataLoaded(true);
+    }
 
     const createReceiptRecord = async () => {
       if (bookingData && paymentData && !propReceipt && bookingData.shipment_id) {
         try {
           const paymentId = generateUniqueId('pmt_');
+          
+          // Extract the correct shipment details
+          const shipmentDetails = {
+            ...bookingData.shipmentDetails,
+            tracking_number: bookingData.shipmentDetails?.tracking_number || 'Pending'
+          };
+          
+          console.log("Creating receipt record with data:", {
+            receipt_number: receipt.receipt_number,
+            payment_id: paymentId,
+            amount: paymentData.finalAmount,
+            shipment_id: bookingData.shipment_id,
+            sender_details: bookingData.senderDetails,
+            recipient_details: bookingData.recipientDetails,
+            shipment_details: shipmentDetails
+          });
           
           await supabase.from('receipts').insert({
             receipt_number: receipt.receipt_number,
@@ -110,7 +133,7 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
             shipment_id: bookingData.shipment_id,
             sender_details: bookingData.senderDetails,
             recipient_details: bookingData.recipientDetails,
-            shipment_details: bookingData.shipmentDetails,
+            shipment_details: shipmentDetails,
             status: 'Pending Payment'
           });
 
@@ -389,232 +412,249 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
         </div>
       </div>
       
-      <Card className="border-0 shadow-lg overflow-hidden">
-        <div className="p-3 sm:p-6" ref={receiptRef}>
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center pb-4 sm:pb-6 border-b mb-4 sm:mb-6 gap-3">
-            <div className="flex items-center">
-              <div className="mr-3 hidden sm:block">
-                <Logo size={isMobile ? "small" : "medium"} />
+      {!dataLoaded ? (
+        <div className="text-center py-12">
+          <h2 className="text-xl font-medium text-gray-700">No receipt data available</h2>
+          <p className="mt-2 text-gray-500">Please complete your booking to view your receipt.</p>
+          <Button 
+            variant="default"
+            className="mt-4"
+            onClick={() => navigate('/book-shipment')}
+          >
+            Book a Shipment
+          </Button>
+        </div>
+      ) : (
+        <Card className="border-0 shadow-lg overflow-hidden">
+          <div className="p-3 sm:p-6" ref={receiptRef}>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center pb-4 sm:pb-6 border-b mb-4 sm:mb-6 gap-3">
+              <div className="flex items-center">
+                <div className="mr-3 hidden sm:block">
+                  <Logo size={isMobile ? "small" : "medium"} />
+                </div>
+                <div>
+                  <h1 className="text-lg sm:text-2xl font-bold text-zim-green">Zimbabwe Shipping</h1>
+                  <p className="text-gray-600 text-xs sm:text-sm">Pastures Lodge Farm, Raunds Road
+    Chelveston, Wellingborough, NN9 6AA</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-lg sm:text-2xl font-bold text-zim-green">Zimbabwe Shipping</h1>
-                <p className="text-gray-600 text-xs sm:text-sm">Pastures Lodge Farm, Raunds Road
-Chelveston, Wellingborough, NN9 6AA</p>
+              <div className="text-left sm:text-right mt-2 sm:mt-0">
+                <h2 className="text-lg sm:text-xl font-bold">RECEIPT</h2>
+                <p className="text-gray-600 text-xs sm:text-sm"># {receipt.receipt_number}</p>
+                <p className="text-gray-600 text-xs sm:text-sm">Date: {formatDate(receipt.created_at)}</p>
               </div>
-            </div>
-            <div className="text-left sm:text-right mt-2 sm:mt-0">
-              <h2 className="text-lg sm:text-xl font-bold">RECEIPT</h2>
-              <p className="text-gray-600 text-xs sm:text-sm"># {receipt.receipt_number}</p>
-              <p className="text-gray-600 text-xs sm:text-sm">Date: {formatDate(receipt.created_at)}</p>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
-            <div className="border rounded-md p-3 sm:p-4">
-              <h3 className="font-bold text-sm mb-1 sm:mb-2">Sender Details</h3>
-              <p className="text-sm"><span className="font-medium">Name:</span> {senderDetails.name}</p>
-              <p className="text-sm"><span className="font-medium">Address:</span> {senderDetails.address || "Not provided"}</p>
-              <p className="text-sm"><span className="font-medium">Phone:</span> {senderDetails.phone || "Not provided"}</p>
-              <p className="text-sm"><span className="font-medium">Email:</span> {senderDetails.email || "Not provided"}</p>
             </div>
             
-            <div className="border rounded-md p-3 sm:p-4">
-              <h3 className="font-bold text-sm mb-1 sm:mb-2">Receiver Details</h3>
-              <p className="text-sm"><span className="font-medium">Name:</span> {recipientDetails.name || "Not provided"}</p>
-              <p className="text-sm"><span className="font-medium">Address:</span> {recipientDetails.address || "Not provided"}</p>
-              <p className="text-sm"><span className="font-medium">Phone:</span> {recipientDetails.phone || "Not provided"}</p>
-              {recipientDetails.additionalPhone && (
-                <p className="text-sm"><span className="font-medium">Additional Phone:</span> {recipientDetails.additionalPhone}</p>
-              )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
+              <div className="border rounded-md p-3 sm:p-4">
+                <h3 className="font-bold text-sm mb-1 sm:mb-2">Sender Details</h3>
+                <p className="text-sm"><span className="font-medium">Name:</span> {senderDetails.name || bookingData.firstName + ' ' + bookingData.lastName || "Not provided"}</p>
+                <p className="text-sm"><span className="font-medium">Address:</span> {senderDetails.address || (bookingData.pickupAddress ? `${bookingData.pickupAddress}, ${bookingData.pickupCountry === 'England' ? bookingData.pickupPostcode : bookingData.pickupCity}` : "Not provided")}</p>
+                <p className="text-sm"><span className="font-medium">Phone:</span> {senderDetails.phone || bookingData.phone || "Not provided"}</p>
+                <p className="text-sm"><span className="font-medium">Email:</span> {senderDetails.email || bookingData.email || "Not provided"}</p>
+              </div>
+              
+              <div className="border rounded-md p-3 sm:p-4">
+                <h3 className="font-bold text-sm mb-1 sm:mb-2">Receiver Details</h3>
+                <p className="text-sm"><span className="font-medium">Name:</span> {recipientDetails.name || bookingData.recipientName || "Not provided"}</p>
+                <p className="text-sm"><span className="font-medium">Address:</span> {recipientDetails.address || (bookingData.deliveryAddress ? `${bookingData.deliveryAddress}, ${bookingData.deliveryCity}` : "Not provided")}</p>
+                <p className="text-sm"><span className="font-medium">Phone:</span> {recipientDetails.phone || bookingData.recipientPhone || "Not provided"}</p>
+                {(recipientDetails.additionalPhone || bookingData.additionalRecipientPhone) && (
+                  <p className="text-sm"><span className="font-medium">Additional Phone:</span> {recipientDetails.additionalPhone || bookingData.additionalRecipientPhone}</p>
+                )}
+              </div>
             </div>
-          </div>
-          
-          <div className="mb-4 sm:mb-6">
-            <h3 className="font-bold text-sm mb-1 sm:mb-2">Shipment Details</h3>
-            <div className="border rounded-md overflow-x-auto">
-              <table className="w-full min-w-[400px]">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="text-left p-2 sm:p-3 text-xs sm:text-sm">Tracking Number</th>
-                    <th className="text-left p-2 sm:p-3 text-xs sm:text-sm">Description</th>
-                    <th className="text-left p-2 sm:p-3 text-xs sm:text-sm">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-t">
-                    <td className="p-2 sm:p-3 text-xs sm:text-sm break-all sm:break-normal">
-                      {shipment.tracking_number || shipmentDetails.tracking_number || "Pending"}
-                    </td>
-                    <td className="p-2 sm:p-3 text-xs sm:text-sm">
-                      <div className="flex flex-col">
-                        {shipmentDetails.includeDrums && (
-                          <div className="flex items-center mb-1">
-                            <Drum className="h-4 w-4 mr-1 text-zim-green" />
-                            {shipmentDetails.quantity || 0} x 200L-220L Drums
-                          </div>
-                        )}
-                        {shipmentDetails.includeOtherItems && (
-                          <div className="flex items-center">
-                            <Package className="h-4 w-4 mr-1 text-zim-green" />
-                            {shipmentDetails.category && shipmentDetails.specificItem ? (
-                              `${shipmentDetails.category} - ${shipmentDetails.specificItem}`
-                            ) : (
-                              `Custom Item - ${customQuoteData.description || shipmentDetails.description || 'Pending quote'}`
-                            )}
-                          </div>
-                        )}
-                        {!shipmentDetails.includeDrums && !shipmentDetails.includeOtherItems && (
-                          `${shipmentDetails.type || 'Custom Item'}`
-                        )}
+            
+            <div className="mb-4 sm:mb-6">
+              <h3 className="font-bold text-sm mb-1 sm:mb-2">Shipment Details</h3>
+              <div className="border rounded-md overflow-x-auto">
+                <table className="w-full min-w-[400px]">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="text-left p-2 sm:p-3 text-xs sm:text-sm">Tracking Number</th>
+                      <th className="text-left p-2 sm:p-3 text-xs sm:text-sm">Description</th>
+                      <th className="text-left p-2 sm:p-3 text-xs sm:text-sm">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-t">
+                      <td className="p-2 sm:p-3 text-xs sm:text-sm break-all sm:break-normal">
+                        {shipment.tracking_number || shipmentDetails.tracking_number || bookingData.shipmentDetails?.tracking_number || "Pending"}
+                      </td>
+                      <td className="p-2 sm:p-3 text-xs sm:text-sm">
+                        <div className="flex flex-col">
+                          {(shipmentDetails.includeDrums || bookingData.includeDrums) && (
+                            <div className="flex items-center mb-1">
+                              <Drum className="h-4 w-4 mr-1 text-zim-green" />
+                              {shipmentDetails.quantity || bookingData.drumQuantity || 0} x 200L-220L Drums
+                            </div>
+                          )}
+                          {(shipmentDetails.includeOtherItems || bookingData.includeOtherItems) && (
+                            <div className="flex items-center">
+                              <Package className="h-4 w-4 mr-1 text-zim-green" />
+                              {shipmentDetails.category && shipmentDetails.specificItem ? (
+                                `${shipmentDetails.category} - ${shipmentDetails.specificItem}`
+                              ) : bookingData.itemCategory && bookingData.specificItem ? (
+                                `${bookingData.itemCategory} - ${bookingData.specificItem}`
+                              ) : (
+                                `Custom Item - ${customQuoteData.description || shipmentDetails.description || bookingData.otherItemDescription || 'Pending quote'}`
+                              )}
+                            </div>
+                          )}
+                          {!shipmentDetails.includeDrums && !shipmentDetails.includeOtherItems && 
+                           !bookingData.includeDrums && !bookingData.includeOtherItems && (
+                            `${shipmentDetails.type || bookingData.shipmentType || 'Custom Item'}`
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-2 sm:p-3 text-xs sm:text-sm">{shipment.status || receipt.status}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <div className="mb-4 sm:mb-6">
+              <h3 className="font-bold text-sm mb-1 sm:mb-2">Collection & Delivery Information</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="border rounded-md p-3">
+                  <p className="text-sm"><span className="font-medium">Pickup Address:</span> {shipment.origin || senderDetails.address || (bookingData.pickupAddress ? `${bookingData.pickupAddress}, ${bookingData.pickupCountry === 'England' ? bookingData.pickupPostcode : bookingData.pickupCity}` : "Not specified")}</p>
+                </div>
+                <div className="border rounded-md p-3">
+                  <p className="text-sm"><span className="font-medium">Delivery Address:</span> {shipment.destination || recipientDetails.address || (bookingData.deliveryAddress ? `${bookingData.deliveryAddress}, ${bookingData.deliveryCity}` : "Not specified")}</p>
+                </div>
+              </div>
+              
+              {/* Collection Date Information */}
+              <div className="border rounded-md p-3 mt-3">
+                <p className="text-sm"><span className="font-medium">Collection Date:</span> {bookingData.collectionDate || "To be scheduled"}</p>
+                <p className="text-sm"><span className="font-medium">Collection Location:</span> {bookingData.senderDetails?.address || bookingData.pickupAddress || shipment.origin || "Not specified"}</p>
+              </div>
+            </div>
+            
+            {(shipmentDetails.includeDrums || bookingData.includeDrums) && (
+              <div className="mb-4 sm:mb-6">
+                <h3 className="font-bold text-sm mb-1 sm:mb-2">Payment Details</h3>
+                
+                <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
+                  <span className="font-medium">Shipping Cost</span>
+                  <span>£{(((receipt.amount || paymentData.finalAmount || 0) * 0.9)).toFixed(2)}</span>
+                </div>
+                
+                {(shipmentDetails.services && shipmentDetails.services.length > 0) && (
+                  <>
+                    {shipmentDetails.services.map((service: any, index: number) => (
+                      <div key={index} className="flex justify-between py-2 sm:py-3 border-b text-sm">
+                        <span className="font-medium">{service.name}</span>
+                        <span>£{service.price.toFixed(2)}</span>
                       </div>
-                    </td>
-                    <td className="p-2 sm:p-3 text-xs sm:text-sm">{shipment.status || receipt.status}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-          
-          <div className="mb-4 sm:mb-6">
-            <h3 className="font-bold text-sm mb-1 sm:mb-2">Collection & Delivery Information</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="border rounded-md p-3">
-                <p className="text-sm"><span className="font-medium">Pickup Address:</span> {shipment.origin || senderDetails.address || "Not specified"}</p>
-              </div>
-              <div className="border rounded-md p-3">
-                <p className="text-sm"><span className="font-medium">Delivery Address:</span> {shipment.destination || recipientDetails.address || "Not specified"}</p>
-              </div>
-            </div>
-            
-            {/* Collection Date Information */}
-            <div className="border rounded-md p-3 mt-3">
-              <p className="text-sm"><span className="font-medium">Collection Date:</span> {bookingData.collectionDate || "To be scheduled"}</p>
-              <p className="text-sm"><span className="font-medium">Collection Location:</span> {bookingData.senderDetails?.address || shipment.origin || "Not specified"}</p>
-            </div>
-          </div>
-          
-          {shipmentDetails.includeDrums && (
-            <div className="mb-4 sm:mb-6">
-              <h3 className="font-bold text-sm mb-1 sm:mb-2">Payment Details</h3>
-              
-              <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
-                <span className="font-medium">Shipping Cost</span>
-                <span>£{((receipt.amount || 0) * 0.9).toFixed(2)}</span>
-              </div>
-              
-              {shipmentDetails.services && shipmentDetails.services.length > 0 && (
-                <>
-                  {shipmentDetails.services.map((service: any, index: number) => (
-                    <div key={index} className="flex justify-between py-2 sm:py-3 border-b text-sm">
-                      <span className="font-medium">{service.name}</span>
-                      <span>£{service.price.toFixed(2)}</span>
-                    </div>
-                  ))}
-                </>
-              )}
-              
-              {paymentData && paymentData.discount > 0 && (
-                <div className="flex justify-between py-2 sm:py-3 border-b text-sm text-green-600">
-                  <span className="font-medium">Cash Discount</span>
-                  <span>-£{paymentData.discount.toFixed(2)}</span>
-                </div>
-              )}
-              
-              {paymentData && paymentData.premium > 0 && (
-                <div className="flex justify-between py-2 sm:py-3 border-b text-sm text-amber-600">
-                  <span className="font-medium">Pay on Arrival Premium (20%)</span>
-                  <span>+£{paymentData.premium.toFixed(2)}</span>
-                </div>
-              )}
-              
-              <div className="flex justify-between py-3 sm:py-4 font-bold text-base sm:text-lg">
-                <span>Total</span>
-                <span>£{(receipt.amount || 0).toFixed(2)}</span>
-              </div>
-              
-              <div className="border rounded-md p-2 sm:p-3 bg-gray-50 mt-2">
-                <p className="font-medium text-sm">Payment Method: {getPaymentMethodDisplay(receipt.payment_method)}</p>
-                <p className="text-xs sm:text-sm text-gray-600 mt-1">Payment Status: {receipt.status}</p>
-              </div>
-            </div>
-          )}
-          
-          {shipmentDetails.includeDrums && (
-            <div className="mb-4 sm:mb-6">
-              <h3 className="font-bold text-sm mb-1 sm:mb-2">Drum Information</h3>
-              <div className="border rounded-md p-3">
-                <p className="text-sm"><span className="font-medium">Number of Drums:</span> {shipmentDetails.quantity || 0}</p>
-                <p className="text-sm"><span className="font-medium">Drum Capacity:</span> 200L-220L</p>
-                {shipmentDetails.wantMetalSeal && (
-                  <p className="text-sm"><span className="font-medium">Security:</span> Metal Coded Seals</p>
+                    ))}
+                  </>
                 )}
-              </div>
-            </div>
-          )}
-          
-          {(shipmentDetails.includeOtherItems || (customQuoteData && customQuoteData.id)) && (
-            <div className="mb-4 sm:mb-6">
-              <h3 className="font-bold text-sm mb-1 sm:mb-2">Other Item Details</h3>
-              <div className="border rounded-md p-3">
-                {shipmentDetails.category && (
-                  <p className="text-sm"><span className="font-medium">Item Category:</span> {shipmentDetails.category}</p>
-                )}
-                {shipmentDetails.specificItem && (
-                  <p className="text-sm"><span className="font-medium">Specific Item:</span> {shipmentDetails.specificItem}</p>
-                )}
-                {(shipmentDetails.description || (customQuoteData && customQuoteData.description)) && (
-                  <p className="text-sm"><span className="font-medium">Description:</span> {(customQuoteData && customQuoteData.description) || shipmentDetails.description}</p>
-                )}
-                {customQuoteData && customQuoteData.id && (
-                  <div className="mt-2 flex items-center text-sm text-green-600">
-                    <PackageCheck className="h-4 w-4 mr-1.5" />
-                    <span>Custom quote request submitted successfully</span>
+                
+                {paymentData && paymentData.discount > 0 && (
+                  <div className="flex justify-between py-2 sm:py-3 border-b text-sm text-green-600">
+                    <span className="font-medium">Cash Discount</span>
+                    <span>-£{paymentData.discount.toFixed(2)}</span>
                   </div>
                 )}
+                
+                {paymentData && paymentData.premium > 0 && (
+                  <div className="flex justify-between py-2 sm:py-3 border-b text-sm text-amber-600">
+                    <span className="font-medium">Pay on Arrival Premium (20%)</span>
+                    <span>+£{paymentData.premium.toFixed(2)}</span>
+                  </div>
+                )}
+                
+                <div className="flex justify-between py-3 sm:py-4 font-bold text-base sm:text-lg">
+                  <span>Total</span>
+                  <span>£{(receipt.amount || paymentData.finalAmount || 0).toFixed(2)}</span>
+                </div>
+                
+                <div className="border rounded-md p-2 sm:p-3 bg-gray-50 mt-2">
+                  <p className="font-medium text-sm">Payment Method: {getPaymentMethodDisplay(receipt.payment_method || paymentData.method || 'standard')}</p>
+                  <p className="text-xs sm:text-sm text-gray-600 mt-1">Payment Status: {receipt.status}</p>
+                </div>
               </div>
+            )}
+            
+            {(shipmentDetails.includeDrums || bookingData.includeDrums) && (
+              <div className="mb-4 sm:mb-6">
+                <h3 className="font-bold text-sm mb-1 sm:mb-2">Drum Information</h3>
+                <div className="border rounded-md p-3">
+                  <p className="text-sm"><span className="font-medium">Number of Drums:</span> {shipmentDetails.quantity || bookingData.drumQuantity || 0}</p>
+                  <p className="text-sm"><span className="font-medium">Drum Capacity:</span> 200L-220L</p>
+                  {(shipmentDetails.wantMetalSeal || bookingData.wantMetalSeal) && (
+                    <p className="text-sm"><span className="font-medium">Security:</span> Metal Coded Seals</p>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {((shipmentDetails.includeOtherItems || bookingData.includeOtherItems) || (customQuoteData && customQuoteData.id)) && (
+              <div className="mb-4 sm:mb-6">
+                <h3 className="font-bold text-sm mb-1 sm:mb-2">Other Item Details</h3>
+                <div className="border rounded-md p-3">
+                  {(shipmentDetails.category || bookingData.itemCategory) && (
+                    <p className="text-sm"><span className="font-medium">Item Category:</span> {shipmentDetails.category || bookingData.itemCategory}</p>
+                  )}
+                  {(shipmentDetails.specificItem || bookingData.specificItem) && (
+                    <p className="text-sm"><span className="font-medium">Specific Item:</span> {shipmentDetails.specificItem || bookingData.specificItem}</p>
+                  )}
+                  {(shipmentDetails.description || customQuoteData.description || bookingData.otherItemDescription) && (
+                    <p className="text-sm"><span className="font-medium">Description:</span> {customQuoteData.description || shipmentDetails.description || bookingData.otherItemDescription}</p>
+                  )}
+                  {customQuoteData && customQuoteData.id && (
+                    <div className="mt-2 flex items-center text-sm text-green-600">
+                      <PackageCheck className="h-4 w-4 mr-1.5" />
+                      <span>Custom quote request submitted successfully</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            <div className="text-center text-gray-500 text-xs sm:text-sm mt-8 sm:mt-12 pt-3 sm:pt-4 border-t">
+              <p>Thank you for choosing our shipping service</p>
+              <p>For any inquiries, please contact us at +44 7584 100552</p>
             </div>
-          )}
-          
-          <div className="text-center text-gray-500 text-xs sm:text-sm mt-8 sm:mt-12 pt-3 sm:pt-4 border-t">
-            <p>Thank you for choosing our shipping service</p>
-            <p>For any inquiries, please contact us at +44 7584 100552</p>
           </div>
-        </div>
-        
-        <div className="bg-gray-50 p-3 sm:p-4 flex flex-wrap justify-center sm:justify-end gap-2 sm:gap-3">
-          {isMobile ? (
-            <>
-              <Button variant="outline" size="sm" className="flex items-center text-xs" onClick={handlePrint}>
-                <Printer className="mr-1 h-3 w-3" />
-                Print
-              </Button>
-              <Button variant="outline" size="sm" className="flex items-center text-xs" onClick={handleDownload}>
-                <Download className="mr-1 h-3 w-3" />
-                Download
-              </Button>
-              <Button variant="outline" size="sm" className="flex items-center text-xs" onClick={handleEmail}>
-                <Mail className="mr-1 h-3 w-3" />
-                Email
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="outline" size="sm" className="flex items-center" onClick={handlePrint}>
-                <Printer className="mr-2 h-4 w-4" />
-                Print
-              </Button>
-              <Button variant="outline" size="sm" className="flex items-center" onClick={handleDownload}>
-                <Download className="mr-2 h-4 w-4" />
-                Download
-              </Button>
-              <Button variant="outline" size="sm" className="flex items-center" onClick={handleEmail}>
-                <Mail className="mr-2 h-4 w-4" />
-                Email
-              </Button>
-            </>
-          )}
-        </div>
-      </Card>
+          
+          <div className="bg-gray-50 p-3 sm:p-4 flex flex-wrap justify-center sm:justify-end gap-2 sm:gap-3">
+            {isMobile ? (
+              <>
+                <Button variant="outline" size="sm" className="flex items-center text-xs" onClick={handlePrint}>
+                  <Printer className="mr-1 h-3 w-3" />
+                  Print
+                </Button>
+                <Button variant="outline" size="sm" className="flex items-center text-xs" onClick={handleDownload}>
+                  <Download className="mr-1 h-3 w-3" />
+                  Download
+                </Button>
+                <Button variant="outline" size="sm" className="flex items-center text-xs" onClick={handleEmail}>
+                  <Mail className="mr-1 h-3 w-3" />
+                  Email
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" size="sm" className="flex items-center" onClick={handlePrint}>
+                  <Printer className="mr-2 h-4 w-4" />
+                  Print
+                </Button>
+                <Button variant="outline" size="sm" className="flex items-center" onClick={handleDownload}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Download
+                </Button>
+                <Button variant="outline" size="sm" className="flex items-center" onClick={handleEmail}>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Email
+                </Button>
+              </>
+            )}
+          </div>
+        </Card>
+      )}
     </div>
   );
 };
