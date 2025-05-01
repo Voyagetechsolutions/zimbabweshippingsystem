@@ -97,7 +97,8 @@ const ShippingGallerySlideshow: React.FC = () => {
         <h2 className="text-3xl md:text-4xl font-bold text-center mb-8">Our Shipping Operations</h2>
         
         <div className="relative max-w-5xl mx-auto">
-          <div className="aspect-w-16 aspect-h-9 bg-gray-800 overflow-hidden rounded-lg">
+          {/* Increased height for the slideshow container */}
+          <div className="aspect-w-16 aspect-h-9 bg-gray-800 overflow-hidden rounded-lg" style={{ minHeight: '400px', height: 'calc(50vh)' }}>
             {images.map((image, index) => (
               <div 
                 key={index}
@@ -108,7 +109,8 @@ const ShippingGallerySlideshow: React.FC = () => {
                 <img
                   src={image.src}
                   alt={image.alt}
-                  className={`object-contain w-full h-full`}
+                  className="object-contain w-full h-full"
+                  style={{ maxHeight: '100%', margin: '0 auto' }}
                   onLoad={handleImageLoad}
                 />
                 <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 p-4 text-white">
