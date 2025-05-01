@@ -1347,7 +1347,7 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                 onComplete={handlePaymentComplete}
               />
               
-              <div className="mt-6 border-t pt-6">
+              {/*<div className="mt-6 border-t pt-6">
                 <FormField
                   control={form.control}
                   name="terms"
@@ -1371,7 +1371,7 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
                     </FormItem>
                   )}
                 />
-              </div>
+              </div>*/}
               
               <div className="flex justify-between mt-6">
                 <Button 
