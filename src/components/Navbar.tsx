@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, ChevronDown, User, ShoppingBag, LogOut, Shield } from 'lucide-react';
@@ -287,9 +288,6 @@ const Navbar = () => {
           </Link>
           <Link to="/collection-schedule" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
             Collection Schedule
-          </Link>
-          <Link to="/gallery" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-            Gallery
           </Link>
           <Link to="/" onClick={(e) => { handleReviewsClick(e); setIsOpen(false); }} className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50">
             Reviews
