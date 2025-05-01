@@ -142,12 +142,10 @@ const Auth = () => {
 
     try {
       setLoading(true);
-      const result = await signIn(email, password);
+      const { error } = await signIn(email, password);
 
-      // Updated this section to fix the TypeScript error
-      // signIn returns { data, error } or could throw an error
-      if (!result) throw new Error("Authentication failed");
-      
+      if (error) throw error;
+
       // Navigation handled in useEffect after login
     } catch (error: any) {
       handleAuthError(error, toast);

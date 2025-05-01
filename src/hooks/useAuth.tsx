@@ -42,7 +42,7 @@ export const useAuth = () => {
 
       // No custom email - using Supabase's built-in email service
       return data;
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error:', error);
       toast({
         title: 'Error',
@@ -64,7 +64,7 @@ export const useAuth = () => {
         description: 'You have been logged out successfully.',
         variant: 'default',
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error:', error);
       toast({
         title: 'Error',
