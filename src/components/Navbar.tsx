@@ -148,14 +148,6 @@ const Navbar = () => {
                   </NavigationMenuContent>
                 </NavigationMenuItem>
                 
-                {/*<NavigationMenuItem>  //First update the gallery features
-                  <Link to="/gallery">
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                      Gallery
-                    </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>*/}
-                
                 <NavigationMenuItem>
                   <Link to="/" onClick={handleReviewsClick}>
                     <NavigationMenuLink className={navigationMenuTriggerStyle()}>
@@ -287,9 +279,6 @@ const Navbar = () => {
           </Link>
           <Link to="/collection-schedule" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
             Collection Schedule
-          </Link>
-          <Link to="/gallery" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
-            Gallery
           </Link>
           <Link to="/" onClick={(e) => { handleReviewsClick(e); setIsOpen(false); }} className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50">
             Reviews
