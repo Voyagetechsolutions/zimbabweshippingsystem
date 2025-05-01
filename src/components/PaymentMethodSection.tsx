@@ -201,7 +201,31 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
             <span>£{finalAmount.toFixed(2)}</span>
           </div>
         </div>
-        
+        <div className="mt-6 border-t pt-6">
+                <FormField
+                  control={form.control}
+                  name="terms"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>
+                          I agree to the <a href="/terms" target="_blank" className="text-blue-600 hover:underline">Terms & Conditions</a>*
+                        </FormLabel>
+                        <FormDescription>
+                          By checking this box, you agree to our terms of service and privacy policy.
+                        </FormDescription>
+                        <FormMessage />
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              </div>
         <div className="flex justify-between">
           <Button
             type="button"
