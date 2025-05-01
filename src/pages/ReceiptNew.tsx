@@ -412,7 +412,7 @@ Chelveston, Wellingborough, NN9 6AA</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
             <div className="border rounded-md p-3 sm:p-4">
               <h3 className="font-bold text-sm mb-1 sm:mb-2">Sender Details</h3>
-              <p className="text-sm"><span className="font-medium">Name:</span> {senderDetails.name || "Not provided"}</p>
+              <p className="text-sm"><span className="font-medium">Name:</span> {senderDetails.name}</p>
               <p className="text-sm"><span className="font-medium">Address:</span> {senderDetails.address || "Not provided"}</p>
               <p className="text-sm"><span className="font-medium">Phone:</span> {senderDetails.phone || "Not provided"}</p>
               <p className="text-sm"><span className="font-medium">Email:</span> {senderDetails.email || "Not provided"}</p>
