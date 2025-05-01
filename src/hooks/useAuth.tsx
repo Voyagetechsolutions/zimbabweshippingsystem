@@ -3,10 +3,6 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-interface AuthError {
-  message: string;
-}
-
 export const useAuth = () => {
   const [session, setSession] = useState<any>(null); // Type according to the expected session data
   const [user, setUser] = useState<any>(null); // Type accordingly
@@ -37,7 +33,7 @@ export const useAuth = () => {
   // Sign-in method with error handling
   const signIn = async (email: string, password: string): Promise<{
     data?: any;
-    error?: AuthError;
+    error?: any;
   }> => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -48,7 +44,7 @@ export const useAuth = () => {
       if (error) throw error;
 
       return { data };
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error:', error);
       toast({
         title: "Error",
@@ -70,7 +66,7 @@ export const useAuth = () => {
         description: 'You have been logged out successfully.',
         variant: 'default',
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error:', error);
       toast({
         title: 'Error',
