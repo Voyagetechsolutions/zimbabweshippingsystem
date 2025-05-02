@@ -36,21 +36,20 @@ interface ReceiptProps {
 
 const ReceiptNew: React.FC<ReceiptProps> = ({ 
   receipt: propReceipt, 
-  shipment: propShipment,
-  customQuote: propCustomQuote,
-  bookingData: propBookingData,
-  paymentData: propPaymentData
+  shipment: propShipment
 }) => {
   const { toast } = useToast();
   const receiptRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
   const location = useLocation();
+  const stateData = location.state || {};
   const navigate = useNavigate();
   
   // Ensure we properly extract data from props or location state
-  const stateData = location.state || {};
-  const bookingData = propBookingData || stateData.bookingData || {};
-  const paymentData = propPaymentData || stateData.paymentData || {};
+  // Extract all data from location state
+  const bookingData = stateData.bookingData || {};
+  const paymentData = bookingData.paymentData || {};
+  const formData = bookingData.formData || {};
   const customQuoteData = propCustomQuote || stateData.customQuoteData || {};
   
   console.log("ReceiptNew component data:", {
@@ -61,6 +60,7 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
   });
   
   // Create default receipt data if not provided
+    // Create complete receipt data
   const receipt = propReceipt || {
     receipt_number: `ZIM-${Date.now().toString().substring(8)}`,
     created_at: new Date().toISOString(),
@@ -70,14 +70,14 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
     sender_details: bookingData.senderDetails || {},
     recipient_details: bookingData.recipientDetails || {},
     shipment_details: bookingData.shipmentDetails || {},
-    status: 'Pending Payment'
+    status: paymentData.method ? 'Paid' : 'Pending Payment'
   };
-  
+
   const shipment = propShipment || {
     tracking_number: bookingData.shipmentDetails?.tracking_number || 'Pending',
     origin: bookingData.senderDetails?.address || 'Not specified',
     destination: bookingData.recipientDetails?.address || 'Not specified',
-    status: 'Pending Payment'
+    status: paymentData.method ? 'Processing' : 'Pending Payment'
   };
 
   const generateUniqueId = (prefix: string = '') => {
