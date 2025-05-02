@@ -57,6 +57,7 @@ import ContentManagement from '@/components/admin/ContentManagement';
 import CollectionScheduleManagement from '@/components/admin/CollectionScheduleManagement';
 import SupportTickets from '@/components/admin/SupportTickets';
 import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
+import { ShipmentMetadata } from '@/types/shipment';
 
 const STATUS_OPTIONS = [
   'Booking Confirmed',
@@ -82,7 +83,7 @@ interface Shipment {
   created_at: string;
   updated_at: string;
   user_id: string;
-  metadata: any | null;
+  metadata: ShipmentMetadata | null;
   sender_name?: string;
   sender_phone?: string;
   recipient_name?: string;
@@ -138,7 +139,6 @@ const AdminDashboardContent = () => {
     quotes: 0,
   });
 
-  // Fix dependency array in useEffect to prevent unnecessary re-renders
   useEffect(() => {
     fetchShipments();
     fetchStats();
@@ -175,14 +175,45 @@ const AdminDashboardContent = () => {
       }
 
       if (data) {
-        // Extract sender and recipient details from metadata
+        // Extract sender and recipient details from metadata, safely handling different data types
         const enhancedData = data.map(shipment => {
+          // Default values
+          let senderName = 'N/A';
+          let senderPhone = 'N/A';
+          let recipientName = 'N/A';
+          let recipientPhone = 'N/A';
+          
+          // Check if metadata exists and has the right structure
+          if (shipment.metadata && typeof shipment.metadata === 'object') {
+            // Type guard to check if senderDetails exists and is an object
+            if (
+              'senderDetails' in shipment.metadata && 
+              shipment.metadata.senderDetails && 
+              typeof shipment.metadata.senderDetails === 'object'
+            ) {
+              const senderDetails = shipment.metadata.senderDetails as Record<string, any>;
+              senderName = senderDetails.name || 'N/A';
+              senderPhone = senderDetails.phone || 'N/A';
+            }
+            
+            // Type guard to check if recipientDetails exists and is an object
+            if (
+              'recipientDetails' in shipment.metadata && 
+              shipment.metadata.recipientDetails && 
+              typeof shipment.metadata.recipientDetails === 'object'
+            ) {
+              const recipientDetails = shipment.metadata.recipientDetails as Record<string, any>;
+              recipientName = recipientDetails.name || 'N/A';
+              recipientPhone = recipientDetails.phone || 'N/A';
+            }
+          }
+          
           return {
             ...shipment,
-            sender_name: shipment.metadata?.senderDetails?.name || 'N/A',
-            sender_phone: shipment.metadata?.senderDetails?.phone || 'N/A',
-            recipient_name: shipment.metadata?.recipientDetails?.name || 'N/A',
-            recipient_phone: shipment.metadata?.recipientDetails?.phone || 'N/A'
+            sender_name: senderName,
+            sender_phone: senderPhone,
+            recipient_name: recipientName,
+            recipient_phone: recipientPhone
           };
         });
         
@@ -253,7 +284,9 @@ const AdminDashboardContent = () => {
       searchQuery === '' ||
       shipment.tracking_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
       shipment.origin.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      shipment.destination.toLowerCase().includes(searchQuery.toLowerCase());
+      shipment.destination.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      shipment.sender_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      shipment.recipient_name.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesStatus = 
       statusFilter === 'all' ||

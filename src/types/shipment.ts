@@ -14,6 +14,34 @@ export interface ShipmentMetadata {
   amountPaid?: number;
   pickupCountry?: string;
   shipmentType?: string;
+  senderDetails?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+  };
+  recipientDetails?: {
+    name?: string;
+    phone?: string;
+    additionalPhone?: string;
+    address?: string;
+  };
+  shipmentDetails?: {
+    includeDrums?: boolean;
+    includeOtherItems?: boolean;
+    type?: string;
+    quantity?: number;
+    weight?: number;
+    tracking_number?: string;
+    category?: string;
+    specificItem?: string;
+    description?: string;
+    services?: Array<{
+      name: string;
+      price: number;
+    }>;
+    additionalAddresses?: string[];
+  };
 }
 
 export interface Shipment {
