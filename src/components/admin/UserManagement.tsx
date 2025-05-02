@@ -132,11 +132,7 @@ const UserManagement = () => {
     try {
       console.log("Fetching all profiles");
       
-      // First check if current user is admin (this helps with debugging)
-      const { data: isAdminData } = await supabase.rpc('is_admin');
-      console.log("Current user is admin:", isAdminData);
-      
-      // Now fetch all profiles
+      // Get profiles from the profiles table (not auth.users directly)
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*');

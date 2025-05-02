@@ -248,6 +248,17 @@ const AdminDashboardContent = () => {
     return matchesSearch && matchesStatus;
   });
 
+  // Function to extract sender and recipient information from shipment metadata
+  const getShipmentContactInfo = (shipment: Shipment) => {
+    const metadata = shipment.metadata || {};
+    return {
+      senderName: metadata.senderName || metadata.firstName || "N/A",
+      senderPhone: metadata.senderPhone || metadata.phone || "N/A",
+      recipientName: metadata.recipientName || "N/A",
+      recipientPhone: metadata.recipientPhone || "N/A"
+    };
+  };
+
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
@@ -438,6 +449,10 @@ const AdminDashboardContent = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[120px]">Tracking #</TableHead>
+                      <TableHead>Sender Name</TableHead>
+                      <TableHead>Sender Phone</TableHead>
+                      <TableHead>Recipient Name</TableHead>
+                      <TableHead>Recipient Phone</TableHead>
                       <TableHead>Origin</TableHead>
                       <TableHead>Destination</TableHead>
                       <TableHead>Status</TableHead>
@@ -446,30 +461,37 @@ const AdminDashboardContent = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {shipments.slice(0, 5).map((shipment) => (
-                      <TableRow key={shipment.id}>
-                        <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
-                        <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
-                        <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
-                        <TableCell>
-                          <Badge className={getStatusBadgeClass(shipment.status)}>
-                            {shipment.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {format(new Date(shipment.created_at), 'MMM d, yyyy')}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => navigate(`/shipment/${shipment.id}`)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {shipments.slice(0, 5).map((shipment) => {
+                      const contactInfo = getShipmentContactInfo(shipment);
+                      return (
+                        <TableRow key={shipment.id}>
+                          <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
+                          <TableCell>{contactInfo.senderName}</TableCell>
+                          <TableCell>{contactInfo.senderPhone}</TableCell>
+                          <TableCell>{contactInfo.recipientName}</TableCell>
+                          <TableCell>{contactInfo.recipientPhone}</TableCell>
+                          <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
+                          <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
+                          <TableCell>
+                            <Badge className={getStatusBadgeClass(shipment.status)}>
+                              {shipment.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {format(new Date(shipment.created_at), 'MMM d, yyyy')}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => navigate(`/shipment/${shipment.id}`)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -554,56 +576,61 @@ const AdminDashboardContent = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-[120px]">Tracking #</TableHead>
+                        <TableHead>Sender Name</TableHead>
+                        <TableHead>Sender Phone</TableHead>
+                        <TableHead>Recipient Name</TableHead>
+                        <TableHead>Recipient Phone</TableHead>
                         <TableHead>Origin</TableHead>
                         <TableHead>Destination</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Created</TableHead>
-                        <TableHead>Est. Delivery</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredShipments.map((shipment) => (
-                        <TableRow key={shipment.id}>
-                          <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
-                          <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
-                          <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
-                          <TableCell>
-                            <Badge className={getStatusBadgeClass(shipment.status)}>
-                              {shipment.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {format(new Date(shipment.created_at), 'MMM d, yyyy')}
-                          </TableCell>
-                          <TableCell>
-                            {shipment.estimated_delivery 
-                              ? format(new Date(shipment.estimated_delivery), 'MMM d, yyyy')
-                              : "Not specified"}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end space-x-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => navigate(`/shipment/${shipment.id}`)}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setEditingShipment(shipment);
-                                  setNewStatus(shipment.status);
-                                }}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {filteredShipments.map((shipment) => {
+                        const contactInfo = getShipmentContactInfo(shipment);
+                        return (
+                          <TableRow key={shipment.id}>
+                            <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
+                            <TableCell>{contactInfo.senderName}</TableCell>
+                            <TableCell>{contactInfo.senderPhone}</TableCell>
+                            <TableCell>{contactInfo.recipientName}</TableCell>
+                            <TableCell>{contactInfo.recipientPhone}</TableCell>
+                            <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
+                            <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
+                            <TableCell>
+                              <Badge className={getStatusBadgeClass(shipment.status)}>
+                                {shipment.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {format(new Date(shipment.created_at), 'MMM d, yyyy')}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end space-x-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => navigate(`/shipment/${shipment.id}`)}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingShipment(shipment);
+                                    setNewStatus(shipment.status);
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
