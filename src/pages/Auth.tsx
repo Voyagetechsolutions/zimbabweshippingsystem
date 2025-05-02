@@ -191,7 +191,6 @@ const Auth = () => {
           <span>Back to Home</span>
         </Link>
       <div className="w-full max-w-md space-y-6">
-        
         <div className="text-center">
           <Logo className="mx-auto h-12 w-auto" />
           <h1 className="mt-6 text-3xl font-bold">Welcome to Zimbabwe Shipping</h1>
