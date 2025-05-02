@@ -25,6 +25,9 @@ const AdminDashboard = () => {
               <div className="mt-8">
                 <CustomQuoteManagement />
               </div>
+              <div className="mt-8">
+                <UserManagement />
+              </div>
             </>
           ) : (
             <div className="max-w-md mx-auto">

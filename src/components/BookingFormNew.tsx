@@ -1,17 +1,20 @@
+
 import React, { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { Checkbox } from "@/components/ui/checkbox"
-import { useToast } from "@/hooks/use-toast"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { PlusCircle, MinusCircle } from 'lucide-react';
 import { countries } from '@/constants/countries';
 import { paymentOptions } from '@/constants/paymentOptions';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const BookingFormNew = ({ onSubmitComplete }) => {
   const [formValues, setFormValues] = useState({
@@ -45,6 +48,7 @@ const BookingFormNew = ({ onSubmitComplete }) => {
     collectionDate: '',
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const { toast } = useToast();
   const [shipmentId, setShipmentId] = useState(uuidv4());
   const [amount, setAmount] = useState(0);
@@ -53,14 +57,27 @@ const BookingFormNew = ({ onSubmitComplete }) => {
   const [pickupCountry, setPickupCountry] = useState('England');
   const [paymentOption, setPaymentOption] = useState('standard');
   const isMobile = useIsMobile();
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
+    // Redirect if user is not logged in
+    if (!user) {
+      toast({
+        title: "Login Required",
+        description: "Please log in to book a shipment",
+        variant: "destructive",
+      });
+      navigate('/auth');
+      return;
+    }
+
     setShipmentId(`shp_${uuidv4()}`);
-  }, []);
+  }, [user, navigate, toast]);
 
   useEffect(() => {
-    setIncludeDrums(formValues.includeDrums);
-    setIncludeOtherItems(formValues.includeOtherItems);
+    setIncludeDrums(Boolean(formValues.includeDrums));
+    setIncludeOtherItems(Boolean(formValues.includeOtherItems));
     setPickupCountry(formValues.pickupCountry);
     setPaymentOption(formValues.paymentOption);
   }, [formValues.includeDrums, formValues.includeOtherItems, formValues.pickupCountry, formValues.paymentOption]);
@@ -73,8 +90,7 @@ const BookingFormNew = ({ onSubmitComplete }) => {
     }));
   };
 
-  const handleCheckboxChange = (e) => {
-    const { name, checked } = e.target;
+  const handleCheckboxChange = (name: string, checked: boolean) => {
     setFormValues(prev => ({
       ...prev,
       [name]: checked
@@ -106,73 +122,80 @@ const BookingFormNew = ({ onSubmitComplete }) => {
     }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Form validation
-    const requiredFields = {
-      firstName: "First Name",
-      lastName: "Last Name",
-      email: "Email",
-      phone: "Phone Number",
-      pickupAddress: "Pickup Address",
-      pickupPostcode: pickupCountry === 'England' ? "Pickup Postcode" : null,
-      pickupCity: pickupCountry !== 'England' ? "Pickup City" : null,
-      recipientName: "Recipient Name",
-      recipientPhone: "Recipient Phone",
-      deliveryAddress: "Delivery Address",
-      deliveryCity: "Delivery City",
-    };
-    
-    // Add conditional required fields
-    if (includeDrums) {
-      requiredFields.drumQuantity = "Drum Quantity";
-    }
-    
-    if (includeOtherItems) {
-      requiredFields.itemCategory = "Item Category";
-      requiredFields.otherItemDescription = "Item Description";
-    }
-    
-    // Validate required fields
+  // Validate form function
+  const validateForm = () => {
     const errors = [];
-    Object.entries(requiredFields).forEach(([field, label]) => {
-      if (label && !formValues[field]) {
-        errors.push(`${label} is required`);
+    
+    // Required personal information
+    if (!formValues.firstName) errors.push("First Name is required");
+    if (!formValues.lastName) errors.push("Last Name is required");
+    if (!formValues.email) errors.push("Email is required");
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formValues.email)) errors.push("Please enter a valid email address");
+    if (!formValues.phone) errors.push("Phone Number is required");
+    else if (!/^\+?[0-9\s()-]{8,20}$/.test(formValues.phone)) errors.push("Please enter a valid phone number");
+    
+    // Required pickup information
+    if (!formValues.pickupAddress) errors.push("Pickup Address is required");
+    if (formValues.pickupCountry === 'England' && !formValues.pickupPostcode) errors.push("Pickup Postcode is required");
+    if (formValues.pickupCountry !== 'England' && !formValues.pickupCity) errors.push("Pickup City is required");
+    
+    // Required recipient information
+    if (!formValues.recipientName) errors.push("Recipient Name is required");
+    if (!formValues.recipientPhone) errors.push("Recipient Phone is required");
+    else if (!/^\+?[0-9\s()-]{8,20}$/.test(formValues.recipientPhone)) errors.push("Please enter a valid recipient phone number");
+    if (!formValues.deliveryAddress) errors.push("Delivery Address is required");
+    if (!formValues.deliveryCity) errors.push("Delivery City is required");
+
+    // Validate additional delivery addresses if door to door is selected
+    if (formValues.doorToDoor && formValues.additionalDeliveryAddresses.length > 0) {
+      formValues.additionalDeliveryAddresses.forEach((addr, i) => {
+        if (!addr.address) errors.push(`Additional address #${i+1} is missing street address`);
+        if (!addr.city) errors.push(`Additional address #${i+1} is missing city`);
+      });
+    }
+    
+    // Validate drum information if includeDrums is true
+    if (formValues.includeDrums) {
+      if (!formValues.drumQuantity) errors.push("Drum Quantity is required");
+      else {
+        const qty = parseInt(formValues.drumQuantity);
+        if (isNaN(qty) || qty <= 0) errors.push("Please enter a valid drum quantity");
       }
-    });
-    
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (formValues.email && !emailRegex.test(formValues.email)) {
-      errors.push("Please enter a valid email address");
     }
     
-    // Validate phone numbers
-    const phoneRegex = /^\+?[0-9\s()-]{8,20}$/;
-    if (formValues.phone && !phoneRegex.test(formValues.phone)) {
-      errors.push("Please enter a valid phone number");
-    }
-    if (formValues.recipientPhone && !phoneRegex.test(formValues.recipientPhone)) {
-      errors.push("Please enter a valid recipient phone number");
-    }
-    
-    // Validate drum quantity if needed
-    if (includeDrums && formValues.drumQuantity) {
-      const quantity = parseInt(formValues.drumQuantity);
-      if (isNaN(quantity) || quantity <= 0) {
-        errors.push("Please enter a valid drum quantity");
-      }
+    // Validate other item information if includeOtherItems is true
+    if (formValues.includeOtherItems) {
+      if (!formValues.itemCategory) errors.push("Item Category is required");
+      if (!formValues.specificItem) errors.push("Specific Item is required");
+      if (!formValues.otherItemDescription) errors.push("Item Description is required");
     }
     
     // Check if at least one shipment type is selected
-    if (!includeDrums && !includeOtherItems) {
+    if (!formValues.includeDrums && !formValues.includeOtherItems) {
       errors.push("Please select at least one shipment type (Drums or Other Items)");
     }
     
-    // If there are validation errors, show them and return without submitting
+    // Validate parcel weight if shipment type is parcel
+    if (formValues.shipmentType === 'parcel' && !formValues.weight) {
+      errors.push("Weight is required for parcel shipments");
+    }
+    
+    // Validate payment information
+    if (formValues.paymentOption === 'payLater' && !formValues.payLaterMethod) {
+      errors.push("Please select payment terms for Pay Later option");
+    }
+
+    return errors;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validate form fields
+    const errors = validateForm();
+    
     if (errors.length > 0) {
-      setIsLoading(false);
+      setValidationErrors(errors);
       toast({
         title: "Form Validation Error",
         description: (
@@ -186,8 +209,11 @@ const BookingFormNew = ({ onSubmitComplete }) => {
       });
       return;
     }
-
+    
+    // Clear validation errors if form is valid
+    setValidationErrors([]);
     setIsLoading(true);
+    
     try {
       // Simulate calculating the amount based on form values
       const calculatedAmount = Math.floor(Math.random() * (500 - 200 + 1)) + 200;
@@ -229,6 +255,7 @@ const BookingFormNew = ({ onSubmitComplete }) => {
                 value={formValues.firstName}
                 onChange={handleInputChange}
                 required
+                className={validationErrors.includes("First Name is required") ? "border-red-500" : ""}
               />
             </div>
             <div>
@@ -240,6 +267,7 @@ const BookingFormNew = ({ onSubmitComplete }) => {
                 value={formValues.lastName}
                 onChange={handleInputChange}
                 required
+                className={validationErrors.includes("Last Name is required") ? "border-red-500" : ""}
               />
             </div>
           </div>
@@ -253,6 +281,7 @@ const BookingFormNew = ({ onSubmitComplete }) => {
                 value={formValues.email}
                 onChange={handleInputChange}
                 required
+                className={validationErrors.some(e => e.includes("email")) ? "border-red-500" : ""}
               />
             </div>
             <div>
@@ -264,6 +293,7 @@ const BookingFormNew = ({ onSubmitComplete }) => {
                 value={formValues.phone}
                 onChange={handleInputChange}
                 required
+                className={validationErrors.some(e => e.includes("phone number")) ? "border-red-500" : ""}
               />
             </div>
           </div>
@@ -277,11 +307,15 @@ const BookingFormNew = ({ onSubmitComplete }) => {
                 value={formValues.pickupAddress}
                 onChange={handleInputChange}
                 required
+                className={validationErrors.includes("Pickup Address is required") ? "border-red-500" : ""}
               />
             </div>
             <div>
               <Label htmlFor="pickupCountry">Pickup Country</Label>
-              <Select value={formValues.pickupCountry} onValueChange={(value) => setFormValues(prev => ({ ...prev, pickupCountry: value }))}>
+              <Select 
+                value={formValues.pickupCountry} 
+                onValueChange={(value) => setFormValues(prev => ({ ...prev, pickupCountry: value }))}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a country" />
                 </SelectTrigger>
@@ -305,6 +339,7 @@ const BookingFormNew = ({ onSubmitComplete }) => {
                 value={formValues.pickupPostcode}
                 onChange={handleInputChange}
                 required
+                className={validationErrors.includes("Pickup Postcode is required") ? "border-red-500" : ""}
               />
             </div>
           ) : (
@@ -317,6 +352,7 @@ const BookingFormNew = ({ onSubmitComplete }) => {
                 value={formValues.pickupCity}
                 onChange={handleInputChange}
                 required
+                className={validationErrors.includes("Pickup City is required") ? "border-red-500" : ""}
               />
             </div>
           )}
@@ -330,6 +366,7 @@ const BookingFormNew = ({ onSubmitComplete }) => {
                 value={formValues.recipientName}
                 onChange={handleInputChange}
                 required
+                className={validationErrors.includes("Recipient Name is required") ? "border-red-500" : ""}
               />
             </div>
             <div>
@@ -341,6 +378,7 @@ const BookingFormNew = ({ onSubmitComplete }) => {
                 value={formValues.recipientPhone}
                 onChange={handleInputChange}
                 required
+                className={validationErrors.some(e => e.includes("recipient phone")) ? "border-red-500" : ""}
               />
             </div>
           </div>
@@ -364,6 +402,7 @@ const BookingFormNew = ({ onSubmitComplete }) => {
                 value={formValues.deliveryAddress}
                 onChange={handleInputChange}
                 required
+                className={validationErrors.includes("Delivery Address is required") ? "border-red-500" : ""}
               />
             </div>
             <div>
@@ -375,6 +414,7 @@ const BookingFormNew = ({ onSubmitComplete }) => {
                 value={formValues.deliveryCity}
                 onChange={handleInputChange}
                 required
+                className={validationErrors.includes("Delivery City is required") ? "border-red-500" : ""}
               />
             </div>
           </div>
@@ -393,11 +433,10 @@ const BookingFormNew = ({ onSubmitComplete }) => {
           </div>
 
           <div>
-            <Label>
+            <Label className="flex items-center space-x-2">
               <Checkbox
                 checked={formValues.doorToDoor}
-                onCheckedChange={(checked) => setFormValues(prev => ({ ...prev, doorToDoor: checked }))}
-                name="doorToDoor"
+                onCheckedChange={(checked) => handleCheckboxChange("doorToDoor", Boolean(checked))}
                 id="doorToDoor"
               />
               <span className="ml-2">Door to Door Delivery</span>
@@ -414,14 +453,14 @@ const BookingFormNew = ({ onSubmitComplete }) => {
                     placeholder="Address"
                     value={address.address}
                     onChange={(e) => handleAddressChange(index, 'address', e.target.value)}
-                    className="flex-grow"
+                    className={`flex-grow ${validationErrors.some(e => e.includes(`Additional address #${index+1} is missing street address`)) ? "border-red-500" : ""}`}
                   />
                   <Input
                     type="text"
                     placeholder="City"
                     value={address.city}
                     onChange={(e) => handleAddressChange(index, 'city', e.target.value)}
-                    className="w-32"
+                    className={`w-32 ${validationErrors.some(e => e.includes(`Additional address #${index+1} is missing city`)) ? "border-red-500" : ""}`}
                   />
                   <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveAddress(index)}>
                     <MinusCircle className="h-4 w-4" />
@@ -434,14 +473,11 @@ const BookingFormNew = ({ onSubmitComplete }) => {
             </div>
           )}
 
-          <div className="border rounded-md p-4">
-            <Label>
+          <div className={`border rounded-md p-4 ${validationErrors.some(e => e.includes("shipment type")) ? "border-red-500" : ""}`}>
+            <Label className="flex items-center space-x-2">
               <Checkbox
                 checked={formValues.includeDrums}
-                onCheckedChange={(checked) => {
-                  setFormValues(prev => ({ ...prev, includeDrums: checked }));
-                }}
-                name="includeDrums"
+                onCheckedChange={(checked) => handleCheckboxChange("includeDrums", Boolean(checked))}
                 id="includeDrums"
               />
               <span className="ml-2">Include Drums (200L-220L)</span>
@@ -456,12 +492,12 @@ const BookingFormNew = ({ onSubmitComplete }) => {
                   value={formValues.drumQuantity}
                   onChange={handleInputChange}
                   required
+                  className={validationErrors.some(e => e.includes("drum")) ? "border-red-500" : ""}
                 />
                 <Label className="mt-2 flex items-center">
                   <Checkbox
                     checked={formValues.wantMetalSeal}
-                    onCheckedChange={(checked) => setFormValues(prev => ({ ...prev, wantMetalSeal: checked }))}
-                    name="wantMetalSeal"
+                    onCheckedChange={(checked) => handleCheckboxChange("wantMetalSeal", Boolean(checked))}
                     id="wantMetalSeal"
                   />
                   <span className="ml-2">Want Metal Coded Seals? (£5 per seal)</span>
@@ -471,13 +507,10 @@ const BookingFormNew = ({ onSubmitComplete }) => {
           </div>
 
           <div className="border rounded-md p-4">
-            <Label>
+            <Label className="flex items-center space-x-2">
               <Checkbox
                 checked={formValues.includeOtherItems}
-                onCheckedChange={(checked) => {
-                  setFormValues(prev => ({ ...prev, includeOtherItems: checked }));
-                }}
-                name="includeOtherItems"
+                onCheckedChange={(checked) => handleCheckboxChange("includeOtherItems", Boolean(checked))}
                 id="includeOtherItems"
               />
               <span className="ml-2">Include Other Items</span>
@@ -493,6 +526,7 @@ const BookingFormNew = ({ onSubmitComplete }) => {
                     value={formValues.itemCategory}
                     onChange={handleInputChange}
                     required
+                    className={validationErrors.includes("Item Category is required") ? "border-red-500" : ""}
                   />
                 </div>
                 <div>
@@ -504,6 +538,7 @@ const BookingFormNew = ({ onSubmitComplete }) => {
                     value={formValues.specificItem}
                     onChange={handleInputChange}
                     required
+                    className={validationErrors.includes("Specific Item is required") ? "border-red-500" : ""}
                   />
                 </div>
                 <div>
@@ -514,6 +549,7 @@ const BookingFormNew = ({ onSubmitComplete }) => {
                     value={formValues.otherItemDescription}
                     onChange={handleInputChange}
                     required
+                    className={validationErrors.includes("Item Description is required") ? "border-red-500" : ""}
                   />
                 </div>
               </div>
@@ -522,7 +558,10 @@ const BookingFormNew = ({ onSubmitComplete }) => {
 
           <div>
             <Label htmlFor="shipmentType">Shipment Type</Label>
-            <Select value={formValues.shipmentType} onValueChange={(value) => setFormValues(prev => ({ ...prev, shipmentType: value }))}>
+            <Select 
+              value={formValues.shipmentType} 
+              onValueChange={(value) => setFormValues(prev => ({ ...prev, shipmentType: value }))}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select shipment type" />
               </SelectTrigger>
@@ -544,13 +583,17 @@ const BookingFormNew = ({ onSubmitComplete }) => {
                 value={formValues.weight}
                 onChange={handleInputChange}
                 required
+                className={validationErrors.includes("Weight is required for parcel shipments") ? "border-red-500" : ""}
               />
             </div>
           )}
 
           <div>
             <Label htmlFor="paymentOption">Payment Option</Label>
-            <Select value={formValues.paymentOption} onValueChange={(value) => setFormValues(prev => ({ ...prev, paymentOption: value }))}>
+            <Select 
+              value={formValues.paymentOption} 
+              onValueChange={(value) => setFormValues(prev => ({ ...prev, paymentOption: value }))}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select a payment option" />
               </SelectTrigger>
@@ -567,7 +610,10 @@ const BookingFormNew = ({ onSubmitComplete }) => {
           {paymentOption === 'standard' && (
             <div>
               <Label htmlFor="paymentMethod">Payment Method</Label>
-              <Select value={formValues.paymentMethod} onValueChange={(value) => setFormValues(prev => ({ ...prev, paymentMethod: value }))}>
+              <Select 
+                value={formValues.paymentMethod} 
+                onValueChange={(value) => setFormValues(prev => ({ ...prev, paymentMethod: value }))}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a payment method" />
                 </SelectTrigger>
@@ -583,8 +629,11 @@ const BookingFormNew = ({ onSubmitComplete }) => {
           {paymentOption === 'payLater' && (
             <div>
               <Label htmlFor="payLaterMethod">Payment Terms</Label>
-              <Select value={formValues.payLaterMethod} onValueChange={(value) => setFormValues(prev => ({ ...prev, payLaterMethod: value }))}>
-                <SelectTrigger className="w-full">
+              <Select 
+                value={formValues.payLaterMethod} 
+                onValueChange={(value) => setFormValues(prev => ({ ...prev, payLaterMethod: value }))}
+              >
+                <SelectTrigger className={`w-full ${validationErrors.includes("Please select payment terms for Pay Later option") ? "border-red-500" : ""}`}>
                   <SelectValue placeholder="Select payment terms" />
                 </SelectTrigger>
                 <SelectContent>
@@ -592,6 +641,17 @@ const BookingFormNew = ({ onSubmitComplete }) => {
                   <SelectItem value="60-days">60 Days</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          )}
+
+          {validationErrors.length > 0 && (
+            <div className="text-red-500 text-sm">
+              <p className="font-bold">Please correct the following errors:</p>
+              <ul className="list-disc pl-5 mt-1">
+                {validationErrors.map((error, index) => (
+                  <li key={index}>{error}</li>
+                ))}
+              </ul>
             </div>
           )}
 

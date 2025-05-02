@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -132,7 +133,7 @@ const AdminDashboardContent = () => {
       // Handle the case when metadata is a string (JSON)
       const metadata = typeof shipment.metadata === 'string' 
         ? JSON.parse(shipment.metadata) 
-        : shipment.metadata;
+        : shipment.metadata as ShipmentMetadata;
       
       if (metadata.senderDetails) {
         return {
@@ -154,7 +155,7 @@ const AdminDashboardContent = () => {
       // Handle the case when metadata is a string (JSON)
       const metadata = typeof shipment.metadata === 'string' 
         ? JSON.parse(shipment.metadata) 
-        : shipment.metadata;
+        : shipment.metadata as ShipmentMetadata;
       
       if (metadata.recipientDetails) {
         return {

@@ -1,698 +1,86 @@
 
-import React, { useRef, useEffect, useState } from 'react';
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { useToast } from '@/hooks/use-toast';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { Download, Printer, Mail, Drum, Package, PackageCheck, Home, Search, ArrowLeft } from 'lucide-react';
-import Logo from '@/components/Logo';
-import { formatDate } from '@/utils/formatters';
-import { supabase } from '@/integrations/supabase/client';
-import html2pdf from 'html2pdf.js';
-import { useLocation, Link, useNavigate } from 'react-router-dom';
+import React from 'react';
+import { useLocation } from 'react-router-dom';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
+import Receipt from '@/components/Receipt';
+import { useAuth } from '@/hooks/useAuth';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 
-interface ReceiptProps {
-  receipt?: {
-    receipt_number: string;
-    created_at: string;
-    amount: number;
-    currency: string;
-    payment_method: string;
-    sender_details: any;
-    recipient_details: any;
-    shipment_details: any;
-    status: string;
-  };
-  shipment?: {
-    tracking_number: string;
-    origin: string;
-    destination: string;
-    status: string;
-  };
-  customQuote?: any;
-  bookingData?: any;
-  paymentData?: any;
-}
-
-const ReceiptNew: React.FC<ReceiptProps> = ({ 
-  receipt: propReceipt, 
-  shipment: propShipment,
-  customQuote: propCustomQuote,
-  bookingData: propBookingData,
-  paymentData: propPaymentData
-}) => {
-  const { toast } = useToast();
-  const receiptRef = useRef<HTMLDivElement>(null);
-  const isMobile = useIsMobile();
+const ReceiptNew = () => {
+  const { user } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(true);
+  const { bookingData, paymentData, customQuoteData } = location.state || {};
   
-  // Ensure we properly extract data from props or location state
-  const stateData = location.state || {};
-  const bookingData = propBookingData || stateData.bookingData || {};
-  const paymentData = propPaymentData || stateData.paymentData || {};
-  const customQuoteData = propCustomQuote || stateData.customQuoteData || {};
-  
-  console.log("ReceiptNew component data:", {
-    locationState: location.state,
+  // Log state data to help debug
+  console.log("ReceiptNew page state:", {
     bookingData,
     paymentData,
-    customQuoteData
+    customQuoteData,
+    location
   });
 
-  // Check if we have a shipment ID but missing data
-  const [loadedShipmentData, setLoadedShipmentData] = useState<any>(null);
-
-  useEffect(() => {
-    const loadShipmentData = async () => {
-      setIsLoading(true);
-      
-      try {
-        // If we have location state with shipment ID but no receipt data
-        if (location.state?.shipmentId && !bookingData.shipmentDetails) {
-          const shipmentId = location.state.shipmentId;
-          console.log("Fetching shipment data for ID:", shipmentId);
-          
-          // Fetch shipment data
-          const { data: shipmentData, error: shipmentError } = await supabase
-            .from('shipments')
-            .select('*')
-            .eq('id', shipmentId)
-            .single();
-          
-          if (shipmentError) {
-            console.error('Error fetching shipment data:', shipmentError);
-            toast({
-              title: 'Error',
-              description: 'Failed to load shipment details',
-              variant: 'destructive',
-            });
-            return;
-          }
-          
-          // Fetch receipt data
-          const { data: receiptData, error: receiptError } = await supabase
-            .from('receipts')
-            .select('*')
-            .eq('shipment_id', shipmentId)
-            .maybeSingle();
-            
-          if (receiptError) {
-            console.error('Error fetching receipt:', receiptError);
-          }
-          
-          // Combine the data
-          const combinedData = {
-            shipment: shipmentData,
-            receipt: receiptData,
-            metadata: shipmentData.metadata || {}
-          };
-          
-          setLoadedShipmentData(combinedData);
-          console.log("Loaded shipment data:", combinedData);
-        }
-      } catch (error) {
-        console.error("Error loading shipment data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    loadShipmentData();
-  }, [location.state]);
-  
-  // Create default receipt data if not provided, using loaded shipment data if available
-  const receiptData = propReceipt || loadedShipmentData?.receipt || {
-    receipt_number: `ZIM-${Date.now().toString().substring(8)}`,
-    created_at: new Date().toISOString(),
-    amount: paymentData.finalAmount || 0,
-    currency: 'GBP',
-    payment_method: paymentData.method || 'standard',
-    sender_details: bookingData.senderDetails || {},
-    recipient_details: bookingData.recipientDetails || {},
-    shipment_details: bookingData.shipmentDetails || {},
-    status: 'Pending Payment'
-  };
-  
-  const shipmentData = propShipment || loadedShipmentData?.shipment || {
-    tracking_number: bookingData.shipmentDetails?.tracking_number || loadedShipmentData?.metadata?.tracking_number || 'Pending',
-    origin: bookingData.senderDetails?.address || loadedShipmentData?.metadata?.senderDetails?.address || 'Not specified',
-    destination: bookingData.recipientDetails?.address || loadedShipmentData?.metadata?.recipientDetails?.address || 'Not specified',
-    status: 'Pending Payment'
-  };
-
-  const generateUniqueId = (prefix: string = '') => {
-    return `${prefix}${Date.now().toString(36)}${Math.random().toString(36).substring(2, 7)}`;
-  };
-
-  useEffect(() => {
-    document.title = `Receipt ${receiptData.receipt_number} | Zimbabwe Shipping`;
-    
-    // Log the data to help debug
-    console.log("Receipt details:", {
-      receiptData,
-      shipmentData,
-      senderDetails: receiptData.sender_details,
-      recipientDetails: receiptData.recipient_details,
-      shipmentDetails: receiptData.shipment_details,
-      loadedShipmentData
-    });
-
-    const createReceiptRecord = async () => {
-      // Only create a new record if we have booking data, payment data, and no existing receipt
-      if (bookingData && paymentData && !propReceipt && bookingData.shipment_id && !loadedShipmentData?.receipt) {
-        try {
-          const paymentId = generateUniqueId('pmt_');
-          
-          await supabase.from('receipts').insert({
-            receipt_number: receiptData.receipt_number,
-            payment_id: paymentId,
-            amount: paymentData.finalAmount,
-            currency: 'GBP',
-            payment_method: getPaymentMethodValue(paymentData.method, paymentData.payLaterMethod),
-            shipment_id: bookingData.shipment_id,
-            sender_details: bookingData.senderDetails,
-            recipient_details: bookingData.recipientDetails,
-            shipment_details: bookingData.shipmentDetails,
-            status: 'Pending Payment'
-          });
-
-          await supabase.from('notifications').insert({
-            user_id: '00000000-0000-0000-0000-000000000000',
-            title: 'New Shipment Booked',
-            message: `A new shipment has been booked with tracking number: ${shipmentData.tracking_number}`,
-            type: 'shipment',
-            related_id: bookingData.shipment_id,
-            is_read: false
-          });
-        } catch (error) {
-          console.error('Error saving receipt:', error);
-        }
-      }
-    };
-
-    createReceiptRecord();
-  }, [bookingData, paymentData, propReceipt, loadedShipmentData]);
-  
-  const handlePrint = () => {
-    const content = receiptRef.current;
-    if (!content) return;
-    
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast({
-        title: "Error",
-        description: "Could not open print window. Please check your popup blocker settings.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Receipt ${receiptData.receipt_number}</title>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              padding: 20px;
-              color: #000;
-            }
-            .receipt {
-              max-width: 800px;
-              margin: 0 auto;
-            }
-            .header {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              margin-bottom: 30px;
-              padding-bottom: 20px;
-              border-bottom: 1px solid #ddd;
-            }
-            .company-name {
-              font-size: 24px;
-              font-weight: bold;
-              color: #006400;
-            }
-            .receipt-number {
-              font-size: 18px;
-              color: #333;
-            }
-            .section {
-              margin-bottom: 20px;
-            }
-            .section-title {
-              font-weight: bold;
-              margin-bottom: 5px;
-            }
-            .grid {
-              display: grid;
-              grid-template-columns: 1fr 1fr;
-              gap: 20px;
-            }
-            .details {
-              padding: 15px;
-              border: 1px solid #ddd;
-              border-radius: 5px;
-            }
-            .item-row {
-              display: flex;
-              justify-content: space-between;
-              padding: 8px 0;
-              border-bottom: 1px solid #eee;
-            }
-            .total-row {
-              display: flex;
-              justify-content: space-between;
-              padding: 15px 0;
-              font-weight: bold;
-              border-top: 2px solid #ddd;
-              font-size: 18px;
-            }
-            .footer {
-              margin-top: 30px;
-              text-align: center;
-              font-size: 12px;
-              color: #666;
-            }
-            @media print {
-              body {
-                print-color-adjust: exact;
-                -webkit-print-color-adjust: exact;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="receipt">
-            ${content.innerHTML}
-          </div>
-          <script>
-            window.onload = function() { window.print(); window.setTimeout(function() { window.close(); }, 500); }
-          </script>
-        </body>
-      </html>
-    `);
-    
-    printWindow.document.close();
-  };
-  
-  const handleDownload = async () => {
-    const content = receiptRef.current;
-    if (!content) return;
-    
-    toast({
-      title: "Preparing Download",
-      description: "Your receipt is being prepared for download...",
-    });
-    
-    try {
-      const options = {
-        margin: 10,
-        filename: `receipt-${receiptData.receipt_number}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      };
-      
-      await html2pdf().from(content).set(options).save();
-      
-      toast({
-        title: "Download Complete",
-        description: "Your receipt has been downloaded successfully",
-      });
-    } catch (error) {
-      console.error("Download error:", error);
-      toast({
-        title: "Download Failed",
-        description: "There was a problem downloading your receipt. Please try again later.",
-        variant: "destructive",
-      });
-    }
-  };
-  
-  const handleEmail = async () => {
-    toast({
-      title: "Sending Email",
-      description: "Your receipt is being emailed...",
-    });
-    
-    try {
-      let email = receiptData.sender_details?.email;
-      
-      if (!email) {
-        const userEmail = window.prompt("Please enter your email address to receive the receipt:");
-        if (!userEmail) {
-          toast({
-            title: "Email Cancelled",
-            description: "Email sending was cancelled.",
-          });
-          return;
-        }
-        email = userEmail;
-      }
-      
-      const { data, error } = await supabase.functions.invoke('email-receipt', {
-        body: { 
-          receiptId: receiptData.receipt_number,
-          email: email,
-          receiptData: receiptData,
-          shipmentData: shipmentData
-        }
-      });
-      
-      if (error) throw new Error(error.message || 'Failed to send email');
-      
-      toast({
-        title: "Email Sent",
-        description: `Your receipt has been emailed to ${email}`,
-      });
-    } catch (error) {
-      console.error("Email error:", error);
-      toast({
-        title: "Email Failed",
-        description: "There was a problem sending your receipt. Please try again later.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleTrackShipment = () => {
-    const trackingNumber = shipmentData.tracking_number || receiptData.shipment_details?.tracking_number;
-    if (trackingNumber && trackingNumber !== 'Pending') {
-      navigate('/track', { state: { trackingNumber } });
-    } else {
-      toast({
-        title: "Tracking Not Available",
-        description: "Tracking information is not yet available for this shipment.",
-      });
-    }
-  };
-
-  const getPaymentMethodDisplay = (method: string) => {
-    switch(method) {
-      case 'stripe':
-      case 'card':
-        return 'Credit/Debit Card';
-      case 'paypal':
-        return 'PayPal';
-      case 'bankTransfer':
-        return 'Bank Transfer';
-      case 'payLater':
-        return '30-Day Payment Terms';
-      case 'cashOnCollection':
-        return 'Cash on Collection';
-      case 'payOnArrival':
-        return 'Pay on Arrival';
-      default:
-        return method.charAt(0).toUpperCase() + method.slice(1);
-    }
-  };
-  
-  const getPaymentMethodValue = (method: string, payLaterMethod?: string) => {
-    if (method === 'standard' && payLaterMethod) {
-      return payLaterMethod;
-    }
-    return method;
-  };
-
-  // Safeguard against undefined properties
-  const senderDetails = receiptData.sender_details || {};
-  const recipientDetails = receiptData.recipient_details || {};
-  const shipmentDetails = receiptData.shipment_details || {};
-
-  if (isLoading) {
-    return (
-      <div className="container mx-auto px-4 py-12 flex justify-center items-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-800" />
-      </div>
-    );
-  }
+  // Check if we have receipt data
+  const hasReceiptData = bookingData && (paymentData || customQuoteData);
 
   return (
-    <div className="container mx-auto px-2 sm:px-4 max-w-4xl py-6">
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between">
-        <Link to="/" className="flex items-center text-gray-600 hover:text-gray-900 mb-4 sm:mb-0">
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          <span>Back to Home</span>
-        </Link>
-        
-        <div className="flex flex-wrap gap-3">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="flex items-center" 
-            onClick={() => navigate('/')}
-          >
-            <Home className={`${isMobile ? 'mr-1 h-3 w-3' : 'mr-2 h-4 w-4'}`} />
-            <span>Home</span>
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="flex items-center" 
-            onClick={handleTrackShipment}
-          >
-            <Search className={`${isMobile ? 'mr-1 h-3 w-3' : 'mr-2 h-4 w-4'}`} />
-            <span>Track Shipment</span>
-          </Button>
-        </div>
-      </div>
+    <div className="min-h-screen flex flex-col">
+      <Navbar />
       
-      <Card className="border-0 shadow-lg overflow-hidden">
-        <div className="p-3 sm:p-6" ref={receiptRef}>
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center pb-4 sm:pb-6 border-b mb-4 sm:mb-6 gap-3">
-            <div className="flex items-center">
-              <div className="mr-3 hidden sm:block">
-                <Logo size={isMobile ? "small" : "medium"} />
-              </div>
-              <div>
-                <h1 className="text-lg sm:text-2xl font-bold text-zim-green">Zimbabwe Shipping</h1>
-                <p className="text-gray-600 text-xs sm:text-sm">Pastures Lodge Farm, Raunds Road
-Chelveston, Wellingborough, NN9 6AA</p>
-              </div>
-            </div>
-            <div className="text-left sm:text-right mt-2 sm:mt-0">
-              <h2 className="text-lg sm:text-xl font-bold">RECEIPT</h2>
-              <p className="text-gray-600 text-xs sm:text-sm"># {receiptData.receipt_number}</p>
-              <p className="text-gray-600 text-xs sm:text-sm">Date: {formatDate(receiptData.created_at)}</p>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
-            <div className="border rounded-md p-3 sm:p-4">
-              <h3 className="font-bold text-sm mb-1 sm:mb-2">Sender Details</h3>
-              <p className="text-sm"><span className="font-medium">Name:</span> {senderDetails.name || loadedShipmentData?.metadata?.senderDetails?.name || "Not provided"}</p>
-              <p className="text-sm"><span className="font-medium">Address:</span> {senderDetails.address || loadedShipmentData?.metadata?.senderDetails?.address || "Not provided"}</p>
-              <p className="text-sm"><span className="font-medium">Phone:</span> {senderDetails.phone || loadedShipmentData?.metadata?.senderDetails?.phone || "Not provided"}</p>
-              <p className="text-sm"><span className="font-medium">Email:</span> {senderDetails.email || loadedShipmentData?.metadata?.senderDetails?.email || "Not provided"}</p>
-            </div>
+      <main className="flex-grow py-8 px-4 bg-gray-50">
+        <div className="container mx-auto">
+          <div className="mb-6">
+            <Link to="/dashboard" className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900">
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back to Dashboard
+            </Link>
             
-            <div className="border rounded-md p-3 sm:p-4">
-              <h3 className="font-bold text-sm mb-1 sm:mb-2">Receiver Details</h3>
-              <p className="text-sm"><span className="font-medium">Name:</span> {recipientDetails.name || loadedShipmentData?.metadata?.recipientDetails?.name || "Not provided"}</p>
-              <p className="text-sm"><span className="font-medium">Address:</span> {recipientDetails.address || loadedShipmentData?.metadata?.recipientDetails?.address || "Not provided"}</p>
-              <p className="text-sm"><span className="font-medium">Phone:</span> {recipientDetails.phone || loadedShipmentData?.metadata?.recipientDetails?.phone || "Not provided"}</p>
-              {(recipientDetails.additionalPhone || loadedShipmentData?.metadata?.recipientDetails?.additionalPhone) && (
-                <p className="text-sm"><span className="font-medium">Additional Phone:</span> {recipientDetails.additionalPhone || loadedShipmentData?.metadata?.recipientDetails?.additionalPhone}</p>
-              )}
-            </div>
+            <h1 className="text-2xl md:text-3xl font-bold mt-4 mb-2">Receipt</h1>
+            {hasReceiptData ? (
+              <p className="text-gray-600">
+                Thank you for your shipment. Here's your receipt and shipping details.
+              </p>
+            ) : (
+              <p className="text-gray-600">
+                No receipt data available. Please go back and complete your booking.
+              </p>
+            )}
           </div>
           
-          <div className="mb-4 sm:mb-6">
-            <h3 className="font-bold text-sm mb-1 sm:mb-2">Shipment Details</h3>
-            <div className="border rounded-md overflow-x-auto">
-              <table className="w-full min-w-[400px]">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="text-left p-2 sm:p-3 text-xs sm:text-sm">Tracking Number</th>
-                    <th className="text-left p-2 sm:p-3 text-xs sm:text-sm">Description</th>
-                    <th className="text-left p-2 sm:p-3 text-xs sm:text-sm">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-t">
-                    <td className="p-2 sm:p-3 text-xs sm:text-sm break-all sm:break-normal">
-                      {shipmentData.tracking_number || shipmentDetails.tracking_number || loadedShipmentData?.metadata?.tracking_number || "Pending"}
-                    </td>
-                    <td className="p-2 sm:p-3 text-xs sm:text-sm">
-                      <div className="flex flex-col">
-                        {(shipmentDetails.includeDrums || loadedShipmentData?.metadata?.includeDrums) && (
-                          <div className="flex items-center mb-1">
-                            <Drum className="h-4 w-4 mr-1 text-zim-green" />
-                            {shipmentDetails.quantity || loadedShipmentData?.metadata?.quantity || 0} x 200L-220L Drums
-                          </div>
-                        )}
-                        {(shipmentDetails.includeOtherItems || loadedShipmentData?.metadata?.includeOtherItems) && (
-                          <div className="flex items-center">
-                            <Package className="h-4 w-4 mr-1 text-zim-green" />
-                            {((shipmentDetails.category && shipmentDetails.specificItem) || 
-                              (loadedShipmentData?.metadata?.category && loadedShipmentData?.metadata?.specificItem)) ? (
-                              `${shipmentDetails.category || loadedShipmentData?.metadata?.category} - 
-                              ${shipmentDetails.specificItem || loadedShipmentData?.metadata?.specificItem}`
-                            ) : (
-                              `Custom Item - ${customQuoteData.description || 
-                                shipmentDetails.description || 
-                                loadedShipmentData?.metadata?.description || 
-                                'Pending quote'}`
-                            )}
-                          </div>
-                        )}
-                        {(!shipmentDetails.includeDrums && !shipmentDetails.includeOtherItems && 
-                          !loadedShipmentData?.metadata?.includeDrums && !loadedShipmentData?.metadata?.includeOtherItems) && (
-                          `${shipmentDetails.type || loadedShipmentData?.metadata?.type || 'Custom Item'}`
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-2 sm:p-3 text-xs sm:text-sm">{shipmentData.status || receiptData.status}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-          
-          <div className="mb-4 sm:mb-6">
-            <h3 className="font-bold text-sm mb-1 sm:mb-2">Collection & Delivery Information</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="border rounded-md p-3">
-                <p className="text-sm"><span className="font-medium">Pickup Address:</span> {shipmentData.origin || senderDetails.address || loadedShipmentData?.origin || "Not specified"}</p>
-              </div>
-              <div className="border rounded-md p-3">
-                <p className="text-sm"><span className="font-medium">Delivery Address:</span> {shipmentData.destination || recipientDetails.address || loadedShipmentData?.destination || "Not specified"}</p>
-              </div>
-            </div>
-            
-            {/* Collection Date Information */}
-            <div className="border rounded-md p-3 mt-3">
-              <p className="text-sm"><span className="font-medium">Collection Date:</span> {bookingData.collectionDate || loadedShipmentData?.metadata?.collectionDate || "To be scheduled"}</p>
-              <p className="text-sm"><span className="font-medium">Collection Location:</span> {bookingData.senderDetails?.address || shipmentData.origin || loadedShipmentData?.origin || "Not specified"}</p>
-            </div>
-          </div>
-          
-          {(shipmentDetails.includeDrums || loadedShipmentData?.metadata?.includeDrums) && (
-            <div className="mb-4 sm:mb-6">
-              <h3 className="font-bold text-sm mb-1 sm:mb-2">Payment Details</h3>
-              
-              <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
-                <span className="font-medium">Shipping Cost</span>
-                <span>£{((receiptData.amount || 0) * 0.9).toFixed(2)}</span>
-              </div>
-              
-              {(shipmentDetails.services && shipmentDetails.services.length > 0) && (
-                <>
-                  {shipmentDetails.services.map((service: any, index: number) => (
-                    <div key={index} className="flex justify-between py-2 sm:py-3 border-b text-sm">
-                      <span className="font-medium">{service.name}</span>
-                      <span>£{service.price.toFixed(2)}</span>
-                    </div>
-                  ))}
-                </>
-              )}
-              
-              {paymentData && paymentData.discount > 0 && (
-                <div className="flex justify-between py-2 sm:py-3 border-b text-sm text-green-600">
-                  <span className="font-medium">Cash Discount</span>
-                  <span>-£{paymentData.discount.toFixed(2)}</span>
-                </div>
-              )}
-              
-              {paymentData && paymentData.premium > 0 && (
-                <div className="flex justify-between py-2 sm:py-3 border-b text-sm text-amber-600">
-                  <span className="font-medium">Pay on Arrival Premium (20%)</span>
-                  <span>+£{paymentData.premium.toFixed(2)}</span>
-                </div>
-              )}
-              
-              <div className="flex justify-between py-3 sm:py-4 font-bold text-base sm:text-lg">
-                <span>Total</span>
-                <span>£{(receiptData.amount || 0).toFixed(2)}</span>
-              </div>
-              
-              <div className="border rounded-md p-2 sm:p-3 bg-gray-50 mt-2">
-                <p className="font-medium text-sm">Payment Method: {getPaymentMethodDisplay(receiptData.payment_method)}</p>
-                <p className="text-xs sm:text-sm text-gray-600 mt-1">Payment Status: {receiptData.status}</p>
-              </div>
-            </div>
-          )}
-          
-          {(shipmentDetails.includeDrums || loadedShipmentData?.metadata?.includeDrums) && (
-            <div className="mb-4 sm:mb-6">
-              <h3 className="font-bold text-sm mb-1 sm:mb-2">Drum Information</h3>
-              <div className="border rounded-md p-3">
-                <p className="text-sm"><span className="font-medium">Number of Drums:</span> {shipmentDetails.quantity || loadedShipmentData?.metadata?.quantity || 0}</p>
-                <p className="text-sm"><span className="font-medium">Drum Capacity:</span> 200L-220L</p>
-                {(shipmentDetails.wantMetalSeal || loadedShipmentData?.metadata?.wantMetalSeal) && (
-                  <p className="text-sm"><span className="font-medium">Security:</span> Metal Coded Seals</p>
-                )}
-              </div>
-            </div>
-          )}
-          
-          {((shipmentDetails.includeOtherItems || loadedShipmentData?.metadata?.includeOtherItems) || (customQuoteData && customQuoteData.id)) && (
-            <div className="mb-4 sm:mb-6">
-              <h3 className="font-bold text-sm mb-1 sm:mb-2">Other Item Details</h3>
-              <div className="border rounded-md p-3">
-                {(shipmentDetails.category || loadedShipmentData?.metadata?.category) && (
-                  <p className="text-sm"><span className="font-medium">Item Category:</span> {shipmentDetails.category || loadedShipmentData?.metadata?.category}</p>
-                )}
-                {(shipmentDetails.specificItem || loadedShipmentData?.metadata?.specificItem) && (
-                  <p className="text-sm"><span className="font-medium">Specific Item:</span> {shipmentDetails.specificItem || loadedShipmentData?.metadata?.specificItem}</p>
-                )}
-                {(shipmentDetails.description || loadedShipmentData?.metadata?.description || (customQuoteData && customQuoteData.description)) && (
-                  <p className="text-sm"><span className="font-medium">Description:</span> {(customQuoteData && customQuoteData.description) || shipmentDetails.description || loadedShipmentData?.metadata?.description}</p>
-                )}
-                {customQuoteData && customQuoteData.id && (
-                  <div className="mt-2 flex items-center text-sm text-green-600">
-                    <PackageCheck className="h-4 w-4 mr-1.5" />
-                    <span>Custom quote request submitted successfully</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          
-          <div className="text-center text-gray-500 text-xs sm:text-sm mt-8 sm:mt-12 pt-3 sm:pt-4 border-t">
-            <p>Thank you for choosing our shipping service</p>
-            <p>For any inquiries, please contact us at +44 7584 100552</p>
-          </div>
-        </div>
-        
-        <div className="bg-gray-50 p-3 sm:p-4 flex flex-wrap justify-center sm:justify-end gap-2 sm:gap-3">
-          {isMobile ? (
-            <>
-              <Button variant="outline" size="sm" className="flex items-center text-xs" onClick={handlePrint}>
-                <Printer className="mr-1 h-3 w-3" />
-                Print
-              </Button>
-              <Button variant="outline" size="sm" className="flex items-center text-xs" onClick={handleDownload}>
-                <Download className="mr-1 h-3 w-3" />
-                Download
-              </Button>
-              <Button variant="outline" size="sm" className="flex items-center text-xs" onClick={handleEmail}>
-                <Mail className="mr-1 h-3 w-3" />
-                Email
-              </Button>
-            </>
+          {hasReceiptData ? (
+            <Receipt 
+              bookingData={bookingData}
+              paymentData={paymentData}
+              customQuote={customQuoteData}
+            />
           ) : (
-            <>
-              <Button variant="outline" size="sm" className="flex items-center" onClick={handlePrint}>
-                <Printer className="mr-2 h-4 w-4" />
-                Print
-              </Button>
-              <Button variant="outline" size="sm" className="flex items-center" onClick={handleDownload}>
-                <Download className="mr-2 h-4 w-4" />
-                Download
-              </Button>
-              <Button variant="outline" size="sm" className="flex items-center" onClick={handleEmail}>
-                <Mail className="mr-2 h-4 w-4" />
-                Email
-              </Button>
-            </>
+            <Card className="p-8 text-center">
+              <h2 className="text-xl font-semibold mb-4">No Receipt Data Found</h2>
+              <p className="text-gray-500 mb-6">
+                We couldn't find any receipt information. This could be because:
+              </p>
+              <ul className="list-disc text-left max-w-md mx-auto mb-6 text-gray-500">
+                <li>Your session may have expired</li>
+                <li>You navigated directly to this page without completing a booking</li>
+                <li>There was an issue processing your payment</li>
+              </ul>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button asChild>
+                  <Link to="/book">Book a New Shipment</Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link to="/dashboard">Go to Dashboard</Link>
+                </Button>
+              </div>
+            </Card>
           )}
         </div>
-      </Card>
+      </main>
+      
+      <Footer />
     </div>
   );
 };
