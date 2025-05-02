@@ -33,41 +33,13 @@ const BookShipment = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      if (data.shipmentType === 'other' && !data.includeDrums) {
-        setBookingData({
-          ...data,
-          shipment_id: shipmentId,
-          user_id: user?.id || null,
-          senderDetails: {
-            name: `${data.firstName} ${data.lastName}`,
-            email: data.email,
-            phone: data.phone,
-            address: `${data.pickupAddress}, ${data.pickupCountry === 'England' ? data.pickupPostcode : data.pickupCity}`,
-          },
-          recipientDetails: {
-            name: data.recipientName,
-            phone: data.recipientPhone,
-            additionalPhone: data.additionalRecipientPhone,
-            address: `${data.deliveryAddress}, ${data.deliveryCity}`,
-          },
-          shipmentDetails: {
-            type: 'other',
-            category: data.itemCategory,
-            specificItem: data.specificItem,
-            description: data.otherItemDescription,
-            tracking_number: '',
-          }
-        });
-        setCurrentStep(BookingStep.CUSTOM_QUOTE);
-        return;
-      }
-      
       const metalSealCost = data.wantMetalSeal ? (5 * parseInt(data.drumQuantity || '0')) : 0;
       const doorToDoorAddresses = data.doorToDoor ? (1 + (data.additionalDeliveryAddresses?.length || 0)) : 0;
       const doorToDoorCost = doorToDoorAddresses * 25;
       const finalAmount = amount + metalSealCost + doorToDoorCost;
       
-      setBookingData({
+      // Prepare shipment data structure regardless of type
+      const shipmentData = {
         ...data,
         shipment_id: shipmentId,
         user_id: user?.id || null,
@@ -107,17 +79,10 @@ const BookShipment = () => {
         },
         paymentOption: data.paymentOption || 'standard',
         paymentMethod: data.paymentMethod || 'card',
-      });
+      };
       
+      setBookingData(shipmentData);
       setTotalAmount(finalAmount);
-      
-      if (data.includeOtherItems && data.includeDrums) {
-        setCurrentStep(BookingStep.PAYMENT);
-      } else if (data.includeDrums) {
-        setCurrentStep(BookingStep.PAYMENT);
-      } else {
-        setCurrentStep(BookingStep.CUSTOM_QUOTE);
-      }
       
       try {
         const { data: shipmentData, error: shipmentError } = await supabase
@@ -141,6 +106,9 @@ const BookShipment = () => {
       } catch (err) {
         console.error('Error fetching tracking number:', err);
       }
+      
+      // Always proceed to payment first, regardless of shipment type
+      setCurrentStep(BookingStep.PAYMENT);
     } catch (error: any) {
       console.error('Error processing form submission:', error);
       toast({
@@ -206,6 +174,7 @@ const BookShipment = () => {
         is_read: false
       });
       
+      // Always navigate to receipt page after a custom quote request if payment was completed
       if (bookingData.paymentCompleted) {
         navigate('/receipt', { 
           state: { 
@@ -235,9 +204,13 @@ const BookShipment = () => {
     };
     setBookingData(updatedBookingData);
     
-    if (bookingData.shipmentDetails.includeOtherItems) {
+    // Check if this is a custom quote that needs additional information
+    if (bookingData.shipmentDetails.includeOtherItems && 
+        (!bookingData.shipmentDetails.includeDrums || 
+         bookingData.shipmentType === 'other')) {
       setCurrentStep(BookingStep.CUSTOM_QUOTE);
     } else {
+      // For standard shipments, proceed directly to receipt
       navigate('/receipt', { 
         state: { 
           bookingData: updatedBookingData,

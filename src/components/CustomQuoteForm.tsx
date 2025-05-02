@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -97,7 +96,13 @@ const specificItems = {
   ]
 };
 
-const CustomQuoteForm = () => {
+interface CustomQuoteFormProps {
+  initialData?: any;
+  onSubmit: (data: any) => void;
+  onCancel?: () => void;
+}
+
+const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({ initialData, onSubmit, onCancel }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -106,14 +111,21 @@ const CustomQuoteForm = () => {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      phone_number: "",
-      category: "",
-      specific_item: "",
-      description: "",
+      phone_number: initialData?.senderDetails?.phone || "",
+      category: initialData?.shipmentDetails?.category || "",
+      specific_item: initialData?.shipmentDetails?.specificItem || "",
+      description: initialData?.shipmentDetails?.description || "",
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  // Set the selected category from initialData if available
+  useEffect(() => {
+    if (initialData?.shipmentDetails?.category) {
+      setSelectedCategory(initialData.shipmentDetails.category);
+    }
+  }, [initialData]);
+
+  const handleSubmitForm = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     
     try {
@@ -122,27 +134,40 @@ const CustomQuoteForm = () => {
         category: values.category || null,
         specific_item: values.specific_item || null,
         description: values.description,
+        phoneNumber: values.phone_number,
+        // Include data needed for both new submissions and those from BookShipment
+        ...(initialData ? {
+          shipment_id: initialData.shipment_id,
+          user_id: initialData.user_id,
+          senderDetails: initialData.senderDetails,
+          recipientDetails: initialData.recipientDetails,
+        } : {})
       };
 
-      const result = await submitCustomQuote(quoteData);
-      
-      if (result.success) {
-        toast({
-          title: "Quote Request Submitted",
-          description: "We'll review your request and get back to you soon.",
-        });
-        
-        // Navigate to receipt or confirmation page with the quote data
-        navigate("/custom-quote-confirmation", {
-          state: { 
-            customQuoteData: {
-              id: result.quoteId,
-              ...quoteData
-            }
-          }
-        });
+      // If we have initialData, use onSubmit from parent, otherwise use direct submission
+      if (initialData && onSubmit) {
+        await onSubmit(quoteData);
       } else {
-        throw new Error(result.error || "Failed to submit quote");
+        const result = await submitCustomQuote(quoteData);
+        
+        if (result.success) {
+          toast({
+            title: "Quote Request Submitted",
+            description: "We'll review your request and get back to you soon.",
+          });
+          
+          // Navigate to receipt or confirmation page with the quote data
+          navigate("/custom-quote-confirmation", {
+            state: { 
+              customQuoteData: {
+                id: result.quoteId,
+                ...quoteData
+              }
+            }
+          });
+        } else {
+          throw new Error(result.error || "Failed to submit quote");
+        }
       }
     } catch (error: any) {
       console.error("Error submitting custom quote:", error);
@@ -172,7 +197,7 @@ const CustomQuoteForm = () => {
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(handleSubmitForm)} className="space-y-6">
             <FormField
               control={form.control}
               name="phone_number"
@@ -269,9 +294,16 @@ const CustomQuoteForm = () => {
               )}
             />
             
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Submitting..." : "Submit Request"}
-            </Button>
+            <div className="flex justify-between pt-2">
+              {onCancel && (
+                <Button type="button" variant="outline" onClick={onCancel}>
+                  Back
+                </Button>
+              )}
+              <Button type="submit" className={onCancel ? "" : "w-full"} disabled={loading}>
+                {loading ? "Submitting..." : "Submit Request"}
+              </Button>
+            </div>
           </form>
         </Form>
       </CardContent>
