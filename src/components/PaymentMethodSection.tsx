@@ -39,34 +39,48 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
                       isPayOnArrival ? (totalAmount + payOnArrivalPremium) : 
                       totalAmount;
   
-  const handleConfirm = async () => {
-    setIsProcessing(true);
-    try {
-      const paymentData = {
-        method: selectedPaymentMethod,
-        payLaterMethod: selectedPaymentMethod === 'standard' ? payLaterMethod : null,
-        finalAmount,
-        isSpecialDeal,
-        isPayOnArrival,
-        originalAmount: totalAmount,
-        discount: isSpecialDeal ? specialDealDiscount : 0,
-        premium: isPayOnArrival ? payOnArrivalPremium : 0
-      };
+  // In PaymentMethodSection.tsx
+const handleConfirm = async () => {
+  setIsProcessing(true);
+  try {
+    const paymentData = {
+      method: selectedPaymentMethod,
+      payLaterMethod: selectedPaymentMethod === 'standard' ? payLaterMethod : null,
+      finalAmount,
+      isSpecialDeal,
+      isPayOnArrival,
+      originalAmount: totalAmount,
+      discount: isSpecialDeal ? specialDealDiscount : 0,
+      premium: isPayOnArrival ? payOnArrivalPremium : 0
+    };
 
-      await onComplete(paymentData);
-      
-      navigate('/receipt');
-    } catch (error) {
-      console.error('Payment processing error:', error);
-      toast({
-        title: "Error",
-        description: "There was a problem processing your payment. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+    // Combine booking data with payment data
+    const completeData = {
+      ...bookingData,
+      paymentData
+    };
+
+    // Pass the complete data to parent
+    await onComplete(completeData);
+    
+    // Navigate to receipt with state
+    navigate('/receipt', { 
+      state: { 
+        bookingData: completeData,
+        shipment: {
+          tracking_number: bookingData.shipmentDetails.tracking_number,
+          origin: bookingData.senderDetails.address,
+          destination: bookingData.recipientDetails.address,
+          status: 'Processing'
+        }
+      } 
+    });
+  } catch (error) {
+    // Error handling
+  } finally {
+    setIsProcessing(false);
+  }
+};
 
   return (
     <Card className="p-6">
