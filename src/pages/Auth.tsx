@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import Logo from '@/components/Logo';
-import { Mail, Lock, User, AlertCircle } from 'lucide-react';
+import { Mail, Lock, User, AlertCircle, ArrowLeft} from 'lucide-react';
 import { generateCSRFToken, validateCSRFToken } from '@/utils/csrf';
 import { getClientIP, handleAuthError } from '@/utils/securityUtils';
 
