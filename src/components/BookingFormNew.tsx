@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -59,6 +60,9 @@ const bookingFormSchema = z.object({
   terms: z.boolean().refine(val => val === true, {
     message: 'You must agree to the terms and conditions',
   }),
+  
+  // Add shipmentType property to the schema
+  shipmentType: z.string().optional(),
 });
 
 type BookingFormValues = z.infer<typeof bookingFormSchema>;
@@ -133,6 +137,7 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       paymentOption: 'standard',
       paymentMethod: 'card',
       terms: false,
+      shipmentType: '',  // Initialize the shipmentType field
     },
     mode: 'onBlur',
   });
@@ -420,10 +425,11 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       const trackingNumber = `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
       const shipmentId = generateUniqueId('shp_');
 
-      // Pass the original form data as expected by the parent component
-      // We'll add the additional properties to the data object directly
-      data.additionalDeliveryAddresses = additionalAddresses;
+      // Set the shipmentType based on form selections before submitting
       data.shipmentType = data.includeDrums ? 'drum' : 'other';
+      
+      // Add additional addresses to the data
+      data.additionalDeliveryAddresses = additionalAddresses;
       
       // Call the parent handler with the data in the expected format
       onSubmitComplete(data, shipmentId, price);
