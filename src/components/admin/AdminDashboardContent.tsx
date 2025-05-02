@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -57,7 +58,6 @@ import ContentManagement from '@/components/admin/ContentManagement';
 import CollectionScheduleManagement from '@/components/admin/CollectionScheduleManagement';
 import SupportTickets from '@/components/admin/SupportTickets';
 import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
-import { ShipmentMetadata } from '@/types/shipment';
 
 const STATUS_OPTIONS = [
   'Booking Confirmed',
@@ -83,11 +83,7 @@ interface Shipment {
   created_at: string;
   updated_at: string;
   user_id: string;
-  metadata: ShipmentMetadata | null;
-  sender_name?: string;
-  sender_phone?: string;
-  recipient_name?: string;
-  recipient_phone?: string;
+  metadata: any | null;
 }
 
 const getStatusBadgeClass = (status: string) => {
@@ -139,6 +135,7 @@ const AdminDashboardContent = () => {
     quotes: 0,
   });
 
+  // Fix dependency array in useEffect to prevent unnecessary re-renders
   useEffect(() => {
     fetchShipments();
     fetchStats();
@@ -166,7 +163,7 @@ const AdminDashboardContent = () => {
     try {
       const { data, error } = await supabase
         .from('shipments')
-        .select('*, metadata')
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -175,49 +172,7 @@ const AdminDashboardContent = () => {
       }
 
       if (data) {
-        // Extract sender and recipient details from metadata, safely handling different data types
-        const enhancedData = data.map(shipment => {
-          // Default values
-          let senderName = 'N/A';
-          let senderPhone = 'N/A';
-          let recipientName = 'N/A';
-          let recipientPhone = 'N/A';
-          
-          // Check if metadata exists and has the right structure
-          if (shipment.metadata && typeof shipment.metadata === 'object') {
-            // Type guard to check if senderDetails exists and is an object
-            if (
-              'senderDetails' in shipment.metadata && 
-              shipment.metadata.senderDetails && 
-              typeof shipment.metadata.senderDetails === 'object'
-            ) {
-              const senderDetails = shipment.metadata.senderDetails as Record<string, any>;
-              senderName = senderDetails.name || 'N/A';
-              senderPhone = senderDetails.phone || 'N/A';
-            }
-            
-            // Type guard to check if recipientDetails exists and is an object
-            if (
-              'recipientDetails' in shipment.metadata && 
-              shipment.metadata.recipientDetails && 
-              typeof shipment.metadata.recipientDetails === 'object'
-            ) {
-              const recipientDetails = shipment.metadata.recipientDetails as Record<string, any>;
-              recipientName = recipientDetails.name || 'N/A';
-              recipientPhone = recipientDetails.phone || 'N/A';
-            }
-          }
-          
-          return {
-            ...shipment,
-            sender_name: senderName,
-            sender_phone: senderPhone,
-            recipient_name: recipientName,
-            recipient_phone: recipientPhone
-          };
-        });
-        
-        setShipments(enhancedData as Shipment[]);
+        setShipments(data as Shipment[]);
         const totalCount = data.length;
         const processingCount = data.filter(s => 
           s.status.toLowerCase().includes('processing')).length;
@@ -284,9 +239,7 @@ const AdminDashboardContent = () => {
       searchQuery === '' ||
       shipment.tracking_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
       shipment.origin.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      shipment.destination.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      shipment.sender_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      shipment.recipient_name.toLowerCase().includes(searchQuery.toLowerCase());
+      shipment.destination.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesStatus = 
       statusFilter === 'all' ||
@@ -485,8 +438,6 @@ const AdminDashboardContent = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[120px]">Tracking #</TableHead>
-                      <TableHead>Sender</TableHead>
-                      <TableHead>Recipient</TableHead>
                       <TableHead>Origin</TableHead>
                       <TableHead>Destination</TableHead>
                       <TableHead>Status</TableHead>
@@ -498,18 +449,6 @@ const AdminDashboardContent = () => {
                     {shipments.slice(0, 5).map((shipment) => (
                       <TableRow key={shipment.id}>
                         <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{shipment.sender_name}</span>
-                            <span className="text-xs text-gray-500">{shipment.sender_phone}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{shipment.recipient_name}</span>
-                            <span className="text-xs text-gray-500">{shipment.recipient_phone}</span>
-                          </div>
-                        </TableCell>
                         <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
                         <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
                         <TableCell>
@@ -615,8 +554,6 @@ const AdminDashboardContent = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-[120px]">Tracking #</TableHead>
-                        <TableHead>Sender</TableHead>
-                        <TableHead>Recipient</TableHead>
                         <TableHead>Origin</TableHead>
                         <TableHead>Destination</TableHead>
                         <TableHead>Status</TableHead>
@@ -629,18 +566,6 @@ const AdminDashboardContent = () => {
                       {filteredShipments.map((shipment) => (
                         <TableRow key={shipment.id}>
                           <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
-                          <TableCell>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{shipment.sender_name}</span>
-                              <span className="text-xs text-gray-500">{shipment.sender_phone}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{shipment.recipient_name}</span>
-                              <span className="text-xs text-gray-500">{shipment.recipient_phone}</span>
-                            </div>
-                          </TableCell>
                           <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
                           <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
                           <TableCell>
