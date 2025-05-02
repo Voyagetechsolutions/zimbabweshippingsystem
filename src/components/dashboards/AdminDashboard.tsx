@@ -356,7 +356,7 @@ const AdminDashboard = () => {
                 <SelectItem value="shipments">
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4" />
-                    <span>Shipments</span>
+                    <span>Shipments m</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="quotes">
