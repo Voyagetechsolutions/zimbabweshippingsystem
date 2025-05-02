@@ -414,74 +414,50 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     validateTab('payment');
   };
 
-  const onSubmit = async (data: BookingFormValues) => {
-    // Validate that at least one shipment type is selected
-    if (!data.includeDrums && !data.includeOtherItems) {
-      toast({
-        title: "Missing Information",
-        description: "Please select at least one shipment type (Drums or Other Items).",
-        variant: "destructive",
-      });
-      setCurrentTab('shipment');
-      return;
-    }
-    
-    // Check terms
-    if (!data.terms) {
-      toast({
-        title: "Terms and Conditions",
-        description: "You must agree to the terms and conditions to proceed.",
-        variant: "destructive",
-      });
-      setCurrentTab('payment');
-      return;
-    }
-    
-    setIsSubmitting(true);
-    
-    try {
-      const trackingNumber = `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
-      const shipmentId = generateUniqueId();
-      
-      data.additionalDeliveryAddresses = additionalAddresses;
-      
-      const { error } = await supabase.from('shipments').insert({
-        id: shipmentId,
+// In BookingFormNew.tsx
+const onSubmit = async (data: BookingFormValues) => {
+  setIsSubmitting(true);
+  
+  try {
+    const trackingNumber = `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+    const shipmentId = generateUniqueId('shp_');
+
+    // Structure all data to pass to Receipt
+    const completeData = {
+      formData: data,
+      shipmentDetails: {
         tracking_number: trackingNumber,
-        origin: `${data.pickupAddress}, ${data.pickupCountry === 'England' ? data.pickupPostcode : data.pickupCity}`,
-        destination: `${data.deliveryAddress}, ${data.deliveryCity}`,
-        status: 'pending',
-        metadata: {
-          ...data,
-          includeDrums: data.includeDrums,
-          includeOtherItems: data.includeOtherItems,
-          pickupCountry: data.pickupCountry,
-          doorToDoor: data.doorToDoor,
-          wantMetalSeal: data.wantMetalSeal,
-          additionalDeliveryAddresses: data.additionalDeliveryAddresses,
-          amountPaid: price,
-          basePrice: price,
-          sealCost: sealCost,
-          doorToDoorCost: doorToDoorCost
-        }
-      });
-      
-      if (error) {
-        console.error('Error creating shipment:', error);
-        throw error;
-      }
-      
-      onSubmitComplete(data, shipmentId, price);
-    } catch (error: any) {
-      console.error('Error submitting booking form:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to submit booking. Please try again.",
-        variant: "destructive",
-      });
-      setIsSubmitting(false);
-    }
-  };
+        type: data.includeDrums ? 'drum' : 'other',
+        quantity: data.drumQuantity ? parseInt(data.drumQuantity) : 0,
+        includeDrums: data.includeDrums,
+        includeOtherItems: data.includeOtherItems,
+        wantMetalSeal: data.wantMetalSeal,
+        doorToDoor: data.doorToDoor,
+        // Add other relevant shipment details
+      },
+      senderDetails: {
+        name: `${data.firstName} ${data.lastName}`,
+        email: data.email,
+        phone: data.phone,
+        address: `${data.pickupAddress}, ${data.pickupPostcode || data.pickupCity}, ${data.pickupCountry}`
+      },
+      recipientDetails: {
+        name: data.recipientName,
+        phone: data.recipientPhone,
+        additionalPhone: data.additionalRecipientPhone,
+        address: `${data.deliveryAddress}, ${data.deliveryCity}`
+      },
+      paymentData: null // Will be filled by PaymentMethodSection
+    };
+
+    // Call the parent handler with all data
+    onSubmitComplete(completeData, shipmentId, price);
+  } catch (error) {
+    // Error handling
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const validateTab = (tab: string): boolean => {
     const fields: Record<string, string[]> = {
