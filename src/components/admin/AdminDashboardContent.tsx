@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -84,6 +83,10 @@ interface Shipment {
   updated_at: string;
   user_id: string;
   metadata: any | null;
+  sender_name?: string;
+  sender_phone?: string;
+  recipient_name?: string;
+  recipient_phone?: string;
 }
 
 const getStatusBadgeClass = (status: string) => {
@@ -163,7 +166,7 @@ const AdminDashboardContent = () => {
     try {
       const { data, error } = await supabase
         .from('shipments')
-        .select('*')
+        .select('*, metadata')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -172,7 +175,18 @@ const AdminDashboardContent = () => {
       }
 
       if (data) {
-        setShipments(data as Shipment[]);
+        // Extract sender and recipient details from metadata
+        const enhancedData = data.map(shipment => {
+          return {
+            ...shipment,
+            sender_name: shipment.metadata?.senderDetails?.name || 'N/A',
+            sender_phone: shipment.metadata?.senderDetails?.phone || 'N/A',
+            recipient_name: shipment.metadata?.recipientDetails?.name || 'N/A',
+            recipient_phone: shipment.metadata?.recipientDetails?.phone || 'N/A'
+          };
+        });
+        
+        setShipments(enhancedData as Shipment[]);
         const totalCount = data.length;
         const processingCount = data.filter(s => 
           s.status.toLowerCase().includes('processing')).length;
@@ -438,6 +452,8 @@ const AdminDashboardContent = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[120px]">Tracking #</TableHead>
+                      <TableHead>Sender</TableHead>
+                      <TableHead>Recipient</TableHead>
                       <TableHead>Origin</TableHead>
                       <TableHead>Destination</TableHead>
                       <TableHead>Status</TableHead>
@@ -449,6 +465,18 @@ const AdminDashboardContent = () => {
                     {shipments.slice(0, 5).map((shipment) => (
                       <TableRow key={shipment.id}>
                         <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{shipment.sender_name}</span>
+                            <span className="text-xs text-gray-500">{shipment.sender_phone}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{shipment.recipient_name}</span>
+                            <span className="text-xs text-gray-500">{shipment.recipient_phone}</span>
+                          </div>
+                        </TableCell>
                         <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
                         <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
                         <TableCell>
@@ -554,6 +582,8 @@ const AdminDashboardContent = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-[120px]">Tracking #</TableHead>
+                        <TableHead>Sender</TableHead>
+                        <TableHead>Recipient</TableHead>
                         <TableHead>Origin</TableHead>
                         <TableHead>Destination</TableHead>
                         <TableHead>Status</TableHead>
@@ -566,6 +596,18 @@ const AdminDashboardContent = () => {
                       {filteredShipments.map((shipment) => (
                         <TableRow key={shipment.id}>
                           <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{shipment.sender_name}</span>
+                              <span className="text-xs text-gray-500">{shipment.sender_phone}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{shipment.recipient_name}</span>
+                              <span className="text-xs text-gray-500">{shipment.recipient_phone}</span>
+                            </div>
+                          </TableCell>
                           <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
                           <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
                           <TableCell>

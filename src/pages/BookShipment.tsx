@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -9,6 +8,7 @@ import PaymentProcessor from '@/components/PaymentProcessor';
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 enum BookingStep {
   FORM,
@@ -22,10 +22,21 @@ const BookShipment = () => {
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const navigate = useNavigate();
   const { toast } = useToast();
-
+  const { user, isAuthenticated } = useAuth();
+  
   useEffect(() => {
     document.title = 'Book a Shipment | UK Shipping Service';
-  }, []);
+    
+    // Check authentication
+    if (!isAuthenticated()) {
+      toast({
+        title: "Authentication Required",
+        description: "You must be logged in to book a shipment.",
+        variant: "destructive",
+      });
+      navigate('/auth');
+    }
+  }, [navigate, toast, isAuthenticated]);
 
   const handleFormSubmit = async (data: any, shipmentId: string, amount: number) => {
     console.log("Form submitted with data:", { data, shipmentId, amount });

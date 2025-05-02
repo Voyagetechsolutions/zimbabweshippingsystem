@@ -44,12 +44,48 @@ export const useAuth = () => {
       if (error) throw error;
 
       return { data };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error:', error);
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
+      });
+      return { error };
+    }
+  };
+
+  // Sign-up method for new users
+  const signUp = async (email: string, password: string, fullName: string): Promise<{
+    data?: any;
+    error?: any;
+  }> => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Account Created',
+        description: 'Your account has been created successfully.',
+        variant: 'default',
+      });
+
+      return { data };
+    } catch (error: any) {
+      console.error('Error:', error);
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
       });
       return { error };
     }
@@ -66,7 +102,7 @@ export const useAuth = () => {
         description: 'You have been logged out successfully.',
         variant: 'default',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error:', error);
       toast({
         title: 'Error',
@@ -76,11 +112,18 @@ export const useAuth = () => {
     }
   };
 
+  // Check if user is authenticated
+  const isAuthenticated = (): boolean => {
+    return !!session && !!user;
+  };
+
   return {
     session,
     user,
     loading,
     signIn,
-    signOut, // Exposing signOut function
+    signUp,
+    signOut,
+    isAuthenticated,
   };
 };
