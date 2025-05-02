@@ -60,9 +60,6 @@ const bookingFormSchema = z.object({
   terms: z.boolean().refine(val => val === true, {
     message: 'You must agree to the terms and conditions',
   }),
-  
-  // Add shipmentType property to the schema
-  shipmentType: z.string().optional(),
 });
 
 type BookingFormValues = z.infer<typeof bookingFormSchema>;
@@ -137,7 +134,6 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       paymentOption: 'standard',
       paymentMethod: 'card',
       terms: false,
-      shipmentType: '',  // Initialize the shipmentType field
     },
     mode: 'onBlur',
   });
@@ -386,8 +382,8 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       
       // Find which tab has errors and switch to it
       const errors = form.formState.errors;
-      const senderFields = ['firstName', 'lastName', 'email', 'phone', 'pickupCountry', 'pickupAddress'];
-      const recipientFields = ['recipientName', 'recipientPhone', 'deliveryAddress', 'deliveryCity'];
+      const senderFields = ['firstName', 'lastName', 'email', 'phone', 'pickupCountry', 'pickupAddress', 'pickupPostcode', 'pickupCity'];
+      const recipientFields = ['recipientName', 'recipientPhone', 'deliveryAddress', 'deliveryCity', 'additionalRecipientPhone'];
       const shipmentFields = ['includeDrums', 'includeOtherItems', 'drumQuantity', 'itemCategory', 'specificItem', 'otherItemDescription'];
       const paymentFields = ['paymentOption', 'paymentMethod', 'terms'];
       
@@ -419,28 +415,70 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
   };
 
   const onSubmit = async (data: BookingFormValues) => {
+    // Validate that at least one shipment type is selected
+    if (!data.includeDrums && !data.includeOtherItems) {
+      toast({
+        title: "Missing Information",
+        description: "Please select at least one shipment type (Drums or Other Items).",
+        variant: "destructive",
+      });
+      setCurrentTab('shipment');
+      return;
+    }
+    
+    // Check terms
+    if (!data.terms) {
+      toast({
+        title: "Terms and Conditions",
+        description: "You must agree to the terms and conditions to proceed.",
+        variant: "destructive",
+      });
+      setCurrentTab('payment');
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
       const trackingNumber = `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
-      const shipmentId = generateUniqueId('shp_');
-
-      // Set the shipmentType based on form selections before submitting
-      data.shipmentType = data.includeDrums ? 'drum' : 'other';
+      const shipmentId = generateUniqueId();
       
-      // Add additional addresses to the data
       data.additionalDeliveryAddresses = additionalAddresses;
       
-      // Call the parent handler with the data in the expected format
-      onSubmitComplete(data, shipmentId, price);
-    } catch (error) {
-      console.error('Error processing form submission:', error);
-      toast({
-        title: 'Error',
-        description: 'An error occurred while processing your booking. Please try again.',
-        variant: 'destructive',
+      const { error } = await supabase.from('shipments').insert({
+        id: shipmentId,
+        tracking_number: trackingNumber,
+        origin: `${data.pickupAddress}, ${data.pickupCountry === 'England' ? data.pickupPostcode : data.pickupCity}`,
+        destination: `${data.deliveryAddress}, ${data.deliveryCity}`,
+        status: 'pending',
+        metadata: {
+          ...data,
+          includeDrums: data.includeDrums,
+          includeOtherItems: data.includeOtherItems,
+          pickupCountry: data.pickupCountry,
+          doorToDoor: data.doorToDoor,
+          wantMetalSeal: data.wantMetalSeal,
+          additionalDeliveryAddresses: data.additionalDeliveryAddresses,
+          amountPaid: price,
+          basePrice: price,
+          sealCost: sealCost,
+          doorToDoorCost: doorToDoorCost
+        }
       });
-    } finally {
+      
+      if (error) {
+        console.error('Error creating shipment:', error);
+        throw error;
+      }
+      
+      onSubmitComplete(data, shipmentId, price);
+    } catch (error: any) {
+      console.error('Error submitting booking form:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit booking. Please try again.",
+        variant: "destructive",
+      });
       setIsSubmitting(false);
     }
   };

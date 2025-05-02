@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -36,21 +37,20 @@ interface ReceiptProps {
 const ReceiptNew: React.FC<ReceiptProps> = ({ 
   receipt: propReceipt, 
   shipment: propShipment,
-  customQuote: propCustomQuote
+  customQuote: propCustomQuote,
+  bookingData: propBookingData,
+  paymentData: propPaymentData
 }) => {
   const { toast } = useToast();
   const receiptRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
   const location = useLocation();
-  const stateData = location.state || {};
   const navigate = useNavigate();
   
-  console.log("ReceiptNew received location state:", location.state);
-  
-  // Extract all data from location state
-  const bookingData = stateData.bookingData || {};
-  const paymentData = bookingData.paymentData || stateData.paymentData || {};
-  const formData = bookingData.formData || {};
+  // Ensure we properly extract data from props or location state
+  const stateData = location.state || {};
+  const bookingData = propBookingData || stateData.bookingData || {};
+  const paymentData = propPaymentData || stateData.paymentData || {};
   const customQuoteData = propCustomQuote || stateData.customQuoteData || {};
   
   console.log("ReceiptNew component data:", {
@@ -60,7 +60,7 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
     customQuoteData
   });
   
-  // Create complete receipt data
+  // Create default receipt data if not provided
   const receipt = propReceipt || {
     receipt_number: `ZIM-${Date.now().toString().substring(8)}`,
     created_at: new Date().toISOString(),
@@ -70,14 +70,14 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
     sender_details: bookingData.senderDetails || {},
     recipient_details: bookingData.recipientDetails || {},
     shipment_details: bookingData.shipmentDetails || {},
-    status: paymentData.method ? 'Paid' : 'Pending Payment'
+    status: 'Pending Payment'
   };
-
+  
   const shipment = propShipment || {
     tracking_number: bookingData.shipmentDetails?.tracking_number || 'Pending',
     origin: bookingData.senderDetails?.address || 'Not specified',
     destination: bookingData.recipientDetails?.address || 'Not specified',
-    status: paymentData.method ? 'Processing' : 'Pending Payment'
+    status: 'Pending Payment'
   };
 
   const generateUniqueId = (prefix: string = '') => {
@@ -358,7 +358,7 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
   const senderDetails = receipt.sender_details || {};
   const recipientDetails = receipt.recipient_details || {};
   const shipmentDetails = receipt.shipment_details || {};
-  
+
   return (
     <div className="container mx-auto px-2 sm:px-4 max-w-4xl py-6">
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between">

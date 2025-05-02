@@ -72,16 +72,16 @@ const BookShipment = () => {
         shipment_id: shipmentId,
         user_id: user?.id || null,
         senderDetails: {
-            name: `${data.firstName} ${data.lastName}`,
-            email: data.email,
-            phone: data.phone,
-            address: `${data.pickupAddress}, ${data.pickupCountry === 'England' ? data.pickupPostcode : data.pickupCity}`,
+          name: `${data.firstName} ${data.lastName}`,
+          email: data.email,
+          phone: data.phone,
+          address: `${data.pickupAddress}, ${data.pickupCountry === 'England' ? data.pickupPostcode : data.pickupCity}`,
         },
         recipientDetails: {
-            name: data.recipientName,
-            phone: data.recipientPhone,
-            additionalPhone: data.additionalRecipientPhone,
-            address: `${data.deliveryAddress}, ${data.deliveryCity}`,
+          name: data.recipientName,
+          phone: data.recipientPhone,
+          additionalPhone: data.additionalRecipientPhone,
+          address: `${data.deliveryAddress}, ${data.deliveryCity}`,
         },
         shipmentDetails: {
           includeDrums: data.includeDrums,
@@ -284,7 +284,7 @@ const BookShipment = () => {
             />
           ) : (
             <CustomQuoteForm 
-              bookingData={bookingData}
+              initialData={bookingData}
               onSubmit={handleCustomQuoteSubmit}
               onCancel={handleBackToForm}
             />
