@@ -284,7 +284,7 @@ const BookShipment = () => {
             />
           ) : (
             <CustomQuoteForm 
-              initialData={bookingData}
+              bookingData={bookingData}
               onSubmit={handleCustomQuoteSubmit}
               onCancel={handleBackToForm}
             />

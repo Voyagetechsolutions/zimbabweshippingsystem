@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -36,7 +35,8 @@ interface ReceiptProps {
 
 const ReceiptNew: React.FC<ReceiptProps> = ({ 
   receipt: propReceipt, 
-  shipment: propShipment
+  shipment: propShipment,
+  customQuote: propCustomQuote
 }) => {
   const { toast } = useToast();
   const receiptRef = useRef<HTMLDivElement>(null);
@@ -48,7 +48,7 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
   // Ensure we properly extract data from props or location state
   // Extract all data from location state
   const bookingData = stateData.bookingData || {};
-  const paymentData = bookingData.paymentData || {};
+  const paymentData = bookingData.paymentData || stateData.paymentData || {};
   const formData = bookingData.formData || {};
   const customQuoteData = propCustomQuote || stateData.customQuoteData || {};
   
@@ -59,8 +59,7 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
     customQuoteData
   });
   
-  // Create default receipt data if not provided
-    // Create complete receipt data
+  // Create complete receipt data
   const receipt = propReceipt || {
     receipt_number: `ZIM-${Date.now().toString().substring(8)}`,
     created_at: new Date().toISOString(),
@@ -358,7 +357,7 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
   const senderDetails = receipt.sender_details || {};
   const recipientDetails = receipt.recipient_details || {};
   const shipmentDetails = receipt.shipment_details || {};
-
+  
   return (
     <div className="container mx-auto px-2 sm:px-4 max-w-4xl py-6">
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between">
