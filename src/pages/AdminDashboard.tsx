@@ -7,7 +7,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/contexts/RoleContext';
 import { SetupAdmin } from '@/components/SetupAdmin';
 import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
-import UserManagement from '@/components/admin/UserManagement';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -24,9 +23,6 @@ const AdminDashboard = () => {
               <AdminDashboardContent />
               <div className="mt-8">
                 <CustomQuoteManagement />
-              </div>
-              <div className="mt-8">
-                <UserManagement />
               </div>
             </>
           ) : (
