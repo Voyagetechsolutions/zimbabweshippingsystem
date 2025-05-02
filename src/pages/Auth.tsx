@@ -186,11 +186,12 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50">
-      <div className="w-full max-w-md space-y-6">
-        <Link to="/" className="flex items-center text-gray-600 hover:text-gray-900 mb-4 sm:mb-0">
+      <Link to="/" className="flex items-center text-gray-600 hover:text-gray-900 mb-4 sm:mb-0">
           <ArrowLeft className="h-4 w-4 mr-1" />
           <span>Back to Home</span>
         </Link>
+      <div className="w-full max-w-md space-y-6">
+        
         <div className="text-center">
           <Logo className="mx-auto h-12 w-auto" />
           <h1 className="mt-6 text-3xl font-bold">Welcome to Zimbabwe Shipping</h1>
