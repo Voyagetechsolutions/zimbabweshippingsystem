@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
@@ -54,7 +55,6 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
 
       await onComplete(paymentData);
       
-      // Always navigate to receipt, we'll handle the custom quote flow in BookShipment.tsx
       navigate('/receipt');
     } catch (error) {
       console.error('Payment processing error:', error);

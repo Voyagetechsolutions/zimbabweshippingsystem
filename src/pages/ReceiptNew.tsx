@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,8 +12,23 @@ import html2pdf from 'html2pdf.js';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 
 interface ReceiptProps {
-  receipt?: any;
-  shipment?: any;
+  receipt?: {
+    receipt_number: string;
+    created_at: string;
+    amount: number;
+    currency: string;
+    payment_method: string;
+    sender_details: any;
+    recipient_details: any;
+    shipment_details: any;
+    status: string;
+  };
+  shipment?: {
+    tracking_number: string;
+    origin: string;
+    destination: string;
+    status: string;
+  };
   customQuote?: any;
   bookingData?: any;
   paymentData?: any;
@@ -34,7 +50,7 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
   // Ensure we properly extract data from props or location state
   const stateData = location.state || {};
   const bookingData = propBookingData || stateData.bookingData || {};
-  const paymentData = propPaymentData || stateData.paymentData || bookingData.paymentData || {};
+  const paymentData = propPaymentData || stateData.paymentData || {};
   const customQuoteData = propCustomQuote || stateData.customQuoteData || {};
   
   console.log("ReceiptNew component data:", {
@@ -54,14 +70,14 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
     sender_details: bookingData.senderDetails || {},
     recipient_details: bookingData.recipientDetails || {},
     shipment_details: bookingData.shipmentDetails || {},
-    status: paymentData.method ? 'Paid' : 'Pending Payment'
+    status: 'Pending Payment'
   };
   
   const shipment = propShipment || {
     tracking_number: bookingData.shipmentDetails?.tracking_number || 'Pending',
     origin: bookingData.senderDetails?.address || 'Not specified',
     destination: bookingData.recipientDetails?.address || 'Not specified',
-    status: paymentData.method ? 'Processing' : 'Pending Payment'
+    status: 'Pending Payment'
   };
 
   const generateUniqueId = (prefix: string = '') => {
@@ -95,7 +111,7 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
             sender_details: bookingData.senderDetails,
             recipient_details: bookingData.recipientDetails,
             shipment_details: bookingData.shipmentDetails,
-            status: paymentData.method ? 'Paid' : 'Pending Payment'
+            status: 'Pending Payment'
           });
 
           await supabase.from('notifications').insert({
