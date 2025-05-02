@@ -1,18 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Table, 
   TableBody, 
@@ -21,179 +9,45 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useIsMobile } from '@/hooks/use-mobile';
-import {
-  Package, 
-  Truck, 
-  Search, 
-  RefreshCcw, 
-  Filter, 
-  Eye, 
-  Edit, 
-  User,
-  Settings, 
-  Activity, 
-  Calendar,
-  FileText, 
-  BarChart3, 
-  ImageIcon, 
-  MessageSquare, 
-  FileSpreadsheet,
-  Menu
-} from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import UserManagement from '@/components/admin/UserManagement';
-import AnalyticsReports from '@/components/admin/AnalyticsReports';
-import SettingsManagement from '@/components/admin/SettingsManagement';
-import ContentManagement from '@/components/admin/ContentManagement';
-import CollectionScheduleManagement from '@/components/admin/CollectionScheduleManagement';
-import SupportTickets from '@/components/admin/SupportTickets';
-import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
-
-const STATUS_OPTIONS = [
-  'Booking Confirmed',
-  'Ready for Pickup',
-  'Processing in Warehouse (UK)',
-  'Customs Clearance',
-  'Processing in Warehouse (ZW)',
-  'Out for Delivery',
-  'Delivered',
-  'Cancelled',
-];
-
-interface Shipment {
-  id: string;
-  tracking_number: string;
-  origin: string;
-  destination: string;
-  status: string;
-  carrier: string | null;
-  weight: number | null;
-  dimensions: string | null;
-  estimated_delivery: string | null;
-  created_at: string;
-  updated_at: string;
-  user_id: string;
-  metadata: any | null;
-}
-
-const getStatusBadgeClass = (status: string) => {
-  const statusLower = status.toLowerCase();
-  
-  switch (true) {
-    case statusLower.includes('booking confirmed'):
-      return 'bg-blue-100 text-blue-800 border-blue-300';
-    case statusLower.includes('ready for pickup'):
-      return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-    case statusLower.includes('processing'):
-      return 'bg-orange-100 text-orange-800 border-orange-300';
-    case statusLower.includes('customs'):
-      return 'bg-purple-100 text-purple-800 border-purple-300';
-    case statusLower.includes('transit'):
-      return 'bg-blue-100 text-blue-800 border-blue-300';
-    case statusLower.includes('out for delivery'):
-      return 'bg-indigo-100 text-indigo-800 border-indigo-300';
-    case statusLower.includes('delivered'):
-      return 'bg-green-100 text-green-800 border-green-300';
-    case statusLower.includes('cancelled'):
-      return 'bg-red-100 text-red-800 border-red-300';
-    case statusLower.includes('delayed'):
-      return 'bg-red-100 text-red-800 border-red-300';
-    default:
-      return 'bg-gray-100 text-gray-500';
-  }
-};
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { 
+  Package, 
+  TruckDelivery, 
+  Calendar, 
+  Users, 
+  Search, 
+  CircleDollarSign, 
+  RefreshCcw 
+} from 'lucide-react';
+import { ShipmentMetadata } from '@/types/shipment';
+import UserManagement from './UserManagement';
 
 const AdminDashboardContent = () => {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const isMobile = useIsMobile();
-  const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
-  const [newStatus, setNewStatus] = useState<string>('');
   const [activeTab, setActiveTab] = useState('overview');
-  const [showFullMenu, setShowFullMenu] = useState(false);
-  
-  const [stats, setStats] = useState({
-    total: 0,
-    processing: 0,
-    inTransit: 0,
-    delivered: 0,
-    quotes: 0,
-  });
-
-  // Fix dependency array in useEffect to prevent unnecessary re-renders
-  useEffect(() => {
-    fetchShipments();
-    fetchStats();
-  }, []);
-
-  const fetchStats = async () => {
-    try {
-      const { data: quotesData, error: quotesError } = await supabase
-        .from('custom_quotes')
-        .select('id', { count: 'exact' });
-      
-      if (quotesError) throw quotesError;
-      
-      setStats(prev => ({
-        ...prev,
-        quotes: quotesData ? quotesData.length : 0
-      }));
-    } catch (error) {
-      console.error("Error fetching stats:", error);
-    }
-  };
+  const [shipments, setShipments] = useState<any[]>([]);
+  const [quotes, setQuotes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const { toast } = useToast();
 
   const fetchShipments = async () => {
-    setLoading(true);
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('shipments')
-        .select('*')
+        .select('*, profiles(*)')
         .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error("Error fetching shipments:", error);
-        throw error;
-      }
-
-      if (data) {
-        setShipments(data as Shipment[]);
-        const totalCount = data.length;
-        const processingCount = data.filter(s => 
-          s.status.toLowerCase().includes('processing')).length;
-        const inTransitCount = data.filter(s => 
-          s.status.toLowerCase().includes('transit')).length;
-        const deliveredCount = data.filter(s => 
-          s.status.toLowerCase().includes('delivered')).length;
-        
-        setStats(prev => ({
-          ...prev,
-          total: totalCount,
-          processing: processingCount,
-          inTransit: inTransitCount,
-          delivered: deliveredCount,
-        }));
-      }
+      
+      if (error) throw error;
+      setShipments(data || []);
     } catch (error: any) {
-      console.error("Error in fetchShipments:", error);
+      console.error('Error fetching shipments:', error);
       toast({
-        title: 'Error fetching shipments',
-        description: error.message,
+        title: 'Error Fetching Shipments',
+        description: error.message || 'Failed to load shipments',
         variant: 'destructive',
       });
     } finally {
@@ -201,518 +55,420 @@ const AdminDashboardContent = () => {
     }
   };
 
-  const updateShipmentStatus = async () => {
-    if (!editingShipment || !newStatus) return;
-    
+  const fetchQuotes = async () => {
     try {
-      const { error } = await supabase
-        .from('shipments')
-        .update({
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', editingShipment.id);
-
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('custom_quotes')
+        .select('*, profiles(*)')
+        .order('created_at', { ascending: false });
+      
       if (error) throw error;
-
-      toast({
-        title: 'Status Updated',
-        description: `Shipment ${editingShipment.tracking_number} status updated to ${newStatus}`,
-      });
-
-      fetchShipments();
-      
-      setEditingShipment(null);
-      setNewStatus('');
-      
+      setQuotes(data || []);
     } catch (error: any) {
+      console.error('Error fetching custom quotes:', error);
       toast({
-        title: 'Error updating status',
-        description: error.message,
+        title: 'Error Fetching Quotes',
+        description: error.message || 'Failed to load custom quotes',
         variant: 'destructive',
       });
+    } finally {
+      setLoading(false);
     }
   };
 
+  useEffect(() => {
+    if (activeTab === 'overview' || activeTab === 'shipments') {
+      fetchShipments();
+    }
+    if (activeTab === 'overview' || activeTab === 'quotes') {
+      fetchQuotes();
+    }
+  }, [activeTab]);
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-UK', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
+  const getStatusClass = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'delivered':
+        return 'bg-green-100 text-green-800';
+      case 'in transit':
+        return 'bg-blue-100 text-blue-800';
+      case 'pending':
+      case 'pending payment':
+        return 'bg-amber-100 text-amber-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getQuoteStatusClass = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'approved':
+        return 'bg-green-100 text-green-800';
+      case 'rejected':
+        return 'bg-red-100 text-red-800';
+      case 'pending':
+      default:
+        return 'bg-amber-100 text-amber-800';
+    }
+  };
+
+  const recentShipments = shipments.slice(0, 5);
+  const recentQuotes = quotes.slice(0, 5);
+
+  const getSenderDetails = (shipment: any) => {
+    if (!shipment.metadata) return { name: 'N/A', phone: 'N/A' };
+    
+    try {
+      // Handle the case when metadata is a string (JSON)
+      const metadata = typeof shipment.metadata === 'string' 
+        ? JSON.parse(shipment.metadata) 
+        : shipment.metadata;
+      
+      if (metadata.senderDetails) {
+        return {
+          name: metadata.senderDetails.name || 'N/A',
+          phone: metadata.senderDetails.phone || 'N/A'
+        };
+      }
+    } catch (error) {
+      console.error('Error parsing metadata:', error);
+    }
+    
+    return { name: 'N/A', phone: 'N/A' };
+  };
+
+  const getRecipientDetails = (shipment: any) => {
+    if (!shipment.metadata) return { name: 'N/A', phone: 'N/A' };
+    
+    try {
+      // Handle the case when metadata is a string (JSON)
+      const metadata = typeof shipment.metadata === 'string' 
+        ? JSON.parse(shipment.metadata) 
+        : shipment.metadata;
+      
+      if (metadata.recipientDetails) {
+        return {
+          name: metadata.recipientDetails.name || 'N/A',
+          phone: metadata.recipientDetails.phone || 'N/A'
+        };
+      }
+    } catch (error) {
+      console.error('Error parsing metadata:', error);
+    }
+    
+    return { name: 'N/A', phone: 'N/A' };
+  };
+
   const filteredShipments = shipments.filter(shipment => {
-    const matchesSearch = 
-      searchQuery === '' ||
-      shipment.tracking_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      shipment.origin.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      shipment.destination.toLowerCase().includes(searchQuery.toLowerCase());
+    const senderDetails = getSenderDetails(shipment);
+    const recipientDetails = getRecipientDetails(shipment);
+    const searchLower = searchTerm.toLowerCase();
     
-    const matchesStatus = 
-      statusFilter === 'all' ||
-      shipment.status.toLowerCase() === statusFilter.toLowerCase();
-    
-    return matchesSearch && matchesStatus;
+    return (
+      shipment.tracking_number?.toLowerCase().includes(searchLower) ||
+      shipment.origin?.toLowerCase().includes(searchLower) ||
+      shipment.destination?.toLowerCase().includes(searchLower) ||
+      shipment.status?.toLowerCase().includes(searchLower) ||
+      senderDetails.name.toLowerCase().includes(searchLower) ||
+      senderDetails.phone.toLowerCase().includes(searchLower) ||
+      recipientDetails.name.toLowerCase().includes(searchLower) ||
+      recipientDetails.phone.toLowerCase().includes(searchLower) ||
+      shipment.profiles?.full_name?.toLowerCase().includes(searchLower) ||
+      shipment.profiles?.email?.toLowerCase().includes(searchLower)
+    );
   });
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-        {isMobile && (
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setShowFullMenu(!showFullMenu)}
-          >
-            <Menu className="h-4 w-4" />
-          </Button>
-        )}
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-zim-green" />
+              <CardTitle className="text-base">Total Shipments</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{shipments.length}</div>
+            <p className="text-xs text-gray-500">This month</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <CircleDollarSign className="h-5 w-5 text-zim-green" />
+              <CardTitle className="text-base">Custom Quotes</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{quotes.length}</div>
+            <p className="text-xs text-gray-500">Pending review</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-zim-green" />
+              <CardTitle className="text-base">Today's Shipments</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {shipments.filter(s => new Date(s.created_at).toDateString() === new Date().toDateString()).length}
+            </div>
+            <p className="text-xs text-gray-500">New today</p>
+          </CardContent>
+        </Card>
       </div>
-      
-      <Tabs 
-        defaultValue="overview" 
-        value={activeTab} 
-        onValueChange={setActiveTab}
-        className="mb-8"
-      >
-        {isMobile && !showFullMenu ? (
-          <TabsList className="grid grid-cols-2 gap-2 mb-4">
-            <TabsTrigger value="overview" className="flex items-center justify-center gap-2 p-3">
-              <Activity className="h-5 w-5" />
-              <span>Overview</span>
-            </TabsTrigger>
-            <Select value={activeTab} onValueChange={setActiveTab}>
-              <SelectTrigger className="h-full">
-                <div className="flex items-center">
-                  <span>More</span>
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="shipments">
-                  <div className="flex items-center gap-2">
-                    <Package className="h-4 w-4" />
-                    <span>Shipments</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="quotes">
-                  <div className="flex items-center gap-2">
-                    <FileSpreadsheet className="h-4 w-4" />
-                    <span>Custom Quotes</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="users">
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    <span>Users</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="analytics">
-                  <div className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4" />
-                    <span>Analytics</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="schedule">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    <span>Schedule</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="settings">
-                  <div className="flex items-center gap-2">
-                    <Settings className="h-4 w-4" />
-                    <span>Settings</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="more">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    <span>More</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </TabsList>
-        ) : (
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-8 gap-2 mb-4">
-            <TabsTrigger value="overview" className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>Overview</span>
-            </TabsTrigger>
-            <TabsTrigger value="shipments" className="flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>Shipments</span>
-            </TabsTrigger>
-            <TabsTrigger value="quotes" className="flex items-center gap-2">
-              <FileSpreadsheet className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>Custom Quotes</span>
-            </TabsTrigger>
-            <TabsTrigger value="users" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>Users</span>
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>Analytics</span>
-            </TabsTrigger>
-            <TabsTrigger value="schedule" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>Schedule</span>
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>Settings</span>
-            </TabsTrigger>
-            <TabsTrigger value="more" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>More</span>
-            </TabsTrigger>
-          </TabsList>
-        )}
-        
-        <TabsContent value="overview">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Total Shipments</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <Package className="h-8 w-8 text-zim-green mr-3" />
-                  <div className="text-2xl font-bold">{stats.total}</div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Processing</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <Package className="h-8 w-8 text-yellow-500 mr-3" />
-                  <div className="text-2xl font-bold">{stats.processing}</div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">In Transit</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <Truck className="h-8 w-8 text-blue-500 mr-3" />
-                  <div className="text-2xl font-bold">{stats.inTransit}</div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Delivered</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <Package className="h-8 w-8 text-green-500 mr-3" />
-                  <div className="text-2xl font-bold">{stats.delivered}</div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Custom Quotes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <FileSpreadsheet className="h-8 w-8 text-purple-500 mr-3" />
-                  <div className="text-2xl font-bold">{stats.quotes}</div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          
+
+      <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid grid-cols-4 mb-4">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="shipments">Shipments</TabsTrigger>
+          <TabsTrigger value="quotes">Custom Quotes</TabsTrigger>
+          <TabsTrigger value="users">Users</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-xl">Recent Shipments</CardTitle>
-              <CardDescription>Quick overview of the latest shipments</CardDescription>
+              <CardTitle>Recent Shipments</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[120px]">Tracking #</TableHead>
-                      <TableHead>Origin</TableHead>
-                      <TableHead>Destination</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead className="text-right">View</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {shipments.slice(0, 5).map((shipment) => (
-                      <TableRow key={shipment.id}>
-                        <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
-                        <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
-                        <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
-                        <TableCell>
-                          <Badge className={getStatusBadgeClass(shipment.status)}>
-                            {shipment.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {format(new Date(shipment.created_at), 'MMM d, yyyy')}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => navigate(`/shipment/${shipment.id}`)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
+              {loading ? (
+                <div className="flex justify-center items-center h-40">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-800" />
+                </div>
+              ) : recentShipments.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tracking #</TableHead>
+                        <TableHead>Sender</TableHead>
+                        <TableHead>Recipient</TableHead>
+                        <TableHead>Origin</TableHead>
+                        <TableHead>Destination</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Date</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-            <CardContent className="flex justify-between border-t pt-4">
-              <Button variant="outline" onClick={() => setActiveTab('shipments')}>
-                View All Shipments
-              </Button>
-              <Button variant="outline" onClick={() => setActiveTab('quotes')}>
-                View Custom Quotes
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="shipments">
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle className="text-xl">Shipments Management</CardTitle>
-              <CardDescription>View and manage all shipments</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="relative flex-grow">
-                  <Input
-                    placeholder="Search by tracking #, origin, or destination"
-                    className="pl-10"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                  <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                    </TableHeader>
+                    <TableBody>
+                      {recentShipments.map((shipment) => {
+                        const senderDetails = getSenderDetails(shipment);
+                        const recipientDetails = getRecipientDetails(shipment);
+                        
+                        return (
+                          <TableRow key={shipment.id}>
+                            <TableCell className="font-medium">{shipment.tracking_number}</TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                <div>{senderDetails.name}</div>
+                                <div className="text-gray-500 text-xs">{senderDetails.phone}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                <div>{recipientDetails.name}</div>
+                                <div className="text-gray-500 text-xs">{recipientDetails.phone}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>{shipment.origin}</TableCell>
+                            <TableCell>{shipment.destination}</TableCell>
+                            <TableCell>
+                              <span className={`px-2 py-1 rounded-full text-xs ${getStatusClass(shipment.status)}`}>
+                                {shipment.status}
+                              </span>
+                            </TableCell>
+                            <TableCell>{formatDate(shipment.created_at)}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
                 </div>
-                <div className="flex gap-4">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[180px]">
-                      <div className="flex items-center">
-                        <Filter className="h-4 w-4 mr-2" />
-                        <SelectValue placeholder="Filter by status" />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      {STATUS_OPTIONS.map((status) => (
-                        <SelectItem key={status.toLowerCase()} value={status.toLowerCase()}>
-                          {status}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button 
-                    variant="outline"
-                    onClick={fetchShipments}
-                    className="h-10 px-4"
-                  >
-                    <RefreshCcw className="h-4 w-4 mr-2" />
-                    Refresh
-                  </Button>
+              ) : (
+                <div className="text-center py-8 text-gray-500">No shipments found</div>
+              )}
+              {recentShipments.length > 0 && (
+                <div className="mt-4 text-center">
+                  <Button variant="outline" onClick={() => setActiveTab('shipments')}>View All Shipments</Button>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-0">
+            <CardHeader>
+              <CardTitle>Recent Custom Quotes</CardTitle>
+            </CardHeader>
+            <CardContent>
               {loading ? (
-                <div className="flex justify-center items-center p-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
+                <div className="flex justify-center items-center h-40">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-800" />
                 </div>
-              ) : filteredShipments.length === 0 ? (
-                <div className="text-center p-12">
-                  <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No shipments found</h3>
-                  <p className="text-gray-500">
-                    {searchQuery || statusFilter !== 'all' 
-                      ? "Try adjusting your filters" 
-                      : "There are no shipments in the system yet"}
-                  </p>
+              ) : recentQuotes.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Date</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recentQuotes.map((quote) => (
+                        <TableRow key={quote.id}>
+                          <TableCell>
+                            <div>
+                              {quote.sender_details?.name || quote.profiles?.full_name || 'N/A'}
+                              <div className="text-xs text-gray-500">
+                                {quote.phone_number || quote.sender_details?.phone || 'No phone number'}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>{quote.category || 'N/A'}</TableCell>
+                          <TableCell className="max-w-xs truncate">
+                            {quote.description || 'No description'}
+                          </TableCell>
+                          <TableCell>
+                            <span className={`px-2 py-1 rounded-full text-xs ${getQuoteStatusClass(quote.status)}`}>
+                              {quote.status || 'Pending'}
+                            </span>
+                          </TableCell>
+                          <TableCell>{formatDate(quote.created_at)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">No custom quotes found</div>
+              )}
+              {recentQuotes.length > 0 && (
+                <div className="mt-4 text-center">
+                  <Button variant="outline" onClick={() => setActiveTab('quotes')}>View All Quotes</Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="shipments">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Shipments Management</CardTitle>
+              <Button variant="outline" size="sm" onClick={fetchShipments}>
+                <RefreshCcw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4 relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                <Input
+                  placeholder="Search shipments by tracking number, status, or customer..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+
+              {loading ? (
+                <div className="flex justify-center items-center h-40">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-800" />
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[120px]">Tracking #</TableHead>
+                        <TableHead>Tracking #</TableHead>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Sender</TableHead>
+                        <TableHead>Recipient</TableHead>
                         <TableHead>Origin</TableHead>
                         <TableHead>Destination</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead>Est. Delivery</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead>Date</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredShipments.map((shipment) => (
-                        <TableRow key={shipment.id}>
-                          <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
-                          <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
-                          <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
-                          <TableCell>
-                            <Badge className={getStatusBadgeClass(shipment.status)}>
-                              {shipment.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {format(new Date(shipment.created_at), 'MMM d, yyyy')}
-                          </TableCell>
-                          <TableCell>
-                            {shipment.estimated_delivery 
-                              ? format(new Date(shipment.estimated_delivery), 'MMM d, yyyy')
-                              : "Not specified"}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end space-x-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => navigate(`/shipment/${shipment.id}`)}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setEditingShipment(shipment);
-                                  setNewStatus(shipment.status);
-                                }}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </div>
+                      {filteredShipments.length > 0 ? (
+                        filteredShipments.map((shipment) => {
+                          const senderDetails = getSenderDetails(shipment);
+                          const recipientDetails = getRecipientDetails(shipment);
+                          
+                          return (
+                            <TableRow key={shipment.id}>
+                              <TableCell className="font-medium">{shipment.tracking_number}</TableCell>
+                              <TableCell>
+                                {shipment.profiles?.full_name || 'No customer'}
+                                <div className="text-xs text-gray-500">
+                                  {shipment.profiles?.email || 'No email'}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="text-sm">
+                                  <div>{senderDetails.name}</div>
+                                  <div className="text-gray-500 text-xs">{senderDetails.phone}</div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="text-sm">
+                                  <div>{recipientDetails.name}</div>
+                                  <div className="text-gray-500 text-xs">{recipientDetails.phone}</div>
+                                </div>
+                              </TableCell>
+                              <TableCell>{shipment.origin}</TableCell>
+                              <TableCell>{shipment.destination}</TableCell>
+                              <TableCell>
+                                <span className={`px-2 py-1 rounded-full text-xs ${getStatusClass(shipment.status)}`}>
+                                  {shipment.status}
+                                </span>
+                              </TableCell>
+                              <TableCell>{formatDate(shipment.created_at)}</TableCell>
+                            </TableRow>
+                          );
+                        })
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                            {searchTerm ? "No shipments match your search criteria" : "No shipments found"}
                           </TableCell>
                         </TableRow>
-                      ))}
+                      )}
                     </TableBody>
                   </Table>
                 </div>
               )}
             </CardContent>
-            <CardContent className="flex justify-between py-4">
-              <p className="text-sm text-gray-500">
-                Showing {filteredShipments.length} out of {shipments.length} shipments
-              </p>
-            </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="quotes">
-          <CustomQuoteManagement />
+          {/* CustomQuoteManagement component will be rendered here */}
         </TabsContent>
-        
+
         <TabsContent value="users">
           <UserManagement />
         </TabsContent>
-
-        <TabsContent value="analytics">
-          <AnalyticsReports />
-        </TabsContent>
-
-        <TabsContent value="settings">
-          <SettingsManagement />
-        </TabsContent>
-
-        <TabsContent value="schedule">
-          <CollectionScheduleManagement />
-        </TabsContent>
-
-        <TabsContent value="more">
-          <Tabs defaultValue="support">
-            <TabsList className="mb-6">
-              <TabsTrigger value="support" className="flex items-center gap-2">
-                <MessageSquare className="h-4 w-4" />
-                <span>Support Tickets</span>
-              </TabsTrigger>
-              <TabsTrigger value="media" className="flex items-center gap-2">
-                <ImageIcon className="h-4 w-4" />
-                <span>Media Library</span>
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="support">
-              <SupportTickets />
-            </TabsContent>
-            
-            <TabsContent value="media">
-              <ContentManagement />
-            </TabsContent>
-          </Tabs>
-        </TabsContent>
       </Tabs>
-      
-      {editingShipment && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-bold mb-4">Update Shipment Status</h3>
-            <div className="mb-4">
-              <p className="text-sm text-gray-500 mb-1">Tracking Number</p>
-              <p className="font-medium font-mono">{editingShipment.tracking_number}</p>
-            </div>
-            <div className="mb-6">
-              <p className="text-sm text-gray-500 mb-1">Current Status</p>
-              <Badge className={getStatusBadgeClass(editingShipment.status)}>
-                {editingShipment.status}
-              </Badge>
-            </div>
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-2">New Status</label>
-              <Select
-                value={newStatus}
-                onValueChange={setNewStatus}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUS_OPTIONS.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {status}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end space-x-3">
-              <Button 
-                variant="outline"
-                onClick={() => {
-                  setEditingShipment(null);
-                  setNewStatus('');
-                }}
-              >
-                Cancel
-              </Button>
-              <Button 
-                className="bg-zim-green hover:bg-zim-green/90"
-                onClick={updateShipmentStatus}
-              >
-                Update Status
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

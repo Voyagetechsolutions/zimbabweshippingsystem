@@ -14,6 +14,18 @@ export interface ShipmentMetadata {
   amountPaid?: number;
   pickupCountry?: string;
   shipmentType?: string;
+  senderDetails?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+  };
+  recipientDetails?: {
+    name?: string;
+    phone?: string;
+    additionalPhone?: string;
+    address?: string;
+  };
 }
 
 export interface Shipment {
@@ -34,4 +46,10 @@ export interface Shipment {
   weight?: number;
   // Add the profiles property that we attach after fetching
   profiles?: ShipmentProfile;
+}
+
+export interface CustomQuoteFormProps {
+  initialData?: any;
+  onSubmit: (customQuoteData: any) => Promise<void>;
+  onCancel: () => void;
 }

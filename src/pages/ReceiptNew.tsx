@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from '@/hooks/use-toast';
@@ -46,6 +46,7 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
   const isMobile = useIsMobile();
   const location = useLocation();
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(true);
   
   // Ensure we properly extract data from props or location state
   const stateData = location.state || {};
@@ -59,9 +60,70 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
     paymentData,
     customQuoteData
   });
+
+  // Check if we have a shipment ID but missing data
+  const [loadedShipmentData, setLoadedShipmentData] = useState<any>(null);
+
+  useEffect(() => {
+    const loadShipmentData = async () => {
+      setIsLoading(true);
+      
+      try {
+        // If we have location state with shipment ID but no receipt data
+        if (location.state?.shipmentId && !bookingData.shipmentDetails) {
+          const shipmentId = location.state.shipmentId;
+          console.log("Fetching shipment data for ID:", shipmentId);
+          
+          // Fetch shipment data
+          const { data: shipmentData, error: shipmentError } = await supabase
+            .from('shipments')
+            .select('*')
+            .eq('id', shipmentId)
+            .single();
+          
+          if (shipmentError) {
+            console.error('Error fetching shipment data:', shipmentError);
+            toast({
+              title: 'Error',
+              description: 'Failed to load shipment details',
+              variant: 'destructive',
+            });
+            return;
+          }
+          
+          // Fetch receipt data
+          const { data: receiptData, error: receiptError } = await supabase
+            .from('receipts')
+            .select('*')
+            .eq('shipment_id', shipmentId)
+            .maybeSingle();
+            
+          if (receiptError) {
+            console.error('Error fetching receipt:', receiptError);
+          }
+          
+          // Combine the data
+          const combinedData = {
+            shipment: shipmentData,
+            receipt: receiptData,
+            metadata: shipmentData.metadata || {}
+          };
+          
+          setLoadedShipmentData(combinedData);
+          console.log("Loaded shipment data:", combinedData);
+        }
+      } catch (error) {
+        console.error("Error loading shipment data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadShipmentData();
+  }, [location.state]);
   
-  // Create default receipt data if not provided
-  const receipt = propReceipt || {
+  // Create default receipt data if not provided, using loaded shipment data if available
+  const receiptData = propReceipt || loadedShipmentData?.receipt || {
     receipt_number: `ZIM-${Date.now().toString().substring(8)}`,
     created_at: new Date().toISOString(),
     amount: paymentData.finalAmount || 0,
@@ -73,10 +135,10 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
     status: 'Pending Payment'
   };
   
-  const shipment = propShipment || {
-    tracking_number: bookingData.shipmentDetails?.tracking_number || 'Pending',
-    origin: bookingData.senderDetails?.address || 'Not specified',
-    destination: bookingData.recipientDetails?.address || 'Not specified',
+  const shipmentData = propShipment || loadedShipmentData?.shipment || {
+    tracking_number: bookingData.shipmentDetails?.tracking_number || loadedShipmentData?.metadata?.tracking_number || 'Pending',
+    origin: bookingData.senderDetails?.address || loadedShipmentData?.metadata?.senderDetails?.address || 'Not specified',
+    destination: bookingData.recipientDetails?.address || loadedShipmentData?.metadata?.recipientDetails?.address || 'Not specified',
     status: 'Pending Payment'
   };
 
@@ -85,24 +147,26 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
   };
 
   useEffect(() => {
-    document.title = `Receipt ${receipt.receipt_number} | Zimbabwe Shipping`;
+    document.title = `Receipt ${receiptData.receipt_number} | Zimbabwe Shipping`;
     
     // Log the data to help debug
     console.log("Receipt details:", {
-      receipt,
-      shipment,
-      senderDetails: receipt.sender_details,
-      recipientDetails: receipt.recipient_details,
-      shipmentDetails: receipt.shipment_details
+      receiptData,
+      shipmentData,
+      senderDetails: receiptData.sender_details,
+      recipientDetails: receiptData.recipient_details,
+      shipmentDetails: receiptData.shipment_details,
+      loadedShipmentData
     });
 
     const createReceiptRecord = async () => {
-      if (bookingData && paymentData && !propReceipt && bookingData.shipment_id) {
+      // Only create a new record if we have booking data, payment data, and no existing receipt
+      if (bookingData && paymentData && !propReceipt && bookingData.shipment_id && !loadedShipmentData?.receipt) {
         try {
           const paymentId = generateUniqueId('pmt_');
           
           await supabase.from('receipts').insert({
-            receipt_number: receipt.receipt_number,
+            receipt_number: receiptData.receipt_number,
             payment_id: paymentId,
             amount: paymentData.finalAmount,
             currency: 'GBP',
@@ -117,7 +181,7 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
           await supabase.from('notifications').insert({
             user_id: '00000000-0000-0000-0000-000000000000',
             title: 'New Shipment Booked',
-            message: `A new shipment has been booked with tracking number: ${shipment.tracking_number}`,
+            message: `A new shipment has been booked with tracking number: ${shipmentData.tracking_number}`,
             type: 'shipment',
             related_id: bookingData.shipment_id,
             is_read: false
@@ -129,7 +193,7 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
     };
 
     createReceiptRecord();
-  }, [bookingData, paymentData, propReceipt]);
+  }, [bookingData, paymentData, propReceipt, loadedShipmentData]);
   
   const handlePrint = () => {
     const content = receiptRef.current;
@@ -148,7 +212,7 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
     printWindow.document.write(`
       <html>
         <head>
-          <title>Receipt ${receipt.receipt_number}</title>
+          <title>Receipt ${receiptData.receipt_number}</title>
           <style>
             body {
               font-family: Arial, sans-serif;
@@ -247,7 +311,7 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
     try {
       const options = {
         margin: 10,
-        filename: `receipt-${receipt.receipt_number}.pdf`,
+        filename: `receipt-${receiptData.receipt_number}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -276,7 +340,7 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
     });
     
     try {
-      let email = receipt.sender_details?.email;
+      let email = receiptData.sender_details?.email;
       
       if (!email) {
         const userEmail = window.prompt("Please enter your email address to receive the receipt:");
@@ -292,10 +356,10 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
       
       const { data, error } = await supabase.functions.invoke('email-receipt', {
         body: { 
-          receiptId: receipt.receipt_number,
+          receiptId: receiptData.receipt_number,
           email: email,
-          receiptData: receipt,
-          shipmentData: shipment
+          receiptData: receiptData,
+          shipmentData: shipmentData
         }
       });
       
@@ -316,7 +380,7 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
   };
 
   const handleTrackShipment = () => {
-    const trackingNumber = shipment.tracking_number || receipt.shipment_details?.tracking_number;
+    const trackingNumber = shipmentData.tracking_number || receiptData.shipment_details?.tracking_number;
     if (trackingNumber && trackingNumber !== 'Pending') {
       navigate('/track', { state: { trackingNumber } });
     } else {
@@ -355,9 +419,17 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
   };
 
   // Safeguard against undefined properties
-  const senderDetails = receipt.sender_details || {};
-  const recipientDetails = receipt.recipient_details || {};
-  const shipmentDetails = receipt.shipment_details || {};
+  const senderDetails = receiptData.sender_details || {};
+  const recipientDetails = receiptData.recipient_details || {};
+  const shipmentDetails = receiptData.shipment_details || {};
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-12 flex justify-center items-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-800" />
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-2 sm:px-4 max-w-4xl py-6">
@@ -404,27 +476,27 @@ Chelveston, Wellingborough, NN9 6AA</p>
             </div>
             <div className="text-left sm:text-right mt-2 sm:mt-0">
               <h2 className="text-lg sm:text-xl font-bold">RECEIPT</h2>
-              <p className="text-gray-600 text-xs sm:text-sm"># {receipt.receipt_number}</p>
-              <p className="text-gray-600 text-xs sm:text-sm">Date: {formatDate(receipt.created_at)}</p>
+              <p className="text-gray-600 text-xs sm:text-sm"># {receiptData.receipt_number}</p>
+              <p className="text-gray-600 text-xs sm:text-sm">Date: {formatDate(receiptData.created_at)}</p>
             </div>
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
             <div className="border rounded-md p-3 sm:p-4">
               <h3 className="font-bold text-sm mb-1 sm:mb-2">Sender Details</h3>
-              <p className="text-sm"><span className="font-medium">Name:</span> {senderDetails.name || "Not provided"}</p>
-              <p className="text-sm"><span className="font-medium">Address:</span> {senderDetails.address || "Not provided"}</p>
-              <p className="text-sm"><span className="font-medium">Phone:</span> {senderDetails.phone || "Not provided"}</p>
-              <p className="text-sm"><span className="font-medium">Email:</span> {senderDetails.email || "Not provided"}</p>
+              <p className="text-sm"><span className="font-medium">Name:</span> {senderDetails.name || loadedShipmentData?.metadata?.senderDetails?.name || "Not provided"}</p>
+              <p className="text-sm"><span className="font-medium">Address:</span> {senderDetails.address || loadedShipmentData?.metadata?.senderDetails?.address || "Not provided"}</p>
+              <p className="text-sm"><span className="font-medium">Phone:</span> {senderDetails.phone || loadedShipmentData?.metadata?.senderDetails?.phone || "Not provided"}</p>
+              <p className="text-sm"><span className="font-medium">Email:</span> {senderDetails.email || loadedShipmentData?.metadata?.senderDetails?.email || "Not provided"}</p>
             </div>
             
             <div className="border rounded-md p-3 sm:p-4">
               <h3 className="font-bold text-sm mb-1 sm:mb-2">Receiver Details</h3>
-              <p className="text-sm"><span className="font-medium">Name:</span> {recipientDetails.name || "Not provided"}</p>
-              <p className="text-sm"><span className="font-medium">Address:</span> {recipientDetails.address || "Not provided"}</p>
-              <p className="text-sm"><span className="font-medium">Phone:</span> {recipientDetails.phone || "Not provided"}</p>
-              {recipientDetails.additionalPhone && (
-                <p className="text-sm"><span className="font-medium">Additional Phone:</span> {recipientDetails.additionalPhone}</p>
+              <p className="text-sm"><span className="font-medium">Name:</span> {recipientDetails.name || loadedShipmentData?.metadata?.recipientDetails?.name || "Not provided"}</p>
+              <p className="text-sm"><span className="font-medium">Address:</span> {recipientDetails.address || loadedShipmentData?.metadata?.recipientDetails?.address || "Not provided"}</p>
+              <p className="text-sm"><span className="font-medium">Phone:</span> {recipientDetails.phone || loadedShipmentData?.metadata?.recipientDetails?.phone || "Not provided"}</p>
+              {(recipientDetails.additionalPhone || loadedShipmentData?.metadata?.recipientDetails?.additionalPhone) && (
+                <p className="text-sm"><span className="font-medium">Additional Phone:</span> {recipientDetails.additionalPhone || loadedShipmentData?.metadata?.recipientDetails?.additionalPhone}</p>
               )}
             </div>
           </div>
@@ -443,32 +515,38 @@ Chelveston, Wellingborough, NN9 6AA</p>
                 <tbody>
                   <tr className="border-t">
                     <td className="p-2 sm:p-3 text-xs sm:text-sm break-all sm:break-normal">
-                      {shipment.tracking_number || shipmentDetails.tracking_number || "Pending"}
+                      {shipmentData.tracking_number || shipmentDetails.tracking_number || loadedShipmentData?.metadata?.tracking_number || "Pending"}
                     </td>
                     <td className="p-2 sm:p-3 text-xs sm:text-sm">
                       <div className="flex flex-col">
-                        {shipmentDetails.includeDrums && (
+                        {(shipmentDetails.includeDrums || loadedShipmentData?.metadata?.includeDrums) && (
                           <div className="flex items-center mb-1">
                             <Drum className="h-4 w-4 mr-1 text-zim-green" />
-                            {shipmentDetails.quantity || 0} x 200L-220L Drums
+                            {shipmentDetails.quantity || loadedShipmentData?.metadata?.quantity || 0} x 200L-220L Drums
                           </div>
                         )}
-                        {shipmentDetails.includeOtherItems && (
+                        {(shipmentDetails.includeOtherItems || loadedShipmentData?.metadata?.includeOtherItems) && (
                           <div className="flex items-center">
                             <Package className="h-4 w-4 mr-1 text-zim-green" />
-                            {shipmentDetails.category && shipmentDetails.specificItem ? (
-                              `${shipmentDetails.category} - ${shipmentDetails.specificItem}`
+                            {((shipmentDetails.category && shipmentDetails.specificItem) || 
+                              (loadedShipmentData?.metadata?.category && loadedShipmentData?.metadata?.specificItem)) ? (
+                              `${shipmentDetails.category || loadedShipmentData?.metadata?.category} - 
+                              ${shipmentDetails.specificItem || loadedShipmentData?.metadata?.specificItem}`
                             ) : (
-                              `Custom Item - ${customQuoteData.description || shipmentDetails.description || 'Pending quote'}`
+                              `Custom Item - ${customQuoteData.description || 
+                                shipmentDetails.description || 
+                                loadedShipmentData?.metadata?.description || 
+                                'Pending quote'}`
                             )}
                           </div>
                         )}
-                        {!shipmentDetails.includeDrums && !shipmentDetails.includeOtherItems && (
-                          `${shipmentDetails.type || 'Custom Item'}`
+                        {(!shipmentDetails.includeDrums && !shipmentDetails.includeOtherItems && 
+                          !loadedShipmentData?.metadata?.includeDrums && !loadedShipmentData?.metadata?.includeOtherItems) && (
+                          `${shipmentDetails.type || loadedShipmentData?.metadata?.type || 'Custom Item'}`
                         )}
                       </div>
                     </td>
-                    <td className="p-2 sm:p-3 text-xs sm:text-sm">{shipment.status || receipt.status}</td>
+                    <td className="p-2 sm:p-3 text-xs sm:text-sm">{shipmentData.status || receiptData.status}</td>
                   </tr>
                 </tbody>
               </table>
@@ -479,30 +557,30 @@ Chelveston, Wellingborough, NN9 6AA</p>
             <h3 className="font-bold text-sm mb-1 sm:mb-2">Collection & Delivery Information</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="border rounded-md p-3">
-                <p className="text-sm"><span className="font-medium">Pickup Address:</span> {shipment.origin || senderDetails.address || "Not specified"}</p>
+                <p className="text-sm"><span className="font-medium">Pickup Address:</span> {shipmentData.origin || senderDetails.address || loadedShipmentData?.origin || "Not specified"}</p>
               </div>
               <div className="border rounded-md p-3">
-                <p className="text-sm"><span className="font-medium">Delivery Address:</span> {shipment.destination || recipientDetails.address || "Not specified"}</p>
+                <p className="text-sm"><span className="font-medium">Delivery Address:</span> {shipmentData.destination || recipientDetails.address || loadedShipmentData?.destination || "Not specified"}</p>
               </div>
             </div>
             
             {/* Collection Date Information */}
             <div className="border rounded-md p-3 mt-3">
-              <p className="text-sm"><span className="font-medium">Collection Date:</span> {bookingData.collectionDate || "To be scheduled"}</p>
-              <p className="text-sm"><span className="font-medium">Collection Location:</span> {bookingData.senderDetails?.address || shipment.origin || "Not specified"}</p>
+              <p className="text-sm"><span className="font-medium">Collection Date:</span> {bookingData.collectionDate || loadedShipmentData?.metadata?.collectionDate || "To be scheduled"}</p>
+              <p className="text-sm"><span className="font-medium">Collection Location:</span> {bookingData.senderDetails?.address || shipmentData.origin || loadedShipmentData?.origin || "Not specified"}</p>
             </div>
           </div>
           
-          {shipmentDetails.includeDrums && (
+          {(shipmentDetails.includeDrums || loadedShipmentData?.metadata?.includeDrums) && (
             <div className="mb-4 sm:mb-6">
               <h3 className="font-bold text-sm mb-1 sm:mb-2">Payment Details</h3>
               
               <div className="flex justify-between py-2 sm:py-3 border-b text-sm">
                 <span className="font-medium">Shipping Cost</span>
-                <span>£{((receipt.amount || 0) * 0.9).toFixed(2)}</span>
+                <span>£{((receiptData.amount || 0) * 0.9).toFixed(2)}</span>
               </div>
               
-              {shipmentDetails.services && shipmentDetails.services.length > 0 && (
+              {(shipmentDetails.services && shipmentDetails.services.length > 0) && (
                 <>
                   {shipmentDetails.services.map((service: any, index: number) => (
                     <div key={index} className="flex justify-between py-2 sm:py-3 border-b text-sm">
@@ -529,41 +607,41 @@ Chelveston, Wellingborough, NN9 6AA</p>
               
               <div className="flex justify-between py-3 sm:py-4 font-bold text-base sm:text-lg">
                 <span>Total</span>
-                <span>£{(receipt.amount || 0).toFixed(2)}</span>
+                <span>£{(receiptData.amount || 0).toFixed(2)}</span>
               </div>
               
               <div className="border rounded-md p-2 sm:p-3 bg-gray-50 mt-2">
-                <p className="font-medium text-sm">Payment Method: {getPaymentMethodDisplay(receipt.payment_method)}</p>
-                <p className="text-xs sm:text-sm text-gray-600 mt-1">Payment Status: {receipt.status}</p>
+                <p className="font-medium text-sm">Payment Method: {getPaymentMethodDisplay(receiptData.payment_method)}</p>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1">Payment Status: {receiptData.status}</p>
               </div>
             </div>
           )}
           
-          {shipmentDetails.includeDrums && (
+          {(shipmentDetails.includeDrums || loadedShipmentData?.metadata?.includeDrums) && (
             <div className="mb-4 sm:mb-6">
               <h3 className="font-bold text-sm mb-1 sm:mb-2">Drum Information</h3>
               <div className="border rounded-md p-3">
-                <p className="text-sm"><span className="font-medium">Number of Drums:</span> {shipmentDetails.quantity || 0}</p>
+                <p className="text-sm"><span className="font-medium">Number of Drums:</span> {shipmentDetails.quantity || loadedShipmentData?.metadata?.quantity || 0}</p>
                 <p className="text-sm"><span className="font-medium">Drum Capacity:</span> 200L-220L</p>
-                {shipmentDetails.wantMetalSeal && (
+                {(shipmentDetails.wantMetalSeal || loadedShipmentData?.metadata?.wantMetalSeal) && (
                   <p className="text-sm"><span className="font-medium">Security:</span> Metal Coded Seals</p>
                 )}
               </div>
             </div>
           )}
           
-          {(shipmentDetails.includeOtherItems || (customQuoteData && customQuoteData.id)) && (
+          {((shipmentDetails.includeOtherItems || loadedShipmentData?.metadata?.includeOtherItems) || (customQuoteData && customQuoteData.id)) && (
             <div className="mb-4 sm:mb-6">
               <h3 className="font-bold text-sm mb-1 sm:mb-2">Other Item Details</h3>
               <div className="border rounded-md p-3">
-                {shipmentDetails.category && (
-                  <p className="text-sm"><span className="font-medium">Item Category:</span> {shipmentDetails.category}</p>
+                {(shipmentDetails.category || loadedShipmentData?.metadata?.category) && (
+                  <p className="text-sm"><span className="font-medium">Item Category:</span> {shipmentDetails.category || loadedShipmentData?.metadata?.category}</p>
                 )}
-                {shipmentDetails.specificItem && (
-                  <p className="text-sm"><span className="font-medium">Specific Item:</span> {shipmentDetails.specificItem}</p>
+                {(shipmentDetails.specificItem || loadedShipmentData?.metadata?.specificItem) && (
+                  <p className="text-sm"><span className="font-medium">Specific Item:</span> {shipmentDetails.specificItem || loadedShipmentData?.metadata?.specificItem}</p>
                 )}
-                {(shipmentDetails.description || (customQuoteData && customQuoteData.description)) && (
-                  <p className="text-sm"><span className="font-medium">Description:</span> {(customQuoteData && customQuoteData.description) || shipmentDetails.description}</p>
+                {(shipmentDetails.description || loadedShipmentData?.metadata?.description || (customQuoteData && customQuoteData.description)) && (
+                  <p className="text-sm"><span className="font-medium">Description:</span> {(customQuoteData && customQuoteData.description) || shipmentDetails.description || loadedShipmentData?.metadata?.description}</p>
                 )}
                 {customQuoteData && customQuoteData.id && (
                   <div className="mt-2 flex items-center text-sm text-green-600">
