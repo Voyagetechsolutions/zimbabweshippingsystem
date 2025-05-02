@@ -53,9 +53,10 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
         premium: isPayOnArrival ? payOnArrivalPremium : 0
       };
 
+      // Pass the payment data to the parent component
       await onComplete(paymentData);
       
-      navigate('/receipt');
+      // Let the parent component handle the navigation
     } catch (error) {
       console.error('Payment processing error:', error);
       toast({

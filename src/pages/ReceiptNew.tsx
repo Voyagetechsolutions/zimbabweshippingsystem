@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -45,7 +46,8 @@ const ReceiptNew: React.FC<ReceiptProps> = ({
   const stateData = location.state || {};
   const navigate = useNavigate();
   
-  // Ensure we properly extract data from props or location state
+  console.log("ReceiptNew received location state:", location.state);
+  
   // Extract all data from location state
   const bookingData = stateData.bookingData || {};
   const paymentData = bookingData.paymentData || stateData.paymentData || {};
