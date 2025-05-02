@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -382,8 +381,8 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       
       // Find which tab has errors and switch to it
       const errors = form.formState.errors;
-      const senderFields = ['firstName', 'lastName', 'email', 'phone', 'pickupCountry', 'pickupAddress', 'pickupPostcode', 'pickupCity'];
-      const recipientFields = ['recipientName', 'recipientPhone', 'deliveryAddress', 'deliveryCity', 'additionalRecipientPhone'];
+      const senderFields = ['firstName', 'lastName', 'email', 'phone', 'pickupCountry', 'pickupAddress'];
+      const recipientFields = ['recipientName', 'recipientPhone', 'deliveryAddress', 'deliveryCity'];
       const shipmentFields = ['includeDrums', 'includeOtherItems', 'drumQuantity', 'itemCategory', 'specificItem', 'otherItemDescription'];
       const paymentFields = ['paymentOption', 'paymentMethod', 'terms'];
       
@@ -414,50 +413,31 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     validateTab('payment');
   };
 
-// In BookingFormNew.tsx
-const onSubmit = async (data: BookingFormValues) => {
-  setIsSubmitting(true);
-  
-  try {
-    const trackingNumber = `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
-    const shipmentId = generateUniqueId('shp_');
+  const onSubmit = async (data: BookingFormValues) => {
+    setIsSubmitting(true);
+    
+    try {
+      const trackingNumber = `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+      const shipmentId = generateUniqueId('shp_');
 
-    // Structure all data to pass to Receipt
-    const completeData = {
-      formData: data,
-      shipmentDetails: {
-        tracking_number: trackingNumber,
-        type: data.includeDrums ? 'drum' : 'other',
-        quantity: data.drumQuantity ? parseInt(data.drumQuantity) : 0,
-        includeDrums: data.includeDrums,
-        includeOtherItems: data.includeOtherItems,
-        wantMetalSeal: data.wantMetalSeal,
-        doorToDoor: data.doorToDoor,
-        // Add other relevant shipment details
-      },
-      senderDetails: {
-        name: `${data.firstName} ${data.lastName}`,
-        email: data.email,
-        phone: data.phone,
-        address: `${data.pickupAddress}, ${data.pickupPostcode || data.pickupCity}, ${data.pickupCountry}`
-      },
-      recipientDetails: {
-        name: data.recipientName,
-        phone: data.recipientPhone,
-        additionalPhone: data.additionalRecipientPhone,
-        address: `${data.deliveryAddress}, ${data.deliveryCity}`
-      },
-      paymentData: null // Will be filled by PaymentMethodSection
-    };
-
-    // Call the parent handler with all data
-    onSubmitComplete(completeData, shipmentId, price);
-  } catch (error) {
-    // Error handling
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+      // Pass the original form data as expected by the parent component
+      // We'll add the additional properties to the data object directly
+      data.additionalDeliveryAddresses = additionalAddresses;
+      data.shipmentType = data.includeDrums ? 'drum' : 'other';
+      
+      // Call the parent handler with the data in the expected format
+      onSubmitComplete(data, shipmentId, price);
+    } catch (error) {
+      console.error('Error processing form submission:', error);
+      toast({
+        title: 'Error',
+        description: 'An error occurred while processing your booking. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const validateTab = (tab: string): boolean => {
     const fields: Record<string, string[]> = {
