@@ -9,6 +9,7 @@ import PaymentProcessor from '@/components/PaymentProcessor';
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 enum BookingStep {
   FORM,
@@ -22,16 +23,37 @@ const BookShipment = () => {
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     document.title = 'Book a Shipment | UK Shipping Service';
-  }, []);
+    
+    // Redirect unauthenticated users
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to book a shipment.",
+        variant: "destructive",
+      });
+      navigate('/auth', { state: { returnUrl: '/bookShipment' } });
+    }
+  }, [user, navigate, toast]);
 
   const handleFormSubmit = async (data: any, shipmentId: string, amount: number) => {
     console.log("Form submitted with data:", { data, shipmentId, amount });
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to book a shipment.",
+          variant: "destructive",
+        });
+        navigate('/auth', { state: { returnUrl: '/bookShipment' } });
+        return;
+      }
       
       if (data.shipmentType === 'other' && !data.includeDrums) {
         setBookingData({
@@ -246,6 +268,10 @@ const BookShipment = () => {
       });
     }
   };
+
+  if (!user) {
+    return null; // Return null while redirecting to login page
+  }
 
   return (
     <>

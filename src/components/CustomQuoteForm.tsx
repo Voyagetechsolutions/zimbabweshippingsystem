@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -21,6 +21,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { submitCustomQuote } from "@/utils/supabaseUtils";
+import { useAuth } from '@/hooks/useAuth';
 
 // Define the form schema with zod
 const formSchema = z.object({
@@ -97,26 +98,55 @@ const specificItems = {
   ]
 };
 
-const CustomQuoteForm = () => {
+interface CustomQuoteFormProps {
+  initialData?: any;
+  onSubmit?: (data: any) => void;
+  onCancel?: () => void;
+}
+
+const CustomQuoteForm = ({ initialData, onSubmit, onCancel }: CustomQuoteFormProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    // Redirect unauthenticated users
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to request a quote.",
+        variant: "destructive",
+      });
+      navigate('/auth', { state: { returnUrl: '/custom-quote' } });
+    }
+  }, [user, navigate, toast]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      phone_number: "",
-      category: "",
-      specific_item: "",
-      description: "",
+      phone_number: initialData?.senderDetails?.phone || "",
+      category: initialData?.shipmentDetails?.category || "",
+      specific_item: initialData?.shipmentDetails?.specificItem || "",
+      description: initialData?.shipmentDetails?.description || "",
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const handleFormSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true);
     
     try {
+      if (!user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to request a quote.",
+          variant: "destructive",
+        });
+        navigate('/auth', { state: { returnUrl: '/custom-quote' } });
+        return;
+      }
+      
       const quoteData = {
         phone_number: values.phone_number,
         category: values.category || null,
@@ -124,25 +154,29 @@ const CustomQuoteForm = () => {
         description: values.description,
       };
 
-      const result = await submitCustomQuote(quoteData);
-      
-      if (result.success) {
-        toast({
-          title: "Quote Request Submitted",
-          description: "We'll review your request and get back to you soon.",
-        });
-        
-        // Navigate to receipt or confirmation page with the quote data
-        navigate("/custom-quote-confirmation", {
-          state: { 
-            customQuoteData: {
-              id: result.quoteId,
-              ...quoteData
-            }
-          }
-        });
+      if (onSubmit) {
+        onSubmit(quoteData);
       } else {
-        throw new Error(result.error || "Failed to submit quote");
+        const result = await submitCustomQuote(quoteData);
+        
+        if (result.success) {
+          toast({
+            title: "Quote Request Submitted",
+            description: "We'll review your request and get back to you soon.",
+          });
+          
+          // Navigate to receipt or confirmation page with the quote data
+          navigate("/custom-quote-confirmation", {
+            state: { 
+              customQuoteData: {
+                id: result.quoteId,
+                ...quoteData
+              }
+            }
+          });
+        } else {
+          throw new Error(result.error || "Failed to submit quote");
+        }
       }
     } catch (error: any) {
       console.error("Error submitting custom quote:", error);
@@ -162,6 +196,10 @@ const CustomQuoteForm = () => {
     form.setValue("specific_item", "");
   };
 
+  if (!user) {
+    return null; // Return null while redirecting to login page
+  }
+
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
@@ -172,7 +210,7 @@ const CustomQuoteForm = () => {
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
             <FormField
               control={form.control}
               name="phone_number"
@@ -269,9 +307,16 @@ const CustomQuoteForm = () => {
               )}
             />
             
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Submitting..." : "Submit Request"}
-            </Button>
+            <div className="flex gap-3 justify-end">
+              {onCancel && (
+                <Button type="button" variant="outline" onClick={onCancel}>
+                  Back
+                </Button>
+              )}
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Submitting..." : "Submit Request"}
+              </Button>
+            </div>
           </form>
         </Form>
       </CardContent>
