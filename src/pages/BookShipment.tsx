@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -284,7 +283,7 @@ const BookShipment = () => {
             />
           ) : (
             <CustomQuoteForm 
-              initialData={bookingData}
+              bookingData={bookingData}
               onSubmit={handleCustomQuoteSubmit}
               onCancel={handleBackToForm}
             />

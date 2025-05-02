@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -58,6 +57,30 @@ const Receipt: React.FC<ReceiptProps> = ({
     paymentData,
     customQuoteData
   });
+
+  // Better extract form data - diving deeper into the structure if needed
+  const formData = bookingData.formData || {};
+  
+  // Create detailed sender and recipient details from form data
+  const senderDetailsFromForm = {
+    name: formData.firstName && formData.lastName 
+      ? `${formData.firstName} ${formData.lastName}` 
+      : bookingData.senderDetails?.name || '',
+    email: formData.email || bookingData.senderDetails?.email || '',
+    phone: formData.phone || bookingData.senderDetails?.phone || '',
+    address: formData.pickupAddress 
+      ? `${formData.pickupAddress}${formData.pickupCity ? ', ' + formData.pickupCity : ''}${formData.pickupPostcode ? ', ' + formData.pickupPostcode : ''}`
+      : bookingData.senderDetails?.address || ''
+  };
+  
+  const recipientDetailsFromForm = {
+    name: formData.recipientName || bookingData.recipientDetails?.name || '',
+    phone: formData.recipientPhone || bookingData.recipientDetails?.phone || '',
+    additionalPhone: formData.additionalRecipientPhone || bookingData.recipientDetails?.additionalPhone || '',
+    address: formData.deliveryAddress 
+      ? `${formData.deliveryAddress}${formData.deliveryCity ? ', ' + formData.deliveryCity : ''}`
+      : bookingData.recipientDetails?.address || ''
+  };
   
   // Create default receipt data if not provided
   const receipt = propReceipt || {
@@ -66,16 +89,16 @@ const Receipt: React.FC<ReceiptProps> = ({
     amount: paymentData.finalAmount || 0,
     currency: 'GBP',
     payment_method: paymentData.method || 'standard',
-    sender_details: bookingData.senderDetails || {},
-    recipient_details: bookingData.recipientDetails || {},
+    sender_details: senderDetailsFromForm,
+    recipient_details: recipientDetailsFromForm,
     shipment_details: bookingData.shipmentDetails || {},
     status: 'issued'
   };
   
   const shipment = propShipment || {
     tracking_number: bookingData.shipmentDetails?.tracking_number || 'Pending',
-    origin: bookingData.senderDetails?.address || 'Not specified',
-    destination: bookingData.recipientDetails?.address || 'Not specified',
+    origin: senderDetailsFromForm.address || 'Not specified',
+    destination: recipientDetailsFromForm.address || 'Not specified',
     status: 'Pending'
   };
 
@@ -90,7 +113,8 @@ const Receipt: React.FC<ReceiptProps> = ({
       shipment,
       senderDetails: receipt.sender_details,
       recipientDetails: receipt.recipient_details,
-      shipmentDetails: receipt.shipment_details
+      shipmentDetails: receipt.shipment_details,
+      formData
     });
     
     const createReceiptRecord = async () => {
@@ -339,9 +363,9 @@ const Receipt: React.FC<ReceiptProps> = ({
     return method;
   };
 
-  // Safeguard against undefined properties
-  const senderDetails = receipt.sender_details || {};
-  const recipientDetails = receipt.recipient_details || {};
+  // Safeguard against undefined properties - using our enhanced data
+  const senderDetails = receipt.sender_details || senderDetailsFromForm;
+  const recipientDetails = receipt.recipient_details || recipientDetailsFromForm;
   const shipmentDetails = receipt.shipment_details || {};
 
   return (
@@ -407,7 +431,7 @@ Chelveston, Wellingborough, NN9 6AA</p>
                         {shipmentDetails.includeDrums && (
                           <div className="flex items-center mb-1">
                             <Drum className="h-4 w-4 mr-1 text-zim-green" />
-                            {shipmentDetails.quantity || 0} x 200L-220L Drums
+                            {shipmentDetails.quantity || formData.drumQuantity || 0} x 200L-220L Drums
                           </div>
                         )}
                         {shipmentDetails.includeOtherItems && (
@@ -415,8 +439,10 @@ Chelveston, Wellingborough, NN9 6AA</p>
                             <Package className="h-4 w-4 mr-1 text-zim-green" />
                             {shipmentDetails.category && shipmentDetails.specificItem ? (
                               `${shipmentDetails.category} - ${shipmentDetails.specificItem}`
+                            ) : formData.itemCategory && formData.specificItem ? (
+                              `${formData.itemCategory} - ${formData.specificItem}`
                             ) : (
-                              `Custom Item - ${customQuoteData.description || shipmentDetails.description || 'Pending quote'}`
+                              `Custom Item - ${customQuoteData.description || formData.otherItemDescription || shipmentDetails.description || 'Pending quote'}`
                             )}
                           </div>
                         )}
