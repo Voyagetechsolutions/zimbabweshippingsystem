@@ -40,10 +40,10 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
   // Extract shipment details from receipt data
   const shipmentDetails = shipment || receipt.shipment_details || receipt.shipmentDetails || {};
   
-  // Get tracking number from various possible sources
-  const trackingNumber = shipmentDetails?.tracking_number || 
-                        (receipt.metadata?.tracking_number) || 
-                        (receipt.tracking_number) ||
+  // Get tracking number directly from the booking form data or the metadata
+  const trackingNumber = receipt.tracking_number || 
+                        shipmentDetails?.tracking_number || 
+                        receipt.metadata?.tracking_number ||
                         "Not assigned yet";
   
   // Extract payment information from receipt data
@@ -164,7 +164,7 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
             </div>
             
             <div>
-              <p className="text-sm font-medium">Descriptionm</p>
+              <p className="text-sm font-medium">Description</p>
               <p className="text-sm">
                 {fullShipmentDetails.type === 'other' 
                   ? (fullShipmentDetails.description || "Custom quote requested")

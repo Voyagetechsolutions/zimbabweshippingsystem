@@ -11,7 +11,6 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import ReceiptComponent from '@/components/Receipt';
 import { generateUniqueId } from '@/utils/utils';
-import { Receipt as ReceiptType } from '@/types/receipt';
 
 /**
  * Receipt page component that displays a receipt for a shipment
@@ -167,37 +166,17 @@ const Receipt = () => {
     });
   };
 
-  // Generate a tracking number if none exists
-  const generateTrackingNumber = () => {
-    // Using the same format as in BookingFormNew.tsx 
-    return `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
-  };
-
   // Prepare the data for the receipt component
   const prepareReceiptData = () => {
     // First try to use the receipt data passed directly
     if (receiptData) {
       console.log("Using receiptData passed via location state");
-      // Ensure there's a tracking number
-      if (!receiptData.shipment_details?.tracking_number) {
-        receiptData.shipment_details = {
-          ...receiptData.shipment_details,
-          tracking_number: generateTrackingNumber()
-        };
-      }
       return receiptData;
     }
     
     // Then try fetched receipt data
     if (fetchedReceiptData) {
       console.log("Using fetchedReceiptData from database");
-      // Ensure there's a tracking number
-      if (!fetchedReceiptData.shipment_details?.tracking_number) {
-        fetchedReceiptData.shipment_details = {
-          ...fetchedReceiptData.shipment_details,
-          tracking_number: generateTrackingNumber()
-        };
-      }
       return fetchedReceiptData;
     }
     
@@ -205,15 +184,18 @@ const Receipt = () => {
     if (bookingData) {
       console.log("Constructing receipt data from bookingData and paymentData");
       
-      // Generate tracking number if one doesn't exist
-      const tracking_number = bookingData.shipmentDetails?.tracking_number || 
-                              bookingData.tracking_number || 
-                              generateTrackingNumber();
+      // Use tracking number directly from bookingData (created in BookingFormNew)
+      const tracking_number = bookingData.tracking_number || 
+                             (bookingData.shipmentDetails && bookingData.shipmentDetails.tracking_number) || 
+                             (bookingData.metadata && bookingData.metadata.tracking_number);
       
       // Create a properly structured receipt object from the booking data
       const constructedReceiptData = {
         // Include booking data at the root level for fallbacks
         ...bookingData,
+        
+        // Ensure tracking number is accessible
+        tracking_number: tracking_number,
         
         // Add standard receipt fields
         receipt_number: paymentData?.receipt_number || `REC-${Date.now().toString().slice(-8)}`,
