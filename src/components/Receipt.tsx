@@ -596,4 +596,4 @@ Chelveston, Wellingborough, NN9 6AA</p>
   );
 };
 
-export default Receipt;
+export default Receipt;*/}
