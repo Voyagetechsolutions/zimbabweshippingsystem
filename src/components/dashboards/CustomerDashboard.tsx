@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -48,6 +47,7 @@ import {
 } from 'lucide-react';
 import { RecentShipments } from '@/components/customer/RecentShipments';
 import { useToast } from '@/hooks/use-toast';
+import { Receipt as ReceiptType } from '@/types/receipt';
 
 interface ShipmentMetadata {
   pickup_date?: string;
@@ -178,7 +178,7 @@ const CustomerDashboard = () => {
   });
 
   // Fetch receipts for this user
-  const { data: receipts, isLoading: receiptsLoading, refetch: refetchReceipts } = useQuery<Receipt[]>({
+  const { data: receipts, isLoading: receiptsLoading, refetch: refetchReceipts } = useQuery<ReceiptType[]>({
     queryKey: ['user-receipts', user?.id],
     queryFn: async () => {
       try {
@@ -218,7 +218,7 @@ const CustomerDashboard = () => {
         }
         
         console.log('Fetched customer receipts:', data?.length);
-        return data || [];
+        return data as ReceiptType[] || [];
       } catch (error: any) {
         console.error('Error in receipts query function:', error.message);
         toast({
@@ -546,12 +546,16 @@ const CustomerDashboard = () => {
                     <TableBody>
                       {receipts.map((receipt) => (
                         <TableRow key={receipt.id}>
-                          <TableCell className="font-medium">{receipt.receipt_number}</TableCell>
+                          <TableCell className="font-medium">{receipt.receipt_number || receipt.id.substring(0, 8)}</TableCell>
                           <TableCell className="hidden md:table-cell">
-                            {receipt.currency} {receipt.amount.toFixed(2)}
+                            {receipt.currency || "GBP"} {receipt.amount?.toFixed(2) || 
+                              (typeof receipt.payment_info === 'object' && receipt.payment_info && 
+                              'amount' in receipt.payment_info ? Number(receipt.payment_info.amount).toFixed(2) : "N/A")}
                           </TableCell>
                           <TableCell className="hidden md:table-cell capitalize">
-                            {receipt.payment_method}
+                            {receipt.payment_method || 
+                              (typeof receipt.payment_info === 'object' && receipt.payment_info && 
+                              'method' in receipt.payment_info ? receipt.payment_info.method : "N/A")}
                           </TableCell>
                           <TableCell className="hidden md:table-cell text-sm text-gray-500">
                             {format(new Date(receipt.created_at), 'MMM d, yyyy')}

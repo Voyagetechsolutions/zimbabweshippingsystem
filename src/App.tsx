@@ -76,6 +76,7 @@ function App() {
                     <Route path="/payment-success" element={<PaymentSuccess />} />
                     <Route path="/quote-submitted" element={<QuoteSubmitted />} />
                     <Route path="/receipt" element={<Receipt />} />
+                    <Route path="/receipt/:id" element={<Receipt />} />
                     <Route path="/reviews" element={<Reviews />} />
                     <Route path="/support" element={<Support />} />
                     <Route path="/pricing" element={<Pricing />} />

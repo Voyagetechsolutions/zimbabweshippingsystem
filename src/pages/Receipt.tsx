@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation, Link, useParams } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useToast } from '@/hooks/use-toast';
@@ -14,13 +14,17 @@ import jsPDF from 'jspdf';
 
 /**
  * Receipt page component that displays a receipt for a shipment
- * It gets data from location.state passed from BookShipment.tsx
- * Or fetches data from Supabase if accessed directly via URL with receipt ID
+ * It gets data from:
+ * 1. location.state passed from BookShipment.tsx
+ * 2. URL params if accessed directly with receipt ID
  */
 const Receipt = () => {
   // Get data passed from BookShipment.tsx via react-router's useLocation
   const location = useLocation();
   const { bookingData, paymentData, customQuoteData } = location.state || {};
+  
+  // Get receipt ID from URL params
+  const { id: receiptId } = useParams();
   
   // Reference for the receipt to be printed/downloaded
   const receiptRef = useRef<HTMLDivElement>(null);
@@ -34,9 +38,39 @@ const Receipt = () => {
   useEffect(() => {
     document.title = 'Payment Receipt | UK Shipping Service';
     
-    // If we don't have data from navigation state, we could try to load it from URL params
-    // This would require additional implementation for direct receipt access
-  }, []);
+    // If we don't have data from navigation state, we try to load it from URL params
+    const fetchReceipt = async () => {
+      if (!bookingData && receiptId) {
+        setIsLoading(true);
+        try {
+          const { data, error } = await supabase
+            .from('receipts')
+            .select('*')
+            .eq('id', receiptId)
+            .single();
+            
+          if (error) {
+            throw error;
+          }
+          
+          if (data) {
+            setReceiptData(data);
+          }
+        } catch (error: any) {
+          console.error('Error fetching receipt:', error);
+          toast({
+            title: 'Error loading receipt',
+            description: error.message || 'Failed to load receipt data',
+            variant: 'destructive'
+          });
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+    
+    fetchReceipt();
+  }, [receiptId, bookingData, toast]);
 
   /**
    * Helper function to print the receipt
@@ -133,7 +167,23 @@ const Receipt = () => {
   // This is where we show either data from the form submission or from the database
   const data = bookingData || receiptData;
   
-  // If we have no data to display, show loading or error message
+  // If we have no data to display and still loading, show loading state
+  if (isLoading) {
+    return (
+      <>
+        <Navbar />
+        <main className="min-h-screen bg-gray-50 py-12 px-4">
+          <div className="container mx-auto max-w-4xl text-center">
+            <h1 className="text-3xl font-bold mb-4">Loading Receipt...</h1>
+            <p className="mb-6">Please wait while we load your receipt information.</p>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+  
+  // If we have no data to display and not loading, show error message
   if (!data) {
     return (
       <>
@@ -152,13 +202,13 @@ const Receipt = () => {
     );
   }
 
-  // Extract sender details from bookingData
+  // Extract sender details from data
   const senderDetails = data.senderDetails || {};
   
-  // Extract recipient details from bookingData  
+  // Extract recipient details from data  
   const recipientDetails = data.recipientDetails || {};
   
-  // Extract shipment details from bookingData
+  // Extract shipment details from data
   const shipmentDetails = data.shipmentDetails || {};
   
   // For custom quotes, use customQuoteData
@@ -166,7 +216,7 @@ const Receipt = () => {
     (shipmentDetails.type === 'other' && !shipmentDetails.includeDrums);
   
   // Extract payment information from paymentData
-  const paymentInfo = paymentData || {};
+  const paymentInfo = paymentData || data.payment_info || {};
   
   // Determine if payment has been completed
   const paymentStatus = data.paymentCompleted ? "Paid" : "Pending";
@@ -174,7 +224,7 @@ const Receipt = () => {
   // Check for collection area information based on postcode
   // This would come from the collection schedule based on postcode
   // For now, we'll use placeholder data
-  const collectionInfo = {
+  const collectionInfo = data.collection_info || {
     date: "Next available collection date",
     area: data.pickupPostcode ? `Collection from ${data.pickupPostcode} area` : "Collection area not specified"
   };
