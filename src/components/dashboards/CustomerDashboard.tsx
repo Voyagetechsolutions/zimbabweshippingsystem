@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -6,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Receipt, PaymentInfo } from '@/types/receipt';
 import { formatDate, formatCurrency } from '@/utils/formatters';
 import { Button } from '@/components/ui/button';
-import { Receipt } from 'lucide-react';
+import { Receipt as ReceiptIcon } from 'lucide-react';
 import { EmptyState } from '@/components/EmptyState';
 
 interface CustomerDashboardProps {
@@ -142,7 +143,7 @@ const CustomerDashboard: React.FC<CustomerDashboardProps> = () => {
             </div>
           ) : !isLoadingReceipts ? (
             <EmptyState 
-              icon={<Receipt className="h-12 w-12 text-gray-400" />}
+              icon={<ReceiptIcon className="h-12 w-12 text-gray-400" />}
               title="No Receipts Yet"
               description="When you make a payment, your receipt will appear here."
               action={
