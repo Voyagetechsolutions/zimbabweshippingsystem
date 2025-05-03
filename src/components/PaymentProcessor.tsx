@@ -167,7 +167,21 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         description: 'Your shipment has been booked successfully.',
       });
       
-      navigate(`/payment-success?receipt_id=${receiptData.id}`);
+      // Instead of navigating to payment-success, go directly to receipt page with all data
+      navigate('/receipt', {
+        state: { 
+          bookingData,
+          receiptData,
+          paymentData: {
+            method: paymentMethod,
+            finalAmount,
+            currency: 'GBP',
+            status: 'pending',
+            date: new Date().toISOString(),
+            receipt_number: receiptNumber
+          }
+        }
+      });
     } catch (error: any) {
       console.error('Error processing payment selection:', error);
       toast({
@@ -284,6 +298,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
                           Cash Payment
                         </Label>
                       </div>
+                      
                       <div className="flex items-center space-x-2 border rounded p-2 pl-3">
                         <RadioGroupItem value="bank_transfer" id="method-bank" />
                         <Label htmlFor="method-bank" className="flex items-center">
@@ -291,6 +306,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
                           Bank Transfer
                         </Label>
                       </div>
+                      
                       <div className="flex items-center space-x-2 border rounded p-2 pl-3">
                         <RadioGroupItem value="direct_debit" id="method-dd" />
                         <Label htmlFor="method-dd" className="flex items-center">

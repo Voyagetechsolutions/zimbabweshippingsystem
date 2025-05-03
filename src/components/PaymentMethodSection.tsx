@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
@@ -46,16 +45,30 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
         method: selectedPaymentMethod,
         payLaterMethod: selectedPaymentMethod === 'standard' ? payLaterMethod : null,
         finalAmount,
+        currency: 'GBP',
         isSpecialDeal,
         isPayOnArrival,
         originalAmount: totalAmount,
         discount: isSpecialDeal ? specialDealDiscount : 0,
-        premium: isPayOnArrival ? payOnArrivalPremium : 0
+        premium: isPayOnArrival ? payOnArrivalPremium : 0,
+        status: 'pending',
+        date: new Date().toISOString(),
+        receipt_number: `REC-${Date.now().toString().slice(-8)}`
       };
 
       await onComplete(paymentData);
       
-      navigate('/receipt');
+      // Navigate to receipt page with all the necessary data
+      navigate('/receipt', { 
+        state: { 
+          bookingData: {
+            ...bookingData,
+            paymentCompleted: true,
+            paymentData
+          },
+          paymentData
+        }
+      });
     } catch (error) {
       console.error('Payment processing error:', error);
       toast({
@@ -63,7 +76,6 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
         description: "There was a problem processing your payment. Please try again.",
         variant: "destructive",
       });
-    } finally {
       setIsProcessing(false);
     }
   };

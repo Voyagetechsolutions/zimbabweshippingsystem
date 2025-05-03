@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -287,16 +288,13 @@ const BookShipment = () => {
       }
     }
     
-    if (bookingData.shipmentDetails.includeOtherItems) {
-      setCurrentStep(BookingStep.CUSTOM_QUOTE);
-    } else {
-      navigate('/receipt', { 
-        state: { 
-          bookingData: updatedBookingData,
-          paymentData
-        }
-      });
-    }
+    // When payment is completed, always navigate to receipt page
+    navigate('/receipt', { 
+      state: { 
+        bookingData: updatedBookingData,
+        paymentData
+      }
+    });
   };
 
   return (
