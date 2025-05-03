@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
@@ -46,7 +47,7 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
       
       // Generate a tracking number if one doesn't exist
       const trackingNumber = bookingData?.shipmentDetails?.tracking_number || 
-                            'ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+                            `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
       
       // Create payment data with all necessary information
       const paymentData = {
