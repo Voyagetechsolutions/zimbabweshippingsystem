@@ -111,12 +111,6 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
         recipientDetails: enhancedRecipientDetails,
       };
 
-      console.log("Navigating to receipt with:", {
-  bookingData,
-  paymentData,
-  receiptData
-});
-
       console.log("Payment confirmation data:", { 
         bookingData: finalBookingData, 
         paymentData,

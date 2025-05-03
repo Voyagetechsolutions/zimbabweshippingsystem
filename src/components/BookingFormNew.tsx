@@ -414,15 +414,6 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     validateTab('payment');
   };
 
-  console.log("Submitting with data:", {
-  sender_details: {
-    firstName: data.firstName,
-    lastName: data.lastName,
-    // ... other sender fields
-  },
-  // ... other data
-});
-
   const onSubmit = async (data: BookingFormValues) => {
     // Validate that at least one shipment type is selected
     if (!data.includeDrums && !data.includeOtherItems) {
