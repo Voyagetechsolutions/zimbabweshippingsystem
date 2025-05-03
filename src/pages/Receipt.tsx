@@ -203,19 +203,19 @@ const Receipt = () => {
         id: bookingData.id || bookingData.shipment_id,
         
         // Ensure properly nested objects according to Receipt component expectations
-        sender_details: {
+        sender_details: bookingData.sender_details || bookingData.senderDetails || {
           name: bookingData.senderDetails?.name || `${bookingData.firstName || ""} ${bookingData.lastName || ""}`.trim(),
           email: bookingData.senderDetails?.email || bookingData.email,
           phone: bookingData.senderDetails?.phone || bookingData.phone,
           address: bookingData.senderDetails?.address || bookingData.pickupAddress
         },
-        recipient_details: {
+        recipient_details: bookingData.recipient_details || bookingData.recipientDetails || {
           name: bookingData.recipientDetails?.name || bookingData.recipientName,
           phone: bookingData.recipientDetails?.phone || bookingData.recipientPhone,
           additionalPhone: bookingData.recipientDetails?.additionalPhone || bookingData.additionalRecipientPhone,
           address: bookingData.recipientDetails?.address || bookingData.deliveryAddress
         },
-        shipment_details: {
+        shipment_details: bookingData.shipment_details || bookingData.shipmentDetails || {
           ...bookingData.shipmentDetails,
           tracking_number: tracking_number,
           type: bookingData.shipmentDetails?.type || (bookingData.includeDrums ? "drum" : "other"),
@@ -223,7 +223,7 @@ const Receipt = () => {
                     (bookingData.includeDrums ? parseInt(bookingData.drumQuantity || "1") : 1),
           services: bookingData.shipmentDetails?.services || []
         },
-        collection_info: {
+        collection_info: bookingData.collection_info || {
           pickup_address: bookingData.pickupAddress,
           pickup_postcode: bookingData.pickupPostcode,
           pickup_country: bookingData.pickupCountry,
@@ -318,7 +318,7 @@ const Receipt = () => {
           <div id="receipt-to-print">
             <ReceiptComponent 
               receipt={finalReceiptData} 
-              shipment={finalReceiptData?.shipmentDetails} 
+              shipment={finalReceiptData?.shipment_details || finalReceiptData?.shipmentDetails} 
             />
           </div>
           
