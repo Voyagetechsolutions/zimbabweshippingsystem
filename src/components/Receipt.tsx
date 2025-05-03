@@ -237,7 +237,7 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
           <div className="mb-3">
             <p className="text-sm font-medium">Pickup Address</p>
             <p className="text-red-600 font-medium">
-              {fullSenderDetails.address}
+              {collectionInfo.pickup_address || fullSenderDetails.address}
             </p>
           </div>
           
