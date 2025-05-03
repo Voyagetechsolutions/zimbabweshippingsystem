@@ -1,4 +1,5 @@
-
+console.log("Location state:", location.state);
+console.log("Receipt data:", receiptData);
 import React, { useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { formatDate, formatCurrency } from '@/utils/formatters';
