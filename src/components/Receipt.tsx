@@ -164,7 +164,7 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
             </div>
             
             <div>
-              <p className="text-sm font-medium">Description</p>
+              <p className="text-sm font-medium">Descriptionm</p>
               <p className="text-sm">
                 {fullShipmentDetails.type === 'other' 
                   ? (fullShipmentDetails.description || "Custom quote requested")
