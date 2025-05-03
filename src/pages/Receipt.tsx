@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, Link, useParams } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -55,6 +54,13 @@ const Receipt = () => {
           
           if (data) {
             setReceiptData(data);
+          } else {
+            // Handle case when no data is found
+            toast({
+              title: 'Receipt not found',
+              description: 'We could not find the receipt you requested',
+              variant: 'destructive'
+            });
           }
         } catch (error: any) {
           console.error('Error fetching receipt:', error);

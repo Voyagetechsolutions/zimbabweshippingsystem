@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole, UserRoleType } from '@/contexts/RoleContext';
@@ -23,6 +23,13 @@ const Dashboard = () => {
   const navigate = useNavigate();
   
   console.log('Dashboard - User:', user?.id, 'Role:', role, 'isAdmin:', hasPermission('admin'));
+  
+  useEffect(() => {
+    if (user && !isLoading && !role) {
+      // If no role is assigned, default to customer
+      console.log('No role assigned, defaulting to customer');
+    }
+  }, [user, role, isLoading]);
   
   // Handle loading state
   if (isLoading) {

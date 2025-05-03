@@ -19,3 +19,14 @@ export interface Receipt {
   collection_info: Json;
   payment_info: Json;
 }
+
+export interface PaymentInfo {
+  receipt_number?: string;
+  amount?: number;
+  currency?: string;
+  method?: string;
+  status?: string;
+  date?: string;
+  payment_id?: string;
+  [key: string]: any;
+}
