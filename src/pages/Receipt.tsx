@@ -11,6 +11,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import ReceiptComponent from '@/components/Receipt';
 import { generateUniqueId } from '@/utils/utils';
+import { Receipt as ReceiptType } from '@/types/receipt';
 
 /**
  * Receipt page component that displays a receipt for a shipment
@@ -82,7 +83,7 @@ const Receipt = () => {
     };
     
     fetchReceipt();
-  }, [receiptId, bookingData, toast]);
+  }, [receiptId, bookingData, receiptData, toast]);
 
   // Helper function to print the receipt
   const handlePrint = () => {
@@ -168,11 +169,8 @@ const Receipt = () => {
 
   // Generate a tracking number if none exists
   const generateTrackingNumber = () => {
-    // Similar logic to what's used in AdminDashboardContent
-    const prefix = 'TR';
-    const timestamp = Date.now().toString().slice(-6);
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    return `${prefix}${timestamp}${random}`;
+    // Using the same format as in BookingFormNew.tsx 
+    return `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
   };
 
   // Prepare the data for the receipt component
@@ -209,14 +207,15 @@ const Receipt = () => {
       
       // Generate tracking number if one doesn't exist
       const tracking_number = bookingData.shipmentDetails?.tracking_number || 
+                              bookingData.tracking_number || 
                               generateTrackingNumber();
       
-      // Ensure proper nesting of data according to what Receipt component expects
-      return {
+      // Create a properly structured receipt object from the booking data
+      const constructedReceiptData = {
         // Include booking data at the root level for fallbacks
         ...bookingData,
         
-        // Add standard receipt fields that the component expects
+        // Add standard receipt fields
         receipt_number: paymentData?.receipt_number || `REC-${Date.now().toString().slice(-8)}`,
         created_at: new Date().toISOString(),
         id: bookingData.id || bookingData.shipment_id,
@@ -251,6 +250,9 @@ const Receipt = () => {
         },
         payment_info: paymentData || {}
       };
+      
+      console.log("Constructed receipt data:", constructedReceiptData);
+      return constructedReceiptData;
     }
     
     // If we get here, we don't have usable data
