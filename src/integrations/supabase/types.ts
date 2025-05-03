@@ -379,42 +379,67 @@ export type Database = {
       }
       receipts: {
         Row: {
-          collection_info: Json
+          amount: number | null
+          collection_info: Json | null
           created_at: string
+          currency: string | null
           id: string
-          payment_info: Json
-          recipient_details: Json
-          sender_details: Json
-          shipment_details: Json
+          payment_id: string | null
+          payment_info: Json | null
+          payment_method: string | null
+          receipt_number: string | null
+          recipient_details: Json | null
+          sender_details: Json | null
+          shipment_details: Json | null
           shipment_id: string | null
+          status: string | null
           updated_at: string
           user_id: string | null
         }
         Insert: {
-          collection_info?: Json
+          amount?: number | null
+          collection_info?: Json | null
           created_at?: string
+          currency?: string | null
           id?: string
-          payment_info?: Json
-          recipient_details?: Json
-          sender_details?: Json
-          shipment_details?: Json
+          payment_id?: string | null
+          payment_info?: Json | null
+          payment_method?: string | null
+          receipt_number?: string | null
+          recipient_details?: Json | null
+          sender_details?: Json | null
+          shipment_details?: Json | null
           shipment_id?: string | null
+          status?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Update: {
-          collection_info?: Json
+          amount?: number | null
+          collection_info?: Json | null
           created_at?: string
+          currency?: string | null
           id?: string
-          payment_info?: Json
-          recipient_details?: Json
-          sender_details?: Json
-          shipment_details?: Json
+          payment_id?: string | null
+          payment_info?: Json | null
+          payment_method?: string | null
+          receipt_number?: string | null
+          recipient_details?: Json | null
+          sender_details?: Json | null
+          shipment_details?: Json | null
           shipment_id?: string | null
+          status?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "receipts_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "receipts_shipment_id_fkey"
             columns: ["shipment_id"]
