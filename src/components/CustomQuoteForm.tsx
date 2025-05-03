@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -69,8 +70,13 @@ const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({ bookingData, onSubmit
           return;
         }
         
-        const imageUrl = `${supabase.storageUrl}/object/public/${data.Key}`;
-        newImageUrls.push(imageUrl);
+        // Fix: Generate public URL correctly using createSignedUrl or getPublicUrl
+        const { data: publicUrlData } = supabase
+          .storage
+          .from('custom-quote-images')
+          .getPublicUrl(data.path);
+        
+        newImageUrls.push(publicUrlData.publicUrl);
         
         toast({
           title: "Upload Complete",

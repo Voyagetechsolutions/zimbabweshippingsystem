@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { Json } from '@/integrations/supabase/types';
+import { Receipt as ReceiptType } from '@/types/receipt';
 import {
   Card,
   CardContent,
@@ -47,7 +48,6 @@ import {
 } from 'lucide-react';
 import { RecentShipments } from '@/components/customer/RecentShipments';
 import { useToast } from '@/hooks/use-toast';
-import { Receipt as ReceiptType } from '@/types/receipt';
 
 interface ShipmentMetadata {
   pickup_date?: string;
@@ -217,8 +217,35 @@ const CustomerDashboard = () => {
           throw error;
         }
         
-        console.log('Fetched customer receipts:', data?.length);
-        return data as ReceiptType[] || [];
+        // Map the receipts to ensure they match the ReceiptType interface
+        const typedReceipts = data?.map(receipt => ({
+          id: receipt.id,
+          user_id: receipt.user_id,
+          shipment_id: receipt.shipment_id,
+          receipt_number: receipt?.payment_info?.receipt_number || receipt.id.substring(0, 8),
+          amount: typeof receipt?.payment_info?.amount === 'number' 
+            ? receipt.payment_info.amount 
+            : undefined,
+          currency: typeof receipt?.payment_info?.currency === 'string' 
+            ? receipt.payment_info.currency 
+            : 'GBP',
+          payment_method: typeof receipt?.payment_info?.method === 'string' 
+            ? receipt.payment_info.method 
+            : undefined,
+          status: typeof receipt?.payment_info?.status === 'string' 
+            ? receipt.payment_info.status 
+            : 'completed',
+          created_at: receipt.created_at,
+          updated_at: receipt.updated_at,
+          sender_details: receipt.sender_details,
+          recipient_details: receipt.recipient_details,
+          shipment_details: receipt.shipment_details,
+          collection_info: receipt.collection_info,
+          payment_info: receipt.payment_info,
+        })) as ReceiptType[];
+        
+        console.log('Fetched customer receipts:', typedReceipts?.length);
+        return typedReceipts || [];
       } catch (error: any) {
         console.error('Error in receipts query function:', error.message);
         toast({
@@ -325,6 +352,24 @@ const CustomerDashboard = () => {
   };
 
   const loadingArray = [1, 2, 3, 4, 5];
+
+  // Helper function to safely stringify JSON data for display
+  const formatJsonValue = (value: Json | undefined): React.ReactNode => {
+    if (value === null || value === undefined) {
+      return "N/A";
+    }
+    
+    if (typeof value === 'string') {
+      return value;
+    }
+    
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+    
+    // If it's an object or array, convert to string
+    return JSON.stringify(value);
+  };
 
   return (
     <div className="space-y-8">
@@ -546,16 +591,22 @@ const CustomerDashboard = () => {
                     <TableBody>
                       {receipts.map((receipt) => (
                         <TableRow key={receipt.id}>
-                          <TableCell className="font-medium">{receipt.receipt_number || receipt.id.substring(0, 8)}</TableCell>
+                          <TableCell className="font-medium">
+                            {receipt.receipt_number || receipt.id.substring(0, 8)}
+                          </TableCell>
                           <TableCell className="hidden md:table-cell">
                             {receipt.currency || "GBP"} {receipt.amount?.toFixed(2) || 
-                              (typeof receipt.payment_info === 'object' && receipt.payment_info && 
-                              'amount' in receipt.payment_info ? Number(receipt.payment_info.amount).toFixed(2) : "N/A")}
+                              formatJsonValue(
+                                typeof receipt.payment_info === 'object' && receipt.payment_info && 
+                                'amount' in receipt.payment_info ? receipt.payment_info.amount : "N/A"
+                              )}
                           </TableCell>
                           <TableCell className="hidden md:table-cell capitalize">
                             {receipt.payment_method || 
-                              (typeof receipt.payment_info === 'object' && receipt.payment_info && 
-                              'method' in receipt.payment_info ? receipt.payment_info.method : "N/A")}
+                              formatJsonValue(
+                                typeof receipt.payment_info === 'object' && receipt.payment_info && 
+                                'method' in receipt.payment_info ? receipt.payment_info.method : "N/A"
+                              )}
                           </TableCell>
                           <TableCell className="hidden md:table-cell text-sm text-gray-500">
                             {format(new Date(receipt.created_at), 'MMM d, yyyy')}
