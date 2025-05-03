@@ -440,7 +440,7 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
     setIsSubmitting(true);
     
     try {
-      const trackingNumber = `ZIt${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+      const trackingNumber = `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
       const shipmentId = generateUniqueId();
       
       data.additionalDeliveryAddresses = additionalAddresses;
