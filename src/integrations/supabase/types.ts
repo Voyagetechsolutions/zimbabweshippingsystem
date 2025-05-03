@@ -379,55 +379,42 @@ export type Database = {
       }
       receipts: {
         Row: {
-          amount: number
+          collection_info: Json
           created_at: string
-          currency: string
           id: string
-          payment_id: string
-          payment_method: string
-          receipt_number: string
+          payment_info: Json
           recipient_details: Json
           sender_details: Json
           shipment_details: Json
-          shipment_id: string
-          status: string
+          shipment_id: string | null
+          updated_at: string
+          user_id: string | null
         }
         Insert: {
-          amount: number
+          collection_info?: Json
           created_at?: string
-          currency?: string
           id?: string
-          payment_id: string
-          payment_method: string
-          receipt_number: string
-          recipient_details: Json
-          sender_details: Json
-          shipment_details: Json
-          shipment_id: string
-          status?: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          currency?: string
-          id?: string
-          payment_id?: string
-          payment_method?: string
-          receipt_number?: string
+          payment_info?: Json
           recipient_details?: Json
           sender_details?: Json
           shipment_details?: Json
-          shipment_id?: string
-          status?: string
+          shipment_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          collection_info?: Json
+          created_at?: string
+          id?: string
+          payment_info?: Json
+          recipient_details?: Json
+          sender_details?: Json
+          shipment_details?: Json
+          shipment_id?: string | null
+          updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "receipts_payment_id_fkey"
-            columns: ["payment_id"]
-            isOneToOne: false
-            referencedRelation: "payments"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "receipts_shipment_id_fkey"
             columns: ["shipment_id"]

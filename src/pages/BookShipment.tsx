@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -205,6 +206,30 @@ const BookShipment = () => {
         is_read: false
       });
       
+      // After custom quote submission, we should store the receipt in the database
+      if (bookingData.user_id) {
+        try {
+          // Create a receipt record in the database
+          const receiptData = {
+            user_id: bookingData.user_id,
+            shipment_id: shipmentUuid,
+            sender_details: bookingData.senderDetails,
+            recipient_details: bookingData.recipientDetails,
+            shipment_details: bookingData.shipmentDetails,
+            collection_info: {
+              pickup_address: bookingData.pickupAddress,
+              pickup_postcode: bookingData.pickupPostcode,
+              pickup_country: bookingData.pickupCountry
+            },
+            payment_info: bookingData.paymentCompleted ? bookingData.paymentData : { status: 'pending' }
+          };
+          
+          await supabase.from('receipts').insert(receiptData);
+        } catch (receiptError) {
+          console.error("Error storing receipt:", receiptError);
+        }
+      }
+      
       if (bookingData.paymentCompleted) {
         navigate('/receipt', { 
           state: { 
@@ -233,6 +258,35 @@ const BookShipment = () => {
       paymentData
     };
     setBookingData(updatedBookingData);
+    
+    // Store the receipt in the database after payment
+    if (bookingData.user_id) {
+      try {
+        let shipmentUuid = bookingData.shipment_id;
+        if (typeof shipmentUuid === 'string' && shipmentUuid.startsWith('shp_')) {
+          shipmentUuid = shipmentUuid.substring(4);
+        }
+        
+        // Create a receipt record in the database
+        const receiptData = {
+          user_id: bookingData.user_id,
+          shipment_id: shipmentUuid,
+          sender_details: bookingData.senderDetails,
+          recipient_details: bookingData.recipientDetails,
+          shipment_details: bookingData.shipmentDetails,
+          collection_info: {
+            pickup_address: bookingData.pickupAddress,
+            pickup_postcode: bookingData.pickupPostcode,
+            pickup_country: bookingData.pickupCountry
+          },
+          payment_info: paymentData
+        };
+        
+        supabase.from('receipts').insert(receiptData);
+      } catch (error) {
+        console.error("Error storing receipt:", error);
+      }
+    }
     
     if (bookingData.shipmentDetails.includeOtherItems) {
       setCurrentStep(BookingStep.CUSTOM_QUOTE);
