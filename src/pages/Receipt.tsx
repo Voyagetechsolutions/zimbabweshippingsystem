@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useLocation, Link, useParams } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -11,7 +12,6 @@ import jsPDF from 'jspdf';
 import ReceiptComponent from '@/components/Receipt';
 import { generateUniqueId } from '@/utils/utils';
 import { Receipt as ReceiptType } from '@/types/receipt';
-import { Shipment } from '@/types/shipment';
 
 /**
  * Receipt page component that displays a receipt for a shipment
@@ -32,7 +32,7 @@ const Receipt = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  console.log("Receipt page mounted with data:", { 
+  console.log("Receipt page mounted with state data:", { 
     bookingData, 
     paymentData, 
     customQuoteData, 
@@ -167,17 +167,37 @@ const Receipt = () => {
     });
   };
 
+  // Generate a tracking number if none exists
+  const generateTrackingNumber = () => {
+    // Using the same format as in BookingFormNew.tsx 
+    return `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+  };
+
   // Prepare the data for the receipt component
   const prepareReceiptData = () => {
     // First try to use the receipt data passed directly
     if (receiptData) {
       console.log("Using receiptData passed via location state");
+      // Ensure there's a tracking number
+      if (!receiptData.shipment_details?.tracking_number) {
+        receiptData.shipment_details = {
+          ...receiptData.shipment_details,
+          tracking_number: generateTrackingNumber()
+        };
+      }
       return receiptData;
     }
     
     // Then try fetched receipt data
     if (fetchedReceiptData) {
       console.log("Using fetchedReceiptData from database");
+      // Ensure there's a tracking number
+      if (!fetchedReceiptData.shipment_details?.tracking_number) {
+        fetchedReceiptData.shipment_details = {
+          ...fetchedReceiptData.shipment_details,
+          tracking_number: generateTrackingNumber()
+        };
+      }
       return fetchedReceiptData;
     }
     
@@ -185,12 +205,10 @@ const Receipt = () => {
     if (bookingData) {
       console.log("Constructing receipt data from bookingData and paymentData");
       
-      // Use the tracking number directly from the booking data
+      // Generate tracking number if one doesn't exist
       const tracking_number = bookingData.shipmentDetails?.tracking_number || 
                               bookingData.tracking_number || 
-                              bookingData.metadata?.tracking_number;
-      
-      console.log("Using tracking number:", tracking_number);
+                              generateTrackingNumber();
       
       // Create a properly structured receipt object from the booking data
       const constructedReceiptData = {
@@ -217,10 +235,11 @@ const Receipt = () => {
         },
         shipment_details: {
           ...bookingData.shipmentDetails,
-          tracking_number: tracking_number, // Use the passed tracking number
-          type: bookingData.includeDrums ? "drum" : "other",
-          quantity: bookingData.includeDrums ? parseInt(bookingData.drumQuantity || "1") : 1,
-          services: []
+          tracking_number: tracking_number,
+          type: bookingData.shipmentDetails?.type || (bookingData.includeDrums ? "drum" : "other"),
+          quantity: bookingData.shipmentDetails?.quantity || 
+                    (bookingData.includeDrums ? parseInt(bookingData.drumQuantity || "1") : 1),
+          services: bookingData.shipmentDetails?.services || []
         },
         collection_info: {
           pickup_address: bookingData.pickupAddress,
@@ -229,12 +248,7 @@ const Receipt = () => {
           date: bookingData.collectionDate || "Next available collection date",
           area: bookingData.collectionArea || bookingData.pickupCountry || "Collection area not specified"
         },
-        payment_info: paymentData || {
-          method: bookingData.paymentMethod,
-          amount: bookingData.price || bookingData.metadata?.amountPaid,
-          finalAmount: bookingData.price || bookingData.metadata?.amountPaid,
-          status: paymentData?.status || 'pending'
-        }
+        payment_info: paymentData || {}
       };
       
       console.log("Constructed receipt data:", constructedReceiptData);

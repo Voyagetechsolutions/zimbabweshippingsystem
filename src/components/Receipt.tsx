@@ -8,7 +8,6 @@ import { Download, Mail, Printer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import Logo from '@/components/Logo';
 
 /**
  * Receipt component that displays detailed shipment receipt information
@@ -41,13 +40,11 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
   // Extract shipment details from receipt data
   const shipmentDetails = shipment || receipt.shipment_details || receipt.shipmentDetails || {};
   
-  // Get tracking number from various possible sources with priority to the original one from BookingForm
-  const trackingNumber = receipt.tracking_number || 
-                        shipmentDetails?.tracking_number || 
-                        receipt.metadata?.tracking_number || 
+  // Get tracking number from various possible sources
+  const trackingNumber = shipmentDetails?.tracking_number || 
+                        (receipt.metadata?.tracking_number) || 
+                        (receipt.tracking_number) ||
                         "Not assigned yet";
-  
-  console.log("Using tracking number in Receipt component:", trackingNumber);
   
   // Extract payment information from receipt data
   const paymentInfo = receipt.payment_info || receipt.paymentData || {};
@@ -67,7 +64,6 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
     name: senderDetails.name || 
           (receipt.firstName && receipt.lastName ? `${receipt.firstName} ${receipt.lastName}`.trim() : '') || 
           receipt.fullName || 
-          receipt.name ||
           "Not provided",
     email: senderDetails.email || receipt.email || "Not provided",
     phone: senderDetails.phone || receipt.phone || "Not provided",
@@ -87,10 +83,8 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
   const fullShipmentDetails = {
     ...shipmentDetails,
     tracking_number: trackingNumber,
-    type: shipmentDetails.type || receipt.metadata?.shipmentType || (receipt.includeDrums ? "drum" : "other"),
-    quantity: shipmentDetails.quantity || 
-              receipt.metadata?.drumQuantity || 
-              (receipt.includeDrums ? parseInt(receipt.drumQuantity || "1") : 1),
+    type: shipmentDetails.type || (receipt.includeDrums ? "drum" : "other"),
+    quantity: shipmentDetails.quantity || (receipt.includeDrums ? parseInt(receipt.drumQuantity || "1") : 1),
     services: shipmentDetails.services || [],
     metadata: shipmentDetails.metadata || receipt.metadata || {}
   };
@@ -113,8 +107,20 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
       {/* Company logo and header */}
       <div className="flex justify-between items-center mb-6 border-b pb-4">
         <div className="flex items-center">
-          {/* Company Logo - Using Logo component */}
-          <Logo size="medium" />
+          {/* Company Logo - Using the Zimbabwe Shipping logo */}
+          <div className="w-20 h-20 mr-4">
+            <AspectRatio ratio={1/1}>
+              <img 
+                src="/lovable-uploads/78cfc0fd-e229-403f-89ae-d65d40e6befc.png" 
+                alt="Zimbabwe Shipping Logo" 
+                className="rounded-full object-contain"
+              />
+            </AspectRatio>
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold">Zimbabwe Shipping</h2>
+            <p className="text-sm text-gray-600">UK to Zimbabwe Express</p>
+          </div>
         </div>
         
         <div className="text-right">
@@ -158,10 +164,10 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
             </div>
             
             <div>
-              <p className="text-sm font-medium">Description</p>
+              <p className="text-sm font-medium">Descriptionm</p>
               <p className="text-sm">
                 {fullShipmentDetails.type === 'other' 
-                  ? (fullShipmentDetails.description || receipt.description || receipt.metadata?.description || "Custom quote requested")
+                  ? (fullShipmentDetails.description || "Custom quote requested")
                   : fullShipmentDetails.type === 'drum' 
                     ? `${fullShipmentDetails.quantity || 0} Drum${(fullShipmentDetails.quantity || 0) > 1 ? 's' : ''}` 
                     : "Other items"
@@ -193,7 +199,7 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
             {fullShipmentDetails.type === 'other' && (
               <div>
                 <p className="text-sm font-medium">Category</p>
-                <p className="text-sm">{fullShipmentDetails.category || receipt.itemCategory || receipt.metadata?.category || "Not specified"}</p>
+                <p className="text-sm">{fullShipmentDetails.category || receipt.itemCategory || "Not specified"}</p>
               </div>
             )}
           </div>
@@ -205,7 +211,7 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
                   <p className="text-sm font-medium">Amount</p>
-                  <p className="text-sm">{formatCurrency(paymentInfo.finalAmount || paymentInfo.amount || receipt.metadata?.amountPaid || receipt.price || 0, paymentInfo.currency || 'GBP')}</p>
+                  <p className="text-sm">{formatCurrency(paymentInfo.finalAmount || paymentInfo.amount || receipt.metadata?.amountPaid || 0, paymentInfo.currency || 'GBP')}</p>
                 </div>
                 
                 <div>
