@@ -67,10 +67,26 @@ const BookShipment = () => {
       const doorToDoorCost = doorToDoorAddresses * 25;
       const finalAmount = amount + metalSealCost + doorToDoorCost;
       
+      // Improved structure to ensure data is properly formatted for the receipt
       setBookingData({
         ...data,
         shipment_id: shipmentId,
         user_id: user?.id || null,
+        // Add these for flat access
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phone: data.phone,
+        pickupAddress: data.pickupAddress,
+        pickupPostcode: data.pickupPostcode,
+        pickupCity: data.pickupCity,
+        pickupCountry: data.pickupCountry,
+        recipientName: data.recipientName,
+        recipientPhone: data.recipientPhone,
+        additionalRecipientPhone: data.additionalRecipientPhone,
+        deliveryAddress: data.deliveryAddress,
+        deliveryCity: data.deliveryCity,
+        // Properly formatted nested objects for the receipt
         senderDetails: {
           name: `${data.firstName} ${data.lastName}`,
           email: data.email,
@@ -271,6 +287,11 @@ const BookShipment = () => {
         const receiptData = {
           user_id: bookingData.user_id,
           shipment_id: shipmentUuid,
+          receipt_number: paymentData.receipt_number,
+          amount: paymentData.finalAmount,
+          currency: paymentData.currency || 'GBP',
+          payment_method: paymentData.method,
+          status: paymentData.status || 'pending',
           sender_details: bookingData.senderDetails,
           recipient_details: bookingData.recipientDetails,
           shipment_details: bookingData.shipmentDetails,
@@ -282,17 +303,52 @@ const BookShipment = () => {
           payment_info: paymentData
         };
         
+        console.log("Storing receipt data:", receiptData);
         supabase.from('receipts').insert(receiptData);
       } catch (error) {
         console.error("Error storing receipt:", error);
       }
     }
     
-    // When payment is completed, always navigate to receipt page
+    // When payment is completed, navigate to receipt page with complete data
     navigate('/receipt', { 
       state: { 
         bookingData: updatedBookingData,
-        paymentData
+        paymentData,
+        receiptData: {
+          receipt_number: paymentData.receipt_number,
+          id: bookingData.id || bookingData.shipment_id,
+          created_at: new Date().toISOString(),
+          
+          // Structured sender details
+          sender_details: {
+            name: bookingData.senderDetails?.name,
+            email: bookingData.senderDetails?.email || bookingData.email,
+            phone: bookingData.senderDetails?.phone || bookingData.phone,
+            address: bookingData.senderDetails?.address || bookingData.pickupAddress
+          },
+          
+          // Structured recipient details
+          recipient_details: {
+            name: bookingData.recipientDetails?.name,
+            phone: bookingData.recipientDetails?.phone,
+            additionalPhone: bookingData.recipientDetails?.additionalPhone,
+            address: bookingData.recipientDetails?.address
+          },
+          
+          // Structured shipment details
+          shipment_details: bookingData.shipmentDetails,
+          
+          // Collection information
+          collection_info: {
+            pickup_address: bookingData.pickupAddress,
+            pickup_postcode: bookingData.pickupPostcode,
+            pickup_country: bookingData.pickupCountry
+          },
+          
+          // Payment information
+          payment_info: paymentData
+        }
       }
     });
   };

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -78,6 +79,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       }
 
       const transactionId = generateUniqueId('TX-');
+      const receiptNumber = `REC-${Date.now().toString().slice(-8)}`;
       
       const currentUserId = user?.id || userId || bookingData.user_id || null;
       
@@ -111,21 +113,38 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         throw paymentError;
       }
 
-      const receiptNumber = `REC-${Date.now().toString().slice(-8)}`;
+      // Prepare receipt data for both the database and React Router navigation
+      const completeReceiptData = {
+        shipment_id: shipmentUuid,
+        payment_id: paymentData.id,
+        receipt_number: receiptNumber,
+        amount: finalAmount,
+        currency: 'GBP',
+        payment_method: paymentMethod,
+        status: 'pending',
+        sender_details: bookingData.senderDetails || {},
+        recipient_details: bookingData.recipientDetails || {},
+        shipment_details: bookingData.shipmentDetails || {},
+        collection_info: {
+          pickup_address: bookingData.pickupAddress,
+          pickup_postcode: bookingData.pickupPostcode,
+          pickup_country: bookingData.pickupCountry
+        },
+        payment_info: {
+          finalAmount,
+          method: paymentMethod,
+          status: 'pending',
+          date: new Date().toISOString(),
+          receipt_number: receiptNumber,
+          transaction_id: transactionId
+        }
+      };
       
       const { data: receiptData, error: receiptError } = await supabase
         .from('receipts')
         .insert({
-          shipment_id: shipmentUuid,
-          payment_id: paymentData.id,
-          receipt_number: receiptNumber,
-          amount: finalAmount,
-          currency: 'GBP',
-          payment_method: paymentMethod,
-          status: 'pending',
-          sender_details: bookingData.senderDetails,
-          recipient_details: bookingData.recipientDetails,
-          shipment_details: bookingData.shipmentDetails
+          user_id: currentUserId,
+          ...completeReceiptData
         })
         .select()
         .single();
@@ -167,19 +186,15 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         description: 'Your shipment has been booked successfully.',
       });
       
-      // Instead of navigating to payment-success, go directly to receipt page with all data
+      // Navigate to receipt page with complete data
       navigate('/receipt', {
         state: { 
-          bookingData,
-          receiptData,
-          paymentData: {
-            method: paymentMethod,
-            finalAmount,
-            currency: 'GBP',
-            status: 'pending',
-            date: new Date().toISOString(),
-            receipt_number: receiptNumber
-          }
+          bookingData: {
+            ...bookingData,
+            paymentCompleted: true
+          },
+          receiptData: completeReceiptData,
+          paymentData: completeReceiptData.payment_info
         }
       });
     } catch (error: any) {

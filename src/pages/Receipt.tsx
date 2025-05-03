@@ -1,11 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+
+import React, { useEffect, useState } from 'react';
 import { useLocation, Link, useParams } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useToast } from '@/hooks/use-toast';
-import { formatDate, formatCurrency } from '@/utils/formatters';
 import { supabase } from '@/integrations/supabase/client';
-import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Button } from '@/components/ui/button';
 import { Download, Mail, Printer } from 'lucide-react';
 import html2canvas from 'html2canvas';
@@ -26,15 +25,12 @@ const Receipt = () => {
   // Get receipt ID from URL params
   const { id: receiptId } = useParams();
   
-  // Reference for the receipt to be printed/downloaded
-  const receiptRef = useRef<HTMLDivElement>(null);
-  
   // State for storing receipt data from database if needed
   const [fetchedReceiptData, setFetchedReceiptData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  console.log("Receipt page mounted with data:", { bookingData, paymentData, customQuoteData, receiptData });
+  console.log("Receipt page mounted with state data:", { bookingData, paymentData, customQuoteData, receiptData });
 
   // Effect to fetch data from Supabase if not passed via location
   useEffect(() => {
@@ -103,7 +99,8 @@ const Receipt = () => {
 
   // Helper function to download the receipt as PDF
   const handleDownload = async () => {
-    if (!receiptRef.current) return;
+    const receiptElement = document.getElementById('receipt-to-print');
+    if (!receiptElement) return;
     
     try {
       setIsLoading(true);
@@ -112,7 +109,7 @@ const Receipt = () => {
         description: "Generating your receipt PDF...",
       });
       
-      const canvas = await html2canvas(receiptRef.current, {
+      const canvas = await html2canvas(receiptElement, {
         scale: 2,
         logging: false,
         useCORS: true,
@@ -133,7 +130,10 @@ const Receipt = () => {
       const imgX = (pdfWidth - imgWidth * ratio) / 2;
       
       pdf.addImage(imgData, 'PNG', imgX, 0, imgWidth * ratio, imgHeight * ratio);
-      pdf.save(`shipping-receipt-${bookingData?.shipment_id || receiptData?.id || 'download'}.pdf`);
+      
+      // Use receipt number or ID for the filename
+      const receiptNumber = receiptData?.receipt_number || bookingData?.receipt_number || 'receipt';
+      pdf.save(`shipping-receipt-${receiptNumber}.pdf`);
       
       toast({
         title: "Download Complete",
@@ -160,21 +160,65 @@ const Receipt = () => {
     });
   };
 
-  // Use receiptData from location.state (from PaymentProcessor) or fetchedReceiptData from database
-  // or directly use bookingData and paymentData to construct receipt data
-  const data = receiptData || fetchedReceiptData || {
-    ...bookingData,
-    payment_info: paymentData,
-    sender_details: bookingData?.senderDetails || {},
-    recipient_details: bookingData?.recipientDetails || {},
-    shipment_details: bookingData?.shipmentDetails || {},
-    collection_info: {
-      pickup_address: bookingData?.pickupAddress,
-      pickup_postcode: bookingData?.pickupPostcode,
-      pickup_country: bookingData?.pickupCountry
+  // Prepare the data for the receipt component
+  const prepareReceiptData = () => {
+    // First try to use the receipt data passed directly
+    if (receiptData) {
+      console.log("Using receiptData passed via location state");
+      return receiptData;
     }
+    
+    // Then try fetched receipt data
+    if (fetchedReceiptData) {
+      console.log("Using fetchedReceiptData from database");
+      return fetchedReceiptData;
+    }
+    
+    // Finally, construct from booking and payment data
+    if (bookingData) {
+      console.log("Constructing receipt data from bookingData and paymentData");
+      // Ensure proper nesting of data according to what Receipt component expects
+      return {
+        // Include booking data at the root level for fallbacks
+        ...bookingData,
+        
+        // Add standard receipt fields that the component expects
+        receipt_number: paymentData?.receipt_number || `REC-${Date.now().toString().slice(-8)}`,
+        created_at: new Date().toISOString(),
+        id: bookingData.id || bookingData.shipment_id,
+        
+        // Ensure properly nested objects according to Receipt component expectations
+        sender_details: {
+          name: bookingData.senderDetails?.name || `${bookingData.firstName || ""} ${bookingData.lastName || ""}`.trim(),
+          email: bookingData.senderDetails?.email || bookingData.email,
+          phone: bookingData.senderDetails?.phone || bookingData.phone,
+          address: bookingData.senderDetails?.address || bookingData.pickupAddress
+        },
+        recipient_details: {
+          name: bookingData.recipientDetails?.name || bookingData.recipientName,
+          phone: bookingData.recipientDetails?.phone || bookingData.recipientPhone,
+          additionalPhone: bookingData.recipientDetails?.additionalPhone || bookingData.additionalRecipientPhone,
+          address: bookingData.recipientDetails?.address || bookingData.deliveryAddress
+        },
+        shipment_details: bookingData.shipmentDetails || {},
+        collection_info: {
+          pickup_address: bookingData.pickupAddress,
+          pickup_postcode: bookingData.pickupPostcode,
+          pickup_country: bookingData.pickupCountry,
+          date: bookingData.collectionDate || "Next available collection date",
+          area: bookingData.collectionArea || bookingData.pickupCountry || "Collection area not specified"
+        },
+        payment_info: paymentData || {}
+      };
+    }
+    
+    // If we get here, we don't have usable data
+    return null;
   };
-  
+
+  const finalReceiptData = prepareReceiptData();
+  console.log("Final data prepared for ReceiptComponent:", finalReceiptData);
+
   // If we have no data to display and still loading, show loading state
   if (isLoading) {
     return (
@@ -192,7 +236,7 @@ const Receipt = () => {
   }
   
   // If we have no data to display and not loading, show error message
-  if (!data && !bookingData) {
+  if (!finalReceiptData) {
     return (
       <>
         <Navbar />
@@ -209,8 +253,6 @@ const Receipt = () => {
       </>
     );
   }
-
-  console.log("Final data being passed to ReceiptComponent:", data);
 
   return (
     <>
@@ -248,9 +290,9 @@ const Receipt = () => {
           </div>
           
           {/* Receipt content - using the receipt component */}
-          <div ref={receiptRef}>
+          <div id="receipt-to-print">
             <ReceiptComponent 
-              receipt={data} 
+              receipt={finalReceiptData} 
               shipment={bookingData?.shipmentDetails} 
             />
           </div>

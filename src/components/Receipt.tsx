@@ -112,7 +112,7 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
   const recipientDetails = receipt.recipient_details || receipt.recipientDetails || {};
   
   // Extract shipment details from receipt data
-  const shipmentDetails = receipt.shipment_details || receipt.shipmentDetails || shipment || {};
+  const shipmentDetails = shipment || receipt.shipment_details || receipt.shipmentDetails || {};
   
   // Extract payment information from receipt data
   const paymentInfo = receipt.payment_info || receipt.paymentData || {};
@@ -122,8 +122,8 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
     pickup_address: receipt.pickupAddress,
     pickup_postcode: receipt.pickupPostcode,
     pickup_country: receipt.pickupCountry,
-    date: "Next available collection date",
-    area: "Collection area not specified"
+    date: receipt.collectionDate || "Next available collection date",
+    area: receipt.collectionArea || "Collection area not specified"
   };
 
   return (

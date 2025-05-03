@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
@@ -40,6 +41,9 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
   const handleConfirm = async () => {
     setIsProcessing(true);
     try {
+      // Generate a receipt number
+      const receiptNumber = `REC-${Date.now().toString().slice(-8)}`;
+      
       // Create payment data with all necessary information
       const paymentData = {
         method: selectedPaymentMethod,
@@ -53,14 +57,19 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
         premium: isPayOnArrival ? payOnArrivalPremium : 0,
         status: 'pending',
         date: new Date().toISOString(),
-        receipt_number: `REC-${Date.now().toString().slice(-8)}`
+        receipt_number: receiptNumber
       };
 
       // Merge all booking data for the receipt
       const finalBookingData = {
         ...bookingData,
+        receipt_number: receiptNumber,
         paymentCompleted: true,
-        paymentData
+        paymentData,
+        // Add flat properties for easier access in the Receipt component
+        paymentMethod: selectedPaymentMethod,
+        finalAmount,
+        paymentDate: paymentData.date
       };
 
       console.log("Payment confirmation data:", { bookingData: finalBookingData, paymentData });
@@ -72,7 +81,44 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
       navigate('/receipt', { 
         state: { 
           bookingData: finalBookingData,
-          paymentData
+          paymentData,
+          // Create a properly structured receiptData object
+          receiptData: {
+            receipt_number: receiptNumber,
+            id: bookingData.id || bookingData.shipment_id,
+            created_at: new Date().toISOString(),
+            
+            // Structured sender details
+            sender_details: {
+              name: bookingData.senderDetails?.name || `${bookingData.firstName || ""} ${bookingData.lastName || ""}`.trim(),
+              email: bookingData.senderDetails?.email || bookingData.email,
+              phone: bookingData.senderDetails?.phone || bookingData.phone,
+              address: bookingData.senderDetails?.address || bookingData.pickupAddress
+            },
+            
+            // Structured recipient details
+            recipient_details: {
+              name: bookingData.recipientDetails?.name || bookingData.recipientName,
+              phone: bookingData.recipientDetails?.phone || bookingData.recipientPhone,
+              additionalPhone: bookingData.recipientDetails?.additionalPhone || bookingData.additionalRecipientPhone,
+              address: bookingData.recipientDetails?.address || bookingData.deliveryAddress
+            },
+            
+            // Structured shipment details
+            shipment_details: bookingData.shipmentDetails || {},
+            
+            // Collection information
+            collection_info: {
+              pickup_address: bookingData.pickupAddress,
+              pickup_postcode: bookingData.pickupPostcode,
+              pickup_country: bookingData.pickupCountry,
+              date: bookingData.collectionDate || "Next available collection date",
+              area: bookingData.collectionArea || bookingData.pickupCountry || "Collection area not specified"
+            },
+            
+            // Payment information
+            payment_info: paymentData
+          }
         }
       });
     } catch (error) {
@@ -248,3 +294,4 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
     </Card>
   );
 };
+
