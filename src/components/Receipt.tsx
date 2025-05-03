@@ -15,6 +15,10 @@ import jsPDF from 'jspdf';
  * @param {Object} props.receipt - Receipt data including sender, recipient, and payment details
  * @param {Object} props.shipment - Shipment data related to this receipt
  */
+
+console.log("ReceiptComponent received receipt:", receipt);
+console.log("ReceiptComponent received shipment:", shipment);
+
 const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
   const receiptRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
