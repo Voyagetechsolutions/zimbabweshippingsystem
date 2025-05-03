@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, Link, useParams } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -83,9 +82,7 @@ const Receipt = () => {
     fetchReceipt();
   }, [receiptId, bookingData, toast]);
 
-  /**
-   * Helper function to print the receipt
-   */
+  // Helper function to print the receipt
   const handlePrint = () => {
     const printContent = document.getElementById('receipt-to-print');
     const originalContents = document.body.innerHTML;
@@ -104,9 +101,7 @@ const Receipt = () => {
     }
   };
 
-  /**
-   * Helper function to download the receipt as PDF
-   */
+  // Helper function to download the receipt as PDF
   const handleDownload = async () => {
     if (!receiptRef.current) return;
     
@@ -156,10 +151,7 @@ const Receipt = () => {
     }
   };
 
-  /**
-   * Helper function to email the receipt
-   * This would typically integrate with an edge function to send emails
-   */
+  // Helper function to email the receipt
   const handleEmail = async () => {
     // In a real implementation, this would call a serverless function to send an email
     toast({
@@ -169,7 +161,19 @@ const Receipt = () => {
   };
 
   // Use receiptData from location.state (from PaymentProcessor) or fetchedReceiptData from database
-  const data = receiptData || fetchedReceiptData || bookingData;
+  // or directly use bookingData and paymentData to construct receipt data
+  const data = receiptData || fetchedReceiptData || {
+    ...bookingData,
+    payment_info: paymentData,
+    sender_details: bookingData?.senderDetails || {},
+    recipient_details: bookingData?.recipientDetails || {},
+    shipment_details: bookingData?.shipmentDetails || {},
+    collection_info: {
+      pickup_address: bookingData?.pickupAddress,
+      pickup_postcode: bookingData?.pickupPostcode,
+      pickup_country: bookingData?.pickupCountry
+    }
+  };
   
   // If we have no data to display and still loading, show loading state
   if (isLoading) {
@@ -188,7 +192,7 @@ const Receipt = () => {
   }
   
   // If we have no data to display and not loading, show error message
-  if (!data) {
+  if (!data && !bookingData) {
     return (
       <>
         <Navbar />
@@ -205,6 +209,8 @@ const Receipt = () => {
       </>
     );
   }
+
+  console.log("Final data being passed to ReceiptComponent:", data);
 
   return (
     <>
@@ -242,10 +248,12 @@ const Receipt = () => {
           </div>
           
           {/* Receipt content - using the receipt component */}
-          <ReceiptComponent 
-            receipt={fetchedReceiptData || data} 
-            shipment={bookingData?.shipmentDetails} 
-          />
+          <div ref={receiptRef}>
+            <ReceiptComponent 
+              receipt={data} 
+              shipment={bookingData?.shipmentDetails} 
+            />
+          </div>
           
           {/* Action buttons below receipt */}
           <div className="mt-6 flex justify-center">

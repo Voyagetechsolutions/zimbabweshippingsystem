@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { CheckCircle2, AlertCircle, CreditCard, Wallet, CalendarClock, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import Receipt from '@/components/Receipt';
 
 interface PaymentMethodSectionProps {
   bookingData: any;
@@ -41,6 +40,7 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
   const handleConfirm = async () => {
     setIsProcessing(true);
     try {
+      // Create payment data with all necessary information
       const paymentData = {
         method: selectedPaymentMethod,
         payLaterMethod: selectedPaymentMethod === 'standard' ? payLaterMethod : null,
@@ -56,16 +56,22 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
         receipt_number: `REC-${Date.now().toString().slice(-8)}`
       };
 
+      // Merge all booking data for the receipt
+      const finalBookingData = {
+        ...bookingData,
+        paymentCompleted: true,
+        paymentData
+      };
+
+      console.log("Payment confirmation data:", { bookingData: finalBookingData, paymentData });
+      
+      // Call the parent component's onComplete handler
       await onComplete(paymentData);
       
       // Navigate to receipt page with all the necessary data
       navigate('/receipt', { 
         state: { 
-          bookingData: {
-            ...bookingData,
-            paymentCompleted: true,
-            paymentData
-          },
+          bookingData: finalBookingData,
           paymentData
         }
       });

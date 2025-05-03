@@ -16,13 +16,10 @@ import jsPDF from 'jspdf';
  * @param {Object} props.shipment - Shipment data related to this receipt
  */
 const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
-  // Reference for the receipt to be printed/downloaded
   const receiptRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   
-  /**
-   * Helper function to print the receipt
-   */
+  // Helper function to print the receipt
   const handlePrint = () => {
     const printContent = document.getElementById('receipt-to-print');
     const originalContents = document.body.innerHTML;
@@ -41,9 +38,7 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
     }
   };
 
-  /**
-   * Helper function to download the receipt as PDF
-   */
+  // Helper function to download the receipt as PDF
   const handleDownload = async () => {
     if (!receiptRef.current) return;
     
@@ -90,9 +85,7 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
     }
   };
 
-  /**
-   * Helper function to email the receipt
-   */
+  // Helper function to email the receipt
   const handleEmail = async () => {
     // In a real implementation, this would call a serverless function to send an email
     toast({
@@ -100,6 +93,8 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
       description: "Receipt has been emailed to your registered email address.",
     });
   };
+
+  console.log("ReceiptComponent received data:", receipt);
 
   // If we have no data to display, show a message
   if (!receipt) {
@@ -110,231 +105,197 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
     );
   }
 
-  // Extract sender details from receipt data
-  const senderDetails = receipt.sender_details || {};
+  // Extract sender details from receipt data - try different possible data structures
+  const senderDetails = receipt.sender_details || receipt.senderDetails || {};
   
   // Extract recipient details from receipt data
-  const recipientDetails = receipt.recipient_details || {};
+  const recipientDetails = receipt.recipient_details || receipt.recipientDetails || {};
   
   // Extract shipment details from receipt data
-  const shipmentDetails = receipt.shipment_details || {};
+  const shipmentDetails = receipt.shipment_details || receipt.shipmentDetails || shipment || {};
   
   // Extract payment information from receipt data
-  const paymentInfo = receipt.payment_info || {};
-  
-  // Determine if payment has been completed
-  const paymentStatus = paymentInfo.status === 'completed' ? "Paid" : "Pending";
+  const paymentInfo = receipt.payment_info || receipt.paymentData || {};
   
   // Collection information
   const collectionInfo = receipt.collection_info || {
+    pickup_address: receipt.pickupAddress,
+    pickup_postcode: receipt.pickupPostcode,
+    pickup_country: receipt.pickupCountry,
     date: "Next available collection date",
     area: "Collection area not specified"
   };
 
   return (
-    <div className="mb-6">
-      <div className="mb-6 flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Shipping Receipt</h1>
-        <div className="flex space-x-2">
-          <Button 
-            variant="outline" 
-            onClick={handlePrint}
-          >
-            <Printer className="h-4 w-4 mr-2" />
-            Print
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={handleDownload}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Download
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={handleEmail}
-          >
-            <Mail className="h-4 w-4 mr-2" />
-            Email
-          </Button>
+    <div id="receipt-to-print" ref={receiptRef} className="bg-white p-8 rounded-lg shadow-md border border-gray-200">
+      {/* Company logo and header */}
+      <div className="flex justify-between items-center mb-6 border-b pb-4">
+        <div className="flex items-center">
+          {/* Company Logo */}
+          <div className="w-16 h-16 mr-4">
+            <AspectRatio ratio={1/1}>
+              <img 
+                src="/lovable-uploads/85f04a52-387b-4e3e-8fe8-5b1476f172a3.png" 
+                alt="UK Shipping Service Logo" 
+                className="rounded-md object-contain"
+              />
+            </AspectRatio>
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold">UK Shipping Service</h2>
+            <p className="text-sm text-gray-600">Trusted Shipping to Zimbabwe</p>
+          </div>
+        </div>
+        
+        <div className="text-right">
+          <p className="text-sm text-gray-600">Receipt #{receipt.receipt_number || receipt.id?.substring(0, 8) || "N/A"}</p>
+          <p className="text-sm text-gray-600">Date: {formatDate(receipt.created_at || receipt.date || new Date())}</p>
+          <p className="text-sm text-gray-600">
+            Tracking #: {shipmentDetails.tracking_number || "Not assigned yet"}
+          </p>
         </div>
       </div>
       
-      {/* Receipt content - this div will be used for printing/PDF generation */}
-      <div 
-        ref={receiptRef} 
-        id="receipt-to-print" 
-        className="bg-white p-8 rounded-lg shadow-md border border-gray-200"
-      >
-        {/* Company logo and header */}
-        <div className="flex justify-between items-center mb-6 border-b pb-4">
-          <div className="flex items-center">
-            {/* Company Logo */}
-            <div className="w-16 h-16 mr-4">
-              <AspectRatio ratio={1/1}>
-                <img 
-                  src="/lovable-uploads/85f04a52-387b-4e3e-8fe8-5b1476f172a3.png" 
-                  alt="UK Shipping Service Logo" 
-                  className="rounded-md object-contain"
-                />
-              </AspectRatio>
-            </div>
+      {/* Sender and Recipient Information */}
+      <div className="grid md:grid-cols-2 gap-6 mb-6">
+        {/* Sender Details */}
+        <div className="border rounded-md p-4">
+          <h3 className="text-md font-semibold mb-2">Sender Details</h3>
+          <p className="text-sm"><span className="font-medium">Name:</span> {senderDetails.name || `${receipt.firstName || ""} ${receipt.lastName || ""}`.trim() || "Not provided"}</p>
+          <p className="text-sm"><span className="font-medium">Email:</span> {senderDetails.email || receipt.email || "Not provided"}</p>
+          <p className="text-sm"><span className="font-medium">Phone:</span> {senderDetails.phone || receipt.phone || "Not provided"}</p>
+          <p className="text-sm"><span className="font-medium">Address:</span> {senderDetails.address || receipt.pickupAddress || "Not provided"}</p>
+        </div>
+        
+        {/* Recipient Details */}
+        <div className="border rounded-md p-4">
+          <h3 className="text-md font-semibold mb-2">Recipient Details</h3>
+          <p className="text-sm"><span className="font-medium">Name:</span> {recipientDetails.name || receipt.recipientName || "Not provided"}</p>
+          <p className="text-sm"><span className="font-medium">Phone:</span> {recipientDetails.phone || receipt.recipientPhone || "Not provided"}</p>
+          <p className="text-sm"><span className="font-medium">Additional Phone:</span> {recipientDetails.additionalPhone || receipt.additionalRecipientPhone || "Not provided"}</p>
+          <p className="text-sm"><span className="font-medium">Address:</span> {recipientDetails.address || receipt.deliveryAddress || "Not provided"}</p>
+        </div>
+      </div>
+      
+      {/* Shipment Details */}
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold mb-3">Shipment Details</h3>
+        <div className="bg-gray-50 p-4 rounded-md">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div>
-              <h2 className="text-xl font-semibold">UK Shipping Service</h2>
-              <p className="text-sm text-gray-600">Trusted Shipping to Zimbabwe</p>
-            </div>
-          </div>
-          
-          <div className="text-right">
-            <p className="text-sm text-gray-600">Receipt #{receipt.id?.substring(0, 8) || "N/A"}</p>
-            <p className="text-sm text-gray-600">Date: {formatDate(receipt.created_at || new Date())}</p>
-            <p className="text-sm text-gray-600">
-              Tracking #: {shipmentDetails.tracking_number || shipment?.tracking_number || "Not assigned yet"}
-            </p>
-          </div>
-        </div>
-        
-        {/* Sender and Recipient Information */}
-        <div className="grid md:grid-cols-2 gap-6 mb-6">
-          {/* Sender Details */}
-          <div className="border rounded-md p-4">
-            <h3 className="text-md font-semibold mb-2">Sender Details</h3>
-            <p className="text-sm"><span className="font-medium">Name:</span> {senderDetails.name || "Not provided"}</p>
-            <p className="text-sm"><span className="font-medium">Email:</span> {senderDetails.email || "Not provided"}</p>
-            <p className="text-sm"><span className="font-medium">Phone:</span> {senderDetails.phone || "Not provided"}</p>
-            <p className="text-sm"><span className="font-medium">Address:</span> {senderDetails.address || "Not provided"}</p>
-          </div>
-          
-          {/* Recipient Details */}
-          <div className="border rounded-md p-4">
-            <h3 className="text-md font-semibold mb-2">Recipient Details</h3>
-            <p className="text-sm"><span className="font-medium">Name:</span> {recipientDetails.name || "Not provided"}</p>
-            <p className="text-sm"><span className="font-medium">Phone:</span> {recipientDetails.phone || "Not provided"}</p>
-            <p className="text-sm"><span className="font-medium">Additional Phone:</span> {recipientDetails.additionalPhone || "Not provided"}</p>
-            <p className="text-sm"><span className="font-medium">Address:</span> {recipientDetails.address || "Not provided"}</p>
-          </div>
-        </div>
-        
-        {/* Shipment Details */}
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-3">Shipment Details</h3>
-          <div className="bg-gray-50 p-4 rounded-md">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div>
-                <p className="text-sm font-medium">Tracking Number</p>
-                <p className="text-sm">{shipmentDetails.tracking_number || shipment?.tracking_number || "Not assigned yet"}</p>
-              </div>
-              
-              <div>
-                <p className="text-sm font-medium">Description</p>
-                <p className="text-sm">
-                  {shipmentDetails.type === 'other' 
-                    ? (shipmentDetails.description || "Custom quote requested")
-                    : shipmentDetails.type === 'drum' 
-                      ? `${shipmentDetails.quantity || 0} Drum${(shipmentDetails.quantity || 0) > 1 ? 's' : ''}` 
-                      : "Other items"
-                  }
-                </p>
-              </div>
-              
-              <div>
-                <p className="text-sm font-medium">Payment Status</p>
-                <p className={`text-sm font-medium ${paymentStatus === 'Paid' ? 'text-green-600' : 'text-amber-600'}`}>
-                  {paymentStatus}
-                </p>
-              </div>
-              
-              {shipmentDetails.type === 'drum' && (
-                <>
-                  <div>
-                    <p className="text-sm font-medium">Metal Seal</p>
-                    <p className="text-sm">{shipmentDetails.services?.some((s: any) => s.name.includes('Metal Seal')) ? 'Yes' : 'No'}</p>
-                  </div>
-                  
-                  <div>
-                    <p className="text-sm font-medium">Door to Door</p>
-                    <p className="text-sm">{shipmentDetails.services?.some((s: any) => s.name.includes('Door to Door')) ? 'Yes' : 'No'}</p>
-                  </div>
-                </>
-              )}
-              
-              {shipmentDetails.type === 'other' && (
-                <div>
-                  <p className="text-sm font-medium">Category</p>
-                  <p className="text-sm">{shipmentDetails.category || "Not specified"}</p>
-                </div>
-              )}
+              <p className="text-sm font-medium">Tracking Number</p>
+              <p className="text-sm">{shipmentDetails.tracking_number || "Not assigned yet"}</p>
             </div>
             
-            {/* Payment Information */}
-            {paymentInfo && Object.keys(paymentInfo).length > 0 && (
-              <div className="mt-4 pt-4 border-t">
-                <h4 className="text-md font-semibold mb-2">Payment Information</h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-sm font-medium">Amount</p>
-                    <p className="text-sm">{formatCurrency(paymentInfo.amount || 0, paymentInfo.currency || 'USD')}</p>
-                  </div>
-                  
-                  <div>
-                    <p className="text-sm font-medium">Method</p>
-                    <p className="text-sm capitalize">{paymentInfo.method || receipt.payment_method || "Not specified"}</p>
-                  </div>
-                  
-                  <div>
-                    <p className="text-sm font-medium">Date</p>
-                    <p className="text-sm">{formatDate(paymentInfo.date || receipt.created_at || new Date())}</p>
-                  </div>
+            <div>
+              <p className="text-sm font-medium">Description</p>
+              <p className="text-sm">
+                {shipmentDetails.type === 'other' 
+                  ? (shipmentDetails.description || "Custom quote requested")
+                  : shipmentDetails.type === 'drum' 
+                    ? `${shipmentDetails.quantity || receipt.drumQuantity || 0} Drum${(shipmentDetails.quantity || receipt.drumQuantity || 0) > 1 ? 's' : ''}` 
+                    : "Other items"
+                }
+              </p>
+            </div>
+            
+            <div>
+              <p className="text-sm font-medium">Payment Status</p>
+              <p className={`text-sm font-medium ${paymentInfo.status === 'completed' ? 'text-green-600' : 'text-amber-600'}`}>
+                {paymentInfo.status === 'completed' ? 'Paid' : 'Pending'}
+              </p>
+            </div>
+            
+            {(shipmentDetails.type === 'drum' || receipt.includeDrums) && (
+              <>
+                <div>
+                  <p className="text-sm font-medium">Metal Seal</p>
+                  <p className="text-sm">{(shipmentDetails.services?.some((s: any) => s.name.includes('Metal Seal')) || receipt.wantMetalSeal) ? 'Yes' : 'No'}</p>
                 </div>
+                
+                <div>
+                  <p className="text-sm font-medium">Door to Door</p>
+                  <p className="text-sm">{(shipmentDetails.services?.some((s: any) => s.name.includes('Door to Door')) || receipt.doorToDoor) ? 'Yes' : 'No'}</p>
+                </div>
+              </>
+            )}
+            
+            {shipmentDetails.type === 'other' && (
+              <div>
+                <p className="text-sm font-medium">Category</p>
+                <p className="text-sm">{shipmentDetails.category || receipt.itemCategory || "Not specified"}</p>
               </div>
             )}
           </div>
+          
+          {/* Payment Information */}
+          {paymentInfo && Object.keys(paymentInfo).length > 0 && (
+            <div className="mt-4 pt-4 border-t">
+              <h4 className="text-md font-semibold mb-2">Payment Information</h4>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-sm font-medium">Amount</p>
+                  <p className="text-sm">{formatCurrency(paymentInfo.finalAmount || paymentInfo.amount || 0, paymentInfo.currency || 'GBP')}</p>
+                </div>
+                
+                <div>
+                  <p className="text-sm font-medium">Method</p>
+                  <p className="text-sm capitalize">{paymentInfo.method || receipt.paymentMethod || "Not specified"}</p>
+                </div>
+                
+                <div>
+                  <p className="text-sm font-medium">Date</p>
+                  <p className="text-sm">{formatDate(paymentInfo.date || receipt.created_at || new Date())}</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-        
-        {/* Collection & Delivery Information */}
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-3">Collection & Delivery Information</h3>
-          <div className="bg-gray-50 p-4 rounded-md">
-            {/* Pickup Address - highlighted in red as requested */}
-            <div className="mb-3">
-              <p className="text-sm font-medium">Pickup Address</p>
-              <p className="text-red-600 font-medium">
-                {senderDetails.address || "Not provided"}
-              </p>
+      </div>
+      
+      {/* Collection & Delivery Information */}
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold mb-3">Collection & Delivery Information</h3>
+        <div className="bg-gray-50 p-4 rounded-md">
+          {/* Pickup Address - highlighted in red as requested */}
+          <div className="mb-3">
+            <p className="text-sm font-medium">Pickup Address</p>
+            <p className="text-red-600 font-medium">
+              {senderDetails.address || receipt.pickupAddress || collectionInfo.pickup_address || "Not provided"}
+            </p>
+          </div>
+          
+          {/* Delivery Address - highlighted in red as requested */}
+          <div className="mb-3">
+            <p className="text-sm font-medium">Delivery Address</p>
+            <p className="text-red-600 font-medium">
+              {recipientDetails.address || receipt.deliveryAddress || "Not provided"}
+            </p>
+          </div>
+          
+          {/* Collection Information */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm font-medium">Collection Date</p>
+              <p className="text-sm">{collectionInfo.date || "Next available collection date"}</p>
             </div>
             
-            {/* Delivery Address - highlighted in red as requested */}
-            <div className="mb-3">
-              <p className="text-sm font-medium">Delivery Address</p>
-              <p className="text-red-600 font-medium">
-                {recipientDetails.address || "Not provided"}
-              </p>
-            </div>
-            
-            {/* Collection Information */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-medium">Collection Date</p>
-                <p className="text-sm">{collectionInfo.date}</p>
-              </div>
-              
-              <div>
-                <p className="text-sm font-medium">Collection Area</p>
-                <p className="text-sm">{collectionInfo.area}</p>
-              </div>
+            <div>
+              <p className="text-sm font-medium">Collection Area</p>
+              <p className="text-sm">{collectionInfo.area || collectionInfo.pickup_country || receipt.pickupCountry || "Collection area not specified"}</p>
             </div>
           </div>
         </div>
-        
-        {/* Additional notes or information */}
-        <div className="border-t pt-4 mt-8">
-          <p className="text-sm text-gray-600 text-center">
-            Thank you for choosing UK Shipping Service. For any inquiries, please contact our customer service.
-          </p>
-          <p className="text-xs text-gray-500 text-center mt-2">
-            This receipt was generated automatically. Please keep it for your records.
-          </p>
-        </div>
+      </div>
+      
+      {/* Additional notes or information */}
+      <div className="border-t pt-4 mt-8">
+        <p className="text-sm text-gray-600 text-center">
+          Thank you for choosing UK Shipping Service. For any inquiries, please contact our customer service.
+        </p>
+        <p className="text-xs text-gray-500 text-center mt-2">
+          This receipt was generated automatically. Please keep it for your records.
+        </p>
       </div>
     </div>
   );
