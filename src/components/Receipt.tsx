@@ -19,81 +19,6 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
   const receiptRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   
-  // Helper function to print the receipt
-  const handlePrint = () => {
-    const printContent = document.getElementById('receipt-to-print');
-    const originalContents = document.body.innerHTML;
-    
-    if (printContent) {
-      document.body.innerHTML = printContent.innerHTML;
-      window.print();
-      document.body.innerHTML = originalContents;
-      window.location.reload(); // Reload to restore React functionality
-    } else {
-      toast({
-        title: "Print Error",
-        description: "Could not prepare receipt for printing",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Helper function to download the receipt as PDF
-  const handleDownload = async () => {
-    if (!receiptRef.current) return;
-    
-    try {
-      toast({
-        title: "Preparing Download",
-        description: "Generating your receipt PDF...",
-      });
-      
-      const canvas = await html2canvas(receiptRef.current, {
-        scale: 2,
-        logging: false,
-        useCORS: true,
-      });
-      
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      });
-      
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-      const imgX = (pdfWidth - imgWidth * ratio) / 2;
-      
-      pdf.addImage(imgData, 'PNG', imgX, 0, imgWidth * ratio, imgHeight * ratio);
-      pdf.save(`shipping-receipt-${receipt?.id || 'download'}.pdf`);
-      
-      toast({
-        title: "Download Complete",
-        description: "Your receipt has been downloaded successfully.",
-      });
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      toast({
-        title: "Download Failed",
-        description: "There was an error generating your receipt PDF.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Helper function to email the receipt
-  const handleEmail = async () => {
-    // In a real implementation, this would call a serverless function to send an email
-    toast({
-      title: "Email Sent",
-      description: "Receipt has been emailed to your registered email address.",
-    });
-  };
-
   console.log("ReceiptComponent received data:", receipt);
 
   // If we have no data to display, show a message
@@ -123,7 +48,34 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
     pickup_postcode: receipt.pickupPostcode,
     pickup_country: receipt.pickupCountry,
     date: receipt.collectionDate || "Next available collection date",
-    area: receipt.collectionArea || "Collection area not specified"
+    area: receipt.collectionArea || receipt.pickupCountry || "Collection area not specified"
+  };
+
+  // Combine sender details with potential flat properties in the receipt
+  const fullSenderDetails = {
+    ...senderDetails,
+    name: senderDetails.name || `${receipt.firstName || ""} ${receipt.lastName || ""}`.trim() || "Not provided",
+    email: senderDetails.email || receipt.email || "Not provided",
+    phone: senderDetails.phone || receipt.phone || "Not provided",
+    address: senderDetails.address || receipt.pickupAddress || "Not provided"
+  };
+
+  // Combine recipient details with potential flat properties in the receipt
+  const fullRecipientDetails = {
+    ...recipientDetails,
+    name: recipientDetails.name || receipt.recipientName || "Not provided",
+    phone: recipientDetails.phone || receipt.recipientPhone || "Not provided",
+    additionalPhone: recipientDetails.additionalPhone || receipt.additionalRecipientPhone || "Not provided",
+    address: recipientDetails.address || receipt.deliveryAddress || "Not provided"
+  };
+
+  // Ensure shipment details has all the required fields
+  const fullShipmentDetails = {
+    ...shipmentDetails,
+    tracking_number: shipmentDetails.tracking_number || "Not assigned yet",
+    type: shipmentDetails.type || (receipt.includeDrums ? "drum" : "other"),
+    quantity: shipmentDetails.quantity || (receipt.includeDrums ? parseInt(receipt.drumQuantity || "1") : 1),
+    services: shipmentDetails.services || []
   };
 
   return (
@@ -131,19 +83,19 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
       {/* Company logo and header */}
       <div className="flex justify-between items-center mb-6 border-b pb-4">
         <div className="flex items-center">
-          {/* Company Logo */}
-          <div className="w-16 h-16 mr-4">
+          {/* Company Logo - Updated to use the new logo */}
+          <div className="w-20 h-20 mr-4">
             <AspectRatio ratio={1/1}>
               <img 
-                src="/lovable-uploads/85f04a52-387b-4e3e-8fe8-5b1476f172a3.png" 
-                alt="UK Shipping Service Logo" 
-                className="rounded-md object-contain"
+                src="/lovable-uploads/78cfc0fd-e229-403f-89ae-d65d40e6befc.png" 
+                alt="Zimbabwe Shipping Logo" 
+                className="rounded-full object-contain"
               />
             </AspectRatio>
           </div>
           <div>
-            <h2 className="text-xl font-semibold">UK Shipping Service</h2>
-            <p className="text-sm text-gray-600">Trusted Shipping to Zimbabwe</p>
+            <h2 className="text-xl font-semibold">Zimbabwe Shipping</h2>
+            <p className="text-sm text-gray-600">UK to Zimbabwe Express</p>
           </div>
         </div>
         
@@ -151,7 +103,7 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
           <p className="text-sm text-gray-600">Receipt #{receipt.receipt_number || receipt.id?.substring(0, 8) || "N/A"}</p>
           <p className="text-sm text-gray-600">Date: {formatDate(receipt.created_at || receipt.date || new Date())}</p>
           <p className="text-sm text-gray-600">
-            Tracking #: {shipmentDetails.tracking_number || "Not assigned yet"}
+            Tracking #: {fullShipmentDetails.tracking_number}
           </p>
         </div>
       </div>
@@ -161,19 +113,19 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
         {/* Sender Details */}
         <div className="border rounded-md p-4">
           <h3 className="text-md font-semibold mb-2">Sender Details</h3>
-          <p className="text-sm"><span className="font-medium">Name:</span> {senderDetails.name || `${receipt.firstName || ""} ${receipt.lastName || ""}`.trim() || "Not provided"}</p>
-          <p className="text-sm"><span className="font-medium">Email:</span> {senderDetails.email || receipt.email || "Not provided"}</p>
-          <p className="text-sm"><span className="font-medium">Phone:</span> {senderDetails.phone || receipt.phone || "Not provided"}</p>
-          <p className="text-sm"><span className="font-medium">Address:</span> {senderDetails.address || receipt.pickupAddress || "Not provided"}</p>
+          <p className="text-sm"><span className="font-medium">Name:</span> {fullSenderDetails.name}</p>
+          <p className="text-sm"><span className="font-medium">Email:</span> {fullSenderDetails.email}</p>
+          <p className="text-sm"><span className="font-medium">Phone:</span> {fullSenderDetails.phone}</p>
+          <p className="text-sm"><span className="font-medium">Address:</span> {fullSenderDetails.address}</p>
         </div>
         
         {/* Recipient Details */}
         <div className="border rounded-md p-4">
           <h3 className="text-md font-semibold mb-2">Recipient Details</h3>
-          <p className="text-sm"><span className="font-medium">Name:</span> {recipientDetails.name || receipt.recipientName || "Not provided"}</p>
-          <p className="text-sm"><span className="font-medium">Phone:</span> {recipientDetails.phone || receipt.recipientPhone || "Not provided"}</p>
-          <p className="text-sm"><span className="font-medium">Additional Phone:</span> {recipientDetails.additionalPhone || receipt.additionalRecipientPhone || "Not provided"}</p>
-          <p className="text-sm"><span className="font-medium">Address:</span> {recipientDetails.address || receipt.deliveryAddress || "Not provided"}</p>
+          <p className="text-sm"><span className="font-medium">Name:</span> {fullRecipientDetails.name}</p>
+          <p className="text-sm"><span className="font-medium">Phone:</span> {fullRecipientDetails.phone}</p>
+          <p className="text-sm"><span className="font-medium">Additional Phone:</span> {fullRecipientDetails.additionalPhone}</p>
+          <p className="text-sm"><span className="font-medium">Address:</span> {fullRecipientDetails.address}</p>
         </div>
       </div>
       
@@ -184,16 +136,16 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div>
               <p className="text-sm font-medium">Tracking Number</p>
-              <p className="text-sm">{shipmentDetails.tracking_number || "Not assigned yet"}</p>
+              <p className="text-sm">{fullShipmentDetails.tracking_number}</p>
             </div>
             
             <div>
               <p className="text-sm font-medium">Description</p>
               <p className="text-sm">
-                {shipmentDetails.type === 'other' 
-                  ? (shipmentDetails.description || "Custom quote requested")
-                  : shipmentDetails.type === 'drum' 
-                    ? `${shipmentDetails.quantity || receipt.drumQuantity || 0} Drum${(shipmentDetails.quantity || receipt.drumQuantity || 0) > 1 ? 's' : ''}` 
+                {fullShipmentDetails.type === 'other' 
+                  ? (fullShipmentDetails.description || "Custom quote requested")
+                  : fullShipmentDetails.type === 'drum' 
+                    ? `${fullShipmentDetails.quantity || 0} Drum${(fullShipmentDetails.quantity || 0) > 1 ? 's' : ''}` 
                     : "Other items"
                 }
               </p>
@@ -206,24 +158,24 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
               </p>
             </div>
             
-            {(shipmentDetails.type === 'drum' || receipt.includeDrums) && (
+            {(fullShipmentDetails.type === 'drum' || receipt.includeDrums) && (
               <>
                 <div>
                   <p className="text-sm font-medium">Metal Seal</p>
-                  <p className="text-sm">{(shipmentDetails.services?.some((s: any) => s.name.includes('Metal Seal')) || receipt.wantMetalSeal) ? 'Yes' : 'No'}</p>
+                  <p className="text-sm">{(fullShipmentDetails.services?.some((s: any) => s?.name?.includes('Metal Seal')) || receipt.wantMetalSeal) ? 'Yes' : 'No'}</p>
                 </div>
                 
                 <div>
                   <p className="text-sm font-medium">Door to Door</p>
-                  <p className="text-sm">{(shipmentDetails.services?.some((s: any) => s.name.includes('Door to Door')) || receipt.doorToDoor) ? 'Yes' : 'No'}</p>
+                  <p className="text-sm">{(fullShipmentDetails.services?.some((s: any) => s?.name?.includes('Door to Door')) || receipt.doorToDoor) ? 'Yes' : 'No'}</p>
                 </div>
               </>
             )}
             
-            {shipmentDetails.type === 'other' && (
+            {fullShipmentDetails.type === 'other' && (
               <div>
                 <p className="text-sm font-medium">Category</p>
-                <p className="text-sm">{shipmentDetails.category || receipt.itemCategory || "Not specified"}</p>
+                <p className="text-sm">{fullShipmentDetails.category || receipt.itemCategory || "Not specified"}</p>
               </div>
             )}
           </div>
@@ -261,7 +213,7 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
           <div className="mb-3">
             <p className="text-sm font-medium">Pickup Address</p>
             <p className="text-red-600 font-medium">
-              {senderDetails.address || receipt.pickupAddress || collectionInfo.pickup_address || "Not provided"}
+              {fullSenderDetails.address}
             </p>
           </div>
           
@@ -269,7 +221,7 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
           <div className="mb-3">
             <p className="text-sm font-medium">Delivery Address</p>
             <p className="text-red-600 font-medium">
-              {recipientDetails.address || receipt.deliveryAddress || "Not provided"}
+              {fullRecipientDetails.address}
             </p>
           </div>
           
@@ -291,7 +243,7 @@ const Receipt = ({ receipt, shipment }: { receipt: any; shipment?: any }) => {
       {/* Additional notes or information */}
       <div className="border-t pt-4 mt-8">
         <p className="text-sm text-gray-600 text-center">
-          Thank you for choosing UK Shipping Service. For any inquiries, please contact our customer service.
+          Thank you for choosing Zimbabwe Shipping. For any inquiries, please contact our customer service.
         </p>
         <p className="text-xs text-gray-500 text-center mt-2">
           This receipt was generated automatically. Please keep it for your records.

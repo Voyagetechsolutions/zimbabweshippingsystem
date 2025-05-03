@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
@@ -6,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { CheckCircle2, AlertCircle, CreditCard, Wallet, CalendarClock, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { generateUniqueId } from '@/utils/utils';
 
 interface PaymentMethodSectionProps {
   bookingData: any;
@@ -44,6 +44,10 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
       // Generate a receipt number
       const receiptNumber = `REC-${Date.now().toString().slice(-8)}`;
       
+      // Generate a tracking number if one doesn't exist
+      const trackingNumber = bookingData?.shipmentDetails?.tracking_number || 
+                            `TR${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+      
       // Create payment data with all necessary information
       const paymentData = {
         method: selectedPaymentMethod,
@@ -60,19 +64,60 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
         receipt_number: receiptNumber
       };
 
+      // Ensure the shipment details have all required information including tracking number
+      const enhancedShipmentDetails = {
+        ...(bookingData.shipmentDetails || {}),
+        tracking_number: trackingNumber,
+        type: bookingData?.shipmentDetails?.type || (bookingData?.includeDrums ? 'drum' : 'other'),
+        quantity: bookingData?.shipmentDetails?.quantity || 
+                 (bookingData?.includeDrums ? parseInt(bookingData?.drumQuantity || '1') : 1),
+        services: [
+          ...(bookingData?.shipmentDetails?.services || []),
+          ...(bookingData?.wantMetalSeal ? [{
+            name: `Metal Seal${parseInt(bookingData?.drumQuantity || '1') > 1 ? 's' : ''} (${parseInt(bookingData?.drumQuantity || '1')} x £5)`,
+            price: 5 * parseInt(bookingData?.drumQuantity || '1')
+          }] : []),
+          ...(bookingData?.doorToDoor ? [{
+            name: 'Door to Door Delivery',
+            price: 25
+          }] : [])
+        ]
+      };
+      
+      // Ensure sender details are complete
+      const enhancedSenderDetails = {
+        name: bookingData.senderDetails?.name || `${bookingData.firstName || ""} ${bookingData.lastName || ""}`.trim(),
+        email: bookingData.senderDetails?.email || bookingData.email,
+        phone: bookingData.senderDetails?.phone || bookingData.phone,
+        address: bookingData.senderDetails?.address || bookingData.pickupAddress
+      };
+      
+      // Ensure recipient details are complete
+      const enhancedRecipientDetails = {
+        name: bookingData.recipientDetails?.name || bookingData.recipientName,
+        phone: bookingData.recipientDetails?.phone || bookingData.recipientPhone,
+        additionalPhone: bookingData.recipientDetails?.additionalPhone || bookingData.additionalRecipientPhone,
+        address: bookingData.recipientDetails?.address || bookingData.deliveryAddress
+      };
+
       // Merge all booking data for the receipt
       const finalBookingData = {
         ...bookingData,
         receipt_number: receiptNumber,
         paymentCompleted: true,
         paymentData,
-        // Add flat properties for easier access in the Receipt component
-        paymentMethod: selectedPaymentMethod,
-        finalAmount,
-        paymentDate: paymentData.date
+        shipmentDetails: enhancedShipmentDetails,
+        senderDetails: enhancedSenderDetails,
+        recipientDetails: enhancedRecipientDetails,
       };
 
-      console.log("Payment confirmation data:", { bookingData: finalBookingData, paymentData });
+      console.log("Payment confirmation data:", { 
+        bookingData: finalBookingData, 
+        paymentData,
+        shipmentDetails: enhancedShipmentDetails,
+        senderDetails: enhancedSenderDetails,
+        recipientDetails: enhancedRecipientDetails
+      });
       
       // Call the parent component's onComplete handler
       await onComplete(paymentData);
@@ -89,23 +134,13 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
             created_at: new Date().toISOString(),
             
             // Structured sender details
-            sender_details: {
-              name: bookingData.senderDetails?.name || `${bookingData.firstName || ""} ${bookingData.lastName || ""}`.trim(),
-              email: bookingData.senderDetails?.email || bookingData.email,
-              phone: bookingData.senderDetails?.phone || bookingData.phone,
-              address: bookingData.senderDetails?.address || bookingData.pickupAddress
-            },
+            sender_details: enhancedSenderDetails,
             
             // Structured recipient details
-            recipient_details: {
-              name: bookingData.recipientDetails?.name || bookingData.recipientName,
-              phone: bookingData.recipientDetails?.phone || bookingData.recipientPhone,
-              additionalPhone: bookingData.recipientDetails?.additionalPhone || bookingData.additionalRecipientPhone,
-              address: bookingData.recipientDetails?.address || bookingData.deliveryAddress
-            },
+            recipient_details: enhancedRecipientDetails,
             
             // Structured shipment details
-            shipment_details: bookingData.shipmentDetails || {},
+            shipment_details: enhancedShipmentDetails,
             
             // Collection information
             collection_info: {
@@ -294,4 +329,3 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
     </Card>
   );
 };
-

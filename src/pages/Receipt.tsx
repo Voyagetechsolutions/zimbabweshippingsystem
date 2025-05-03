@@ -10,6 +10,7 @@ import { Download, Mail, Printer } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import ReceiptComponent from '@/components/Receipt';
+import { generateUniqueId } from '@/utils/utils';
 
 /**
  * Receipt page component that displays a receipt for a shipment
@@ -30,7 +31,12 @@ const Receipt = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  console.log("Receipt page mounted with state data:", { bookingData, paymentData, customQuoteData, receiptData });
+  console.log("Receipt page mounted with state data:", { 
+    bookingData, 
+    paymentData, 
+    customQuoteData, 
+    receiptData 
+  });
 
   // Effect to fetch data from Supabase if not passed via location
   useEffect(() => {
@@ -160,23 +166,51 @@ const Receipt = () => {
     });
   };
 
+  // Generate a tracking number if none exists
+  const generateTrackingNumber = () => {
+    // Similar logic to what's used in AdminDashboardContent
+    const prefix = 'TR';
+    const timestamp = Date.now().toString().slice(-6);
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    return `${prefix}${timestamp}${random}`;
+  };
+
   // Prepare the data for the receipt component
   const prepareReceiptData = () => {
     // First try to use the receipt data passed directly
     if (receiptData) {
       console.log("Using receiptData passed via location state");
+      // Ensure there's a tracking number
+      if (!receiptData.shipment_details?.tracking_number) {
+        receiptData.shipment_details = {
+          ...receiptData.shipment_details,
+          tracking_number: generateTrackingNumber()
+        };
+      }
       return receiptData;
     }
     
     // Then try fetched receipt data
     if (fetchedReceiptData) {
       console.log("Using fetchedReceiptData from database");
+      // Ensure there's a tracking number
+      if (!fetchedReceiptData.shipment_details?.tracking_number) {
+        fetchedReceiptData.shipment_details = {
+          ...fetchedReceiptData.shipment_details,
+          tracking_number: generateTrackingNumber()
+        };
+      }
       return fetchedReceiptData;
     }
     
     // Finally, construct from booking and payment data
     if (bookingData) {
       console.log("Constructing receipt data from bookingData and paymentData");
+      
+      // Generate tracking number if one doesn't exist
+      const tracking_number = bookingData.shipmentDetails?.tracking_number || 
+                              generateTrackingNumber();
+      
       // Ensure proper nesting of data according to what Receipt component expects
       return {
         // Include booking data at the root level for fallbacks
@@ -200,7 +234,14 @@ const Receipt = () => {
           additionalPhone: bookingData.recipientDetails?.additionalPhone || bookingData.additionalRecipientPhone,
           address: bookingData.recipientDetails?.address || bookingData.deliveryAddress
         },
-        shipment_details: bookingData.shipmentDetails || {},
+        shipment_details: {
+          ...bookingData.shipmentDetails,
+          tracking_number: tracking_number,
+          type: bookingData.shipmentDetails?.type || (bookingData.includeDrums ? "drum" : "other"),
+          quantity: bookingData.shipmentDetails?.quantity || 
+                    (bookingData.includeDrums ? parseInt(bookingData.drumQuantity || "1") : 1),
+          services: bookingData.shipmentDetails?.services || []
+        },
         collection_info: {
           pickup_address: bookingData.pickupAddress,
           pickup_postcode: bookingData.pickupPostcode,
@@ -293,7 +334,7 @@ const Receipt = () => {
           <div id="receipt-to-print">
             <ReceiptComponent 
               receipt={finalReceiptData} 
-              shipment={bookingData?.shipmentDetails} 
+              shipment={finalReceiptData?.shipmentDetails} 
             />
           </div>
           
