@@ -4,7 +4,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { tableFrom } from '@/integrations/supabase/db-types';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import Receipt from '@/components/Receipt';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -165,7 +164,7 @@ const PaymentSuccess = () => {
                   Thank you for your booking. Your shipment has been confirmed and is being processed.
                 </p>
                 <p className="text-gray-600 mt-2 text-sm md:text-base">
-                  You can print, download or email your receipt below.
+                  You can view your receipt details on your dashboard.
                 </p>
                 
                 {receiptData && receiptData.payment_method && (
@@ -194,7 +193,21 @@ const PaymentSuccess = () => {
                 )}
               </div>
               
-              {receiptData && <Receipt receipt={receiptData} shipment={shipmentData} />}
+              <div className="mt-6 border border-gray-200 rounded-lg p-4 md:p-6 bg-white">
+                <h2 className="text-xl font-bold mb-4">Receipt Information</h2>
+                {receiptData && (
+                  <>
+                    <p className="text-gray-700"><span className="font-medium">Receipt Number:</span> {receiptData.receipt_number}</p>
+                    <p className="text-gray-700"><span className="font-medium">Date:</span> {new Date(receiptData.created_at).toLocaleDateString()}</p>
+                    <p className="text-gray-700"><span className="font-medium">Amount:</span> {receiptData.currency || '£'}{receiptData.amount}</p>
+                    <div className="mt-4">
+                      <Button onClick={() => navigate(`/receipt/${receiptData.id}`)}>
+                        View Full Receipt
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
               
               <div className="flex justify-center mt-6 md:mt-8">
                 <Button 
