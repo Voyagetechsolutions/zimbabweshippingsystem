@@ -8,19 +8,12 @@ export interface ShipmentProfile {
 
 // Interface to properly type the metadata field
 export interface ShipmentMetadata {
-  [key: string]: any; // Add index signature to allow for dynamic properties
+  [key: string]: any; // Add index signature to allow for dynamic properties like 'delivery_image'
   // Add specific properties that we know will exist
   doorToDoor?: boolean;
   amountPaid?: number;
   pickupCountry?: string;
   shipmentType?: string;
-  includeDrums?: boolean;
-  includeOtherItems?: boolean;
-  wantMetalSeal?: boolean;
-  additionalDeliveryAddresses?: any[];
-  basePrice?: number;
-  sealCost?: number;
-  doorToDoorCost?: number;
 }
 
 export interface Shipment {
