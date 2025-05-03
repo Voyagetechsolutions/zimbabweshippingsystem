@@ -1,4 +1,4 @@
-{/*import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from '@/hooks/use-toast';
@@ -514,7 +514,7 @@ Chelveston, Wellingborough, NN9 6AA</p>
             </div>
             
             {/* Collection Date Information */}
-{/* <div className="border rounded-md p-3 mt-3">
+            <div className="border rounded-md p-3 mt-3">
               <p className="text-sm"><span className="font-medium">Collection Date:</span> {formData.collectionDate || bookingData.collectionDate || "To be scheduled"}</p>
               <p className="text-sm"><span className="font-medium">Collection Location:</span> {formData.pickupAddress || bookingData.senderDetails?.address || shipment.origin || "Not specified"}</p>
             </div>
@@ -646,4 +646,4 @@ Chelveston, Wellingborough, NN9 6AA</p>
   );
 };
 
-export default ReceiptNew;/*}
+export default ReceiptNew;
