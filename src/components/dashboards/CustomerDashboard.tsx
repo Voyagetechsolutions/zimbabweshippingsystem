@@ -54,6 +54,16 @@ interface ShipmentMetadata {
   [key: string]: any;
 }
 
+interface PaymentInfo {
+  receipt_number?: string;
+  amount?: number;
+  currency?: string;
+  method?: string;
+  status?: string;
+  date?: string;
+  [key: string]: any;
+}
+
 const getStatusBadge = (status: string) => {
   const statusLower = status.toLowerCase();
   
@@ -97,18 +107,6 @@ interface Shipment {
   metadata?: Json;
   user_id?: string;
   weight?: number;
-}
-
-interface Receipt {
-  id: string;
-  payment_id: string;
-  shipment_id: string;
-  receipt_number: string;
-  amount: number;
-  currency: string;
-  payment_method: string;
-  status: string;
-  created_at: string;
 }
 
 interface Notification {
@@ -218,31 +216,38 @@ const CustomerDashboard = () => {
         }
         
         // Map the receipts to ensure they match the ReceiptType interface
-        const typedReceipts = data?.map(receipt => ({
-          id: receipt.id,
-          user_id: receipt.user_id,
-          shipment_id: receipt.shipment_id,
-          receipt_number: receipt?.payment_info?.receipt_number || receipt.id.substring(0, 8),
-          amount: typeof receipt?.payment_info?.amount === 'number' 
-            ? receipt.payment_info.amount 
-            : undefined,
-          currency: typeof receipt?.payment_info?.currency === 'string' 
-            ? receipt.payment_info.currency 
-            : 'GBP',
-          payment_method: typeof receipt?.payment_info?.method === 'string' 
-            ? receipt.payment_info.method 
-            : undefined,
-          status: typeof receipt?.payment_info?.status === 'string' 
-            ? receipt.payment_info.status 
-            : 'completed',
-          created_at: receipt.created_at,
-          updated_at: receipt.updated_at,
-          sender_details: receipt.sender_details,
-          recipient_details: receipt.recipient_details,
-          shipment_details: receipt.shipment_details,
-          collection_info: receipt.collection_info,
-          payment_info: receipt.payment_info,
-        })) as ReceiptType[];
+        const typedReceipts = data?.map(receipt => {
+          const paymentInfo = receipt.payment_info as PaymentInfo | null;
+          
+          return {
+            id: receipt.id,
+            user_id: receipt.user_id,
+            shipment_id: receipt.shipment_id,
+            payment_id: paymentInfo?.payment_id,
+            receipt_number: typeof paymentInfo === 'object' && paymentInfo 
+              ? paymentInfo.receipt_number || receipt.id.substring(0, 8)
+              : receipt.id.substring(0, 8),
+            amount: typeof paymentInfo === 'object' && paymentInfo && 'amount' in paymentInfo 
+              ? paymentInfo.amount 
+              : undefined,
+            currency: typeof paymentInfo === 'object' && paymentInfo && 'currency' in paymentInfo 
+              ? paymentInfo.currency 
+              : 'GBP',
+            payment_method: typeof paymentInfo === 'object' && paymentInfo && 'method' in paymentInfo 
+              ? paymentInfo.method 
+              : undefined,
+            status: typeof paymentInfo === 'object' && paymentInfo && 'status' in paymentInfo 
+              ? paymentInfo.status 
+              : 'completed',
+            created_at: receipt.created_at,
+            updated_at: receipt.updated_at,
+            sender_details: receipt.sender_details,
+            recipient_details: receipt.recipient_details,
+            shipment_details: receipt.shipment_details,
+            collection_info: receipt.collection_info,
+            payment_info: receipt.payment_info
+          } as ReceiptType;
+        });
         
         console.log('Fetched customer receipts:', typedReceipts?.length);
         return typedReceipts || [];
