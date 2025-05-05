@@ -5,7 +5,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import BookingFormNew from '@/components/BookingFormNew';
 import CustomQuoteForm from '@/components/CustomQuoteForm';
-import PaymentProcessor from '@/components/PaymentProcessor';
+import { PaymentMethodSection } from '@/components/PaymentMethodSection';
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -289,11 +289,11 @@ const BookShipment = () => {
           {currentStep === BookingStep.FORM ? (
             <BookingFormNew onSubmitComplete={handleFormSubmit} />
           ) : currentStep === BookingStep.PAYMENT ? (
-            <PaymentProcessor 
+            <PaymentMethodSection 
               bookingData={bookingData}
               totalAmount={totalAmount}
               onCancel={handleBackToForm}
-              onPaymentComplete={handlePaymentComplete}
+              onComplete={handlePaymentComplete}
             />
           ) : (
             <CustomQuoteForm 
