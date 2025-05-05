@@ -21,7 +21,7 @@ const NotFound = () => {
           <div className="relative inline-block">
             <div className="text-9xl font-bold text-gray-200">404</div>
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-              <div className="h-16 w-16 zim-gradient rounded-full"></div>
+              <div className="h-16 w-16 bg-gradient-to-r from-green-500 to-green-600 rounded-full"></div>
             </div>
           </div>
         </div>
@@ -30,7 +30,7 @@ const NotFound = () => {
           The page you are looking for doesn't exist or has been moved.
         </p>
         <div className="flex flex-col md:flex-row justify-center space-y-4 md:space-y-0 md:space-x-4">
-          <Button asChild className="bg-zim-green hover:bg-zim-green/90">
+          <Button asChild className="bg-green-600 hover:bg-green-700">
             <Link to="/" className="flex items-center">
               <Home className="mr-2 h-5 w-5" /> Go Home
             </Link>

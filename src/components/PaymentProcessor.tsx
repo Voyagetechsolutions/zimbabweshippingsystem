@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -143,17 +144,26 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         description: 'Your shipment has been booked successfully.',
       });
       
-      // Navigate to ConfirmBooking page with complete data
+      // Store booking data with additional information for the confirmation page
+      const completeBookingData = {
+        ...bookingData,
+        paymentCompleted: true,
+        paymentMethod: paymentMethod,
+        amount: finalAmount,
+        paymentData
+      };
+      
+      // Navigate directly to the /confirm-booking route with state
       navigate('/confirm-booking', {
         state: { 
-          bookingData: {
-            ...bookingData,
-            paymentCompleted: true,
-            paymentMethod: paymentMethod,
-            amount: finalAmount,
-          },
+          bookingData: completeBookingData,
           shipmentId: shipmentUuid
         }
+      });
+      
+      console.log('Navigation to confirmation page triggered with data:', {
+        bookingData: completeBookingData,
+        shipmentId: shipmentUuid
       });
     } catch (error: any) {
       console.error('Error processing payment selection:', error);
