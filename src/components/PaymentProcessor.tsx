@@ -235,7 +235,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
                     <div className="flex justify-between items-center">
                       <Label htmlFor="cashOnCollection" className="flex items-center text-lg font-medium">
                         <Tag className="h-5 w-5 mr-2 text-green-600" />
-                        Special Deal: Cash on Collection
+                        Special Deal: Cash on Collection12
                       </Label>
                       <span className="bg-yellow-400 text-yellow-800 text-xs font-bold px-2 py-1 rounded-full">SAVE £{specialDealDiscount}</span>
                     </div>
