@@ -136,11 +136,12 @@ const ConfirmBooking = () => {
 
   // Use the collection date with fallbacks
   const collectionDate = collectionInfo.collectionDate || bookingData.collectionDate || 'Next available collection date';
+  const route = collectionInfo.route || 'Standard Route';
   
   return (
     <>
       <Navbar />
-      {/* The CollectionInfo component placed at the top - makes sure it loads early */}
+      {/* The CollectionInfo component placed earlier so it starts loading as soon as possible */}
       <div className="sr-only">
         <CollectionInfo
           country={pickupCountry}

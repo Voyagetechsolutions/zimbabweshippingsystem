@@ -28,26 +28,48 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
     let newRoute: string | null = null;
     let newCollectionDate: string | null = null;
     
+    console.log("CollectionInfo useEffect running with:", { country, postalCode, city });
+    
     if (country === 'England' && postalCode) {
       newRoute = getRouteForPostalCode(postalCode);
       if (newRoute) {
         newCollectionDate = getDateByRoute(newRoute);
+        console.log("Retrieved England route and date:", { newRoute, newCollectionDate });
       }
     } else if (country === 'Ireland' && city) {
       const normalizedCity = city.trim().toUpperCase();
       newRoute = getIrelandRouteForCity(normalizedCity);
       if (newRoute) {
-        newCollectionDate = getDateByRoute(newRoute);
+        newCollectionDate = getDateForIrelandCity(normalizedCity) || getDateByRoute(newRoute);
+        console.log("Retrieved Ireland route and date:", { newRoute, newCollectionDate });
       }
+    } else if (country === 'England' && !postalCode) {
+      // Fallback for England when no postal code is provided
+      newRoute = "Default England Route";
+      newCollectionDate = "Next available collection date";
+      console.log("Using fallback route for England");
+    } else if (country === 'Ireland' && !city) {
+      // Fallback for Ireland when no city is provided
+      newRoute = "Default Ireland Route";
+      newCollectionDate = "Next available collection date";
+      console.log("Using fallback route for Ireland");
+    } else {
+      // Fallback for any other cases
+      newRoute = "Standard Route";
+      newCollectionDate = "Next available collection date";
+      console.log("Using standard fallback route");
     }
 
     setRoute(newRoute);
     setCollectionDate(newCollectionDate);
     setIsDataReady(true);
     
-    // Call the callback immediately with the route and collection date
+    // Ensure we always call the callback with the route and collection date
     if (onCollectionInfoReady) {
+      console.log("Calling onCollectionInfoReady with:", { route: newRoute, collectionDate: newCollectionDate });
       onCollectionInfoReady({ route: newRoute, collectionDate: newCollectionDate });
+    } else {
+      console.warn("onCollectionInfoReady callback is not provided to CollectionInfo component");
     }
   }, [country, postalCode, city, onCollectionInfoReady]);
 
