@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -159,45 +158,39 @@ const AdminDashboardContent = () => {
   };
 
   const fetchShipments = async () => {
-    setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('shipments')
+        .from(tableFrom('shipments'))
         .select('*')
         .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error("Error fetching shipments:", error);
-        throw error;
-      }
-
-      if (data) {
-        setShipments(data as Shipment[]);
-        const totalCount = data.length;
-        const processingCount = data.filter(s => 
-          s.status.toLowerCase().includes('processing')).length;
-        const inTransitCount = data.filter(s => 
-          s.status.toLowerCase().includes('transit')).length;
-        const deliveredCount = data.filter(s => 
-          s.status.toLowerCase().includes('delivered')).length;
-        
-        setStats(prev => ({
-          ...prev,
-          total: totalCount,
-          processing: processingCount,
-          inTransit: inTransitCount,
-          delivered: deliveredCount,
-        }));
-      }
-    } catch (error: any) {
+    
+      if (error) throw error;
+    
+      // Use the castToShipments helper for proper type conversion
+      setShipments(castToShipments(data || []));
+      
+      const totalCount = data.length;
+      const processingCount = data.filter(s => 
+        s.status.toLowerCase().includes('processing')).length;
+      const inTransitCount = data.filter(s => 
+        s.status.toLowerCase().includes('transit')).length;
+      const deliveredCount = data.filter(s => 
+        s.status.toLowerCase().includes('delivered')).length;
+      
+      setStats(prev => ({
+        ...prev,
+        total: totalCount,
+        processing: processingCount,
+        inTransit: inTransitCount,
+        delivered: deliveredCount,
+      }));
+    } catch (error) {
       console.error("Error in fetchShipments:", error);
       toast({
         title: 'Error fetching shipments',
         description: error.message,
         variant: 'destructive',
       });
-    } finally {
-      setLoading(false);
     }
   };
 

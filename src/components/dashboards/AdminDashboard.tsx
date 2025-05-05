@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -217,21 +216,17 @@ const AdminDashboard = () => {
   };
 
   const fetchShipments = async () => {
-    if (!isMounted.current) return;
-    
-    setLoading(true);
     try {
-      console.log("Admin: Fetching all shipments");
       const { data, error } = await supabase
-        .from('shipments')
+        .from(tableFrom('shipments'))
         .select('*')
         .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error("Error fetching shipments:", error);
-        throw error;
-      }
-
+    
+      if (error) throw error;
+    
+      // Use the castToShipments helper for proper type conversion
+      setShipments(castToShipments(data || []));
+      
       if (data && isMounted.current) {
         console.log("Admin: Fetched shipments count:", data.length);
         setShipments(data as Shipment[]);
@@ -248,7 +243,7 @@ const AdminDashboard = () => {
           delivered: deliveredCount,
         }));
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error in fetchShipments:", error);
       if (isMounted.current) {
         toast({
