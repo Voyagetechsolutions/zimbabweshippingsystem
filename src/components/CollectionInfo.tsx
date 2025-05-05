@@ -31,7 +31,7 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
     let newRoute: string | null = null;
     let newCollectionDate: string | null = null;
 
-    // Always determine a route and collection date regardless of inputs
+    // Determine a route and collection date based on inputs
     if (country === 'England' && postalCode) {
       newRoute = getRouteForPostalCode(postalCode);
       if (newRoute) {
