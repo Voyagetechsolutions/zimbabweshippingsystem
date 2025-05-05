@@ -1,160 +1,156 @@
-
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@/contexts/AuthContext';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Receipt, PaymentInfo } from '@/types/receipt';
-import { formatDate, formatCurrency } from '@/utils/formatters';
-import { Button } from '@/components/ui/button';
-import { Receipt as ReceiptIcon } from 'lucide-react';
-import { EmptyState } from '@/components/EmptyState';
+import { Shipment, castToShipments } from '@/types/shipment';
+import { PaymentInfo } from '@/types/receipt'; // Corrected import
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { formatDate, formatRelativeTime, getStatusBadgeClass } from '@/utils/formatters';
+import { Link } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
+import { ShipmentExporter } from '@/components/ShipmentExporter';
 
-interface CustomerDashboardProps {
-  // You can define props here if needed
-}
-
-const getStatusBadge = (status: string) => {
-  switch (status) {
-    case 'pending':
-      return <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Pending</span>;
-    case 'completed':
-      return <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Completed</span>;
-    case 'failed':
-      return <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">Failed</span>;
-    default:
-      return <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">Unknown</span>;
-  }
-};
-
-const CustomerDashboard: React.FC<CustomerDashboardProps> = () => {
+const CustomerDashboard = () => {
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
+  const { toast } = useToast();
+  const navigate = useNavigate();
 
-  const fetchReceipts = async () => {
-    try {
-      console.log('Fetching receipts for user ID:', user?.id);
-      
-      const { data, error } = await supabase
-        .from('receipts')
-        .select('*')
-        .eq('user_id', user?.id);
-        
-      if (error) {
-        console.error('Error fetching receipts:', error);
-        throw error;
+  useEffect(() => {
+    document.title = 'Dashboard | UK to Zimbabwe Shipping';
+  }, []);
+
+  useEffect(() => {
+    const fetchShipments = async () => {
+      setLoading(true);
+      try {
+        if (!user) {
+          setError('Not authenticated');
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('shipments')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching shipments:', error);
+          setError('Failed to load shipments data');
+        } else {
+          setShipments(castToShipments(data || []));
+        }
+      } catch (err) {
+        console.error('Error fetching shipments:', err);
+        setError('Failed to load shipments data');
+      } finally {
+        setLoading(false);
       }
-      
-      if (!data || data.length === 0) {
-        console.log('No receipts found for user');
-        return [];
-      }
-      
-      // Map the receipts to ensure they match the Receipt interface
-      const typedReceipts = data.map(receipt => {
-        const paymentInfo = receipt.payment_info as PaymentInfo | null;
-        
-        return {
-          id: receipt.id,
-          user_id: receipt.user_id,
-          shipment_id: receipt.shipment_id,
-          payment_id: paymentInfo?.payment_id,
-          receipt_number: typeof paymentInfo === 'object' && paymentInfo 
-            ? paymentInfo.receipt_number || receipt.id.substring(0, 8)
-            : receipt.id.substring(0, 8),
-          amount: typeof paymentInfo === 'object' && paymentInfo && 'amount' in paymentInfo 
-            ? paymentInfo.amount 
-            : undefined,
-          currency: typeof paymentInfo === 'object' && paymentInfo && 'currency' in paymentInfo 
-            ? paymentInfo.currency 
-            : 'GBP',
-          payment_method: typeof paymentInfo === 'object' && paymentInfo && 'method' in paymentInfo 
-            ? paymentInfo.method 
-            : undefined,
-          status: typeof paymentInfo === 'object' && paymentInfo && 'status' in paymentInfo 
-            ? paymentInfo.status 
-            : 'completed',
-          created_at: receipt.created_at,
-          updated_at: receipt.updated_at,
-          sender_details: receipt.sender_details,
-          recipient_details: receipt.recipient_details,
-          shipment_details: receipt.shipment_details,
-          collection_info: receipt.collection_info,
-          payment_info: receipt.payment_info
-        } as Receipt;
-      });
-      
-      console.log('Fetched customer receipts:', typedReceipts.length);
-      return typedReceipts || [];
-    } catch (error) {
-      console.error('Error in fetchReceipts:', error);
-      return [];
-    }
+    };
+
+    fetchShipments();
+  }, [user]);
+
+  const handleBookShipment = () => {
+    navigate('/book-shipment');
   };
 
-  const { data: receipts, isLoading: isLoadingReceipts } = useQuery({
-    queryKey: ['customerReceipts', user?.id],
-    queryFn: fetchReceipts,
-    enabled: !!user?.id
-  });
-
   return (
-    <div>
-      <h2 className="text-2xl font-bold mb-4">My Receipts</h2>
-      {isLoadingReceipts ? (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
+    <div className="container mx-auto py-10">
+      <div className="mb-8 flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">
+            Welcome to Your Dashboard!
+          </h1>
+          <p className="text-gray-500">
+            Track your shipments and manage your account.
+          </p>
         </div>
-      ) : (
-        <>
-          {receipts && receipts.length > 0 ? (
-            <div className="space-y-4">
-              {receipts.map((receipt) => (
-                <div key={receipt.id} className="bg-white p-4 rounded-lg shadow">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="text-lg font-medium">Receipt #{receipt.receipt_number || receipt.id.substring(0, 8)}</h4>
-                    <Link to={`/receipt/${receipt.id}`} className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                      View Receipt
-                    </Link>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Amount</p>
-                      <p className="text-sm">
-                        {receipt.amount !== undefined 
-                          ? formatCurrency(receipt.amount, receipt.currency || 'GBP') 
-                          : 'N/A'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Payment Method</p>
-                      <p className="text-sm capitalize">{receipt.payment_method || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Status</p>
-                      <p className="text-sm">{receipt.status || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Date</p>
-                      <p className="text-sm">{formatDate(receipt.created_at)}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : !isLoadingReceipts ? (
-            <EmptyState 
-              icon={<ReceiptIcon className="h-12 w-12 text-gray-400" />}
-              title="No Receipts Yet"
-              description="When you make a payment, your receipt will appear here."
-              action={
-                <Link to="/book-shipment">
-                  <Button>Book a Shipment</Button>
-                </Link>
-              }
-            />
-          ) : null}
-        </>
+        <ShipmentExporter />
+      </div>
+
+      {error && (
+        <div className="rounded-md bg-red-50 p-4">
+          <p className="text-sm text-red-800">
+            {error}
+          </p>
+        </div>
       )}
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {loading ? (
+          <>
+            {[...Array(6)].map((_, i) => (
+              <Card key={i}>
+                <CardHeader>
+                  <CardTitle><Skeleton className="h-5 w-3/4" /></CardTitle>
+                  <CardDescription><Skeleton className="h-4 w-1/2" /></CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-4 w-full mb-2" />
+                  <Skeleton className="h-4 w-5/6" />
+                </CardContent>
+              </Card>
+            ))}
+          </>
+        ) : shipments.length > 0 ? (
+          shipments.map((shipment) => (
+            <Card key={shipment.id} className="bg-white shadow-sm">
+              <CardHeader className="space-y-1">
+                <CardTitle className="text-lg font-semibold">
+                  Tracking Number: {shipment.tracking_number}
+                </CardTitle>
+                <CardDescription>
+                  Updated {formatRelativeTime(shipment.updated_at)}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-2">
+                <div className="text-sm">
+                  Origin: {shipment.origin || 'N/A'}
+                </div>
+                <div className="text-sm">
+                  Destination: {shipment.destination || 'N/A'}
+                </div>
+                <div className="flex items-center">
+                  <Badge className={getStatusBadgeClass(shipment.status)}>
+                    {shipment.status}
+                  </Badge>
+                </div>
+              </CardContent>
+              <div className="p-4 border-t">
+                <Link
+                  to={`/shipment/${shipment.id}`}
+                  className="inline-flex items-center text-blue-600 hover:underline"
+                >
+                  View Details
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </div>
+            </Card>
+          ))
+        ) : (
+          <div className="md:col-span-2 lg:col-span-3 text-center py-6">
+            <h2 className="text-xl font-semibold text-gray-700">
+              No shipments found
+            </h2>
+            <p className="text-gray-500 mt-2">
+              Ready to send a package?
+            </p>
+            <button
+              onClick={handleBookShipment}
+              className="mt-4 bg-zim-green hover:bg-zim-green/90 text-white font-bold py-2 px-4 rounded"
+            >
+              Book a Shipment
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -58,6 +57,7 @@ import ContentManagement from '@/components/admin/ContentManagement';
 import CollectionScheduleManagement from '@/components/admin/CollectionScheduleManagement';
 import SupportTickets from '@/components/admin/SupportTickets';
 import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
+import { Shipment, castToShipments } from '@/types/shipment';
 
 const STATUS_OPTIONS = [
   'Booking Confirmed',
@@ -167,27 +167,11 @@ const AdminDashboardContent = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error("Error fetching shipments:", error);
-        throw error;
-      }
-
-      if (data) {
-        setShipments(data as Shipment[]);
-        const totalCount = data.length;
-        const processingCount = data.filter(s => 
-          s.status.toLowerCase().includes('processing')).length;
-        const inTransitCount = data.filter(s => 
-          s.status.toLowerCase().includes('transit')).length;
-        const deliveredCount = data.filter(s => 
-          s.status.toLowerCase().includes('delivered')).length;
-        
-        setStats(prev => ({
-          ...prev,
-          total: totalCount,
-          processing: processingCount,
-          inTransit: inTransitCount,
-          delivered: deliveredCount,
-        }));
+        console.error('Error fetching shipments:', error);
+        setError('Failed to load shipments data');
+      } else {
+        // Use the castToShipments helper for proper typing
+        setShipments(castToShipments(data || []));
       }
     } catch (error: any) {
       console.error("Error in fetchShipments:", error);

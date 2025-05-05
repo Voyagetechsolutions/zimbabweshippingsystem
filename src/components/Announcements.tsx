@@ -1,7 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { Announcement, castTo } from '@/types/admin';
+import React, { useState } from 'react';
 import { 
   Card, 
   CardContent, 
@@ -18,43 +16,52 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { tableFrom } from '@/integrations/supabase/db-types';
+
+// Define a minimal announcement interface
+interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  created_at: string;
+  is_active?: boolean;
+  expiry_date?: string;
+}
 
 const Announcements = () => {
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Since the announcements table has been deleted, we'll use static data instead
+  const staticAnnouncements: Announcement[] = [
+    {
+      id: '1',
+      title: 'New Shipping Routes Available',
+      content: 'We are excited to announce new shipping routes between UK and Zimbabwe.',
+      category: 'Service Update',
+      created_at: new Date().toISOString(),
+      is_active: true
+    },
+    {
+      id: '2',
+      title: 'Holiday Schedule Changes',
+      content: 'Please note our modified operating hours during the upcoming holiday season.',
+      category: 'Schedule',
+      created_at: new Date().toISOString(),
+      is_active: true
+    },
+    {
+      id: '3',
+      title: 'Important Shipping Information',
+      content: 'All shipments during May will have extra security measures applied.',
+      category: 'Information',
+      created_at: new Date().toISOString(),
+      is_active: true
+    }
+  ];
+  
+  const [announcements] = useState<Announcement[]>(staticAnnouncements);
   const [currentPage, setCurrentPage] = useState(0);
 
-  useEffect(() => {
-    fetchAnnouncements();
-  }, []);
-
-  const fetchAnnouncements = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from(tableFrom('announcements'))
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      if (data) {
-        setAnnouncements(castTo<Announcement[]>(data));
-      }
-    } catch (error) {
-      console.error('Error fetching announcements:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Filter out expired announcements
-  const activeAnnouncements = announcements.filter(announcement => {
-    if (!announcement.expiry_date) return true;
-    return new Date(announcement.expiry_date) >= new Date();
-  });
+  // Filter out inactive announcements
+  const activeAnnouncements = announcements.filter(announcement => announcement.is_active);
 
   const totalPages = Math.ceil(activeAnnouncements.length / 1);
   const hasAnnouncements = activeAnnouncements.length > 0;
@@ -68,16 +75,6 @@ const Announcements = () => {
   };
 
   const currentAnnouncement = activeAnnouncements[currentPage];
-
-  if (loading) {
-    return (
-      <div className="relative overflow-hidden rounded-lg bg-gray-50 p-6 animate-pulse">
-        <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
-        <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
-        <div className="h-4 bg-gray-200 rounded w-5/6"></div>
-      </div>
-    );
-  }
 
   if (!hasAnnouncements) {
     return null;

@@ -54,6 +54,15 @@ export const castToShipment = (shipment: any): Shipment => {
   return {
     ...shipment,
     metadata: castToShipmentMetadata(shipment.metadata),
+    // Extract metadata properties to the top level if they exist
+    carrier: shipment.carrier || (shipment.metadata && typeof shipment.metadata === 'object' && !Array.isArray(shipment.metadata)) 
+      ? shipment.metadata.carrier : undefined,
+    dimensions: shipment.dimensions || (shipment.metadata && typeof shipment.metadata === 'object' && !Array.isArray(shipment.metadata)) 
+      ? shipment.metadata.dimensions : undefined,
+    estimated_delivery: shipment.estimated_delivery || (shipment.metadata && typeof shipment.metadata === 'object' && !Array.isArray(shipment.metadata)) 
+      ? shipment.metadata.estimatedDelivery : undefined,
+    weight: shipment.weight || (shipment.metadata && typeof shipment.metadata === 'object' && !Array.isArray(shipment.metadata)) 
+      ? shipment.metadata.weight : undefined,
   };
 };
 
