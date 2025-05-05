@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Shipment, castToShipment } from '@/types/shipment';
+import { Shipment, castToShipment, ShipmentMetadata } from '@/types/shipment';
 import { Json } from '@/integrations/supabase/types';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';

@@ -57,7 +57,7 @@ import ContentManagement from '@/components/admin/ContentManagement';
 import CollectionScheduleManagement from '@/components/admin/CollectionScheduleManagement';
 import SupportTickets from '@/components/admin/SupportTickets';
 import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
-import { Shipment as ShipmentType, castToShipments } from '@/types/shipment';
+import { Shipment, castToShipment, castToShipments } from '@/types/shipment';
 
 const STATUS_OPTIONS = [
   'Booking Confirmed',
@@ -69,22 +69,6 @@ const STATUS_OPTIONS = [
   'Delivered',
   'Cancelled',
 ];
-
-interface Shipment {
-  id: string;
-  tracking_number: string;
-  origin: string;
-  destination: string;
-  status: string;
-  carrier: string | null;
-  weight: number | null;
-  dimensions: string | null;
-  estimated_delivery: string | null;
-  created_at: string;
-  updated_at: string;
-  user_id: string;
-  metadata: any | null;
-}
 
 const getStatusBadgeClass = (status: string) => {
   const statusLower = status.toLowerCase();
@@ -172,7 +156,8 @@ const AdminDashboardContent = () => {
       }
 
       // Use the castToShipments helper to properly type the data
-      setShipments(castToShipments(data || []));
+      const typedShipments = castToShipments(data || []);
+      setShipments(typedShipments);
     } catch (error) {
       console.error('Error fetching shipments:', error);
     } finally {
