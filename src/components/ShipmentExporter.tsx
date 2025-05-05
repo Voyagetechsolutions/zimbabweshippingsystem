@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import { Shipment } from '@/types/shipment';
-import { castToShipments } from '@/types/shipment';
+import { castToShipments } from '@/utils/shipmentUtils';
 
 interface ShipmentExporterProps {
   shipments: Shipment[] | null;

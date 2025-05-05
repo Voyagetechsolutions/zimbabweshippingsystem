@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { CSVLink } from 'react-csv';
@@ -121,7 +122,7 @@ const AdminDashboardContent: React.FC = () => {
           <Package className="h-4 w-4 text-gray-500" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{isLoading ? <Skeleton width={80} /> : totalShipments}</div>
+          <div className="text-2xl font-bold">{isLoading ? <Skeleton className="w-20 h-8" /> : totalShipments}</div>
           <p className="text-sm text-gray-500">All time shipments</p>
         </CardContent>
       </Card>
@@ -133,7 +134,7 @@ const AdminDashboardContent: React.FC = () => {
           <User className="h-4 w-4 text-gray-500" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{isLoading ? <Skeleton width={80} /> : totalUsers}</div>
+          <div className="text-2xl font-bold">{isLoading ? <Skeleton className="w-20 h-8" /> : totalUsers}</div>
           <p className="text-sm text-gray-500">Registered users</p>
         </CardContent>
       </Card>

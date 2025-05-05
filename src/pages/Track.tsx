@@ -9,6 +9,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import TrackingInstructions from '@/components/TrackingInstructions';
+import { castToShipment } from '@/utils/shipmentUtils';
 
 type TrackingResult = {
   status: string;
@@ -52,25 +53,25 @@ const Track = () => {
       }
       
       if (data) {
-        // Extract carrier and estimated_delivery from metadata if available
-        const metadataObj = typeof data.metadata === 'object' ? data.metadata : {};
+        // Convert to proper Shipment type with metadata extracted
+        const shipment = castToShipment(data);
         
         const result: TrackingResult = {
-          status: data.status,
-          origin: data.origin,
-          destination: data.destination,
-          lastUpdate: new Date(data.updated_at).toLocaleString(),
-          estimatedDelivery: metadataObj?.estimatedDelivery 
-            ? new Date(metadataObj.estimatedDelivery).toLocaleDateString() 
+          status: shipment.status,
+          origin: shipment.origin,
+          destination: shipment.destination,
+          lastUpdate: new Date(shipment.updated_at).toLocaleString(),
+          estimatedDelivery: shipment.estimated_delivery 
+            ? new Date(shipment.estimated_delivery).toLocaleDateString() 
             : null,
-          carrier: metadataObj?.carrier || null,
-          tracking_number: data.tracking_number
+          carrier: shipment.carrier || null,
+          tracking_number: shipment.tracking_number
         };
         
         setTrackingResult(result);
         toast({
           title: "Tracking Information Found",
-          description: `Latest status: ${data.status}`,
+          description: `Latest status: ${shipment.status}`,
         });
       } else {
         setError('No shipment found with this tracking number');
