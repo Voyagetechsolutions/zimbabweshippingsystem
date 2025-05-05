@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useRole, UserRoleType } from '@/contexts/RoleContext';
+import { useRole, UserRole } from '@/contexts/RoleContext';
 import {
   Card,
   CardContent,
@@ -68,7 +67,7 @@ interface Profile {
   email: string;
   full_name: string | null;
   is_admin: boolean;
-  role?: UserRoleType | null;
+  role?: UserRole | null;
   avatar_url?: string | null;
   created_at: string;
 }
@@ -91,7 +90,7 @@ const UserManagement = () => {
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [roleAssignDialogOpen, setRoleAssignDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
-  const [selectedRole, setSelectedRole] = useState<UserRoleType>('customer');
+  const [selectedRole, setSelectedRole] = useState<UserRole>('customer');
   const { toast } = useToast();
   const { setUserRole } = useRole();
 
@@ -622,7 +621,7 @@ const UserManagement = () => {
               <Label htmlFor="role">Select Role</Label>
               <Select
                 value={selectedRole}
-                onValueChange={(value) => setSelectedRole(value as UserRoleType)}
+                onValueChange={(value) => setSelectedRole(value as UserRole)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select a role" />

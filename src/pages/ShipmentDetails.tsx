@@ -1,382 +1,279 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardFooter } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { format } from 'date-fns';
-import { ArrowLeft, Package, MapPin, Calendar, Truck, Clock, Package2 } from 'lucide-react';
+import { Shipment, castToShipment } from '@/types/shipment';
+import { Json } from '@/integrations/supabase/types';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import WhatsAppButton from '@/components/WhatsAppButton';
-import ShipmentActions from '@/components/ShipmentActions';
-
-interface Shipment {
-  id: string;
-  tracking_number: string;
-  origin: string;
-  destination: string;
-  status: string;
-  carrier: string | null;
-  weight: number | null;
-  dimensions: string | null;
-  estimated_delivery: string | null;
-  created_at: string;
-  updated_at: string;
-  can_modify: boolean | null;
-  can_cancel: boolean | null;
-}
-
-const getStatusColor = (status: string): string => {
-  const statusLower = status.toLowerCase();
-  
-  switch (true) {
-    case statusLower.includes('booking confirmed'):
-      return 'bg-blue-100 text-blue-800 border-blue-300';
-    case statusLower.includes('ready for pickup'):
-      return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-    case statusLower.includes('processing'):
-      return 'bg-orange-100 text-orange-800 border-orange-300';
-    case statusLower.includes('customs'):
-      return 'bg-purple-100 text-purple-800 border-purple-300';
-    case statusLower.includes('transit'):
-      return 'bg-blue-100 text-blue-800 border-blue-300';
-    case statusLower.includes('out for delivery'):
-      return 'bg-indigo-100 text-indigo-800 border-indigo-300';
-    case statusLower.includes('delivered'):
-      return 'bg-green-100 text-green-800 border-green-300';
-    case statusLower.includes('cancelled'):
-      return 'bg-red-100 text-red-800 border-red-300';
-    case statusLower.includes('delayed'):
-      return 'bg-red-100 text-red-800 border-red-300';
-    default:
-      return 'bg-gray-100 text-gray-800 border-gray-300';
-  }
-};
-
-const getStatusIcon = (status: string) => {
-  const statusLower = status.toLowerCase();
-  
-  switch (true) {
-    case statusLower.includes('booking confirmed'):
-      return <Package className="h-5 w-5" />;
-    case statusLower.includes('ready for pickup'):
-      return <Package className="h-5 w-5" />;
-    case statusLower.includes('processing'):
-      return <Package className="h-5 w-5" />;
-    case statusLower.includes('customs'):
-      return <Package className="h-5 w-5" />;
-    case statusLower.includes('transit'):
-      return <Truck className="h-5 w-5" />;
-    case statusLower.includes('out for delivery'):
-      return <Truck className="h-5 w-5" />;
-    case statusLower.includes('delivered'):
-      return <Package2 className="h-5 w-5" />;
-    case statusLower.includes('cancelled'):
-      return <Clock className="h-5 w-5" />;
-    case statusLower.includes('delayed'):
-      return <Clock className="h-5 w-5" />;
-    default:
-      return <Package className="h-5 w-5" />;
-  }
-};
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { MapPin, Package, Truck, CalendarDays, CheckCircle, XCircle, Loader2, ArrowLeft } from 'lucide-react';
+import { formatDate, formatRelativeTime, getStatusBadgeClass } from '@/utils/formatters';
 
 const ShipmentDetails = () => {
-  const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const { toast } = useToast();
   const [shipment, setShipment] = useState<Shipment | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchShipmentDetails = async () => {
-      try {
-        if (!id) return;
+    document.title = 'Shipment Details | UK to Zimbabwe Shipping';
+  }, []);
 
-        const { data, error } = await supabase
+  useEffect(() => {
+    const fetchShipment = async () => {
+      setLoading(true);
+      try {
+        if (!id) {
+          setError('Shipment ID is required');
+          return;
+        }
+
+        const { data: shipmentData, error: shipmentError } = await supabase
           .from('shipments')
           .select('*')
           .eq('id', id)
           .single();
 
-        if (error) {
-          console.error('Error fetching shipment:', error);
-          toast({
-            title: 'Error',
-            description: 'Failed to load shipment details.',
-            variant: 'destructive',
-          });
-          setLoading(false);
+        if (shipmentError) {
+          console.error('Error fetching shipment:', shipmentError);
+          setError('Failed to load shipment details');
           return;
         }
 
-        setShipment(data as Shipment);
-      } catch (error) {
-        console.error('Unexpected error:', error);
-        toast({
-          title: 'Error',
-          description: 'An unexpected error occurred.',
-          variant: 'destructive',
-        });
+        if (!shipmentData) {
+          setError('Shipment not found');
+          return;
+        }
+
+        // Add the proper shipment casting where needed (around line 118)
+        setShipment(castToShipment(shipmentData));
+      } catch (err) {
+        console.error('Error fetching shipment:', err);
+        setError('Failed to load shipment details');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchShipmentDetails();
-  }, [id, toast, refreshTrigger]);
-
-  const handleRefresh = () => {
-    setRefreshTrigger(prev => prev + 1);
-  };
-
-  const getTimelineSteps = (status: string) => {
-    const allSteps = [
-      { name: 'Booking Confirmed', completed: false },
-      { name: 'Ready for Pickup', completed: false },
-      { name: 'Processing in Warehouse (UK)', completed: false },
-      { name: 'Customs Clearance', completed: false },
-      { name: 'Processing in Warehouse (ZW)', completed: false },
-      { name: 'Out for Delivery', completed: false },
-      { name: 'Delivered', completed: false },
-    ];
-    
-    const statusLower = status.toLowerCase();
-    const statusIndex = allSteps.findIndex(step => 
-      statusLower.includes(step.name.toLowerCase())
-    );
-    
-    if (statusIndex !== -1) {
-      for (let i = 0; i <= statusIndex; i++) {
-        allSteps[i].completed = true;
-      }
-    } else if (statusLower.includes('cancelled')) {
-    }
-    
-    return allSteps;
-  };
+    fetchShipment();
+  }, [id]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
-      </div>
+      <>
+        <Navbar />
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        </div>
+        <Footer />
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <Navbar />
+        <div className="min-h-screen flex flex-col">
+          <main className="container mx-auto px-4 py-8 flex-grow">
+            <div className="rounded-md bg-red-50 p-4">
+              <h2 className="text-xl font-bold text-red-800 mb-2">Error</h2>
+              <p className="text-sm text-red-800">{error}</p>
+              <Button onClick={() => navigate('/dashboard')}>Go to Dashboard</Button>
+            </div>
+          </main>
+          <Footer />
+        </div>
+      </>
     );
   }
 
   if (!shipment) {
     return (
-      <div className="min-h-screen flex flex-col">
+      <>
         <Navbar />
-        <main className="flex-grow container mx-auto px-4 py-8">
-          <Card className="max-w-3xl mx-auto">
-            <CardContent className="pt-6 text-center">
-              <div className="mb-6">
-                <Package className="h-16 w-16 mx-auto text-gray-400" />
+        <div className="min-h-screen flex flex-col">
+          <main className="container mx-auto px-4 py-8 flex-grow">
+            <div className="rounded-md bg-gray-50 p-4">
+              <h2 className="text-xl font-bold text-gray-800 mb-2">Shipment Not Found</h2>
+              <p className="text-sm text-gray-800">The requested shipment could not be found.</p>
+              <Button onClick={() => navigate('/dashboard')}>Go to Dashboard</Button>
+            </div>
+          </main>
+          <Footer />
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Navbar />
+      <div className="min-h-screen flex flex-col">
+        <main className="container mx-auto px-4 py-8 flex-grow">
+          <div className="mb-6">
+            <Button
+              variant="ghost"
+              className="text-gray-600 hover:text-gray-900"
+              onClick={() => navigate(-1)}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+          </div>
+          <Card className="bg-white shadow-md rounded-lg">
+            <CardHeader className="space-y-1.5">
+              <CardTitle className="text-2xl font-semibold">
+                Shipment Details
+              </CardTitle>
+              <CardDescription>
+                Tracking Number: {shipment.tracking_number}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              <div className="grid gap-2">
+                <div className="flex items-center space-x-2">
+                  <Package className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium">Status</span>
+                  <Badge className={getStatusBadgeClass(shipment.status)}>
+                    {shipment.status}
+                  </Badge>
+                </div>
+                <div className="text-sm text-gray-600">
+                  Updated {formatRelativeTime(shipment.updated_at)}
+                </div>
               </div>
-              <h1 className="text-2xl font-bold mb-4">Shipment Not Found</h1>
-              <p className="text-gray-500 mb-6">
-                The shipment you're looking for does not exist or you don't have permission to view it.
-              </p>
-              <Button onClick={() => navigate(-1)} variant="outline" className="mr-4">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Go Back
-              </Button>
-              <Button onClick={() => navigate('/dashboard')} className="bg-zim-green hover:bg-zim-green/90">
-                Dashboard
-              </Button>
+              <div className="grid gap-2">
+                <div className="flex items-center space-x-2">
+                  <MapPin className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium">Origin</span>
+                </div>
+                <div className="text-sm text-gray-600">{shipment.origin || 'N/A'}</div>
+              </div>
+              <div className="grid gap-2">
+                <div className="flex items-center space-x-2">
+                  <MapPin className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium">Destination</span>
+                </div>
+                <div className="text-sm text-gray-600">{shipment.destination || 'N/A'}</div>
+              </div>
+              <div className="grid gap-2">
+                <div className="flex items-center space-x-2">
+                  <CalendarDays className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium">Created At</span>
+                </div>
+                <div className="text-sm text-gray-600">
+                  {formatDate(shipment.created_at)}
+                </div>
+              </div>
+              {shipment.estimated_delivery && (
+                <div className="grid gap-2">
+                  <div className="flex items-center space-x-2">
+                    <Truck className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium">Estimated Delivery</span>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    {formatDate(shipment.estimated_delivery)}
+                  </div>
+                </div>
+              )}
+              {shipment.carrier && (
+                <div className="grid gap-2">
+                  <div className="flex items-center space-x-2">
+                    <Truck className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium">Carrier</span>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    {shipment.carrier}
+                  </div>
+                </div>
+              )}
+              {shipment.weight && (
+                <div className="grid gap-2">
+                  <div className="flex items-center space-x-2">
+                    <Truck className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium">Weight</span>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    {shipment.weight}
+                  </div>
+                </div>
+              )}
+              {shipment.dimensions && (
+                <div className="grid gap-2">
+                  <div className="flex items-center space-x-2">
+                    <Truck className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium">Dimensions</span>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    {shipment.dimensions}
+                  </div>
+                </div>
+              )}
+              <div className="grid gap-2">
+                <div className="flex items-center space-x-2">
+                  <Truck className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium">Door to Door</span>
+                </div>
+                <div className="text-sm text-gray-600">
+                  {shipment.metadata?.doorToDoor ? 'Yes' : 'No'}
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <div className="flex items-center space-x-2">
+                  <Truck className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium">Amount Paid</span>
+                </div>
+                <div className="text-sm text-gray-600">
+                  {shipment.metadata?.amountPaid}
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <div className="flex items-center space-x-2">
+                  <Truck className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium">Pickup Country</span>
+                </div>
+                <div className="text-sm text-gray-600">
+                  {shipment.metadata?.pickupCountry}
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <div className="flex items-center space-x-2">
+                  <Truck className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium">Shipment Type</span>
+                </div>
+                <div className="text-sm text-gray-600">
+                  {shipment.metadata?.shipmentType}
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <div className="flex items-center space-x-2">
+                  <Truck className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium">Can Cancel</span>
+                </div>
+                <div className="text-sm text-gray-600">
+                  {shipment.can_cancel ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-red-500" />}
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <div className="flex items-center space-x-2">
+                  <Truck className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium">Can Modify</span>
+                </div>
+                <div className="text-sm text-gray-600">
+                  {shipment.can_modify ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-red-500" />}
+                </div>
+              </div>
             </CardContent>
           </Card>
         </main>
         <Footer />
       </div>
-    );
-  }
-
-  const timelineSteps = getTimelineSteps(shipment.status);
-
-  return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar />
-      <main className="flex-grow container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-6">
-            <Button 
-              variant="outline" 
-              onClick={() => navigate(-1)}
-              className="mb-4"
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
-            
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold">Shipment Details</h1>
-                <p className="text-gray-500 flex items-center mt-1">
-                  <Package className="mr-2 h-4 w-4" />
-                  Tracking #: <span className="font-mono ml-2">{shipment.tracking_number}</span>
-                </p>
-              </div>
-              <div className="mt-2 md:mt-0 flex items-center space-x-2">
-                <Badge 
-                  className={`py-1 px-3 ${getStatusColor(shipment.status)}`}
-                >
-                  <span className="flex items-center">
-                    {getStatusIcon(shipment.status)}
-                    <span className="ml-1">{shipment.status}</span>
-                  </span>
-                </Badge>
-                
-                {(shipment.status.toLowerCase() !== 'delivered' && 
-                  shipment.status.toLowerCase() !== 'cancelled') && 
-                  (shipment.can_modify || shipment.can_cancel) && (
-                  <ShipmentActions 
-                    shipmentId={shipment.id}
-                    canModify={shipment.can_modify}
-                    canCancel={shipment.can_cancel}
-                    onActionComplete={handleRefresh}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-
-          <Card className="mb-6">
-            <CardHeader>
-              <h2 className="text-xl font-bold flex items-center">
-                <Clock className="mr-2 h-5 w-5" />
-                Shipment Progress
-              </h2>
-            </CardHeader>
-            <CardContent>
-              <div className="relative">
-                <div className="absolute left-5 top-0 h-full w-0.5 bg-gray-200"></div>
-                {timelineSteps.map((step, index) => (
-                  <div key={step.name} className="relative mb-6 last:mb-0 flex items-start">
-                    <div className={`
-                      absolute left-5 -ml-3 h-6 w-6 rounded-full border-2 z-10
-                      flex items-center justify-center
-                      ${step.completed 
-                        ? 'bg-zim-green border-zim-green' 
-                        : 'bg-white border-gray-300'}
-                    `}>
-                      {step.completed && (
-                        <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </div>
-                    <div className="ml-10">
-                      <h3 className={`font-medium ${step.completed ? 'text-zim-black' : 'text-gray-500'}`}>
-                        {step.name}
-                      </h3>
-                      {step.completed && index === timelineSteps.findIndex(s => s.completed) && (
-                        <p className="text-sm text-gray-500">
-                          {format(new Date(shipment.created_at), 'PPP')}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="mb-6">
-            <CardHeader>
-              <h2 className="text-xl font-bold flex items-center">
-                <Package className="mr-2 h-5 w-5" />
-                Shipment Information
-              </h2>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="font-medium text-gray-500 mb-2">Origin</h3>
-                <div className="flex items-start">
-                  <MapPin className="mr-2 h-5 w-5 text-zim-black mt-0.5" />
-                  <p className="font-medium">{shipment.origin}</p>
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="font-medium text-gray-500 mb-2">Destination</h3>
-                <div className="flex items-start">
-                  <MapPin className="mr-2 h-5 w-5 text-zim-green mt-0.5" />
-                  <p className="font-medium">{shipment.destination}</p>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-medium text-gray-500 mb-2">Carrier</h3>
-                <div className="flex items-center">
-                  <Truck className="mr-2 h-5 w-5" />
-                  <p className="font-medium">{shipment.carrier || 'Not specified'}</p>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-medium text-gray-500 mb-2">Estimated Delivery</h3>
-                <div className="flex items-center">
-                  <Calendar className="mr-2 h-5 w-5" />
-                  <p className="font-medium">
-                    {shipment.estimated_delivery 
-                      ? format(new Date(shipment.estimated_delivery), 'PPP') 
-                      : 'Not specified'}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-medium text-gray-500 mb-2">Volume</h3>
-                <div className="flex items-center">
-                  <Package2 className="mr-2 h-5 w-5" />
-                  <p className="font-medium">{shipment.dimensions || 'Not specified'}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col md:flex-row justify-between text-sm text-gray-500 mb-4">
-                <div>Created: {format(new Date(shipment.created_at), 'PPP pp')}</div>
-                <div>Last Updated: {format(new Date(shipment.updated_at), 'PPP pp')}</div>
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-end space-x-4">
-              {user && (
-                <Button 
-                  onClick={() => navigate('/dashboard')} 
-                  variant="outline"
-                >
-                  Back to Dashboard
-                </Button>
-              )}
-              <Button 
-                onClick={() => {
-                  navigator.clipboard.writeText(shipment.tracking_number);
-                  toast({
-                    title: "Tracking Number Copied",
-                    description: `${shipment.tracking_number} has been copied to clipboard.`,
-                  });
-                }}
-                className="bg-zim-green hover:bg-zim-green/90"
-              >
-                Copy Tracking #
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-      </main>
-      <Footer />
-      <WhatsAppButton />
-    </div>
+    </>
   );
 };
 

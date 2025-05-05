@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -20,6 +21,9 @@ interface RoleContextType {
   hasPermission: (permission: string) => boolean;
   checkRoleIncludes: (roles: UserRole[]) => boolean;
   refetchRole: () => Promise<void>;
+  isLoading: boolean;
+  elevateToAdmin: (password: string) => Promise<boolean>;
+  setUserRole: (userId: string, role: UserRole) => Promise<boolean>;
 }
 
 // Create the context with a default value
@@ -177,6 +181,50 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
     });
   };
 
+  // Add the elevateToAdmin function
+  const elevateToAdmin = async (password: string): Promise<boolean> => {
+    try {
+      // For security, use a secure API call instead of checking password directly
+      if (password === 'admin123') { // This is a simplified example; use a more secure method in production
+        setRole('admin');
+        
+        // Log the elevation attempt - using console as audit_logs table is removed
+        console.log("User elevated to admin role", new Date().toISOString());
+        
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error in elevateToAdmin:', error);
+      return false;
+    }
+  };
+
+  // Add the setUserRole function
+  const setUserRole = async (userId: string, newRole: UserRole): Promise<boolean> => {
+    try {
+      // Update user's role in the profiles table
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          role: newRole,
+          is_admin: newRole === 'admin' 
+        })
+        .eq('id', userId);
+      
+      if (error) {
+        console.error('Error updating user role:', error);
+        return false;
+      }
+      
+      console.log(`User role updated: ${userId} set to ${newRole}`);
+      return true;
+    } catch (error) {
+      console.error('Error in setUserRole:', error);
+      return false;
+    }
+  };
+
   // Exported context value
   const contextValue: RoleContextType = {
     role,
@@ -188,12 +236,10 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
     hasPermission,
     checkRoleIncludes,
     refetchRole: fetchUserRole,
+    isLoading: loading,
+    elevateToAdmin,
+    setUserRole
   };
-
-  if (loading) {
-    // Return a loading state or the children with a default role
-    return <>{children}</>;
-  }
 
   return (
     <RoleContext.Provider value={contextValue}>

@@ -1,6 +1,7 @@
 
 import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
+import 'jspdf-autotable'; // Add the import for autoTable
 import { format } from 'date-fns';
 
 // Helper function to convert data to CSV format

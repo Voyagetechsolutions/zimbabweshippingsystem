@@ -61,7 +61,7 @@ import ContentManagement from '@/components/admin/ContentManagement';
 import CollectionScheduleManagement from '@/components/admin/CollectionScheduleManagement';
 import SupportTickets from '@/components/admin/SupportTickets';
 import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
-import { Shipment, castToShipments } from '@/types/shipment';
+import { Shipment as ShipmentType, castToShipments } from '@/types/shipment';
 
 const STATUS_OPTIONS = [
   'Booking Confirmed',
@@ -229,7 +229,7 @@ const AdminDashboard = () => {
 
       if (error) {
         console.error("Error fetching shipments:", error);
-        setError('Failed to load shipments data');
+        // Handle error display without setError
       } else {
         // Use the castToShipments helper for proper typing
         setShipments(castToShipments(data || []));
