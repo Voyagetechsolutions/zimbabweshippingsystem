@@ -134,7 +134,7 @@ const ConfirmBooking = () => {
     );
   }
 
-  // Use the collection date with fallbacks
+  // Collection information with fallbacks
   const collectionDate = collectionInfo.collectionDate || bookingData.collectionDate || 'Next available collection date';
   const route = collectionInfo.route || 'Standard Route';
   

@@ -25,11 +25,13 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
   
   // Process the collection information when props change
   useEffect(() => {
-    let newRoute: string | null = null;
-    let newCollectionDate: string | null = null;
-    
+    // Print debug information
     console.log("CollectionInfo useEffect running with:", { country, postalCode, city });
     
+    let newRoute: string | null = null;
+    let newCollectionDate: string | null = null;
+
+    // Always determine a route and collection date regardless of inputs
     if (country === 'England' && postalCode) {
       newRoute = getRouteForPostalCode(postalCode);
       if (newRoute) {
@@ -43,40 +45,48 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
         newCollectionDate = getDateForIrelandCity(normalizedCity) || getDateByRoute(newRoute);
         console.log("Retrieved Ireland route and date:", { newRoute, newCollectionDate });
       }
-    } else if (country === 'England' && !postalCode) {
-      // Fallback for England when no postal code is provided
-      newRoute = "Default England Route";
-      newCollectionDate = "Next available collection date";
-      console.log("Using fallback route for England");
-    } else if (country === 'Ireland' && !city) {
-      // Fallback for Ireland when no city is provided
-      newRoute = "Default Ireland Route";
-      newCollectionDate = "Next available collection date";
-      console.log("Using fallback route for Ireland");
-    } else {
-      // Fallback for any other cases
-      newRoute = "Standard Route";
-      newCollectionDate = "Next available collection date";
-      console.log("Using standard fallback route");
+    }
+    
+    // If we couldn't determine a route and date based on inputs, use fallbacks
+    if (!newRoute || !newCollectionDate) {
+      if (country === 'England') {
+        newRoute = "Default England Route";
+        newCollectionDate = "Next available collection date";
+        console.log("Using fallback route for England");
+      } else if (country === 'Ireland') {
+        newRoute = "Default Ireland Route";
+        newCollectionDate = "Next available collection date";
+        console.log("Using fallback route for Ireland");
+      } else {
+        newRoute = "Standard Route";
+        newCollectionDate = "Next available collection date";
+        console.log("Using standard fallback route");
+      }
     }
 
+    // Update state
     setRoute(newRoute);
     setCollectionDate(newCollectionDate);
     setIsDataReady(true);
     
-    // Ensure we always call the callback with the route and collection date
+    // ALWAYS call the callback with determined values
     if (onCollectionInfoReady) {
       console.log("Calling onCollectionInfoReady with:", { route: newRoute, collectionDate: newCollectionDate });
-      onCollectionInfoReady({ route: newRoute, collectionDate: newCollectionDate });
+      onCollectionInfoReady({ 
+        route: newRoute, 
+        collectionDate: newCollectionDate 
+      });
     } else {
       console.warn("onCollectionInfoReady callback is not provided to CollectionInfo component");
     }
   }, [country, postalCode, city, onCollectionInfoReady]);
 
+  // Don't render anything if data isn't ready yet
   if (!isDataReady) {
     return <div className="text-center p-4">Loading collection information...</div>;
   }
 
+  // Show an alert if we couldn't determine a specific route or collection date
   if (!route || !collectionDate) {
     return (
       <Alert className="bg-amber-50 border-amber-200 mt-4">
