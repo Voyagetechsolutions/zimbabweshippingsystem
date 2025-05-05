@@ -3,7 +3,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { CalendarClock, CheckCircle2, FileText, Printer, Mail } from 'lucide-react';
+import { CalendarClock, CheckCircle2, FileText, Printer, Mail, Loader } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import html2pdf from 'html2pdf.js';
 import Navbar from '@/components/Navbar';
@@ -16,6 +16,7 @@ const ConfirmBooking = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const printRef = useRef<HTMLDivElement>(null);
+  const [isCollectionInfoLoading, setIsCollectionInfoLoading] = useState(true);
   const [collectionInfo, setCollectionInfo] = useState<{ route: string | null; collectionDate: string | null }>({
     route: null,
     collectionDate: null
@@ -52,7 +53,6 @@ const ConfirmBooking = () => {
   const receiverPhone = bookingData.recipientDetails?.phone || bookingData.recipientPhone;
   const receiverAddress = bookingData.recipientDetails?.address || bookingData.deliveryAddress;
   const trackingNumber = bookingData.shipmentDetails?.tracking_number || 'Pending Assignment';
-  const collectionDate = collectionInfo.collectionDate || bookingData.collectionDate || 'Next available collection date';
   
   // Get country and postal code for collection info
   const pickupCountry = bookingData.pickupCountry || 'England';
@@ -70,7 +70,7 @@ const ConfirmBooking = () => {
   if (paymentMethod === 'standard' || paymentMethod === 'bankTransfer' || paymentMethod === 'payLater') {
     paymentInstructions = "You selected the standard payment method. For direct debit and bank transfer, please contact Mr. Moyo at +44 7984 099041. Reference: Your tracking number or surname and initials.";
   } else if (paymentMethod === 'cashOnCollection') {
-    paymentInstructions = `Payment is required upon collection of the items. Amount Due: £${finalAmount.toFixed(2)} payable on the ${collectionDate}.`;
+    paymentInstructions = `Payment is required upon collection of the items. Amount Due: £${finalAmount.toFixed(2)} payable on the ${collectionInfo.collectionDate || 'collection date'}.`;
   } else if (paymentMethod === 'payOnArrival') {
     paymentInstructions = `Goods will be kept in our warehouse in Zimbabwe until payment of: £${payOnArrivalAmount} (including 20% premium).`;
   }
@@ -112,14 +112,44 @@ const ConfirmBooking = () => {
     });
   };
 
-  // Hidden CollectionInfo component to get the collection date
+  // Handle when collection info is ready
   const handleCollectionInfoReady = (info: { route: string | null; collectionDate: string | null }) => {
+    console.log("Collection info received:", info);
     setCollectionInfo(info);
+    setIsCollectionInfoLoading(false);
   };
+  
+  // If still loading collection info, show a loading state
+  if (isCollectionInfoLoading) {
+    return (
+      <>
+        <Navbar />
+        <div className="container mx-auto py-20 text-center">
+          <Loader className="h-8 w-8 mx-auto animate-spin text-primary mb-4" />
+          <h1 className="text-2xl font-bold mb-4">Preparing Your Confirmation</h1>
+          <p className="mb-8">Please wait while we retrieve your collection information...</p>
+        </div>
+        <Footer />
+      </>
+    );
+  }
+
+  // Use the collection date with fallbacks
+  const collectionDate = collectionInfo.collectionDate || bookingData.collectionDate || 'Next available collection date';
   
   return (
     <>
       <Navbar />
+      {/* The CollectionInfo component placed at the top - makes sure it loads early */}
+      <div className="sr-only">
+        <CollectionInfo
+          country={pickupCountry}
+          postalCode={pickupPostcode}
+          city={pickupCity}
+          onCollectionInfoReady={handleCollectionInfoReady}
+        />
+      </div>
+      
       <div className="container mx-auto py-8 px-4">
         <div className="mb-6">
           <Button
@@ -233,16 +263,6 @@ const ConfirmBooking = () => {
           
           <div className="mt-8 text-center">
             <p className="text-gray-600 italic">Thank you for choosing Zimbabwe Shipping. Your support is highly appreciated.</p>
-          </div>
-          
-          {/* Hidden component to get collection info */}
-          <div className="hidden">
-            <CollectionInfo
-              country={pickupCountry}
-              postalCode={pickupPostcode}
-              city={pickupCity}
-              onCollectionInfoReady={handleCollectionInfoReady}
-            />
           </div>
         </div>
       </div>

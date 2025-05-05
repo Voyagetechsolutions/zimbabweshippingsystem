@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { PhoneIcon } from 'lucide-react';
 import { getRouteForPostalCode, getIrelandRouteForCity } from '@/utils/postalCodeUtils';
@@ -18,28 +18,42 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
   city,
   onCollectionInfoReady
 }) => {
-  let route: string | null = null;
-  let collectionDate: string | null = null;
+  // Use state to track when data is ready
+  const [isDataReady, setIsDataReady] = useState(false);
+  const [route, setRoute] = useState<string | null>(null);
+  const [collectionDate, setCollectionDate] = useState<string | null>(null);
   
-  if (country === 'England' && postalCode) {
-    route = getRouteForPostalCode(postalCode);
-    if (route) {
-      collectionDate = getDateByRoute(route);
+  // Process the collection information when props change
+  useEffect(() => {
+    let newRoute: string | null = null;
+    let newCollectionDate: string | null = null;
+    
+    if (country === 'England' && postalCode) {
+      newRoute = getRouteForPostalCode(postalCode);
+      if (newRoute) {
+        newCollectionDate = getDateByRoute(newRoute);
+      }
+    } else if (country === 'Ireland' && city) {
+      const normalizedCity = city.trim().toUpperCase();
+      newRoute = getIrelandRouteForCity(normalizedCity);
+      if (newRoute) {
+        newCollectionDate = getDateByRoute(newRoute);
+      }
     }
-  } else if (country === 'Ireland' && city) {
-    const normalizedCity = city.trim().toUpperCase();
-    route = getIrelandRouteForCity(normalizedCity);
-    if (route) {
-      collectionDate = getDateByRoute(route);
-    }
-  }
 
-  // Call the callback if provided to pass the collection info
-  React.useEffect(() => {
+    setRoute(newRoute);
+    setCollectionDate(newCollectionDate);
+    setIsDataReady(true);
+    
+    // Call the callback immediately with the route and collection date
     if (onCollectionInfoReady) {
-      onCollectionInfoReady({ route, collectionDate });
+      onCollectionInfoReady({ route: newRoute, collectionDate: newCollectionDate });
     }
-  }, [route, collectionDate, onCollectionInfoReady]);
+  }, [country, postalCode, city, onCollectionInfoReady]);
+
+  if (!isDataReady) {
+    return <div className="text-center p-4">Loading collection information...</div>;
+  }
 
   if (!route || !collectionDate) {
     return (
