@@ -65,6 +65,13 @@ const ConfirmBooking = () => {
   const finalAmount = paymentData.finalAmount || baseAmount;
   const payOnArrivalAmount = (baseAmount * 1.2).toFixed(2);
   
+  // Handle when collection info is ready
+  const handleCollectionInfoReady = (info: { route: string | null; collectionDate: string | null }) => {
+    console.log("Collection info received:", info);
+    setCollectionInfo(info);
+    setIsCollectionInfoLoading(false);
+  };
+  
   // Generate payment instructions based on payment method
   let paymentInstructions = '';
   if (paymentMethod === 'standard' || paymentMethod === 'bankTransfer' || paymentMethod === 'payLater') {
@@ -111,13 +118,6 @@ const ConfirmBooking = () => {
       description: "The email feature is not yet implemented. Please use the download option for now.",
     });
   };
-
-  // Handle when collection info is ready
-  const handleCollectionInfoReady = (info: { route: string | null; collectionDate: string | null }) => {
-    console.log("Collection info received:", info);
-    setCollectionInfo(info);
-    setIsCollectionInfoLoading(false);
-  };
   
   // If still loading collection info, show a loading state
   if (isCollectionInfoLoading) {
@@ -128,6 +128,16 @@ const ConfirmBooking = () => {
           <Loader className="h-8 w-8 mx-auto animate-spin text-primary mb-4" />
           <h1 className="text-2xl font-bold mb-4">Preparing Your Confirmation</h1>
           <p className="mb-8">Please wait while we retrieve your collection information...</p>
+          
+          {/* Mount the CollectionInfo component to start data loading, but make it invisible */}
+          <div className="sr-only">
+            <CollectionInfo
+              country={pickupCountry}
+              postalCode={pickupPostcode}
+              city={pickupCity}
+              onCollectionInfoReady={handleCollectionInfoReady}
+            />
+          </div>
         </div>
         <Footer />
       </>
@@ -135,22 +145,12 @@ const ConfirmBooking = () => {
   }
 
   // Collection information with fallbacks
-  const collectionDate = collectionInfo.collectionDate || bookingData.collectionDate || 'Next available collection date';
+  const collectionDate = collectionInfo.collectionDate || 'Next available collection date';
   const route = collectionInfo.route || 'Standard Route';
   
   return (
     <>
       <Navbar />
-      {/* The CollectionInfo component placed earlier so it starts loading as soon as possible */}
-      <div className="sr-only">
-        <CollectionInfo
-          country={pickupCountry}
-          postalCode={pickupPostcode}
-          city={pickupCity}
-          onCollectionInfoReady={handleCollectionInfoReady}
-        />
-      </div>
-      
       <div className="container mx-auto py-8 px-4">
         <div className="mb-6">
           <Button
