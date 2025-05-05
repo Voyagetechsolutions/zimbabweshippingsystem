@@ -61,6 +61,8 @@ import ContentManagement from '@/components/admin/ContentManagement';
 import CollectionScheduleManagement from '@/components/admin/CollectionScheduleManagement';
 import SupportTickets from '@/components/admin/SupportTickets';
 import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
+import { tableFrom } from '@/integrations/supabase/db-types';
+import { castToShipments } from '@/types/shipment';
 
 const STATUS_OPTIONS = [
   'Booking Confirmed',
@@ -256,6 +258,22 @@ const AdminDashboard = () => {
       if (isMounted.current) {
         setLoading(false);
       }
+    }
+  };
+
+  const fetchRecentShipments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from(tableFrom('shipments'))
+        .select('*, profiles(email, full_name)')
+        .order('created_at', { ascending: false })
+        .limit(5);
+    
+      if (error) throw error;
+      return castToShipments(data || []);
+    } catch (error) {
+      console.error('Error fetching recent shipments:', error);
+      return [];
     }
   };
 
@@ -516,7 +534,7 @@ const AdminDashboard = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {shipments.slice(0, 5).map((shipment) => (
+                    {fetchRecentShipments().map((shipment) => (
                       <TableRow key={shipment.id}>
                         <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
                         <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>

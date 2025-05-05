@@ -1,5 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
+import { AUDIT_LOGS_TABLE } from '@/integrations/supabase/db-types';
 
 /**
  * Helper function to call Supabase RPC functions
@@ -74,11 +74,14 @@ export const logAuthEvent = async (event: string, details: Record<string, any> =
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     
-    await supabase.from('audit_logs').insert({
+    // Instead of trying to use a non-existent audit_logs table,
+    // We'll use the notifications table to log actions
+    await supabase.from(AUDIT_LOGS_TABLE).insert({
       user_id: user.id,
-      action: event,
-      entity_type: 'AUTH',
-      details
+      title: `Audit: ${event}`,
+      message: JSON.stringify(details),
+      type: 'audit_log',
+      is_read: false
     });
   } catch (error) {
     console.error('Error logging auth event:', error);

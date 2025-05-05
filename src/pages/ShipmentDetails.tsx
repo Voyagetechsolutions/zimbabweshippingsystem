@@ -13,6 +13,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import ShipmentActions from '@/components/ShipmentActions';
+import { castToShipment } from '@/types/shipment';
 
 interface Shipment {
   id: string;
@@ -115,7 +116,8 @@ const ShipmentDetails = () => {
           return;
         }
 
-        setShipment(data as Shipment);
+        // Use the castToShipment function to ensure data conforms to Shipment type
+        setShipment(castToShipment(data));
       } catch (error) {
         console.error('Unexpected error:', error);
         toast({

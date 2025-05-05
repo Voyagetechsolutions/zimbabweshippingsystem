@@ -57,6 +57,8 @@ import ContentManagement from '@/components/admin/ContentManagement';
 import CollectionScheduleManagement from '@/components/admin/CollectionScheduleManagement';
 import SupportTickets from '@/components/admin/SupportTickets';
 import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
+import { tableFrom } from '@/integrations/supabase/db-types';
+import { castToShipments } from '@/types/shipment';
 
 const STATUS_OPTIONS = [
   'Booking Confirmed',
@@ -191,6 +193,23 @@ const AdminDashboardContent = () => {
         description: error.message,
         variant: 'destructive',
       });
+    }
+  };
+
+  const fetchRecentShipments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from(tableFrom('shipments'))
+        .select('*, profiles(email, full_name)')
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      if (error) throw error;
+      
+      return castToShipments(data || []);
+    } catch (error) {
+      console.error('Error fetching recent shipments:', error);
+      return [];
     }
   };
 
@@ -454,7 +473,7 @@ const AdminDashboardContent = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {shipments.slice(0, 5).map((shipment) => {
+                    {fetchRecentShipments().map((shipment) => {
                       const contactInfo = getShipmentContactInfo(shipment);
                       return (
                         <TableRow key={shipment.id}>
