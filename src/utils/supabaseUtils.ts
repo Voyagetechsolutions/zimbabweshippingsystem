@@ -77,7 +77,7 @@ export const fetchAll = async (tableName: string) => {
   }
 }
 
-// Add the missing callRpcFunction
+// Add the missing callRpcFunction with proper typing
 export const callRpcFunction = async <T>(functionName: string, params?: any): Promise<{ data: T | null; error: any }> => {
   try {
     // For functions that no longer exist in the database, let's create mock implementations
@@ -107,7 +107,7 @@ export const callRpcFunction = async <T>(functionName: string, params?: any): Pr
     }
     
     if (functionName === 'insert_gallery_image') {
-      // Create a mock return for gallery image insertion
+      // Create a mock return for gallery image insertion with proper ID
       const mockImage = {
         id: Math.random().toString(36).substring(2, 15),
         src: params.p_src,
@@ -126,7 +126,7 @@ export const callRpcFunction = async <T>(functionName: string, params?: any): Pr
     }
     
     if (functionName === 'get_announcements' || functionName === 'get_active_announcements') {
-      // Return mock announcements data
+      // Return mock announcements data with proper IDs
       const mockAnnouncementsData = [
         {
           id: '1',
@@ -145,7 +145,7 @@ export const callRpcFunction = async <T>(functionName: string, params?: any): Pr
     }
     
     if (functionName === 'create_announcement') {
-      // Mock announcement creation
+      // Mock announcement creation with proper ID
       const mockAnnouncement = {
         id: Math.random().toString(36).substring(2, 15),
         title: params.p_title,
@@ -164,6 +164,11 @@ export const callRpcFunction = async <T>(functionName: string, params?: any): Pr
     if (functionName === 'delete_announcement') {
       // Mock successful deletion
       return { data: true as unknown as T, error: null };
+    }
+
+    // Create the mock notification function
+    if (functionName === 'create_announcement_notification') {
+      return { data: { success: true } as unknown as T, error: null };
     }
 
     // If we don't have a mock implementation, we'll return an error

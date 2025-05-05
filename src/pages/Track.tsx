@@ -54,19 +54,22 @@ const Track = () => {
       
       if (data) {
         const shipment = data;
-        // Safely extract estimated_delivery from metadata, with fallbacks
+        
+        // Safely extract estimated_delivery from metadata, with improved type checks
         let estimatedDelivery = 'Not available';
-        if (typeof shipment.metadata === 'object' && shipment.metadata !== null) {
-          if (shipment.metadata.estimated_delivery) {
-            estimatedDelivery = shipment.metadata.estimated_delivery;
+        if (shipment.metadata && typeof shipment.metadata === 'object' && shipment.metadata !== null && !Array.isArray(shipment.metadata)) {
+          const metadata = shipment.metadata as Record<string, any>;
+          if (metadata.estimated_delivery) {
+            estimatedDelivery = metadata.estimated_delivery as string;
           }
         }
         
-        // Safely extract carrier from metadata, with fallbacks
+        // Safely extract carrier from metadata, with improved type checks
         let carrier = 'Zimbabwe Shipping';
-        if (typeof shipment.metadata === 'object' && shipment.metadata !== null) {
-          if (shipment.metadata.carrier) {
-            carrier = shipment.metadata.carrier;
+        if (shipment.metadata && typeof shipment.metadata === 'object' && shipment.metadata !== null && !Array.isArray(shipment.metadata)) {
+          const metadata = shipment.metadata as Record<string, any>;
+          if (metadata.carrier) {
+            carrier = metadata.carrier as string;
           }
         }
         

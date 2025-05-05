@@ -1,4 +1,3 @@
-
 export interface Role {
   id: string;
   name: string;
@@ -72,13 +71,13 @@ export interface Announcement {
   updated_at: string;
   created_by: string;
   expiry_date: string | null;
-  author_name?: string; // For display purposes
-  status: 'draft' | 'published' | 'scheduled' | string;
-  publish_at: string | null;
-  archived: boolean;
-  target_roles: string[] | null;
-  target_locations: string[] | null;
-  is_critical: boolean;
+  author_name: string | null;
+  archived?: boolean;
+  status?: 'draft' | 'published' | 'scheduled';
+  publish_at?: string | null;
+  target_roles?: string[];
+  target_locations?: string[];
+  is_critical?: boolean;
 }
 
 // Helper function for typescript casting
