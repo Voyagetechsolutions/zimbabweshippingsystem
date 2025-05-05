@@ -74,13 +74,11 @@ export const logAuthEvent = async (event: string, details: Record<string, any> =
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     
-    // Log to notifications table instead of audit_logs
-    await supabase.from('notifications').insert({
+    await supabase.from('audit_logs').insert({
       user_id: user.id,
-      title: `Auth event: ${event}`,
-      message: JSON.stringify(details),
-      type: 'system',
-      is_read: false
+      action: event,
+      entity_type: 'AUTH',
+      details
     });
   } catch (error) {
     console.error('Error logging auth event:', error);

@@ -1,67 +1,160 @@
 
 import React, { useEffect, useState } from 'react';
+import { ChevronRight, ChevronLeft, Truck, AlertTriangle, Bell } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { formatDistanceToNow } from 'date-fns';
-import { ArrowRight } from 'lucide-react';
-import { tableFrom } from '@/integrations/supabase/db-types';
-import { Announcement, adaptToAnnouncements } from '@/types/announcements';
 
-const ShippingNewsTicker: React.FC = () => {
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+interface NewsItem {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  is_urgent: boolean;
+  created_at: string;
+}
+
+const ShippingNewsTicker = () => {
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchAnnouncements = async () => {
+    const fetchNews = async () => {
+      setLoading(true);
       try {
-        // Using notifications table for news/announcements
+        // Fetch from announcements table
         const { data, error } = await supabase
-          .from(tableFrom('notifications'))
+          .from('announcements')
           .select('*')
-          .order('created_at', { ascending: false })
-          .limit(5);
-
+          .eq('is_active', true)
+          .order('created_at', { ascending: false });
+          
         if (error) throw error;
         
-        // Adapt the notification data to our announcement interface
-        const formattedAnnouncements = adaptToAnnouncements(data || []);
-        setAnnouncements(formattedAnnouncements);
+        if (data) {
+          // Transform to our news item format
+          const newsItems: NewsItem[] = data.map(item => ({
+            id: item.id,
+            title: item.title,
+            content: item.content,
+            category: item.category,
+            is_urgent: item.category.toLowerCase() === 'urgent' || item.category.toLowerCase() === 'delay',
+            created_at: item.created_at
+          }));
+          
+          setNews(newsItems);
+        }
       } catch (error) {
         console.error('Error fetching shipping news:', error);
+        // Fallback to static news if fetch fails
+        setNews(fallbackNews);
       } finally {
         setLoading(false);
       }
     };
+    
+    fetchNews();
+    
+    // Auto-rotate news items every 8 seconds
+    const interval = setInterval(() => {
+      setCurrentIndex(prevIndex => 
+        news.length > 0 ? (prevIndex + 1) % news.length : 0
+      );
+    }, 8000);
+    
+    return () => clearInterval(interval);
+  }, [news.length]);
 
-    fetchAnnouncements();
-  }, []);
+  const goToPrev = () => {
+    setCurrentIndex(prevIndex => 
+      prevIndex === 0 ? news.length - 1 : prevIndex - 1
+    );
+  };
 
-  if (loading) {
-    return <div className="p-2 text-gray-500">Loading latest updates...</div>;
+  const goToNext = () => {
+    setCurrentIndex(prevIndex => 
+      (prevIndex + 1) % news.length
+    );
+  };
+
+  // Fallback static news items
+  const fallbackNews: NewsItem[] = [
+    {
+      id: '1',
+      title: 'New Route Added',
+      content: 'We now offer direct shipping from Birmingham to Bulawayo twice weekly.',
+      category: 'Service Update',
+      is_urgent: false,
+      created_at: new Date().toISOString()
+    },
+    {
+      id: '2',
+      title: 'Holiday Schedule',
+      content: 'Modified operating hours during the upcoming public holidays. Please check our schedule.',
+      category: 'Announcement',
+      is_urgent: false,
+      created_at: new Date().toISOString()
+    },
+    {
+      id: '3',
+      title: 'Weather Delay Alert',
+      content: 'Shipments to Harare may experience 1-2 day delays due to heavy rainfall in the region.',
+      category: 'Delay',
+      is_urgent: true, 
+      created_at: new Date().toISOString()
+    }
+  ];
+
+  if (loading || news.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-3 px-4 bg-gray-100 animate-pulse rounded-lg">
+        <div className="h-5 w-full bg-gray-200 rounded"></div>
+      </div>
+    );
   }
 
-  if (announcements.length === 0) {
-    return <div className="p-2 text-gray-500">No shipping updates available at this time.</div>;
-  }
+  const currentNews = news[currentIndex];
 
   return (
-    <div className="bg-gray-100 p-2 rounded-md shadow-sm">
-      <div className="flex items-center space-x-2 overflow-x-auto whitespace-nowrap">
-        {announcements.map((announcement, index) => (
-          <div key={announcement.id} className="flex-shrink-0">
-            <a
-              href={`/notifications`}
-              className="text-sm text-gray-700 hover:text-gray-900 transition-colors duration-200"
-            >
-              <span className="font-semibold">{announcement.title}:</span>
-              {announcement.content.length > 50 ? `${announcement.content.substring(0, 50)}...` : announcement.content}
-              <span className="ml-1 text-gray-500">
-                ({formatDistanceToNow(new Date(announcement.created_at), { addSuffix: true })})
-              </span>
-              <ArrowRight className="inline-block w-4 h-4 ml-1 align-middle" />
-            </a>
-          </div>
-        ))}
+    <div className={`flex items-center justify-between py-3 px-4 rounded-lg ${
+      currentNews.is_urgent ? 'bg-red-50 border border-red-100' : 'bg-gray-50 border border-gray-100'
+    }`}>
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        onClick={goToPrev}
+        className="h-8 w-8 rounded-full"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      
+      <div className="flex-1 mx-2">
+        <div className="flex items-center gap-2">
+          {currentNews.is_urgent ? (
+            <AlertTriangle className="h-4 w-4 text-red-500" />
+          ) : (
+            <Truck className="h-4 w-4 text-zim-green" />
+          )}
+          <span className={`text-sm font-medium ${
+            currentNews.is_urgent ? 'text-red-700' : 'text-zim-green'
+          }`}>
+            {currentNews.title}
+          </span>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">
+            {currentNews.category}
+          </span>
+        </div>
+        <p className="text-sm text-gray-600">{currentNews.content}</p>
       </div>
+      
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        onClick={goToNext}
+        className="h-8 w-8 rounded-full"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
     </div>
   );
 };

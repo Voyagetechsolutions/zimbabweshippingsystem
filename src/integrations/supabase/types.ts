@@ -57,6 +57,75 @@ export type Database = {
         }
         Relationships: []
       }
+      announcements: {
+        Row: {
+          category: string
+          content: string
+          created_at: string
+          created_by: string
+          expiry_date: string | null
+          id: string
+          is_active: boolean
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          content: string
+          created_at?: string
+          created_by: string
+          expiry_date?: string | null
+          id?: string
+          is_active?: boolean
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string
+          created_by?: string
+          expiry_date?: string | null
+          id?: string
+          is_active?: boolean
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+          ip_address: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          ip_address?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          ip_address?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       collection_schedules: {
         Row: {
           areas: string[]
@@ -453,8 +522,11 @@ export type Database = {
         Row: {
           can_cancel: boolean | null
           can_modify: boolean | null
+          carrier: string | null
           created_at: string
           destination: string
+          dimensions: string | null
+          estimated_delivery: string | null
           id: string
           metadata: Json | null
           origin: string
@@ -462,12 +534,16 @@ export type Database = {
           tracking_number: string
           updated_at: string
           user_id: string | null
+          weight: number | null
         }
         Insert: {
           can_cancel?: boolean | null
           can_modify?: boolean | null
+          carrier?: string | null
           created_at?: string
           destination: string
+          dimensions?: string | null
+          estimated_delivery?: string | null
           id?: string
           metadata?: Json | null
           origin: string
@@ -475,12 +551,16 @@ export type Database = {
           tracking_number: string
           updated_at?: string
           user_id?: string | null
+          weight?: number | null
         }
         Update: {
           can_cancel?: boolean | null
           can_modify?: boolean | null
+          carrier?: string | null
           created_at?: string
           destination?: string
+          dimensions?: string | null
+          estimated_delivery?: string | null
           id?: string
           metadata?: Json | null
           origin?: string
@@ -488,6 +568,7 @@ export type Database = {
           tracking_number?: string
           updated_at?: string
           user_id?: string | null
+          weight?: number | null
         }
         Relationships: []
       }

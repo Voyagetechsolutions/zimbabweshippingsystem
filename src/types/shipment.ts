@@ -27,38 +27,11 @@ export interface Shipment {
   user_id?: string;
   can_cancel?: boolean;
   can_modify?: boolean;
-  carrier?: string | null;
-  dimensions?: string | null;
-  estimated_delivery?: string | null;
-  metadata?: ShipmentMetadata | Json | null;
-  weight?: number | null;
+  carrier?: string;
+  dimensions?: string;
+  estimated_delivery?: string;
+  metadata?: ShipmentMetadata | Json;
+  weight?: number;
   // Add the profiles property that we attach after fetching
   profiles?: ShipmentProfile;
-}
-
-// Helper function to cast data to Shipment type
-export function castToShipment(data: any): Shipment {
-  return {
-    id: data.id,
-    tracking_number: data.tracking_number,
-    origin: data.origin,
-    destination: data.destination,
-    status: data.status,
-    created_at: data.created_at,
-    updated_at: data.updated_at,
-    user_id: data.user_id,
-    can_cancel: data.can_cancel ?? true,
-    can_modify: data.can_modify ?? true,
-    carrier: data.carrier || null,
-    dimensions: data.dimensions || null,
-    estimated_delivery: data.estimated_delivery || null,
-    metadata: data.metadata || null,
-    weight: data.weight || null,
-    profiles: data.profiles
-  };
-}
-
-// Helper function to cast array of data to Shipment[] type
-export function castToShipments(data: any[]): Shipment[] {
-  return data.map(item => castToShipment(item));
 }

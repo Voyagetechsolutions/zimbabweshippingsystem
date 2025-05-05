@@ -9,7 +9,6 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import TrackingInstructions from '@/components/TrackingInstructions';
-import { castToShipment } from '@/utils/shipmentUtils';
 
 type TrackingResult = {
   status: string;
@@ -53,25 +52,20 @@ const Track = () => {
       }
       
       if (data) {
-        // Convert to proper Shipment type with metadata extracted
-        const shipment = castToShipment(data);
-        
         const result: TrackingResult = {
-          status: shipment.status,
-          origin: shipment.origin,
-          destination: shipment.destination,
-          lastUpdate: new Date(shipment.updated_at).toLocaleString(),
-          estimatedDelivery: shipment.estimated_delivery 
-            ? new Date(shipment.estimated_delivery).toLocaleDateString() 
-            : null,
-          carrier: shipment.carrier || null,
-          tracking_number: shipment.tracking_number
+          status: data.status,
+          origin: data.origin,
+          destination: data.destination,
+          lastUpdate: new Date(data.updated_at).toLocaleString(),
+          estimatedDelivery: data.estimated_delivery ? new Date(data.estimated_delivery).toLocaleDateString() : null,
+          carrier: data.carrier,
+          tracking_number: data.tracking_number
         };
         
         setTrackingResult(result);
         toast({
           title: "Tracking Information Found",
-          description: `Latest status: ${shipment.status}`,
+          description: `Latest status: ${data.status}`,
         });
       } else {
         setError('No shipment found with this tracking number');
