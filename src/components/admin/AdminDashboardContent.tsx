@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -172,7 +171,8 @@ const AdminDashboardContent = () => {
       }
 
       if (data) {
-        setShipments(data as Shipment[]);
+        const shipmentsData = data as unknown as Shipment[];
+        setShipments(shipmentsData);
         const totalCount = data.length;
         const processingCount = data.filter(s => 
           s.status.toLowerCase().includes('processing')).length;

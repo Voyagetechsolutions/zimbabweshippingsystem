@@ -1,44 +1,38 @@
 
-import { Json } from '@/integrations/supabase/types';
-
-export interface ShipmentProfile {
-  email?: string;
-  full_name?: string;
-}
-
-// Interface to properly type the metadata field
-export interface ShipmentMetadata {
-  [key: string]: any; // Add index signature to allow for dynamic properties like 'delivery_image'
-  // Add specific properties that we know will exist
-  doorToDoor?: boolean;
-  amountPaid?: number;
-  pickupCountry?: string;
-  shipmentType?: string;
-  paymentMethod?: string;
-  paymentStatus?: string;
-  includeDrums?: boolean;
-  includeOtherItems?: boolean;
-  type?: string;
-  quantity?: number;
-  services?: Array<{name: string, price: number}>;
-}
-
 export interface Shipment {
   id: string;
   tracking_number: string;
+  status: string;
   origin: string;
   destination: string;
-  status: string;
+  user_id: string;
   created_at: string;
   updated_at: string;
-  user_id?: string;
-  can_cancel?: boolean;
-  can_modify?: boolean;
+  metadata: any;
+  can_cancel: boolean;
+  can_modify: boolean;
+  // Note: These fields might not exist in the database but are required by the type
+  // so we mark them as optional to prevent errors
   carrier?: string;
+  weight?: number | string;
   dimensions?: string;
   estimated_delivery?: string;
-  metadata?: ShipmentMetadata | Json;
-  weight?: number;
-  // Add the profiles property that we attach after fetching
-  profiles?: ShipmentProfile;
+}
+
+export interface ShipmentExport {
+  id: string;
+  tracking_number: string;
+  status: string;
+  origin: string;
+  destination: string;
+  created_at: string;
+  user_id: string;
+  metadata: any;
+}
+
+export interface ShipmentFilters {
+  status?: string;
+  fromDate?: Date;
+  toDate?: Date;
+  search?: string;
 }

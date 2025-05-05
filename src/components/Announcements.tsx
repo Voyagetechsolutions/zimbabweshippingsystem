@@ -1,141 +1,92 @@
 
-import React, { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { Announcement, castTo } from '@/types/admin';
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle,
-  CardFooter
-} from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Megaphone, 
-  Calendar, 
-  ChevronRight, 
-  ChevronLeft 
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { format } from 'date-fns';
-import { tableFrom } from '@/integrations/supabase/db-types';
+import React, { useEffect, useState } from 'react';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { InfoIcon, BellIcon, TagIcon } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+
+// Since the announcements table was deleted, we'll use mockup data
+const MOCK_ANNOUNCEMENTS = [
+  {
+    id: '1',
+    title: 'Holiday Schedule',
+    content: 'We will be closed during the Christmas holidays from December 24th to December 26th.',
+    category: 'schedule',
+    created_at: new Date().toISOString(),
+    author_name: 'Admin'
+  },
+  {
+    id: '2',
+    title: 'New Shipping Rates',
+    content: 'Our shipping rates will be updated starting January 1st, 2026. Please check the pricing page for details.',
+    category: 'pricing',
+    created_at: new Date().toISOString(),
+    author_name: 'Admin'
+  }
+];
 
 const Announcements = () => {
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(0);
 
   useEffect(() => {
+    const fetchAnnouncements = async () => {
+      try {
+        // Instead of fetching from Supabase, we'll use mock data
+        setAnnouncements(MOCK_ANNOUNCEMENTS);
+      } catch (error) {
+        console.error("Error fetching announcements:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchAnnouncements();
   }, []);
 
-  const fetchAnnouncements = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from(tableFrom('announcements'))
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      if (data) {
-        setAnnouncements(castTo<Announcement[]>(data));
-      }
-    } catch (error) {
-      console.error('Error fetching announcements:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Filter out expired announcements
-  const activeAnnouncements = announcements.filter(announcement => {
-    if (!announcement.expiry_date) return true;
-    return new Date(announcement.expiry_date) >= new Date();
-  });
-
-  const totalPages = Math.ceil(activeAnnouncements.length / 1);
-  const hasAnnouncements = activeAnnouncements.length > 0;
-
-  const goToNextPage = () => {
-    setCurrentPage((prev) => (prev + 1) % totalPages);
-  };
-
-  const goToPrevPage = () => {
-    setCurrentPage((prev) => (prev - 1 + totalPages) % totalPages);
-  };
-
-  const currentAnnouncement = activeAnnouncements[currentPage];
-
   if (loading) {
-    return (
-      <div className="relative overflow-hidden rounded-lg bg-gray-50 p-6 animate-pulse">
-        <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
-        <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
-        <div className="h-4 bg-gray-200 rounded w-5/6"></div>
-      </div>
-    );
+    return <div className="h-32 flex items-center justify-center">Loading announcements...</div>;
   }
 
-  if (!hasAnnouncements) {
+  if (announcements.length === 0) {
     return null;
   }
 
   return (
-    <Card className="border-l-4 border-l-zim-green overflow-hidden">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Megaphone className="h-5 w-5 text-zim-green" />
-            Latest Updates
-          </CardTitle>
-          {totalPages > 1 && (
-            <div className="flex items-center gap-1">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={goToPrevPage}
-                className="h-7 w-7"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-xs text-gray-500">
-                {currentPage + 1} / {totalPages}
-              </span>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={goToNextPage}
-                className="h-7 w-7"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+    <div className="space-y-4">
+      {announcements.map((announcement) => (
+        <Alert 
+          key={announcement.id} 
+          className={`border-l-4 ${
+            announcement.category === 'urgent' ? 'border-l-red-500 bg-red-50' : 
+            announcement.category === 'schedule' ? 'border-l-blue-500 bg-blue-50' : 
+            announcement.category === 'promotion' ? 'border-l-green-500 bg-green-50' : 
+            announcement.category === 'pricing' ? 'border-l-amber-500 bg-amber-50' : 
+            'border-l-gray-500 bg-gray-50'
+          }`}
+        >
+          <div className="flex items-start">
+            <div className="mr-3 mt-0.5">
+              {announcement.category === 'urgent' ? <InfoIcon className="h-5 w-5 text-red-500" /> : 
+               announcement.category === 'schedule' ? <InfoIcon className="h-5 w-5 text-blue-500" /> : 
+               announcement.category === 'promotion' ? <TagIcon className="h-5 w-5 text-green-500" /> : 
+               announcement.category === 'pricing' ? <TagIcon className="h-5 w-5 text-amber-500" /> : 
+               <BellIcon className="h-5 w-5 text-gray-500" />}
             </div>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold">{currentAnnouncement.title}</h3>
-            <Badge variant="outline" className="text-xs">
-              {currentAnnouncement.category}
-            </Badge>
+            <div>
+              <AlertTitle className="text-base font-semibold mb-1">
+                {announcement.title}
+              </AlertTitle>
+              <AlertDescription className="text-sm">
+                {announcement.content}
+                <div className="text-xs text-gray-500 mt-2">
+                  Posted: {new Date(announcement.created_at).toLocaleDateString()}
+                </div>
+              </AlertDescription>
+            </div>
           </div>
-          <p className="text-sm text-gray-600">{currentAnnouncement.content}</p>
-        </div>
-      </CardContent>
-      <CardFooter className="pt-0 pb-2">
-        <div className="flex items-center text-xs text-gray-500">
-          <Calendar className="h-3 w-3 mr-1" />
-          <span>
-            {format(new Date(currentAnnouncement.created_at), 'MMM d, yyyy')}
-          </span>
-        </div>
-      </CardFooter>
-    </Card>
+        </Alert>
+      ))}
+    </div>
   );
 };
 

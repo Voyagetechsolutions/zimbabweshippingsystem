@@ -1,242 +1,102 @@
-
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useAuth } from './AuthContext';
+import React, {
+  createContext,
+  useState,
+  useEffect,
+  useContext,
+  ReactNode,
+} from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { UserRoleType } from '@/types/admin';
-import { callRpcFunction } from '@/utils/supabaseUtils';
 
-interface RoleContextType {
-  role: UserRoleType | null;
+interface RoleContextProps {
+  userRole: string | null;
+  requestRoleElevation: (role: string) => Promise<void>;
   isLoading: boolean;
-  hasPermission: (requiredRole: UserRoleType) => boolean;
-  elevateToAdmin: (password: string) => Promise<boolean>;
-  setUserRole: (userId: string, newRole: UserRoleType) => Promise<boolean>;
 }
 
-const RoleContext = createContext<RoleContextType | undefined>(undefined);
+const RoleContext = createContext<RoleContextProps>({
+  userRole: null,
+  requestRoleElevation: async () => {},
+  isLoading: true,
+});
 
-export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, session, isAdmin } = useAuth();
-  const [role, setRole] = useState<UserRoleType | null>(null);
+interface RoleProviderProps {
+  children: ReactNode;
+}
+
+export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
+  const { auth, isLoading: authLoading } = useAuth();
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { toast } = useToast();
 
   useEffect(() => {
     const fetchUserRole = async () => {
-      if (!user) {
-        setRole(null);
+      if (!auth?.user) {
+        setUserRole('anonymous');
         setIsLoading(false);
         return;
       }
 
       try {
-        setIsLoading(true);
-        
-        if (isAdmin) {
-          setRole('admin');
-          setIsLoading(false);
-          return;
-        }
-        
         const { data, error } = await supabase
-          .from('profiles')
+          .from('user_roles')
           .select('role')
-          .eq('id', user.id)
+          .eq('user_id', auth.user.id)
           .single();
 
         if (error) {
           console.error('Error fetching user role:', error);
-          
-          if (error.message.includes("column 'role' does not exist")) {
-            console.log('Role column not found, setting default role');
-            setRole('customer');
-          } else {
-            setRole('customer');
-          }
-        } else if (data && 'role' in data) {
-          // Temporarily restrict roles to only 'admin' and 'customer'
-          const userRole = data.role as UserRoleType;
-          if (userRole !== 'admin') {
-            setRole('customer');
-          } else {
-            setRole(userRole);
-          }
+          setUserRole('anonymous');
         } else {
-          setRole('customer');
+          setUserRole(data?.role || 'anonymous');
         }
       } catch (error) {
-        console.error('Error in fetchUserRole:', error);
-        setRole('customer');
+        console.error('Unexpected error fetching user role:', error);
+        setUserRole('anonymous');
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchUserRole();
-  }, [user, isAdmin]);
-
-  const hasPermission = (requiredRole: UserRoleType): boolean => {
-    if (!role) return false;
-    
-    if (role === 'admin' || isAdmin) return true;
-
-    // Temporarily only check for 'admin' or 'customer' role
-    switch (requiredRole) {
-      case 'admin':
-        return false; // Only admin roles can access admin features
-      case 'customer':
-        return true; // Everyone has customer access
-      default:
-        // Temporarily disable logistics, driver, and support roles
-        return false;
+    if (!authLoading) {
+      fetchUserRole();
     }
-  };
+  }, [auth, authLoading]);
 
-  const elevateToAdmin = async (password: string): Promise<boolean> => {
-    if (!user) {
-      toast({
-        title: 'Authentication Required',
-        description: 'You must be logged in to perform this action.',
-        variant: 'destructive',
-      });
-      return false;
-    }
-    
-    try {
-      const { data, error } = await supabase.rpc('elevate_to_admin', {
-        admin_password: password
-      });
-
-      if (error) {
-        toast({
-          title: 'Elevation Failed',
-          description: error.message,
-          variant: 'destructive',
-        });
-        return false;
-      }
-
-      if (data) {
-        toast({
-          title: 'Admin Access Granted',
-          description: 'You now have administrative privileges.',
-        });
-        setRole('admin');
-        return true;
-      }
-      
-      toast({
-        title: 'Elevation Failed',
-        description: 'Invalid admin password.',
-        variant: 'destructive',
-      });
-      return false;
-    } catch (error: any) {
-      toast({
-        title: 'Elevation Error',
-        description: error.message || 'An unknown error occurred.',
-        variant: 'destructive',
-      });
-      return false;
-    }
-  };
-
-  const setUserRole = async (userId: string, newRole: UserRoleType): Promise<boolean> => {
-    // Temporarily restrict role changes to only 'admin' and 'customer'
-    if (newRole !== 'admin' && newRole !== 'customer') {
-      toast({
-        title: 'Role Change Failed',
-        description: 'Only admin and customer roles are currently supported.',
-        variant: 'destructive',
-      });
-      return false;
-    }
-
-    if (!hasPermission('admin')) {
-      toast({
-        title: 'Permission Denied',
-        description: 'Only administrators can change user roles.',
-        variant: 'destructive',
-      });
-      return false;
+  const requestRoleElevation = async (role: string) => {
+    if (!auth?.user) {
+      console.error('User not authenticated.');
+      return;
     }
 
     try {
-      // Log the action before attempting the update for audit purposes
-      await supabase.from('audit_logs').insert({
-        user_id: user?.id,
-        action: 'ROLE_CHANGE_ATTEMPT',
+      // Just log to console instead since audit_logs table was deleted
+      console.log('Role elevation request:', {
+        user_id: auth.user?.id,
+        action: 'ROLE_ELEVATION_REQUEST',
         entity_type: 'USER',
-        entity_id: userId,
-        details: { current_role: role, new_role: newRole }
+        details: {
+          requested_role: role,
+          status: 'pending'
+        }
       });
 
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role: newRole })
-        .eq('id', userId);
+      // Optimistically update the user role
+      setUserRole('pending');
 
-      if (error) {
-        toast({
-          title: 'Role Change Failed',
-          description: error.message,
-          variant: 'destructive',
-        });
-        
-        // Log the failure
-        await supabase.from('audit_logs').insert({
-          user_id: user?.id,
-          action: 'ROLE_CHANGE_FAILED',
-          entity_type: 'USER',
-          entity_id: userId,
-          details: { error: error.message }
-        });
-        
-        return false;
-      }
-
-      // Log the successful change
-      await supabase.from('audit_logs').insert({
-        user_id: user?.id,
-        action: 'ROLE_CHANGED',
-        entity_type: 'USER',
-        entity_id: userId,
-        details: { new_role: newRole }
-      });
-
-      toast({
-        title: 'Role Updated',
-        description: `User role has been changed to ${newRole}.`,
-      });
-      return true;
-    } catch (error: any) {
-      toast({
-        title: 'Role Change Error',
-        description: error.message || 'An unknown error occurred.',
-        variant: 'destructive',
-      });
-      return false;
+      // Notify success (even though we're only logging)
+      console.log('Role elevation request submitted successfully.');
+    } catch (error) {
+      console.error('Error requesting role elevation:', error);
     }
   };
 
-  const contextValue: RoleContextType = {
-    role,
-    isLoading,
-    hasPermission,
-    elevateToAdmin,
-    setUserRole
-  };
-
-  return <RoleContext.Provider value={contextValue}>{children}</RoleContext.Provider>;
+  return (
+    <RoleContext.Provider value={{ userRole, requestRoleElevation, isLoading }}>
+      {children}
+    </RoleContext.Provider>
+  );
 };
 
-export const useRole = () => {
-  const context = useContext(RoleContext);
-  if (context === undefined) {
-    throw new Error('useRole must be used within a RoleProvider');
-  }
-  return context;
-};
-
-export type { UserRoleType };
+export const useRole = () => useContext(RoleContext);

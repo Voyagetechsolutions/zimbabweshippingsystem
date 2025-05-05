@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -234,7 +233,8 @@ const AdminDashboard = () => {
 
       if (data && isMounted.current) {
         console.log("Admin: Fetched shipments count:", data.length);
-        setShipments(data as Shipment[]);
+        const shipmentsData = data as unknown as Shipment[];
+        setShipments(shipmentsData);
         const totalCount = data.length;
         const processingCount = data.filter(s => s.status.toLowerCase() === 'processing').length;
         const inTransitCount = data.filter(s => s.status.toLowerCase() === 'in transit').length;

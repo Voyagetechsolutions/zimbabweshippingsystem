@@ -24,6 +24,11 @@ const ConfirmBooking = () => {
   const bookingData = location.state?.bookingData || {};
   const paymentData = location.state?.paymentData || {};
   
+  // Debug logs to help identify issues
+  console.log('Booking Data:', bookingData);
+  console.log('Payment Data:', paymentData);
+  console.log('Collection Info:', collectionInfo);
+  
   if (!bookingData || Object.keys(bookingData).length === 0) {
     return (
       <>
