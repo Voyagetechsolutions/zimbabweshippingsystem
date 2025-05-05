@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -241,12 +240,14 @@ const AnnouncementsManager = () => {
 
           // If critical and published, create notifications
           if (formData.is_critical && formData.is_active && formData.status === 'published') {
-            await callRpcFunction('create_announcement_notification', { p_announcement_id: formData.id });
+            // Fixed: Cast the data to Announcement type to ensure type safety
+            const announcement = data as Announcement;
+            await callRpcFunction('create_announcement_notification', { p_announcement_id: announcement.id });
             sonnerToast.success('Notifications sent to users about this critical announcement');
           }
         }
       } else {
-        const { data, error } = await callRpcFunction('create_announcement', {
+        const { data, error } = await callRpcFunction<Announcement>('create_announcement', {
           p_title: formData.title,
           p_content: formData.content,
           p_category: formData.category,
@@ -270,7 +271,9 @@ const AnnouncementsManager = () => {
 
           // If critical and published, create notifications
           if (formData.is_critical && formData.is_active && formData.status === 'published') {
-            await callRpcFunction('create_announcement_notification', { p_announcement_id: data.id });
+            // Fixed: Cast the data to Announcement type explicitly
+            const announcement = data as Announcement;
+            await callRpcFunction('create_announcement_notification', { p_announcement_id: announcement.id });
             sonnerToast.success('Notifications sent to users about this critical announcement');
           }
         }
