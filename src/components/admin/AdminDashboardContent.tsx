@@ -168,19 +168,13 @@ const AdminDashboardContent = () => {
 
       if (error) {
         console.error('Error fetching shipments:', error);
-        // Handle error display without setError
-      } else {
-        // Use the castToShipments helper for proper typing
-        const castedShipments = castToShipments(data || []);
-        setShipments(castedShipments);
+        return;
       }
-    } catch (error: any) {
-      console.error("Error in fetchShipments:", error);
-      toast({
-        title: 'Error fetching shipments',
-        description: error.message,
-        variant: 'destructive',
-      });
+
+      // Use the castToShipments helper to properly type the data
+      setShipments(castToShipments(data || []));
+    } catch (error) {
+      console.error('Error fetching shipments:', error);
     } finally {
       setLoading(false);
     }

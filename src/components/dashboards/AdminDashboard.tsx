@@ -229,8 +229,7 @@ const AdminDashboard = () => {
         // Handle error display without setError
       } else {
         // Use the castToShipments helper for proper typing
-        const castedShipments = castToShipments(data || []);
-        setShipments(castedShipments);
+        setShipments(castToShipments(data || []));
       }
     } catch (err) {
       console.error('Error fetching shipments:', err);

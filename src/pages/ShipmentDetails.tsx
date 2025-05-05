@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -49,7 +50,7 @@ const ShipmentDetails = () => {
           return;
         }
 
-        // Add the proper shipment casting where needed (around line 118)
+        // Use the castToShipment helper to properly type the shipment data
         setShipment(castToShipment(shipmentData));
       } catch (err) {
         console.error('Error fetching shipment:', err);
@@ -61,6 +62,24 @@ const ShipmentDetails = () => {
 
     fetchShipment();
   }, [id]);
+
+  // Helper function to safely render metadata fields
+  const renderMetadataField = (field: string): React.ReactNode => {
+    if (!shipment?.metadata) return 'N/A';
+    
+    if (typeof shipment.metadata === 'object' && shipment.metadata !== null) {
+      // Using type assertion to handle the metadata
+      const metadata = shipment.metadata as Record<string, any>;
+      if (field in metadata) {
+        const value = metadata[field];
+        if (typeof value === 'boolean') {
+          return value ? 'Yes' : 'No';
+        }
+        return value?.toString() || 'N/A';
+      }
+    }
+    return 'N/A';
+  };
 
   if (loading) {
     return (
@@ -220,9 +239,7 @@ const ShipmentDetails = () => {
                   <span className="text-sm font-medium">Door to Door</span>
                 </div>
                 <div className="text-sm text-gray-600">
-                  {typeof shipment.metadata === 'object' && shipment.metadata && 'doorToDoor' in shipment.metadata 
-                    ? (shipment.metadata.doorToDoor ? 'Yes' : 'No') 
-                    : 'N/A'}
+                  {renderMetadataField('doorToDoor')}
                 </div>
               </div>
               <div className="grid gap-2">
@@ -231,9 +248,7 @@ const ShipmentDetails = () => {
                   <span className="text-sm font-medium">Amount Paid</span>
                 </div>
                 <div className="text-sm text-gray-600">
-                  {typeof shipment.metadata === 'object' && shipment.metadata && 'amountPaid' in shipment.metadata 
-                    ? shipment.metadata.amountPaid 
-                    : 'N/A'}
+                  {renderMetadataField('amountPaid')}
                 </div>
               </div>
               <div className="grid gap-2">
@@ -242,9 +257,7 @@ const ShipmentDetails = () => {
                   <span className="text-sm font-medium">Pickup Country</span>
                 </div>
                 <div className="text-sm text-gray-600">
-                  {typeof shipment.metadata === 'object' && shipment.metadata && 'pickupCountry' in shipment.metadata 
-                    ? shipment.metadata.pickupCountry 
-                    : 'N/A'}
+                  {renderMetadataField('pickupCountry')}
                 </div>
               </div>
               <div className="grid gap-2">
@@ -253,9 +266,7 @@ const ShipmentDetails = () => {
                   <span className="text-sm font-medium">Shipment Type</span>
                 </div>
                 <div className="text-sm text-gray-600">
-                  {typeof shipment.metadata === 'object' && shipment.metadata && 'shipmentType' in shipment.metadata 
-                    ? shipment.metadata.shipmentType 
-                    : 'N/A'}
+                  {renderMetadataField('shipmentType')}
                 </div>
               </div>
               <div className="grid gap-2">
