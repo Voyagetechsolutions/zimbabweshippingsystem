@@ -3,7 +3,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { CalendarClock, CheckCircle2, FileText, Printer, Mail, Loader } from 'lucide-react';
+import { CalendarClock, CheckCircle2, FileText, Printer, Mail, Loader, User, Phone, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import html2pdf from 'html2pdf.js';
 import Navbar from '@/components/Navbar';
@@ -49,8 +49,12 @@ const ConfirmBooking = () => {
   // Extract necessary data
   const senderName = bookingData.senderDetails?.name || `${bookingData.firstName || ''} ${bookingData.lastName || ''}`.trim();
   const senderPhone = bookingData.senderDetails?.phone || bookingData.phone;
+  const senderEmail = bookingData.senderDetails?.email || bookingData.email;
+  const senderAddress = bookingData.senderDetails?.address || bookingData.pickupAddress;
+  
   const receiverName = bookingData.recipientDetails?.name || bookingData.recipientName;
   const receiverPhone = bookingData.recipientDetails?.phone || bookingData.recipientPhone;
+  const additionalReceiverPhone = bookingData.recipientDetails?.additionalPhone || bookingData.additionalRecipientPhone;
   const receiverAddress = bookingData.recipientDetails?.address || bookingData.deliveryAddress;
   const trackingNumber = bookingData.shipmentDetails?.tracking_number || 'Pending Assignment';
   
@@ -222,6 +226,87 @@ const ConfirmBooking = () => {
             </CardContent>
           </Card>
           
+          {/* Sender Information Card */}
+          <Card className="mt-6">
+            <CardHeader className="bg-gray-50">
+              <CardTitle className="flex items-center">
+                <User className="mr-2 h-5 w-5 text-gray-500" />
+                Sender Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-gray-700 pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="flex items-center mb-2">
+                    <User className="mr-2 h-4 w-4 text-gray-500" />
+                    <span className="font-semibold">Name:</span> 
+                    <span className="ml-2">{senderName}</span>
+                  </p>
+                  <p className="flex items-center mb-2">
+                    <Phone className="mr-2 h-4 w-4 text-gray-500" />
+                    <span className="font-semibold">Phone:</span> 
+                    <span className="ml-2">{senderPhone}</span>
+                  </p>
+                </div>
+                <div>
+                  <p className="flex items-center mb-2">
+                    <Mail className="mr-2 h-4 w-4 text-gray-500" />
+                    <span className="font-semibold">Email:</span> 
+                    <span className="ml-2">{senderEmail}</span>
+                  </p>
+                  <p className="flex items-center">
+                    <MapPin className="mr-2 h-4 w-4 text-gray-500" />
+                    <span className="font-semibold">Address:</span> 
+                    <span className="ml-2">{senderAddress}</span>
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Receiver Information Card */}
+          <Card className="mt-6">
+            <CardHeader className="bg-gray-50">
+              <CardTitle className="flex items-center">
+                <User className="mr-2 h-5 w-5 text-gray-500" />
+                Receiver Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-gray-700 pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="flex items-center mb-2">
+                    <User className="mr-2 h-4 w-4 text-gray-500" />
+                    <span className="font-semibold">Name:</span> 
+                    <span className="ml-2">{receiverName}</span>
+                  </p>
+                  <p className="flex items-center mb-2">
+                    <Phone className="mr-2 h-4 w-4 text-gray-500" />
+                    <span className="font-semibold">Phone:</span> 
+                    <span className="ml-2">{receiverPhone}</span>
+                  </p>
+                </div>
+                <div>
+                  {additionalReceiverPhone && (
+                    <p className="flex items-center mb-2">
+                      <Phone className="mr-2 h-4 w-4 text-gray-500" />
+                      <span className="font-semibold">Additional Phone:</span> 
+                      <span className="ml-2">{additionalReceiverPhone}</span>
+                    </p>
+                  )}
+                  <p className="flex items-center">
+                    <MapPin className="mr-2 h-4 w-4 text-gray-500" />
+                    <span className="font-semibold">Address:</span> 
+                    <span className="ml-2">{receiverAddress}</span>
+                  </p>
+                </div>
+              </div>
+              <p className="mt-4">
+                Please ensure that you are available on the collection day. And please let <span className="font-semibold">{receiverName}</span> of <span className="font-semibold">{receiverAddress}</span> with contact number <span className="font-semibold">{receiverPhone}</span> be aware of the parcel that will arrive 6-8 weeks from collection day.
+              </p>
+            </CardContent>
+          </Card>
+          
           <Card className="mt-6">
             <CardHeader className="bg-gray-50">
               <CardTitle className="flex items-center">
@@ -248,17 +333,6 @@ const ConfirmBooking = () => {
                   <span className="font-medium">£{finalAmount.toFixed(2)}</span>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Receiver Information</CardTitle>
-            </CardHeader>
-            <CardContent className="text-gray-700">
-              <p>
-                Please ensure that you are available on the collection day. And please let <span className="font-semibold">{receiverName}</span> of <span className="font-semibold">{receiverAddress}</span> with contact number <span className="font-semibold">{receiverPhone}</span> be aware of the parcel that will arrive 6-8 weeks from collection day.
-              </p>
             </CardContent>
           </Card>
           
