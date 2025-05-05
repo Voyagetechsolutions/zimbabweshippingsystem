@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -247,7 +246,7 @@ const BookShipment = () => {
       }
       
       if (bookingData.paymentCompleted) {
-        navigate('/receipt', { 
+        navigate('/confirm-booking', { 
           state: { 
             bookingData,
             paymentData: bookingData.paymentData,
@@ -310,44 +309,14 @@ const BookShipment = () => {
       }
     }
     
-    // When payment is completed, navigate to receipt page with complete data
-    navigate('/receipt', { 
+    // When payment is completed, navigate to the confirmation page with complete data
+    navigate('/confirm-booking', { 
       state: { 
-        bookingData: updatedBookingData,
-        paymentData,
-        receiptData: {
-          receipt_number: paymentData.receipt_number,
-          id: bookingData.id || bookingData.shipment_id,
-          created_at: new Date().toISOString(),
-          
-          // Structured sender details
-          sender_details: {
-            name: bookingData.senderDetails?.name,
-            email: bookingData.senderDetails?.email || bookingData.email,
-            phone: bookingData.senderDetails?.phone || bookingData.phone,
-            address: bookingData.senderDetails?.address || bookingData.pickupAddress
-          },
-          
-          // Structured recipient details
-          recipient_details: {
-            name: bookingData.recipientDetails?.name,
-            phone: bookingData.recipientDetails?.phone,
-            additionalPhone: bookingData.recipientDetails?.additionalPhone,
-            address: bookingData.recipientDetails?.address
-          },
-          
-          // Structured shipment details
-          shipment_details: bookingData.shipmentDetails,
-          
-          // Collection information
-          collection_info: {
-            pickup_address: bookingData.pickupAddress,
-            pickup_postcode: bookingData.pickupPostcode,
-            pickup_country: bookingData.pickupCountry
-          },
-          
-          // Payment information
-          payment_info: paymentData
+        bookingData: {
+          ...updatedBookingData,
+          totalAmount: paymentData.finalAmount,
+          paymentMethod: paymentData.method,
+          trackingNumber: bookingData.shipmentDetails?.tracking_number
         }
       }
     });
