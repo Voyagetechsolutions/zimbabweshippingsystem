@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
@@ -101,7 +100,7 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
         address: bookingData.recipientDetails?.address || bookingData.deliveryAddress
       };
 
-      // Merge all booking data for the receipt
+      // Merge all booking data for the confirmation
       const finalBookingData = {
         ...bookingData,
         receipt_number: receiptNumber,
@@ -123,38 +122,11 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
       // Call the parent component's onComplete handler
       await onComplete(paymentData);
       
-      // Navigate to receipt page with all the necessary data
-      navigate('/receipt', { 
+      // Navigate to confirmation page with all the necessary data
+      navigate('/confirm-booking', { 
         state: { 
           bookingData: finalBookingData,
           paymentData,
-          // Create a properly structured receiptData object
-          receiptData: {
-            receipt_number: receiptNumber,
-            id: bookingData.id || bookingData.shipment_id,
-            created_at: new Date().toISOString(),
-            
-            // Structured sender details
-            sender_details: enhancedSenderDetails,
-            
-            // Structured recipient details
-            recipient_details: enhancedRecipientDetails,
-            
-            // Structured shipment details
-            shipment_details: enhancedShipmentDetails,
-            
-            // Collection information
-            collection_info: {
-              pickup_address: bookingData.pickupAddress,
-              pickup_postcode: bookingData.pickupPostcode,
-              pickup_country: bookingData.pickupCountry,
-              date: bookingData.collectionDate || "Next available collection date",
-              area: bookingData.collectionArea || bookingData.pickupCountry || "Collection area not specified"
-            },
-            
-            // Payment information
-            payment_info: paymentData
-          }
         }
       });
     } catch (error) {

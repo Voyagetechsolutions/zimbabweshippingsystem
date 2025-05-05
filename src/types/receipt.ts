@@ -28,5 +28,12 @@ export interface PaymentInfo {
   status?: string;
   date?: string;
   payment_id?: string;
+  finalAmount?: number;
+  originalAmount?: number;
+  discount?: number;
+  premium?: number;
+  isSpecialDeal?: boolean;
+  isPayOnArrival?: boolean;
+  payLaterMethod?: string;
   [key: string]: any;
 }

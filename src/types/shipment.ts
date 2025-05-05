@@ -14,6 +14,13 @@ export interface ShipmentMetadata {
   amountPaid?: number;
   pickupCountry?: string;
   shipmentType?: string;
+  paymentMethod?: string;
+  paymentStatus?: string;
+  includeDrums?: boolean;
+  includeOtherItems?: boolean;
+  type?: string;
+  quantity?: number;
+  services?: Array<{name: string, price: number}>;
 }
 
 export interface Shipment {
