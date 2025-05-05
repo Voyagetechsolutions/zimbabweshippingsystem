@@ -1,10 +1,11 @@
 
+
 import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useRole } from '@/contexts/RoleContext';
-import { UserRoleType } from '@/types/admin';
+import { UserRoleType } from '@/contexts/RoleContext';
 
 interface AuthProps {
   children: React.ReactNode;
