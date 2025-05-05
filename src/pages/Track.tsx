@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from "@/components/ui/button";
@@ -53,11 +54,21 @@ const Track = () => {
       
       if (data) {
         const shipment = data;
-        const estimatedDelivery = shipment.estimated_delivery || 
-          (shipment.metadata?.estimated_delivery ? shipment.metadata.estimated_delivery : 'Not available');
+        // Safely extract estimated_delivery from metadata, with fallbacks
+        let estimatedDelivery = 'Not available';
+        if (typeof shipment.metadata === 'object' && shipment.metadata !== null) {
+          if (shipment.metadata.estimated_delivery) {
+            estimatedDelivery = shipment.metadata.estimated_delivery;
+          }
+        }
         
-        const carrier = shipment.carrier || 
-          (shipment.metadata?.carrier ? shipment.metadata.carrier : 'Zimbabwe Shipping');
+        // Safely extract carrier from metadata, with fallbacks
+        let carrier = 'Zimbabwe Shipping';
+        if (typeof shipment.metadata === 'object' && shipment.metadata !== null) {
+          if (shipment.metadata.carrier) {
+            carrier = shipment.metadata.carrier;
+          }
+        }
         
         const result: TrackingResult = {
           status: shipment.status,

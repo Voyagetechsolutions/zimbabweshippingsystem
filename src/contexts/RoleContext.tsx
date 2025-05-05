@@ -36,7 +36,7 @@ interface RoleProviderProps {
 }
 
 export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user } = useAuth();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -69,10 +69,8 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
       }
     };
 
-    if (!authLoading) {
-      fetchUserRole();
-    }
-  }, [user, authLoading]);
+    fetchUserRole();
+  }, [user]);
 
   // This is a simplified implementation that just logs the request
   const requestRoleElevation = async (role: string) => {
