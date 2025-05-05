@@ -58,7 +58,6 @@ import ContentManagement from '@/components/admin/ContentManagement';
 import CollectionScheduleManagement from '@/components/admin/CollectionScheduleManagement';
 import SupportTickets from '@/components/admin/SupportTickets';
 import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
-import { Shipment, castToShipment, castToShipments, ShipmentMetadata, castToShipmentMetadata } from '@/types/shipment';
 
 const STATUS_OPTIONS = [
   'Booking Confirmed',
@@ -70,6 +69,22 @@ const STATUS_OPTIONS = [
   'Delivered',
   'Cancelled',
 ];
+
+interface Shipment {
+  id: string;
+  tracking_number: string;
+  origin: string;
+  destination: string;
+  status: string;
+  carrier: string | null;
+  weight: number | null;
+  dimensions: string | null;
+  estimated_delivery: string | null;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  metadata: any | null;
+}
 
 const getStatusBadgeClass = (status: string) => {
   const statusLower = status.toLowerCase();
@@ -152,15 +167,35 @@ const AdminDashboardContent = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching shipments:', error);
-        return;
+        console.error("Error fetching shipments:", error);
+        throw error;
       }
 
-      // Use the castToShipments helper to properly type the data
-      const typedShipments = castToShipments(data || []);
-      setShipments(typedShipments);
-    } catch (error) {
-      console.error('Error fetching shipments:', error);
+      if (data) {
+        setShipments(data as Shipment[]);
+        const totalCount = data.length;
+        const processingCount = data.filter(s => 
+          s.status.toLowerCase().includes('processing')).length;
+        const inTransitCount = data.filter(s => 
+          s.status.toLowerCase().includes('transit')).length;
+        const deliveredCount = data.filter(s => 
+          s.status.toLowerCase().includes('delivered')).length;
+        
+        setStats(prev => ({
+          ...prev,
+          total: totalCount,
+          processing: processingCount,
+          inTransit: inTransitCount,
+          delivered: deliveredCount,
+        }));
+      }
+    } catch (error: any) {
+      console.error("Error in fetchShipments:", error);
+      toast({
+        title: 'Error fetching shipments',
+        description: error.message,
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -215,18 +250,12 @@ const AdminDashboardContent = () => {
 
   // Function to extract sender and recipient information from shipment metadata
   const getShipmentContactInfo = (shipment: Shipment) => {
-    // Convert metadata to proper type first
-    const metadata = castToShipmentMetadata(shipment.metadata);
-    
+    const metadata = shipment.metadata || {};
     return {
-      senderName: typeof metadata === 'object' && metadata !== null ? 
-        (metadata.senderName || metadata.firstName || "N/A") : "N/A",
-      senderPhone: typeof metadata === 'object' && metadata !== null ? 
-        (metadata.senderPhone || metadata.phone || "N/A") : "N/A",
-      recipientName: typeof metadata === 'object' && metadata !== null ? 
-        (metadata.recipientName || "N/A") : "N/A",
-      recipientPhone: typeof metadata === 'object' && metadata !== null ? 
-        (metadata.recipientPhone || "N/A") : "N/A"
+      senderName: metadata.senderName || metadata.firstName || "N/A",
+      senderPhone: metadata.senderPhone || metadata.phone || "N/A",
+      recipientName: metadata.recipientName || "N/A",
+      recipientPhone: metadata.recipientPhone || "N/A"
     };
   };
 

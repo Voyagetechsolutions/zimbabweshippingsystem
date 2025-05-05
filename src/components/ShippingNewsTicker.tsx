@@ -19,9 +19,41 @@ const ShippingNewsTicker = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Since announcements table has been removed, we'll use only fallback news
-    setNews(fallbackNews);
-    setLoading(false);
+    const fetchNews = async () => {
+      setLoading(true);
+      try {
+        // Fetch from announcements table
+        const { data, error } = await supabase
+          .from('announcements')
+          .select('*')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false });
+          
+        if (error) throw error;
+        
+        if (data) {
+          // Transform to our news item format
+          const newsItems: NewsItem[] = data.map(item => ({
+            id: item.id,
+            title: item.title,
+            content: item.content,
+            category: item.category,
+            is_urgent: item.category.toLowerCase() === 'urgent' || item.category.toLowerCase() === 'delay',
+            created_at: item.created_at
+          }));
+          
+          setNews(newsItems);
+        }
+      } catch (error) {
+        console.error('Error fetching shipping news:', error);
+        // Fallback to static news if fetch fails
+        setNews(fallbackNews);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchNews();
     
     // Auto-rotate news items every 8 seconds
     const interval = setInterval(() => {

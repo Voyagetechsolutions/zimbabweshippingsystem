@@ -1,6 +1,25 @@
 
 import { Json } from "@/integrations/supabase/types";
 
+export interface Receipt {
+  id: string;
+  user_id: string | null;
+  shipment_id: string | null;
+  payment_id?: string;
+  receipt_number?: string;
+  amount?: number;
+  currency?: string;
+  payment_method?: string;
+  status?: string;
+  created_at: string;
+  updated_at: string;
+  sender_details: Json;
+  recipient_details: Json;
+  shipment_details: Json;
+  collection_info: Json;
+  payment_info: Json;
+}
+
 export interface PaymentInfo {
   receipt_number?: string;
   amount?: number;
@@ -10,23 +29,4 @@ export interface PaymentInfo {
   date?: string;
   payment_id?: string;
   [key: string]: any;
-}
-
-export interface Receipt {
-  id: string;
-  created_at: string;
-  updated_at: string;
-  receipt_number?: string;
-  user_id?: string;
-  shipment_id?: string;
-  amount?: number;
-  currency?: string;
-  payment_method?: string;
-  status?: string;
-  payment_id?: string;
-  sender_details?: Record<string, any>;
-  recipient_details?: Record<string, any>;
-  shipment_details?: Record<string, any>;
-  collection_info?: Record<string, any>;
-  payment_info?: PaymentInfo;
 }

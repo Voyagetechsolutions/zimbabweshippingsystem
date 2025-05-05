@@ -14,17 +14,6 @@ export interface ShipmentMetadata {
   amountPaid?: number;
   pickupCountry?: string;
   shipmentType?: string;
-  estimatedDelivery?: string;
-  carrier?: string;
-  weight?: number;
-  dimensions?: string;
-  // Add contact information properties
-  senderName?: string;
-  firstName?: string; // Alternative field
-  senderPhone?: string;
-  phone?: string; // Alternative field
-  recipientName?: string;
-  recipientPhone?: string;
 }
 
 export interface Shipment {
@@ -46,39 +35,3 @@ export interface Shipment {
   // Add the profiles property that we attach after fetching
   profiles?: ShipmentProfile;
 }
-
-// Helper function to cast Json to ShipmentMetadata
-export const castToShipmentMetadata = (metadata: Json | null | ShipmentMetadata): ShipmentMetadata => {
-  if (!metadata) return {};
-  if (Array.isArray(metadata)) return {};
-  if (typeof metadata === 'string') return {};
-  if (typeof metadata === 'number') return {};
-  if (typeof metadata === 'boolean') return {};
-  return metadata as ShipmentMetadata;
-};
-
-// Helper function to safely cast a shipment with proper metadata typing
-export const castToShipment = (shipment: any): Shipment => {
-  if (!shipment) return {} as Shipment;
-  
-  return {
-    ...shipment,
-    metadata: castToShipmentMetadata(shipment.metadata),
-    // Extract metadata properties to the top level if they exist
-    carrier: shipment.carrier || (shipment.metadata && typeof shipment.metadata === 'object' && !Array.isArray(shipment.metadata)) 
-      ? shipment.metadata.carrier : undefined,
-    dimensions: shipment.dimensions || (shipment.metadata && typeof shipment.metadata === 'object' && !Array.isArray(shipment.metadata)) 
-      ? shipment.metadata.dimensions : undefined,
-    estimated_delivery: shipment.estimated_delivery || (shipment.metadata && typeof shipment.metadata === 'object' && !Array.isArray(shipment.metadata)) 
-      ? shipment.metadata.estimatedDelivery : undefined,
-    weight: shipment.weight || (shipment.metadata && typeof shipment.metadata === 'object' && !Array.isArray(shipment.metadata)) 
-      ? shipment.metadata.weight : undefined,
-  };
-};
-
-// Helper function to safely cast an array of shipments with proper metadata typing
-export const castToShipments = (shipments: any[]): Shipment[] => {
-  if (!shipments || !Array.isArray(shipments)) return [];
-  
-  return shipments.map(shipment => castToShipment(shipment));
-};

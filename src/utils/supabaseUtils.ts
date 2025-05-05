@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 /**
@@ -73,7 +74,12 @@ export const logAuthEvent = async (event: string, details: Record<string, any> =
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     
-    console.log('Authentication attempt would have been logged to audit_logs');
+    await supabase.from('audit_logs').insert({
+      user_id: user.id,
+      action: event,
+      entity_type: 'AUTH',
+      details
+    });
   } catch (error) {
     console.error('Error logging auth event:', error);
   }

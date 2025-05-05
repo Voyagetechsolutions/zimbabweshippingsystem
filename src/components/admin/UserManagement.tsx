@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useRole, UserRole } from '@/contexts/RoleContext';
+import { useRole, UserRoleType } from '@/contexts/RoleContext';
 import {
   Card,
   CardContent,
@@ -67,7 +68,7 @@ interface Profile {
   email: string;
   full_name: string | null;
   is_admin: boolean;
-  role?: UserRole | null;
+  role?: UserRoleType | null;
   avatar_url?: string | null;
   created_at: string;
 }
@@ -90,7 +91,7 @@ const UserManagement = () => {
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [roleAssignDialogOpen, setRoleAssignDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
-  const [selectedRole, setSelectedRole] = useState<UserRole>('customer');
+  const [selectedRole, setSelectedRole] = useState<UserRoleType>('customer');
   const { toast } = useToast();
   const { setUserRole } = useRole();
 
@@ -248,7 +249,7 @@ const UserManagement = () => {
             .single();
             
           if (userData) {
-            await setUserRole(userData.id, values.role as UserRole);
+            await setUserRole(userData.id, values.role as UserRoleType);
           }
         }, 2000); // Give it a moment for the trigger to create the profile
       }
@@ -297,7 +298,7 @@ const UserManagement = () => {
 
       // Update role if changed
       if (values.role && values.role !== editingUser.role) {
-        await setUserRole(editingUser.id, values.role as UserRole);
+        await setUserRole(editingUser.id, values.role as UserRoleType);
       }
 
       toast({
@@ -621,7 +622,7 @@ const UserManagement = () => {
               <Label htmlFor="role">Select Role</Label>
               <Select
                 value={selectedRole}
-                onValueChange={(value) => setSelectedRole(value as UserRole)}
+                onValueChange={(value) => setSelectedRole(value as UserRoleType)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select a role" />

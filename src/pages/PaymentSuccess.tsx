@@ -16,7 +16,7 @@ const PaymentSuccess = () => {
   const isMobile = useIsMobile();
   
   const [loading, setLoading] = useState(true);
-  const [paymentData, setPaymentData] = useState<any>(null);
+  const [receiptData, setReceiptData] = useState<any>(null);
   const [shipmentData, setShipmentData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   
@@ -25,7 +25,7 @@ const PaymentSuccess = () => {
   }, []);
   
   useEffect(() => {
-    const fetchPaymentData = async () => {
+    const fetchReceiptData = async () => {
       setLoading(true);
       
       try {
@@ -33,53 +33,37 @@ const PaymentSuccess = () => {
         const sessionId = searchParams.get('session_id');
         const paymentIntent = searchParams.get('payment_intent');
         const paymentId = searchParams.get('payment_id');
-        const shipmentId = searchParams.get('shipment_id');
+        const receiptId = searchParams.get('receipt_id');
         
-        console.log("URL parameters:", { sessionId, paymentIntent, paymentId, shipmentId });
+        console.log("URL parameters:", { sessionId, paymentIntent, paymentId, receiptId });
         
-        if (!sessionId && !paymentIntent && !paymentId && !shipmentId) {
+        if (!sessionId && !paymentIntent && !paymentId && !receiptId) {
           throw new Error('No payment information found');
         }
         
-        let payment;
-        let shipment;
+        let receipt;
         
-        // If we have a shipment ID directly
-        if (shipmentId) {
-          console.log("Fetching shipment by ID:", shipmentId);
+        // If we have a receipt ID directly
+        if (receiptId) {
+          console.log("Fetching receipt by ID:", receiptId);
           
           // Use tableFrom helper to type-cast the table name
           const { data, error } = await supabase
-            .from(tableFrom('shipments'))
-            .select('*')
-            .eq('id', shipmentId)
+            .from(tableFrom('receipts'))
+            .select('*, payments(*), shipments(*)')
+            .eq('id', receiptId)
             .single();
           
           if (error) {
-            console.error("Error fetching shipment by ID:", error);
+            console.error("Error fetching receipt by ID:", error);
             throw error;
           }
           
-          shipment = data;
-          setShipmentData(data);
-          console.log("Shipment data loaded:", data.id);
-          
-          // Also fetch the payment data
-          const { data: paymentData, error: paymentError } = await supabase
-            .from(tableFrom('payments'))
-            .select('*')
-            .eq('shipment_id', shipmentId)
-            .order('created_at', { ascending: false })
-            .limit(1);
-            
-          if (paymentError) {
-            console.error("Error fetching payment data:", paymentError);
-          } else if (paymentData && paymentData.length > 0) {
-            payment = paymentData[0];
-            setPaymentData(payment);
-          }
+          receipt = data;
+          setShipmentData(data.shipments);
+          console.log("Receipt data loaded:", data.id);
         }
-        // Otherwise verify with the payment processor and get payment
+        // Otherwise verify with the payment processor and get receipt
         else {
           const { data, error } = await supabase.functions.invoke('verify-payment', {
             body: { 
@@ -91,69 +75,60 @@ const PaymentSuccess = () => {
           
           if (error) throw error;
           
-          if (!data || !data.paymentId) {
+          if (!data || !data.receiptId) {
             throw new Error('Could not verify payment');
           }
           
-          // Fetch the payment data
-          const { data: paymentData, error: paymentError } = await supabase
-            .from(tableFrom('payments'))
-            .select('*')
-            .eq('id', data.paymentId)
+          // Fetch the receipt data using the tableFrom helper
+          const { data: receiptData, error: receiptError } = await supabase
+            .from(tableFrom('receipts'))
+            .select('*, payments(*), shipments(*)')
+            .eq('id', data.receiptId)
             .single();
             
-          if (paymentError) throw paymentError;
-          payment = paymentData;
-          
-          // Also fetch the shipment data
-          if (payment.shipment_id) {
-            const { data: shipmentData, error: shipmentError } = await supabase
-              .from(tableFrom('shipments'))
-              .select('*')
-              .eq('id', payment.shipment_id)
-              .single();
-              
-            if (shipmentError) {
-              console.error("Error fetching shipment:", shipmentError);
-            } else {
-              shipment = shipmentData;
-              setShipmentData(shipmentData);
-            }
-          }
+          if (receiptError) throw receiptError;
+          receipt = receiptData;
+          setShipmentData(receiptData.shipments);
         }
         
-        setPaymentData(payment);
-        
-        // If shipment data is available, redirect to ConfirmBooking
-        if (shipment) {
-          setTimeout(() => {
-            navigate(`/confirm-booking/${shipment.id}`, {
-              state: { 
-                shipmentId: shipment.id,
-                bookingData: {
-                  amount: payment?.amount,
-                  paymentMethod: payment?.payment_method,
-                  paymentCompleted: true
-                }
-              }
-            });
-          }, 2000); // Short delay to show success message
-        }
+        setReceiptData(receipt);
       } catch (err: any) {
-        console.error('Error fetching payment data:', err);
-        setError(err.message || 'Failed to load payment data');
+        console.error('Error fetching receipt:', err);
+        setError(err.message || 'Failed to load receipt data');
         toast({
           variant: "destructive",
           title: "Error",
-          description: err.message || "Could not load payment information"
+          description: err.message || "Could not load receipt information"
         });
       } finally {
         setLoading(false);
       }
     };
     
-    fetchPaymentData();
-  }, [searchParams, toast, navigate]);
+    fetchReceiptData();
+  }, [searchParams, toast]);
+
+  // Helper function to get friendly payment method name
+  const getPaymentMethodDisplay = () => {
+    if (!receiptData || !receiptData.payment_method) return 'Standard Payment';
+    
+    const method = receiptData.payment_method;
+    
+    switch(method) {
+      case 'goods_arriving':
+        return 'Pay on Goods Arriving in Zimbabwe';
+      case 'cashOnCollection':
+        return 'Cash on Collection (Special Deal)';
+      case 'cash':
+        return 'Cash Payment (30-day terms)';
+      case 'bank_transfer':
+        return 'Bank Transfer (30-day terms)';
+      case 'direct_debit':
+        return 'Direct Debit (30-day terms)';
+      default:
+        return method.charAt(0).toUpperCase() + method.slice(1).replace('_', ' ');
+    }
+  };
 
   return (
     <>
@@ -164,8 +139,8 @@ const PaymentSuccess = () => {
           {loading ? (
             <div className="flex flex-col items-center justify-center py-10 md:py-16">
               <Loader2 className="h-10 w-10 md:h-12 md:w-12 animate-spin text-zim-green mb-4" />
-              <h2 className="text-xl md:text-2xl font-semibold">Processing Your Payment...</h2>
-              <p className="text-gray-500 mt-2 text-center">Please wait while we verify your payment information</p>
+              <h2 className="text-xl md:text-2xl font-semibold">Loading Receipt...</h2>
+              <p className="text-gray-500 mt-2 text-center">Please wait while we retrieve your payment information</p>
             </div>
           ) : error ? (
             <div className="text-center py-10 md:py-16">
@@ -189,8 +164,49 @@ const PaymentSuccess = () => {
                   Thank you for your booking. Your shipment has been confirmed and is being processed.
                 </p>
                 <p className="text-gray-600 mt-2 text-sm md:text-base">
-                  You will be redirected to your booking confirmation...
+                  You can view your receipt details on your dashboard.
                 </p>
+                
+                {receiptData && receiptData.payment_method && (
+                  <div className="mt-4 bg-blue-50 border border-blue-100 rounded-md p-3 inline-block mx-auto">
+                    <p className="font-medium text-blue-800">
+                      Payment Method: {getPaymentMethodDisplay()}
+                    </p>
+                    {receiptData.payment_method === 'bank_transfer' && (
+                      <div className="mt-2 text-sm text-blue-700">
+                        <p>Please transfer to: Zimbabwe Shipping Ltd</p>
+                        <p>Account: 12345678 | Sort Code: 12-34-56</p>
+                        <p>Reference: {receiptData.receipt_number}</p>
+                      </div>
+                    )}
+                    {receiptData.payment_method === 'goods_arriving' && (
+                      <p className="mt-2 text-sm text-blue-700">
+                        You'll pay when your goods arrive in Zimbabwe (20% premium included).
+                      </p>
+                    )}
+                    {receiptData.payment_method === 'cash_on_collection' && (
+                      <p className="mt-2 text-sm text-blue-700">
+                        Please have cash ready when we collect your items. £20 discount applied on each drum!
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+              
+              <div className="mt-6 border border-gray-200 rounded-lg p-4 md:p-6 bg-white">
+                <h2 className="text-xl font-bold mb-4">Receipt Information</h2>
+                {receiptData && (
+                  <>
+                    <p className="text-gray-700"><span className="font-medium">Receipt Number:</span> {receiptData.receipt_number}</p>
+                    <p className="text-gray-700"><span className="font-medium">Date:</span> {new Date(receiptData.created_at).toLocaleDateString()}</p>
+                    <p className="text-gray-700"><span className="font-medium">Amount:</span> {receiptData.currency || '£'}{receiptData.amount}</p>
+                    <div className="mt-4">
+                      <Button onClick={() => navigate(`/receipt/${receiptData.id}`)}>
+                        View Full Receipt
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
               
               <div className="flex justify-center mt-6 md:mt-8">

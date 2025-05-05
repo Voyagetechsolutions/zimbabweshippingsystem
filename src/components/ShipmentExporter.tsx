@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Download, FileSpreadsheet, File, ChevronDown } from 'lucide-react';
 import { formatDate } from 'date-fns';
-import { useToast } from '@/hooks/use-toast';
+import { useToast, toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { exportToCsv, exportToPdf } from '@/utils/exportUtils';
 

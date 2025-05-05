@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -61,7 +62,6 @@ import ContentManagement from '@/components/admin/ContentManagement';
 import CollectionScheduleManagement from '@/components/admin/CollectionScheduleManagement';
 import SupportTickets from '@/components/admin/SupportTickets';
 import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
-import { Shipment, castToShipment, castToShipments } from '@/types/shipment';
 
 const STATUS_OPTIONS = [
   'Booking Confirmed',
@@ -73,6 +73,22 @@ const STATUS_OPTIONS = [
   'Delivered',
   'Cancelled',
 ];
+
+interface Shipment {
+  id: string;
+  tracking_number: string;
+  origin: string;
+  destination: string;
+  status: string;
+  carrier: string | null;
+  weight: number | null;
+  dimensions: string | null;
+  estimated_delivery: string | null;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  metadata: any | null;
+}
 
 const getStatusBadgeClass = (status: string) => {
   const statusLower = status.toLowerCase();
@@ -201,26 +217,50 @@ const AdminDashboard = () => {
   };
 
   const fetchShipments = async () => {
+    if (!isMounted.current) return;
+    
     setLoading(true);
     try {
+      console.log("Admin: Fetching all shipments");
       const { data, error } = await supabase
         .from('shipments')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching shipments:', error);
-        // Handle error display without setError
-      } else {
-        // Use the castToShipments helper for proper typing
-        const typedShipments = castToShipments(data || []);
-        setShipments(typedShipments);
+        console.error("Error fetching shipments:", error);
+        throw error;
       }
-    } catch (err) {
-      console.error('Error fetching shipments:', err);
-      // Handle error display
+
+      if (data && isMounted.current) {
+        console.log("Admin: Fetched shipments count:", data.length);
+        setShipments(data as Shipment[]);
+        const totalCount = data.length;
+        const processingCount = data.filter(s => s.status.toLowerCase() === 'processing').length;
+        const inTransitCount = data.filter(s => s.status.toLowerCase() === 'in transit').length;
+        const deliveredCount = data.filter(s => s.status.toLowerCase() === 'delivered').length;
+        
+        setStats(prev => ({
+          ...prev,
+          total: totalCount,
+          processing: processingCount,
+          inTransit: inTransitCount,
+          delivered: deliveredCount,
+        }));
+      }
+    } catch (error: any) {
+      console.error("Error in fetchShipments:", error);
+      if (isMounted.current) {
+        toast({
+          title: 'Error fetching shipments',
+          description: error.message,
+          variant: 'destructive',
+        });
+      }
     } finally {
-      setLoading(false);
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
   };
 
