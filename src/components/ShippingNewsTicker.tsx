@@ -13,7 +13,7 @@ const ShippingNewsTicker: React.FC = () => {
   useEffect(() => {
     const fetchAnnouncements = async () => {
       try {
-        // Using notifications table instead of announcements
+        // Using notifications table for news/announcements
         const { data, error } = await supabase
           .from(tableFrom('notifications'))
           .select('*')

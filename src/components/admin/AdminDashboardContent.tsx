@@ -1,757 +1,210 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
+import { CSVLink } from 'react-csv';
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ArrowDownToLine, Package, BarChart, User, File } from 'lucide-react';
 import { format } from 'date-fns';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useIsMobile } from '@/hooks/use-mobile';
-import {
-  Package, 
-  Truck, 
-  Search, 
-  RefreshCcw, 
-  Filter, 
-  Eye, 
-  Edit, 
-  User,
-  Settings, 
-  Activity, 
-  Calendar,
-  FileText, 
-  BarChart3, 
-  ImageIcon, 
-  MessageSquare, 
-  FileSpreadsheet,
-  Menu
-} from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import UserManagement from '@/components/admin/UserManagement';
-import AnalyticsReports from '@/components/admin/AnalyticsReports';
-import SettingsManagement from '@/components/admin/SettingsManagement';
-import ContentManagement from '@/components/admin/ContentManagement';
-import CollectionScheduleManagement from '@/components/admin/CollectionScheduleManagement';
-import SupportTickets from '@/components/admin/SupportTickets';
-import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
 import { tableFrom } from '@/integrations/supabase/db-types';
-import { castToShipments } from '@/types/shipment';
+import { castToShipments } from '@/utils/shipmentUtils';
 
-const STATUS_OPTIONS = [
-  'Booking Confirmed',
-  'Ready for Pickup',
-  'Processing in Warehouse (UK)',
-  'Customs Clearance',
-  'Processing in Warehouse (ZW)',
-  'Out for Delivery',
-  'Delivered',
-  'Cancelled',
-];
-
-interface Shipment {
-  id: string;
-  tracking_number: string;
-  origin: string;
-  destination: string;
-  status: string;
-  carrier: string | null;
-  weight: number | null;
-  dimensions: string | null;
-  estimated_delivery: string | null;
-  created_at: string;
-  updated_at: string;
-  user_id: string;
-  metadata: any | null;
-}
-
-const getStatusBadgeClass = (status: string) => {
-  const statusLower = status.toLowerCase();
+const AdminDashboardContent: React.FC = () => {
+  const [shipments, setShipments] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [totalShipments, setTotalShipments] = useState(0);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [shipmentsCsv, setShipmentsCsv] = useState<any[]>([]);
   
-  switch (true) {
-    case statusLower.includes('booking confirmed'):
-      return 'bg-blue-100 text-blue-800 border-blue-300';
-    case statusLower.includes('ready for pickup'):
-      return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-    case statusLower.includes('processing'):
-      return 'bg-orange-100 text-orange-800 border-orange-300';
-    case statusLower.includes('customs'):
-      return 'bg-purple-100 text-purple-800 border-purple-300';
-    case statusLower.includes('transit'):
-      return 'bg-blue-100 text-blue-800 border-blue-300';
-    case statusLower.includes('out for delivery'):
-      return 'bg-indigo-100 text-indigo-800 border-indigo-300';
-    case statusLower.includes('delivered'):
-      return 'bg-green-100 text-green-800 border-green-300';
-    case statusLower.includes('cancelled'):
-      return 'bg-red-100 text-red-800 border-red-300';
-    case statusLower.includes('delayed'):
-      return 'bg-red-100 text-red-800 border-red-300';
-    default:
-      return 'bg-gray-100 text-gray-500';
-  }
-};
-
-const AdminDashboardContent = () => {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const isMobile = useIsMobile();
-  const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
-  const [newStatus, setNewStatus] = useState<string>('');
-  const [activeTab, setActiveTab] = useState('overview');
-  const [showFullMenu, setShowFullMenu] = useState(false);
-  
-  const [stats, setStats] = useState({
-    total: 0,
-    processing: 0,
-    inTransit: 0,
-    delivered: 0,
-    quotes: 0,
-  });
-
-  // Fix dependency array in useEffect to prevent unnecessary re-renders
   useEffect(() => {
-    fetchShipments();
-    fetchStats();
+    const fetchDashboardData = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        // Fetch total shipments count
+        const { count: shipmentsCount, error: shipmentsError } = await supabase
+          .from(tableFrom('shipments'))
+          .select('*', { count: 'exact' });
+        
+        if (shipmentsError) throw shipmentsError;
+        setTotalShipments(shipmentsCount || 0);
+        
+        // Fetch total users count
+        const { count: usersCount, error: usersError } = await supabase
+          .from(tableFrom('profiles'))
+          .select('*', { count: 'exact' });
+        
+        if (usersError) throw usersError;
+        setTotalUsers(usersCount || 0);
+      } catch (error: any) {
+        console.error('Error fetching dashboard counts:', error);
+        setError('Failed to fetch dashboard counts');
+      }
+    };
+    
+    const fetchRecentShipments = async () => {
+      try {
+        const { data, error } = await supabase
+          .from(tableFrom('shipments'))
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(5);
+          
+        if (error) throw error;
+        
+        if (data) {
+          // Convert to Shipment[] with metadata extracted
+          const shipmentData = castToShipments(data);
+          setShipments(shipmentData);
+        }
+      } catch (error) {
+        console.error('Error fetching recent shipments:', error);
+        setError('Failed to fetch recent shipments');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchDashboardData();
+    fetchRecentShipments();
   }, []);
-
-  const fetchStats = async () => {
-    try {
-      const { data: quotesData, error: quotesError } = await supabase
-        .from('custom_quotes')
-        .select('id', { count: 'exact' });
-      
-      if (quotesError) throw quotesError;
-      
-      setStats(prev => ({
-        ...prev,
-        quotes: quotesData ? quotesData.length : 0
-      }));
-    } catch (error) {
-      console.error("Error fetching stats:", error);
-    }
-  };
-
-  const fetchShipments = async () => {
+  
+  // Update exportShipments function to use the async/await properly
+  const exportShipments = async () => {
+    setIsLoading(true);
+    setError(null);
+    
     try {
       const { data, error } = await supabase
         .from(tableFrom('shipments'))
         .select('*')
         .order('created_at', { ascending: false });
-    
+        
       if (error) throw error;
-    
-      // Use the castToShipments helper for proper type conversion
-      setShipments(castToShipments(data || []));
       
-      const totalCount = data.length;
-      const processingCount = data.filter(s => 
-        s.status.toLowerCase().includes('processing')).length;
-      const inTransitCount = data.filter(s => 
-        s.status.toLowerCase().includes('transit')).length;
-      const deliveredCount = data.filter(s => 
-        s.status.toLowerCase().includes('delivered')).length;
-      
-      setStats(prev => ({
-        ...prev,
-        total: totalCount,
-        processing: processingCount,
-        inTransit: inTransitCount,
-        delivered: deliveredCount,
-      }));
+      if (data) {
+        const shipmentData = castToShipments(data);
+        // Then use the shipmentData array for your export logic
+        const shipmentsCsv = shipmentData.map(shipment => ({
+          id: shipment.id,
+          tracking_number: shipment.tracking_number,
+          origin: shipment.origin,
+          destination: shipment.destination,
+          status: shipment.status,
+          created_at: shipment.created_at,
+          updated_at: shipment.updated_at,
+          user_id: shipment.user_id,
+          carrier: shipment.carrier,
+          weight: shipment.weight,
+          dimensions: shipment.dimensions,
+          estimated_delivery: shipment.estimated_delivery,
+        }));
+        
+        setShipmentsCsv(shipmentsCsv);
+      }
     } catch (error) {
-      console.error("Error in fetchShipments:", error);
-      toast({
-        title: 'Error fetching shipments',
-        description: error.message,
-        variant: 'destructive',
-      });
+      console.error('Error exporting shipments:', error);
+      setError('Failed to export shipments');
+    } finally {
+      setIsLoading(false);
     }
   };
-
-  const fetchRecentShipments = async () => {
-    try {
-      const { data, error } = await supabase
-        .from(tableFrom('shipments'))
-        .select('*, profiles(email, full_name)')
-        .order('created_at', { ascending: false })
-        .limit(5);
-      
-      if (error) throw error;
-      
-      return castToShipments(data || []);
-    } catch (error) {
-      console.error('Error fetching recent shipments:', error);
-      return [];
-    }
-  };
-
-  const updateShipmentStatus = async () => {
-    if (!editingShipment || !newStatus) return;
-    
-    try {
-      const { error } = await supabase
-        .from('shipments')
-        .update({
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', editingShipment.id);
-
-      if (error) throw error;
-
-      toast({
-        title: 'Status Updated',
-        description: `Shipment ${editingShipment.tracking_number} status updated to ${newStatus}`,
-      });
-
-      fetchShipments();
-      
-      setEditingShipment(null);
-      setNewStatus('');
-      
-    } catch (error: any) {
-      toast({
-        title: 'Error updating status',
-        description: error.message,
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const filteredShipments = shipments.filter(shipment => {
-    const matchesSearch = 
-      searchQuery === '' ||
-      shipment.tracking_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      shipment.origin.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      shipment.destination.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = 
-      statusFilter === 'all' ||
-      shipment.status.toLowerCase() === statusFilter.toLowerCase();
-    
-    return matchesSearch && matchesStatus;
-  });
-
-  // Function to extract sender and recipient information from shipment metadata
-  const getShipmentContactInfo = (shipment: Shipment) => {
-    const metadata = shipment.metadata || {};
-    return {
-      senderName: metadata.senderName || metadata.firstName || "N/A",
-      senderPhone: metadata.senderPhone || metadata.phone || "N/A",
-      recipientName: metadata.recipientName || "N/A",
-      recipientPhone: metadata.recipientPhone || "N/A"
-    };
-  };
-
+  
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-        {isMobile && (
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setShowFullMenu(!showFullMenu)}
-          >
-            <Menu className="h-4 w-4" />
+    <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+      {/* Total Shipments Card */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Total Shipments</CardTitle>
+          <Package className="h-4 w-4 text-gray-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{isLoading ? <Skeleton width={80} /> : totalShipments}</div>
+          <p className="text-sm text-gray-500">All time shipments</p>
+        </CardContent>
+      </Card>
+      
+      {/* Total Users Card */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+          <User className="h-4 w-4 text-gray-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{isLoading ? <Skeleton width={80} /> : totalUsers}</div>
+          <p className="text-sm text-gray-500">Registered users</p>
+        </CardContent>
+      </Card>
+      
+      {/* Recent Shipments Card */}
+      <Card className="col-span-1 md:col-span-2 lg:col-span-3">
+        <CardHeader>
+          <CardTitle>Recent Shipments</CardTitle>
+          <CardDescription>Latest shipment activity</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          {error && <p className="text-red-500">{error}</p>}
+          {isLoading ? (
+            <>
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </>
+          ) : shipments.length > 0 ? (
+            <div className="grid gap-2">
+              {shipments.map((shipment) => (
+                <div key={shipment.id} className="border rounded-md p-4">
+                  <div className="font-medium">{shipment.tracking_number}</div>
+                  <div className="text-sm text-gray-500">
+                    {shipment.origin} to {shipment.destination}
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    Status: {shipment.status}
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    Created at: {format(new Date(shipment.created_at), 'MMM d, yyyy h:mm a')}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-4">No recent shipments</div>
+          )}
+        </CardContent>
+      </Card>
+      
+      {/* Export Shipments Card */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Export Shipments</CardTitle>
+          <File className="h-4 w-4 text-gray-500" />
+        </CardHeader>
+        <CardContent>
+          <Button onClick={exportShipments} disabled={isLoading} className="w-full">
+            {isLoading ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Exporting...
+              </>
+            ) : (
+              <>
+                <ArrowDownToLine className="mr-2 h-4 w-4" />
+                Export to CSV
+              </>
+            )}
           </Button>
-        )}
-      </div>
-      
-      <Tabs 
-        defaultValue="overview" 
-        value={activeTab} 
-        onValueChange={setActiveTab}
-        className="mb-8"
-      >
-        {isMobile && !showFullMenu ? (
-          <TabsList className="grid grid-cols-2 gap-2 mb-4">
-            <TabsTrigger value="overview" className="flex items-center justify-center gap-2 p-3">
-              <Activity className="h-5 w-5" />
-              <span>Overview</span>
-            </TabsTrigger>
-            <Select value={activeTab} onValueChange={setActiveTab}>
-              <SelectTrigger className="h-full">
-                <div className="flex items-center">
-                  <span>More</span>
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="shipments">
-                  <div className="flex items-center gap-2">
-                    <Package className="h-4 w-4" />
-                    <span>Shipments</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="quotes">
-                  <div className="flex items-center gap-2">
-                    <FileSpreadsheet className="h-4 w-4" />
-                    <span>Custom Quotes</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="users">
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    <span>Users</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="analytics">
-                  <div className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4" />
-                    <span>Analytics</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="schedule">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    <span>Schedule</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="settings">
-                  <div className="flex items-center gap-2">
-                    <Settings className="h-4 w-4" />
-                    <span>Settings</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="more">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    <span>More</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </TabsList>
-        ) : (
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-8 gap-2 mb-4">
-            <TabsTrigger value="overview" className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>Overview</span>
-            </TabsTrigger>
-            <TabsTrigger value="shipments" className="flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>Shipments</span>
-            </TabsTrigger>
-            <TabsTrigger value="quotes" className="flex items-center gap-2">
-              <FileSpreadsheet className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>Custom Quotes</span>
-            </TabsTrigger>
-            <TabsTrigger value="users" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>Users</span>
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>Analytics</span>
-            </TabsTrigger>
-            <TabsTrigger value="schedule" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>Schedule</span>
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>Settings</span>
-            </TabsTrigger>
-            <TabsTrigger value="more" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>More</span>
-            </TabsTrigger>
-          </TabsList>
-        )}
-        
-        <TabsContent value="overview">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Total Shipments</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <Package className="h-8 w-8 text-zim-green mr-3" />
-                  <div className="text-2xl font-bold">{stats.total}</div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Processing</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <Package className="h-8 w-8 text-yellow-500 mr-3" />
-                  <div className="text-2xl font-bold">{stats.processing}</div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">In Transit</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <Truck className="h-8 w-8 text-blue-500 mr-3" />
-                  <div className="text-2xl font-bold">{stats.inTransit}</div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Delivered</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <Package className="h-8 w-8 text-green-500 mr-3" />
-                  <div className="text-2xl font-bold">{stats.delivered}</div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Custom Quotes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <FileSpreadsheet className="h-8 w-8 text-purple-500 mr-3" />
-                  <div className="text-2xl font-bold">{stats.quotes}</div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl">Recent Shipments</CardTitle>
-              <CardDescription>Quick overview of the latest shipments</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[120px]">Tracking #</TableHead>
-                      <TableHead>Sender Name</TableHead>
-                      <TableHead>Sender Phone</TableHead>
-                      <TableHead>Recipient Name</TableHead>
-                      <TableHead>Recipient Phone</TableHead>
-                      <TableHead>Origin</TableHead>
-                      <TableHead>Destination</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead className="text-right">View</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {fetchRecentShipments().map((shipment) => {
-                      const contactInfo = getShipmentContactInfo(shipment);
-                      return (
-                        <TableRow key={shipment.id}>
-                          <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
-                          <TableCell>{contactInfo.senderName}</TableCell>
-                          <TableCell>{contactInfo.senderPhone}</TableCell>
-                          <TableCell>{contactInfo.recipientName}</TableCell>
-                          <TableCell>{contactInfo.recipientPhone}</TableCell>
-                          <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
-                          <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
-                          <TableCell>
-                            <Badge className={getStatusBadgeClass(shipment.status)}>
-                              {shipment.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {format(new Date(shipment.created_at), 'MMM d, yyyy')}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => navigate(`/shipment/${shipment.id}`)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-            <CardContent className="flex justify-between border-t pt-4">
-              <Button variant="outline" onClick={() => setActiveTab('shipments')}>
-                View All Shipments
-              </Button>
-              <Button variant="outline" onClick={() => setActiveTab('quotes')}>
-                View Custom Quotes
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="shipments">
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle className="text-xl">Shipments Management</CardTitle>
-              <CardDescription>View and manage all shipments</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="relative flex-grow">
-                  <Input
-                    placeholder="Search by tracking #, origin, or destination"
-                    className="pl-10"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                  <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                </div>
-                <div className="flex gap-4">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[180px]">
-                      <div className="flex items-center">
-                        <Filter className="h-4 w-4 mr-2" />
-                        <SelectValue placeholder="Filter by status" />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      {STATUS_OPTIONS.map((status) => (
-                        <SelectItem key={status.toLowerCase()} value={status.toLowerCase()}>
-                          {status}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button 
-                    variant="outline"
-                    onClick={fetchShipments}
-                    className="h-10 px-4"
-                  >
-                    <RefreshCcw className="h-4 w-4 mr-2" />
-                    Refresh
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-0">
-              {loading ? (
-                <div className="flex justify-center items-center p-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
-                </div>
-              ) : filteredShipments.length === 0 ? (
-                <div className="text-center p-12">
-                  <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No shipments found</h3>
-                  <p className="text-gray-500">
-                    {searchQuery || statusFilter !== 'all' 
-                      ? "Try adjusting your filters" 
-                      : "There are no shipments in the system yet"}
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[120px]">Tracking #</TableHead>
-                        <TableHead>Sender Name</TableHead>
-                        <TableHead>Sender Phone</TableHead>
-                        <TableHead>Recipient Name</TableHead>
-                        <TableHead>Recipient Phone</TableHead>
-                        <TableHead>Origin</TableHead>
-                        <TableHead>Destination</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredShipments.map((shipment) => {
-                        const contactInfo = getShipmentContactInfo(shipment);
-                        return (
-                          <TableRow key={shipment.id}>
-                            <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
-                            <TableCell>{contactInfo.senderName}</TableCell>
-                            <TableCell>{contactInfo.senderPhone}</TableCell>
-                            <TableCell>{contactInfo.recipientName}</TableCell>
-                            <TableCell>{contactInfo.recipientPhone}</TableCell>
-                            <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
-                            <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
-                            <TableCell>
-                              <Badge className={getStatusBadgeClass(shipment.status)}>
-                                {shipment.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {format(new Date(shipment.created_at), 'MMM d, yyyy')}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end space-x-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => navigate(`/shipment/${shipment.id}`)}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    setEditingShipment(shipment);
-                                    setNewStatus(shipment.status);
-                                  }}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-            <CardContent className="flex justify-between py-4">
-              <p className="text-sm text-gray-500">
-                Showing {filteredShipments.length} out of {shipments.length} shipments
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="quotes">
-          <CustomQuoteManagement />
-        </TabsContent>
-        
-        <TabsContent value="users">
-          <UserManagement />
-        </TabsContent>
-
-        <TabsContent value="analytics">
-          <AnalyticsReports />
-        </TabsContent>
-
-        <TabsContent value="settings">
-          <SettingsManagement />
-        </TabsContent>
-
-        <TabsContent value="schedule">
-          <CollectionScheduleManagement />
-        </TabsContent>
-
-        <TabsContent value="more">
-          <Tabs defaultValue="support">
-            <TabsList className="mb-6">
-              <TabsTrigger value="support" className="flex items-center gap-2">
-                <MessageSquare className="h-4 w-4" />
-                <span>Support Tickets</span>
-              </TabsTrigger>
-              <TabsTrigger value="media" className="flex items-center gap-2">
-                <ImageIcon className="h-4 w-4" />
-                <span>Media Library</span>
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="support">
-              <SupportTickets />
-            </TabsContent>
-            
-            <TabsContent value="media">
-              <ContentManagement />
-            </TabsContent>
-          </Tabs>
-        </TabsContent>
-      </Tabs>
-      
-      {editingShipment && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-bold mb-4">Update Shipment Status</h3>
-            <div className="mb-4">
-              <p className="text-sm text-gray-500 mb-1">Tracking Number</p>
-              <p className="font-medium font-mono">{editingShipment.tracking_number}</p>
-            </div>
-            <div className="mb-6">
-              <p className="text-sm text-gray-500 mb-1">Current Status</p>
-              <Badge className={getStatusBadgeClass(editingShipment.status)}>
-                {editingShipment.status}
-              </Badge>
-            </div>
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-2">New Status</label>
-              <Select
-                value={newStatus}
-                onValueChange={setNewStatus}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUS_OPTIONS.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {status}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end space-x-3">
-              <Button 
-                variant="outline"
-                onClick={() => {
-                  setEditingShipment(null);
-                  setNewStatus('');
-                }}
-              >
-                Cancel
-              </Button>
-              <Button 
-                className="bg-zim-green hover:bg-zim-green/90"
-                onClick={updateShipmentStatus}
-              >
-                Update Status
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+          {shipmentsCsv.length > 0 && (
+            <CSVLink data={shipmentsCsv} filename={"shipments.csv"} className="text-sm text-gray-500 mt-2 block">
+              Download CSV
+            </CSVLink>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

@@ -11,6 +11,3 @@ export type DbTables = keyof Database['public']['Tables'];
 export function tableFrom<T extends DbTables>(table: T): T {
   return table;
 }
-
-// Add specific tables that might not be in the Database type but are used in the codebase
-export const AUDIT_LOGS_TABLE = 'notifications'; // We're using notifications table to log actions since audit_logs doesn't exist

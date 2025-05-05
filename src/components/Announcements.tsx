@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { tableFrom } from '@/integrations/supabase/db-types';
 import { Announcement, adaptToAnnouncements } from '@/types/announcements';
+import { formatDistanceToNow } from 'date-fns';
 
 const Announcements: React.FC = () => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -11,7 +12,7 @@ const Announcements: React.FC = () => {
   useEffect(() => {
     const fetchAnnouncements = async () => {
       try {
-        // Use notifications table instead of announcements
+        // Use notifications table for announcements
         const { data, error } = await supabase
           .from(tableFrom('notifications'))
           .select('*')
@@ -61,5 +62,4 @@ const Announcements: React.FC = () => {
   );
 };
 
-import { formatDistanceToNow } from 'date-fns';
 export default Announcements;

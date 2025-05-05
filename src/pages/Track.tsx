@@ -52,23 +52,19 @@ const Track = () => {
       }
       
       if (data) {
-        // Add any missing properties from the database for Track page to work
-        const shipmentWithExtras = {
-          ...data,
-          carrier: data.carrier || data.metadata?.carrier || null,
-          estimated_delivery: data.estimated_delivery || data.metadata?.estimatedDelivery || null,
-        };
+        // Extract carrier and estimated_delivery from metadata if available
+        const metadataObj = typeof data.metadata === 'object' ? data.metadata : {};
         
         const result: TrackingResult = {
-          status: shipmentWithExtras.status,
-          origin: shipmentWithExtras.origin,
-          destination: shipmentWithExtras.destination,
-          lastUpdate: new Date(shipmentWithExtras.updated_at).toLocaleString(),
-          estimatedDelivery: shipmentWithExtras.estimated_delivery 
-            ? new Date(shipmentWithExtras.estimated_delivery).toLocaleDateString() 
+          status: data.status,
+          origin: data.origin,
+          destination: data.destination,
+          lastUpdate: new Date(data.updated_at).toLocaleString(),
+          estimatedDelivery: metadataObj?.estimatedDelivery 
+            ? new Date(metadataObj.estimatedDelivery).toLocaleDateString() 
             : null,
-          carrier: shipmentWithExtras.carrier,
-          tracking_number: shipmentWithExtras.tracking_number
+          carrier: metadataObj?.carrier || null,
+          tracking_number: data.tracking_number
         };
         
         setTrackingResult(result);
