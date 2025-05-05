@@ -1,3 +1,4 @@
+
 import React, {
   createContext,
   useState,
@@ -9,16 +10,25 @@ import { useAuth } from '@/contexts/AuthContext';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
+export type UserRoleType = 'admin' | 'driver' | 'logistics' | 'customer' | 'anonymous';
+
 interface RoleContextProps {
   userRole: string | null;
   requestRoleElevation: (role: string) => Promise<void>;
   isLoading: boolean;
+  hasPermission: (role: string) => boolean;
+  role: string | null; // For backward compatibility
+  elevateToAdmin: (password: string) => Promise<boolean>;
+  setUserRole?: (userId: string, role: string) => Promise<boolean>; // For admin usage
 }
 
 const RoleContext = createContext<RoleContextProps>({
   userRole: null,
+  role: null,
   requestRoleElevation: async () => {},
   isLoading: true,
+  hasPermission: () => false,
+  elevateToAdmin: async () => false,
 });
 
 interface RoleProviderProps {
@@ -26,13 +36,13 @@ interface RoleProviderProps {
 }
 
 export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
-  const { auth, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchUserRole = async () => {
-      if (!auth?.user) {
+      if (!user) {
         setUserRole('anonymous');
         setIsLoading(false);
         return;
@@ -40,9 +50,9 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
 
       try {
         const { data, error } = await supabase
-          .from('user_roles')
+          .from('profiles')
           .select('role')
-          .eq('user_id', auth.user.id)
+          .eq('id', user.id)
           .single();
 
         if (error) {
@@ -62,10 +72,11 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
     if (!authLoading) {
       fetchUserRole();
     }
-  }, [auth, authLoading]);
+  }, [user, authLoading]);
 
+  // This is a simplified implementation that just logs the request
   const requestRoleElevation = async (role: string) => {
-    if (!auth?.user) {
+    if (!user) {
       console.error('User not authenticated.');
       return;
     }
@@ -73,7 +84,7 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
     try {
       // Just log to console instead since audit_logs table was deleted
       console.log('Role elevation request:', {
-        user_id: auth.user?.id,
+        user_id: user.id,
         action: 'ROLE_ELEVATION_REQUEST',
         entity_type: 'USER',
         details: {
@@ -92,8 +103,80 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
     }
   };
 
+  // New function to check if a user has permission
+  const hasPermission = (requiredRole: string) => {
+    if (!userRole) return false;
+    
+    // Admin has all permissions
+    if (userRole === 'admin') return true;
+    
+    // Exact role match
+    if (userRole === requiredRole) return true;
+    
+    // Add other role hierarchies if needed
+    if (requiredRole === 'customer' && ['driver', 'logistics', 'admin'].includes(userRole)) {
+      return true;
+    }
+    
+    return false;
+  };
+
+  // New function to elevate to admin
+  const elevateToAdmin = async (password: string): Promise<boolean> => {
+    try {
+      // This would normally call a Supabase function, but we'll mock the behavior
+      console.log('Admin elevation with password', password);
+      
+      if (password === 'admin123') { // Demo password for testing
+        setUserRole('admin');
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error during admin elevation:', error);
+      return false;
+    }
+  };
+
+  // For admin to set user roles
+  const setRoleForUser = async (userId: string, role: string): Promise<boolean> => {
+    try {
+      if (!hasPermission('admin')) {
+        console.error('Only admins can set user roles');
+        return false;
+      }
+
+      // Update the user's role in the database
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role })
+        .eq('id', userId);
+
+      if (error) {
+        console.error('Error updating user role:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error setting user role:', error);
+      return false;
+    }
+  };
+
   return (
-    <RoleContext.Provider value={{ userRole, requestRoleElevation, isLoading }}>
+    <RoleContext.Provider 
+      value={{ 
+        userRole, 
+        role: userRole, // For backward compatibility
+        requestRoleElevation, 
+        isLoading,
+        hasPermission,
+        elevateToAdmin,
+        setUserRole: setRoleForUser
+      }}
+    >
       {children}
     </RoleContext.Provider>
   );

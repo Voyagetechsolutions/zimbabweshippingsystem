@@ -17,6 +17,11 @@ export interface Shipment {
   weight?: number | string;
   dimensions?: string;
   estimated_delivery?: string;
+  // Add profiles for joined queries
+  profiles?: {
+    email?: string;
+    full_name?: string;
+  };
 }
 
 export interface ShipmentExport {

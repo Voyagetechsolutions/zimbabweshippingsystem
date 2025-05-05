@@ -115,7 +115,10 @@ const ShipmentDetails = () => {
           return;
         }
 
-        setShipment(data as Shipment);
+        if (data) {
+          // Cast the database object to our Shipment type
+          setShipment(data as unknown as Shipment);
+        }
       } catch (error) {
         console.error('Unexpected error:', error);
         toast({

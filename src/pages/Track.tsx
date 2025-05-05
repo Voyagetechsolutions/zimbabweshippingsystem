@@ -52,20 +52,27 @@ const Track = () => {
       }
       
       if (data) {
+        const shipment = data;
+        const estimatedDelivery = shipment.estimated_delivery || 
+          (shipment.metadata?.estimated_delivery ? shipment.metadata.estimated_delivery : 'Not available');
+        
+        const carrier = shipment.carrier || 
+          (shipment.metadata?.carrier ? shipment.metadata.carrier : 'Zimbabwe Shipping');
+        
         const result: TrackingResult = {
-          status: data.status,
-          origin: data.origin,
-          destination: data.destination,
-          lastUpdate: new Date(data.updated_at).toLocaleString(),
-          estimatedDelivery: data.estimated_delivery ? new Date(data.estimated_delivery).toLocaleDateString() : null,
-          carrier: data.carrier,
-          tracking_number: data.tracking_number
+          status: shipment.status,
+          origin: shipment.origin,
+          destination: shipment.destination,
+          lastUpdate: new Date(shipment.updated_at).toLocaleString(),
+          estimatedDelivery,
+          carrier,
+          tracking_number: shipment.tracking_number
         };
         
         setTrackingResult(result);
         toast({
           title: "Tracking Information Found",
-          description: `Latest status: ${data.status}`,
+          description: `Latest status: ${shipment.status}`,
         });
       } else {
         setError('No shipment found with this tracking number');
