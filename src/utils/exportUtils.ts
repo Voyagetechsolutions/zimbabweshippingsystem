@@ -1,4 +1,3 @@
-
 import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable'; // Add the import for autoTable
@@ -67,6 +66,13 @@ export const exportToCsv = async (data: any[], toast: any) => {
   }
 };
 
+// Add the declaration for the autoTable method to avoid TypeScript errors
+declare module 'jspdf' {
+  interface jsPDF {
+    autoTable: (options: any) => jsPDF;
+  }
+}
+
 // Helper function to convert data to PDF format
 export const exportToPdf = async (data: any[], toast: any) => {
   try {
@@ -108,7 +114,7 @@ export const exportToPdf = async (data: any[], toast: any) => {
       item.created_at ? format(new Date(item.created_at), 'yyyy-MM-dd') : '-'
     ]);
     
-    // Add table
+    // Add table - now with proper typing recognition
     doc.autoTable({
       head: [columns],
       body: rows,

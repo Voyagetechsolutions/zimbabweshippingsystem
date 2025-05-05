@@ -220,7 +220,9 @@ const ShipmentDetails = () => {
                   <span className="text-sm font-medium">Door to Door</span>
                 </div>
                 <div className="text-sm text-gray-600">
-                  {shipment.metadata?.doorToDoor ? 'Yes' : 'No'}
+                  {typeof shipment.metadata === 'object' && shipment.metadata && 'doorToDoor' in shipment.metadata 
+                    ? (shipment.metadata.doorToDoor ? 'Yes' : 'No') 
+                    : 'N/A'}
                 </div>
               </div>
               <div className="grid gap-2">
@@ -229,7 +231,9 @@ const ShipmentDetails = () => {
                   <span className="text-sm font-medium">Amount Paid</span>
                 </div>
                 <div className="text-sm text-gray-600">
-                  {shipment.metadata?.amountPaid}
+                  {typeof shipment.metadata === 'object' && shipment.metadata && 'amountPaid' in shipment.metadata 
+                    ? shipment.metadata.amountPaid 
+                    : 'N/A'}
                 </div>
               </div>
               <div className="grid gap-2">
@@ -238,7 +242,9 @@ const ShipmentDetails = () => {
                   <span className="text-sm font-medium">Pickup Country</span>
                 </div>
                 <div className="text-sm text-gray-600">
-                  {shipment.metadata?.pickupCountry}
+                  {typeof shipment.metadata === 'object' && shipment.metadata && 'pickupCountry' in shipment.metadata 
+                    ? shipment.metadata.pickupCountry 
+                    : 'N/A'}
                 </div>
               </div>
               <div className="grid gap-2">
@@ -247,7 +253,9 @@ const ShipmentDetails = () => {
                   <span className="text-sm font-medium">Shipment Type</span>
                 </div>
                 <div className="text-sm text-gray-600">
-                  {shipment.metadata?.shipmentType}
+                  {typeof shipment.metadata === 'object' && shipment.metadata && 'shipmentType' in shipment.metadata 
+                    ? shipment.metadata.shipmentType 
+                    : 'N/A'}
                 </div>
               </div>
               <div className="grid gap-2">

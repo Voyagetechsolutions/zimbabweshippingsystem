@@ -248,7 +248,7 @@ const UserManagement = () => {
             .single();
             
           if (userData) {
-            await setUserRole(userData.id, values.role as UserRoleType);
+            await setUserRole(userData.id, values.role as UserRole);
           }
         }, 2000); // Give it a moment for the trigger to create the profile
       }
@@ -297,7 +297,7 @@ const UserManagement = () => {
 
       // Update role if changed
       if (values.role && values.role !== editingUser.role) {
-        await setUserRole(editingUser.id, values.role as UserRoleType);
+        await setUserRole(editingUser.id, values.role as UserRole);
       }
 
       toast({

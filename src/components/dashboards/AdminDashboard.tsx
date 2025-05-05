@@ -217,36 +217,26 @@ const AdminDashboard = () => {
   };
 
   const fetchShipments = async () => {
-    if (!isMounted.current) return;
-    
     setLoading(true);
     try {
-      console.log("Admin: Fetching all shipments");
       const { data, error } = await supabase
         .from('shipments')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error("Error fetching shipments:", error);
+        console.error('Error fetching shipments:', error);
         // Handle error display without setError
       } else {
         // Use the castToShipments helper for proper typing
-        setShipments(castToShipments(data || []));
+        const castedShipments = castToShipments(data || []);
+        setShipments(castedShipments);
       }
-    } catch (error: any) {
-      console.error("Error in fetchShipments:", error);
-      if (isMounted.current) {
-        toast({
-          title: 'Error fetching shipments',
-          description: error.message,
-          variant: 'destructive',
-        });
-      }
+    } catch (err) {
+      console.error('Error fetching shipments:', err);
+      // Handle error display
     } finally {
-      if (isMounted.current) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   };
 
