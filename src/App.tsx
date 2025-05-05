@@ -31,7 +31,7 @@ import FAQ from './pages/FAQ';
 import QuoteSubmitted from '@/pages/QuoteSubmitted';
 import TermsAndConditions from './pages/TermsAndConditions';
 import PrivacyPolicy from './pages/PrivacyPolicy';
-import Receipt from './pages/Receipt';
+import ConfirmBooking from './pages/ConfirmBooking';
 
 // Components
 import { RequireAuth, RequireAdmin, RedirectIfAuthenticated, RequireRole } from './components/RouteGuard';
@@ -57,9 +57,9 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <div className="App">
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <RoleProvider>
+      <AuthProvider>
+        <RoleProvider>
+          <QueryClientProvider client={queryClient}>
             <ThemeProvider>
               <ShippingProvider>
                 <Router>
@@ -75,8 +75,8 @@ function App() {
                     <Route path="/book-shipment" element={<BookShipment />} />
                     <Route path="/payment-success" element={<PaymentSuccess />} />
                     <Route path="/quote-submitted" element={<QuoteSubmitted />} />
-                    <Route path="/receipt" element={<Receipt />} />
-                    <Route path="/receipt/:id" element={<Receipt />} />
+                    <Route path="/confirm-booking" element={<ConfirmBooking />} />
+                    <Route path="/confirm-booking/:id" element={<ConfirmBooking />} />
                     <Route path="/reviews" element={<Reviews />} />
                     <Route path="/support" element={<Support />} />
                     <Route path="/pricing" element={<Pricing />} />
@@ -183,9 +183,9 @@ function App() {
                 </Router>
               </ShippingProvider>
             </ThemeProvider>
-          </RoleProvider>
-        </AuthProvider>
-      </QueryClientProvider>
+          </QueryClientProvider>
+        </RoleProvider>
+      </AuthProvider>
     </div>
   );
 }

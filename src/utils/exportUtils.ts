@@ -1,187 +1,142 @@
 
-import { formatDate } from 'date-fns';
-import type { ToastMethod } from '@/hooks/use-toast';
+import { saveAs } from 'file-saver';
+import jsPDF from 'jspdf';
+import { format } from 'date-fns';
 
-interface Shipment {
-  id: string;
-  tracking_number: string;
-  status: string;
-  origin: string;
-  destination: string;
-  weight: number | null;
-  dimensions: string | null;
-  carrier: string | null;
-  created_at: string;
-  estimated_delivery: string | null;
-}
+// Helper function to convert data to CSV format
+export const exportToCsv = async (data: any[], toast: any) => {
+  try {
+    if (!data.length) {
+      toast({
+        title: 'No data to export',
+        description: 'There is no data available to export.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
-/**
- * Exports shipment data to CSV format
- */
-export const exportToCsv = async (data: Shipment[], toast: ToastMethod): Promise<void> => {
-  // Convert data to CSV
-  const headers = [
-    'Tracking Number',
-    'Status',
-    'Origin',
-    'Destination',
-    'Weight (kg)',
-    'Dimensions',
-    'Carrier',
-    'Created Date',
-    'Estimated Delivery'
-  ];
-  
-  const csvRows = [
-    headers.join(','),
-    ...data.map(shipment => [
-      `"${shipment.tracking_number}"`,
-      `"${shipment.status}"`,
-      `"${shipment.origin}"`,
-      `"${shipment.destination}"`,
-      shipment.weight,
-      `"${shipment.dimensions || ''}"`,
-      `"${shipment.carrier || ''}"`,
-      shipment.created_at ? formatDate(new Date(shipment.created_at), 'yyyy-MM-dd') : '',
-      shipment.estimated_delivery ? formatDate(new Date(shipment.estimated_delivery), 'yyyy-MM-dd') : ''
-    ].join(','))
-  ];
-  
-  const csvContent = csvRows.join('\n');
-  
-  // Create and download the CSV file
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.setAttribute('href', url);
-  link.setAttribute('download', `shipments_export_${formatDate(new Date(), 'yyyyMMdd')}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  
-  toast({
-    title: 'Export successful',
-    description: 'Your shipments have been exported to CSV.',
-  });
+    // Convert the data to CSV format
+    const headers = Object.keys(data[0]).map(key => key.replace(/_/g, ' ').toUpperCase());
+    const csvRows = [headers];
+
+    for (const item of data) {
+      const values = headers.map(header => {
+        const key = header.toLowerCase().replace(/ /g, '_');
+        let value = item[key];
+        
+        // Format dates
+        if (key.includes('date') || key.includes('created_at') || key.includes('updated_at')) {
+          if (value) {
+            value = format(new Date(value), 'yyyy-MM-dd HH:mm');
+          }
+        }
+        
+        // Ensure string is wrapped in quotes if it contains commas
+        if (typeof value === 'string' && value.includes(',')) {
+          return `"${value}"`;
+        }
+        
+        return value || '';
+      });
+      
+      csvRows.push(values);
+    }
+
+    // Join rows with newlines and create a Blob
+    const csvString = csvRows.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8' });
+    
+    // Generate filename with date
+    const filename = `shipments_export_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    
+    // Save the file
+    saveAs(blob, filename);
+    
+    toast({
+      title: 'Export Successful',
+      description: `Data has been exported to ${filename}`,
+    });
+  } catch (error) {
+    console.error('Error exporting to CSV:', error);
+    toast({
+      title: 'Export Failed',
+      description: 'There was an error exporting your data to CSV.',
+      variant: 'destructive',
+    });
+  }
 };
 
-/**
- * Exports shipment data to PDF format
- */
-export const exportToPdf = async (data: Shipment[], toast: ToastMethod): Promise<void> => {
-  // For PDF, we need to dynamically import html2pdf
-  const html2pdf = await import('html2pdf.js');
-  
-  // Create a temporary HTML table
-  const table = document.createElement('table');
-  table.style.width = '100%';
-  table.style.borderCollapse = 'collapse';
-  
-  // Add table header
-  const thead = document.createElement('thead');
-  const headerRow = document.createElement('tr');
-  ['Tracking Number', 'Status', 'Origin', 'Destination', 'Details', 'Date'].forEach(text => {
-    const th = document.createElement('th');
-    th.textContent = text;
-    th.style.border = '1px solid #ddd';
-    th.style.padding = '8px';
-    th.style.backgroundColor = '#f2f2f2';
-    headerRow.appendChild(th);
-  });
-  thead.appendChild(headerRow);
-  table.appendChild(thead);
-  
-  // Add table body
-  const tbody = document.createElement('tbody');
-  data.forEach(shipment => {
-    const row = document.createElement('tr');
+// Helper function to convert data to PDF format
+export const exportToPdf = async (data: any[], toast: any) => {
+  try {
+    if (!data.length) {
+      toast({
+        title: 'No data to export',
+        description: 'There is no data available to export.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Create new PDF document
+    const doc = new jsPDF();
+
+    // Add title
+    doc.setFontSize(16);
+    doc.text('Shipments Export', 15, 15);
     
-    // Tracking Number
-    const tdTracking = document.createElement('td');
-    tdTracking.textContent = shipment.tracking_number;
-    tdTracking.style.border = '1px solid #ddd';
-    tdTracking.style.padding = '8px';
-    row.appendChild(tdTracking);
+    // Add date
+    doc.setFontSize(10);
+    doc.text(`Generated on: ${format(new Date(), 'yyyy-MM-dd HH:mm')}`, 15, 22);
     
-    // Status
-    const tdStatus = document.createElement('td');
-    tdStatus.textContent = shipment.status;
-    tdStatus.style.border = '1px solid #ddd';
-    tdStatus.style.padding = '8px';
-    row.appendChild(tdStatus);
+    // Define table columns
+    const columns = [
+      'Tracking Number', 
+      'Status', 
+      'Origin', 
+      'Destination', 
+      'Created'
+    ];
     
-    // Origin
-    const tdOrigin = document.createElement('td');
-    tdOrigin.textContent = shipment.origin;
-    tdOrigin.style.border = '1px solid #ddd';
-    tdOrigin.style.padding = '8px';
-    row.appendChild(tdOrigin);
+    // Prepare data rows
+    const rows = data.map(item => [
+      item.tracking_number || '-',
+      (item.status || '-').replace(/_/g, ' '),
+      item.origin || '-',
+      item.destination || '-',
+      item.created_at ? format(new Date(item.created_at), 'yyyy-MM-dd') : '-'
+    ]);
     
-    // Destination
-    const tdDestination = document.createElement('td');
-    tdDestination.textContent = shipment.destination;
-    tdDestination.style.border = '1px solid #ddd';
-    tdDestination.style.padding = '8px';
-    row.appendChild(tdDestination);
+    // Add table
+    doc.autoTable({
+      head: [columns],
+      body: rows,
+      startY: 30,
+      styles: {
+        fontSize: 9,
+        cellPadding: 3,
+      },
+      headStyles: {
+        fillColor: [0, 100, 0]
+      }
+    });
     
-    // Details (weight, dimensions, carrier)
-    const tdDetails = document.createElement('td');
-    tdDetails.innerHTML = `
-      <strong>Weight:</strong> ${shipment.weight || 'N/A'} kg<br>
-      <strong>Dimensions:</strong> ${shipment.dimensions || 'N/A'}<br>
-      <strong>Carrier:</strong> ${shipment.carrier || 'N/A'}
-    `;
-    tdDetails.style.border = '1px solid #ddd';
-    tdDetails.style.padding = '8px';
-    row.appendChild(tdDetails);
+    // Generate filename with date
+    const filename = `shipments_export_${format(new Date(), 'yyyy-MM-dd')}.pdf`;
     
-    // Date
-    const tdDate = document.createElement('td');
-    tdDate.innerHTML = `
-      <strong>Created:</strong> ${shipment.created_at ? formatDate(new Date(shipment.created_at), 'yyyy-MM-dd') : 'N/A'}<br>
-      <strong>Delivery:</strong> ${shipment.estimated_delivery ? formatDate(new Date(shipment.estimated_delivery), 'yyyy-MM-dd') : 'N/A'}
-    `;
-    tdDate.style.border = '1px solid #ddd';
-    tdDate.style.padding = '8px';
-    row.appendChild(tdDate);
+    // Save the PDF
+    doc.save(filename);
     
-    tbody.appendChild(row);
-  });
-  table.appendChild(tbody);
-  
-  // Create a container with header
-  const container = document.createElement('div');
-  
-  const header = document.createElement('div');
-  header.style.textAlign = 'center';
-  header.style.marginBottom = '20px';
-  
-  const title = document.createElement('h1');
-  title.textContent = 'Zimbabwe Shipping - Shipments Report';
-  title.style.color = '#2D3748';
-  header.appendChild(title);
-  
-  const subtitle = document.createElement('p');
-  subtitle.textContent = `Generated on ${formatDate(new Date(), 'MMMM dd, yyyy')}`;
-  subtitle.style.color = '#718096';
-  header.appendChild(subtitle);
-  
-  container.appendChild(header);
-  container.appendChild(table);
-  
-  // Generate PDF
-  const opt = {
-    margin: 10,
-    filename: `shipments_export_${formatDate(new Date(), 'yyyyMMdd')}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2 },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-  };
-  
-  await html2pdf.default().from(container).set(opt).save();
-  
-  toast({
-    title: 'Export successful',
-    description: 'Your shipments have been exported to PDF.',
-  });
+    toast({
+      title: 'Export Successful',
+      description: `Data has been exported to ${filename}`,
+    });
+  } catch (error) {
+    console.error('Error exporting to PDF:', error);
+    toast({
+      title: 'Export Failed',
+      description: 'There was an error exporting your data to PDF.',
+      variant: 'destructive',
+    });
+  }
 };

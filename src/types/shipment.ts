@@ -14,6 +14,10 @@ export interface ShipmentMetadata {
   amountPaid?: number;
   pickupCountry?: string;
   shipmentType?: string;
+  estimatedDelivery?: string;
+  carrier?: string;
+  weight?: number;
+  dimensions?: string;
 }
 
 export interface Shipment {
@@ -35,3 +39,27 @@ export interface Shipment {
   // Add the profiles property that we attach after fetching
   profiles?: ShipmentProfile;
 }
+
+// Helper function to cast Json to ShipmentMetadata
+export const castToShipmentMetadata = (metadata: Json | null): ShipmentMetadata => {
+  if (!metadata) return {};
+  if (Array.isArray(metadata)) return {};
+  return metadata as ShipmentMetadata;
+};
+
+// Helper function to safely cast a shipment with proper metadata typing
+export const castToShipment = (shipment: any): Shipment => {
+  if (!shipment) return {} as Shipment;
+  
+  return {
+    ...shipment,
+    metadata: castToShipmentMetadata(shipment.metadata),
+  };
+};
+
+// Helper function to safely cast an array of shipments with proper metadata typing
+export const castToShipments = (shipments: any[]): Shipment[] => {
+  if (!shipments || !Array.isArray(shipments)) return [];
+  
+  return shipments.map(shipment => castToShipment(shipment));
+};

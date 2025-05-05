@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -79,7 +78,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
       }
 
       const transactionId = generateUniqueId('TX-');
-      const receiptNumber = `REC-${Date.now().toString().slice(-8)}`;
       
       const currentUserId = user?.id || userId || bookingData.user_id || null;
       
@@ -113,47 +111,6 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         throw paymentError;
       }
 
-      // Prepare receipt data for both the database and React Router navigation
-      const completeReceiptData = {
-        shipment_id: shipmentUuid,
-        payment_id: paymentData.id,
-        receipt_number: receiptNumber,
-        amount: finalAmount,
-        currency: 'GBP',
-        payment_method: paymentMethod,
-        status: 'pending',
-        sender_details: bookingData.senderDetails || {},
-        recipient_details: bookingData.recipientDetails || {},
-        shipment_details: bookingData.shipmentDetails || {},
-        collection_info: {
-          pickup_address: bookingData.pickupAddress,
-          pickup_postcode: bookingData.pickupPostcode,
-          pickup_country: bookingData.pickupCountry
-        },
-        payment_info: {
-          finalAmount,
-          method: paymentMethod,
-          status: 'pending',
-          date: new Date().toISOString(),
-          receipt_number: receiptNumber,
-          transaction_id: transactionId
-        }
-      };
-      
-      const { data: receiptData, error: receiptError } = await supabase
-        .from('receipts')
-        .insert({
-          user_id: currentUserId,
-          ...completeReceiptData
-        })
-        .select()
-        .single();
-
-      if (receiptError) {
-        console.error('Receipt error:', receiptError);
-        throw receiptError;
-      }
-
       const { error: shipmentError } = await supabase
         .from('shipments')
         .update({ 
@@ -176,7 +133,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         .insert({
           user_id: '00000000-0000-0000-0000-000000000000',
           title: 'New Shipment Ready for Collection',
-          message: `New shipment ${receiptNumber} is ready for collection.`,
+          message: `New shipment ${shipmentUuid} is ready for collection.`,
           type: 'shipment_collection',
           related_id: shipmentUuid
         });
@@ -186,15 +143,16 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         description: 'Your shipment has been booked successfully.',
       });
       
-      // Navigate to receipt page with complete data
-      navigate('/receipt', {
+      // Navigate to ConfirmBooking page with complete data
+      navigate('/confirm-booking', {
         state: { 
           bookingData: {
             ...bookingData,
-            paymentCompleted: true
+            paymentCompleted: true,
+            paymentMethod: paymentMethod,
+            amount: finalAmount,
           },
-          receiptData: completeReceiptData,
-          paymentData: completeReceiptData.payment_info
+          shipmentId: shipmentUuid
         }
       });
     } catch (error: any) {
