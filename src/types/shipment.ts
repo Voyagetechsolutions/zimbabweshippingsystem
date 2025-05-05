@@ -18,6 +18,13 @@ export interface ShipmentMetadata {
   carrier?: string;
   weight?: number;
   dimensions?: string;
+  // Add contact information properties
+  senderName?: string;
+  firstName?: string; // Alternative field
+  senderPhone?: string;
+  phone?: string; // Alternative field
+  recipientName?: string;
+  recipientPhone?: string;
 }
 
 export interface Shipment {
@@ -41,9 +48,12 @@ export interface Shipment {
 }
 
 // Helper function to cast Json to ShipmentMetadata
-export const castToShipmentMetadata = (metadata: Json | null): ShipmentMetadata => {
+export const castToShipmentMetadata = (metadata: Json | null | ShipmentMetadata): ShipmentMetadata => {
   if (!metadata) return {};
   if (Array.isArray(metadata)) return {};
+  if (typeof metadata === 'string') return {};
+  if (typeof metadata === 'number') return {};
+  if (typeof metadata === 'boolean') return {};
   return metadata as ShipmentMetadata;
 };
 

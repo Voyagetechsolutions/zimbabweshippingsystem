@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Shipment, castToShipment, ShipmentMetadata } from '@/types/shipment';
+import { Shipment, castToShipment, ShipmentMetadata, castToShipmentMetadata } from '@/types/shipment';
 import { Json } from '@/integrations/supabase/types';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -66,17 +67,17 @@ const ShipmentDetails = () => {
   const renderMetadataField = (field: string): React.ReactNode => {
     if (!shipment?.metadata) return 'N/A';
     
-    if (typeof shipment.metadata === 'object' && shipment.metadata !== null) {
-      // Using type assertion to handle the metadata
-      const metadata = shipment.metadata as Record<string, any>;
-      if (field in metadata) {
-        const value = metadata[field];
-        if (typeof value === 'boolean') {
-          return value ? 'Yes' : 'No';
-        }
-        return value?.toString() || 'N/A';
+    // Use our improved castToShipmentMetadata helper
+    const metadata = castToShipmentMetadata(shipment.metadata);
+    
+    if (field in metadata) {
+      const value = metadata[field];
+      if (typeof value === 'boolean') {
+        return value ? 'Yes' : 'No';
       }
+      return value?.toString() || 'N/A';
     }
+    
     return 'N/A';
   };
 

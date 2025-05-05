@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -57,7 +58,7 @@ import ContentManagement from '@/components/admin/ContentManagement';
 import CollectionScheduleManagement from '@/components/admin/CollectionScheduleManagement';
 import SupportTickets from '@/components/admin/SupportTickets';
 import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
-import { Shipment, castToShipment, castToShipments } from '@/types/shipment';
+import { Shipment, castToShipment, castToShipments, ShipmentMetadata, castToShipmentMetadata } from '@/types/shipment';
 
 const STATUS_OPTIONS = [
   'Booking Confirmed',
@@ -214,12 +215,18 @@ const AdminDashboardContent = () => {
 
   // Function to extract sender and recipient information from shipment metadata
   const getShipmentContactInfo = (shipment: Shipment) => {
-    const metadata = shipment.metadata || {};
+    // Convert metadata to proper type first
+    const metadata = castToShipmentMetadata(shipment.metadata);
+    
     return {
-      senderName: metadata.senderName || metadata.firstName || "N/A",
-      senderPhone: metadata.senderPhone || metadata.phone || "N/A",
-      recipientName: metadata.recipientName || "N/A",
-      recipientPhone: metadata.recipientPhone || "N/A"
+      senderName: typeof metadata === 'object' && metadata !== null ? 
+        (metadata.senderName || metadata.firstName || "N/A") : "N/A",
+      senderPhone: typeof metadata === 'object' && metadata !== null ? 
+        (metadata.senderPhone || metadata.phone || "N/A") : "N/A",
+      recipientName: typeof metadata === 'object' && metadata !== null ? 
+        (metadata.recipientName || "N/A") : "N/A",
+      recipientPhone: typeof metadata === 'object' && metadata !== null ? 
+        (metadata.recipientPhone || "N/A") : "N/A"
     };
   };
 
