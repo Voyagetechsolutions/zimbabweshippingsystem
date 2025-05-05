@@ -1,5 +1,5 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -8,12 +8,18 @@ import { useToast } from '@/hooks/use-toast';
 import html2pdf from 'html2pdf.js';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import Logo from '@/components/Logo';
+import CollectionInfo from '@/components/CollectionInfo';
 
 const ConfirmBooking = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
   const printRef = useRef<HTMLDivElement>(null);
+  const [collectionInfo, setCollectionInfo] = useState<{ route: string | null; collectionDate: string | null }>({
+    route: null,
+    collectionDate: null
+  });
   
   const bookingData = location.state?.bookingData || {};
   const paymentData = location.state?.paymentData || {};
@@ -41,7 +47,12 @@ const ConfirmBooking = () => {
   const receiverPhone = bookingData.recipientDetails?.phone || bookingData.recipientPhone;
   const receiverAddress = bookingData.recipientDetails?.address || bookingData.deliveryAddress;
   const trackingNumber = bookingData.shipmentDetails?.tracking_number || 'Pending Assignment';
-  const collectionDate = bookingData.collectionDate || 'Next available collection date';
+  const collectionDate = collectionInfo.collectionDate || bookingData.collectionDate || 'Next available collection date';
+  
+  // Get country and postal code for collection info
+  const pickupCountry = bookingData.pickupCountry || 'England';
+  const pickupPostcode = bookingData.pickupPostcode || '';
+  const pickupCity = bookingData.pickupCity || '';
   
   // Payment details
   const baseAmount = paymentData.originalAmount || paymentData.finalAmount || 0;
@@ -95,6 +106,11 @@ const ConfirmBooking = () => {
       description: "The email feature is not yet implemented. Please use the download option for now.",
     });
   };
+
+  // Hidden CollectionInfo component to get the collection date
+  const handleCollectionInfoReady = (info: { route: string | null; collectionDate: string | null }) => {
+    setCollectionInfo(info);
+  };
   
   return (
     <>
@@ -138,6 +154,14 @@ const ConfirmBooking = () => {
         </div>
         
         <div ref={printRef} className="max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-md print:shadow-none">
+          <div className="text-center mb-6">
+            <img
+              src="/lovable-uploads/f662f2d7-317f-42a5-afdc-43dfa2d4e82c.png"
+              alt="Zimbabwe Shipping"
+              className="h-32 mx-auto mb-4"
+            />
+          </div>
+          
           <div className="text-center border-b pb-6 mb-6">
             <div className="flex justify-center items-center mb-4">
               <CheckCircle2 className="h-12 w-12 text-green-500" />
@@ -204,6 +228,16 @@ const ConfirmBooking = () => {
           
           <div className="mt-8 text-center">
             <p className="text-gray-600 italic">Thank you for choosing Zimbabwe Shipping. Your support is highly appreciated.</p>
+          </div>
+          
+          {/* Hidden component to get collection info */}
+          <div className="hidden">
+            <CollectionInfo
+              country={pickupCountry}
+              postalCode={pickupPostcode}
+              city={pickupCity}
+              onCollectionInfoReady={handleCollectionInfoReady}
+            />
           </div>
         </div>
       </div>

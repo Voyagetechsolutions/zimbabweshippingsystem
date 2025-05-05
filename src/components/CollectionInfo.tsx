@@ -9,9 +9,15 @@ interface CollectionInfoProps {
   country: string;
   postalCode?: string;
   city?: string;
+  onCollectionInfoReady?: (data: { route: string | null; collectionDate: string | null }) => void;
 }
 
-const CollectionInfo: React.FC<CollectionInfoProps> = ({ country, postalCode, city }) => {
+const CollectionInfo: React.FC<CollectionInfoProps> = ({ 
+  country, 
+  postalCode, 
+  city,
+  onCollectionInfoReady
+}) => {
   let route: string | null = null;
   let collectionDate: string | null = null;
   
@@ -27,6 +33,13 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({ country, postalCode, ci
       collectionDate = getDateByRoute(route);
     }
   }
+
+  // Call the callback if provided to pass the collection info
+  React.useEffect(() => {
+    if (onCollectionInfoReady) {
+      onCollectionInfoReady({ route, collectionDate });
+    }
+  }, [route, collectionDate, onCollectionInfoReady]);
 
   if (!route || !collectionDate) {
     return (
