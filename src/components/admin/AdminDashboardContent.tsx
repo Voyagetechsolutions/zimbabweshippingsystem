@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -58,6 +57,8 @@ import ContentManagement from '@/components/admin/ContentManagement';
 import CollectionScheduleManagement from '@/components/admin/CollectionScheduleManagement';
 import SupportTickets from '@/components/admin/SupportTickets';
 import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
+import { useQuery } from '@tanstack/react-query';
+import { Shipment } from '@/types/shipment';
 
 const STATUS_OPTIONS = [
   'Booking Confirmed',
@@ -161,24 +162,31 @@ const AdminDashboardContent = () => {
   const fetchShipments = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('shipments')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error("Error fetching shipments:", error);
-        throw error;
-      }
-
-      if (data) {
-        setShipments(data as Shipment[]);
-        const totalCount = data.length;
-        const processingCount = data.filter(s => 
+      const { data: shipmentsData, isLoading: isLoadingShipments } = useQuery({
+        queryKey: ['admin-shipments'],
+        queryFn: async () => {
+          const { data, error } = await supabase
+            .from('shipments')
+            .select('*')
+            .order('created_at', { ascending: false });
+            
+          if (error) throw error;
+          
+          // Cast the data to Shipment[] type
+          return data as unknown as Shipment[];
+        }
+      });
+      
+      if (isLoadingShipments) return;
+      
+      if (shipmentsData) {
+        setShipments(shipmentsData);
+        const totalCount = shipmentsData.length;
+        const processingCount = shipmentsData.filter(s => 
           s.status.toLowerCase().includes('processing')).length;
-        const inTransitCount = data.filter(s => 
+        const inTransitCount = shipmentsData.filter(s => 
           s.status.toLowerCase().includes('transit')).length;
-        const deliveredCount = data.filter(s => 
+        const deliveredCount = shipmentsData.filter(s => 
           s.status.toLowerCase().includes('delivered')).length;
         
         setStats(prev => ({
