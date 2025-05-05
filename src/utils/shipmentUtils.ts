@@ -2,27 +2,29 @@
 import { Shipment } from '@/types/shipment';
 
 /**
- * Cast database shipment data to the Shipment type
- * This utility helps extract metadata fields into top-level properties
+ * Converts a database shipment record to a properly typed Shipment object
+ * by extracting carrier, weight, dimensions, and estimated_delivery from metadata
  */
-export function castToShipment(shipmentData: any): Shipment {
-  if (!shipmentData) return null as unknown as Shipment;
-  
-  const metadata = typeof shipmentData.metadata === 'object' ? shipmentData.metadata : {};
+export function castToShipment(shipment: any): Shipment {
+  if (!shipment) return null as unknown as Shipment;
+
+  const metadata = shipment.metadata || {};
   
   return {
-    ...shipmentData,
+    ...shipment,
     carrier: metadata.carrier || null,
     weight: metadata.weight || null,
     dimensions: metadata.dimensions || null,
     estimated_delivery: metadata.estimatedDelivery || null,
-  } as Shipment;
+    // Make sure profiles data is preserved if it exists
+    profiles: shipment.profiles || null
+  };
 }
 
 /**
- * Cast an array of database shipment data to Shipment[]
+ * Converts an array of database shipment records to properly typed Shipment objects
  */
-export function castToShipments(shipmentDataArray: any[]): Shipment[] {
-  if (!Array.isArray(shipmentDataArray)) return [];
-  return shipmentDataArray.map(castToShipment);
+export function castToShipments(shipments: any[]): Shipment[] {
+  if (!shipments || !Array.isArray(shipments)) return [];
+  return shipments.map(castToShipment);
 }

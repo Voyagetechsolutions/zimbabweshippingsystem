@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { ShippingProvider } from './contexts/ShippingContext';
+import { RoleProvider } from './contexts/RoleContext';
 import { Toaster } from '@/components/ui/toaster';
 
 // Page imports
@@ -46,42 +47,44 @@ function App() {
     <ThemeProvider>
       <ShippingProvider>
         <AuthProvider>
-          <QueryClientProvider client={queryClient}>
-            <Router>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/about-us" element={<AboutUs />} />
-                <Route path="/collection-schedule" element={<CollectionSchedule />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/faq" element={<FAQ />} />
-                <Route path="/gallery" element={<Gallery />} />
-                <Route path="/pricing" element={<Pricing />} />
-                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-                <Route path="/services" element={<Services />} />
-                <Route path="/support" element={<Support />} />
-                <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
-                <Route path="/track" element={<Track />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/auth/callback" element={<AuthCallback />} />
-                <Route path="/account" element={<Account />} />
-                <Route path="/address-book" element={<AddressBook />} />
-                <Route path="/admin" element={<AdminDashboard />} />
-                <Route path="/admin/gallery" element={<GalleryAdmin />} />
-                <Route path="/shipments/:id" element={<ShipmentDetails />} />
-                <Route path="/reviews" element={<Reviews />} />
-                <Route path="/notifications" element={<Notifications />} />
-                <Route path="/quote-submitted" element={<QuoteSubmitted />} />
-                <Route path="/task-management" element={<TaskManagement />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/book-shipment" element={<BookShipment />} />
-                <Route path="/receipt/:id" element={<Receipt />} />
-                <Route path="/payment-success" element={<PaymentSuccess />} />
-                <Route path="/confirm-booking" element={<ConfirmBooking />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-              <Toaster />
-            </Router>
-          </QueryClientProvider>
+          <RoleProvider>
+            <QueryClientProvider client={queryClient}>
+              <Router>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/about-us" element={<AboutUs />} />
+                  <Route path="/collection-schedule" element={<CollectionSchedule />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/faq" element={<FAQ />} />
+                  <Route path="/gallery" element={<Gallery />} />
+                  <Route path="/pricing" element={<Pricing />} />
+                  <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                  <Route path="/services" element={<Services />} />
+                  <Route path="/support" element={<Support />} />
+                  <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+                  <Route path="/track" element={<Track />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/auth/callback" element={<AuthCallback />} />
+                  <Route path="/account" element={<Account />} />
+                  <Route path="/address-book" element={<AddressBook />} />
+                  <Route path="/admin" element={<AdminDashboard />} />
+                  <Route path="/admin/gallery" element={<GalleryAdmin />} />
+                  <Route path="/shipments/:id" element={<ShipmentDetails />} />
+                  <Route path="/reviews" element={<Reviews />} />
+                  <Route path="/notifications" element={<Notifications />} />
+                  <Route path="/quote-submitted" element={<QuoteSubmitted />} />
+                  <Route path="/task-management" element={<TaskManagement />} />
+                  <Route path="/contact" element={<Contact />} />
+                  <Route path="/book-shipment" element={<BookShipment />} />
+                  <Route path="/receipt/:id" element={<Receipt />} />
+                  <Route path="/payment-success" element={<PaymentSuccess />} />
+                  <Route path="/confirm-booking" element={<ConfirmBooking />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+                <Toaster />
+              </Router>
+            </QueryClientProvider>
+          </RoleProvider>
         </AuthProvider>
       </ShippingProvider>
     </ThemeProvider>
