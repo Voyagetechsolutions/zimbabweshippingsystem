@@ -30,38 +30,47 @@ const ConfirmBooking = () => {
   console.log('Payment Data:', paymentData);
   console.log('Collection Info:', collectionInfo);
   
-  // Similar to getShipmentContactInfo function, extract contact information
+  // Similar to getShipmentContactInfo function, extract contact information with proper fallbacks
   const getBookingContactInfo = () => {
+    // Check if senderDetails or recipientDetails are present as objects
+    const senderDetails = bookingData.senderDetails || {};
+    const recipientDetails = bookingData.recipientDetails || {};
+    
+    // Extract names with proper fallbacks to avoid N/A
+    const senderFirstName = bookingData.firstName || senderDetails.firstName || '';
+    const senderLastName = bookingData.lastName || senderDetails.lastName || '';
+    const formattedSenderName = `${senderFirstName} ${senderLastName}`.trim();
+    
     return {
       senderName: bookingData.senderName || 
-                 (bookingData.senderDetails?.name || 
-                 `${bookingData.firstName || ''} ${bookingData.lastName || ''}`).trim() || 
-                 "N/A",
+                 senderDetails.name || 
+                 formattedSenderName || 
+                 "Unknown",
       senderPhone: bookingData.senderPhone || 
-                  bookingData.senderDetails?.phone || 
+                  senderDetails.phone || 
                   bookingData.phone || 
-                  "N/A",
+                  "Unknown",
       senderEmail: bookingData.senderEmail || 
-                  bookingData.senderDetails?.email || 
+                  senderDetails.email || 
                   bookingData.email || 
-                  "N/A",
+                  "Unknown",
       senderAddress: bookingData.senderAddress || 
-                    bookingData.senderDetails?.address || 
+                    senderDetails.address || 
                     bookingData.pickupAddress || 
-                    "N/A",
+                    "Unknown",
       recipientName: bookingData.recipientName || 
-                    bookingData.recipientDetails?.name || 
-                    "N/A",
+                    recipientDetails.name || 
+                    "Unknown",
       recipientPhone: bookingData.recipientPhone || 
-                     bookingData.recipientDetails?.phone || 
-                     "N/A",
+                     recipientDetails.phone || 
+                     "Unknown",
       additionalRecipientPhone: bookingData.additionalRecipientPhone || 
-                               bookingData.recipientDetails?.additionalPhone || 
+                               recipientDetails.additionalPhone || 
                                null,
       recipientAddress: bookingData.recipientAddress || 
-                       bookingData.recipientDetails?.address || 
+                       recipientDetails.address || 
                        bookingData.deliveryAddress || 
-                       "N/A"
+                       "Unknown"
     };
   };
   
