@@ -30,47 +30,61 @@ const ConfirmBooking = () => {
   console.log('Payment Data:', paymentData);
   console.log('Collection Info:', collectionInfo);
   
-  // Similar to getShipmentContactInfo function, extract contact information with proper fallbacks
+  // Get the contact information by accessing the metadata correctly
   const getBookingContactInfo = () => {
-    // Check if senderDetails or recipientDetails are present as objects
-    const senderDetails = bookingData.senderDetails || {};
-    const recipientDetails = bookingData.recipientDetails || {};
+    // First check if there's metadata in the bookingData
+    const metadata = bookingData.metadata || bookingData;
     
-    // Extract names with proper fallbacks to avoid N/A
-    const senderFirstName = bookingData.firstName || senderDetails.firstName || '';
-    const senderLastName = bookingData.lastName || senderDetails.lastName || '';
-    const formattedSenderName = `${senderFirstName} ${senderLastName}`.trim();
-    
+    // Try to access sender information from different possible locations
+    const senderName = metadata.senderName || 
+                      (metadata.firstName && metadata.lastName ? 
+                        `${metadata.firstName} ${metadata.lastName}` : 
+                        metadata.firstName || metadata.lastName) || 
+                      (metadata.senderDetails?.name) || 
+                      "Not provided";
+                      
+    const senderPhone = metadata.senderPhone || 
+                       metadata.phone || 
+                       metadata.senderDetails?.phone || 
+                       "Not provided";
+                       
+    const senderEmail = metadata.senderEmail || 
+                       metadata.email || 
+                       metadata.senderDetails?.email || 
+                       "Not provided";
+                       
+    const senderAddress = metadata.senderAddress || 
+                         metadata.pickupAddress || 
+                         metadata.senderDetails?.address || 
+                         "Not provided";
+                         
+    // Try to access recipient information
+    const recipientName = metadata.recipientName || 
+                         metadata.recipientDetails?.name || 
+                         "Not provided";
+                         
+    const recipientPhone = metadata.recipientPhone || 
+                          metadata.recipientDetails?.phone || 
+                          "Not provided";
+                          
+    const additionalRecipientPhone = metadata.additionalRecipientPhone || 
+                                    metadata.recipientDetails?.additionalPhone || 
+                                    null;
+                                    
+    const recipientAddress = metadata.recipientAddress || 
+                            metadata.deliveryAddress || 
+                            metadata.recipientDetails?.address || 
+                            "Not provided";
+
     return {
-      senderName: bookingData.senderName || 
-                 senderDetails.name || 
-                 formattedSenderName || 
-                 "Unknown",
-      senderPhone: bookingData.senderPhone || 
-                  senderDetails.phone || 
-                  bookingData.phone || 
-                  "Unknown",
-      senderEmail: bookingData.senderEmail || 
-                  senderDetails.email || 
-                  bookingData.email || 
-                  "Unknown",
-      senderAddress: bookingData.senderAddress || 
-                    senderDetails.address || 
-                    bookingData.pickupAddress || 
-                    "Unknown",
-      recipientName: bookingData.recipientName || 
-                    recipientDetails.name || 
-                    "Unknown",
-      recipientPhone: bookingData.recipientPhone || 
-                     recipientDetails.phone || 
-                     "Unknown",
-      additionalRecipientPhone: bookingData.additionalRecipientPhone || 
-                               recipientDetails.additionalPhone || 
-                               null,
-      recipientAddress: bookingData.recipientAddress || 
-                       recipientDetails.address || 
-                       bookingData.deliveryAddress || 
-                       "Unknown"
+      senderName,
+      senderPhone,
+      senderEmail,
+      senderAddress,
+      recipientName,
+      recipientPhone,
+      additionalRecipientPhone,
+      recipientAddress
     };
   };
   
@@ -93,8 +107,10 @@ const ConfirmBooking = () => {
     );
   }
   
-  // Extract tracking number
-  const trackingNumber = bookingData.shipmentDetails?.tracking_number || 'Pending Assignment';
+  // Extract tracking number - check in shipmentDetails or directly
+  const trackingNumber = bookingData.shipmentDetails?.tracking_number || 
+                        bookingData.tracking_number || 
+                        'Pending Assignment';
   
   // Get country and postal code for collection info
   const pickupCountry = bookingData.pickupCountry || 'England';
