@@ -30,6 +30,44 @@ const ConfirmBooking = () => {
   console.log('Payment Data:', paymentData);
   console.log('Collection Info:', collectionInfo);
   
+  // Similar to getShipmentContactInfo function, extract contact information
+  const getBookingContactInfo = () => {
+    return {
+      senderName: bookingData.senderName || 
+                 (bookingData.senderDetails?.name || 
+                 `${bookingData.firstName || ''} ${bookingData.lastName || ''}`).trim() || 
+                 "N/A",
+      senderPhone: bookingData.senderPhone || 
+                  bookingData.senderDetails?.phone || 
+                  bookingData.phone || 
+                  "N/A",
+      senderEmail: bookingData.senderEmail || 
+                  bookingData.senderDetails?.email || 
+                  bookingData.email || 
+                  "N/A",
+      senderAddress: bookingData.senderAddress || 
+                    bookingData.senderDetails?.address || 
+                    bookingData.pickupAddress || 
+                    "N/A",
+      recipientName: bookingData.recipientName || 
+                    bookingData.recipientDetails?.name || 
+                    "N/A",
+      recipientPhone: bookingData.recipientPhone || 
+                     bookingData.recipientDetails?.phone || 
+                     "N/A",
+      additionalRecipientPhone: bookingData.additionalRecipientPhone || 
+                               bookingData.recipientDetails?.additionalPhone || 
+                               null,
+      recipientAddress: bookingData.recipientAddress || 
+                       bookingData.recipientDetails?.address || 
+                       bookingData.deliveryAddress || 
+                       "N/A"
+    };
+  };
+  
+  // Get the contact information
+  const contactInfo = getBookingContactInfo();
+  
   if (!bookingData || Object.keys(bookingData).length === 0) {
     return (
       <>
@@ -46,16 +84,7 @@ const ConfirmBooking = () => {
     );
   }
   
-  // Extract necessary data
-  const senderName = bookingData.senderDetails?.name || `${bookingData.firstName || ''} ${bookingData.lastName || ''}`.trim();
-  const senderPhone = bookingData.senderDetails?.phone || bookingData.phone;
-  const senderEmail = bookingData.senderDetails?.email || bookingData.email;
-  const senderAddress = bookingData.senderDetails?.address || bookingData.pickupAddress;
-  
-  const receiverName = bookingData.recipientDetails?.name || bookingData.recipientName;
-  const receiverPhone = bookingData.recipientDetails?.phone || bookingData.recipientPhone;
-  const additionalReceiverPhone = bookingData.recipientDetails?.additionalPhone || bookingData.additionalRecipientPhone;
-  const receiverAddress = bookingData.recipientDetails?.address || bookingData.deliveryAddress;
+  // Extract tracking number
   const trackingNumber = bookingData.shipmentDetails?.tracking_number || 'Pending Assignment';
   
   // Get country and postal code for collection info
@@ -216,9 +245,9 @@ const ConfirmBooking = () => {
             </CardHeader>
             <CardContent className="text-gray-700">
               <p className="mb-4">
-                Thank You <span className="font-semibold">{senderName}</span>, Your booking is successful. 
+                Thank You <span className="font-semibold">{contactInfo.senderName}</span>, Your booking is successful. 
                 Goods will be collected on <span className="font-semibold">{collectionDate}</span> from 
-                the Sender Address, and we will contact you on <span className="font-semibold">{senderPhone}</span>. 
+                the Sender Address, and we will contact you on <span className="font-semibold">{contactInfo.senderPhone}</span>. 
                 Your tracking number is <span className="font-semibold">{trackingNumber}</span>. 
                 Your payment status is currently 'Pending.' Payment will be required on or before the day of 
                 collection. Cash on Collection clients will be required to be on standby with the cash on the day of pickup.
@@ -240,24 +269,24 @@ const ConfirmBooking = () => {
                   <p className="flex items-center mb-2">
                     <User className="mr-2 h-4 w-4 text-gray-500" />
                     <span className="font-semibold">Name:</span> 
-                    <span className="ml-2">{senderName}</span>
+                    <span className="ml-2">{contactInfo.senderName}</span>
                   </p>
                   <p className="flex items-center mb-2">
                     <Phone className="mr-2 h-4 w-4 text-gray-500" />
                     <span className="font-semibold">Phone:</span> 
-                    <span className="ml-2">{senderPhone}</span>
+                    <span className="ml-2">{contactInfo.senderPhone}</span>
                   </p>
                 </div>
                 <div>
                   <p className="flex items-center mb-2">
                     <Mail className="mr-2 h-4 w-4 text-gray-500" />
                     <span className="font-semibold">Email:</span> 
-                    <span className="ml-2">{senderEmail}</span>
+                    <span className="ml-2">{contactInfo.senderEmail}</span>
                   </p>
                   <p className="flex items-center">
                     <MapPin className="mr-2 h-4 w-4 text-gray-500" />
                     <span className="font-semibold">Address:</span> 
-                    <span className="ml-2">{senderAddress}</span>
+                    <span className="ml-2">{contactInfo.senderAddress}</span>
                   </p>
                 </div>
               </div>
@@ -278,31 +307,31 @@ const ConfirmBooking = () => {
                   <p className="flex items-center mb-2">
                     <User className="mr-2 h-4 w-4 text-gray-500" />
                     <span className="font-semibold">Name:</span> 
-                    <span className="ml-2">{receiverName}</span>
+                    <span className="ml-2">{contactInfo.recipientName}</span>
                   </p>
                   <p className="flex items-center mb-2">
                     <Phone className="mr-2 h-4 w-4 text-gray-500" />
                     <span className="font-semibold">Phone:</span> 
-                    <span className="ml-2">{receiverPhone}</span>
+                    <span className="ml-2">{contactInfo.recipientPhone}</span>
                   </p>
                 </div>
                 <div>
-                  {additionalReceiverPhone && (
+                  {contactInfo.additionalRecipientPhone && (
                     <p className="flex items-center mb-2">
                       <Phone className="mr-2 h-4 w-4 text-gray-500" />
                       <span className="font-semibold">Additional Phone:</span> 
-                      <span className="ml-2">{additionalReceiverPhone}</span>
+                      <span className="ml-2">{contactInfo.additionalRecipientPhone}</span>
                     </p>
                   )}
                   <p className="flex items-center">
                     <MapPin className="mr-2 h-4 w-4 text-gray-500" />
                     <span className="font-semibold">Address:</span> 
-                    <span className="ml-2">{receiverAddress}</span>
+                    <span className="ml-2">{contactInfo.recipientAddress}</span>
                   </p>
                 </div>
               </div>
               <p className="mt-4">
-                Please ensure that you are available on the collection day. And please let <span className="font-semibold">{receiverName}</span> of <span className="font-semibold">{receiverAddress}</span> with contact number <span className="font-semibold">{receiverPhone}</span> be aware of the parcel that will arrive 6-8 weeks from collection day.
+                Please ensure that you are available on the collection day. And please let <span className="font-semibold">{contactInfo.recipientName}</span> of <span className="font-semibold">{contactInfo.recipientAddress}</span> with contact number <span className="font-semibold">{contactInfo.recipientPhone}</span> be aware of the parcel that will arrive 6-8 weeks from collection day.
               </p>
             </CardContent>
           </Card>
