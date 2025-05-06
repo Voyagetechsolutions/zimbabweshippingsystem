@@ -11,6 +11,18 @@ import Footer from '@/components/Footer';
 import Logo from '@/components/Logo';
 import CollectionInfo from '@/components/CollectionInfo';
 
+interface Shipment {
+  id: string;
+  tracking_number: string;
+  origin: string;
+  destination: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  metadata: any | null;
+}
+
 const ConfirmBooking = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -22,7 +34,8 @@ const ConfirmBooking = () => {
     collectionDate: null
   });
   
-  const bookingData = location.state?.bookingData || {};
+  // Cast the bookingData to Shipment interface
+  const bookingData: Shipment = location.state?.bookingData || {};
   const paymentData = location.state?.paymentData || {};
   
   // Debug logs to help identify issues
@@ -30,66 +43,23 @@ const ConfirmBooking = () => {
   console.log('Payment Data:', paymentData);
   console.log('Collection Info:', collectionInfo);
   
-  // Get the contact information by accessing the metadata correctly
-  const getBookingContactInfo = () => {
-    // First check if there's metadata in the bookingData
-    const metadata = bookingData.metadata || bookingData;
-    
-    // Try to access sender information from different possible locations
-    const senderName = metadata.senderName || 
-                      (metadata.firstName && metadata.lastName ? 
-                        `${metadata.firstName} ${metadata.lastName}` : 
-                        metadata.firstName || metadata.lastName) || 
-                      (metadata.senderDetails?.name) || 
-                      "Not provided";
-                      
-    const senderPhone = metadata.senderPhone || 
-                       metadata.phone || 
-                       metadata.senderDetails?.phone || 
-                       "Not provided";
-                       
-    const senderEmail = metadata.senderEmail || 
-                       metadata.email || 
-                       metadata.senderDetails?.email || 
-                       "Not provided";
-                       
-    const senderAddress = metadata.senderAddress || 
-                         metadata.pickupAddress || 
-                         metadata.senderDetails?.address || 
-                         "Not provided";
-                         
-    // Try to access recipient information
-    const recipientName = metadata.recipientName || 
-                         metadata.recipientDetails?.name || 
-                         "Not provided";
-                         
-    const recipientPhone = metadata.recipientPhone || 
-                          metadata.recipientDetails?.phone || 
-                          "Not provided";
-                          
-    const additionalRecipientPhone = metadata.additionalRecipientPhone || 
-                                    metadata.recipientDetails?.additionalPhone || 
-                                    null;
-                                    
-    const recipientAddress = metadata.recipientAddress || 
-                            metadata.deliveryAddress || 
-                            metadata.recipientDetails?.address || 
-                            "Not provided";
-
+  // Get the contact information exactly as in AdminDashboardContent.tsx
+  const getShipmentContactInfo = (shipment: Shipment) => {
+    const metadata = shipment.metadata || {};
     return {
-      senderName,
-      senderPhone,
-      senderEmail,
-      senderAddress,
-      recipientName,
-      recipientPhone,
-      additionalRecipientPhone,
-      recipientAddress
+      senderName: metadata.senderName || metadata.firstName || "Not provided",
+      senderPhone: metadata.senderPhone || metadata.phone || "Not provided",
+      senderEmail: metadata.senderEmail || metadata.email || "Not provided",
+      senderAddress: metadata.senderAddress || metadata.pickupAddress || "Not provided",
+      recipientName: metadata.recipientName || "Not provided",
+      recipientPhone: metadata.recipientPhone || "Not provided",
+      additionalRecipientPhone: metadata.additionalRecipientPhone || null,
+      recipientAddress: metadata.recipientAddress || metadata.deliveryAddress || "Not provided"
     };
   };
   
   // Get the contact information
-  const contactInfo = getBookingContactInfo();
+  const contactInfo = getShipmentContactInfo(bookingData);
   
   if (!bookingData || Object.keys(bookingData).length === 0) {
     return (
@@ -107,15 +77,13 @@ const ConfirmBooking = () => {
     );
   }
   
-  // Extract tracking number - check in shipmentDetails or directly
-  const trackingNumber = bookingData.shipmentDetails?.tracking_number || 
-                        bookingData.tracking_number || 
-                        'Pending Assignment';
+  // Extract tracking number directly from the shipment data as done in AdminDashboardContent.tsx
+  const trackingNumber = bookingData.tracking_number || 'Pending Assignment';
   
   // Get country and postal code for collection info
-  const pickupCountry = bookingData.pickupCountry || 'England';
-  const pickupPostcode = bookingData.pickupPostcode || '';
-  const pickupCity = bookingData.pickupCity || '';
+  const pickupCountry = bookingData.metadata?.pickupCountry || 'England';
+  const pickupPostcode = bookingData.metadata?.pickupPostcode || '';
+  const pickupCity = bookingData.metadata?.pickupCity || '';
   
   // Payment details
   const baseAmount = paymentData.originalAmount || paymentData.finalAmount || 0;
