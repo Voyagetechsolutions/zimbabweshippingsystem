@@ -47,14 +47,14 @@ const ConfirmBooking = () => {
   const getShipmentContactInfo = (shipment: Shipment) => {
     const metadata = shipment.metadata || {};
     return {
-      senderName: metadata.senderName || metadata.firstName || "Not provided",
-      senderPhone: metadata.senderPhone || metadata.phone || "Not provided",
-      senderEmail: metadata.senderEmail || metadata.email || "Not provided",
-      senderAddress: metadata.senderAddress || metadata.pickupAddress || "Not provided",
-      recipientName: metadata.recipientName || "Not provided",
-      recipientPhone: metadata.recipientPhone || "Not provided",
-      additionalRecipientPhone: metadata.additionalRecipientPhone || null,
-      recipientAddress: metadata.recipientAddress || metadata.deliveryAddress || "Not provided"
+      senderName: metadata.senderName || metadata.firstName || metadata.sender?.name || "Not provided",
+      senderPhone: metadata.senderPhone || metadata.phone || metadata.sender?.phone || "Not provided",
+      senderEmail: metadata.senderEmail || metadata.email || metadata.sender?.email || "Not provided",
+      senderAddress: metadata.senderAddress || metadata.pickupAddress || metadata.sender?.address || "Not provided",
+      recipientName: metadata.recipientName || metadata.recipient?.name || "Not provided",
+      recipientPhone: metadata.recipientPhone || metadata.recipient?.phone || "Not provided",
+      additionalRecipientPhone: metadata.additionalRecipientPhone || metadata.recipient?.additionalPhone || null,
+      recipientAddress: metadata.recipientAddress || metadata.deliveryAddress || metadata.recipient?.address || "Not provided"
     };
   };
   
