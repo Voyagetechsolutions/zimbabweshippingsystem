@@ -1,6 +1,6 @@
 # Welcome to your Lovable project
 
-## Project info
+## Project information 
 
 **URL**: https://lovable.dev/projects/4b1ca189-d9a1-4cab-be0f-df90c4f44318
 
@@ -71,3 +71,4 @@ Yes it is!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+trigger vercel prod deployment
