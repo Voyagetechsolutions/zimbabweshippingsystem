@@ -328,15 +328,15 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
       const qty = parseInt(values.drumQuantity || '1');
       if (values.paymentOption === 'standard') {
         if (qty >= 5) {
-          total += qty * 220;
-        } else if (qty >= 2) {
           total += qty * 240;
+        } else if (qty >= 2) {
+          total += qty * 250;
         } else {
           total += 260;
         }
       } else {
         if (qty >= 5) {
-          total += qty * 250;
+          total += qty * 260;
         } else if (qty >= 2) {
           total += qty * 270;
         } else {
