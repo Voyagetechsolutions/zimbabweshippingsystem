@@ -3,6 +3,179 @@
  * UK Postal Code validation utilities
  */
 
+// Map of postal code prefixes to routes for England
+export const postalCodeToRouteMap: Record<string, string> = {
+  // London area
+  'EC': 'LONDON ROUTE',
+  'WC': 'LONDON ROUTE',
+  'N': 'LONDON ROUTE',
+  'NW': 'LONDON ROUTE',
+  'E': 'LONDON ROUTE',
+  'SE': 'LONDON ROUTE',
+  'SW': 'LONDON ROUTE',
+  'W': 'LONDON ROUTE',
+  // Birmingham area
+  'B': 'BIRMINGHAM ROUTE',
+  'CV': 'BIRMINGHAM ROUTE',
+  'WV': 'BIRMINGHAM ROUTE',
+  'DY': 'BIRMINGHAM ROUTE',
+  'WS': 'BIRMINGHAM ROUTE',
+  // Manchester area
+  'M': 'MANCHESTER ROUTE',
+  'L': 'MANCHESTER ROUTE',
+  'WA': 'MANCHESTER ROUTE',
+  'OL': 'MANCHESTER ROUTE',
+  'SK': 'MANCHESTER ROUTE',
+  'ST': 'MANCHESTER ROUTE',
+  // Leeds area
+  'LS': 'LEEDS ROUTE',
+  'WF': 'LEEDS ROUTE',
+  'HX': 'LEEDS ROUTE',
+  'DN': 'LEEDS ROUTE',
+  'S': 'LEEDS ROUTE',
+  'HD': 'LEEDS ROUTE',
+  'YO': 'LEEDS ROUTE',
+  // Cardiff area
+  'CF': 'CARDIFF ROUTE',
+  'GL': 'CARDIFF ROUTE',
+  'BS': 'CARDIFF ROUTE',
+  'SN': 'CARDIFF ROUTE',
+  'BA': 'CARDIFF ROUTE',
+  'SP': 'CARDIFF ROUTE',
+  // Bournemouth area
+  'SO': 'BOURNEMOUTH ROUTE',
+  'OX': 'BOURNEMOUTH ROUTE',
+  'PO': 'BOURNEMOUTH ROUTE',
+  'RG': 'BOURNEMOUTH ROUTE',
+  'GU': 'BOURNEMOUTH ROUTE',
+  // Nottingham area
+  'NG': 'NOTTINGHAM ROUTE',
+  'LE': 'NOTTINGHAM ROUTE',
+  'DE': 'NOTTINGHAM ROUTE',
+  'PE': 'NOTTINGHAM ROUTE',
+  'NN': 'NOTTINGHAM ROUTE',
+  // Brighton area
+  'BN': 'BRIGHTON ROUTE',
+  'RH': 'BRIGHTON ROUTE',
+  'SL': 'BRIGHTON ROUTE',
+  'HP': 'BRIGHTON ROUTE',
+  'TN': 'BRIGHTON ROUTE',
+  'CT': 'BRIGHTON ROUTE',
+  // Southend area
+  'NR': 'SOUTHEND ROUTE',
+  'IP': 'SOUTHEND ROUTE',
+  'CO': 'SOUTHEND ROUTE',
+  'CM': 'SOUTHEND ROUTE',
+  'CB': 'SOUTHEND ROUTE',
+  'SS': 'SOUTHEND ROUTE',
+  // Northampton area
+  'MK': 'NORTHAMPTON ROUTE',
+  'LU': 'NORTHAMPTON ROUTE',
+  'AL': 'NORTHAMPTON ROUTE',
+  'SG': 'NORTHAMPTON ROUTE',
+  'OX': 'NORTHAMPTON ROUTE',
+  // Scotland area
+  'G': 'SCOTLAND ROUTE',
+  'EH': 'SCOTLAND ROUTE',
+  'NE': 'SCOTLAND ROUTE',
+  'TS': 'SCOTLAND ROUTE',
+  'PR': 'SCOTLAND ROUTE',
+  'CA': 'SCOTLAND ROUTE'
+};
+
+// Map of Ireland cities to routes
+export const irelandCityToRouteMap: Record<string, string> = {
+  // London Derry Route
+  'LARNE': 'LONDON DERRY ROUTE',
+  'BALLYCLARE': 'LONDON DERRY ROUTE',
+  'BALLYMENA': 'LONDON DERRY ROUTE',
+  'BALLYMONEY': 'LONDON DERRY ROUTE',
+  'KILERA': 'LONDON DERRY ROUTE',
+  'COLERAINE': 'LONDON DERRY ROUTE',
+  'LONDONDERRY': 'LONDON DERRY ROUTE',
+  'LIFFORD': 'LONDON DERRY ROUTE',
+  'OMAGH': 'LONDON DERRY ROUTE',
+  'COOKSTOWN': 'LONDON DERRY ROUTE',
+  'CARRICKFERGUS': 'LONDON DERRY ROUTE',
+  // Belfast Route
+  'BELFAST': 'BELFAST ROUTE',
+  'BANGOR': 'BELFAST ROUTE',
+  'COMBER': 'BELFAST ROUTE',
+  'LISBURN': 'BELFAST ROUTE',
+  'NEWRY': 'BELFAST ROUTE',
+  'NEWTOWNARDS': 'BELFAST ROUTE',
+  'DUNMURRY': 'BELFAST ROUTE',
+  'LURGAN': 'BELFAST ROUTE',
+  'PORTADOWN': 'BELFAST ROUTE',
+  'BANBRIDGE': 'BELFAST ROUTE',
+  'MOY': 'BELFAST ROUTE',
+  'DUNGANNON': 'BELFAST ROUTE',
+  'ARMAGH': 'BELFAST ROUTE',
+  // Cavan Route
+  'MAYNOOTH': 'CAVAN ROUTE',
+  'ASHBOURNE': 'CAVAN ROUTE',
+  'SWORDS': 'CAVAN ROUTE',
+  'SKERRIES': 'CAVAN ROUTE',
+  'DROGHEDA': 'CAVAN ROUTE',
+  'DUNDALK': 'CAVAN ROUTE',
+  'CAVAN': 'CAVAN ROUTE',
+  'VIRGINIA': 'CAVAN ROUTE',
+  'KELLS': 'CAVAN ROUTE',
+  'NAVAN': 'CAVAN ROUTE',
+  'TRIM': 'CAVAN ROUTE',
+  // Athlone Route
+  'MALIGURAR': 'ATHLONE ROUTE',
+  'LONGFORD': 'ATHLONE ROUTE',
+  'ROSECOMMON': 'ATHLONE ROUTE',
+  'BOYLE': 'ATHLONE ROUTE',
+  'SLIGO': 'ATHLONE ROUTE',
+  'BALLINA': 'ATHLONE ROUTE',
+  'SWINFORD': 'ATHLONE ROUTE',
+  'CASTLEBAR': 'ATHLONE ROUTE',
+  'TAURM': 'ATHLONE ROUTE',
+  'GALWAY': 'ATHLONE ROUTE',
+  'ATERNY': 'ATHLONE ROUTE',
+  'ATHLONE': 'ATHLONE ROUTE',
+  // Limerick Route
+  'NEWBRIDGE': 'LIMERICK ROUTE',
+  'PORTLAOISE': 'LIMERICK ROUTE',
+  'ROSCREA': 'LIMERICK ROUTE',
+  'LIMERICK': 'LIMERICK ROUTE',
+  'ENNIS': 'LIMERICK ROUTE',
+  'DOOLIN': 'LIMERICK ROUTE',
+  'LOUGHREA': 'LIMERICK ROUTE',
+  'BALLINASLOE': 'LIMERICK ROUTE',
+  'TULLAMORE': 'LIMERICK ROUTE',
+  // Dublin City Route
+  'SANDFORD': 'DUBLIN CITY ROUTE',
+  'RIATO': 'DUBLIN CITY ROUTE',
+  'BALLYMOUNT': 'DUBLIN CITY ROUTE',
+  'CABRA': 'DUBLIN CITY ROUTE',
+  'BEAUMONT': 'DUBLIN CITY ROUTE',
+  'MALAHIDE': 'DUBLIN CITY ROUTE',
+  'PORTMANOCK': 'DUBLIN CITY ROUTE',
+  'DALKEY': 'DUBLIN CITY ROUTE',
+  'SHANDKILL': 'DUBLIN CITY ROUTE',
+  'BRAY': 'DUBLIN CITY ROUTE',
+  'DUBLIN': 'DUBLIN CITY ROUTE',
+  // Cork Route
+  'PORTALOUSE': 'CORK ROUTE',
+  'CASHEL': 'CORK ROUTE',
+  'FERMOY': 'CORK ROUTE',
+  'CORK': 'CORK ROUTE',
+  'DUNGARVEAN': 'CORK ROUTE',
+  'WATERFORD': 'CORK ROUTE',
+  'NEW ROSS': 'CORK ROUTE',
+  'WEXFORD': 'CORK ROUTE',
+  'GOREY': 'CORK ROUTE',
+  'GREYSTONE': 'CORK ROUTE'
+};
+
+// List of restricted postal codes
+export const restrictedPostalCodes: string[] = [
+  // Add restricted postal codes here if needed
+];
+
 // Check if a postal code matches the required format (starts with 1-2 letters followed by numbers)
 export const isValidUKPostcode = (postcode: string): boolean => {
   // Basic UK postcode validation: 
@@ -31,3 +204,35 @@ export const getInwardPostcode = (postcode: string): string => {
   // The inward code is the last 3 characters
   return cleanPostcode.slice(-3);
 };
+
+// Determine the route for a UK postal code
+export const getRouteForPostalCode = (postalCode: string): string | null => {
+  if (!postalCode) return null;
+  
+  // Format and clean the postal code
+  const formattedCode = formatUKPostcode(postalCode);
+  
+  // Check if it's a restricted postal code
+  if (restrictedPostalCodes.includes(formattedCode)) {
+    return null;
+  }
+  
+  // Extract the prefix (first 1-2 letters)
+  const prefix = formattedCode.match(/^[A-Z]{1,2}/i);
+  if (!prefix) return null;
+  
+  // Look up the route based on the prefix
+  return postalCodeToRouteMap[prefix[0]] || null;
+};
+
+// Determine the route for an Ireland city
+export const getIrelandRouteForCity = (city: string): string | null => {
+  if (!city) return null;
+  
+  // Clean and format city name
+  const formattedCity = city.trim().toUpperCase();
+  
+  // Look up the route based on the city
+  return irelandCityToRouteMap[formattedCity] || null;
+};
+
