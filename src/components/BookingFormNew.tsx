@@ -268,9 +268,9 @@ const BookingFormNew: React.FC<BookingFormProps> = ({ onSubmitComplete }) => {
       if (quantity === 1) {
         basePrice = 280;
       } else if (quantity >= 2 && quantity <= 4) {
-        basePrice = 260 * quantity;
+        basePrice = 270 * quantity;
       } else if (quantity >= 5) {
-        basePrice = 240 * quantity;
+        basePrice = 250 * quantity;
       } else {
         basePrice = 280;
       }
