@@ -239,12 +239,11 @@ export async function updateRouteDate(routeName: string, newDate: string): Promi
     if (index !== -1) {
       collectionSchedules[index].date = newDate;
       
-      // Sync with database using RPC function
+      // Sync with database using direct table update
       const { data, error } = await supabase
-        .rpc('update_route_date', {
-          route_name: routeName,
-          new_date: newDate
-        });
+        .from('collection_schedules')
+        .update({ pickup_date: newDate, updated_at: new Date().toISOString() })
+        .eq('route', routeName);
       
       if (error) {
         console.error('Error updating route date:', error);
@@ -323,7 +322,7 @@ export async function removeRoute(routeName: string): Promise<boolean> {
   return false;
 }
 
-// Add an area to a route and sync with database - FIXED to properly update the database
+// Add an area to a route and sync with database
 export async function addAreaToRoute(routeName: string, area: string): Promise<boolean> {
   try {
     console.log(`Adding area ${area} to route ${routeName}`);
@@ -334,15 +333,32 @@ export async function addAreaToRoute(routeName: string, area: string): Promise<b
       if (!collectionSchedules[index].areas.includes(area)) {
         collectionSchedules[index].areas.push(area);
         
-        // Sync with database using RPC function
-        const { data, error } = await supabase
-          .rpc('add_area_to_route', {
-            route_name: routeName,
-            area_name: area
-          });
+        // Get the current areas array from the database
+        const { data, error: fetchError } = await supabase
+          .from('collection_schedules')
+          .select('areas')
+          .eq('route', routeName)
+          .single();
         
-        if (error) {
-          console.error('Error adding area:', error);
+        if (fetchError) {
+          console.error('Error fetching current areas:', fetchError);
+          return false;
+        }
+        
+        // Add the new area to the existing areas array
+        const updatedAreas = [...(data?.areas || []), area];
+        
+        // Update the database with the new areas array
+        const { error: updateError } = await supabase
+          .from('collection_schedules')
+          .update({ 
+            areas: updatedAreas,
+            updated_at: new Date().toISOString()
+          })
+          .eq('route', routeName);
+        
+        if (updateError) {
+          console.error('Error adding area:', updateError);
           // Rollback local change
           const areaIndex = collectionSchedules[index].areas.indexOf(area);
           if (areaIndex !== -1) {
@@ -361,7 +377,7 @@ export async function addAreaToRoute(routeName: string, area: string): Promise<b
   }
 }
 
-// Remove an area from a route and sync with database - FIXED to properly update the database
+// Remove an area from a route and sync with database
 export async function removeAreaFromRoute(routeName: string, area: string): Promise<boolean> {
   try {
     console.log(`Removing area ${area} from route ${routeName}`);
@@ -374,15 +390,32 @@ export async function removeAreaFromRoute(routeName: string, area: string): Prom
         const prevAreas = [...collectionSchedules[index].areas];
         collectionSchedules[index].areas.splice(areaIndex, 1);
         
-        // Sync with database using RPC function
-        const { data, error } = await supabase
-          .rpc('remove_area_from_route', {
-            route_name: routeName,
-            area_name: area
-          });
+        // Get the current areas array from the database
+        const { data, error: fetchError } = await supabase
+          .from('collection_schedules')
+          .select('areas')
+          .eq('route', routeName)
+          .single();
         
-        if (error) {
-          console.error('Error removing area:', error);
+        if (fetchError) {
+          console.error('Error fetching current areas:', fetchError);
+          return false;
+        }
+        
+        // Remove the area from the existing areas array
+        const updatedAreas = (data?.areas || []).filter(a => a !== area);
+        
+        // Update the database with the new areas array
+        const { error: updateError } = await supabase
+          .from('collection_schedules')
+          .update({ 
+            areas: updatedAreas,
+            updated_at: new Date().toISOString()
+          })
+          .eq('route', routeName);
+        
+        if (updateError) {
+          console.error('Error removing area:', updateError);
           // Rollback local change
           collectionSchedules[index].areas = prevAreas;
           return false;

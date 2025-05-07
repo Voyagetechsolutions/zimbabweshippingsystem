@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Select,
   SelectContent,
@@ -98,16 +99,7 @@ const CollectionScheduleManagement: React.FC = () => {
     try {
       console.log(`Updating route ${route} to date: ${formattedDate}`);
       
-      // Direct call to Supabase
-      const { data, error } = await supabase
-        .rpc('update_route_date', {
-          route_name: route,
-          new_date: formattedDate
-        });
-      
-      if (error) throw error;
-      
-      // Update the date in our collection
+      // Update the date in our collection using the fixed function
       const success = await updateRouteDate(route, formattedDate);
       
       if (success) {
@@ -307,15 +299,7 @@ const CollectionScheduleManagement: React.FC = () => {
     try {
       console.log(`Adding area ${newArea} to route ${route}`);
       
-      // Direct call to Supabase
-      const { data, error } = await supabase
-        .rpc('add_area_to_route', {
-          route_name: route,
-          area_name: newArea.toUpperCase()
-        });
-      
-      if (error) throw error;
-      
+      // Use the fixed function to add area
       const success = await addAreaToRoute(route, newArea.toUpperCase());
       
       if (success) {
@@ -366,15 +350,7 @@ const CollectionScheduleManagement: React.FC = () => {
     try {
       console.log(`Removing area ${area} from route ${route}`);
       
-      // Direct call to Supabase
-      const { data, error } = await supabase
-        .rpc('remove_area_from_route', {
-          route_name: route,
-          area_name: area
-        });
-      
-      if (error) throw error;
-      
+      // Use the fixed function to remove area
       const success = await removeAreaFromRoute(route, area);
       
       if (success) {
