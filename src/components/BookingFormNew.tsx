@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -23,8 +23,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertCircle, CheckCircle2, Package, Ship, Info } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Package, Ship, Info, User, Phone, FileBox, ClipboardList } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { getRouteForPostalCode, getIrelandRouteForCity } from '@/utils/postalCodeUtils';
+import { Link } from 'react-router-dom';
 
 // Define the validation schema
 const formSchema = z.object({
@@ -35,6 +37,7 @@ const formSchema = z.object({
   phone: z.string().refine(val => isValidPhoneNumber(val), {
     message: 'Please enter a valid phone number',
   }),
+  hasAdditionalPhone: z.boolean().default(false),
   additionalPhone: z.string().optional(),
   pickupCountry: z.enum(['England', 'Ireland']),
   pickupAddress: z.string().min(1, 'Pickup address is required'),
@@ -47,14 +50,15 @@ const formSchema = z.object({
   pickupCity: z.string().min(1, 'City is required'),
   
   // Collection Information
-  collectionRoute: z.string().min(1, 'Please select a collection route'),
-  collectionDate: z.string().min(1, 'Collection date is required'),
+  collectionRoute: z.string().optional(),
+  collectionDate: z.string().optional(),
   
   // Recipient Information
   recipientName: z.string().min(1, 'Recipient name is required'),
   recipientPhone: z.string().refine(val => isValidPhoneNumber(val), {
     message: 'Please enter a valid phone number',
   }),
+  hasAdditionalRecipientPhone: z.boolean().default(false),
   additionalRecipientPhone: z.string().optional(),
   deliveryAddress: z.string().min(1, 'Delivery address is required'),
   deliveryCity: z.string().min(1, 'Delivery city is required'),
@@ -90,18 +94,23 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('sender');
   const [availableRoutes, setAvailableRoutes] = useState<{ route: string; pickupDate: string }[]>([]);
+  const [detectedRoute, setDetectedRoute] = useState<string | null>(null);
+  const [collectionDate, setCollectionDate] = useState<string | null>(null);
+  const [additionalAddresses, setAdditionalAddresses] = useState<string[]>(['']);
   const { toast } = useToast();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       pickupCountry: 'England',
-      includeDrums: true,
+      includeDrums: false,
       includeOtherItems: false,
       shipmentType: 'drum',
       drumQuantity: '1',
       doorToDoor: false,
       wantMetalSeal: false,
+      hasAdditionalPhone: false,
+      hasAdditionalRecipientPhone: false,
       additionalDeliveryAddresses: [],
       paymentOption: 'standard',
       paymentMethod: 'card',
@@ -109,7 +118,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
   });
 
   // Fetch collection schedules
-  React.useEffect(() => {
+  useEffect(() => {
     const fetchCollectionSchedules = async () => {
       try {
         const { data, error } = await supabase
@@ -136,6 +145,57 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
     
     fetchCollectionSchedules();
   }, [toast]);
+  
+  // Watch for postcode changes to calculate route
+  const watchPostcode = form.watch('pickupPostcode');
+  const watchCountry = form.watch('pickupCountry');
+  const watchPickupCity = form.watch('pickupCity');
+  
+  useEffect(() => {
+    if (watchCountry === 'England' && watchPostcode) {
+      const route = getRouteForPostalCode(watchPostcode);
+      setDetectedRoute(route);
+      
+      if (route) {
+        const matchingRoute = availableRoutes.find(item => item.route === route);
+        if (matchingRoute) {
+          setCollectionDate(matchingRoute.pickupDate);
+          form.setValue('collectionRoute', route);
+          form.setValue('collectionDate', matchingRoute.pickupDate);
+        }
+      }
+    } else if (watchCountry === 'Ireland' && watchPickupCity) {
+      const route = getIrelandRouteForCity(watchPickupCity);
+      setDetectedRoute(route);
+      
+      if (route) {
+        const matchingRoute = availableRoutes.find(item => item.route === route);
+        if (matchingRoute) {
+          setCollectionDate(matchingRoute.pickupDate);
+          form.setValue('collectionRoute', route);
+          form.setValue('collectionDate', matchingRoute.pickupDate);
+        }
+      }
+    }
+  }, [watchPostcode, watchCountry, watchPickupCity, availableRoutes, form]);
+  
+  // Handle adding/removing additional delivery addresses
+  const addDeliveryAddress = () => {
+    setAdditionalAddresses([...additionalAddresses, '']);
+  };
+  
+  const removeDeliveryAddress = (index: number) => {
+    const newAddresses = [...additionalAddresses];
+    newAddresses.splice(index, 1);
+    setAdditionalAddresses(newAddresses);
+  };
+  
+  const updateDeliveryAddress = (index: number, value: string) => {
+    const newAddresses = [...additionalAddresses];
+    newAddresses[index] = value;
+    setAdditionalAddresses(newAddresses);
+    form.setValue('additionalDeliveryAddresses', newAddresses.filter(addr => addr.trim() !== ''));
+  };
 
   // Handle form submission
   const onSubmit = async (values: FormValues) => {
@@ -186,7 +246,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
             lastName: values.lastName,
             email: values.email,
             phone: values.phone,
-            additionalPhone: values.additionalPhone,
+            additionalPhone: values.hasAdditionalPhone ? values.additionalPhone : null,
             country: values.pickupCountry,
             address: values.pickupAddress,
             postcode: values.pickupPostcode,
@@ -195,7 +255,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
           recipient: {
             name: values.recipientName,
             phone: values.recipientPhone,
-            additionalPhone: values.additionalRecipientPhone,
+            additionalPhone: values.hasAdditionalRecipientPhone ? values.additionalRecipientPhone : null,
             address: values.deliveryAddress,
             city: values.deliveryCity,
           },
@@ -213,7 +273,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
           services: {
             doorToDoor: values.doorToDoor,
             metalSeal: values.wantMetalSeal,
-            additionalAddresses: values.additionalDeliveryAddresses,
+            additionalAddresses: values.additionalDeliveryAddresses?.filter(addr => addr.trim() !== '') || [],
           },
           collection: {
             route: values.collectionRoute,
@@ -258,15 +318,68 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
     }
   };
 
+  // Calculate total cost for the booking summary
+  const calculateTotal = () => {
+    const values = form.getValues();
+    let total = 0;
+    
+    // Calculate drum cost
+    if (values.includeDrums) {
+      const qty = parseInt(values.drumQuantity || '1');
+      if (values.paymentOption === 'standard') {
+        if (qty >= 5) {
+          total += qty * 220;
+        } else if (qty >= 2) {
+          total += qty * 240;
+        } else {
+          total += 260;
+        }
+      } else {
+        if (qty >= 5) {
+          total += qty * 250;
+        } else if (qty >= 2) {
+          total += qty * 270;
+        } else {
+          total += 280;
+        }
+      }
+      
+      // Add metal seal cost
+      if (values.wantMetalSeal) {
+        total += 5 * qty;
+      }
+    }
+    
+    // Add door-to-door delivery cost
+    if (values.doorToDoor) {
+      const addressCount = (additionalAddresses.filter(addr => addr.trim() !== '').length || 1);
+      total += 25 * addressCount;
+    }
+    
+    return total;
+  };
+
   return (
     <Card className="bg-white dark:bg-gray-800 shadow-md">
       <CardContent className="p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-8">
-            <TabsTrigger value="sender">Sender Info</TabsTrigger>
-            <TabsTrigger value="recipient">Recipient Info</TabsTrigger>
-            <TabsTrigger value="shipment">Shipment Details</TabsTrigger>
-            <TabsTrigger value="payment">Payment</TabsTrigger>
+            <TabsTrigger value="sender" className="flex items-center justify-center gap-2">
+              <User className="h-4 w-4" />
+              <span>Sender Info</span>
+            </TabsTrigger>
+            <TabsTrigger value="recipient" className="flex items-center justify-center gap-2">
+              <Phone className="h-4 w-4" />
+              <span>Receiver Info</span>
+            </TabsTrigger>
+            <TabsTrigger value="shipment" className="flex items-center justify-center gap-2">
+              <Package className="h-4 w-4" />
+              <span>Shipment Details</span>
+            </TabsTrigger>
+            <TabsTrigger value="payment" className="flex items-center justify-center gap-2">
+              <ClipboardList className="h-4 w-4" />
+              <span>Booking Summary</span>
+            </TabsTrigger>
           </TabsList>
           
           <Form {...form}>
@@ -274,7 +387,10 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
               
               {/* Sender Information */}
               <TabsContent value="sender" className="space-y-6">
-                <div className="text-xl font-semibold mb-4">Sender Information</div>
+                <div className="text-xl font-semibold mb-4 flex items-center">
+                  <User className="h-5 w-5 mr-2" />
+                  Sender Information
+                </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
@@ -338,17 +454,37 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
                 
                 <FormField
                   control={form.control}
-                  name="additionalPhone"
+                  name="hasAdditionalPhone"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Additional Phone Number (Optional)</FormLabel>
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                       <FormControl>
-                        <Input type="tel" placeholder="Additional phone number" {...field} />
+                        <Checkbox 
+                          checked={field.value} 
+                          onCheckedChange={field.onChange}
+                        />
                       </FormControl>
-                      <FormMessage />
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>Add additional phone number</FormLabel>
+                      </div>
                     </FormItem>
                   )}
                 />
+                
+                {form.watch('hasAdditionalPhone') && (
+                  <FormField
+                    control={form.control}
+                    name="additionalPhone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Additional Phone Number</FormLabel>
+                        <FormControl>
+                          <Input type="tel" placeholder="Additional phone number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                 
                 <FormField
                   control={form.control}
@@ -426,65 +562,36 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
                   />
                 </div>
                 
-                <FormField
-                  control={form.control}
-                  name="collectionRoute"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Collection Route</FormLabel>
-                      <Select onValueChange={(value) => {
-                        field.onChange(value);
-                        // Set the corresponding date automatically
-                        const selectedRoute = availableRoutes.find(route => route.route === value);
-                        if (selectedRoute) {
-                          form.setValue('collectionDate', selectedRoute.pickupDate);
-                        }
-                      }} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select collection route" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {availableRoutes.map((route, index) => (
-                            <SelectItem key={index} value={route.route}>
-                              {route.route}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="collectionDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Collection Date</FormLabel>
-                      <FormControl>
-                        <Input readOnly {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {detectedRoute && (
+                  <div className="border rounded-md p-4 bg-gray-50">
+                    <h3 className="font-medium mb-2">Collection Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      <div>
+                        <span className="font-medium">Route:</span> {detectedRoute}
+                      </div>
+                      <div>
+                        <span className="font-medium">Collection Date:</span> {collectionDate || "Not available"}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 <div className="flex justify-end">
                   <Button 
                     type="button"
                     onClick={() => setActiveTab('recipient')}
                   >
-                    Next: Recipient Information
+                    Next: Receiver Information
                   </Button>
                 </div>
               </TabsContent>
               
               {/* Recipient Information */}
               <TabsContent value="recipient" className="space-y-6">
-                <div className="text-xl font-semibold mb-4">Recipient Information</div>
+                <div className="text-xl font-semibold mb-4 flex items-center">
+                  <Phone className="h-5 w-5 mr-2" />
+                  Receiver Information
+                </div>
                 
                 <FormField
                   control={form.control}
@@ -516,17 +623,37 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
                 
                 <FormField
                   control={form.control}
-                  name="additionalRecipientPhone"
+                  name="hasAdditionalRecipientPhone"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Additional Phone Number (Optional)</FormLabel>
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                       <FormControl>
-                        <Input type="tel" placeholder="Additional phone number" {...field} />
+                        <Checkbox 
+                          checked={field.value} 
+                          onCheckedChange={field.onChange}
+                        />
                       </FormControl>
-                      <FormMessage />
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>Add additional phone number</FormLabel>
+                      </div>
                     </FormItem>
                   )}
                 />
+                
+                {form.watch('hasAdditionalRecipientPhone') && (
+                  <FormField
+                    control={form.control}
+                    name="additionalRecipientPhone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Additional Phone Number</FormLabel>
+                        <FormControl>
+                          <Input type="tel" placeholder="Additional phone number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                 
                 <FormField
                   control={form.control}
@@ -578,10 +705,14 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
               
               {/* Shipment Details */}
               <TabsContent value="shipment" className="space-y-6">
-                <div className="text-xl font-semibold mb-4">Shipment Details</div>
+                <div className="text-xl font-semibold mb-4 flex items-center">
+                  <Package className="h-5 w-5 mr-2" />
+                  Shipment Details
+                </div>
                 
                 <div className="space-y-4 bg-gray-50 dark:bg-gray-700 p-4 rounded-md">
                   <div className="font-medium">What would you like to ship?</div>
+                  <p className="text-gray-600 dark:text-gray-400">Please select either Drums or Other Items or both.</p>
                   
                   <div className="flex flex-col space-y-4">
                     <FormField
@@ -635,20 +766,14 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Number of Drums</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select quantity" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-                                <SelectItem key={num} value={num.toString()}>
-                                  {num}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <FormControl>
+                            <Input 
+                              type="number"
+                              min="1"
+                              placeholder="Enter quantity" 
+                              {...field}
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -666,11 +791,69 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
                             />
                           </FormControl>
                           <FormLabel className="font-normal">
-                            Add metal seal for security (£5 per drum)
+                            Add Metal coded seal for security (£5 per drum)
                           </FormLabel>
                         </FormItem>
                       )}
                     />
+                    
+                    <FormField
+                      control={form.control}
+                      name="doorToDoor"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 mt-4">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className="font-normal">
+                              Door-to-Door Delivery (£25 per delivery address)
+                            </FormLabel>
+                            <FormDescription>
+                              We'll pick up from your address and deliver directly to the recipient
+                            </FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    {form.watch('doorToDoor') && (
+                      <div className="mt-4 space-y-4 border-t pt-4">
+                        <div className="font-medium">Delivery Addresses</div>
+                        {additionalAddresses.map((address, index) => (
+                          <div key={index} className="flex items-start gap-2">
+                            <Textarea 
+                              value={address}
+                              onChange={(e) => updateDeliveryAddress(index, e.target.value)}
+                              placeholder={`Delivery address ${index + 1}`}
+                              className="flex-grow"
+                            />
+                            {index > 0 && (
+                              <Button 
+                                type="button" 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => removeDeliveryAddress(index)}
+                              >
+                                Remove
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                        
+                        <Button 
+                          type="button"
+                          variant="outline"
+                          onClick={addDeliveryAddress}
+                          className="mt-2"
+                        >
+                          Add Another Address
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
                 
@@ -679,134 +862,85 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
                   <div className="border rounded-md p-4">
                     <div className="font-medium mb-4">Other Items Details</div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-4">
                       <FormField
                         control={form.control}
-                        name="itemCategory"
+                        name="doorToDoor"
                         render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Item Category</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select category" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="electronics">Electronics</SelectItem>
-                                <SelectItem value="clothing">Clothing</SelectItem>
-                                <SelectItem value="furniture">Furniture</SelectItem>
-                                <SelectItem value="documents">Documents</SelectItem>
-                                <SelectItem value="food">Food Items</SelectItem>
-                                <SelectItem value="building">Building Materials</SelectItem>
-                                <SelectItem value="other">Other</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
+                          <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel className="font-normal">
+                                Door-to-Door Delivery (£25 per delivery address)
+                              </FormLabel>
+                              <FormDescription>
+                                We'll pick up from your address and deliver directly to the recipient
+                              </FormDescription>
+                            </div>
                           </FormItem>
                         )}
                       />
                       
-                      <FormField
-                        control={form.control}
-                        name="specificItem"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Specific Item</FormLabel>
-                            <FormControl>
-                              <Input placeholder="e.g., Laptop, TV, Sofa" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    
-                    <FormField
-                      control={form.control}
-                      name="otherItemDescription"
-                      render={({ field }) => (
-                        <FormItem className="mt-4">
-                          <FormLabel>Item Description</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              placeholder="Please provide details about your item"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
+                      {form.watch('doorToDoor') && (
+                        <div className="mt-4 space-y-4 border-t pt-4">
+                          <div className="font-medium">Delivery Addresses</div>
+                          {additionalAddresses.map((address, index) => (
+                            <div key={index} className="flex items-start gap-2">
+                              <Textarea 
+                                value={address}
+                                onChange={(e) => updateDeliveryAddress(index, e.target.value)}
+                                placeholder={`Delivery address ${index + 1}`}
+                                className="flex-grow"
+                              />
+                              {index > 0 && (
+                                <Button 
+                                  type="button" 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => removeDeliveryAddress(index)}
+                                >
+                                  Remove
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                          
+                          <Button 
+                            type="button"
+                            variant="outline"
+                            onClick={addDeliveryAddress}
+                            className="mt-2"
+                          >
+                            Add Another Address
+                          </Button>
+                        </div>
                       )}
-                    />
+                      
+                      <div className="flex flex-col space-y-4">
+                        <Link 
+                          to="/custom-quote"
+                          className="w-full"
+                        >
+                          <Button className="w-full" variant="secondary">
+                            Request Custom Quote for Other Items
+                          </Button>
+                        </Link>
+                        
+                        <Link
+                          to="/pricing"
+                          className="text-blue-600 hover:underline text-center"
+                        >
+                          View Items We Ship
+                        </Link>
+                      </div>
+                    </div>
                   </div>
                 )}
-                
-                {/* Additional Services Section */}
-                <div className="border rounded-md p-4">
-                  <div className="font-medium mb-4">Additional Services</div>
-                  
-                  <FormField
-                    control={form.control}
-                    name="doorToDoor"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel className="font-normal">
-                            Door-to-Door Delivery (£25)
-                          </FormLabel>
-                          <FormDescription>
-                            We'll pick up from your address and deliver directly to the recipient
-                          </FormDescription>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                
-                {/* Payment Option Section */}
-                <div className="border rounded-md p-4">
-                  <div className="font-medium mb-4">Payment Option</div>
-                  
-                  <FormField
-                    control={form.control}
-                    name="paymentOption"
-                    render={({ field }) => (
-                      <FormItem className="space-y-3">
-                        <FormControl>
-                          <RadioGroup
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                            className="flex flex-col space-y-1"
-                          >
-                            <FormItem className="flex items-center space-x-3 space-y-0">
-                              <FormControl>
-                                <RadioGroupItem value="standard" />
-                              </FormControl>
-                              <FormLabel className="font-normal">
-                                Discount Deal (Pay Now)
-                              </FormLabel>
-                            </FormItem>
-                            <FormItem className="flex items-center space-x-3 space-y-0">
-                              <FormControl>
-                                <RadioGroupItem value="payLater" />
-                              </FormControl>
-                              <FormLabel className="font-normal">
-                                Standard Rate
-                              </FormLabel>
-                            </FormItem>
-                          </RadioGroup>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
                 
                 <div className="flex justify-between">
                   <Button 
@@ -820,64 +954,100 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
                     type="button"
                     onClick={() => setActiveTab('payment')}
                   >
-                    Next: Payment
+                    Next: Booking Summary
                   </Button>
                 </div>
               </TabsContent>
               
-              {/* Payment Section */}
+              {/* Booking Summary Section */}
               <TabsContent value="payment" className="space-y-6">
-                <div className="text-xl font-semibold mb-4">Payment Method</div>
+                <div className="text-xl font-semibold mb-4 flex items-center">
+                  <ClipboardList className="h-5 w-5 mr-2" />
+                  Booking Summary
+                </div>
+                
+                <div className="border rounded-md p-4">
+                  <h3 className="font-medium mb-4">Order Summary</h3>
+                  
+                  {form.watch('includeDrums') && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span>Drums ({form.watch('drumQuantity') || '1'} × {
+                          parseInt(form.watch('drumQuantity') || '1') >= 5 ? '£220' : 
+                          parseInt(form.watch('drumQuantity') || '1') >= 2 ? '£240' : '£260'
+                        })</span>
+                        <span>£{
+                          parseInt(form.watch('drumQuantity') || '1') >= 5 ? 
+                            parseInt(form.watch('drumQuantity') || '1') * 220 : 
+                          parseInt(form.watch('drumQuantity') || '1') >= 2 ? 
+                            parseInt(form.watch('drumQuantity') || '1') * 240 : 260
+                        }</span>
+                      </div>
+                      
+                      {form.watch('wantMetalSeal') && (
+                        <div className="flex justify-between">
+                          <span>Metal Coded Seals ({form.watch('drumQuantity') || '1'} × £5)</span>
+                          <span>£{parseInt(form.watch('drumQuantity') || '1') * 5}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {form.watch('doorToDoor') && (
+                    <div className="flex justify-between mt-2">
+                      <span>Door-to-Door Delivery ({additionalAddresses.filter(a => a.trim() !== '').length || 1} address{additionalAddresses.filter(a => a.trim() !== '').length > 1 ? 'es' : ''})</span>
+                      <span>£{(additionalAddresses.filter(a => a.trim() !== '').length || 1) * 25}</span>
+                    </div>
+                  )}
+                  
+                  {!form.watch('includeDrums') && !form.watch('includeOtherItems') && (
+                    <div className="text-gray-500">No items selected yet</div>
+                  )}
+                  
+                  <div className="border-t mt-4 pt-4">
+                    <div className="flex justify-between font-medium text-lg">
+                      <span>Total</span>
+                      <span>£{calculateTotal()}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <Alert className="bg-gray-50 dark:bg-gray-700">
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    Please review your items and confirm if everything is correct, then click Submit to continue.
+                  </AlertDescription>
+                </Alert>
+                
+                <FormField
+                  control={form.control}
+                  name="paymentOption"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormControl>
+                        <input
+                          type="hidden"
+                          value={field.value}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
                 
                 <FormField
                   control={form.control}
                   name="paymentMethod"
                   render={({ field }) => (
-                    <FormItem className="space-y-3">
-                      <FormLabel>Select Payment Method</FormLabel>
+                    <FormItem className="hidden">
                       <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          className="flex flex-col space-y-1"
-                        >
-                          <FormItem className="flex items-center space-x-3 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="card" />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                              Credit/Debit Card
-                            </FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-3 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="bank" />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                              Bank Transfer
-                            </FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-3 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem value="crypto" />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                              Cryptocurrency
-                            </FormLabel>
-                          </FormItem>
-                        </RadioGroup>
+                        <input
+                          type="hidden"
+                          value={field.value}
+                        />
                       </FormControl>
-                      <FormMessage />
                     </FormItem>
                   )}
                 />
-                
-                <Alert className="bg-gray-50 dark:bg-gray-700">
-                  <Info className="h-4 w-4" />
-                  <AlertDescription>
-                    Your payment method will be used to process payment after reviewing your shipment details.
-                  </AlertDescription>
-                </Alert>
                 
                 <div className="flex justify-between">
                   <Button 
