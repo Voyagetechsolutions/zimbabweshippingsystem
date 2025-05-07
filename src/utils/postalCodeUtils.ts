@@ -44,7 +44,6 @@ export const postalCodeToRouteMap: Record<string, string> = {
   'SP': 'CARDIFF ROUTE',
   // Bournemouth area
   'SO': 'BOURNEMOUTH ROUTE',
-  'OX': 'BOURNEMOUTH ROUTE',
   'PO': 'BOURNEMOUTH ROUTE',
   'RG': 'BOURNEMOUTH ROUTE',
   'GU': 'BOURNEMOUTH ROUTE',
@@ -235,4 +234,3 @@ export const getIrelandRouteForCity = (city: string): string | null => {
   // Look up the route based on the city
   return irelandCityToRouteMap[formattedCity] || null;
 };
-
