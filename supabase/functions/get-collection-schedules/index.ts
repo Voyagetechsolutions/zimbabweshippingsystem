@@ -23,9 +23,15 @@ serve(async (req) => {
     // Get collection schedules
     const { data, error } = await supabaseClient
       .from('collection_schedules')
-      .select('*');
+      .select('*')
+      .order('created_at', { ascending: false });
     
-    if (error) throw error;
+    if (error) {
+      console.error("Error fetching collection schedules:", error);
+      throw error;
+    }
+    
+    console.log(`Retrieved ${data?.length || 0} collection schedules`);
     
     return new Response(
       JSON.stringify({ data }),

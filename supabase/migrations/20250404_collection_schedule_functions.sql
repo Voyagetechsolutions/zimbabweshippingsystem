@@ -33,7 +33,7 @@ EXCEPTION
 END;
 $$;
 
--- Function to update route date
+-- Function to update route date - IMPROVED to handle date format correctly
 CREATE OR REPLACE FUNCTION public.update_route_date(route_name text, new_date text)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -41,7 +41,8 @@ SECURITY DEFINER
 AS $$
 BEGIN
   UPDATE public.collection_schedules
-  SET pickup_date = new_date
+  SET pickup_date = new_date,
+      updated_at = now()
   WHERE route = route_name;
   
   RETURN FOUND;
@@ -85,7 +86,7 @@ EXCEPTION
 END;
 $$;
 
--- Function to add an area to a route
+-- Function to add an area to a route - IMPROVED to handle area updates correctly
 CREATE OR REPLACE FUNCTION public.add_area_to_route(route_name text, area_name text)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -93,7 +94,8 @@ SECURITY DEFINER
 AS $$
 BEGIN
   UPDATE public.collection_schedules
-  SET areas = array_append(areas, area_name)
+  SET areas = array_append(areas, area_name),
+      updated_at = now()
   WHERE route = route_name
   AND NOT area_name = ANY(areas);
   
@@ -112,7 +114,8 @@ SECURITY DEFINER
 AS $$
 BEGIN
   UPDATE public.collection_schedules
-  SET areas = array_remove(areas, area_name)
+  SET areas = array_remove(areas, area_name),
+      updated_at = now()
   WHERE route = route_name
   AND area_name = ANY(areas);
   

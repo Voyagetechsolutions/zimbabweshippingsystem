@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Calendar as CalendarIcon, Plus, Trash2, Edit, Save, X } from 'lucide-react';
@@ -84,7 +83,7 @@ const CollectionScheduleManagement: React.FC = () => {
     ? schedules
     : schedules.filter(schedule => schedule.country === countryFilter);
 
-  // Handle date selection for a route
+  // Handle date selection for a route - FIXED to ensure dates are properly formatted and saved
   const handleDateSelect = async (route: string, date: Date | undefined) => {
     if (!date) return;
     
@@ -97,12 +96,31 @@ const CollectionScheduleManagement: React.FC = () => {
     setIsLoading(true);
     
     try {
-      // Update the date in our collection and database
+      console.log(`Updating route ${route} to date: ${formattedDate}`);
+      
+      // Direct call to Supabase
+      const { data, error } = await supabase
+        .rpc('update_route_date', {
+          route_name: route,
+          new_date: formattedDate
+        });
+      
+      if (error) throw error;
+      
+      // Update the date in our collection
       const success = await updateRouteDate(route, formattedDate);
       
       if (success) {
         // Update local state
-        setSchedules([...collectionSchedules]);
+        setSchedules(prevSchedules => {
+          return prevSchedules.map(schedule => {
+            if (schedule.route === route) {
+              return { ...schedule, date: formattedDate };
+            }
+            return schedule;
+          });
+        });
+        
         setEditingRoute(null);
         setSelectedDate(undefined);
         
@@ -110,6 +128,10 @@ const CollectionScheduleManagement: React.FC = () => {
           title: "Date Updated",
           description: `The collection date for ${route} has been updated to ${formattedDate}.`,
         });
+        
+        // Refresh schedules from database
+        await syncSchedulesWithDatabase();
+        setSchedules([...collectionSchedules]);
       } else {
         throw new Error("Failed to update date");
       }
@@ -269,7 +291,7 @@ const CollectionScheduleManagement: React.FC = () => {
     }
   };
 
-  // Add an area to a route
+  // Add an area to a route - FIXED to ensure immediate UI update
   const handleAddArea = async (route: string) => {
     if (!newArea || isLoading) {
       toast({
@@ -283,15 +305,43 @@ const CollectionScheduleManagement: React.FC = () => {
     setIsLoading(true);
     
     try {
+      console.log(`Adding area ${newArea} to route ${route}`);
+      
+      // Direct call to Supabase
+      const { data, error } = await supabase
+        .rpc('add_area_to_route', {
+          route_name: route,
+          area_name: newArea.toUpperCase()
+        });
+      
+      if (error) throw error;
+      
       const success = await addAreaToRoute(route, newArea.toUpperCase());
       
       if (success) {
-        setSchedules([...collectionSchedules]);
+        // Update local state immediately
+        setSchedules(prevSchedules => {
+          return prevSchedules.map(schedule => {
+            if (schedule.route === route) {
+              return { 
+                ...schedule, 
+                areas: [...schedule.areas, newArea.toUpperCase()]
+              };
+            }
+            return schedule;
+          });
+        });
+        
         setNewArea('');
+        
         toast({
           title: "Area Added",
           description: `${newArea.toUpperCase()} has been added to ${route}.`,
         });
+        
+        // Refresh schedules from database
+        await syncSchedulesWithDatabase();
+        setSchedules([...collectionSchedules]);
       } else {
         throw new Error("Could not add area to route");
       }
@@ -307,21 +357,48 @@ const CollectionScheduleManagement: React.FC = () => {
     }
   };
 
-  // Remove an area from a route
+  // Remove an area from a route - FIXED to ensure immediate UI update
   const handleRemoveArea = async (route: string, area: string) => {
     if (isLoading) return;
     
     setIsLoading(true);
     
     try {
+      console.log(`Removing area ${area} from route ${route}`);
+      
+      // Direct call to Supabase
+      const { data, error } = await supabase
+        .rpc('remove_area_from_route', {
+          route_name: route,
+          area_name: area
+        });
+      
+      if (error) throw error;
+      
       const success = await removeAreaFromRoute(route, area);
       
       if (success) {
-        setSchedules([...collectionSchedules]);
+        // Update local state immediately
+        setSchedules(prevSchedules => {
+          return prevSchedules.map(schedule => {
+            if (schedule.route === route) {
+              return { 
+                ...schedule, 
+                areas: schedule.areas.filter(a => a !== area)
+              };
+            }
+            return schedule;
+          });
+        });
+        
         toast({
           title: "Area Removed",
           description: `${area} has been removed from ${route}.`,
         });
+        
+        // Refresh schedules from database
+        await syncSchedulesWithDatabase();
+        setSchedules([...collectionSchedules]);
       } else {
         throw new Error("Failed to remove area from route");
       }
