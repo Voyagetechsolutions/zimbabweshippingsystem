@@ -973,14 +973,14 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span>Drums ({form.watch('drumQuantity') || '1'} × {
-                          parseInt(form.watch('drumQuantity') || '1') >= 5 ? '£220' : 
-                          parseInt(form.watch('drumQuantity') || '1') >= 2 ? '£240' : '£260'
+                          parseInt(form.watch('drumQuantity') || '1') >= 5 ? '£260' : 
+                          parseInt(form.watch('drumQuantity') || '1') >= 2 ? '£270' : '£280'
                         })</span>
                         <span>£{
                           parseInt(form.watch('drumQuantity') || '1') >= 5 ? 
-                            parseInt(form.watch('drumQuantity') || '1') * 220 : 
+                            parseInt(form.watch('drumQuantity') || '1') * 240 : 
                           parseInt(form.watch('drumQuantity') || '1') >= 2 ? 
-                            parseInt(form.watch('drumQuantity') || '1') * 240 : 260
+                            parseInt(form.watch('drumQuantity') || '1') * 250 : 260
                         }</span>
                       </div>
                       
