@@ -60,10 +60,10 @@ const QuickShippingCalculator = () => {
           <div className="bg-gray-50 p-3 rounded-md text-sm space-y-2">
             <p className="font-medium">Volume Discounts:</p>
             <ul className="list-disc pl-5 space-y-1">
-              <li>1 Drum: £240 each</li>
-              <li>2-4 Drums: £230 each</li>
-              <li>5-9 Drums: £220 each</li>
-              <li>10+ Drums: £200 each</li>
+              <li>1 Drum: £260 each</li>
+              <li>2-4 Drums: £250 each</li>
+              <li>5-9 Drums: £240 each</li>
+              
             </ul>
           </div>
           
