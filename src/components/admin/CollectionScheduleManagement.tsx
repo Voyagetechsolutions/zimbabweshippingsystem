@@ -84,7 +84,7 @@ const CollectionScheduleManagement: React.FC = () => {
     ? schedules
     : schedules.filter(schedule => schedule.country === countryFilter);
 
-  // Handle date selection for a route - FIXED to ensure dates are properly formatted and saved
+  // Handle date selection for a route - Improved to ensure dates are properly formatted and saved
   const handleDateSelect = async (route: string, date: Date | undefined) => {
     if (!date) return;
     
@@ -92,7 +92,7 @@ const CollectionScheduleManagement: React.FC = () => {
     const day = date.getDate();
     const suffix = getOrdinalSuffix(day);
     const month = date.toLocaleString('default', { month: 'long' });
-    const formattedDate = `${day}${suffix} of ${month}`;
+    const formattedDate = `${day < 10 ? '0' + day : day}${suffix} of ${month}`;
     
     setIsLoading(true);
     
@@ -150,12 +150,12 @@ const CollectionScheduleManagement: React.FC = () => {
     }
   };
 
-  // Convert date string to Date object
+  // Convert date string to Date object - Improved to handle special messages
   const parseRouteDate = (dateStr: string): Date | undefined => {
-    // Handle empty date
-    if (!dateStr || dateStr === "No date available") return undefined;
+    // Handle empty date or special messages
+    if (!dateStr || dateStr === "No date available" || dateStr.includes("contact support")) return undefined;
     
-    // Extract the day and month from string like "21st of April"
+    // Extract the day and month from string like "21st of April" or "01st of July"
     const match = dateStr.match(/(\d+)(?:st|nd|rd|th) of (\w+)/);
     if (!match) return undefined;
     
@@ -203,7 +203,7 @@ const CollectionScheduleManagement: React.FC = () => {
     const day = newRouteDate.getDate();
     const suffix = getOrdinalSuffix(day);
     const month = newRouteDate.toLocaleString('default', { month: 'long' });
-    const formattedDate = `${day}${suffix} of ${month}`;
+    const formattedDate = `${day < 10 ? '0' + day : day}${suffix} of ${month}`;
     
     // Parse areas from comma-separated string
     const areas = newRouteAreas

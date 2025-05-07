@@ -20,11 +20,13 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
     );
     
+    console.log("Fetching collection schedules from database");
+    
     // Get collection schedules
     const { data, error } = await supabaseClient
       .from('collection_schedules')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('updated_at', { ascending: false });
     
     if (error) {
       console.error("Error fetching collection schedules:", error);
@@ -33,6 +35,7 @@ serve(async (req) => {
     
     console.log(`Retrieved ${data?.length || 0} collection schedules`);
     
+    // Return the data with CORS headers
     return new Response(
       JSON.stringify({ data }),
       {

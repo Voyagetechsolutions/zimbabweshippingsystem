@@ -12,67 +12,67 @@ export interface RouteSchedule {
 export const collectionSchedules: RouteSchedule[] = [
   {
     route: "CARDIFF ROUTE",
-    date: "21st of April",
+    date: "30th of June",
     areas: ["CARDIFF", "GLOUCESTER", "BRISTOL", "SWINDON", "BATH", "SALISBURY"],
     country: "England"
   },
   {
     route: "BOURNEMOUTH ROUTE",
-    date: "22nd of April",
+    date: "01st of July",
     areas: ["SOUTHAMPTON", "OXFORD", "HAMPHIRE", "READING", "GUILFORD", "PORTSMOUTH"],
     country: "England"
   },
   {
     route: "BIRMINGHAM ROUTE",
-    date: "24th of April",
+    date: "26th of June",
     areas: ["WOLVEHAMPTON", "COVENTRY", "WARWICK", "DUDLEY", "WALSALL", "RUGBY"],
     country: "England"
   },
   {
     route: "LONDON ROUTE",
-    date: "19th of April",
+    date: "28th of June",
     areas: ["CENTRAL LONDON", "HEATHROW", "EAST LONDON", "ROMFORD", "ALL AREAS INSIDE M25"],
     country: "England"
   },
   {
     route: "LEEDS ROUTE",
-    date: "17th of April",
+    date: "24th of June",
     areas: ["WAKEFIELD", "HALIFAX", "DONCASTER", "SHEFFIELD", "HUDDERSFIELD", "YORK"],
     country: "England"
   },
   {
     route: "NOTTINGHAM ROUTE",
-    date: "18th of April",
+    date: "27th of June",
     areas: ["LIECESTER", "DERBY", "PETERSBOROUGH", "CORBY", "MARKET HARB"],
     country: "England"
   },
   {
     route: "MANCHESTER ROUTE",
-    date: "26th of April",
+    date: "05th of July",
     areas: ["LIVERPOOL", "STOKE ON TRENT", "BOLTON", "WARRINGTON", "OLDHAM", "SHREWBURY"],
     country: "England"
   },
   {
     route: "BRIGHTON ROUTE",
-    date: "28th of April",
+    date: "03rd of July",
     areas: ["HIGH COMBE", "SLOUGH", "VRAWLEY", "LANCING", "EASTBOURNE", "CANTEBURY"],
     country: "England"
   },
   {
     route: "SOUTHEND ROUTE",
-    date: "29th of April",
+    date: "07th of July",
     areas: ["NORWICH", "IPSWICH", "COLCHESTER", "BRAINTREE", "CAMBRIDGE", "BASILDON"],
     country: "England"
   },
   {
     route: "NORTHAMPTON ROUTE",
-    date: "16th of April",
+    date: "23rd of June",
     areas: ["KETTERING", "BEDFORD", "MILTON KEYNES", "BANBURY", "AYLESBURY", "LUTON"],
     country: "England"
   },
   {
     route: "SCOTLAND ROUTE",
-    date: "30th of April",
+    date: "Please contact support to place booking",
     areas: ["GLASSGOW", "EDINBURGH", "NECASTLE", "MIDDLESBROUGH", "PRESTON", "CARLLSLE"],
     country: "England"
   },
@@ -164,7 +164,7 @@ export async function syncSchedulesWithDatabase() {
       // Clear the local array and populate with data from the database
       collectionSchedules.length = 0;
       
-      result.data.forEach((item: CollectionSchedule) => {
+      result.data.forEach((item: any) => {
         collectionSchedules.push({
           route: item.route,
           date: item.pickup_date,
@@ -229,7 +229,7 @@ export function getDateByRouteAndArea(routeName: string, areaName: string): stri
   return route?.date || "No date available";
 }
 
-// Update route date for a specific route and sync with database - FIXED to properly update the database
+// Update route date for a specific route and sync with database - Fixed to properly update the database
 export async function updateRouteDate(routeName: string, newDate: string): Promise<boolean> {
   try {
     console.log(`Updating route date for ${routeName} to ${newDate}`);
@@ -240,9 +240,12 @@ export async function updateRouteDate(routeName: string, newDate: string): Promi
       collectionSchedules[index].date = newDate;
       
       // Sync with database using direct table update
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('collection_schedules')
-        .update({ pickup_date: newDate, updated_at: new Date().toISOString() })
+        .update({ 
+          pickup_date: newDate,
+          updated_at: new Date().toISOString()
+        })
         .eq('route', routeName);
       
       if (error) {
