@@ -1,368 +1,357 @@
 
-import React, { useRef, useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { CalendarClock, CheckCircle2, FileText, Printer, Mail, Loader, User, Phone, MapPin } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import html2pdf from 'html2pdf.js';
+import React, { useEffect } from 'react';
+import { useLocation, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import Logo from '@/components/Logo';
-import CollectionInfo from '@/components/CollectionInfo';
-
-interface Shipment {
-  id: string;
-  tracking_number: string;
-  origin: string;
-  destination: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  user_id: string;
-  metadata: any | null;
-}
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { CheckCircle2, Printer, ArrowRight, MapPin, Calendar, Package } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useShipping } from '@/contexts/ShippingContext';
+import { supabase } from '@/integrations/supabase/client';
 
 const ConfirmBooking = () => {
   const location = useLocation();
-  const navigate = useNavigate();
+  const { bookingData, paymentData, customQuoteData } = location.state || {};
   const { toast } = useToast();
-  const printRef = useRef<HTMLDivElement>(null);
-  const [isCollectionInfoLoading, setIsCollectionInfoLoading] = useState(true);
-  const [collectionInfo, setCollectionInfo] = useState<{ route: string | null; collectionDate: string | null }>({
-    route: null,
-    collectionDate: null
-  });
-  
-  // Cast the bookingData to Shipment interface
-  const bookingData: Shipment = location.state?.bookingData || {};
-  const paymentData = location.state?.paymentData || {};
-  
-  // Debug logs to help identify issues
-  console.log('Booking Data:', bookingData);
-  console.log('Payment Data:', paymentData);
-  console.log('Collection Info:', collectionInfo);
-  
-  // Get the contact information exactly as in AdminDashboardContent.tsx
-  const getShipmentContactInfo = (shipment: Shipment) => {
-    const metadata = shipment.metadata || {};
-    return {
-      senderName: metadata.senderName || metadata.firstName || metadata.sender?.name || "Not provided",
-      senderPhone: metadata.senderPhone || metadata.phone || metadata.sender?.phone || "Not provided",
-      senderEmail: metadata.senderEmail || metadata.email || metadata.sender?.email || "Not provided",
-      senderAddress: metadata.senderAddress || metadata.pickupAddress || metadata.sender?.address || "Not provided",
-      recipientName: metadata.recipientName || metadata.recipient?.name || "Not provided",
-      recipientPhone: metadata.recipientPhone || metadata.recipient?.phone || "Not provided",
-      additionalRecipientPhone: metadata.additionalRecipientPhone || metadata.recipient?.additionalPhone || null,
-      recipientAddress: metadata.recipientAddress || metadata.deliveryAddress || metadata.recipient?.address || "Not provided"
-    };
-  };
-  
-  // Get the contact information
-  const contactInfo = getShipmentContactInfo(bookingData);
-  
-  if (!bookingData || Object.keys(bookingData).length === 0) {
-    return (
-      <>
-        <Navbar />
-        <div className="container mx-auto py-20 text-center">
-          <h1 className="text-2xl font-bold mb-4">No Booking Information</h1>
-          <p className="mb-8">We couldn't find any booking details. Please try making a booking first.</p>
-          <Button onClick={() => navigate('/book-shipment')}>
-            Book a Shipment
-          </Button>
-        </div>
-        <Footer />
-      </>
-    );
-  }
-  
-  // Extract tracking number directly from the shipment data as done in AdminDashboardContent.tsx
-  const trackingNumber = bookingData.tracking_number || 'Pending Assignment';
-  
-  // Get country and postal code for collection info
-  const pickupCountry = bookingData.metadata?.pickupCountry || 'England';
-  const pickupPostcode = bookingData.metadata?.pickupPostcode || '';
-  const pickupCity = bookingData.metadata?.pickupCity || '';
-  
-  // Payment details
-  const baseAmount = paymentData.originalAmount || paymentData.finalAmount || 0;
-  const paymentMethod = paymentData.method || 'standard';
-  const finalAmount = paymentData.finalAmount || baseAmount;
-  const payOnArrivalAmount = (baseAmount * 1.2).toFixed(2);
-  
-  // Handle when collection info is ready
-  const handleCollectionInfoReady = (info: { route: string | null; collectionDate: string | null }) => {
-    console.log("Collection info received:", info);
-    setCollectionInfo(info);
-    setIsCollectionInfoLoading(false);
-  };
-  
-  // Generate payment instructions based on payment method
-  let paymentInstructions = '';
-  if (paymentMethod === 'standard' || paymentMethod === 'bankTransfer' || paymentMethod === 'payLater') {
-    paymentInstructions = "You selected the standard payment method. For direct debit and bank transfer, please contact Mr. Moyo at +44 7984 099041. Reference: Your tracking number or surname and initials.";
-  } else if (paymentMethod === 'cashOnCollection') {
-    paymentInstructions = `Payment is required upon collection of the items. Amount Due: £${finalAmount.toFixed(2)} payable on the ${collectionInfo.collectionDate || 'collection date'}.`;
-  } else if (paymentMethod === 'payOnArrival') {
-    paymentInstructions = `Goods will be kept in our warehouse in Zimbabwe until payment of: £${payOnArrivalAmount} (including 20% premium).`;
-  }
-  
-  const handlePrint = () => {
-    window.print();
-  };
-  
-  const handleDownload = () => {
-    if (printRef.current) {
-      const element = printRef.current;
-      const opt = {
-        margin: 10,
-        filename: `Zimbabwe-Shipping-Confirmation-${trackingNumber}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      };
-      
+  const { formatPrice } = useShipping();
+
+  useEffect(() => {
+    // Set the page title
+    document.title = 'Booking Confirmation | UK to Zimbabwe Shipping';
+
+    // If there's no booking data, show an error
+    if (!bookingData) {
       toast({
-        title: "Preparing download...",
-        description: "Your confirmation is being prepared for download.",
-      });
-      
-      html2pdf().from(element).set(opt).save().then(() => {
-        toast({
-          title: "Download complete",
-          description: "Your confirmation has been downloaded successfully.",
-        });
+        title: "Error",
+        description: "No booking data found. Please try again.",
+        variant: "destructive"
       });
     }
-  };
-  
-  const handleEmail = () => {
-    // In a real implementation, this would send the email through a backend service
-    toast({
-      title: "Email feature coming soon",
-      description: "The email feature is not yet implemented. Please use the download option for now.",
-    });
-  };
-  
-  // If still loading collection info, show a loading state
-  if (isCollectionInfoLoading) {
+
+    // If this is a successful booking, create a receipt
+    const createReceipt = async () => {
+      if (bookingData && paymentData && bookingData.paymentCompleted) {
+        try {
+          const receiptData = {
+            shipment_id: bookingData.shipment_id,
+            payment_id: paymentData?.id,
+            user_id: bookingData.user_id,
+            amount: paymentData.finalAmount,
+            currency: paymentData.currency || 'GBP',
+            payment_method: paymentData.method,
+            status: 'completed',
+            sender_details: bookingData.senderDetails,
+            recipient_details: bookingData.recipientDetails,
+            shipment_details: bookingData.shipmentDetails,
+            payment_info: paymentData,
+            collection_info: {
+              route: bookingData.collectionRoute || bookingData.collection?.route,
+              date: bookingData.collectionDate || bookingData.collection?.date
+            }
+          };
+
+          const { error } = await supabase
+            .from('receipts')
+            .insert(receiptData);
+
+          if (error) {
+            console.error('Error creating receipt:', error);
+          }
+        } catch (err) {
+          console.error('Error in receipt creation:', err);
+        }
+      }
+    };
+
+    createReceipt();
+  }, [bookingData, paymentData, toast]);
+
+  // Handle cases where booking data is missing
+  if (!bookingData) {
     return (
       <>
         <Navbar />
-        <div className="container mx-auto py-20 text-center">
-          <Loader className="h-8 w-8 mx-auto animate-spin text-primary mb-4" />
-          <h1 className="text-2xl font-bold mb-4">Preparing Your Confirmation</h1>
-          <p className="mb-8">Please wait while we retrieve your collection information...</p>
-          
-          {/* Mount the CollectionInfo component to start data loading, but make it invisible */}
-          <div className="sr-only">
-            <CollectionInfo
-              country={pickupCountry}
-              postalCode={pickupPostcode}
-              city={pickupCity}
-              onCollectionInfoReady={handleCollectionInfoReady}
-            />
+        <main className="min-h-screen bg-gray-50 py-12 px-4">
+          <div className="container mx-auto max-w-4xl text-center">
+            <h1 className="text-3xl md:text-4xl font-bold mb-6">Booking Error</h1>
+            <p className="text-lg mb-8">Unable to find your booking details. Please try again or contact support.</p>
+            <Link to="/book-shipment">
+              <Button>Return to Booking</Button>
+            </Link>
           </div>
-        </div>
+        </main>
         <Footer />
       </>
     );
   }
 
-  // Collection information with fallbacks
-  const collectionDate = collectionInfo.collectionDate || 'Next available collection date';
-  const route = collectionInfo.route || 'Standard Route';
+  // Extract shipment details from booking data
+  const senderName = `${bookingData.firstName || ''} ${bookingData.lastName || ''}`;
+  const shipmentType = bookingData.includeDrums ? 'Drum Shipping' : bookingData.shipmentType === 'parcel' ? 'Parcel' : 'Custom Items';
+  const trackingNumber = bookingData.shipmentDetails?.tracking_number || '';
+  const deliveryCity = bookingData.deliveryCity || bookingData.recipientDetails?.address?.split(',').pop()?.trim() || 'Zimbabwe';
   
+  // Calculate prices
+  const basePrice = bookingData.shipmentDetails?.price || 0;
+  const additionalServices = bookingData.shipmentDetails?.services || [];
+  const additionalServicesTotal = additionalServices.reduce((total: number, service: any) => total + (service.price || 0), 0);
+  const totalAmount = bookingData.paymentCompleted ? (paymentData?.finalAmount || 0) : (basePrice + additionalServicesTotal);
+
   return (
     <>
       <Navbar />
-      <div className="container mx-auto py-8 px-4">
-        <div className="mb-6">
-          <Button
-            variant="outline"
-            onClick={() => navigate('/dashboard')}
-            className="mb-4"
-          >
-            Back to Dashboard
-          </Button>
-          
-          <div className="print:hidden flex flex-wrap gap-2 justify-end mb-4">
-            <Button 
-              variant="outline" 
-              onClick={handlePrint}
-              className="flex items-center gap-2"
-            >
-              <Printer className="h-4 w-4" />
-              Print
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleDownload}
-              className="flex items-center gap-2"
-            >
-              <FileText className="h-4 w-4" />
-              Download PDF
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleEmail}
-              className="flex items-center gap-2"
-            >
-              <Mail className="h-4 w-4" />
-              Email
-            </Button>
-          </div>
-        </div>
-        
-        <div ref={printRef} className="max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-md print:shadow-none">
-          <div className="text-center mb-6">
-            <img
-              src="/lovable-uploads/f662f2d7-317f-42a5-afdc-43dfa2d4e82c.png"
-              alt="Zimbabwe Shipping"
-              className="h-32 mx-auto mb-4"
-            />
-          </div>
-          
-          <div className="text-center border-b pb-6 mb-6">
-            <div className="flex justify-center items-center mb-4">
-              <CheckCircle2 className="h-12 w-12 text-green-500" />
+      <main className="min-h-screen bg-gray-50 py-12 px-4">
+        <div className="container mx-auto max-w-4xl">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
+              <CheckCircle2 className="h-8 w-8 text-green-600" />
             </div>
-            <h1 className="text-3xl font-bold text-gray-900">Booking Confirmation</h1>
-            <p className="text-xl text-gray-600">Your booking has been successfully completed</p>
-          </div>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Confirmation Message</CardTitle>
-            </CardHeader>
-            <CardContent className="text-gray-700">
-              <p className="mb-4">
-                Thank You <span className="font-semibold">{contactInfo.senderName}</span>, Your booking is successful. 
-                Goods will be collected on <span className="font-semibold">{collectionDate}</span> from 
-                the Sender Address, and we will contact you on <span className="font-semibold">{contactInfo.senderPhone}</span>. 
-                Your tracking number is <span className="font-semibold">{trackingNumber}</span>. 
-                Your payment status is currently 'Pending.' Payment will be required on or before the day of 
-                collection. Cash on Collection clients will be required to be on standby with the cash on the day of pickup.
-              </p>
-            </CardContent>
-          </Card>
-          
-          {/* Sender Information Card */}
-          <Card className="mt-6">
-            <CardHeader className="bg-gray-50">
-              <CardTitle className="flex items-center">
-                <User className="mr-2 h-5 w-5 text-gray-500" />
-                Sender Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-gray-700 pt-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="flex items-center mb-2">
-                    <User className="mr-2 h-4 w-4 text-gray-500" />
-                    <span className="font-semibold">Name:</span> 
-                    <span className="ml-2">{contactInfo.senderName}</span>
-                  </p>
-                  <p className="flex items-center mb-2">
-                    <Phone className="mr-2 h-4 w-4 text-gray-500" />
-                    <span className="font-semibold">Phone:</span> 
-                    <span className="ml-2">{contactInfo.senderPhone}</span>
-                  </p>
-                </div>
-                <div>
-                  <p className="flex items-center mb-2">
-                    <Mail className="mr-2 h-4 w-4 text-gray-500" />
-                    <span className="font-semibold">Email:</span> 
-                    <span className="ml-2">{contactInfo.senderEmail}</span>
-                  </p>
-                  <p className="flex items-center">
-                    <MapPin className="mr-2 h-4 w-4 text-gray-500" />
-                    <span className="font-semibold">Address:</span> 
-                    <span className="ml-2">{contactInfo.senderAddress}</span>
-                  </p>
-                </div>
+            <h1 className="text-3xl md:text-4xl font-bold mb-2">Booking Confirmed</h1>
+            <p className="text-gray-600">
+              {bookingData.paymentCompleted 
+                ? "Thank you for your booking. Your payment has been processed successfully." 
+                : customQuoteData 
+                  ? "Thank you for your request. We'll contact you with a custom quote soon." 
+                  : "Your booking has been submitted successfully."}
+            </p>
+            
+            {trackingNumber && (
+              <div className="mt-4 bg-gray-100 px-4 py-2 rounded-md inline-block">
+                <span className="font-medium">Tracking Number:</span> {trackingNumber}
               </div>
-            </CardContent>
-          </Card>
-          
-          {/* Receiver Information Card */}
-          <Card className="mt-6">
-            <CardHeader className="bg-gray-50">
-              <CardTitle className="flex items-center">
-                <User className="mr-2 h-5 w-5 text-gray-500" />
-                Receiver Information
-              </CardTitle>
+            )}
+          </div>
+
+          <Card className="mb-6 shadow-md border-gray-200 dark:border-gray-700">
+            <CardHeader className="bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700">
+              <CardTitle className="text-xl">Booking Summary</CardTitle>
             </CardHeader>
-            <CardContent className="text-gray-700 pt-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent className="p-6">
+              <div className="space-y-6">
+                {/* Sender Information */}
                 <div>
-                  <p className="flex items-center mb-2">
-                    <User className="mr-2 h-4 w-4 text-gray-500" />
-                    <span className="font-semibold">Name:</span> 
-                    <span className="ml-2">{contactInfo.recipientName}</span>
-                  </p>
-                  <p className="flex items-center mb-2">
-                    <Phone className="mr-2 h-4 w-4 text-gray-500" />
-                    <span className="font-semibold">Phone:</span> 
-                    <span className="ml-2">{contactInfo.recipientPhone}</span>
-                  </p>
+                  <h3 className="text-lg font-semibold mb-3 flex items-center">
+                    <MapPin className="h-5 w-5 mr-2 text-zim-green" /> Sender Details
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div>
+                      <span className="font-medium">Name:</span> {senderName}
+                    </div>
+                    <div>
+                      <span className="font-medium">Email:</span> {bookingData.email}
+                    </div>
+                    <div>
+                      <span className="font-medium">Phone:</span> {bookingData.phone}
+                    </div>
+                    {bookingData.additionalPhone && (
+                      <div>
+                        <span className="font-medium">Additional Phone:</span> {bookingData.additionalPhone}
+                      </div>
+                    )}
+                    <div>
+                      <span className="font-medium">Address:</span> {bookingData.pickupAddress}
+                    </div>
+                    <div>
+                      <span className="font-medium">City:</span> {bookingData.pickupCity}
+                    </div>
+                    <div>
+                      <span className="font-medium">Postal Code:</span> {bookingData.pickupPostcode}
+                    </div>
+                    <div>
+                      <span className="font-medium">Country:</span> {bookingData.pickupCountry}
+                    </div>
+                  </div>
                 </div>
+                
+                <Separator />
+                
+                {/* Recipient Information */}
                 <div>
-                  {contactInfo.additionalRecipientPhone && (
-                    <p className="flex items-center mb-2">
-                      <Phone className="mr-2 h-4 w-4 text-gray-500" />
-                      <span className="font-semibold">Additional Phone:</span> 
-                      <span className="ml-2">{contactInfo.additionalRecipientPhone}</span>
+                  <h3 className="text-lg font-semibold mb-3 flex items-center">
+                    <MapPin className="h-5 w-5 mr-2 text-zim-green" /> Recipient Details
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div>
+                      <span className="font-medium">Name:</span> {bookingData.recipientName}
+                    </div>
+                    <div>
+                      <span className="font-medium">Phone:</span> {bookingData.recipientPhone}
+                    </div>
+                    {bookingData.additionalRecipientPhone && (
+                      <div>
+                        <span className="font-medium">Additional Phone:</span> {bookingData.additionalRecipientPhone}
+                      </div>
+                    )}
+                    <div className="md:col-span-2">
+                      <span className="font-medium">Delivery Address:</span> {bookingData.deliveryAddress}
+                    </div>
+                    <div>
+                      <span className="font-medium">City:</span> {deliveryCity}
+                    </div>
+                  </div>
+                </div>
+                
+                <Separator />
+                
+                {/* Collection Information */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 flex items-center">
+                    <Calendar className="h-5 w-5 mr-2 text-zim-green" /> Collection Information
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div>
+                      <span className="font-medium">Route:</span> {bookingData.collectionRoute || "Not specified"}
+                    </div>
+                    <div>
+                      <span className="font-medium">Collection Date:</span> {bookingData.collectionDate || "Not specified"}
+                    </div>
+                  </div>
+                </div>
+                
+                <Separator />
+                
+                {/* Shipment Details */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 flex items-center">
+                    <Package className="h-5 w-5 mr-2 text-zim-green" /> Shipment Details
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                    <div>
+                      <span className="font-medium">Shipment Type:</span> {shipmentType}
+                    </div>
+                    
+                    {bookingData.includeDrums && (
+                      <div>
+                        <span className="font-medium">Number of Drums:</span> {bookingData.drumQuantity || '1'}
+                      </div>
+                    )}
+                    
+                    {bookingData.includeOtherItems && (
+                      <>
+                        <div>
+                          <span className="font-medium">Category:</span> {bookingData.itemCategory || 'Not specified'}
+                        </div>
+                        {bookingData.specificItem && (
+                          <div>
+                            <span className="font-medium">Item:</span> {bookingData.specificItem}
+                          </div>
+                        )}
+                        {bookingData.otherItemDescription && (
+                          <div className="md:col-span-2">
+                            <span className="font-medium">Description:</span> {bookingData.otherItemDescription}
+                          </div>
+                        )}
+                      </>
+                    )}
+                    
+                    {customQuoteData && (
+                      <div className="md:col-span-2">
+                        <span className="font-medium">Custom Quote Request:</span> A representative will contact you with a quote.
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <Separator />
+                
+                {/* Services */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Additional Services</h3>
+                  <ul className="space-y-2 text-sm">
+                    {bookingData.doorToDoor && (
+                      <li className="flex justify-between">
+                        <span>Door-to-Door Delivery</span>
+                        <span className="font-medium">{formatPrice(25)}</span>
+                      </li>
+                    )}
+                    
+                    {bookingData.wantMetalSeal && bookingData.includeDrums && (
+                      <li className="flex justify-between">
+                        <span>Metal Seal ({bookingData.drumQuantity || 1} x £5)</span>
+                        <span className="font-medium">{formatPrice(5 * parseInt(bookingData.drumQuantity || '1'))}</span>
+                      </li>
+                    )}
+                    
+                    {(!bookingData.doorToDoor && !bookingData.wantMetalSeal) && (
+                      <li className="text-gray-500">No additional services selected</li>
+                    )}
+                  </ul>
+                </div>
+                
+                {bookingData.paymentCompleted && (
+                  <>
+                    <Separator />
+                    
+                    {/* Payment Information */}
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">Payment Information</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                        <div>
+                          <span className="font-medium">Payment Method:</span> {
+                            paymentData?.method === 'card' ? 'Credit/Debit Card' :
+                            paymentData?.method === 'bank' ? 'Bank Transfer' :
+                            paymentData?.method === 'crypto' ? 'Cryptocurrency' : 
+                            'Not specified'
+                          }
+                        </div>
+                        <div>
+                          <span className="font-medium">Payment Status:</span> 
+                          <span className="text-green-600 font-medium ml-1">Completed</span>
+                        </div>
+                        <div>
+                          <span className="font-medium">Payment Option:</span> {
+                            bookingData.paymentOption === 'standard' ? 'Discount Deal (Pay Now)' : 'Standard Rate'
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+                
+                <Separator />
+                
+                {/* Total */}
+                <div>
+                  <div className="flex justify-between items-center text-lg font-bold">
+                    <span>Total{bookingData.paymentCompleted ? ' Paid' : ''}</span>
+                    <span className="text-zim-green">{formatPrice(totalAmount)}</span>
+                  </div>
+                  
+                  {!bookingData.paymentCompleted && !customQuoteData && (
+                    <p className="text-sm text-gray-500 mt-2">
+                      Payment will be collected during the processing of your shipment.
                     </p>
                   )}
-                  <p className="flex items-center">
-                    <MapPin className="mr-2 h-4 w-4 text-gray-500" />
-                    <span className="font-semibold">Address:</span> 
-                    <span className="ml-2">{contactInfo.recipientAddress}</span>
-                  </p>
-                </div>
-              </div>
-              <p className="mt-4">
-                Please ensure that you are available on the collection day. And please let <span className="font-semibold">{contactInfo.recipientName}</span> of <span className="font-semibold">{contactInfo.recipientAddress}</span> with contact number <span className="font-semibold">{contactInfo.recipientPhone}</span> be aware of the parcel that will arrive 6-8 weeks from collection day.
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card className="mt-6">
-            <CardHeader className="bg-gray-50">
-              <CardTitle className="flex items-center">
-                <CalendarClock className="mr-2 h-5 w-5 text-gray-500" />
-                Payment Instructions
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-gray-700 pt-4">
-              <p className="mb-4">{paymentInstructions}</p>
-              
-              <div className="bg-gray-50 p-4 rounded-md mt-2">
-                <h3 className="font-semibold mb-2">Payment Summary</h3>
-                <div className="grid grid-cols-2 gap-1">
-                  <span className="text-gray-600">Payment Method:</span>
-                  <span className="font-medium">{
-                    paymentMethod === 'standard' || paymentMethod === 'bankTransfer' || paymentMethod === 'payLater' 
-                      ? 'Standard Payment' 
-                      : paymentMethod === 'cashOnCollection' 
-                        ? 'Cash on Collection' 
-                        : 'Pay on Arrival'
-                  }</span>
-                  
-                  <span className="text-gray-600">Amount:</span>
-                  <span className="font-medium">£{finalAmount.toFixed(2)}</span>
                 </div>
               </div>
             </CardContent>
           </Card>
           
-          <div className="mt-8 text-center">
-            <p className="text-gray-600 italic">Thank you for choosing Zimbabwe Shipping. Your support is highly appreciated.</p>
+          <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 justify-center mt-8">
+            <Link to="/">
+              <Button variant="outline" className="w-full md:w-auto">
+                Return to Home
+              </Button>
+            </Link>
+            
+            {bookingData.paymentCompleted && (
+              <Link to={`/receipt/${bookingData.shipment_id}`}>
+                <Button variant="outline" className="w-full md:w-auto flex items-center">
+                  <Printer className="h-4 w-4 mr-2" /> Print Receipt
+                </Button>
+              </Link>
+            )}
+            
+            <Link to="/track">
+              <Button className="w-full md:w-auto flex items-center">
+                Track Shipment <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
           </div>
         </div>
-      </div>
+      </main>
       <Footer />
     </>
   );
