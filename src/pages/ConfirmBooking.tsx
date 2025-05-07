@@ -10,9 +10,7 @@ import { CheckCircle2, Printer, ArrowRight, MapPin, Calendar, Package, Download,
 import { useToast } from '@/hooks/use-toast';
 import { useShipping } from '@/contexts/ShippingContext';
 import { supabase } from '@/integrations/supabase/client';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
-import { exportToPdf } from '@/utils/exportUtils';
+import { exportElementToPdf } from '@/utils/exportUtils';
 
 const ConfirmBooking = () => {
   const location = useLocation();
@@ -101,7 +99,7 @@ const ConfirmBooking = () => {
   const basePrice = bookingData.shipmentDetails?.price || 0;
   const additionalServices = bookingData.shipmentDetails?.services || [];
   const additionalServicesTotal = additionalServices.reduce((total: number, service: any) => total + (service.price || 0), 0);
-  const totalAmount = bookingData.paymentCompleted ? (paymentData?.finalAmount || 0) : (basePrice + additionalServicesTotal);
+  const totalAmount = basePrice + additionalServicesTotal;
 
   // Payment method information
   const getPaymentMethodInfo = () => {
@@ -136,27 +134,12 @@ const ConfirmBooking = () => {
   const downloadAsPdf = async () => {
     try {
       if (!bookingSummaryRef.current) return;
-
-      const element = bookingSummaryRef.current;
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        logging: false,
-        useCORS: true
-      });
       
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`zimbabwe_shipping_confirmation_${trackingNumber || 'booking'}.pdf`);
-      
-      toast({
-        title: "Success",
-        description: "Booking confirmation downloaded successfully.",
-      });
+      await exportElementToPdf(
+        bookingSummaryRef.current, 
+        `zimbabwe_shipping_confirmation_${trackingNumber || 'booking'}`,
+        toast
+      );
     } catch (error) {
       console.error('Error generating PDF:', error);
       toast({
@@ -198,49 +181,38 @@ const ConfirmBooking = () => {
       <main className="min-h-screen bg-gray-50 py-12 px-4">
         <div className="container mx-auto max-w-4xl">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
-              <CheckCircle2 className="h-8 w-8 text-green-600" />
+            <div className="inline-flex items-center justify-center mb-4">
+              <img 
+                src="/lovable-uploads/efd3418e-edfe-47c6-b53d-10a17c87dd39.png" 
+                alt="Zimbabwe Shipping Logo" 
+                className="h-32 w-auto"
+              />
+              <h1 className="text-3xl md:text-4xl font-bold ml-4">Zimbabwe Shipping</h1>
             </div>
-            <h1 className="text-3xl md:text-4xl font-bold mb-2">Booking Confirmed</h1>
             <p className="text-gray-600">
-              {bookingData.paymentCompleted 
-                ? "Thank you for your booking. Your payment has been processed successfully." 
-                : customQuoteData 
-                  ? "Thank you for your request. We'll contact you with a custom quote soon." 
-                  : "Your booking has been submitted successfully."}
+              {customQuoteData 
+                ? "Thank you for your request. We'll contact you with a custom quote soon." 
+                : "Your booking has been submitted successfully."}
             </p>
             
-            {trackingNumber && (
-              <div className="mt-4 bg-gray-100 px-4 py-2 rounded-md inline-block">
-                <span className="font-medium">Tracking Number:</span> {trackingNumber}
-              </div>
-            )}
+            <div className="mt-4 bg-gray-100 px-4 py-2 rounded-md inline-block">
+              <CheckCircle2 className="h-5 w-5 text-green-600 inline mr-2" />
+              <span className="font-medium">Booking Confirmed</span>
+            </div>
           </div>
 
           <Card className="mb-6 shadow-md border-gray-200 dark:border-gray-700" ref={bookingSummaryRef}>
-            <CardHeader className="bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700 flex flex-row justify-between items-center">
+            <CardHeader className="bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700">
               <CardTitle className="text-xl">Booking Summary</CardTitle>
-              <div className="flex space-x-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={downloadAsPdf}
-                  className="flex items-center"
-                >
-                  <Download className="h-4 w-4 mr-1" /> Download
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={sendConfirmationEmail}
-                  className="flex items-center"
-                >
-                  <Mail className="h-4 w-4 mr-1" /> Email
-                </Button>
-              </div>
             </CardHeader>
             <CardContent className="p-6">
               <div className="space-y-6">
+                {/* Tracking Number */}
+                <div className="bg-amber-50 border border-amber-200 rounded-md p-4 text-center">
+                  <h3 className="text-lg font-semibold mb-1">Tracking Number</h3>
+                  <p className="text-xl font-bold text-amber-800">{trackingNumber || 'Pending'}</p>
+                </div>
+                
                 {/* Sender Information */}
                 <div>
                   <h3 className="text-lg font-semibold mb-3 flex items-center">
@@ -420,17 +392,8 @@ const ConfirmBooking = () => {
                     </div>
                     <div>
                       <span className="font-medium">Payment Status:</span> 
-                      <span className="ml-1 font-medium text-amber-600">
-                        {bookingData.paymentCompleted ? "Completed" : "Pending Payment"}
-                      </span>
+                      <span className="ml-1 font-medium text-amber-600">Pending Payment</span>
                     </div>
-                    {bookingData.paymentOption && (
-                      <div>
-                        <span className="font-medium">Payment Option:</span> {
-                          bookingData.paymentOption === 'standard' ? 'Discount Deal (Pay Now)' : 'Standard Rate'
-                        }
-                      </div>
-                    )}
                   </div>
                   
                   <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm">
@@ -443,7 +406,7 @@ const ConfirmBooking = () => {
                 {/* Total */}
                 <div>
                   <div className="flex justify-between items-center text-lg font-bold">
-                    <span>Total{bookingData.paymentCompleted ? ' Paid' : ''}</span>
+                    <span>Total</span>
                     <span className="text-zim-green">{formatPrice(totalAmount)}</span>
                   </div>
                 </div>
@@ -458,13 +421,29 @@ const ConfirmBooking = () => {
               </Button>
             </Link>
             
-            {bookingData.paymentCompleted && (
-              <Link to={`/receipt/${bookingData.shipment_id}`}>
-                <Button variant="outline" className="w-full md:w-auto flex items-center">
-                  <Printer className="h-4 w-4 mr-2" /> Print Receipt
-                </Button>
-              </Link>
-            )}
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={downloadAsPdf}
+              className="flex items-center w-full md:w-auto"
+            >
+              <Download className="h-4 w-4 mr-1" /> Download Confirmation
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={sendConfirmationEmail}
+              className="flex items-center w-full md:w-auto"
+            >
+              <Mail className="h-4 w-4 mr-1" /> Email Confirmation
+            </Button>
+            
+            <Link to={`/receipt/${bookingData.shipment_id}`}>
+              <Button variant="outline" className="w-full md:w-auto flex items-center">
+                <Printer className="h-4 w-4 mr-2" /> Print Receipt
+              </Button>
+            </Link>
             
             <Link to="/track">
               <Button className="w-full md:w-auto flex items-center">
