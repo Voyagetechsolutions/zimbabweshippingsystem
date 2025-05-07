@@ -75,7 +75,7 @@ const PricingSection: React.FC = () => {
     },
     {
       title: "Multiple Drums (2-4)",
-      price: "£260",
+      price: "£270",
       priceDetail: "per drum",
       description: "Multiple drum shipments with deferred payment",
       features: [
@@ -85,14 +85,14 @@ const PricingSection: React.FC = () => {
         "SMS & Email notifications",
         "Collection from UK address",
         "Priority shipping",
-        "30-day payment terms"
+        "30-day payment period"
       ],
       buttonText: "Book Multiple Drums",
       popular: true
     },
     {
       title: "Bulk Shipping (5+)",
-      price: "£240",
+      price: "£250",
       priceDetail: "per drum",
       description: "Best value for large shipments with flexible payment",
       features: [
@@ -103,7 +103,7 @@ const PricingSection: React.FC = () => {
         "Collection from UK address",
         "Priority shipping",
         "Dedicated account manager",
-        "30-day payment terms"
+        "30-day payment period"
       ],
       buttonText: "Book Bulk Shipping",
       popular: false
