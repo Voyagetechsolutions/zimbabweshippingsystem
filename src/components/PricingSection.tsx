@@ -24,7 +24,7 @@ const PricingSection: React.FC = () => {
     },
     {
       title: "Multiple Drums (2-4)",
-      price: "£240",
+      price: "£250",
       priceDetail: "per drum",
       description: "Multiple drum shipments",
       features: [
@@ -40,7 +40,7 @@ const PricingSection: React.FC = () => {
     },
     {
       title: "Bulk Shipping (5+)",
-      price: "£220",
+      price: "£240",
       priceDetail: "per drum",
       description: "Best value for large shipments",
       features: [
