@@ -211,16 +211,16 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
         if (values.paymentOption === 'standard') {
           // Standard payment prices
           if (qty >= 5) {
-            basePrice = qty * 220;
-          } else if (qty >= 2) {
             basePrice = qty * 240;
+          } else if (qty >= 2) {
+            basePrice = qty * 250;
           } else {
             basePrice = 260;
           }
         } else {
           // Pay later prices
           if (qty >= 5) {
-            basePrice = qty * 250;
+            basePrice = qty * 260;
           } else if (qty >= 2) {
             basePrice = qty * 270;
           } else {
