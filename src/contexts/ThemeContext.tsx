@@ -72,8 +72,15 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Apply theme to document when it changes
   useEffect(() => {
     const root = window.document.documentElement;
+    
+    // Remove both classes first
     root.classList.remove('light', 'dark');
+    
+    // Add the resolved theme class
     root.classList.add(resolvedTheme);
+    
+    // Set the color-scheme property for better OS integration
+    document.documentElement.style.setProperty('color-scheme', resolvedTheme);
   }, [resolvedTheme]);
 
   const value = {

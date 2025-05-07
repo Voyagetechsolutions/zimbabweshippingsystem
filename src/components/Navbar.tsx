@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, ChevronDown, User, ShoppingBag, LogOut, Shield } from 'lucide-react';
@@ -25,6 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useRole } from '@/contexts/RoleContext';
 import ThemeToggle from '@/components/ThemeToggle';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -32,6 +32,7 @@ const Navbar = () => {
   const { user, signOut } = useAuth();
   const location = useLocation();
   const { hasPermission } = useRole();
+  const { resolvedTheme } = useTheme();
   
   const isAdmin = hasPermission('admin');
 
@@ -64,17 +65,25 @@ const Navbar = () => {
     <header
       className={cn(
         "sticky top-0 z-50 w-full transition-all duration-200",
-        isScrolled ? "bg-white shadow-md" : "bg-white/80 backdrop-blur-sm"
+        isScrolled 
+          ? resolvedTheme === 'dark' 
+            ? "bg-gray-900 shadow-lg shadow-black/20" 
+            : "bg-white shadow-md" 
+          : resolvedTheme === 'dark' 
+            ? "bg-gray-900/80 backdrop-blur-sm" 
+            : "bg-white/80 backdrop-blur-sm"
       )}
     >
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
+          {/* Logo section */}
           <div className="flex-shrink-0">
             <Link to="/" className="flex items-center">
               <Logo className="h-8 w-auto" />
             </Link>
           </div>
 
+          {/* Desktop navigation */}
           <div className="hidden md:block">
             <NavigationMenu>
               <NavigationMenuList>
@@ -193,8 +202,9 @@ const Navbar = () => {
             </NavigationMenu>
           </div>
 
+          {/* Desktop account section */}
           <div className="hidden md:flex items-center">
-            {/* Add ThemeToggle component here, before user account dropdown */}
+            {/* ThemeToggle component */}
             <ThemeToggle />
             
             {user ? (
@@ -260,12 +270,13 @@ const Navbar = () => {
             )}
           </div>
 
+          {/* Mobile menu button */}
           <div className="md:hidden flex items-center">
-            {/* Add ThemeToggle component for mobile */}
+            {/* ThemeToggle for mobile */}
             <ThemeToggle />
             <button
               onClick={toggleMenu}
-              className="inline-flex items-center justify-center p-2 ml-2 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-zim-green"
+              className="inline-flex items-center justify-center p-2 ml-2 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-zim-green dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700"
             >
               <span className="sr-only">Open main menu</span>
               {isOpen ? (
@@ -278,67 +289,68 @@ const Navbar = () => {
         </div>
       </div>
 
+      {/* Mobile menu */}
       <div className={`md:hidden ${isOpen ? 'block' : 'hidden'}`}>
-        <div className="px-2 pt-2 pb-3 space-y-1 bg-white">
-          <Link to="/services" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
+        <div className="px-2 pt-2 pb-3 space-y-1 bg-white dark:bg-gray-900">
+          <Link to="/services" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800" onClick={() => setIsOpen(false)}>
             Services
           </Link>
-          <Link to="/pricing" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
+          <Link to="/pricing" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800" onClick={() => setIsOpen(false)}>
             Pricing
           </Link>
-          <Link to="/track" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
+          <Link to="/track" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800" onClick={() => setIsOpen(false)}>
             Track Shipment
           </Link>
-          <Link to="/book-shipment" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
+          <Link to="/book-shipment" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800" onClick={() => setIsOpen(false)}>
             Book Shipment
           </Link>
-          <Link to="/collection-schedule" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
+          <Link to="/collection-schedule" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800" onClick={() => setIsOpen(false)}>
             Collection Schedule
           </Link>
-          <Link to="/" onClick={(e) => { handleReviewsClick(e); setIsOpen(false); }} className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50">
+          <Link to="/" onClick={(e) => { handleReviewsClick(e); setIsOpen(false); }} className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800">
             Reviews
           </Link>
-          <Link to="/contact" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
+          <Link to="/contact" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800" onClick={() => setIsOpen(false)}>
             Contact
           </Link>
-          <Link to="/about-us" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
+          <Link to="/about-us" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800" onClick={() => setIsOpen(false)}>
             About Us
           </Link>
           
           {user ? (
             <>
-              <Link to="/dashboard" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
+              <Link to="/dashboard" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800" onClick={() => setIsOpen(false)}>
                 Dashboard
               </Link>
-              <Link to="/account" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
+              <Link to="/account" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800" onClick={() => setIsOpen(false)}>
                 Profile
               </Link>
-              <Link to="/shipments" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
+              <Link to="/shipments" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800" onClick={() => setIsOpen(false)}>
                 My Shipments
               </Link>
               
               {isAdmin && (
-                <Link to="/admin" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50" onClick={() => setIsOpen(false)}>
+                <Link to="/admin" className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800" onClick={() => setIsOpen(false)}>
                   Admin Panel
                 </Link>
               )}
               
               <button
                 onClick={() => { signOut(); setIsOpen(false); }}
-                className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50"
+                className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
               >
                 Log out
               </button>
             </>
           ) : (
-            <div className="pt-4 pb-3 border-t border-gray-200">
+            <div className="pt-4 pb-3 border-t border-gray-200 dark:border-gray-700">
               <div className="flex items-center px-5">
                 <Link to="/auth" className="block w-full text-center px-4 py-2 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-zim-green hover:bg-zim-green-dark" onClick={() => setIsOpen(false)}>
                   Log in
                 </Link>
               </div>
               <div className="mt-3 flex items-center px-5">
-                <Link to="/auth?signup=true" className="block w-full text-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-base font-medium text-gray-700 bg-white hover:bg-gray-50" onClick={() => setIsOpen(false)}>
+                <Link to="/auth?signup=true" className="block w-full text-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-base font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700" onClick={() => setIsOpen(false)}>
                   Sign up
                 </Link>
               </div>
