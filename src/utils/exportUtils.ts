@@ -1,6 +1,7 @@
-
 import { formatDate } from 'date-fns';
 import type { ToastMethod } from '@/hooks/use-toast';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface Shipment {
   id: string;
@@ -184,4 +185,38 @@ export const exportToPdf = async (data: Shipment[], toast: ToastMethod): Promise
     title: 'Export successful',
     description: 'Your shipments have been exported to PDF.',
   });
+};
+
+/**
+ * Exports an HTML element to PDF
+ */
+export const exportElementToPdf = async (element: HTMLElement, filename: string, toast: ToastMethod): Promise<void> => {
+  try {
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      logging: false,
+      useCORS: true
+    });
+    
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const imgProps = pdf.getImageProperties(imgData);
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+    
+    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    pdf.save(`${filename}.pdf`);
+    
+    toast({
+      title: 'Export successful',
+      description: 'Your document has been exported to PDF.',
+    });
+  } catch (error) {
+    console.error('Error exporting to PDF:', error);
+    toast({
+      title: 'Export failed',
+      description: 'An error occurred while exporting to PDF.',
+      variant: 'destructive'
+    });
+  }
 };

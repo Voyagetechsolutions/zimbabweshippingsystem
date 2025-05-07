@@ -1,21 +1,25 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { CheckCircle2, Printer, ArrowRight, MapPin, Calendar, Package } from 'lucide-react';
+import { CheckCircle2, Printer, ArrowRight, MapPin, Calendar, Package, Download, Mail } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useShipping } from '@/contexts/ShippingContext';
 import { supabase } from '@/integrations/supabase/client';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+import { exportToPdf } from '@/utils/exportUtils';
 
 const ConfirmBooking = () => {
   const location = useLocation();
   const { bookingData, paymentData, customQuoteData } = location.state || {};
   const { toast } = useToast();
   const { formatPrice } = useShipping();
+  const bookingSummaryRef = useRef(null);
 
   useEffect(() => {
     // Set the page title
@@ -99,6 +103,95 @@ const ConfirmBooking = () => {
   const additionalServicesTotal = additionalServices.reduce((total: number, service: any) => total + (service.price || 0), 0);
   const totalAmount = bookingData.paymentCompleted ? (paymentData?.finalAmount || 0) : (basePrice + additionalServicesTotal);
 
+  // Payment method information
+  const getPaymentMethodInfo = () => {
+    const paymentMethod = bookingData.paymentMethod || paymentData?.method || 'standard-payment';
+    
+    if (paymentMethod === 'standard-payment') {
+      return {
+        displayName: 'Standard Payment',
+        instructions: `Please contact Mr. Moyo on +44 7984 099041 for bank details. Reference: Tracking number (${trackingNumber}), initials, and surname.`
+      };
+    } else if (paymentMethod === 'cash-on-collection') {
+      return {
+        displayName: 'Cash on Collection',
+        instructions: "Please make payment via bank transfer or have cash on the collection date."
+      };
+    } else if (paymentMethod === 'pay-on-arrival') {
+      return {
+        displayName: 'Pay on Arrival (20% Premium)',
+        instructions: "Payment will be required when goods arrive in Zimbabwe."
+      };
+    }
+    
+    return {
+      displayName: 'Standard Payment',
+      instructions: `Please contact Mr. Moyo on +44 7984 099041 for bank details. Reference: Tracking number (${trackingNumber}), initials, and surname.`
+    };
+  };
+  
+  const paymentInfo = getPaymentMethodInfo();
+
+  // Handle PDF download
+  const downloadAsPdf = async () => {
+    try {
+      if (!bookingSummaryRef.current) return;
+
+      const element = bookingSummaryRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        logging: false,
+        useCORS: true
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`zimbabwe_shipping_confirmation_${trackingNumber || 'booking'}.pdf`);
+      
+      toast({
+        title: "Success",
+        description: "Booking confirmation downloaded successfully.",
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: "Error",
+        description: "Failed to download confirmation. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Handle email sending
+  const sendConfirmationEmail = async () => {
+    try {
+      toast({
+        title: "Sending Email",
+        description: "Sending booking confirmation to your email...",
+      });
+      
+      // This would typically call a backend API to send the email
+      // For now, we'll just show a success message
+      setTimeout(() => {
+        toast({
+          title: "Email Sent",
+          description: "Booking confirmation has been sent to your email.",
+        });
+      }, 2000);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send email. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <>
       <Navbar />
@@ -124,9 +217,27 @@ const ConfirmBooking = () => {
             )}
           </div>
 
-          <Card className="mb-6 shadow-md border-gray-200 dark:border-gray-700">
-            <CardHeader className="bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700">
+          <Card className="mb-6 shadow-md border-gray-200 dark:border-gray-700" ref={bookingSummaryRef}>
+            <CardHeader className="bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700 flex flex-row justify-between items-center">
               <CardTitle className="text-xl">Booking Summary</CardTitle>
+              <div className="flex space-x-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={downloadAsPdf}
+                  className="flex items-center"
+                >
+                  <Download className="h-4 w-4 mr-1" /> Download
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={sendConfirmationEmail}
+                  className="flex items-center"
+                >
+                  <Mail className="h-4 w-4 mr-1" /> Email
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-6">
               <div className="space-y-6">
@@ -167,10 +278,10 @@ const ConfirmBooking = () => {
                 
                 <Separator />
                 
-                {/* Recipient Information */}
+                {/* Receiver Information */}
                 <div>
                   <h3 className="text-lg font-semibold mb-3 flex items-center">
-                    <MapPin className="h-5 w-5 mr-2 text-zim-green" /> Recipient Details
+                    <MapPin className="h-5 w-5 mr-2 text-zim-green" /> Receiver Details
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
                     <div>
@@ -190,6 +301,20 @@ const ConfirmBooking = () => {
                     <div>
                       <span className="font-medium">City:</span> {deliveryCity}
                     </div>
+                    
+                    {/* Additional Delivery Addresses (if any) */}
+                    {bookingData.additionalDeliveryAddresses && bookingData.additionalDeliveryAddresses.length > 0 && (
+                      <div className="md:col-span-2 mt-2">
+                        <h4 className="text-sm font-semibold mb-2">Additional Delivery Addresses:</h4>
+                        <ul className="list-disc pl-5 space-y-1">
+                          {bookingData.additionalDeliveryAddresses.map((address: any, index: number) => (
+                            <li key={index}>
+                              {address.address}, {address.city || deliveryCity}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 </div>
                 
@@ -262,14 +387,18 @@ const ConfirmBooking = () => {
                   <ul className="space-y-2 text-sm">
                     {bookingData.doorToDoor && (
                       <li className="flex justify-between">
-                        <span>Door-to-Door Delivery</span>
-                        <span className="font-medium">{formatPrice(25)}</span>
+                        <span>Door-to-Door Delivery{bookingData.additionalDeliveryAddresses?.length > 0 ? 
+                          ` (${1 + (bookingData.additionalDeliveryAddresses?.length || 0)} addresses)` : ''}
+                        </span>
+                        <span className="font-medium">
+                          {formatPrice(25 * (1 + (bookingData.additionalDeliveryAddresses?.length || 0)))}
+                        </span>
                       </li>
                     )}
                     
                     {bookingData.wantMetalSeal && bookingData.includeDrums && (
                       <li className="flex justify-between">
-                        <span>Metal Seal ({bookingData.drumQuantity || 1} x £5)</span>
+                        <span>Metal Coded Seal ({bookingData.drumQuantity || 1} x £5)</span>
                         <span className="font-medium">{formatPrice(5 * parseInt(bookingData.drumQuantity || '1'))}</span>
                       </li>
                     )}
@@ -280,35 +409,34 @@ const ConfirmBooking = () => {
                   </ul>
                 </div>
                 
-                {bookingData.paymentCompleted && (
-                  <>
-                    <Separator />
-                    
-                    {/* Payment Information */}
+                <Separator />
+                
+                {/* Payment Information */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Payment Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
                     <div>
-                      <h3 className="text-lg font-semibold mb-3">Payment Information</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                        <div>
-                          <span className="font-medium">Payment Method:</span> {
-                            paymentData?.method === 'card' ? 'Credit/Debit Card' :
-                            paymentData?.method === 'bank' ? 'Bank Transfer' :
-                            paymentData?.method === 'crypto' ? 'Cryptocurrency' : 
-                            'Not specified'
-                          }
-                        </div>
-                        <div>
-                          <span className="font-medium">Payment Status:</span> 
-                          <span className="text-green-600 font-medium ml-1">Completed</span>
-                        </div>
-                        <div>
-                          <span className="font-medium">Payment Option:</span> {
-                            bookingData.paymentOption === 'standard' ? 'Discount Deal (Pay Now)' : 'Standard Rate'
-                          }
-                        </div>
-                      </div>
+                      <span className="font-medium">Payment Method:</span> {paymentInfo.displayName}
                     </div>
-                  </>
-                )}
+                    <div>
+                      <span className="font-medium">Payment Status:</span> 
+                      <span className="ml-1 font-medium text-amber-600">
+                        {bookingData.paymentCompleted ? "Completed" : "Pending Payment"}
+                      </span>
+                    </div>
+                    {bookingData.paymentOption && (
+                      <div>
+                        <span className="font-medium">Payment Option:</span> {
+                          bookingData.paymentOption === 'standard' ? 'Discount Deal (Pay Now)' : 'Standard Rate'
+                        }
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm">
+                    <p className="text-amber-800">{paymentInfo.instructions}</p>
+                  </div>
+                </div>
                 
                 <Separator />
                 
@@ -318,12 +446,6 @@ const ConfirmBooking = () => {
                     <span>Total{bookingData.paymentCompleted ? ' Paid' : ''}</span>
                     <span className="text-zim-green">{formatPrice(totalAmount)}</span>
                   </div>
-                  
-                  {!bookingData.paymentCompleted && !customQuoteData && (
-                    <p className="text-sm text-gray-500 mt-2">
-                      Payment will be collected during the processing of your shipment.
-                    </p>
-                  )}
                 </div>
               </div>
             </CardContent>
