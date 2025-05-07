@@ -35,9 +35,9 @@ const ShippingCalculator: React.FC = () => {
       if (paymentType === "standard") {
         // Standard payment prices
         if (qty >= 5) {
-          basePrice = qty * 220;
-        } else if (qty >= 2) {
           basePrice = qty * 240;
+        } else if (qty >= 2) {
+          basePrice = qty * 250;
         } else {
           basePrice = 260;
         }
@@ -140,14 +140,14 @@ const ShippingCalculator: React.FC = () => {
                     {paymentType === "standard" ? (
                       <ul className="space-y-1 list-disc pl-5 dark:text-gray-200">
                         <li>1 Drum: {formatPrice(260)} each</li>
-                        <li>2-4 Drums: {formatPrice(240)} each</li>
-                        <li>5+ Drums: {formatPrice(220)} each</li>
+                        <li>2-4 Drums: {formatPrice(250)} each</li>
+                        <li>5+ Drums: {formatPrice(240)} each</li>
                       </ul>
                     ) : (
                       <ul className="space-y-1 list-disc pl-5 dark:text-gray-200">
                         <li>1 Drum: {formatPrice(280)} each</li>
                         <li>2-4 Drums: {formatPrice(270)} each</li>
-                        <li>5+ Drums: {formatPrice(250)} each</li>
+                        <li>5+ Drums: {formatPrice(260)} each</li>
                       </ul>
                     )}
                     <p className="mt-2 text-gray-500 dark:text-gray-300">Each drum has a capacity of 200L-220L</p>
