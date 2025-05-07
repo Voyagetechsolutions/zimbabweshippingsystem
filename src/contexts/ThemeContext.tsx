@@ -46,7 +46,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Toggle between light, dark, and system modes
   const toggleTheme = () => {
-    setTheme(current => {
+    setThemeValue((current: Theme) => {
       const nextTheme = current === 'light' ? 'dark' : current === 'dark' ? 'system' : 'light';
       localStorage.setItem('theme', nextTheme);
       return nextTheme;
