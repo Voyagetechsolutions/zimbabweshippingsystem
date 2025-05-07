@@ -95,11 +95,26 @@ const ConfirmBooking = () => {
   const trackingNumber = bookingData.shipmentDetails?.tracking_number || '';
   const deliveryCity = bookingData.deliveryCity || bookingData.recipientDetails?.address?.split(',').pop()?.trim() || 'Zimbabwe';
   
-  // Calculate prices
-  const basePrice = bookingData.shipmentDetails?.price || 0;
+  // Calculate prices based on updated pricing structure
+  const basePrice = calculateBasePrice(bookingData);
   const additionalServices = bookingData.shipmentDetails?.services || [];
-  const additionalServicesTotal = additionalServices.reduce((total: number, service: any) => total + (service.price || 0), 0);
+  const additionalServicesTotal = additionalServices.reduce((total, service) => total + (service.price || 0), 0);
   const totalAmount = basePrice + additionalServicesTotal;
+  
+  // Calculate the base price based on the updated drum pricing structure
+  function calculateBasePrice(data) {
+    if (!data.includeDrums) return 0;
+    
+    const drumQuantity = parseInt(data.shipmentDetails?.quantity || data.drumQuantity || '1');
+    
+    if (drumQuantity >= 5) {
+      return drumQuantity * 260;
+    } else if (drumQuantity >= 2) {
+      return drumQuantity * 270;
+    } else {
+      return 280; // 1 drum
+    }
+  }
 
   // Payment method information
   const getPaymentMethodInfo = () => {
@@ -130,7 +145,7 @@ const ConfirmBooking = () => {
   
   const paymentInfo = getPaymentMethodInfo();
 
-  // Handle PDF download
+  // Handle PDF download for the entire page
   const downloadAsPdf = async () => {
     try {
       if (!bookingSummaryRef.current) return;
@@ -179,7 +194,7 @@ const ConfirmBooking = () => {
     <>
       <Navbar />
       <main className="min-h-screen bg-gray-50 py-12 px-4">
-        <div className="container mx-auto max-w-4xl">
+        <div ref={bookingSummaryRef} className="container mx-auto max-w-4xl">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center mb-4">
               <img 
@@ -201,10 +216,7 @@ const ConfirmBooking = () => {
             </div>
           </div>
 
-          <Card className="mb-6 shadow-md border-gray-200 dark:border-gray-700" ref={bookingSummaryRef}>
-            <CardHeader className="bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700">
-              <CardTitle className="text-xl">Booking Summary</CardTitle>
-            </CardHeader>
+          <Card className="mb-6 shadow-md border-gray-200 dark:border-gray-700">
             <CardContent className="p-6">
               <div className="space-y-6">
                 {/* Tracking Number */}
@@ -279,7 +291,7 @@ const ConfirmBooking = () => {
                       <div className="md:col-span-2 mt-2">
                         <h4 className="text-sm font-semibold mb-2">Additional Delivery Addresses:</h4>
                         <ul className="list-disc pl-5 space-y-1">
-                          {bookingData.additionalDeliveryAddresses.map((address: any, index: number) => (
+                          {bookingData.additionalDeliveryAddresses.map((address, index) => (
                             <li key={index}>
                               {address.address}, {address.city || deliveryCity}
                             </li>

@@ -1,59 +1,58 @@
-
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const images = [
   {
-    src: "public/lovable-uploads/5fac2a37-1652-4c06-8f85-d373c1e9ccd6.png",
+    src: "/lovable-uploads/5fac2a37-1652-4c06-8f85-d373c1e9ccd6.png",
     alt: "Industrial machinery being loaded into a shipping container"
   },
   {
-    src: "public/lovable-uploads/87d356cd-e4fd-45cd-a049-81430ed045d8.png",
+    src: "/lovable-uploads/87d356cd-e4fd-45cd-a049-81430ed045d8.png",
     alt: "Wrapped pallets in a warehouse"
   },
   {
-    src: "public/lovable-uploads/14353843-5722-4925-ae94-9139b2b90e3b.png",
+    src: "/lovable-uploads/14353843-5722-4925-ae94-9139b2b90e3b.png",
     alt: "Bicycles packed for shipping"
   },
   {
-    src: "public/lovable-uploads/bb75a161-68c8-4e58-b4d4-976981bfc09d.png",
+    src: "/lovable-uploads/bb75a161-68c8-4e58-b4d4-976981bfc09d.png",
     alt: "Boxes and containers loaded in a delivery van"
   },
   {
-    src: "public/lovable-uploads/f286a2cc-08fc-44f2-97d7-32aa9f8b7b29.png",
+    src: "/lovable-uploads/f286a2cc-08fc-44f2-97d7-32aa9f8b7b29.png",
     alt: "Shipping drums and containers on a truck"
   },
   {
-    src: "public/lovable-uploads/a6e31b25-8e47-4f36-a10c-e732aa7e1428.png",
+    src: "/lovable-uploads/a6e31b25-8e47-4f36-a10c-e732aa7e1428.png",
     alt: "Various drums and containers in a warehouse"
   },
   {
-    src: "public/lovable-uploads/275a803d-5d1a-491c-8d90-c55de3be45ad.png",
+    src: "/lovable-uploads/275a803d-5d1a-491c-8d90-c55de3be45ad.png",
     alt: "Pallets and packages in a shipping facility"
   },
   {
-    src: "public/lovable-uploads/8452275d-128f-45da-b43f-90c495c254fa.png",
+    src: "/lovable-uploads/8452275d-128f-45da-b43f-90c495c254fa.png",
     alt: "Appliance and household items packed for shipping"
   },
   {
-    src: "public/lovable-uploads/aec3d23a-8fba-4439-85ec-88285cf2fd29.png",
+    src: "/lovable-uploads/aec3d23a-8fba-4439-85ec-88285cf2fd29.png",
     alt: "Workers loading items into a shipping container"
   },
   {
-    src: "public/lovable-uploads/85f04a52-387b-4e3e-8fe8-5b1476f172a3.png",
+    src: "/lovable-uploads/85f04a52-387b-4e3e-8fe8-5b1476f172a3.png",
     alt: "Workers and forklift loading shipping container"
   },
   {
-    src: "public/lovable-uploads/c3482a65-f7a2-4164-ab96-f1226119d1d9.png",
+    src: "/lovable-uploads/c3482a65-f7a2-4164-ab96-f1226119d1d9.png",
     alt: "Shipping drums being loaded into container"
   },
   {
-    src: "public/lovable-uploads/81064313-d991-4317-a4ff-7955835ff8fa.png",
+    src: "/lovable-uploads/81064313-d991-4317-a4ff-7955835ff8fa.png",
     alt: "Forklift operator moving pallets"
   },
   {
-    src: "public/lovable-uploads/ce8c4a7e-bf4b-4b7e-9a53-b05074d0184c.png",
+    src: "/lovable-uploads/ce8c4a7e-bf4b-4b7e-9a53-b05074d0184c.png",
     alt: "Worker standing on pallet in shipping container"
   }
 ];
