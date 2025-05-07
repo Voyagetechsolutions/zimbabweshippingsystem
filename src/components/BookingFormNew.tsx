@@ -978,9 +978,9 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
                         })</span>
                         <span>£{
                           parseInt(form.watch('drumQuantity') || '1') >= 5 ? 
-                            parseInt(form.watch('drumQuantity') || '1') * 240 : 
+                            parseInt(form.watch('drumQuantity') || '1') * 260 : 
                           parseInt(form.watch('drumQuantity') || '1') >= 2 ? 
-                            parseInt(form.watch('drumQuantity') || '1') * 250 : 260
+                            parseInt(form.watch('drumQuantity') || '1') * 270 : 280
                         }</span>
                       </div>
                       
