@@ -22,7 +22,7 @@ const ThemeToggle = () => {
           size="icon" 
           className={cn(
             "rounded-full w-8 h-8 transition-colors", 
-            resolvedTheme === 'dark' ? 'hover:bg-slate-800' : 'hover:bg-slate-200'
+            resolvedTheme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-200'
           )}
         >
           {resolvedTheme === 'light' ? (
@@ -34,15 +34,15 @@ const ThemeToggle = () => {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme('light')} className={theme === 'light' ? 'bg-accent' : ''}>
+        <DropdownMenuItem onClick={() => setTheme('light')} className={theme === 'light' ? 'bg-accent text-accent-foreground' : ''}>
           <Sun className="h-4 w-4 mr-2 text-amber-500" />
           <span>Light</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme('dark')} className={theme === 'dark' ? 'bg-accent' : ''}>
+        <DropdownMenuItem onClick={() => setTheme('dark')} className={theme === 'dark' ? 'bg-accent text-accent-foreground' : ''}>
           <Moon className="h-4 w-4 mr-2 text-indigo-400" />
           <span>Dark</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme('system')} className={theme === 'system' ? 'bg-accent' : ''}>
+        <DropdownMenuItem onClick={() => setTheme('system')} className={theme === 'system' ? 'bg-accent text-accent-foreground' : ''}>
           <Monitor className="h-4 w-4 mr-2" />
           <span>System</span>
         </DropdownMenuItem>

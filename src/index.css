@@ -143,6 +143,34 @@
     @apply text-gray-300;
   }
 
+  /* Updated text color overrides for better visibility */
+  .dark .text-black {
+    @apply text-gray-100;
+  }
+  
+  .dark .text-gray-800 {
+    @apply text-gray-200;
+  }
+  
+  .dark .text-gray-500 {
+    @apply text-gray-400;
+  }
+  
+  .dark .text-gray-400 {
+    @apply text-gray-300;
+  }
+
+  /* Link text needs to be visible in dark mode too */
+  .dark a:not(.btn):not([class*="bg-"]) {
+    @apply text-blue-400 hover:text-blue-300;
+  }
+
+  /* Fix for buttons with dark text */
+  .dark .btn-dark, 
+  .dark .btn-black {
+    @apply text-white;
+  }
+
   .dark .border-gray-200, 
   .dark .border-gray-300 {
     @apply border-gray-700;
@@ -156,6 +184,12 @@
   .dark .bg-white\/80,
   .dark .bg-white\/90 {
     @apply bg-gray-900/90;
+  }
+  
+  /* Fix for dropdown and menu items that might have dark text on dark bg */
+  .dark .dropdown-item,
+  .dark .menu-item {
+    @apply text-gray-200 hover:bg-gray-800;
   }
 }
 
@@ -199,4 +233,22 @@
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     transition-duration: 150ms;
   }
+  
+  /* Additional utility classes for improved text visibility */
+  .text-contrast-light {
+    @apply text-gray-900;
+  }
+  
+  .text-contrast-dark {
+    @apply text-white;
+  }
+  
+  .dark .text-contrast-light {
+    @apply text-white;
+  }
+  
+  .dark .text-contrast-dark {
+    @apply text-gray-200;
+  }
 }
+
