@@ -8,7 +8,6 @@ import Footer from '@/components/Footer';
 import WhatsAppButton from '@/components/WhatsAppButton';
 
 // Role-specific dashboards
-import AdminDashboard from '@/components/dashboards/AdminDashboard';
 import LogisticsDashboard from '@/components/dashboards/LogisticsDashboard';
 import DriverDashboard from '@/components/dashboards/DriverDashboard';
 import SupportDashboard from '@/components/dashboards/SupportDashboard';
@@ -29,7 +28,12 @@ const Dashboard = () => {
       // If no role is assigned, default to customer
       console.log('No role assigned, defaulting to customer');
     }
-  }, [user, role, isLoading]);
+    
+    // Redirect admins to the admin dashboard
+    if (role === 'admin') {
+      navigate('/admin');
+    }
+  }, [user, role, isLoading, navigate]);
   
   // Handle loading state
   if (isLoading) {
@@ -44,7 +48,8 @@ const Dashboard = () => {
   const renderDashboard = () => {
     switch (role) {
       case 'admin':
-        return <AdminDashboard />;
+        // This won't be reached due to the redirect in useEffect
+        return null;
       case 'logistics':
         return <LogisticsDashboard />;
       case 'driver':
@@ -64,8 +69,7 @@ const Dashboard = () => {
         <div className="mb-4 md:mb-8 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold">
-              {role === 'admin' ? 'Admin Dashboard' :
-               role === 'logistics' ? 'Logistics Dashboard' :
+              {role === 'logistics' ? 'Logistics Dashboard' :
                role === 'driver' ? 'Driver Dashboard' :
                role === 'support' ? 'Support Dashboard' :
                'My Dashboard'}
