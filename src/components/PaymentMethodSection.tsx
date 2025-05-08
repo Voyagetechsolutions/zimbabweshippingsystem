@@ -1,345 +1,304 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
+import { CheckCircle2, AlertCircle, CreditCard, Wallet, CalendarClock, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Check, CreditCard, Banknote, ArrowRight, Clock } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { v4 as uuidv4 } from 'uuid';
-import { useAuth } from '@/hooks/useAuth';
-import { cn } from '@/lib/utils';
-import { useTheme } from '@/contexts/ThemeContext';
+import { generateUniqueId } from '@/utils/utils';
 
 interface PaymentMethodSectionProps {
   bookingData: any;
   totalAmount: number;
   onCancel: () => void;
-  onComplete: (paymentData: any) => Promise<boolean>;
+  onComplete: (paymentData: any) => void;
 }
 
-export function PaymentMethodSection({ bookingData, totalAmount, onCancel, onComplete }: PaymentMethodSectionProps) {
-  const { session } = useAuth();
+export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
+  bookingData,
+  totalAmount,
+  onCancel,
+  onComplete
+}) => {
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'standard' | 'cashOnCollection' | 'payOnArrival'>('standard');
+  const [payLaterMethod, setPayLaterMethod] = useState<'bankTransfer' | 'payLater'>('bankTransfer');
+  const [isProcessing, setIsProcessing] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { resolvedTheme } = useTheme();
-
-  const [selectedMethod, setSelectedMethod] = useState<string>('card');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSpecialDeal, setIsSpecialDeal] = useState(false);
-  const [discountApplied, setDiscountApplied] = useState(false);
-  const [finalAmount, setFinalAmount] = useState(totalAmount);
   
-  // Check for special deals
-  useEffect(() => {
-    const checkForSpecialDeals = async () => {
-      if (session?.user?.id) {
-        try {
-          const { data, error } = await supabase
-            .from('special_deals')
-            .select('*')
-            .eq('user_id', session.user.id)
-            .eq('active', true)
-            .single();
-          
-          if (data && !error) {
-            setIsSpecialDeal(true);
-          }
-        } catch (err) {
-          console.error("Error checking for special deals:", err);
-        }
-      }
-    };
-    
-    checkForSpecialDeals();
-  }, [session]);
+  const isSpecialDeal = selectedPaymentMethod === 'cashOnCollection';
+  const drumQuantity = bookingData?.shipmentDetails?.type === 'drum' ? (bookingData?.shipmentDetails?.quantity || 1) : 0;
+  const specialDealDiscount = isSpecialDeal ? (20 * drumQuantity) : 0;
   
-  // Apply cash on collection discount if applicable
-  useEffect(() => {
-    if (selectedMethod === 'cash_on_collection' && bookingData?.includeDrums && !discountApplied) {
-      // Apply £20 discount per drum
-      const drumQuantity = parseInt(bookingData.drumQuantity || '0');
-      const discount = drumQuantity * 20;
-      setFinalAmount(totalAmount - discount);
-      setDiscountApplied(true);
-    } else if (selectedMethod === 'goods_arriving' && !discountApplied) {
-      // Add 20% premium for pay on goods arriving
-      setFinalAmount(totalAmount * 1.2);
-      setDiscountApplied(true);
-    } else if (discountApplied && selectedMethod !== 'cash_on_collection' && selectedMethod !== 'goods_arriving') {
-      // Reset to original amount if changing from discounted method
-      setFinalAmount(totalAmount);
-      setDiscountApplied(false);
-    }
-  }, [selectedMethod, bookingData, totalAmount, discountApplied]);
-
-  const handlePaymentSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    
+  const isPayOnArrival = selectedPaymentMethod === 'payOnArrival';
+  const baseAmount = totalAmount - specialDealDiscount;
+  const payOnArrivalPremium = isPayOnArrival ? (baseAmount * 0.20) : 0;
+  
+  const finalAmount = isSpecialDeal ? (totalAmount - specialDealDiscount) : 
+                      isPayOnArrival ? (totalAmount + payOnArrivalPremium) : 
+                      totalAmount;
+  
+  const handleConfirm = async () => {
+    setIsProcessing(true);
     try {
-      // Generate a unique receipt number
-      const receiptNumber = `REC-${Date.now().toString().substring(6)}-${Math.floor(Math.random() * 10000)}`;
+      // Generate a receipt number
+      const receiptNumber = `REC-${Date.now().toString().slice(-8)}`;
       
-      // Create a shipment record if not already created
-      let shipmentId = bookingData.shipment_id;
-      if (!shipmentId) {
-        shipmentId = `shp_${uuidv4()}`;
-      }
+      // Generate a tracking number if one doesn't exist
+      const trackingNumber = bookingData?.shipmentDetails?.tracking_number || 
+                            `ZIM${Date.now().toString().substring(6)}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
       
-      let userId = null;
-      if (session?.user) {
-        userId = session.user.id;
-      } else if (bookingData.user_id) {
-        userId = bookingData.user_id;
-      }
+      // Create payment data with all necessary information
+      const paymentData = {
+        method: selectedPaymentMethod,
+        payLaterMethod: selectedPaymentMethod === 'standard' ? payLaterMethod : null,
+        finalAmount,
+        currency: 'GBP',
+        isSpecialDeal,
+        isPayOnArrival,
+        originalAmount: totalAmount,
+        discount: isSpecialDeal ? specialDealDiscount : 0,
+        premium: isPayOnArrival ? payOnArrivalPremium : 0,
+        status: 'pending',
+        date: new Date().toISOString(),
+        receipt_number: receiptNumber
+      };
+
+      // Ensure the shipment details have all required information including tracking number
+      const enhancedShipmentDetails = {
+        ...(bookingData.shipmentDetails || {}),
+        tracking_number: trackingNumber,
+        type: bookingData?.shipmentDetails?.type || (bookingData?.includeDrums ? 'drum' : 'other'),
+        quantity: bookingData?.shipmentDetails?.quantity || 
+                 (bookingData?.includeDrums ? parseInt(bookingData?.drumQuantity || '1') : 1),
+        services: [
+          ...(bookingData?.shipmentDetails?.services || []),
+          ...(bookingData?.wantMetalSeal ? [{
+            name: `Metal Seal${parseInt(bookingData?.drumQuantity || '1') > 1 ? 's' : ''} (${parseInt(bookingData?.drumQuantity || '1')} x £5)`,
+            price: 5 * parseInt(bookingData?.drumQuantity || '1')
+          }] : []),
+          ...(bookingData?.doorToDoor ? [{
+            name: 'Door to Door Delivery',
+            price: 25
+          }] : [])
+        ]
+      };
       
-      // Different behavior based on payment method
-      if (selectedMethod === 'card') {
-        // Process card payment (in real app, integrate with a payment processor)
-        const paymentData = {
-          method: selectedMethod,
-          status: 'pending',
-          finalAmount,
-          currency: 'GBP',
-          receiptNumber,
-        };
-        
-        const success = await onComplete(paymentData);
-        if (success) {
-          navigate('/payment-success', { 
-            state: { 
-              paymentData,
-              bookingData: {
-                ...bookingData,
-                shipment_id: shipmentId,
-                paymentData
-              } 
-            }
-          });
+      // Ensure sender details are complete
+      const enhancedSenderDetails = {
+        name: bookingData.senderDetails?.name || `${bookingData.firstName || ""} ${bookingData.lastName || ""}`.trim(),
+        email: bookingData.senderDetails?.email || bookingData.email,
+        phone: bookingData.senderDetails?.phone || bookingData.phone,
+        address: bookingData.senderDetails?.address || bookingData.pickupAddress
+      };
+      
+      // Ensure recipient details are complete
+      const enhancedRecipientDetails = {
+        name: bookingData.recipientDetails?.name || bookingData.recipientName,
+        phone: bookingData.recipientDetails?.phone || bookingData.recipientPhone,
+        additionalPhone: bookingData.recipientDetails?.additionalPhone || bookingData.additionalRecipientPhone,
+        address: bookingData.recipientDetails?.address || bookingData.deliveryAddress
+      };
+
+      // Merge all booking data for the confirmation
+      const finalBookingData = {
+        ...bookingData,
+        receipt_number: receiptNumber,
+        paymentCompleted: true,
+        paymentData,
+        shipmentDetails: enhancedShipmentDetails,
+        senderDetails: enhancedSenderDetails,
+        recipientDetails: enhancedRecipientDetails,
+      };
+
+      console.log("Payment confirmation data:", { 
+        bookingData: finalBookingData, 
+        paymentData,
+        shipmentDetails: enhancedShipmentDetails,
+        senderDetails: enhancedSenderDetails,
+        recipientDetails: enhancedRecipientDetails
+      });
+      
+      // Call the parent component's onComplete handler
+      await onComplete(paymentData);
+      
+      // Navigate to confirmation page with all the necessary data
+      navigate('/confirm-booking', { 
+        state: { 
+          bookingData: finalBookingData,
+          paymentData,
         }
-      } else {
-        // For non-card payment methods (e.g., cash, bank transfer)
-        try {
-          // Create a receipt in the database
-          const { data: receiptData, error: receiptError } = await supabase
-            .from('receipts')
-            .insert({
-              user_id: userId,
-              shipment_id: shipmentId.startsWith('shp_') ? shipmentId.substring(4) : shipmentId,
-              amount: finalAmount,
-              currency: 'GBP',
-              payment_method: selectedMethod,
-              payment_status: 'pending',
-              receipt_number: receiptNumber
-            })
-            .select('id')
-            .single();
-          
-          if (receiptError) throw receiptError;
-          
-          const paymentData = {
-            method: selectedMethod,
-            status: 'pending',
-            finalAmount,
-            currency: 'GBP',
-            receiptId: receiptData.id,
-            receiptNumber
-          };
-          
-          const success = await onComplete(paymentData);
-          if (success) {
-            navigate('/payment-success', { 
-              state: { 
-                receipt_id: receiptData.id,
-                paymentData,
-                bookingData: {
-                  ...bookingData,
-                  shipment_id: shipmentId,
-                  paymentData
-                } 
-              },
-              search: `?receipt_id=${receiptData.id}`
-            });
-          }
-        } catch (err: any) {
-          console.error("Error processing alternative payment:", err);
-          throw err;
-        }
-      }
-    } catch (error: any) {
+      });
+    } catch (error) {
       console.error('Payment processing error:', error);
       toast({
-        title: 'Payment Error',
-        description: error.message || 'There was a problem processing your payment. Please try again.',
-        variant: 'destructive',
+        title: "Error",
+        description: "There was a problem processing your payment. Please try again.",
+        variant: "destructive",
       });
-    } finally {
-      setIsSubmitting(false);
+      setIsProcessing(false);
     }
   };
 
-  const isCardSelected = selectedMethod === 'card';
-  const isBankTransferSelected = selectedMethod === 'bank_transfer';
-  const isCashSelected = selectedMethod === 'cash';
-  const isGoodsArrivingSelected = selectedMethod === 'goods_arriving';
-  const isCashOnCollectionSelected = selectedMethod === 'cash_on_collection';
-
   return (
-    <div className="w-full max-w-4xl mx-auto">
-      <Card className="p-6 md:p-8">
-        <div className="space-y-6">
-          <div className="space-y-2">
-            <h2 className="text-xl md:text-2xl font-semibold">Choose Payment Method</h2>
-            <p className="text-muted-foreground">Select how you'd like to pay for your shipment</p>
-          </div>
-
-          <div className="border-t border-b py-4">
-            <div className="flex justify-between text-base mb-2">
-              <span>Subtotal</span>
-              <span>£{totalAmount.toFixed(2)}</span>
-            </div>
-            
-            {discountApplied && selectedMethod === 'cash_on_collection' && (
-              <div className="flex justify-between text-base text-green-600 mb-2">
-                <span>Cash on Collection Discount</span>
-                <span>-£{(totalAmount - finalAmount).toFixed(2)}</span>
-              </div>
-            )}
-            
-            {discountApplied && selectedMethod === 'goods_arriving' && (
-              <div className="flex justify-between text-base text-amber-600 mb-2">
-                <span>Pay on Arrival Premium (20%)</span>
-                <span>+£{(finalAmount - totalAmount).toFixed(2)}</span>
-              </div>
-            )}
-            
-            <div className="flex justify-between text-lg font-semibold mt-4">
-              <span>Total</span>
-              <span>£{finalAmount.toFixed(2)}</span>
-            </div>
-          </div>
-
-          <form onSubmit={handlePaymentSubmit}>
-            <RadioGroup 
-              value={selectedMethod} 
-              onValueChange={setSelectedMethod}
-              className="space-y-3"
-            >
-              <div className={cn(
-                "flex items-center rounded-lg border p-4 cursor-pointer transition-colors",
-                isCardSelected ? 
-                  "border-primary bg-primary/5 dark:bg-primary/10" : 
-                  "hover:bg-muted/50"
-              )}>
-                <RadioGroupItem value="card" id="card" className="mr-3" />
-                <Label htmlFor="card" className="flex items-center flex-1 cursor-pointer">
-                  <CreditCard className="h-5 w-5 mr-3 text-muted-foreground" />
-                  <div className="flex-1">
-                    <p className="font-medium">Credit/Debit Card</p>
-                    <p className="text-sm text-muted-foreground">Pay now with your card</p>
-                  </div>
-                  {isCardSelected && <Check className="h-5 w-5 text-primary ml-2" />}
-                </Label>
-              </div>
-
-              <div className={cn(
-                "flex items-center rounded-lg border p-4 cursor-pointer transition-colors",
-                isBankTransferSelected ? 
-                  "border-primary bg-primary/5 dark:bg-primary/10" : 
-                  "hover:bg-muted/50"
-              )}>
-                <RadioGroupItem value="bank_transfer" id="bank_transfer" className="mr-3" />
-                <Label htmlFor="bank_transfer" className="flex items-center flex-1 cursor-pointer">
-                  <Banknote className="h-5 w-5 mr-3 text-muted-foreground" />
-                  <div className="flex-1">
-                    <p className="font-medium">Bank Transfer (30-day terms)</p>
-                    <p className="text-sm text-muted-foreground">Pay by bank transfer within 30 days</p>
-                  </div>
-                  {isBankTransferSelected && <Check className="h-5 w-5 text-primary ml-2" />}
-                </Label>
-              </div>
+    <Card className="p-6">
+      <div className="mb-6">
+        <h3 className="text-xl font-semibold mb-2">Choose Payment Method</h3>
+        <p className="text-gray-600">Select how you would like to pay for your shipment</p>
+      </div>
+      
+      <RadioGroup 
+        value={selectedPaymentMethod} 
+        onValueChange={(value) => setSelectedPaymentMethod(value as 'standard' | 'cashOnCollection' | 'payOnArrival')}
+        className="space-y-4"
+      >
+        <div className={`border rounded-lg p-4 transition ${selectedPaymentMethod === 'standard' ? 'border-zim-green bg-green-50' : 'hover:bg-gray-50'}`}>
+          <div className="flex items-start">
+            <RadioGroupItem value="standard" id="standard" className="mt-1" />
+            <div className="ml-3 w-full">
+              <label htmlFor="standard" className="font-medium flex items-center justify-between">
+                <span className="flex items-center">
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Standard Payment
+                </span>
+                <span className="text-zim-green font-semibold">£{totalAmount.toFixed(2)}</span>
+              </label>
+              <p className="text-sm text-gray-600 mt-1 mb-3">Pay by card or bank transfer before collection</p>
               
-              <div className={cn(
-                "flex items-center rounded-lg border p-4 cursor-pointer transition-colors",
-                isCashSelected ? 
-                  "border-primary bg-primary/5 dark:bg-primary/10" : 
-                  "hover:bg-muted/50"
-              )}>
-                <RadioGroupItem value="cash" id="cash" className="mr-3" />
-                <Label htmlFor="cash" className="flex items-center flex-1 cursor-pointer">
-                  <Banknote className="h-5 w-5 mr-3 text-muted-foreground" />
-                  <div className="flex-1">
-                    <p className="font-medium">Cash Payment (30-day terms)</p>
-                    <p className="text-sm text-muted-foreground">Pay in cash within 30 days</p>
-                  </div>
-                  {isCashSelected && <Check className="h-5 w-5 text-primary ml-2" />}
-                </Label>
-              </div>
-              
-              {bookingData?.includeDrums && (
-                <div className={cn(
-                  "flex items-center rounded-lg border p-4 cursor-pointer transition-colors",
-                  isCashOnCollectionSelected ? 
-                    "border-primary bg-primary/5 dark:bg-primary/10" : 
-                    "hover:bg-muted/50"
-                )}>
-                  <RadioGroupItem value="cash_on_collection" id="cash_on_collection" className="mr-3" />
-                  <Label htmlFor="cash_on_collection" className="flex items-center flex-1 cursor-pointer">
-                    <Banknote className="h-5 w-5 mr-3 text-green-500" />
-                    <div className="flex-1">
-                      <p className="font-medium">Cash on Collection (Special Deal)</p>
-                      <p className="text-sm text-muted-foreground">£20 discount per drum when paying in cash on collection</p>
+              {selectedPaymentMethod === 'standard' && (
+                <div className="border-t pt-3 mt-2">
+                  <RadioGroup 
+                    value={payLaterMethod} 
+                    onValueChange={(value) => setPayLaterMethod(value as 'bankTransfer' | 'payLater')}
+                    className="space-y-3"
+                  >
+                    <div className="flex items-center">
+                      <RadioGroupItem value="bankTransfer" id="bankTransfer" />
+                      <label htmlFor="bankTransfer" className="ml-2 text-sm font-medium">Bank Transfer</label>
                     </div>
-                    {isCashOnCollectionSelected && <Check className="h-5 w-5 text-primary ml-2" />}
-                  </Label>
+                    
+                    <div className="flex items-center">
+                      <RadioGroupItem value="payLater" id="payLater" />
+                      <label htmlFor="payLater" className="ml-2 text-sm font-medium">30-Day Payment Terms (For Business Clients)</label>
+                    </div>
+                  </RadioGroup>
                 </div>
               )}
-              
-              <div className={cn(
-                "flex items-center rounded-lg border p-4 cursor-pointer transition-colors",
-                isGoodsArrivingSelected ? 
-                  "border-primary bg-primary/5 dark:bg-primary/10" : 
-                  "hover:bg-muted/50"
-              )}>
-                <RadioGroupItem value="goods_arriving" id="goods_arriving" className="mr-3" />
-                <Label htmlFor="goods_arriving" className="flex items-center flex-1 cursor-pointer">
-                  <Clock className="h-5 w-5 mr-3 text-amber-500" />
-                  <div className="flex-1">
-                    <p className="font-medium">Pay on Goods Arriving</p>
-                    <p className="text-sm text-muted-foreground">Pay when your goods arrive in Zimbabwe (20% premium)</p>
-                  </div>
-                  {isGoodsArrivingSelected && <Check className="h-5 w-5 text-primary ml-2" />}
-                </Label>
-              </div>
-            </RadioGroup>
-
-            <div className="mt-8 flex flex-col md:flex-row justify-between gap-4">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={onCancel}
-                disabled={isSubmitting}
-                className="md:w-auto"
-              >
-                Go Back
-              </Button>
-              
-              <Button 
-                type="submit"
-                className="bg-zim-green hover:bg-zim-green/90 md:w-auto flex items-center"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Processing...' : 'Complete Payment'}
-                {!isSubmitting && <ArrowRight className="ml-2 h-4 w-4" />}
-              </Button>
             </div>
-          </form>
+          </div>
         </div>
-      </Card>
-    </div>
+        
+        <div className={`border rounded-lg p-4 transition ${selectedPaymentMethod === 'cashOnCollection' ? 'border-zim-green bg-green-50' : 'hover:bg-gray-50'}`}>
+          <div className="flex items-start">
+            <RadioGroupItem value="cashOnCollection" id="cashOnCollection" className="mt-1" />
+            <div className="ml-3 w-full">
+              <label htmlFor="cashOnCollection" className="font-medium flex items-center justify-between">
+                <span className="flex items-center">
+                  <Wallet className="mr-2 h-4 w-4" />
+                  Cash on Collection
+                </span>
+                {isSpecialDeal && drumQuantity > 0 ? (
+                  <div className="text-right">
+                    <span className="text-gray-500 line-through mr-2">£{totalAmount.toFixed(2)}</span>
+                    <span className="text-zim-green font-semibold">£{(totalAmount - specialDealDiscount).toFixed(2)}</span>
+                  </div>
+                ) : (
+                  <span className="text-zim-green font-semibold">£{totalAmount.toFixed(2)}</span>
+                )}
+              </label>
+              <p className="text-sm text-gray-600 mt-1">Pay with cash when your items are collected</p>
+              
+              {isSpecialDeal && drumQuantity > 0 && (
+                <div className="mt-3 flex items-start rounded-md bg-green-100 p-2 text-sm">
+                  <CheckCircle2 className="mr-2 h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-green-700">
+                    Special deal: £20 discount per drum for cash payments!
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        <div className={`border rounded-lg p-4 transition ${selectedPaymentMethod === 'payOnArrival' ? 'border-zim-green bg-green-50' : 'hover:bg-gray-50'}`}>
+          <div className="flex items-start">
+            <RadioGroupItem value="payOnArrival" id="payOnArrival" className="mt-1" />
+            <div className="ml-3 w-full">
+              <label htmlFor="payOnArrival" className="font-medium flex items-center justify-between">
+                <span className="flex items-center">
+                  <CalendarClock className="mr-2 h-4 w-4" />
+                  Pay on Arrival (20% Premium)
+                </span>
+                <div className="text-right">
+                  <span className="text-gray-500 line-through mr-2">£{totalAmount.toFixed(2)}</span>
+                  <span className="text-zim-green font-semibold">£{finalAmount.toFixed(2)}</span>
+                </div>
+              </label>
+              <p className="text-sm text-gray-600 mt-1">Pay when your shipment reaches the destination</p>
+              
+              <div className="mt-3 flex items-start rounded-md bg-amber-100 p-2 text-sm">
+                <AlertCircle className="mr-2 h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                <span className="text-amber-700">
+                  This option adds a 20% premium to the total cost.
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </RadioGroup>
+      
+      <div className="border-t mt-6 pt-6">
+        <div className="mb-4">
+          <div className="flex justify-between mb-2">
+            <span className="text-gray-600">Subtotal:</span>
+            <span>£{totalAmount.toFixed(2)}</span>
+          </div>
+          
+          {isSpecialDeal && (
+            <div className="flex justify-between mb-2 text-green-600">
+              <span>Cash discount:</span>
+              <span>-£{specialDealDiscount.toFixed(2)}</span>
+            </div>
+          )}
+          
+          {isPayOnArrival && (
+            <div className="flex justify-between mb-2 text-amber-600">
+              <span>Pay on arrival premium (20%):</span>
+              <span>+£{payOnArrivalPremium.toFixed(2)}</span>
+            </div>
+          )}
+          
+          <div className="flex justify-between font-bold text-lg mt-2">
+            <span>Total:</span>
+            <span>£{finalAmount.toFixed(2)}</span>
+          </div>
+        </div>
+        
+        <div className="flex justify-between">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+          >
+            Back
+          </Button>
+          <Button
+            type="button"
+            className="bg-zim-green hover:bg-zim-green/90"
+            onClick={handleConfirm}
+            disabled={isProcessing}
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              'Complete Payment'
+            )}
+          </Button>
+        </div>
+      </div>
+    </Card>
   );
-}
+};

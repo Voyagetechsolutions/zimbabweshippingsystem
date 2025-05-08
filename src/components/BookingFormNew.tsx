@@ -1,30 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { useNavigate } from 'react-router-dom';
-import { v4 as uuidv4 } from 'uuid';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Card } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
+import { useForm } from 'react-hook-form';
+import * as z from 'zod';
 import { supabase } from '@/integrations/supabase/client';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { Loader2, Plus, Minus, Info, AlertCircle, CheckCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { v4 as uuidv4 } from 'uuid';
+import { useToast } from '@/hooks/use-toast';
+import { isValidEmail, isValidPhoneNumber } from '@/utils/formValidation';
+import { Button } from '@/components/ui/button';
 import {
   Form,
   FormControl,
@@ -33,527 +15,392 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { 
-  getRouteNames, 
-  getAreasByRoute, 
-  getDateByRoute, 
-  getAreasFromPostalCode,
-  getRouteForIrelandCity,
-  getDateForIrelandCity
-} from '@/data/collectionSchedule';
-import { postalCodeToRouteMap, restrictedPostalCodes } from '@/utils/postalCodeUtils';
-import { IrelandCitySelector } from './IrelandCitySelector';
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Card, CardContent } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AlertCircle, CheckCircle2, Package, Ship, Info, User, Phone, FileBox, ClipboardList } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { getRouteForPostalCode, getIrelandRouteForCity } from '@/utils/postalCodeUtils';
+import { Link } from 'react-router-dom';
 
-// Define the form schema with Zod
-const bookingFormSchema = z.object({
-  // Sender details
-  firstName: z.string().min(2, { message: "First name must be at least 2 characters" }),
-  lastName: z.string().min(2, { message: "Last name must be at least 2 characters" }),
-  email: z.string().email({ message: "Please enter a valid email address" }),
-  phone: z.string().min(10, { message: "Phone number must be at least 10 digits" }),
+// Define the validation schema
+const formSchema = z.object({
+  // Sender Information
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
+  email: z.string().email('Please enter a valid email address'),
+  phone: z.string().refine(val => isValidPhoneNumber(val), {
+    message: 'Please enter a valid phone number',
+  }),
+  hasAdditionalPhone: z.boolean().default(false),
+  additionalPhone: z.string().optional(),
+  pickupCountry: z.enum(['England', 'Ireland']),
+  pickupAddress: z.string().min(1, 'Pickup address is required'),
+  pickupPostcode: z.string()
+    .min(1, 'Postcode is required')
+    .refine(val => {
+      // UK Postcode validation: 2 letters + 1 number OR 1 letter + 1 number
+      return /^[A-Z]{1,2}[0-9]/.test(val.toUpperCase());
+    }, { message: 'Please enter a valid UK postcode' }),
+  pickupCity: z.string().min(1, 'City is required'),
   
-  // Pickup details
-  pickupAddress: z.string().min(5, { message: "Address must be at least 5 characters" }),
-  pickupCity: z.string().optional(),
-  pickupPostcode: z.string().optional(),
-  pickupCountry: z.string(),
+  // Collection Information
+  collectionRoute: z.string().optional(),
+  collectionDate: z.string().optional(),
   
-  // Recipient details
-  recipientName: z.string().min(2, { message: "Recipient name must be at least 2 characters" }),
-  recipientPhone: z.string().min(10, { message: "Phone number must be at least 10 digits" }),
+  // Recipient Information
+  recipientName: z.string().min(1, 'Recipient name is required'),
+  recipientPhone: z.string().refine(val => isValidPhoneNumber(val), {
+    message: 'Please enter a valid phone number',
+  }),
+  hasAdditionalRecipientPhone: z.boolean().default(false),
   additionalRecipientPhone: z.string().optional(),
-  deliveryAddress: z.string().min(5, { message: "Delivery address must be at least 5 characters" }),
-  deliveryCity: z.string().min(2, { message: "City must be at least 2 characters" }),
+  deliveryAddress: z.string().min(1, 'Delivery address is required'),
+  deliveryCity: z.string().min(1, 'Delivery city is required'),
   
-  // Shipment details
-  shipmentType: z.enum(["drum", "parcel", "other"]),
-  includeDrums: z.boolean().optional(),
+  // Shipment Details
+  includeDrums: z.boolean().default(false),
+  includeOtherItems: z.boolean().default(false),
   drumQuantity: z.string().optional(),
-  wantMetalSeal: z.boolean().optional(),
-  includeOtherItems: z.boolean().optional(),
+  shipmentType: z.enum(['drum', 'parcel', 'other']).default('drum'),
   weight: z.string().optional(),
+  dimensions: z.string().optional(),
   itemCategory: z.string().optional(),
   specificItem: z.string().optional(),
   otherItemDescription: z.string().optional(),
   
-  // Delivery options
-  doorToDoor: z.boolean().optional(),
+  // Additional Services
+  doorToDoor: z.boolean().default(false),
+  wantMetalSeal: z.boolean().default(false),
   additionalDeliveryAddresses: z.array(z.string()).optional(),
   
-  // Payment options
-  paymentOption: z.enum(["standard", "express"]).optional(),
-  paymentMethod: z.enum(["card", "bank_transfer", "cash", "goods_arriving"]).optional(),
-  
-  // Terms
-  agreeTerms: z.boolean().refine(val => val === true, {
-    message: "You must agree to the terms and conditions"
-  }),
+  // Payment Options
+  paymentOption: z.enum(['standard', 'payLater']).default('standard'),
+  paymentMethod: z.enum(['card', 'bank', 'crypto']).default('card'),
 });
 
-type BookingFormValues = z.infer<typeof bookingFormSchema>;
+type FormValues = z.infer<typeof formSchema>;
 
 interface BookingFormNewProps {
   onSubmitComplete: (data: any, shipmentId: string, amount: number) => void;
 }
 
 const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => {
-  const { session } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('sender');
+  const [availableRoutes, setAvailableRoutes] = useState<{ route: string; pickupDate: string }[]>([]);
+  const [detectedRoute, setDetectedRoute] = useState<string | null>(null);
+  const [collectionDate, setCollectionDate] = useState<string | null>(null);
+  const [additionalAddresses, setAdditionalAddresses] = useState<string[]>(['']);
   const { toast } = useToast();
-  const navigate = useNavigate();
-  const isMobile = useIsMobile();
-  
-  // Form state
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [currentStep, setCurrentStep] = useState(1);
-  const [totalSteps] = useState(3);
-  const [activeTab, setActiveTab] = useState('drum');
-  
-  // Pickup details state
-  const [pickupCountry, setPickupCountry] = useState('England');
-  const [pickupCity, setPickupCity] = useState('');
-  const [pickupPostcode, setPickupPostcode] = useState('');
-  const [postalCodeValid, setPostalCodeValid] = useState(true);
-  const [postalCodeMessage, setPostalCodeMessage] = useState('');
-  const [collectionRoute, setCollectionRoute] = useState('');
-  const [collectionDate, setCollectionDate] = useState('');
-  const [selectedCollectionDate, setSelectedCollectionDate] = useState('');
-  
-  // Shipment details state
-  const [includeDrums, setIncludeDrums] = useState(true);
-  const [includeOtherItems, setIncludeOtherItems] = useState(false);
-  const [drumQuantity, setDrumQuantity] = useState('1');
-  const [wantMetalSeal, setWantMetalSeal] = useState(false);
-  const [doorToDoor, setDoorToDoor] = useState(false);
-  const [additionalAddresses, setAdditionalAddresses] = useState<string[]>([]);
-  const [newAddress, setNewAddress] = useState('');
-  const [itemCategory, setItemCategory] = useState('');
-  const [specificItem, setSpecificItem] = useState('');
-  
-  // Pricing state
-  const [drumPrice, setDrumPrice] = useState(0);
-  const [totalPrice, setTotalPrice] = useState(0);
-  const [metalSealPrice, setMetalSealPrice] = useState(0);
-  const [doorToDoorPrice, setDoorToDoorPrice] = useState(0);
-  
-  // Initialize the form
-  const form = useForm<BookingFormValues>({
-    resolver: zodResolver(bookingFormSchema),
+
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
-      firstName: '',
-      lastName: '',
-      email: '',
-      phone: '',
-      pickupAddress: '',
-      pickupCity: '',
-      pickupPostcode: '',
       pickupCountry: 'England',
-      recipientName: '',
-      recipientPhone: '',
-      additionalRecipientPhone: '',
-      deliveryAddress: '',
-      deliveryCity: '',
-      shipmentType: 'drum',
-      includeDrums: true,
-      drumQuantity: '1',
-      wantMetalSeal: false,
+      includeDrums: false,
       includeOtherItems: false,
-      weight: '',
-      itemCategory: '',
-      specificItem: '',
-      otherItemDescription: '',
+      shipmentType: 'drum',
+      drumQuantity: '1',
       doorToDoor: false,
+      wantMetalSeal: false,
+      hasAdditionalPhone: false,
+      hasAdditionalRecipientPhone: false,
       additionalDeliveryAddresses: [],
       paymentOption: 'standard',
       paymentMethod: 'card',
-      agreeTerms: false,
     },
   });
-  
-  const { watch, setValue, handleSubmit, control, formState: { errors } } = form;
-  
-  // Watch form values for changes
-  const watchShipmentType = watch('shipmentType');
-  const watchDrumQuantity = watch('drumQuantity');
-  const watchWantMetalSeal = watch('wantMetalSeal');
-  const watchDoorToDoor = watch('doorToDoor');
-  const watchIncludeDrums = watch('includeDrums');
-  const watchIncludeOtherItems = watch('includeOtherItems');
-  
-  // Load user data if logged in
+
+  // Fetch collection schedules
   useEffect(() => {
-    const loadUserData = async () => {
-      if (session?.user) {
-        try {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-          
-          if (data && !error) {
-            setValue('firstName', data.first_name || '');
-            setValue('lastName', data.last_name || '');
-            setValue('email', data.email || session.user.email || '');
-            setValue('phone', data.phone || '');
-          }
-        } catch (error) {
-          console.error('Error loading user data:', error);
+    const fetchCollectionSchedules = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('collection_schedules')
+          .select('route, pickup_date, areas');
+        
+        if (error) throw error;
+        
+        if (data) {
+          setAvailableRoutes(data.map(item => ({
+            route: item.route,
+            pickupDate: item.pickup_date
+          })));
+        }
+      } catch (error) {
+        console.error('Error fetching collection schedules:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load collection schedules',
+          variant: 'destructive',
+        });
+      }
+    };
+    
+    fetchCollectionSchedules();
+  }, [toast]);
+  
+  // Watch for postcode changes to calculate route
+  const watchPostcode = form.watch('pickupPostcode');
+  const watchCountry = form.watch('pickupCountry');
+  const watchPickupCity = form.watch('pickupCity');
+  
+  useEffect(() => {
+    if (watchCountry === 'England' && watchPostcode) {
+      const route = getRouteForPostalCode(watchPostcode);
+      setDetectedRoute(route);
+      
+      if (route) {
+        const matchingRoute = availableRoutes.find(item => item.route === route);
+        if (matchingRoute) {
+          setCollectionDate(matchingRoute.pickupDate);
+          form.setValue('collectionRoute', route);
+          form.setValue('collectionDate', matchingRoute.pickupDate);
         }
       }
-    };
-    
-    loadUserData();
-  }, [session, setValue]);
-  
-  // Update pricing when relevant form values change
-  useEffect(() => {
-    const calculatePricing = () => {
-      // Base drum price
-      const baseDrumPrice = 150;
-      const quantity = parseInt(watchDrumQuantity || '1');
-      const drumTotal = watchIncludeDrums ? baseDrumPrice * quantity : 0;
+    } else if (watchCountry === 'Ireland' && watchPickupCity) {
+      const route = getIrelandRouteForCity(watchPickupCity);
+      setDetectedRoute(route);
       
-      // Metal seal price
-      const sealPrice = watchWantMetalSeal ? 5 * quantity : 0;
-      
-      // Door to door price
-      const addressCount = watchDoorToDoor ? 1 + additionalAddresses.length : 0;
-      const dtdPrice = addressCount * 25;
-      
-      setDrumPrice(drumTotal);
-      setMetalSealPrice(sealPrice);
-      setDoorToDoorPrice(dtdPrice);
-      setTotalPrice(drumTotal + sealPrice + dtdPrice);
-    };
-    
-    calculatePricing();
-  }, [watchIncludeDrums, watchDrumQuantity, watchWantMetalSeal, watchDoorToDoor, additionalAddresses]);
-  
-  // Handle postal code validation
-  useEffect(() => {
-    if (pickupPostcode && pickupCountry === 'England') {
-      const cleanPostcode = pickupPostcode.trim().toUpperCase();
-      
-      // Check if it's a restricted postal code
-      const isRestricted = restrictedPostalCodes.some(prefix => 
-        cleanPostcode.startsWith(prefix)
-      );
-      
-      if (isRestricted) {
-        setPostalCodeValid(false);
-        setPostalCodeMessage("We don't currently service this area. Please contact support.");
-        return;
+      if (route) {
+        const matchingRoute = availableRoutes.find(item => item.route === route);
+        if (matchingRoute) {
+          setCollectionDate(matchingRoute.pickupDate);
+          form.setValue('collectionRoute', route);
+          form.setValue('collectionDate', matchingRoute.pickupDate);
+        }
       }
-      
-      // Get the postal code prefix
-      const prefix = cleanPostcode.match(/^[A-Z]+/);
-      if (!prefix) {
-        setPostalCodeValid(false);
-        setPostalCodeMessage("Invalid postal code format");
-        return;
-      }
-      
-      // Check if we have a route for this postal code
-      const route = postalCodeToRouteMap[prefix[0]];
-      if (!route) {
-        setPostalCodeValid(false);
-        setPostalCodeMessage("We don't currently service this area. Please contact support.");
-        return;
-      }
-      
-      // Valid postal code with a route
-      setPostalCodeValid(true);
-      setPostalCodeMessage("");
-      setCollectionRoute(route);
-      
-      // Get collection date for this route
-      const date = getDateByRoute(route);
-      setCollectionDate(date);
-      setSelectedCollectionDate(date);
     }
-  }, [pickupPostcode, pickupCountry]);
+  }, [watchPostcode, watchCountry, watchPickupCity, availableRoutes, form]);
   
-  // Handle form input changes
-  const handleInputChange = (field: string, value: any) => {
-    setValue(field as any, value);
-  };
-  
-  // Handle drum quantity changes
-  const handleDrumQuantityChange = (newQuantity: string) => {
-    const quantity = parseInt(newQuantity);
-    if (!isNaN(quantity) && quantity >= 1 && quantity <= 10) {
-      setDrumQuantity(newQuantity);
-      setValue('drumQuantity', newQuantity);
-    }
-  };
-  
-  // Handle increment/decrement drum quantity
-  const incrementDrumQuantity = () => {
-    const currentQuantity = parseInt(drumQuantity);
-    if (currentQuantity < 10) {
-      const newQuantity = (currentQuantity + 1).toString();
-      setDrumQuantity(newQuantity);
-      setValue('drumQuantity', newQuantity);
-    }
-  };
-  
-  const decrementDrumQuantity = () => {
-    const currentQuantity = parseInt(drumQuantity);
-    if (currentQuantity > 1) {
-      const newQuantity = (currentQuantity - 1).toString();
-      setDrumQuantity(newQuantity);
-      setValue('drumQuantity', newQuantity);
-    }
-  };
-  
-  // Handle adding additional delivery addresses
+  // Handle adding/removing additional delivery addresses
   const addDeliveryAddress = () => {
-    if (newAddress.trim() && !additionalAddresses.includes(newAddress.trim())) {
-      const updatedAddresses = [...additionalAddresses, newAddress.trim()];
-      setAdditionalAddresses(updatedAddresses);
-      setValue('additionalDeliveryAddresses', updatedAddresses);
-      setNewAddress('');
-    }
+    setAdditionalAddresses([...additionalAddresses, '']);
   };
   
-  // Handle removing additional delivery addresses
   const removeDeliveryAddress = (index: number) => {
-    const updatedAddresses = additionalAddresses.filter((_, i) => i !== index);
-    setAdditionalAddresses(updatedAddresses);
-    setValue('additionalDeliveryAddresses', updatedAddresses);
+    const newAddresses = [...additionalAddresses];
+    newAddresses.splice(index, 1);
+    setAdditionalAddresses(newAddresses);
   };
   
+  const updateDeliveryAddress = (index: number, value: string) => {
+    const newAddresses = [...additionalAddresses];
+    newAddresses[index] = value;
+    setAdditionalAddresses(newAddresses);
+    form.setValue('additionalDeliveryAddresses', newAddresses.filter(addr => addr.trim() !== ''));
+  };
+
   // Handle form submission
-  const onSubmit = async (data: BookingFormValues) => {
-    setIsSubmitting(true);
+  const onSubmit = async (values: FormValues) => {
+    setIsLoading(true);
     
     try {
-      // Generate a unique shipment ID
-      const shipmentId = `shp_${uuidv4()}`;
+      // Calculate the base price based on the shipment details
+      let basePrice = 0;
       
-      // Create a tracking number
-      const trackingNumber = `ZIM-${Math.floor(100000 + Math.random() * 900000)}`;
-      
-      // Get user ID if logged in
-      let userId = null;
-      if (session?.user) {
-        userId = session.user.id;
-      }
-      
-      // Create shipment record in database
-      const { error } = await supabase
-        .from('shipments')
-        .insert({
-          id: shipmentId.substring(4), // Remove 'shp_' prefix for UUID
-          user_id: userId,
-          status: 'pending_payment',
-          tracking_number: trackingNumber,
-          sender_details: {
-            name: `${data.firstName} ${data.lastName}`,
-            email: data.email,
-            phone: data.phone,
-            address: `${data.pickupAddress}, ${data.pickupCountry === 'England' ? data.pickupPostcode : data.pickupCity}`,
-          },
-          recipient_details: {
-            name: data.recipientName,
-            phone: data.recipientPhone,
-            additional_phone: data.additionalRecipientPhone || null,
-            address: `${data.deliveryAddress}, ${data.deliveryCity}`,
-          },
-          shipment_type: data.includeDrums ? 'drum' : data.shipmentType,
-          collection_date: selectedCollectionDate,
-          collection_route: collectionRoute,
-          metadata: {
-            drum_quantity: data.includeDrums ? parseInt(data.drumQuantity || '1') : 0,
-            metal_seal: data.wantMetalSeal || false,
-            door_to_door: data.doorToDoor || false,
-            additional_addresses: data.additionalDeliveryAddresses || [],
-            other_items: data.includeOtherItems || false,
-            item_category: data.itemCategory || null,
-            specific_item: data.specificItem || null,
-            item_description: data.otherItemDescription || null,
-            weight: data.weight || null,
-          }
-        });
-      
-      if (error) {
-        throw error;
-      }
-      
-      // Call the onSubmitComplete callback with the form data and shipment ID
-      onSubmitComplete(data, shipmentId, totalPrice);
-      
-    } catch (error: any) {
-      console.error('Error submitting form:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'There was a problem submitting your booking. Please try again.',
-        variant: 'destructive',
-      });
-      setIsSubmitting(false);
-    }
-  };
-  
-  // Handle next step
-  const handleNextStep = async () => {
-    if (currentStep < totalSteps) {
-      // Validate current step fields
-      let isValid = true;
-      
-      if (currentStep === 1) {
-        // Validate sender and pickup details
-        const fields = ['firstName', 'lastName', 'email', 'phone', 'pickupAddress'];
+      if (values.includeDrums) {
+        const qty = parseInt(values.drumQuantity || '1');
         
-        if (pickupCountry === 'England') {
-          fields.push('pickupPostcode');
-          
-          // Check if postal code is valid
-          if (!postalCodeValid) {
-            isValid = false;
-            toast({
-              title: 'Invalid Postal Code',
-              description: postalCodeMessage || 'Please enter a valid postal code',
-              variant: 'destructive',
-            });
+        if (values.paymentOption === 'standard') {
+          // Standard payment prices
+          if (qty >= 5) {
+            basePrice = qty * 260;
+          } else if (qty >= 2) {
+            basePrice = qty * 270;
+          } else {
+            basePrice = 280;
           }
         } else {
-          fields.push('pickupCity');
-        }
-        
-        // Check each field
-        for (const field of fields) {
-          const value = watch(field as any);
-          if (!value) {
-            isValid = false;
-            toast({
-              title: 'Missing Information',
-              description: `Please fill in all required fields`,
-              variant: 'destructive',
-            });
-            break;
+          // Pay later prices
+          if (qty >= 5) {
+            basePrice = qty * 260;
+          } else if (qty >= 2) {
+            basePrice = qty * 270;
+          } else {
+            basePrice = 280;
           }
-        }
-      } else if (currentStep === 2) {
-        // Validate recipient details
-        const fields = ['recipientName', 'recipientPhone', 'deliveryAddress', 'deliveryCity'];
-        
-        // Check each field
-        for (const field of fields) {
-          const value = watch(field as any);
-          if (!value) {
-            isValid = false;
-            toast({
-              title: 'Missing Information',
-              description: `Please fill in all required fields`,
-              variant: 'destructive',
-            });
-            break;
-          }
-        }
-        
-        // Validate shipment details
-        if (watchIncludeDrums && (!watchDrumQuantity || parseInt(watchDrumQuantity) < 1)) {
-          isValid = false;
-          toast({
-            title: 'Invalid Drum Quantity',
-            description: 'Please specify at least 1 drum',
-            variant: 'destructive',
-          });
-        }
-        
-        if (watchIncludeOtherItems && (!itemCategory || !specificItem)) {
-          isValid = false;
-          toast({
-            title: 'Missing Item Details',
-            description: 'Please specify the item category and specific item',
-            variant: 'destructive',
-          });
         }
       }
       
-      if (isValid) {
-        setCurrentStep(currentStep + 1);
-        window.scrollTo(0, 0);
+      // Generate tracking number
+      const trackingNumber = `ZIMSHIP-${Math.floor(10000 + Math.random() * 90000)}`;
+      
+      // Create shipment record
+      const shipment = {
+        id: uuidv4(),
+        tracking_number: trackingNumber,
+        status: 'pending',
+        origin: `${values.pickupAddress}, ${values.pickupCity}, ${values.pickupPostcode}, ${values.pickupCountry}`,
+        destination: `${values.deliveryAddress}, ${values.deliveryCity}, Zimbabwe`,
+        user_id: null, // Will be populated if user is logged in
+        metadata: {
+          sender: {
+            firstName: values.firstName,
+            lastName: values.lastName,
+            email: values.email,
+            phone: values.phone,
+            additionalPhone: values.hasAdditionalPhone ? values.additionalPhone : null,
+            country: values.pickupCountry,
+            address: values.pickupAddress,
+            postcode: values.pickupPostcode,
+            city: values.pickupCity,
+          },
+          recipient: {
+            name: values.recipientName,
+            phone: values.recipientPhone,
+            additionalPhone: values.hasAdditionalRecipientPhone ? values.additionalRecipientPhone : null,
+            address: values.deliveryAddress,
+            city: values.deliveryCity,
+          },
+          shipment: {
+            includeDrums: values.includeDrums,
+            includeOtherItems: values.includeOtherItems,
+            type: values.shipmentType,
+            quantity: values.includeDrums ? parseInt(values.drumQuantity || '1') : null,
+            weight: values.includeOtherItems ? values.weight : null,
+            dimensions: values.includeOtherItems ? values.dimensions : null,
+            category: values.includeOtherItems ? values.itemCategory : null,
+            specificItem: values.includeOtherItems ? values.specificItem : null,
+            description: values.includeOtherItems ? values.otherItemDescription : null,
+          },
+          services: {
+            doorToDoor: values.doorToDoor,
+            metalSeal: values.wantMetalSeal,
+            additionalAddresses: values.additionalDeliveryAddresses?.filter(addr => addr.trim() !== '') || [],
+          },
+          collection: {
+            route: values.collectionRoute,
+            date: values.collectionDate,
+          },
+          payment: {
+            option: values.paymentOption,
+            method: values.paymentMethod,
+            basePrice: basePrice,
+          }
+        }
+      };
+      
+      // Get authenticated user if available
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        shipment.user_id = user.id;
+      }
+      
+      // Insert shipment into Supabase
+      const { data, error } = await supabase
+        .from('shipments')
+        .insert(shipment)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      // Call the onSubmitComplete callback with the relevant data
+      onSubmitComplete(values, data.id, basePrice);
+      
+    } catch (error: any) {
+      console.error('Error submitting shipment:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to submit shipment',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Calculate total cost for the booking summary
+  const calculateTotal = () => {
+    const values = form.getValues();
+    let total = 0;
+    
+    // Calculate drum cost
+    if (values.includeDrums) {
+      const qty = parseInt(values.drumQuantity || '1');
+      if (values.paymentOption === 'standard') {
+        if (qty >= 5) {
+          total += qty * 260;
+        } else if (qty >= 2) {
+          total += qty * 270;
+        } else {
+          total += 280;
+        }
+      } else {
+        if (qty >= 5) {
+          total += qty * 260;
+        } else if (qty >= 2) {
+          total += qty * 270;
+        } else {
+          total += 280;
+        }
+      }
+      
+      // Add metal seal cost
+      if (values.wantMetalSeal) {
+        total += 5 * qty;
       }
     }
-  };
-  
-  // Handle previous step
-  const handlePrevStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-      window.scrollTo(0, 0);
+    
+    // Add door-to-door delivery cost
+    if (values.doorToDoor) {
+      const addressCount = (additionalAddresses.filter(addr => addr.trim() !== '').length || 1);
+      total += 25 * addressCount;
     }
+    
+    return total;
   };
-  
+
   return (
-    <div className="w-full">
-      {/* Progress indicator */}
-      <div className="mb-8">
-        <div className="flex justify-between items-center">
-          {Array.from({ length: totalSteps }).map((_, index) => (
-            <React.Fragment key={index}>
-              {index > 0 && (
-                <div 
-                  className={`flex-1 h-1 mx-2 ${
-                    index < currentStep ? 'bg-zim-green' : 'bg-gray-200 dark:bg-gray-700'
-                  }`}
-                />
-              )}
-              <div 
-                className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium ${
-                  index + 1 === currentStep
-                    ? 'bg-zim-green text-white'
-                    : index + 1 < currentStep
-                    ? 'bg-zim-green/20 text-zim-green border border-zim-green'
-                    : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-                }`}
-              >
-                {index + 1 < currentStep ? (
-                  <CheckCircle className="h-5 w-5" />
-                ) : (
-                  index + 1
-                )}
-              </div>
-            </React.Fragment>
-          ))}
-        </div>
-        <div className="flex justify-between mt-2 text-sm">
-          <div className={currentStep === 1 ? 'text-zim-green font-medium' : ''}>Sender Details</div>
-          <div className={currentStep === 2 ? 'text-zim-green font-medium' : ''}>Shipment Details</div>
-          <div className={currentStep === 3 ? 'text-zim-green font-medium' : ''}>Review & Submit</div>
-        </div>
-      </div>
-      
-      <Form {...form}>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Step 1: Sender Details */}
-          {currentStep === 1 && (
-            <div className="space-y-6">
-              <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-4">Sender Details</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <Card className="bg-white dark:bg-gray-800 shadow-md">
+      <CardContent className="p-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-4 mb-8">
+            <TabsTrigger value="sender" className="flex items-center justify-center gap-2">
+              <User className="h-4 w-4" />
+              <span>Sender Info</span>
+            </TabsTrigger>
+            <TabsTrigger value="recipient" className="flex items-center justify-center gap-2">
+              <Phone className="h-4 w-4" />
+              <span>Receiver Info</span>
+            </TabsTrigger>
+            <TabsTrigger value="shipment" className="flex items-center justify-center gap-2">
+              <Package className="h-4 w-4" />
+              <span>Shipment Details</span>
+            </TabsTrigger>
+            <TabsTrigger value="payment" className="flex items-center justify-center gap-2">
+              <ClipboardList className="h-4 w-4" />
+              <span>Booking Summary</span>
+            </TabsTrigger>
+          </TabsList>
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              
+              {/* Sender Information */}
+              <TabsContent value="sender" className="space-y-6">
+                <div className="text-xl font-semibold mb-4 flex items-center">
+                  <User className="h-5 w-5 mr-2" />
+                  Sender Information
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
-                    control={control}
+                    control={form.control}
                     name="firstName"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>First Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="John" {...field} />
+                          <Input placeholder="First name" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -561,27 +408,29 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
                   />
                   
                   <FormField
-                    control={control}
+                    control={form.control}
                     name="lastName"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Last Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="Doe" {...field} />
+                          <Input placeholder="Last name" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
-                    control={control}
+                    control={form.control}
                     name="email"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <Input type="email" placeholder="john.doe@example.com" {...field} />
+                          <Input type="email" placeholder="Email address" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -589,227 +438,99 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
                   />
                   
                   <FormField
-                    control={control}
+                    control={form.control}
                     name="phone"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Phone Number</FormLabel>
                         <FormControl>
-                          <Input placeholder="+44 123 456 7890" {...field} />
+                          <Input type="tel" placeholder="Phone number" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
-              </Card>
-              
-              <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-4">Pickup Details</h2>
-                <div className="grid grid-cols-1 gap-4">
+                
+                <FormField
+                  control={form.control}
+                  name="hasAdditionalPhone"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                      <FormControl>
+                        <Checkbox 
+                          checked={field.value} 
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>Add additional phone number</FormLabel>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+                
+                {form.watch('hasAdditionalPhone') && (
                   <FormField
-                    control={control}
-                    name="pickupAddress"
+                    control={form.control}
+                    name="additionalPhone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Pickup Address</FormLabel>
+                        <FormLabel>Additional Phone Number</FormLabel>
                         <FormControl>
-                          <Input placeholder="123 Main St, Apt 4B" {...field} />
+                          <Input type="tel" placeholder="Additional phone number" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Pickup Country */}
-                    <div className="w-full">
-                      <Label htmlFor="pickupCountry">Pickup Country</Label>
-                      <Select
-                        value={pickupCountry}
-                        onValueChange={(value) => {
-                          setPickupCountry(value);
-                          // Clear city when country changes
-                          if (value === 'Ireland') {
-                            setPickupPostcode('');
-                          } else {
-                            setPickupCity('');
-                          }
-                          handleInputChange('pickupCountry', value);
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select country" />
-                        </SelectTrigger>
+                )}
+                
+                <FormField
+                  control={form.control}
+                  name="pickupCountry"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Country</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select country" />
+                          </SelectTrigger>
+                        </FormControl>
                         <SelectContent>
                           <SelectItem value="England">England</SelectItem>
                           <SelectItem value="Ireland">Ireland</SelectItem>
                         </SelectContent>
                       </Select>
-                    </div>
-
-                    {/* For England: Show postcode field */}
-                    {pickupCountry === 'England' && (
-                      <div className="w-full sm:w-1/2">
-                        <Label htmlFor="pickupPostcode">Postcode</Label>
-                        <Input
-                          id="pickupPostcode"
-                          name="pickupPostcode"
-                          placeholder="e.g. W1A 1AA"
-                          onChange={(e) => {
-                            setPickupPostcode(e.target.value);
-                            handleInputChange('pickupPostcode', e.target.value);
-                          }}
-                          value={pickupPostcode}
-                          required
-                        />
-                      </div>
-                    )}
-
-                    {/* For England: Show city input field */}
-                    {pickupCountry === 'England' && (
-                      <div className="w-full sm:w-1/2">
-                        <Label htmlFor="pickupCity">City</Label>
-                        <Input
-                          id="pickupCity"
-                          name="pickupCity"
-                          placeholder="e.g. London"
-                          onChange={(e) => {
-                            setPickupCity(e.target.value);
-                            handleInputChange('pickupCity', e.target.value);
-                          }}
-                          value={pickupCity}
-                          required
-                        />
-                      </div>
-                    )}
-
-                    {/* For Ireland: Show city dropdown selector */}
-                    {pickupCountry === 'Ireland' && (
-                      <div className="w-full">
-                        <IrelandCitySelector 
-                          value={pickupCity}
-                          onChange={(city) => {
-                            setPickupCity(city);
-                            handleInputChange('pickupCity', city);
-                          }}
-                          onCollectionDateChange={(date) => {
-                            if (date) {
-                              setCollectionDate(date);
-                              setSelectedCollectionDate(date);
-                            }
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Collection information */}
-                  {pickupPostcode && pickupCountry === 'England' && postalCodeValid && collectionRoute && (
-                    <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
-                      <h3 className="font-medium text-green-800 dark:text-green-300 mb-1">Collection Information</h3>
-                      <p className="text-sm text-green-700 dark:text-green-400">
-                        Your area is serviced by our <strong>{collectionRoute}</strong> collection route.
-                      </p>
-                      <p className="text-sm text-green-700 dark:text-green-400">
-                        Next collection date: <strong>{collectionDate}</strong>
-                      </p>
-                    </div>
+                      <FormMessage />
+                    </FormItem>
                   )}
-                  
-                  {pickupPostcode && pickupCountry === 'England' && !postalCodeValid && (
-                    <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                      <h3 className="font-medium text-red-800 dark:text-red-300 mb-1">Collection Information</h3>
-                      <p className="text-sm text-red-700 dark:text-red-400">
-                        {postalCodeMessage || "We don't currently service this area. Please contact support."}
-                      </p>
-                    </div>
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="pickupAddress"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Pickup Address</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="Enter pickup address" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )}
-                  
-                  {pickupCity && pickupCountry === 'Ireland' && collectionDate && (
-                    <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
-                      <h3 className="font-medium text-green-800 dark:text-green-300 mb-1">Collection Information</h3>
-                      <p className="text-sm text-green-700 dark:text-green-400">
-                        Your area is serviced by our <strong>{getRouteForIrelandCity(pickupCity)}</strong> collection route.
-                      </p>
-                      <p className="text-sm text-green-700 dark:text-green-400">
-                        Next collection date: <strong>{collectionDate}</strong>
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </Card>
-              
-              <div className="flex justify-end">
-                <Button 
-                  type="button" 
-                  onClick={handleNextStep}
-                  className="bg-zim-green hover:bg-zim-green/90"
-                >
-                  Next Step
-                </Button>
-              </div>
-            </div>
-          )}
-          
-          {/* Step 2: Shipment Details */}
-          {currentStep === 2 && (
-            <div className="space-y-6">
-              <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-4">Recipient Details</h2>
-                <div className="grid grid-cols-1 gap-4">
+                />
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
-                    control={control}
-                    name="recipientName"
+                    control={form.control}
+                    name="pickupCity"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Recipient Name</FormLabel>
+                        <FormLabel>City</FormLabel>
                         <FormControl>
-                          <Input placeholder="Jane Doe" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <FormField
-                      control={control}
-                      name="recipientPhone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Recipient Phone</FormLabel>
-                          <FormControl>
-                            <Input placeholder="+263 123 456 789" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={control}
-                      name="additionalRecipientPhone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Additional Phone (Optional)</FormLabel>
-                          <FormControl>
-                            <Input placeholder="+263 987 654 321" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <FormField
-                    control={control}
-                    name="deliveryAddress"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Delivery Address</FormLabel>
-                        <FormControl>
-                          <Input placeholder="456 Example St" {...field} />
+                          <Input placeholder="City" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -817,584 +538,538 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
                   />
                   
                   <FormField
-                    control={control}
-                    name="deliveryCity"
+                    control={form.control}
+                    name="pickupPostcode"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>City in Zimbabwe</FormLabel>
+                        <FormLabel>Postal Code</FormLabel>
                         <FormControl>
-                          <Input placeholder="Harare" {...field} />
+                          <Input 
+                            placeholder="Postal code" 
+                            {...field} 
+                            onChange={(e) => {
+                              // Convert to uppercase for consistent validation
+                              field.onChange(e.target.value.toUpperCase());
+                            }}
+                          />
                         </FormControl>
+                        <FormDescription>
+                          Must start with 1-2 letters followed by a number (e.g., SW1 or B1)
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
-              </Card>
-              
-              <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-4">Shipment Details</h2>
                 
-                <Tabs defaultValue="drum" value={activeTab} onValueChange={(value) => {
-                  setActiveTab(value);
-                  setValue('shipmentType', value as any);
-                  
-                  if (value === 'drum') {
-                    setValue('includeDrums', true);
-                    setIncludeDrums(true);
-                  } else {
-                    setValue('includeDrums', false);
-                    setIncludeDrums(false);
-                  }
-                  
-                  if (value === 'other') {
-                    setValue('includeOtherItems', true);
-                    setIncludeOtherItems(true);
-                  }
-                }}>
-                  <TabsList className="grid grid-cols-3 mb-6">
-                    <TabsTrigger value="drum">Shipping Drums</TabsTrigger>
-                    <TabsTrigger value="parcel">Parcels</TabsTrigger>
-                    <TabsTrigger value="other">Other Items</TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="drum" className="space-y-4">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox 
-                        id="includeDrums" 
-                        checked={includeDrums}
-                        onCheckedChange={(checked) => {
-                          setIncludeDrums(!!checked);
-                          setValue('includeDrums', !!checked);
-                        }}
-                      />
-                      <label
-                        htmlFor="includeDrums"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        I want to ship items in drums
-                      </label>
-                    </div>
-                    
-                    {includeDrums && (
-                      <div className="space-y-4 mt-4">
-                        <div>
-                          <Label htmlFor="drumQuantity">Number of Drums</Label>
-                          <div className="flex items-center mt-1.5">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              onClick={decrementDrumQuantity}
-                              disabled={parseInt(drumQuantity) <= 1}
-                              className="h-9 w-9 rounded-r-none"
-                            >
-                              <Minus className="h-4 w-4" />
-                            </Button>
-                            <Input
-                              id="drumQuantity"
-                              type="text"
-                              value={drumQuantity}
-                              onChange={(e) => handleDrumQuantityChange(e.target.value)}
-                              className="h-9 rounded-none text-center w-16"
-                            />
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              onClick={incrementDrumQuantity}
-                              disabled={parseInt(drumQuantity) >= 10}
-                              className="h-9 w-9 rounded-l-none"
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
-                            <span className="ml-3 text-sm text-gray-600 dark:text-gray-400">
-                              (Max 10 drums per booking)
-                            </span>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          <Checkbox 
-                            id="wantMetalSeal" 
-                            checked={wantMetalSeal}
-                            onCheckedChange={(checked) => {
-                              setWantMetalSeal(!!checked);
-                              setValue('wantMetalSeal', !!checked);
-                            }}
-                          />
-                          <div className="grid gap-1.5 leading-none">
-                            <label
-                              htmlFor="wantMetalSeal"
-                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center"
-                            >
-                              Add metal security seals
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Info className="h-4 w-4 ml-1 text-gray-500" />
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p className="w-[200px] text-xs">
-                                      Metal seals provide extra security for your drums. £5 per drum.
-                                    </p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            </label>
-                            <p className="text-sm text-muted-foreground">
-                              £5 per drum (recommended for valuable items)
-                            </p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          <Checkbox 
-                            id="includeOtherItems" 
-                            checked={includeOtherItems}
-                            onCheckedChange={(checked) => {
-                              setIncludeOtherItems(!!checked);
-                              setValue('includeOtherItems', !!checked);
-                            }}
-                          />
-                          <label
-                            htmlFor="includeOtherItems"
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            I also want to ship other items (not in drums)
-                          </label>
-                        </div>
+                {detectedRoute && (
+                  <div className="border rounded-md p-4 bg-gray-50">
+                    <h3 className="font-medium mb-2">Collection Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      <div>
+                        <span className="font-medium">Route:</span> {detectedRoute}
                       </div>
-                    )}
-                  </TabsContent>
-                  
-                  <TabsContent value="parcel" className="space-y-4">
-                    <div>
-                      <Label htmlFor="weight">Parcel Weight (kg)</Label>
-                      <Input
-                        id="weight"
-                        type="number"
-                        placeholder="e.g. 5"
-                        min="0.1"
-                        step="0.1"
-                        onChange={(e) => setValue('weight', e.target.value)}
-                        className="max-w-[200px]"
-                      />
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Enter the weight of your parcel in kilograms
-                      </p>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2 mt-4">
-                      <Checkbox 
-                        id="includeOtherItems" 
-                        checked={true}
-                        disabled
-                      />
-                      <label
-                        htmlFor="includeOtherItems"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        Describe your items below
-                      </label>
-                    </div>
-                  </TabsContent>
-                  
-                  <TabsContent value="other" className="space-y-4">
-                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md p-4 mb-4">
-                      <div className="flex">
-                        <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mr-2 flex-shrink-0" />
-                        <div>
-                          <h3 className="text-sm font-medium text-amber-800 dark:text-amber-300">Custom Quote Required</h3>
-                          <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
-                            For items that don't fit in standard drums or parcels, we'll need to provide a custom quote.
-                          </p>
-                        </div>
+                      <div>
+                        <span className="font-medium">Collection Date:</span> {collectionDate || "Not available"}
                       </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2 mt-4">
-                      <Checkbox 
-                        id="includeOtherItems" 
-                        checked={true}
-                        disabled
-                      />
-                      <label
-                        htmlFor="includeOtherItems"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        Describe your items below
-                      </label>
-                    </div>
-                  </TabsContent>
-                </Tabs>
-                
-                {includeOtherItems && (
-                  <div className="mt-6 space-y-4 border-t pt-4">
-                    <h3 className="font-medium">Item Details</h3>
-                    
-                    <div>
-                      <Label htmlFor="itemCategory">Item Category</Label>
-                      <Select
-                        value={itemCategory}
-                        onValueChange={(value) => {
-                          setItemCategory(value);
-                          setValue('itemCategory', value);
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="electronics">Electronics</SelectItem>
-                          <SelectItem value="clothing">Clothing & Textiles</SelectItem>
-                          <SelectItem value="furniture">Furniture</SelectItem>
-                          <SelectItem value="appliances">Household Appliances</SelectItem>
-                          <SelectItem value="auto_parts">Auto Parts</SelectItem>
-                          <SelectItem value="medical">Medical Supplies</SelectItem>
-                          <SelectItem value="food">Food Items</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="specificItem">Specific Item</Label>
-                      <Input
-                        id="specificItem"
-                        placeholder="e.g. Laptop, Refrigerator, etc."
-                        value={specificItem}
-                        onChange={(e) => {
-                          setSpecificItem(e.target.value);
-                          setValue('specificItem', e.target.value);
-                        }}
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="otherItemDescription">Description (Optional)</Label>
-                      <Textarea
-                        id="otherItemDescription"
-                        placeholder="Provide additional details about your item..."
-                        onChange={(e) => setValue('otherItemDescription', e.target.value)}
-                        rows={3}
-                      />
                     </div>
                   </div>
                 )}
-              </Card>
-              
-              <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-4">Delivery Options</h2>
                 
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="doorToDoor" 
-                      checked={doorToDoor}
-                      onCheckedChange={(checked) => {
-                        setDoorToDoor(!!checked);
-                        setValue('doorToDoor', !!checked);
-                      }}
-                    />
-                    <div className="grid gap-1.5 leading-none">
-                      <label
-                        htmlFor="doorToDoor"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center"
-                      >
-                        Door-to-Door Delivery
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Info className="h-4 w-4 ml-1 text-gray-500" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="w-[200px] text-xs">
-                                We'll deliver directly to the recipient's address in Zimbabwe.
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </label>
-                      <p className="text-sm text-muted-foreground">
-                        £25 per delivery address
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {doorToDoor && (
-                    <div className="pl-6 border-l-2 border-gray-200 dark:border-gray-700 mt-4 space-y-4">
-                      <div>
-                        <Label htmlFor="additionalAddress">Additional Delivery Addresses (Optional)</Label>
-                        <div className="flex mt-1.5">
-                          <Input
-                            id="additionalAddress"
-                            placeholder="Enter additional address"
-                            value={newAddress}
-                            onChange={(e) => setNewAddress(e.target.value)}
-                            className="rounded-r-none"
-                          />
-                          <Button
-                            type="button"
-                            onClick={addDeliveryAddress}
-                            disabled={!newAddress.trim()}
-                            className="rounded-l-none bg-zim-green hover:bg-zim-green/90"
-                          >
-                            Add
-                          </Button>
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          £25 will be added for each additional address
-                        </p>
+                <div className="flex justify-end">
+                  <Button 
+                    type="button"
+                    onClick={() => setActiveTab('recipient')}
+                  >
+                    Next: Receiver Information
+                  </Button>
+                </div>
+              </TabsContent>
+              
+              {/* Recipient Information */}
+              <TabsContent value="recipient" className="space-y-6">
+                <div className="text-xl font-semibold mb-4 flex items-center">
+                  <Phone className="h-5 w-5 mr-2" />
+                  Receiver Information
+                </div>
+                
+                <FormField
+                  control={form.control}
+                  name="recipientName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Recipient Full Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Full name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="recipientPhone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone Number</FormLabel>
+                      <FormControl>
+                        <Input type="tel" placeholder="Phone number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="hasAdditionalRecipientPhone"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                      <FormControl>
+                        <Checkbox 
+                          checked={field.value} 
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>Add additional phone number</FormLabel>
                       </div>
+                    </FormItem>
+                  )}
+                />
+                
+                {form.watch('hasAdditionalRecipientPhone') && (
+                  <FormField
+                    control={form.control}
+                    name="additionalRecipientPhone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Additional Phone Number</FormLabel>
+                        <FormControl>
+                          <Input type="tel" placeholder="Additional phone number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+                
+                <FormField
+                  control={form.control}
+                  name="deliveryAddress"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Delivery Address</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="Enter delivery address" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="deliveryCity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Delivery City</FormLabel>
+                      <FormControl>
+                        <Input placeholder="City" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        We deliver in major towns and cities except rural areas
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="flex justify-between">
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={() => setActiveTab('sender')}
+                  >
+                    Back
+                  </Button>
+                  <Button 
+                    type="button"
+                    onClick={() => setActiveTab('shipment')}
+                  >
+                    Next: Shipment Details
+                  </Button>
+                </div>
+              </TabsContent>
+              
+              {/* Shipment Details */}
+              <TabsContent value="shipment" className="space-y-6">
+                <div className="text-xl font-semibold mb-4 flex items-center">
+                  <Package className="h-5 w-5 mr-2" />
+                  Shipment Details
+                </div>
+                
+                <div className="space-y-4 bg-gray-50 dark:bg-gray-700 p-4 rounded-md">
+                  <div className="font-medium">What would you like to ship?</div>
+                  <p className="text-gray-600 dark:text-gray-400">Please select either Drums or Other Items or both.</p>
+                  
+                  <div className="flex flex-col space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="includeDrums"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal flex items-center">
+                            <Ship className="h-4 w-4 mr-2" />
+                            Drums (200-220L each)
+                          </FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="includeOtherItems"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal flex items-center">
+                            <Package className="h-4 w-4 mr-2" />
+                            Other Items
+                          </FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+                
+                {/* Drums Section */}
+                {form.watch('includeDrums') && (
+                  <div className="border rounded-md p-4">
+                    <div className="font-medium mb-4">Drum Details</div>
+                    
+                    <FormField
+                      control={form.control}
+                      name="drumQuantity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Number of Drums</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number"
+                              min="1"
+                              placeholder="Enter quantity" 
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="wantMetalSeal"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 mt-4">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal">
+                            Add Metal coded seal for security (£5 per drum)
+                          </FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="doorToDoor"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 mt-4">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className="font-normal">
+                              Door-to-Door Delivery (£25 per delivery address)
+                            </FormLabel>
+                            <FormDescription>
+                              We'll pick up from your address and deliver directly to the recipient
+                            </FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    {form.watch('doorToDoor') && (
+                      <div className="mt-4 space-y-4 border-t pt-4">
+                        <div className="font-medium">Delivery Addresses</div>
+                        {additionalAddresses.map((address, index) => (
+                          <div key={index} className="flex items-start gap-2">
+                            <Textarea 
+                              value={address}
+                              onChange={(e) => updateDeliveryAddress(index, e.target.value)}
+                              placeholder={`Delivery address ${index + 1}`}
+                              className="flex-grow"
+                            />
+                            {index > 0 && (
+                              <Button 
+                                type="button" 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => removeDeliveryAddress(index)}
+                              >
+                                Remove
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                        
+                        <Button 
+                          type="button"
+                          variant="outline"
+                          onClick={addDeliveryAddress}
+                          className="mt-2"
+                        >
+                          Add Another Address
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* Other Items Section */}
+                {form.watch('includeOtherItems') && (
+                  <div className="border rounded-md p-4">
+                    <div className="font-medium mb-4">Other Items Details</div>
+                    
+                    <div className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="doorToDoor"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel className="font-normal">
+                                Door-to-Door Delivery (£25 per delivery address)
+                              </FormLabel>
+                              <FormDescription>
+                                We'll pick up from your address and deliver directly to the recipient
+                              </FormDescription>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
                       
-                      {additionalAddresses.length > 0 && (
-                        <div className="space-y-2">
-                          <Label>Additional Addresses</Label>
-                          <div className="space-y-2">
-                            {additionalAddresses.map((address, index) => (
-                              <div key={index} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 p-2 rounded-md">
-                                <span className="text-sm truncate mr-2">{address}</span>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
+                      {form.watch('doorToDoor') && (
+                        <div className="mt-4 space-y-4 border-t pt-4">
+                          <div className="font-medium">Delivery Addresses</div>
+                          {additionalAddresses.map((address, index) => (
+                            <div key={index} className="flex items-start gap-2">
+                              <Textarea 
+                                value={address}
+                                onChange={(e) => updateDeliveryAddress(index, e.target.value)}
+                                placeholder={`Delivery address ${index + 1}`}
+                                className="flex-grow"
+                              />
+                              {index > 0 && (
+                                <Button 
+                                  type="button" 
+                                  variant="outline" 
                                   size="sm"
                                   onClick={() => removeDeliveryAddress(index)}
-                                  className="h-8 w-8 p-0"
                                 >
-                                  <Minus className="h-4 w-4" />
+                                  Remove
                                 </Button>
-                              </div>
-                            ))}
-                          </div>
+                              )}
+                            </div>
+                          ))}
+                          
+                          <Button 
+                            type="button"
+                            variant="outline"
+                            onClick={addDeliveryAddress}
+                            className="mt-2"
+                          >
+                            Add Another Address
+                          </Button>
+                        </div>
+                      )}
+                      
+                      <div className="flex flex-col space-y-4">
+                        <Link 
+                          to="/custom-quote"
+                          className="w-full"
+                        >
+                          <Button className="w-full" variant="secondary">
+                            Request Custom Quote for Other Items
+                          </Button>
+                        </Link>
+                        
+                        <Link
+                          to="/pricing"
+                          className="text-blue-600 hover:underline text-center"
+                        >
+                          View Items We Ship
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex justify-between">
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={() => setActiveTab('recipient')}
+                  >
+                    Back
+                  </Button>
+                  <Button 
+                    type="button"
+                    onClick={() => setActiveTab('payment')}
+                  >
+                    Next: Booking Summary
+                  </Button>
+                </div>
+              </TabsContent>
+              
+              {/* Booking Summary Section */}
+              <TabsContent value="payment" className="space-y-6">
+                <div className="text-xl font-semibold mb-4 flex items-center">
+                  <ClipboardList className="h-5 w-5 mr-2" />
+                  Booking Summary
+                </div>
+                
+                <div className="border rounded-md p-4">
+                  <h3 className="font-medium mb-4">Order Summary</h3>
+                  
+                  {form.watch('includeDrums') && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span>Drums ({form.watch('drumQuantity') || '1'} × {
+                          parseInt(form.watch('drumQuantity') || '1') >= 5 ? '£260' : 
+                          parseInt(form.watch('drumQuantity') || '1') >= 2 ? '£270' : '£280'
+                        })</span>
+                        <span>£{
+                          parseInt(form.watch('drumQuantity') || '1') >= 5 ? 
+                            parseInt(form.watch('drumQuantity') || '1') * 260 : 
+                          parseInt(form.watch('drumQuantity') || '1') >= 2 ? 
+                            parseInt(form.watch('drumQuantity') || '1') * 270 : 280
+                        }</span>
+                      </div>
+                      
+                      {form.watch('wantMetalSeal') && (
+                        <div className="flex justify-between">
+                          <span>Metal Coded Seals ({form.watch('drumQuantity') || '1'} × £5)</span>
+                          <span>£{parseInt(form.watch('drumQuantity') || '1') * 5}</span>
                         </div>
                       )}
                     </div>
                   )}
-                </div>
-              </Card>
-              
-              <div className="flex justify-between">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={handlePrevStep}
-                >
-                  Previous Step
-                </Button>
-                <Button 
-                  type="button" 
-                  onClick={handleNextStep}
-                  className="bg-zim-green hover:bg-zim-green/90"
-                >
-                  Next Step
-                </Button>
-              </div>
-            </div>
-          )}
-          
-          {/* Step 3: Review & Submit */}
-          {currentStep === 3 && (
-            <div className="space-y-6">
-              <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-4">Review Your Booking</h2>
-                
-                <Accordion type="single" collapsible className="w-full">
-                  <AccordionItem value="sender">
-                    <AccordionTrigger>Sender Details</AccordionTrigger>
-                    <AccordionContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Name</h4>
-                          <p>{watch('firstName')} {watch('lastName')}</p>
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Email</h4>
-                          <p>{watch('email')}</p>
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Phone</h4>
-                          <p>{watch('phone')}</p>
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Pickup Address</h4>
-                          <p>{watch('pickupAddress')}, {pickupCountry === 'England' ? watch('pickupPostcode') : watch('pickupCity')}</p>
-                        </div>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
                   
-                  <AccordionItem value="recipient">
-                    <AccordionTrigger>Recipient Details</AccordionTrigger>
-                    <AccordionContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Name</h4>
-                          <p>{watch('recipientName')}</p>
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Phone</h4>
-                          <p>{watch('recipientPhone')}</p>
-                          {watch('additionalRecipientPhone') && (
-                            <p className="text-sm text-gray-500">Additional: {watch('additionalRecipientPhone')}</p>
-                          )}
-                        </div>
-                        <div className="md:col-span-2">
-                          <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Delivery Address</h4>
-                          <p>{watch('deliveryAddress')}, {watch('deliveryCity')}</p>
-                        </div>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                  
-                  <AccordionItem value="shipment">
-                    <AccordionTrigger>Shipment Details</AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-4">
-                        {watchIncludeDrums && (
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Drums</h4>
-                            <p>{watch('drumQuantity')} drum(s)</p>
-                            {watchWantMetalSeal && <p className="text-sm">With metal security seals</p>}
-                          </div>
-                        )}
-                        
-                        {watchIncludeOtherItems && (
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Other Items</h4>
-                            <p>{watch('specificItem')} ({watch('itemCategory')})</p>
-                            {watch('otherItemDescription') && (
-                              <p className="text-sm">{watch('otherItemDescription')}</p>
-                            )}
-                          </div>
-                        )}
-                        
-                        {watchShipmentType === 'parcel' && (
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Parcel</h4>
-                            <p>Weight: {watch('weight')} kg</p>
-                          </div>
-                        )}
-                        
-                        {watchDoorToDoor && (
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Door-to-Door Delivery</h4>
-                            <p>Primary address: {watch('deliveryAddress')}, {watch('deliveryCity')}</p>
-                            {additionalAddresses.length > 0 && (
-                              <div className="mt-2">
-                                <h5 className="text-sm font-medium">Additional Addresses:</h5>
-                                <ul className="list-disc pl-5 text-sm">
-                                  {additionalAddresses.map((address, index) => (
-                                    <li key={index}>{address}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                  
-                  <AccordionItem value="collection">
-                    <AccordionTrigger>Collection Information</AccordionTrigger>
-                    <AccordionContent>
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Collection Route</h4>
-                        <p>{collectionRoute || getRouteForIrelandCity(pickupCity) || 'Not available'}</p>
-                      </div>
-                      <div className="mt-2">
-                        <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Collection Date</h4>
-                        <p>{selectedCollectionDate || 'Not available'}</p>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              </Card>
-              
-              <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-4">Price Summary</h2>
-                
-                <div className="space-y-2">
-                  {watchIncludeDrums && (
-                    <div className="flex justify-between">
-                      <span>{watch('drumQuantity')} Drum(s)</span>
-                      <span>£{drumPrice.toFixed(2)}</span>
+                  {form.watch('doorToDoor') && (
+                    <div className="flex justify-between mt-2">
+                      <span>Door-to-Door Delivery ({additionalAddresses.filter(a => a.trim() !== '').length || 1} address{additionalAddresses.filter(a => a.trim() !== '').length > 1 ? 'es' : ''})</span>
+                      <span>£{(additionalAddresses.filter(a => a.trim() !== '').length || 1) * 25}</span>
                     </div>
                   )}
                   
-                  {watchWantMetalSeal && watchIncludeDrums && (
-                    <div className="flex justify-between">
-                      <span>Metal Security Seals ({watch('drumQuantity')} x £5)</span>
-                      <span>£{metalSealPrice.toFixed(2)}</span>
-                    </div>
+                  {!form.watch('includeDrums') && !form.watch('includeOtherItems') && (
+                    <div className="text-gray-500">No items selected yet</div>
                   )}
                   
-                  {watchDoorToDoor && (
-                    <div className="flex justify-between">
-                      <span>Door-to-Door Delivery ({1 + additionalAddresses.length} address{additionalAddresses.length > 0 ? 'es' : ''})</span>
-                      <span>£{doorToDoorPrice.toFixed(2)}</span>
-                    </div>
-                  )}
-                  
-                  <div className="border-t pt-2 mt-2">
-                    <div className="flex justify-between font-medium">
+                  <div className="border-t mt-4 pt-4">
+                    <div className="flex justify-between font-medium text-lg">
                       <span>Total</span>
-                      <span>£{totalPrice.toFixed(2)}</span>
+                      <span>£{calculateTotal()}</span>
                     </div>
                   </div>
                 </div>
-              </Card>
-              
-              <Card className="p-6">
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="agreeTerms" 
-                    checked={watch('agreeTerms')}
-                    onCheckedChange={(checked) => {
-                      setValue('agreeTerms', !!checked);
-                    }}
-                  />
-                  <label
-                    htmlFor="agreeTerms"
-                    className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    I agree to the <a href="/terms" target="_blank" className="text-zim-green hover:underline">Terms and Conditions</a> and <a href="/privacy" target="_blank" className="text-zim-green hover:underline">Privacy Policy</a>
-                  </label>
-                </div>
-                {errors.agreeTerms && (
-                  <p className="text-sm text-red-500 mt-2">{errors.agreeTerms.message}</p>
-                )}
-              </Card>
-              
-              <div className="flex justify-between">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={handlePrevStep}
-                >
-                  Previous Step
-                </Button>
-                <Button 
-                  type="submit"
-                  disabled={isSubmitting || !watch('agreeTerms')}
-                  className="bg-zim-green hover:bg-zim-green/90"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    'Complete Booking'
+                
+                <Alert className="bg-gray-50 dark:bg-gray-700">
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    Please review your items and confirm if everything is correct, then click Submit to continue.
+                  </AlertDescription>
+                </Alert>
+                
+                <FormField
+                  control={form.control}
+                  name="paymentOption"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormControl>
+                        <input
+                          type="hidden"
+                          value={field.value}
+                        />
+                      </FormControl>
+                    </FormItem>
                   )}
-                </Button>
-              </div>
-            </div>
-          )}
-        </form>
-      </Form>
-    </div>
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="paymentMethod"
+                  render={({ field }) => (
+                    <FormItem className="hidden">
+                      <FormControl>
+                        <input
+                          type="hidden"
+                          value={field.value}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="flex justify-between">
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={() => setActiveTab('shipment')}
+                  >
+                    Back
+                  </Button>
+                  <Button 
+                    type="submit"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? 'Processing...' : 'Submit Booking'}
+                  </Button>
+                </div>
+              </TabsContent>
+            </form>
+          </Form>
+        </Tabs>
+      </CardContent>
+    </Card>
   );
 };
 
