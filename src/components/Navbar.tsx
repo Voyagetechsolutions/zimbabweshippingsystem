@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, ChevronDown, User, ShoppingBag, LogOut, Shield, LayoutDashboard, Settings, Package } from 'lucide-react';
+import { Menu, X, ChevronDown, User, ShoppingBag, LogOut, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   NavigationMenu,
@@ -80,10 +80,7 @@ const Navbar = () => {
           {/* Logo section */}
           <div className="flex-shrink-0">
             <Link to="/" className="flex items-center">
-              <Logo className="h-10 w-auto mr-2" />
-              <span className={cn("text-xl font-bold", resolvedTheme === 'dark' ? "text-white" : "text-gray-800")}>
-                Zimbabwe Shipping UK to Zimbabwe Express
-              </span>
+              <Logo className="h-8 w-auto" />
             </Link>
           </div>
 
@@ -163,7 +160,13 @@ const Navbar = () => {
                   </NavigationMenuContent>
                 </NavigationMenuItem>
                 
-                
+                {/*<NavigationMenuItem>  //First update the gallery features
+                  <Link to="/gallery">
+                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                      Gallery
+                    </NavigationMenuLink>
+                  </Link>
+                </NavigationMenuItem>*/}
                 
                 <NavigationMenuItem>
                   <Link to="/" onClick={handleReviewsClick}>
@@ -220,30 +223,33 @@ const Navbar = () => {
                   <DropdownMenuSeparator />
                   <Link to="/dashboard">
                     <DropdownMenuItem className="cursor-pointer">
-                      <LayoutDashboard className="mr-2 h-4 w-4" />
+                      <User className="mr-2 h-4 w-4" />
                       <span>Dashboard</span>
                     </DropdownMenuItem>
                   </Link>
                   <Link to="/account">
                     <DropdownMenuItem className="cursor-pointer">
-                      <Settings className="mr-2 h-4 w-4" />
+                      <User className="mr-2 h-4 w-4" />
                       <span>Profile</span>
                     </DropdownMenuItem>
                   </Link>
                   <Link to="/shipments">
                     <DropdownMenuItem className="cursor-pointer">
-                      <Package className="mr-2 h-4 w-4" />
+                      <ShoppingBag className="mr-2 h-4 w-4" />
                       <span>My Shipments</span>
                     </DropdownMenuItem>
                   </Link>
                   
                   {isAdmin && (
-                    <Link to="/admin-dashboard">
-                      <DropdownMenuItem className="cursor-pointer">
-                        <Shield className="mr-2 h-4 w-4" />
-                        <span>Admin Panel</span>
-                      </DropdownMenuItem>
-                    </Link>
+                    <>
+                      <DropdownMenuSeparator />
+                      <Link to="/admin">
+                        <DropdownMenuItem className="cursor-pointer">
+                          <Shield className="mr-2 h-4 w-4" />
+                          <span>Admin Panel</span>
+                        </DropdownMenuItem>
+                      </Link>
+                    </>
                   )}
                   
                   <DropdownMenuSeparator />
@@ -314,32 +320,27 @@ const Navbar = () => {
           
           {user ? (
             <>
-              <Link to="/dashboard" className="flex items-center px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
-                <LayoutDashboard className="mr-2 h-4 w-4" />
-                <span>Dashboard</span>
+              <Link to="/dashboard" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
+                Dashboard
               </Link>
-              <Link to="/account" className="flex items-center px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Profile</span>
+              <Link to="/account" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
+                Profile
               </Link>
-              <Link to="/shipments" className="flex items-center px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
-                <Package className="mr-2 h-4 w-4" />
-                <span>My Shipments</span>
+              <Link to="/shipments" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
+                My Shipments
               </Link>
               
               {isAdmin && (
-                <Link to="/admin-dashboard" className="flex items-center px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
-                  <Shield className="mr-2 h-4 w-4" />
-                  <span>Admin Dashboard</span>
+                <Link to="/admin" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
+                  Admin Panel
                 </Link>
               )}
               
               <button
                 onClick={() => { signOut(); setIsOpen(false); }}
-                className="flex items-center w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-accent"
+                className="block w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-accent"
               >
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Log out</span>
+                Log out
               </button>
             </>
           ) : (
