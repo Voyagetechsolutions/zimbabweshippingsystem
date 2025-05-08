@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import Logo from '@/components/Logo';
-import { Mail, Lock, User, AlertCircle, ArrowLeft} from 'lucide-react';
+import { Mail, Lock, User, AlertCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { generateCSRFToken, validateCSRFToken } from '@/utils/csrf';
 import { getClientIP, handleAuthError } from '@/utils/securityUtils';
 
@@ -21,6 +21,7 @@ const Auth = () => {
   const [activeTab, setActiveTab] = useState('login');
   const [csrfToken, setCsrfToken] = useState('');
   const [ipAddress, setIpAddress] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { session, signIn } = useAuth();
@@ -41,6 +42,11 @@ const Auth = () => {
       navigate('/dashboard');
     }
   }, [session, navigate]);
+
+  // Toggle password visibility
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
 
   // Handle signup process
   const handleSignUp = async (e: React.FormEvent) => {
@@ -239,14 +245,25 @@ const Auth = () => {
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
                       id="password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       placeholder="••••••••"
-                      className="pl-10"
+                      className="pl-10 pr-10"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       autoComplete="current-password"
                     />
+                    <button
+                      type="button"
+                      onClick={togglePasswordVisibility}
+                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? 
+                        <EyeOff className="h-4 w-4" /> : 
+                        <Eye className="h-4 w-4" />
+                      }
+                    </button>
                   </div>
                 </div>
 
@@ -298,14 +315,25 @@ const Auth = () => {
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
                       id="register-password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       placeholder="••••••••"
-                      className="pl-10"
+                      className="pl-10 pr-10"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       autoComplete="new-password"
                     />
+                    <button
+                      type="button"
+                      onClick={togglePasswordVisibility}
+                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? 
+                        <EyeOff className="h-4 w-4" /> : 
+                        <Eye className="h-4 w-4" />
+                      }
+                    </button>
                   </div>
                   <p className="text-xs text-gray-500">
                     Must be at least 8 characters with uppercase, lowercase, number, and symbol.

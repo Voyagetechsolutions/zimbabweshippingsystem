@@ -81,6 +81,9 @@ const Navbar = () => {
           <div className="flex-shrink-0">
             <Link to="/" className="flex items-center">
               <Logo className="h-8 w-auto" />
+              <span className="ml-2 font-bold text-lg text-foreground">
+                Zimbabwe Shipping UK to Zimbabwe Express
+              </span>
             </Link>
           </div>
 
