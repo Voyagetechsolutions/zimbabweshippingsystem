@@ -137,59 +137,69 @@
     @apply bg-gray-800;
   }
 
+  /* Fix for text color in dark mode */
   .dark .text-gray-600, 
   .dark .text-gray-700, 
   .dark .text-gray-900 {
-    @apply text-gray-300;
+    color: rgb(209 213 219); /* text-gray-300 equivalent */
   }
 
   /* Updated text color overrides for better visibility */
   .dark .text-black {
-    @apply text-gray-100;
+    color: rgb(243 244 246); /* text-gray-100 equivalent */
   }
   
   .dark .text-gray-800 {
-    @apply text-gray-200;
+    color: rgb(229 231 235); /* text-gray-200 equivalent */
   }
   
   .dark .text-gray-500 {
-    @apply text-gray-400;
+    color: rgb(156 163 175); /* text-gray-400 equivalent */
   }
   
   .dark .text-gray-400 {
-    @apply text-gray-300;
+    color: rgb(209 213 219); /* text-gray-300 equivalent */
   }
 
   /* Link text needs to be visible in dark mode too */
   .dark a:not(.btn):not([class*="bg-"]) {
-    @apply text-blue-400 hover:text-blue-300;
+    color: rgb(96 165 250); /* text-blue-400 equivalent */
+  }
+  
+  .dark a:not(.btn):not([class*="bg-"]):hover {
+    color: rgb(147 197 253); /* text-blue-300 equivalent */
   }
 
   /* Fix for buttons with dark text */
   .dark .btn-dark, 
   .dark .btn-black {
-    @apply text-white;
+    color: rgb(255 255 255); /* text-white equivalent */
   }
 
   .dark .border-gray-200, 
   .dark .border-gray-300 {
-    @apply border-gray-700;
+    border-color: rgb(55 65 81); /* border-gray-700 equivalent */
   }
 
   .dark .shadow-md,
   .dark .shadow-lg {
-    @apply shadow-xl shadow-black/20;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
   }
 
   .dark .bg-white\/80,
   .dark .bg-white\/90 {
-    @apply bg-gray-900/90;
+    background-color: rgba(17, 24, 39, 0.9); /* bg-gray-900/90 equivalent */
   }
   
   /* Fix for dropdown and menu items that might have dark text on dark bg */
   .dark .dropdown-item,
   .dark .menu-item {
-    @apply text-gray-200 hover:bg-gray-800;
+    color: rgb(229 231 235); /* text-gray-200 equivalent */
+  }
+  
+  .dark .dropdown-item:hover,
+  .dark .menu-item:hover {
+    background-color: rgb(31 41 55); /* bg-gray-800 equivalent */
   }
 }
 
@@ -236,19 +246,18 @@
   
   /* Additional utility classes for improved text visibility */
   .text-contrast-light {
-    @apply text-gray-900;
+    color: rgb(17 24 39); /* text-gray-900 equivalent */
   }
   
   .text-contrast-dark {
-    @apply text-white;
+    color: rgb(255 255 255); /* text-white equivalent */
   }
   
   .dark .text-contrast-light {
-    @apply text-white;
+    color: rgb(255 255 255); /* text-white equivalent */
   }
   
   .dark .text-contrast-dark {
-    @apply text-gray-200;
+    color: rgb(229 231 235); /* text-gray-200 equivalent */
   }
 }
-
