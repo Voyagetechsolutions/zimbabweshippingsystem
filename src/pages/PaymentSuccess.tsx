@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -134,58 +135,58 @@ const PaymentSuccess = () => {
     <>
       <Navbar />
       
-      <main className="min-h-screen bg-gray-50 py-8 px-4 md:py-12">
+      <main className="min-h-screen w-full bg-gray-50 py-8 px-4 md:py-12 dark:bg-gray-800">
         <div className="container mx-auto max-w-5xl">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-10 md:py-16">
               <Loader2 className="h-10 w-10 md:h-12 md:w-12 animate-spin text-zim-green mb-4" />
-              <h2 className="text-xl md:text-2xl font-semibold">Loading Receipt...</h2>
-              <p className="text-gray-500 mt-2 text-center">Please wait while we retrieve your payment information</p>
+              <h2 className="text-xl md:text-2xl font-semibold dark:text-gray-100">Loading Receipt...</h2>
+              <p className="text-gray-500 mt-2 text-center dark:text-gray-300">Please wait while we retrieve your payment information</p>
             </div>
           ) : error ? (
             <div className="text-center py-10 md:py-16">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 md:p-6">
-                <h2 className="text-xl md:text-2xl font-semibold text-red-700">Payment Verification Error</h2>
-                <p className="text-gray-700 mt-2 mb-4 md:mb-6">{error}</p>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 md:p-6 dark:bg-red-900/20 dark:border-red-800">
+                <h2 className="text-xl md:text-2xl font-semibold text-red-700 dark:text-red-300">Payment Verification Error</h2>
+                <p className="text-gray-700 mt-2 mb-4 md:mb-6 dark:text-gray-300">{error}</p>
                 <Button onClick={() => navigate('/dashboard')}>Go to Dashboard</Button>
               </div>
             </div>
           ) : (
             <>
               <div className="flex justify-center mb-6 md:mb-8">
-                <div className="bg-green-50 border border-green-200 rounded-full p-2 md:p-3">
+                <div className="bg-green-50 border border-green-200 rounded-full p-2 md:p-3 dark:bg-green-900/20 dark:border-green-800">
                   <CheckCircle2 className="h-8 w-8 md:h-12 md:w-12 text-green-500" />
                 </div>
               </div>
               
               <div className="text-center mb-6 md:mb-10">
-                <h1 className="text-2xl md:text-4xl font-bold mb-2">Booking Successful!</h1>
-                <p className="text-gray-600 max-w-2xl mx-auto text-sm md:text-base">
+                <h1 className="text-2xl md:text-4xl font-bold mb-2 dark:text-white">Booking Successful!</h1>
+                <p className="text-gray-600 max-w-2xl mx-auto text-sm md:text-base dark:text-gray-300">
                   Thank you for your booking. Your shipment has been confirmed and is being processed.
                 </p>
-                <p className="text-gray-600 mt-2 text-sm md:text-base">
+                <p className="text-gray-600 mt-2 text-sm md:text-base dark:text-gray-300">
                   You can view your receipt details on your dashboard.
                 </p>
                 
                 {receiptData && receiptData.payment_method && (
-                  <div className="mt-4 bg-blue-50 border border-blue-100 rounded-md p-3 inline-block mx-auto">
-                    <p className="font-medium text-blue-800">
+                  <div className="mt-4 bg-blue-50 border border-blue-100 rounded-md p-3 inline-block mx-auto dark:bg-blue-900/20 dark:border-blue-800">
+                    <p className="font-medium text-blue-800 dark:text-blue-300">
                       Payment Method: {getPaymentMethodDisplay()}
                     </p>
                     {receiptData.payment_method === 'bank_transfer' && (
-                      <div className="mt-2 text-sm text-blue-700">
+                      <div className="mt-2 text-sm text-blue-700 dark:text-blue-300">
                         <p>Please transfer to: Zimbabwe Shipping Ltd</p>
                         <p>Account: 12345678 | Sort Code: 12-34-56</p>
                         <p>Reference: {receiptData.receipt_number}</p>
                       </div>
                     )}
                     {receiptData.payment_method === 'goods_arriving' && (
-                      <p className="mt-2 text-sm text-blue-700">
+                      <p className="mt-2 text-sm text-blue-700 dark:text-blue-300">
                         You'll pay when your goods arrive in Zimbabwe (20% premium included).
                       </p>
                     )}
                     {receiptData.payment_method === 'cash_on_collection' && (
-                      <p className="mt-2 text-sm text-blue-700">
+                      <p className="mt-2 text-sm text-blue-700 dark:text-blue-300">
                         Please have cash ready when we collect your items. £20 discount applied on each drum!
                       </p>
                     )}
@@ -193,13 +194,13 @@ const PaymentSuccess = () => {
                 )}
               </div>
               
-              <div className="mt-6 border border-gray-200 rounded-lg p-4 md:p-6 bg-white">
-                <h2 className="text-xl font-bold mb-4">Receipt Information</h2>
+              <div className="mt-6 border border-gray-200 rounded-lg p-4 md:p-6 bg-white dark:bg-gray-700 dark:border-gray-600">
+                <h2 className="text-xl font-bold mb-4 dark:text-white">Receipt Information</h2>
                 {receiptData && (
                   <>
-                    <p className="text-gray-700"><span className="font-medium">Receipt Number:</span> {receiptData.receipt_number}</p>
-                    <p className="text-gray-700"><span className="font-medium">Date:</span> {new Date(receiptData.created_at).toLocaleDateString()}</p>
-                    <p className="text-gray-700"><span className="font-medium">Amount:</span> {receiptData.currency || '£'}{receiptData.amount}</p>
+                    <p className="text-gray-700 dark:text-gray-200"><span className="font-medium">Receipt Number:</span> {receiptData.receipt_number}</p>
+                    <p className="text-gray-700 dark:text-gray-200"><span className="font-medium">Date:</span> {new Date(receiptData.created_at).toLocaleDateString()}</p>
+                    <p className="text-gray-700 dark:text-gray-200"><span className="font-medium">Amount:</span> {receiptData.currency || '£'}{receiptData.amount}</p>
                     <div className="mt-4">
                       <Button onClick={() => navigate(`/receipt/${receiptData.id}`)}>
                         View Full Receipt

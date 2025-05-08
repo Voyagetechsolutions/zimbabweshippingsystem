@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -318,20 +317,20 @@ const BookShipment = () => {
     <>
       <Navbar />
       
-      <main className="min-h-screen bg-gray-50 py-12 px-4">
+      <main className="min-h-screen w-full bg-gray-50 dark:bg-gray-800 py-12 px-4">
         <div className="container mx-auto max-w-4xl">
           <div className="mb-8">
-            <Link to="/" className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900">
+            <Link to="/" className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100">
               <ArrowLeft className="h-4 w-4 mr-1" />
               Back to Home
             </Link>
             
-            <h1 className="text-3xl md:text-4xl font-bold mt-4 mb-2">
+            <h1 className="text-3xl md:text-4xl font-bold mt-4 mb-2 dark:text-white">
               {currentStep === BookingStep.FORM ? 'Book Your Shipment' : 
                currentStep === BookingStep.PAYMENT ? 'Complete Payment' :
                'Request Custom Quote'}
             </h1>
-            <p className="text-gray-600 max-w-2xl">
+            <p className="text-gray-600 max-w-2xl dark:text-gray-300">
               {currentStep === BookingStep.FORM 
                 ? 'Complete the form below to book your shipment from the UK.' 
                 : currentStep === BookingStep.PAYMENT

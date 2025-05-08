@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, ChevronDown, User, ShoppingBag, LogOut, Shield } from 'lucide-react';
@@ -80,7 +79,10 @@ const Navbar = () => {
           {/* Logo section */}
           <div className="flex-shrink-0">
             <Link to="/" className="flex items-center">
-              <Logo className="h-8 w-auto" />
+              <Logo className="h-10 w-auto mr-2" />
+              <span className="hidden md:inline-block text-lg font-bold text-gray-900 dark:text-gray-100">
+                Zimbabwe Shipping UK to Zimbabwe Express
+              </span>
             </Link>
           </div>
 
@@ -240,16 +242,13 @@ const Navbar = () => {
                     </DropdownMenuItem>
                   </Link>
                   
-                  {isAdmin && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <Link to="/admin">
-                        <DropdownMenuItem className="cursor-pointer">
-                          <Shield className="mr-2 h-4 w-4" />
-                          <span>Admin Panel</span>
-                        </DropdownMenuItem>
-                      </Link>
-                    </>
+                  {hasPermission('admin') && (
+                    <Link 
+                      to="/admin-dashboard" 
+                      className="text-gray-700 hover:text-zim-green dark:text-gray-300 dark:hover:text-zim-green"
+                    >
+                      Admin Dashboard
+                    </Link>
                   )}
                   
                   <DropdownMenuSeparator />
@@ -330,9 +329,9 @@ const Navbar = () => {
                 My Shipments
               </Link>
               
-              {isAdmin && (
-                <Link to="/admin" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
-                  Admin Panel
+              {hasPermission('admin') && (
+                <Link to="/admin-dashboard" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
+                  Admin Dashboard
                 </Link>
               )}
               

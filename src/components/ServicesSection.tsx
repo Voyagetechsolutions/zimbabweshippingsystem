@@ -44,11 +44,11 @@ const ServicesSection: React.FC = () => {
   ];
 
   return (
-    <section id="services" className="py-16 bg-gray-50">
+    <section id="services" className="py-16 bg-gray-50 dark:bg-gray-800">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Our Services</h2>
-          <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4 dark:text-white">Our Services</h2>
+          <p className="text-lg text-gray-600 max-w-3xl mx-auto dark:text-gray-300">
             We offer a range of shipping services to meet your needs, with a focus on reliability and affordability.
           </p>
           <div className="flex justify-center mt-6">
@@ -62,13 +62,13 @@ const ServicesSection: React.FC = () => {
           {services.map((service, index) => (
             <div 
               key={index} 
-              className="bg-white p-8 rounded-lg shadow-lg transition-transform duration-300 hover:translate-y-[-8px]"
+              className="bg-white dark:bg-gray-700 p-8 rounded-lg shadow-lg transition-transform duration-300 hover:translate-y-[-8px]"
             >
               <div className="mb-4">
                 {service.icon}
               </div>
-              <h3 className="text-xl font-bold mb-2">{service.title}</h3>
-              <p className="text-gray-600 mb-6">{service.description}</p>
+              <h3 className="text-xl font-bold mb-2 dark:text-white">{service.title}</h3>
+              <p className="text-gray-600 mb-6 dark:text-gray-300">{service.description}</p>
               <Link 
                 to={service.link} 
                 className="text-zim-green font-medium hover:underline"
@@ -83,6 +83,18 @@ const ServicesSection: React.FC = () => {
           <Link to="/services">
             <button className="bg-zim-green hover:bg-zim-green/90 text-white font-bold py-3 px-6 rounded-lg transition-colors">
               View All Services
+            </button>
+          </Link>
+        </div>
+
+        <div className="mt-16 p-6 bg-white dark:bg-gray-700 rounded-lg shadow-lg text-center">
+          <h3 className="text-2xl font-bold mb-4 dark:text-white">Need a Custom Quote?</h3>
+          <p className="text-gray-600 mb-6 max-w-2xl mx-auto dark:text-gray-300">
+            For special items or unique shipping requirements, request a custom quote tailored to your needs.
+          </p>
+          <Link to="/book-shipment">
+            <button className="bg-zim-yellow hover:bg-zim-yellow/90 text-gray-900 font-bold py-3 px-6 rounded-lg transition-colors">
+              Request Custom Quote
             </button>
           </Link>
         </div>
