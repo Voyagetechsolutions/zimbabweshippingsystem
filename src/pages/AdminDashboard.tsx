@@ -20,7 +20,13 @@ const AdminDashboard = () => {
       <Navbar />
       <main className="flex-grow py-8 bg-gray-50">
         <div className="container mx-auto px-4">
-          <AdminDashboardContent />
+          {isAdmin ? (
+            <AdminDashboardContent />
+          ) : (
+            <div className="max-w-md mx-auto">
+              <SetupAdmin />
+            </div>
+          )}
         </div>
       </main>
       <Footer />

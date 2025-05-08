@@ -81,22 +81,10 @@ const ServicesSection: React.FC = () => {
 
         <div className="text-center mt-12">
           <Link to="/services">
-            <button className="bg-zim-green hover:bg-zim-green/90 text-white font-bold py-3 px-6 rounded-lg transition-colors mb-8">
+            <button className="bg-zim-green hover:bg-zim-green/90 text-white font-bold py-3 px-6 rounded-lg transition-colors">
               View All Services
             </button>
           </Link>
-          
-          <div className="bg-white p-8 rounded-lg shadow-lg max-w-3xl mx-auto">
-            <h3 className="text-2xl font-bold mb-3">Need a Custom Quote?</h3>
-            <p className="text-gray-600 mb-6">
-              For special shipping needs or bulk orders, our team can prepare a customized quote for you.
-            </p>
-            <Link to="/custom-quote">
-              <button className="bg-zim-yellow hover:bg-zim-yellow/90 text-black font-bold py-3 px-6 rounded-lg transition-colors">
-                Request Custom Quote
-              </button>
-            </Link>
-          </div>
         </div>
       </div>
     </section>
