@@ -5,11 +5,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import Logo from '@/components/Logo';
-import { Mail, Lock, User, AlertCircle, ArrowLeft} from 'lucide-react';
+import { Mail, Lock, User, AlertCircle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { generateCSRFToken, validateCSRFToken } from '@/utils/csrf';
 import { getClientIP, handleAuthError } from '@/utils/securityUtils';
 
@@ -21,6 +22,7 @@ const Auth = () => {
   const [activeTab, setActiveTab] = useState('login');
   const [csrfToken, setCsrfToken] = useState('');
   const [ipAddress, setIpAddress] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { session, signIn } = useAuth();
@@ -184,6 +186,10 @@ const Auth = () => {
     }
   };
 
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50">
       <Link to="/" className="flex items-center text-gray-600 hover:text-gray-900 mb-4 sm:mb-0">
@@ -239,14 +245,39 @@ const Auth = () => {
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
                       id="password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       placeholder="••••••••"
-                      className="pl-10"
+                      className="pl-10 pr-10"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       autoComplete="current-password"
                     />
+                    <button
+                      type="button"
+                      onClick={togglePasswordVisibility}
+                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2 mt-2">
+                    <Checkbox 
+                      id="showPasswordCheckbox" 
+                      checked={showPassword}
+                      onCheckedChange={() => setShowPassword(!showPassword)}
+                    />
+                    <label
+                      htmlFor="showPasswordCheckbox"
+                      className="text-sm text-gray-600 cursor-pointer"
+                    >
+                      Show password
+                    </label>
                   </div>
                 </div>
 
@@ -298,15 +329,41 @@ const Auth = () => {
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
                       id="register-password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       placeholder="••••••••"
-                      className="pl-10"
+                      className="pl-10 pr-10"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       autoComplete="new-password"
                     />
+                    <button
+                      type="button"
+                      onClick={togglePasswordVisibility}
+                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
                   </div>
+                  
+                  <div className="flex items-center space-x-2 mt-2">
+                    <Checkbox 
+                      id="showPasswordRegisterCheckbox" 
+                      checked={showPassword}
+                      onCheckedChange={() => setShowPassword(!showPassword)}
+                    />
+                    <label
+                      htmlFor="showPasswordRegisterCheckbox"
+                      className="text-sm text-gray-600 cursor-pointer"
+                    >
+                      Show password
+                    </label>
+                  </div>
+                  
                   <p className="text-xs text-gray-500">
                     Must be at least 8 characters with uppercase, lowercase, number, and symbol.
                   </p>

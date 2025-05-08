@@ -1,93 +1,116 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Truck, Package, PoundSterling, Clock, Shield, HeartHandshake } from 'lucide-react';
+import { ArrowUpRight, Truck, Crosshair, Package, Car, Building, FileBox, AlertCircle } from 'lucide-react';
+import { useTheme } from '@/contexts/ThemeContext';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 
-const ServicesSection: React.FC = () => {
-  const services = [
-    {
-      icon: <Truck className="h-12 w-12 text-zim-green" />,
-      title: "Drum Shipping",
-      description: "Our most popular service. We provide standardized drums for shipping your goods safely.",
-      link: "/services#drum-shipping"
-    },
-    {
-      icon: <Package className="h-12 w-12 text-zim-green" />,
-      title: "Other Items",
-      description: "Ship furniture, appliances, and other large items that don't fit in standard drums.",
-      link: "/services#other-items"
-    },
-    {
-      icon: <PoundSterling className="h-12 w-12 text-zim-green" />,
-      title: "Commercial Shipping",
-      description: "Specialized services for businesses shipping commercial goods.",
-      link: "/services#commercial-shipping"
-    },
-    {
-      icon: <Clock className="h-12 w-12 text-zim-green" />,
-      title: "Flexible Payment Options",
-      description: "Choose from standard payment, 30-day terms, cash on collection, or pay on arrival.",
-      link: "/services#payment-options"
-    },
-    {
-      icon: <Shield className="h-12 w-12 text-zim-green" />,
-      title: "Secure Handling",
-      description: "Your items are handled with care and security throughout the shipping process.",
-      link: "/services#secure-handling"
-    },
-    {
-      icon: <HeartHandshake className="h-12 w-12 text-zim-green" />,
-      title: "Door-to-Door Delivery",
-      description: "Optional service for direct delivery to the reciever's address.",
-      link: "/services#door-to-door"
-    },
-  ];
+const ServicesSection = () => {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
 
   return (
-    <section id="services" className="py-16 bg-gray-50">
+    <section className={`py-12 md:py-16 ${isDark ? 'bg-gray-900' : 'bg-gray-50'}`} id="services">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Our Services</h2>
-          <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-            We offer a range of shipping services to meet your needs, with a focus on reliability and affordability.
+        <div className="text-center max-w-3xl mx-auto mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Our Shipping Services</h2>
+          <p className="text-lg text-gray-600 dark:text-gray-300">
+            We offer a comprehensive range of shipping services to meet all your UK to Zimbabwe shipping needs
           </p>
-          <div className="flex justify-center mt-6">
-            <div className="h-1 w-20 bg-zim-green rounded-full mx-1"></div>
-            <div className="h-1 w-20 bg-zim-yellow rounded-full mx-1"></div>
-            <div className="h-1 w-20 bg-zim-red rounded-full mx-1"></div>
-          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {services.map((service, index) => (
-            <div 
-              key={index} 
-              className="bg-white p-8 rounded-lg shadow-lg transition-transform duration-300 hover:translate-y-[-8px]"
-            >
-              <div className="mb-4">
-                {service.icon}
-              </div>
-              <h3 className="text-xl font-bold mb-2">{service.title}</h3>
-              <p className="text-gray-600 mb-6">{service.description}</p>
-              <Link 
-                to={service.link} 
-                className="text-zim-green font-medium hover:underline"
-              >
-                Learn more →
-              </Link>
-            </div>
-          ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+          <ServiceCard 
+            icon={<Truck className="h-8 w-8" />}
+            title="Drum Shipping"
+            description="Ship your goods securely in our 210L metal drums from the UK to Zimbabwe."
+            link="/services#drum-shipping"
+          />
+          <ServiceCard 
+            icon={<Crosshair className="h-8 w-8" />}
+            title="Door-to-Door Service"
+            description="We'll collect from your UK address and deliver directly to your destination in Zimbabwe."
+            link="/services#door-to-door"
+          />
+          <ServiceCard 
+            icon={<Package className="h-8 w-8" />}
+            title="Parcel Shipping"
+            description="Send individual parcels and packages of all sizes with full tracking capabilities."
+            link="/services#parcel-shipping"
+          />
+          <ServiceCard 
+            icon={<Car className="h-8 w-8" />}
+            title="Vehicle Shipping"
+            description="Transport cars, motorbikes and other vehicles securely from the UK to Zimbabwe."
+            link="/services#vehicle-shipping"
+          />
+          <ServiceCard 
+            icon={<Building className="h-8 w-8" />}
+            title="Commercial Shipping"
+            description="Specialized shipping solutions for businesses, with bulk rates and dedicated support."
+            link="/services#commercial-shipping"
+          />
+          <ServiceCard 
+            icon={<AlertCircle className="h-8 w-8" />}
+            title="Custom Shipping"
+            description="Need to ship something unusual? Get a custom quote for your specific requirements."
+            link="/book-shipment"
+            isSpecial={true}
+          />
         </div>
-
-        <div className="text-center mt-12">
+        
+        <div className="text-center mt-8">
           <Link to="/services">
-            <button className="bg-zim-green hover:bg-zim-green/90 text-white font-bold py-3 px-6 rounded-lg transition-colors">
+            <Button size="lg" variant="outline" className="group">
               View All Services
-            </button>
+              <ArrowUpRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
+            </Button>
           </Link>
         </div>
       </div>
     </section>
+  );
+};
+
+interface ServiceCardProps {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  link: string;
+  isSpecial?: boolean;
+}
+
+const ServiceCard = ({ icon, title, description, link, isSpecial = false }: ServiceCardProps) => {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+
+  return (
+    <Card className={`h-full flex flex-col transition-all duration-300 hover:shadow-lg border ${
+      isDark ? 'hover:border-gray-700' : 'hover:border-gray-300'
+    } ${isSpecial ? 'border-zim-green/40 dark:border-zim-green/30' : ''}`}>
+      <Link to={link} className="group flex flex-col h-full p-6">
+        <div className={`p-3 rounded-full w-fit mb-4 ${
+          isSpecial 
+            ? 'bg-zim-green/10 text-zim-green' 
+            : isDark 
+              ? 'bg-gray-800 text-gray-300' 
+              : 'bg-gray-100 text-gray-700'
+        }`}>
+          {icon}
+        </div>
+        <h3 className="text-xl font-semibold mb-2">{title}</h3>
+        <p className={`mb-4 flex-grow ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+          {description}
+        </p>
+        <div className={`flex items-center text-sm font-medium mt-auto ${
+          isSpecial ? 'text-zim-green' : 'text-gray-700 dark:text-gray-300'
+        } group-hover:underline`}>
+          {isSpecial ? 'Request Custom Quote' : 'Learn More'}
+          <ArrowUpRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
+        </div>
+      </Link>
+    </Card>
   );
 };
 
