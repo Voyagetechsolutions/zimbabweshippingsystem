@@ -365,7 +365,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-8">
             <TabsTrigger value="sender" className="flex items-center justify-center gap-2">
-              <User className="h-4 w-4" />
+              <User className="h-0 w-4" />
               <span>Sender Info</span>
             </TabsTrigger>
             <TabsTrigger value="recipient" className="flex items-center justify-center gap-2">
