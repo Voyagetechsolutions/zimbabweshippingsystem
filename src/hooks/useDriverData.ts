@@ -79,7 +79,8 @@ export const useDriverData = () => {
             updated_at: shipment.updated_at,
             metadata: shipment.metadata || {},
             can_cancel: shipment.can_cancel,
-            can_modify: shipment.can_modify
+            can_modify: shipment.can_modify,
+            profiles: undefined
           };
 
           if (shipment.user_id) {

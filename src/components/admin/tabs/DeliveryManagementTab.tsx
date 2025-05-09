@@ -29,7 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { Truck, Package, UserCheck, RefreshCcw, Search, Filter, CheckCircle, XCircle, AlertCircle, UserX } from 'lucide-react';
-import { Shipment, ShipmentMetadata } from '@/types/shipment';
+import { Shipment } from '@/types/shipment';
 
 // Define types for driver and delivery data
 interface Driver {
@@ -40,6 +40,7 @@ interface Driver {
   active: boolean;
 }
 
+// Update DeliveryRecord to use proper typing for metadata
 interface DeliveryRecord {
   id: string;
   tracking_number: string;
@@ -53,8 +54,25 @@ interface DeliveryRecord {
   destination: string;
   created_at: string;
   updated_at: string;
-  metadata?: Record<string, any>; 
+  metadata?: any; // Using any for metadata field to avoid type issues
 }
+
+// Type guard to check if an object has specific properties
+const hasProperty = (obj: any, prop: string): boolean => {
+  return obj && typeof obj === 'object' && prop in obj;
+};
+
+// Helper function to safely extract values from nested objects
+const safeGet = (obj: any, path: string[], defaultValue: any = undefined): any => {
+  if (!obj) return defaultValue;
+  
+  let current = obj;
+  for (const key of path) {
+    if (!hasProperty(current, key)) return defaultValue;
+    current = current[key];
+  }
+  return current;
+};
 
 const DeliveryManagementTab = () => {
   const { toast } = useToast();
@@ -82,44 +100,46 @@ const DeliveryManagementTab = () => {
 
       if (shipmentError) throw shipmentError;
 
-      // Transform shipment data to delivery records
+      // Transform shipment data to delivery records with safe type handling
       const deliveryRecords: DeliveryRecord[] = (shipmentData || []).map(shipment => {
-        const metadata = shipment.metadata || {};
-        
-        // Safely extract recipient details from metadata
+        // Safely extract recipient name using our helper function
         let recipientName = 'No Name Provided';
-        if (typeof metadata === 'object') {
-          const recipientDetails = metadata.recipient || metadata.recipientDetails;
-          if (recipientDetails) {
-            if (recipientDetails.name) {
-              recipientName = recipientDetails.name;
-            } else if (recipientDetails.firstName && recipientDetails.lastName) {
-              recipientName = `${recipientDetails.firstName} ${recipientDetails.lastName}`;
-            }
-          } else if (metadata.recipientName) {
-            recipientName = metadata.recipientName;
-          }
+        
+        // Ensure metadata is an object before trying to access properties
+        const metadata = typeof shipment.metadata === 'object' ? shipment.metadata : {};
+        
+        // Try different paths to get recipient name
+        const recipient = safeGet(metadata, ['recipient'], null);
+        const recipientDetails = safeGet(metadata, ['recipientDetails'], null);
+        
+        if (hasProperty(recipient, 'name')) {
+          recipientName = recipient.name;
+        } else if (recipient && hasProperty(recipient, 'firstName') && hasProperty(recipient, 'lastName')) {
+          recipientName = `${recipient.firstName} ${recipient.lastName}`;
+        } else if (hasProperty(recipientDetails, 'name')) {
+          recipientName = recipientDetails.name;
+        } else if (recipientDetails && hasProperty(recipientDetails, 'firstName') && hasProperty(recipientDetails, 'lastName')) {
+          recipientName = `${recipientDetails.firstName} ${recipientDetails.lastName}`;
+        } else if (hasProperty(metadata, 'recipientName')) {
+          recipientName = metadata.recipientName;
         }
         
         // Safely extract delivery info
-        let deliveryInfo = {};
-        if (typeof metadata === 'object' && metadata.delivery) {
-          deliveryInfo = metadata.delivery;
-        }
+        const deliveryInfo = safeGet(metadata, ['delivery'], {});
         
         return {
           id: shipment.id,
           tracking_number: shipment.tracking_number,
           status: shipment.status,
-          delivery_date: deliveryInfo?.date || shipment.updated_at,
+          delivery_date: hasProperty(deliveryInfo, 'date') ? deliveryInfo.date : shipment.updated_at,
           recipient_name: recipientName,
           origin: shipment.origin,
           destination: shipment.destination,
           timeliness: getTimeliness(shipment),
           created_at: shipment.created_at,
           updated_at: shipment.updated_at,
-          driver_id: deliveryInfo?.driver_id,
-          driver_name: deliveryInfo?.driver_name,
+          driver_id: hasProperty(deliveryInfo, 'driver_id') ? deliveryInfo.driver_id : undefined,
+          driver_name: hasProperty(deliveryInfo, 'driver_name') ? deliveryInfo.driver_name : undefined,
           metadata: shipment.metadata
         };
       });
@@ -164,11 +184,11 @@ const DeliveryManagementTab = () => {
       return 'No Name Provided';
     }
     
-    if (metadata.recipientDetails?.name) {
+    if (safeGet(metadata, ['recipientDetails', 'name'])) {
       return metadata.recipientDetails.name;
-    } else if (metadata.recipient?.name) {
+    } else if (safeGet(metadata, ['recipient', 'name'])) {
       return metadata.recipient.name;
-    } else if (metadata.recipient?.firstName && metadata.recipient?.lastName) {
+    } else if (safeGet(metadata, ['recipient', 'firstName']) && safeGet(metadata, ['recipient', 'lastName'])) {
       return `${metadata.recipient.firstName} ${metadata.recipient.lastName}`;
     } else if (metadata.recipientName) {
       return metadata.recipientName;
@@ -190,11 +210,10 @@ const DeliveryManagementTab = () => {
       return 'on-time'; // Default if metadata is not an object
     }
     
-    if (metadata.delivery && metadata.delivery.isLate) {
-      return 'late';
-    }
+    // Safely check if delivery is marked as late
+    const isLate = safeGet(metadata, ['delivery', 'isLate'], false);
     
-    return 'on-time';
+    return isLate ? 'late' : 'on-time';
   };
 
   const getStatusBadgeClass = (status: string) => {
@@ -261,13 +280,14 @@ const DeliveryManagementTab = () => {
         
       if (driverError) throw driverError;
       
-      // Update the shipment metadata with driver information
-      const metadata = typeof shipment.metadata === 'object' ? shipment.metadata : {};
+      // Safely prepare the updated metadata
+      const existingMetadata = typeof shipment.metadata === 'object' ? shipment.metadata : {};
+      const existingDelivery = safeGet(existingMetadata, ['delivery'], {});
       
       const updatedMetadata = {
-        ...metadata,
+        ...existingMetadata,
         delivery: {
-          ...(metadata?.delivery || {}),
+          ...existingDelivery,
           driver_id: driverId,
           driver_name: driver.full_name,
           assigned_at: new Date().toISOString()
