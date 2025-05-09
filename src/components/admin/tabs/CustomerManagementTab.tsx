@@ -54,6 +54,9 @@ import {
   Mail
 } from 'lucide-react';
 
+// Define the Json type to match Supabase's Json type
+type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
+
 // Define an extended profile type that includes is_active
 interface ExtendedProfile {
   id: string;
@@ -63,8 +66,12 @@ interface ExtendedProfile {
   is_admin?: boolean;
   is_active?: boolean; // Add this property
   created_at: string;
-  communication_preferences?: { phone?: string };
-  // Add other properties as needed
+  communication_preferences?: Json; // Changed from { phone?: string } to Json
+  avatar_url?: string;
+  mfa_backup_codes?: string[];
+  mfa_enabled?: boolean;
+  mfa_secret?: string;
+  updated_at?: string;
 }
 
 const CustomerManagementTab = () => {
@@ -93,7 +100,8 @@ const CustomerManagementTab = () => {
       if (error) throw error;
 
       console.log('Customers fetched:', data);
-      setCustomers(data || []);
+      // Cast the data to ExtendedProfile[] to ensure type compatibility
+      setCustomers(data as ExtendedProfile[] || []);
     } catch (error: any) {
       console.error('Error fetching customers:', error);
       toast({
@@ -195,6 +203,17 @@ const CustomerManagementTab = () => {
     return <Badge variant="secondary">Active</Badge>; // Changed from "success" to "secondary"
   };
 
+  // Helper function to safely extract phone number from JSON
+  const getPhoneNumber = (preferences: Json | undefined): string => {
+    if (!preferences) return 'N/A';
+    
+    if (typeof preferences === 'object' && preferences !== null && 'phone' in preferences) {
+      return preferences.phone as string || 'N/A';
+    }
+    
+    return 'N/A';
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -264,7 +283,7 @@ const CustomerManagementTab = () => {
                 </TableHeader>
                 <TableBody>
                   {filteredCustomers.map(customer => {
-                    const phoneNumber = customer.communication_preferences?.phone || 'N/A';
+                    const phoneNumber = getPhoneNumber(customer.communication_preferences);
                     
                     return (
                       <TableRow key={customer.id}>

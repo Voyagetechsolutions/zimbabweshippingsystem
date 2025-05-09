@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Shipment } from '@/types/shipment';
 
 // UI Components
 import { 
@@ -68,27 +70,16 @@ import {
   MapPin
 } from 'lucide-react';
 
-// Define the shipment and status update types
-interface Shipment {
+// Define the Json type to match Supabase's Json type
+type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
+
+// Define the status history type
+interface StatusHistory {
   id: string;
-  tracking_number: string;
-  origin: string;
-  destination: string;
   status: string;
   created_at: string;
-  updated_at: string;
-  user_id: string;
-  metadata?: {
-    sender_name?: string;
-    sender_phone?: string;
-    receiver_name?: string;
-    receiver_phone?: string;
-    shipment_type?: string;
-    drums_quantity?: number;
-    metal_seals?: number;
-    additional_contacts?: any;
-    pickup_zone?: string;
-  };
+  created_by: string;
+  notes: string;
 }
 
 const STATUS_OPTIONS = [
@@ -112,7 +103,7 @@ const ShipmentManagementTab = () => {
   const [editingStatus, setEditingStatus] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
   const [statusNote, setStatusNote] = useState('');
-  const [statusHistory, setStatusHistory] = useState<any[]>([]);
+  const [statusHistory, setStatusHistory] = useState<StatusHistory[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [activeTab, setActiveTab] = useState('allShipments');
   const [customQuotes, setCustomQuotes] = useState<any[]>([]);
@@ -135,7 +126,19 @@ const ShipmentManagementTab = () => {
       if (error) throw error;
 
       console.log('Shipments fetched:', data);
-      setShipments(data || []);
+      // Cast the data to ensure type compatibility
+      const typedData = data?.map(item => {
+        // Ensure metadata is in the correct shape for Shipment type
+        return {
+          ...item,
+          metadata: item.metadata || {},
+          // Add required fields from the Shipment type that might be missing
+          can_cancel: item.can_cancel !== undefined ? item.can_cancel : true,
+          can_modify: item.can_modify !== undefined ? item.can_modify : true
+        } as Shipment;
+      }) || [];
+      
+      setShipments(typedData);
     } catch (error: any) {
       console.error('Error fetching shipments:', error);
       toast({
@@ -166,8 +169,7 @@ const ShipmentManagementTab = () => {
   const fetchStatusHistory = async (shipmentId: string) => {
     setLoadingHistory(true);
     try {
-      // Instead of querying a non-existent table, we'll simulate this with the shipment's own data
-      // In a real application, you would create this table or query relevant data
+      // Since there's no status_updates table, we'll simulate this with the shipment's own data
       const { data, error } = await supabase
         .from('shipments')
         .select('status, updated_at')
@@ -177,7 +179,7 @@ const ShipmentManagementTab = () => {
       if (error) throw error;
 
       // Create a mock status history
-      const mockHistory = [
+      const mockHistory: StatusHistory[] = [
         {
           id: '1',
           status: data.status,
@@ -222,9 +224,6 @@ const ShipmentManagementTab = () => {
 
       if (error) throw error;
 
-      // In a real application, you would also record this in a status_updates table
-      // For now, we'll just show a success message
-
       toast({
         title: 'Status Updated',
         description: `Shipment ${viewingShipment.tracking_number} status updated to ${selectedStatus}`,
@@ -266,8 +265,8 @@ const ShipmentManagementTab = () => {
     const matchesSearch = 
       searchQuery === '' ||
       shipment.tracking_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      metadata.sender_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      metadata.receiver_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      metadata.sender_name?.toLowerCase()?.includes(searchQuery.toLowerCase()) ||
+      metadata.receiver_name?.toLowerCase()?.includes(searchQuery.toLowerCase()) ||
       shipment.origin?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       shipment.destination?.toLowerCase().includes(searchQuery.toLowerCase());
     
