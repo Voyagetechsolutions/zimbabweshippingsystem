@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -64,7 +63,7 @@ interface ExtendedProfile {
   email: string;
   role?: string;
   is_admin?: boolean;
-  is_active?: boolean; // Add this property
+  is_active?: boolean;
   created_at: string;
   communication_preferences?: Json;
   avatar_url?: string;
@@ -149,7 +148,7 @@ const CustomerManagementTab = () => {
     }
   };
 
-  const toggleCustomerStatus = async (customerId: string, currentStatus: boolean) => {
+  const toggleCustomerStatus = async (customerId: string, currentStatus: boolean | undefined) => {
     try {
       const { error } = await supabase
         .from('profiles')
@@ -163,12 +162,14 @@ const CustomerManagementTab = () => {
         description: `Customer status has been ${!currentStatus ? 'activated' : 'suspended'}.`,
       });
 
-      // Update the local state
-      setCustomers(customers.map(customer => 
-        customer.id === customerId 
-          ? { ...customer, is_active: !currentStatus }
-          : customer
-      ));
+      // Update the local state with the correct typing
+      setCustomers(prevCustomers => 
+        prevCustomers.map(customer => 
+          customer.id === customerId 
+            ? { ...customer, is_active: !currentStatus }
+            : customer
+        )
+      );
     } catch (error: any) {
       console.error('Error updating customer status:', error);
       toast({
