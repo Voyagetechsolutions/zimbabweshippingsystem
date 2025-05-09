@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -150,9 +151,19 @@ const CustomerManagementTab = () => {
 
   const toggleCustomerStatus = async (customerId: string, currentStatus: boolean | undefined) => {
     try {
+      // For Supabase update operation, we need to specify a custom table with our additional fields
+      interface ProfileUpdate {
+        is_active?: boolean;
+      }
+
+      // Create an update object that only contains the is_active field
+      const updateData: ProfileUpdate = {
+        is_active: !currentStatus
+      };
+
       const { error } = await supabase
         .from('profiles')
-        .update({ is_active: !currentStatus })
+        .update(updateData)
         .eq('id', customerId);
 
       if (error) throw error;
