@@ -70,6 +70,7 @@ import {
   Check,
   Search
 } from 'lucide-react';
+import { formatDate } from '@/utils/formatters'; // Import the utility function
 
 interface RouteData {
   id: string;
@@ -286,9 +287,19 @@ const RouteManagementTab = () => {
     setEditRouteName(route.route);
     setEditRouteAreas(route.areas.join(', '));
     
-    // Parse date string to Date object
-    const parsedDate = new Date(route.pickup_date);
-    setEditRouteDate(parsedDate);
+    // Parse date string to Date object safely
+    try {
+      const parsedDate = new Date(route.pickup_date);
+      if (isValid(parsedDate)) {
+        setEditRouteDate(parsedDate);
+      } else {
+        console.warn(`Invalid pickup date: ${route.pickup_date}`);
+        setEditRouteDate(new Date()); // Default to current date if invalid
+      }
+    } catch (error) {
+      console.error(`Error parsing date: ${route.pickup_date}`, error);
+      setEditRouteDate(new Date()); // Default to current date on error
+    }
   };
   
   const selectPredefinedRoute = (routeName: string) => {
@@ -489,7 +500,10 @@ const RouteManagementTab = () => {
                               ))}
                             </div>
                           </TableCell>
-                          <TableCell>{route.pickup_date}</TableCell>
+                          <TableCell>
+                            {/* Safely display pickup date */}
+                            {safeFormatDate(route.pickup_date, 'MMMM d, yyyy')}
+                          </TableCell>
                           <TableCell className="text-gray-500 text-sm">
                             {safeFormatDate(route.updated_at, 'dd/MM/yyyy HH:mm')}
                           </TableCell>
