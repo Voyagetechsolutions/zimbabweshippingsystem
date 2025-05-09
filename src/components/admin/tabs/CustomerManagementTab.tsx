@@ -73,6 +73,11 @@ interface ExtendedProfile {
   updated_at?: string;
 }
 
+// Define a specific type for profile updates
+interface ProfileUpdate {
+  is_active: boolean;
+}
+
 const CustomerManagementTab = () => {
   const { toast } = useToast();
   const [customers, setCustomers] = useState<ExtendedProfile[]>([]);
@@ -150,9 +155,10 @@ const CustomerManagementTab = () => {
 
   const toggleCustomerStatus = async (customerId: string, currentStatus: boolean | undefined) => {
     try {
+      // For Supabase update operation, we need to explicitly type cast the update object
       const { error } = await supabase
         .from('profiles')
-        .update({ is_active: !currentStatus })
+        .update({ is_active: !currentStatus } as ProfileUpdate)
         .eq('id', customerId);
 
       if (error) throw error;
