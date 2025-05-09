@@ -4,11 +4,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Shipment } from '@/types/shipment';
 
+// Extending the Shipment interface to include profiles
+interface ShipmentWithProfiles extends Shipment {
+  profiles?: {
+    email?: string;
+    full_name?: string;
+  };
+}
+
 export const useDriverData = () => {
-  const [activeDeliveries, setActiveDeliveries] = useState<Shipment[]>([]);
-  const [completedDeliveries, setCompletedDeliveries] = useState<Shipment[]>([]);
+  const [activeDeliveries, setActiveDeliveries] = useState<ShipmentWithProfiles[]>([]);
+  const [completedDeliveries, setCompletedDeliveries] = useState<ShipmentWithProfiles[]>([]);
   const [collectionSchedules, setCollectionSchedules] = useState<any[]>([]);
-  const [scheduleShipments, setScheduleShipments] = useState<Record<string, Shipment[]>>({});
+  const [scheduleShipments, setScheduleShipments] = useState<Record<string, ShipmentWithProfiles[]>>({});
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
@@ -57,17 +65,32 @@ export const useDriverData = () => {
       if (completedDeliveriesRes.error) throw completedDeliveriesRes.error;
       if (scheduleRes.error) throw scheduleRes.error;
 
-      const enrichShipments = async (shipments: Shipment[]) => {
+      const enrichShipments = async (shipments: any[]): Promise<ShipmentWithProfiles[]> => {
         const userFetches = shipments.map(async (shipment) => {
+          // Create a properly typed shipment object
+          const typedShipment: ShipmentWithProfiles = {
+            id: shipment.id,
+            tracking_number: shipment.tracking_number,
+            status: shipment.status,
+            origin: shipment.origin,
+            destination: shipment.destination,
+            user_id: shipment.user_id,
+            created_at: shipment.created_at,
+            updated_at: shipment.updated_at,
+            metadata: shipment.metadata || {},
+            can_cancel: shipment.can_cancel,
+            can_modify: shipment.can_modify
+          };
+
           if (shipment.user_id) {
             const { data: userData } = await supabase
               .from('profiles')
               .select('email, full_name')
               .eq('id', shipment.user_id)
               .single();
-            if (userData) shipment.profiles = userData;
+            if (userData) typedShipment.profiles = userData;
           }
-          return shipment;
+          return typedShipment;
         });
         return await Promise.all(userFetches);
       };
@@ -81,7 +104,7 @@ export const useDriverData = () => {
       setCompletedDeliveries(enrichedCompleted);
       setCollectionSchedules(scheduleRes.data || []);
 
-      const schedulesWithShipments: Record<string, Shipment[]> = {};
+      const schedulesWithShipments: Record<string, ShipmentWithProfiles[]> = {};
 
       for (const schedule of scheduleRes.data || []) {
         const { data: shipments, error } = await supabase

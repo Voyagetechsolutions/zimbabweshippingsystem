@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -48,6 +49,14 @@ import {
 } from 'lucide-react';
 import { Shipment } from '@/types/shipment';
 
+// Define extended shipment type with profiles
+interface ShipmentWithProfiles extends Shipment {
+  profiles?: {
+    email?: string;
+    full_name?: string;
+  };
+}
+
 const LogisticsDashboard = () => {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,7 +84,7 @@ const LogisticsDashboard = () => {
         
         // Fetch user details separately for each shipment
         if (shipmentsData && shipmentsData.length > 0) {
-          for (const shipment of shipmentsData as Shipment[]) {
+          for (const shipment of shipmentsData) {
             if (shipment.user_id) {
               const { data: userData, error: userError } = await supabase
                 .from('profiles')
@@ -91,7 +100,7 @@ const LogisticsDashboard = () => {
         }
         
         console.log('Fetched shipments with profiles:', shipmentsData?.length);
-        return shipmentsData as Shipment[];
+        return shipmentsData as ShipmentWithProfiles[];
       } catch (error: any) {
         console.error('Error in query function:', error);
         toast({
@@ -488,7 +497,7 @@ const LogisticsDashboard = () => {
   );
   
   // Render shipments table
-  function renderShipmentsTable(shipmentsList: Shipment[]) {
+  function renderShipmentsTable(shipmentsList: ShipmentWithProfiles[]) {
     if (isLoading) {
       return (
         <div className="animate-pulse space-y-4">

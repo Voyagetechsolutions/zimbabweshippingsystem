@@ -16,6 +16,11 @@ export interface Shipment {
   weight?: number | string;
   dimensions?: string;
   estimated_delivery?: string;
+  // Add profiles property for user data
+  profiles?: {
+    email?: string;
+    full_name?: string;
+  };
 }
 
 export interface ShipmentMetadata {

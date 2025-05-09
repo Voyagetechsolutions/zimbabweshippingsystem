@@ -30,7 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { Truck, Package, UserCheck, RefreshCcw, Search, Filter, CheckCircle, XCircle, AlertCircle, UserX } from 'lucide-react';
-import { Shipment } from '@/types/shipment';
+import { Shipment, ShipmentMetadata } from '@/types/shipment';
 
 // Define types for driver and delivery data
 interface Driver {
@@ -54,6 +54,7 @@ interface DeliveryRecord {
   destination: string;
   created_at: string;
   updated_at: string;
+  metadata?: Record<string, any>; // Added metadata property
 }
 
 const DeliveryManagementTab = () => {
@@ -85,8 +86,13 @@ const DeliveryManagementTab = () => {
       // Transform shipment data to delivery records
       const deliveryRecords: DeliveryRecord[] = (shipmentData || []).map(shipment => {
         const metadata = shipment.metadata || {};
-        const recipientDetails = metadata.recipient || metadata.recipientDetails || {};
-        const deliveryInfo = metadata.delivery || {};
+        
+        // Safely extract recipient details from metadata (which could be any type)
+        const recipientDetails = typeof metadata === 'object' ? 
+          (metadata.recipient || metadata.recipientDetails || {}) : {};
+        
+        // Safely extract delivery info
+        const deliveryInfo = typeof metadata === 'object' ? (metadata.delivery || {}) : {};
         
         const recipientName = getRecipientName(shipment);
         
@@ -100,7 +106,10 @@ const DeliveryManagementTab = () => {
           destination: shipment.destination,
           timeliness: getTimeliness(shipment),
           created_at: shipment.created_at,
-          updated_at: shipment.updated_at
+          updated_at: shipment.updated_at,
+          driver_id: deliveryInfo.driver_id,
+          driver_name: deliveryInfo.driver_name,
+          metadata: shipment.metadata
         };
       });
 
@@ -140,6 +149,10 @@ const DeliveryManagementTab = () => {
   const getRecipientName = (shipment: any): string => {
     const metadata = shipment.metadata || {};
     
+    if (typeof metadata !== 'object') {
+      return 'No Name Provided';
+    }
+    
     if (metadata.recipientDetails?.name) {
       return metadata.recipientDetails.name;
     } else if (metadata.recipient?.name) {
@@ -161,6 +174,11 @@ const DeliveryManagementTab = () => {
     
     // Check if delivery was late based on metadata
     const metadata = shipment.metadata || {};
+    
+    if (typeof metadata !== 'object') {
+      return 'on-time'; // Default if metadata is not an object
+    }
+    
     const delivery = metadata.delivery || {};
     
     if (delivery.isLate) {
@@ -235,10 +253,11 @@ const DeliveryManagementTab = () => {
       if (driverError) throw driverError;
       
       // Update the shipment metadata with driver information
+      const metadata = shipment.metadata || {};
       const updatedMetadata = {
-        ...shipment.metadata,
+        ...metadata,
         delivery: {
-          ...(shipment.metadata?.delivery || {}),
+          ...(typeof metadata === 'object' ? (metadata.delivery || {}) : {}),
           driver_id: driverId,
           driver_name: driver.full_name,
           assigned_at: new Date().toISOString()
@@ -458,9 +477,7 @@ const DeliveryManagementTab = () => {
                       {drivers.map((driver) => {
                         // Count assigned deliveries for this driver
                         const assignedDeliveries = deliveries.filter(d => {
-                          const metadata = d.metadata || {};
-                          const deliveryInfo = metadata?.delivery || {};
-                          return deliveryInfo.driver_id === driver.id;
+                          return d.driver_id === driver.id;
                         }).length;
                         
                         return (
