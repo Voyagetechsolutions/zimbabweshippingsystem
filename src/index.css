@@ -43,8 +43,6 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
-
-    color-scheme: light;
   }
 
   .dark {
@@ -84,8 +82,6 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
-
-    color-scheme: dark;
   }
 }
 
@@ -95,7 +91,7 @@
   }
 
   body {
-    @apply bg-background text-foreground transition-colors duration-300;
+    @apply bg-background text-foreground;
   }
 
   .zim-gradient {
@@ -122,84 +118,6 @@
   .dark .hero-pattern {
     background-color: #0a0a0a;
     background-image: url("data:image/svg+xml,%3Csvg width='100' height='20' viewBox='0 0 100 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M21.184 20c.357-.13.72-.264 1.088-.402l1.768-.661C33.64 15.347 39.647 14 50 14c10.271 0 15.362 1.222 24.629 4.928.955.383 1.869.74 2.75 1.072h6.225c-2.51-.73-5.139-1.691-8.233-2.928C65.888 13.278 60.562 12 50 12c-10.626 0-16.855 1.397-26.66 5.063l-1.767.662c-2.475.923-4.66 1.674-6.724 2.275h6.335zm0-20C13.258 2.892 8.077 4 0 4V2c5.744 0 9.951-.574 14.85-2h6.334zM77.38 0C85.239 2.966 90.502 4 100 4V2c-6.842 0-11.386-.542-16.396-2h-6.225zM0 14c8.44 0 13.718-1.21 22.272-4.402l1.768-.661C33.64 5.347 39.647 4 50 4c10.271 0 15.362 1.222 24.629 4.928C84.112 12.722 89.438 14 100 14v-2c-10.271 0-15.362-1.222-24.629-4.928C65.888 3.278 60.562 2 50 2 39.374 2 33.145 3.397 23.34 7.063l-1.767.662C13.223 10.84 8.163 12 0 12v2z' fill='%23008C45' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
-  }
-
-  /* Dark mode overrides for specific components */
-  .dark .bg-white {
-    @apply bg-gray-900;
-  }
-
-  .dark .bg-gray-50 {
-    @apply bg-gray-800;
-  }
-
-  .dark .bg-gray-100 {
-    @apply bg-gray-800;
-  }
-
-  /* Fix for text color in dark mode */
-  .dark .text-gray-600, 
-  .dark .text-gray-700, 
-  .dark .text-gray-900 {
-    color: rgb(209 213 219); /* text-gray-300 equivalent */
-  }
-
-  /* Updated text color overrides for better visibility */
-  .dark .text-black {
-    color: rgb(243 244 246); /* text-gray-100 equivalent */
-  }
-  
-  .dark .text-gray-800 {
-    color: rgb(229 231 235); /* text-gray-200 equivalent */
-  }
-  
-  .dark .text-gray-500 {
-    color: rgb(156 163 175); /* text-gray-400 equivalent */
-  }
-  
-  .dark .text-gray-400 {
-    color: rgb(209 213 219); /* text-gray-300 equivalent */
-  }
-
-  /* Link text needs to be visible in dark mode too */
-  .dark a:not(.btn):not([class*="bg-"]) {
-    color: rgb(96 165 250); /* text-blue-400 equivalent */
-  }
-  
-  .dark a:not(.btn):not([class*="bg-"]):hover {
-    color: rgb(147 197 253); /* text-blue-300 equivalent */
-  }
-
-  /* Fix for buttons with dark text */
-  .dark .btn-dark, 
-  .dark .btn-black {
-    color: rgb(255 255 255); /* text-white equivalent */
-  }
-
-  .dark .border-gray-200, 
-  .dark .border-gray-300 {
-    border-color: rgb(55 65 81); /* border-gray-700 equivalent */
-  }
-
-  .dark .shadow-md,
-  .dark .shadow-lg {
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
-  }
-
-  .dark .bg-white\/80,
-  .dark .bg-white\/90 {
-    background-color: rgba(17, 24, 39, 0.9); /* bg-gray-900/90 equivalent */
-  }
-  
-  /* Fix for dropdown and menu items that might have dark text on dark bg */
-  .dark .dropdown-item,
-  .dark .menu-item {
-    color: rgb(229 231 235); /* text-gray-200 equivalent */
-  }
-  
-  .dark .dropdown-item:hover,
-  .dark .menu-item:hover {
-    background-color: rgb(31 41 55); /* bg-gray-800 equivalent */
   }
 }
 
@@ -242,22 +160,5 @@
     transition-property: transform;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     transition-duration: 150ms;
-  }
-  
-  /* Additional utility classes for improved text visibility */
-  .text-contrast-light {
-    color: rgb(17 24 39); /* text-gray-900 equivalent */
-  }
-  
-  .text-contrast-dark {
-    color: rgb(255 255 255); /* text-white equivalent */
-  }
-  
-  .dark .text-contrast-light {
-    color: rgb(255 255 255); /* text-white equivalent */
-  }
-  
-  .dark .text-contrast-dark {
-    color: rgb(229 231 235); /* text-gray-200 equivalent */
   }
 }

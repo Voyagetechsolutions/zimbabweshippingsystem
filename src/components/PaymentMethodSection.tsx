@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
@@ -142,10 +141,10 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
   };
 
   return (
-    <Card className="p-6 w-full shadow-none border-none md:border md:shadow-md dark:bg-gray-800">
+    <Card className="p-6">
       <div className="mb-6">
         <h3 className="text-xl font-semibold mb-2">Choose Payment Method</h3>
-        <p className="text-gray-600 dark:text-gray-400">Select how you would like to pay for your shipment</p>
+        <p className="text-gray-600">Select how you would like to pay for your shipment</p>
       </div>
       
       <RadioGroup 
@@ -153,7 +152,7 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
         onValueChange={(value) => setSelectedPaymentMethod(value as 'standard' | 'cashOnCollection' | 'payOnArrival')}
         className="space-y-4"
       >
-        <div className={`border rounded-lg p-4 transition ${selectedPaymentMethod === 'standard' ? 'border-zim-green bg-green-50 dark:bg-green-900/20 dark:border-green-700' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}>
+        <div className={`border rounded-lg p-4 transition ${selectedPaymentMethod === 'standard' ? 'border-zim-green bg-green-50' : 'hover:bg-gray-50'}`}>
           <div className="flex items-start">
             <RadioGroupItem value="standard" id="standard" className="mt-1" />
             <div className="ml-3 w-full">
@@ -162,12 +161,12 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
                   <CreditCard className="mr-2 h-4 w-4" />
                   Standard Payment
                 </span>
-                <span className="text-zim-green dark:text-green-400 font-semibold">£{totalAmount.toFixed(2)}</span>
+                <span className="text-zim-green font-semibold">£{totalAmount.toFixed(2)}</span>
               </label>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 mb-3">Pay by card or bank transfer before collection</p>
+              <p className="text-sm text-gray-600 mt-1 mb-3">Pay by card or bank transfer before collection</p>
               
               {selectedPaymentMethod === 'standard' && (
-                <div className="border-t dark:border-gray-600 pt-3 mt-2">
+                <div className="border-t pt-3 mt-2">
                   <RadioGroup 
                     value={payLaterMethod} 
                     onValueChange={(value) => setPayLaterMethod(value as 'bankTransfer' | 'payLater')}
@@ -189,7 +188,7 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
           </div>
         </div>
         
-        <div className={`border rounded-lg p-4 transition ${selectedPaymentMethod === 'cashOnCollection' ? 'border-zim-green bg-green-50 dark:bg-green-900/20 dark:border-green-700' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}>
+        <div className={`border rounded-lg p-4 transition ${selectedPaymentMethod === 'cashOnCollection' ? 'border-zim-green bg-green-50' : 'hover:bg-gray-50'}`}>
           <div className="flex items-start">
             <RadioGroupItem value="cashOnCollection" id="cashOnCollection" className="mt-1" />
             <div className="ml-3 w-full">
@@ -200,19 +199,19 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
                 </span>
                 {isSpecialDeal && drumQuantity > 0 ? (
                   <div className="text-right">
-                    <span className="text-gray-500 dark:text-gray-400 line-through mr-2">£{totalAmount.toFixed(2)}</span>
-                    <span className="text-zim-green dark:text-green-400 font-semibold">£{(totalAmount - specialDealDiscount).toFixed(2)}</span>
+                    <span className="text-gray-500 line-through mr-2">£{totalAmount.toFixed(2)}</span>
+                    <span className="text-zim-green font-semibold">£{(totalAmount - specialDealDiscount).toFixed(2)}</span>
                   </div>
                 ) : (
-                  <span className="text-zim-green dark:text-green-400 font-semibold">£{totalAmount.toFixed(2)}</span>
+                  <span className="text-zim-green font-semibold">£{totalAmount.toFixed(2)}</span>
                 )}
               </label>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Pay with cash when your items are collected</p>
+              <p className="text-sm text-gray-600 mt-1">Pay with cash when your items are collected</p>
               
               {isSpecialDeal && drumQuantity > 0 && (
-                <div className="mt-3 flex items-start rounded-md bg-green-100 dark:bg-green-900/30 p-2 text-sm">
-                  <CheckCircle2 className="mr-2 h-4 w-4 text-green-600 dark:text-green-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-green-700 dark:text-green-400">
+                <div className="mt-3 flex items-start rounded-md bg-green-100 p-2 text-sm">
+                  <CheckCircle2 className="mr-2 h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-green-700">
                     Special deal: £20 discount per drum for cash payments!
                   </span>
                 </div>
@@ -221,7 +220,7 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
           </div>
         </div>
         
-        <div className={`border rounded-lg p-4 transition ${selectedPaymentMethod === 'payOnArrival' ? 'border-zim-green bg-green-50 dark:bg-green-900/20 dark:border-green-700' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}>
+        <div className={`border rounded-lg p-4 transition ${selectedPaymentMethod === 'payOnArrival' ? 'border-zim-green bg-green-50' : 'hover:bg-gray-50'}`}>
           <div className="flex items-start">
             <RadioGroupItem value="payOnArrival" id="payOnArrival" className="mt-1" />
             <div className="ml-3 w-full">
@@ -231,15 +230,15 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
                   Pay on Arrival (20% Premium)
                 </span>
                 <div className="text-right">
-                  <span className="text-gray-500 dark:text-gray-400 line-through mr-2">£{totalAmount.toFixed(2)}</span>
-                  <span className="text-zim-green dark:text-green-400 font-semibold">£{finalAmount.toFixed(2)}</span>
+                  <span className="text-gray-500 line-through mr-2">£{totalAmount.toFixed(2)}</span>
+                  <span className="text-zim-green font-semibold">£{finalAmount.toFixed(2)}</span>
                 </div>
               </label>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Pay when your shipment reaches the destination</p>
+              <p className="text-sm text-gray-600 mt-1">Pay when your shipment reaches the destination</p>
               
-              <div className="mt-3 flex items-start rounded-md bg-amber-100 dark:bg-amber-900/30 p-2 text-sm">
-                <AlertCircle className="mr-2 h-4 w-4 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" />
-                <span className="text-amber-700 dark:text-amber-400">
+              <div className="mt-3 flex items-start rounded-md bg-amber-100 p-2 text-sm">
+                <AlertCircle className="mr-2 h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                <span className="text-amber-700">
                   This option adds a 20% premium to the total cost.
                 </span>
               </div>
@@ -248,22 +247,22 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
         </div>
       </RadioGroup>
       
-      <div className="border-t dark:border-gray-600 mt-6 pt-6">
+      <div className="border-t mt-6 pt-6">
         <div className="mb-4">
           <div className="flex justify-between mb-2">
-            <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
+            <span className="text-gray-600">Subtotal:</span>
             <span>£{totalAmount.toFixed(2)}</span>
           </div>
           
           {isSpecialDeal && (
-            <div className="flex justify-between mb-2 text-green-600 dark:text-green-400">
+            <div className="flex justify-between mb-2 text-green-600">
               <span>Cash discount:</span>
               <span>-£{specialDealDiscount.toFixed(2)}</span>
             </div>
           )}
           
           {isPayOnArrival && (
-            <div className="flex justify-between mb-2 text-amber-600 dark:text-amber-400">
+            <div className="flex justify-between mb-2 text-amber-600">
               <span>Pay on arrival premium (20%):</span>
               <span>+£{payOnArrivalPremium.toFixed(2)}</span>
             </div>
@@ -275,7 +274,7 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
           </div>
         </div>
         
-        <div className="flex justify-between mt-4">
+        <div className="flex justify-between">
           <Button
             type="button"
             variant="outline"

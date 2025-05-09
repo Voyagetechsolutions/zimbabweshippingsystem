@@ -9,14 +9,13 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import Logo from '@/components/Logo';
-import { Mail, Lock, User, AlertCircle, ArrowLeft, Eye, EyeOff} from 'lucide-react';
+import { Mail, Lock, User, AlertCircle, ArrowLeft} from 'lucide-react';
 import { generateCSRFToken, validateCSRFToken } from '@/utils/csrf';
 import { getClientIP, handleAuthError } from '@/utils/securityUtils';
 
 const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('login');
@@ -185,24 +184,20 @@ const Auth = () => {
     }
   };
 
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
-  };
-
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50 dark:bg-gray-900">
-      <Link to="/" className="flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 mb-4 sm:mb-0">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50">
+      <Link to="/" className="flex items-center text-gray-600 hover:text-gray-900 mb-4 sm:mb-0">
           <ArrowLeft className="h-4 w-4 mr-1" />
           <span>Back to Home</span>
         </Link>
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
           <Logo className="mx-auto h-12 w-auto" />
-          <h1 className="mt-6 text-3xl font-bold dark:text-white">Welcome to Zimbabwe Shipping</h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">Sign in to your account or create a new one</p>
+          <h1 className="mt-6 text-3xl font-bold">Welcome to Zimbabwe Shipping</h1>
+          <p className="mt-2 text-gray-600">Sign in to your account or create a new one</p>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+        <div className="bg-white p-8 rounded-lg shadow-md border border-gray-200">
           <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-8">
               <TabsTrigger value="login">Login</TabsTrigger>
@@ -244,7 +239,7 @@ const Auth = () => {
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
                       id="password"
-                      type={showPassword ? "text" : "password"}
+                      type="password"
                       placeholder="••••••••"
                       className="pl-10"
                       value={password}
@@ -252,14 +247,6 @@ const Auth = () => {
                       required
                       autoComplete="current-password"
                     />
-                    <button 
-                      type="button" 
-                      onClick={togglePasswordVisibility}
-                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
                   </div>
                 </div>
 
@@ -311,7 +298,7 @@ const Auth = () => {
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
                       id="register-password"
-                      type={showPassword ? "text" : "password"}
+                      type="password"
                       placeholder="••••••••"
                       className="pl-10"
                       value={password}
@@ -319,16 +306,8 @@ const Auth = () => {
                       required
                       autoComplete="new-password"
                     />
-                    <button 
-                      type="button" 
-                      onClick={togglePasswordVisibility}
-                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-gray-500">
                     Must be at least 8 characters with uppercase, lowercase, number, and symbol.
                   </p>
                 </div>
@@ -341,7 +320,7 @@ const Auth = () => {
           </Tabs>
 
           {activeTab === 'login' && (
-            <div className="text-center mt-4 text-sm text-gray-600 dark:text-gray-400">
+            <div className="text-center mt-4 text-sm text-gray-600">
               <p>Don't have an account?{' '}
                 <button 
                   type="button" 
@@ -354,7 +333,7 @@ const Auth = () => {
             </div>
           )}
           {activeTab === 'register' && (
-            <div className="text-center mt-4 text-sm text-gray-600 dark:text-gray-400">
+            <div className="text-center mt-4 text-sm text-gray-600">
               <p>Already have an account?{' '}
                 <button 
                   type="button" 
