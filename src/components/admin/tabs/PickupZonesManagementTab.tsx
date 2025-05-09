@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -92,9 +91,10 @@ const PickupZonesManagementTab = () => {
   const fetchShipments = async () => {
     setLoading(true);
     try {
+      // Modified query to not join with profiles table since the relationship doesn't exist
       const { data, error } = await supabase
         .from('shipments')
-        .select('*, profiles(email, full_name)')
+        .select('*')
         .in('status', ['Booking Confirmed', 'Ready for Pickup'])
         .order('created_at', { ascending: false });
 

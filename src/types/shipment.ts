@@ -8,20 +8,83 @@ export interface Shipment {
   user_id: string;
   created_at: string;
   updated_at: string;
-  metadata: any;
+  metadata: ShipmentMetadata;
   can_cancel: boolean;
   can_modify: boolean;
-  // Note: These fields might not exist in the database but are required by the type
-  // so we mark them as optional to prevent errors
+  // Additional optional fields
   carrier?: string;
   weight?: number | string;
   dimensions?: string;
   estimated_delivery?: string;
-  // Add profiles for joined queries
-  profiles?: {
-    email?: string;
-    full_name?: string;
-  };
+}
+
+export interface ShipmentMetadata {
+  sender?: SenderDetails;
+  senderDetails?: SenderDetails;
+  recipient?: RecipientDetails;
+  recipientDetails?: RecipientDetails;
+  shipment?: ShipmentDetails;
+  shipmentDetails?: ShipmentDetails;
+  collection?: CollectionDetails;
+  delivery?: DeliveryDetails;
+  // Any other fields that might be present
+  [key: string]: any;
+}
+
+export interface SenderDetails {
+  firstName?: string;
+  lastName?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  additionalPhone?: string;
+  [key: string]: any;
+}
+
+export interface RecipientDetails {
+  firstName?: string;
+  lastName?: string;
+  name?: string;
+  phone?: string;
+  address?: string;
+  additionalPhone?: string;
+  [key: string]: any;
+}
+
+export interface ShipmentDetails {
+  type?: string;
+  quantity?: string | number;
+  category?: string;
+  description?: string;
+  includeDrums?: boolean;
+  includeOtherItems?: boolean;
+  wantMetalSeal?: boolean;
+  doorToDoor?: boolean;
+  specificItem?: string;
+  services?: Array<{ name: string; price: string | number }>;
+  additionalAddresses?: string[];
+  [key: string]: any;
+}
+
+export interface CollectionDetails {
+  route?: string;
+  date?: string;
+  scheduled?: boolean;
+  completed?: boolean;
+  notes?: string;
+  [key: string]: any;
+}
+
+export interface DeliveryDetails {
+  driver_id?: string;
+  driver_name?: string;
+  date?: string;
+  assigned_at?: string;
+  completed_at?: string;
+  isLate?: boolean;
+  notes?: string;
+  [key: string]: any;
 }
 
 export interface ShipmentExport {
@@ -32,7 +95,7 @@ export interface ShipmentExport {
   destination: string;
   created_at: string;
   user_id: string;
-  metadata: any;
+  metadata: ShipmentMetadata;
 }
 
 export interface ShipmentFilters {

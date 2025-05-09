@@ -30,25 +30,30 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { Truck, Package, UserCheck, RefreshCcw, Search, Filter, CheckCircle, XCircle, AlertCircle, UserX } from 'lucide-react';
+import { Shipment } from '@/types/shipment';
 
 // Define types for driver and delivery data
 interface Driver {
   id: string;
   name: string;
-  total_deliveries: number;
-  on_time_rate: number;
+  total_deliveries?: number;
+  on_time_rate?: number;
   active: boolean;
 }
 
-interface Delivery {
+interface DeliveryRecord {
   id: string;
   tracking_number: string;
-  driver_id: string;
-  driver_name: string;
+  driver_id?: string; 
+  driver_name?: string;
   status: string;
-  delivery_date: string;
+  delivery_date?: string;
   recipient_name: string;
-  timeliness: 'on-time' | 'late' | 'failed';
+  timeliness?: 'on-time' | 'late' | 'failed';
+  origin: string;
+  destination: string;
+  created_at: string;
+  updated_at: string;
 }
 
 const DeliveryManagementTab = () => {
@@ -56,90 +61,114 @@ const DeliveryManagementTab = () => {
   const [activeTab, setActiveTab] = useState('monitor');
   const [timeFilter, setTimeFilter] = useState('week');
   const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [deliveries, setDeliveries] = useState<DeliveryRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  // Simulated data - in a real app, this would come from the database
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        // In a real implementation, you would fetch this data from your database
-        // For demo purposes, we'll use mock data
-        const mockDrivers: Driver[] = [
-          { id: 'd1', name: 'John Smith', total_deliveries: 28, on_time_rate: 95, active: true },
-          { id: 'd2', name: 'Maria Garcia', total_deliveries: 35, on_time_rate: 98, active: true },
-          { id: 'd3', name: 'Robert Johnson', total_deliveries: 19, on_time_rate: 87, active: true }
-        ];
-        
-        const mockDeliveries: Delivery[] = [
-          { 
-            id: 'del1', 
-            tracking_number: 'ZIMSHIP-12345', 
-            driver_id: 'd1', 
-            driver_name: 'John Smith',
-            status: 'Delivered', 
-            delivery_date: '2025-05-07T14:30:00', 
-            recipient_name: 'Alice Moyo', 
-            timeliness: 'on-time' 
-          },
-          { 
-            id: 'del2', 
-            tracking_number: 'ZIMSHIP-23456', 
-            driver_id: 'd2', 
-            driver_name: 'Maria Garcia',
-            status: 'Out for Delivery', 
-            delivery_date: '2025-05-09T11:00:00', 
-            recipient_name: 'Thomas Ncube', 
-            timeliness: 'on-time' 
-          },
-          { 
-            id: 'del3', 
-            tracking_number: 'ZIMSHIP-34567', 
-            driver_id: 'd3', 
-            driver_name: 'Robert Johnson',
-            status: 'Failed Attempt', 
-            delivery_date: '2025-05-08T16:15:00', 
-            recipient_name: 'Grace Mutasa', 
-            timeliness: 'failed' 
-          },
-          { 
-            id: 'del4', 
-            tracking_number: 'ZIMSHIP-45678', 
-            driver_id: 'd1', 
-            driver_name: 'John Smith',
-            status: 'Delivered', 
-            delivery_date: '2025-05-08T09:20:00', 
-            recipient_name: 'David Shumba', 
-            timeliness: 'late' 
-          }
-        ];
-
-        // In production, you'd fetch from Supabase here
-        // const { data: driversData, error: driversError } = await supabase
-        //   .from('drivers')
-        //   .select('*');
-        
-        // if (driversError) throw driversError;
-        
-        setDrivers(mockDrivers);
-        setDeliveries(mockDeliveries);
-      } catch (error) {
-        console.error('Error fetching delivery data:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load delivery data',
-          variant: 'destructive'
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchData();
-  }, [toast]);
+  }, [timeFilter]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      // Fetch shipments that are in delivery states
+      const { data: shipmentData, error: shipmentError } = await supabase
+        .from('shipments')
+        .select('*')
+        .in('status', ['Out for Delivery', 'Processing in ZW Warehouse', 'Delivered', 'Failed Attempt'])
+        .order('created_at', { ascending: false });
+
+      if (shipmentError) throw shipmentError;
+
+      // Transform shipment data to delivery records
+      const deliveryRecords: DeliveryRecord[] = (shipmentData || []).map(shipment => {
+        const metadata = shipment.metadata || {};
+        const recipientDetails = metadata.recipient || metadata.recipientDetails || {};
+        const deliveryInfo = metadata.delivery || {};
+        
+        const recipientName = getRecipientName(shipment);
+        
+        return {
+          id: shipment.id,
+          tracking_number: shipment.tracking_number,
+          status: shipment.status,
+          delivery_date: deliveryInfo.date || shipment.updated_at,
+          recipient_name: recipientName,
+          origin: shipment.origin,
+          destination: shipment.destination,
+          timeliness: getTimeliness(shipment),
+          created_at: shipment.created_at,
+          updated_at: shipment.updated_at
+        };
+      });
+
+      // Fetch active drivers from profiles table
+      const { data: driverData, error: driverError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'driver');
+
+      if (driverError) {
+        // If there's an error fetching drivers, we can still show the delivery data
+        console.error('Error fetching drivers:', driverError);
+        setDrivers([]);
+      } else {
+        const formattedDrivers: Driver[] = (driverData || []).map(driver => ({
+          id: driver.id,
+          name: driver.full_name || 'Unknown Driver',
+          active: true
+        }));
+        setDrivers(formattedDrivers);
+      }
+
+      setDeliveries(deliveryRecords);
+    } catch (error: any) {
+      console.error('Error fetching delivery data:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load delivery data',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper function to extract recipient name from shipment metadata
+  const getRecipientName = (shipment: any): string => {
+    const metadata = shipment.metadata || {};
+    
+    if (metadata.recipientDetails?.name) {
+      return metadata.recipientDetails.name;
+    } else if (metadata.recipient?.name) {
+      return metadata.recipient.name;
+    } else if (metadata.recipient?.firstName && metadata.recipient?.lastName) {
+      return `${metadata.recipient.firstName} ${metadata.recipient.lastName}`;
+    } else if (metadata.recipientName) {
+      return metadata.recipientName;
+    }
+    
+    return 'No Name Provided';
+  };
+
+  // Determine timeliness based on shipment data
+  const getTimeliness = (shipment: any): 'on-time' | 'late' | 'failed' => {
+    if (shipment.status === 'Failed Attempt') {
+      return 'failed';
+    }
+    
+    // Check if delivery was late based on metadata
+    const metadata = shipment.metadata || {};
+    const delivery = metadata.delivery || {};
+    
+    if (delivery.isLate) {
+      return 'late';
+    }
+    
+    return 'on-time';
+  };
 
   const getStatusBadgeClass = (status: string) => {
     switch (status.toLowerCase()) {
@@ -153,6 +182,8 @@ const DeliveryManagementTab = () => {
         return 'bg-yellow-100 text-yellow-800 border-yellow-300';
       case 'cancelled':
         return 'bg-gray-100 text-gray-800 border-gray-300';
+      case 'processing in zw warehouse':
+        return 'bg-purple-100 text-purple-800 border-purple-300';
       default:
         return 'bg-gray-100 text-gray-600 border-gray-200';
     }
@@ -174,7 +205,8 @@ const DeliveryManagementTab = () => {
   const filteredDeliveries = deliveries.filter(delivery => {
     const matchesSearch = searchQuery === '' || 
       delivery.tracking_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      delivery.recipient_name.toLowerCase().includes(searchQuery.toLowerCase());
+      delivery.recipient_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      delivery.destination.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || 
       delivery.status.toLowerCase() === statusFilter.toLowerCase();
@@ -182,12 +214,63 @@ const DeliveryManagementTab = () => {
     return matchesSearch && matchesStatus;
   });
 
-  const assignDriver = (deliveryId: string, driverId: string) => {
-    // In a real implementation, you would update the database
-    toast({
-      title: 'Driver assigned',
-      description: 'The delivery has been assigned to a new driver',
-    });
+  const assignDriver = async (deliveryId: string, driverId: string) => {
+    try {
+      // Get the shipment
+      const { data: shipment, error: fetchError } = await supabase
+        .from('shipments')
+        .select('*')
+        .eq('id', deliveryId)
+        .single();
+        
+      if (fetchError) throw fetchError;
+      
+      // Get the driver's name
+      const { data: driver, error: driverError } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', driverId)
+        .single();
+        
+      if (driverError) throw driverError;
+      
+      // Update the shipment metadata with driver information
+      const updatedMetadata = {
+        ...shipment.metadata,
+        delivery: {
+          ...(shipment.metadata?.delivery || {}),
+          driver_id: driverId,
+          driver_name: driver.full_name,
+          assigned_at: new Date().toISOString()
+        }
+      };
+      
+      // Update the shipment
+      const { error: updateError } = await supabase
+        .from('shipments')
+        .update({
+          metadata: updatedMetadata
+        })
+        .eq('id', deliveryId);
+        
+      if (updateError) throw updateError;
+      
+      // Success message
+      toast({
+        title: 'Driver assigned',
+        description: `The delivery has been assigned to ${driver.full_name}`,
+      });
+      
+      // Refresh data
+      fetchData();
+    } catch (error: any) {
+      console.error('Error assigning driver:', error);
+      toast({
+        title: 'Assignment failed',
+        description: 'Failed to assign driver: ' + error.message,
+        variant: 'destructive'
+      });
+    }
   };
 
   return (
@@ -237,9 +320,8 @@ const DeliveryManagementTab = () => {
                       <SelectItem value="all">All Statuses</SelectItem>
                       <SelectItem value="delivered">Delivered</SelectItem>
                       <SelectItem value="out for delivery">Out for Delivery</SelectItem>
+                      <SelectItem value="processing in zw warehouse">Processing in ZW</SelectItem>
                       <SelectItem value="failed attempt">Failed Attempt</SelectItem>
-                      <SelectItem value="returned">Returned</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select value={timeFilter} onValueChange={setTimeFilter}>
@@ -261,10 +343,11 @@ const DeliveryManagementTab = () => {
                       setSearchQuery('');
                       setStatusFilter('all');
                       setTimeFilter('week');
+                      fetchData();
                     }}
                   >
                     <RefreshCcw className="h-4 w-4 mr-2" />
-                    Reset
+                    Refresh
                   </Button>
                 </div>
               </div>
@@ -291,52 +374,60 @@ const DeliveryManagementTab = () => {
                         <TableHead>Driver</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Delivery Date</TableHead>
-                        <TableHead>Timeliness</TableHead>
+                        <TableHead>Destination</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredDeliveries.map((delivery) => (
-                        <TableRow key={delivery.id}>
-                          <TableCell className="font-mono">{delivery.tracking_number}</TableCell>
-                          <TableCell>{delivery.recipient_name}</TableCell>
-                          <TableCell>
-                            <Select 
-                              defaultValue={delivery.driver_id}
-                              onValueChange={(value) => assignDriver(delivery.id, value)}
-                            >
-                              <SelectTrigger className="w-[140px]">
-                                <SelectValue placeholder="Assign driver" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {drivers.map(driver => (
-                                  <SelectItem key={driver.id} value={driver.id}>
-                                    {driver.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={getStatusBadgeClass(delivery.status)}>
-                              {delivery.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {format(new Date(delivery.delivery_date), 'MMM d, yyyy HH:mm')}
-                          </TableCell>
-                          <TableCell className="flex items-center">
-                            {getTimelinessIcon(delivery.timeliness)}
-                            <span className="ml-2">
-                              {delivery.timeliness === 'on-time' ? 'On time' : 
-                               delivery.timeliness === 'late' ? 'Late' : 'Failed'}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button variant="ghost" size="sm">View Details</Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {filteredDeliveries.map((delivery) => {
+                        // Format the delivery date 
+                        const formattedDate = delivery.delivery_date
+                          ? format(new Date(delivery.delivery_date), 'MMM d, yyyy')
+                          : 'Not scheduled';
+                            
+                        return (
+                          <TableRow key={delivery.id}>
+                            <TableCell className="font-mono">{delivery.tracking_number}</TableCell>
+                            <TableCell>{delivery.recipient_name}</TableCell>
+                            <TableCell>
+                              {drivers.length > 0 && (
+                                <Select 
+                                  defaultValue={delivery.driver_id}
+                                  onValueChange={(value) => assignDriver(delivery.id, value)}
+                                >
+                                  <SelectTrigger className="w-[140px]">
+                                    <SelectValue placeholder="Assign driver" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {drivers.map(driver => (
+                                      <SelectItem key={driver.id} value={driver.id}>
+                                        {driver.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                              {drivers.length === 0 && (
+                                <span className="text-sm text-gray-500">No drivers available</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={getStatusBadgeClass(delivery.status)}>
+                                {delivery.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {formattedDate}
+                            </TableCell>
+                            <TableCell className="max-w-[200px] truncate">
+                              {delivery.destination}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="sm">View Details</Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -352,37 +443,57 @@ const DeliveryManagementTab = () => {
               <CardDescription>Monitor driver efficiency and delivery metrics</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Driver Name</TableHead>
-                      <TableHead>Total Deliveries</TableHead>
-                      <TableHead>On-Time Rate</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {drivers.map((driver) => (
-                      <TableRow key={driver.id}>
-                        <TableCell className="font-medium">{driver.name}</TableCell>
-                        <TableCell>{driver.total_deliveries}</TableCell>
-                        <TableCell>{driver.on_time_rate}%</TableCell>
-                        <TableCell>
-                          <Badge className={driver.active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
-                            {driver.active ? "Active" : "Inactive"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm">View Details</Button>
-                          <Button variant="ghost" size="sm">Assign Tasks</Button>
-                        </TableCell>
+              {drivers.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Driver Name</TableHead>
+                        <TableHead>Assigned Deliveries</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {drivers.map((driver) => {
+                        // Count assigned deliveries for this driver
+                        const assignedDeliveries = deliveries.filter(d => {
+                          const metadata = d.metadata || {};
+                          const deliveryInfo = metadata?.delivery || {};
+                          return deliveryInfo.driver_id === driver.id;
+                        }).length;
+                        
+                        return (
+                          <TableRow key={driver.id}>
+                            <TableCell className="font-medium">{driver.name}</TableCell>
+                            <TableCell>{assignedDeliveries}</TableCell>
+                            <TableCell>
+                              <Badge className="bg-green-100 text-green-800">
+                                Active
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="sm">View Details</Button>
+                              <Button variant="ghost" size="sm">Assign Tasks</Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center p-12">
+                  <UserX className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No drivers found</h3>
+                  <p className="text-gray-500 mb-6">
+                    There are currently no drivers in the system
+                  </p>
+                  <Button variant="outline">
+                    Add New Driver
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
