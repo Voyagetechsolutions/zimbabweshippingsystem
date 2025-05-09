@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { useIsMobile } from '@/hooks/use-mobile';
+
+// UI Components
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Card, 
   CardContent, 
@@ -11,735 +13,643 @@ import {
   CardHeader, 
   CardTitle 
 } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+// Icons
+import { 
   Package, 
   Truck, 
-  Search, 
-  RefreshCcw, 
-  Filter, 
-  Eye, 
-  Edit, 
-  User,
-  Settings, 
-  Activity, 
-  Calendar,
-  FileText, 
+  User, 
+  MapPin, 
+  CreditCard, 
   BarChart3, 
-  ImageIcon, 
-  MessageSquare, 
-  FileSpreadsheet,
+  Bell, 
+  Calendar, 
+  Route as RouteIcon, 
+  Settings,
+  Users,
+  RefreshCcw,
   Menu
 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import UserManagement from '@/components/admin/UserManagement';
-import AnalyticsReports from '@/components/admin/AnalyticsReports';
-import SettingsManagement from '@/components/admin/SettingsManagement';
-import ContentManagement from '@/components/admin/ContentManagement';
-import CollectionScheduleManagement from '@/components/admin/CollectionScheduleManagement';
-import SupportTickets from '@/components/admin/SupportTickets';
-import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
-
-const STATUS_OPTIONS = [
-  'Booking Confirmed',
-  'Ready for Pickup',
-  'Processing in Warehouse (UK)',
-  'Customs Clearance',
-  'Processing in Warehouse (ZW)',
-  'Out for Delivery',
-  'Delivered',
-  'Cancelled',
-];
-
-interface Shipment {
-  id: string;
-  tracking_number: string;
-  origin: string;
-  destination: string;
-  status: string;
-  carrier: string | null;
-  weight: number | null;
-  dimensions: string | null;
-  estimated_delivery: string | null;
-  created_at: string;
-  updated_at: string;
-  user_id: string;
-  metadata: any | null;
-}
-
-const getStatusBadgeClass = (status: string) => {
-  const statusLower = status.toLowerCase();
-  
-  switch (true) {
-    case statusLower.includes('booking confirmed'):
-      return 'bg-blue-100 text-blue-800 border-blue-300';
-    case statusLower.includes('ready for pickup'):
-      return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-    case statusLower.includes('processing'):
-      return 'bg-orange-100 text-orange-800 border-orange-300';
-    case statusLower.includes('customs'):
-      return 'bg-purple-100 text-purple-800 border-purple-300';
-    case statusLower.includes('transit'):
-      return 'bg-blue-100 text-blue-800 border-blue-300';
-    case statusLower.includes('out for delivery'):
-      return 'bg-indigo-100 text-indigo-800 border-indigo-300';
-    case statusLower.includes('delivered'):
-      return 'bg-green-100 text-green-800 border-green-300';
-    case statusLower.includes('cancelled'):
-      return 'bg-red-100 text-red-800 border-red-300';
-    case statusLower.includes('delayed'):
-      return 'bg-red-100 text-red-800 border-red-300';
-    default:
-      return 'bg-gray-100 text-gray-500';
-  }
-};
 
 const AdminDashboardContent = () => {
-  const { user } = useAuth();
-  const navigate = useNavigate();
   const { toast } = useToast();
   const isMobile = useIsMobile();
-  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [activeTab, setActiveTab] = useState('shipments');
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
-  const [newStatus, setNewStatus] = useState<string>('');
-  const [activeTab, setActiveTab] = useState('overview');
-  const [showFullMenu, setShowFullMenu] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   
+  // Basic dashboard stats
   const [stats, setStats] = useState({
-    total: 0,
-    processing: 0,
-    inTransit: 0,
-    delivered: 0,
-    quotes: 0,
+    totalShipments: 0,
+    pendingShipments: 0,
+    activeShipments: 0,
+    deliveredShipments: 0,
+    totalRevenue: 0,
+    pendingQuotes: 0
   });
 
-  // Fix dependency array in useEffect to prevent unnecessary re-renders
   useEffect(() => {
-    fetchShipments();
-    fetchStats();
+    fetchDashboardStats();
+    fetchNotifications();
   }, []);
 
-  const fetchStats = async () => {
+  const fetchDashboardStats = async () => {
+    setLoading(true);
     try {
-      const { data: quotesData, error: quotesError } = await supabase
+      // Fetch shipments stats
+      const { data: shipments, error: shipmentError } = await supabase
+        .from('shipments')
+        .select('id, status');
+      
+      if (shipmentError) throw shipmentError;
+      
+      // Fetch payments data for revenue calculation
+      const { data: payments, error: paymentError } = await supabase
+        .from('payments')
+        .select('amount');
+      
+      if (paymentError) throw paymentError;
+      
+      // Fetch custom quotes
+      const { data: quotes, error: quotesError } = await supabase
         .from('custom_quotes')
-        .select('id', { count: 'exact' });
+        .select('id, status')
+        .eq('status', 'pending');
       
       if (quotesError) throw quotesError;
       
-      setStats(prev => ({
-        ...prev,
-        quotes: quotesData ? quotesData.length : 0
-      }));
+      // Calculate stats
+      const totalShipments = shipments?.length || 0;
+      
+      const pendingShipments = shipments?.filter(s => 
+        s.status === 'Booking Confirmed' || 
+        s.status === 'Ready for Pickup'
+      ).length || 0;
+      
+      const activeShipments = shipments?.filter(s => 
+        s.status === 'Processing in UK Warehouse' || 
+        s.status === 'Customs Clearance' ||
+        s.status === 'Processing in ZW Warehouse' ||
+        s.status === 'Out for Delivery'
+      ).length || 0;
+      
+      const deliveredShipments = shipments?.filter(s => 
+        s.status === 'Delivered'
+      ).length || 0;
+      
+      const totalRevenue = payments?.reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0;
+      
+      setStats({
+        totalShipments,
+        pendingShipments,
+        activeShipments,
+        deliveredShipments,
+        totalRevenue,
+        pendingQuotes: quotes?.length || 0
+      });
     } catch (error) {
-      console.error("Error fetching stats:", error);
-    }
-  };
-
-  const fetchShipments = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('shipments')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error("Error fetching shipments:", error);
-        throw error;
-      }
-
-      if (data) {
-        const shipmentsData = data as unknown as Shipment[];
-        setShipments(shipmentsData);
-        const totalCount = data.length;
-        const processingCount = data.filter(s => 
-          s.status.toLowerCase().includes('processing')).length;
-        const inTransitCount = data.filter(s => 
-          s.status.toLowerCase().includes('transit')).length;
-        const deliveredCount = data.filter(s => 
-          s.status.toLowerCase().includes('delivered')).length;
-        
-        setStats(prev => ({
-          ...prev,
-          total: totalCount,
-          processing: processingCount,
-          inTransit: inTransitCount,
-          delivered: deliveredCount,
-        }));
-      }
-    } catch (error: any) {
-      console.error("Error in fetchShipments:", error);
+      console.error('Error fetching dashboard stats:', error);
       toast({
-        title: 'Error fetching shipments',
-        description: error.message,
-        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to load dashboard statistics',
+        variant: 'destructive'
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const updateShipmentStatus = async () => {
-    if (!editingShipment || !newStatus) return;
-    
+  const fetchNotifications = async () => {
     try {
-      const { error } = await supabase
-        .from('shipments')
-        .update({
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', editingShipment.id);
-
+      // Fetch the latest notifications
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
       if (error) throw error;
-
-      toast({
-        title: 'Status Updated',
-        description: `Shipment ${editingShipment.tracking_number} status updated to ${newStatus}`,
-      });
-
-      fetchShipments();
       
-      setEditingShipment(null);
-      setNewStatus('');
-      
-    } catch (error: any) {
-      toast({
-        title: 'Error updating status',
-        description: error.message,
-        variant: 'destructive',
-      });
+      setNotifications(data || []);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
     }
   };
 
-  const filteredShipments = shipments.filter(shipment => {
-    const matchesSearch = 
-      searchQuery === '' ||
-      shipment.tracking_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      shipment.origin.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      shipment.destination.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = 
-      statusFilter === 'all' ||
-      shipment.status.toLowerCase() === statusFilter.toLowerCase();
-    
-    return matchesSearch && matchesStatus;
-  });
-
-  // Function to extract sender and recipient information from shipment metadata
-  const getShipmentContactInfo = (shipment: Shipment) => {
-    const metadata = shipment.metadata || {};
-    return {
-      senderName: metadata.senderName || metadata.firstName || "N/A",
-      senderPhone: metadata.senderPhone || metadata.phone || "N/A",
-      recipientName: metadata.recipientName || "N/A",
-      recipientPhone: metadata.recipientPhone || "N/A"
-    };
+  // Function to handle refreshing the dashboard data
+  const refreshDashboard = () => {
+    fetchDashboardStats();
+    fetchNotifications();
   };
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
+    <div className="space-y-6">
+      {/* Header with title and notification bell */}
+      <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-        {isMobile && (
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setShowFullMenu(!showFullMenu)}
-          >
-            <Menu className="h-4 w-4" />
+        <div className="flex items-center gap-2">
+          {isMobile && (
+            <Button variant="outline" size="icon" onClick={() => setShowMobileMenu(!showMobileMenu)}>
+              <Menu className="h-4 w-4" />
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={refreshDashboard} disabled={loading}>
+            <RefreshCcw className="h-4 w-4 mr-2" />
+            Refresh
           </Button>
-        )}
-      </div>
-      
-      <Tabs 
-        defaultValue="overview" 
-        value={activeTab} 
-        onValueChange={setActiveTab}
-        className="mb-8"
-      >
-        {isMobile && !showFullMenu ? (
-          <TabsList className="grid grid-cols-2 gap-2 mb-4">
-            <TabsTrigger value="overview" className="flex items-center justify-center gap-2 p-3">
-              <Activity className="h-5 w-5" />
-              <span>Overview</span>
-            </TabsTrigger>
-            <Select value={activeTab} onValueChange={setActiveTab}>
-              <SelectTrigger className="h-full">
-                <div className="flex items-center">
-                  <span>More</span>
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="shipments">
-                  <div className="flex items-center gap-2">
-                    <Package className="h-4 w-4" />
-                    <span>Shipments</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="quotes">
-                  <div className="flex items-center gap-2">
-                    <FileSpreadsheet className="h-4 w-4" />
-                    <span>Custom Quotes</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="users">
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    <span>Users</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="analytics">
-                  <div className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4" />
-                    <span>Analytics</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="schedule">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    <span>Schedule</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="settings">
-                  <div className="flex items-center gap-2">
-                    <Settings className="h-4 w-4" />
-                    <span>Settings</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="more">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    <span>More</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </TabsList>
-        ) : (
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-8 gap-2 mb-4">
-            <TabsTrigger value="overview" className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>Overview</span>
-            </TabsTrigger>
-            <TabsTrigger value="shipments" className="flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>Shipments</span>
-            </TabsTrigger>
-            <TabsTrigger value="quotes" className="flex items-center gap-2">
-              <FileSpreadsheet className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>Custom Quotes</span>
-            </TabsTrigger>
-            <TabsTrigger value="users" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>Users</span>
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>Analytics</span>
-            </TabsTrigger>
-            <TabsTrigger value="schedule" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>Schedule</span>
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>Settings</span>
-            </TabsTrigger>
-            <TabsTrigger value="more" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              <span className={isMobile ? "" : "hidden sm:inline"}>More</span>
-            </TabsTrigger>
-          </TabsList>
-        )}
-        
-        <TabsContent value="overview">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Total Shipments</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <Package className="h-8 w-8 text-zim-green mr-3" />
-                  <div className="text-2xl font-bold">{stats.total}</div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Processing</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <Package className="h-8 w-8 text-yellow-500 mr-3" />
-                  <div className="text-2xl font-bold">{stats.processing}</div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">In Transit</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <Truck className="h-8 w-8 text-blue-500 mr-3" />
-                  <div className="text-2xl font-bold">{stats.inTransit}</div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Delivered</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <Package className="h-8 w-8 text-green-500 mr-3" />
-                  <div className="text-2xl font-bold">{stats.delivered}</div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-500">Custom Quotes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center">
-                  <FileSpreadsheet className="h-8 w-8 text-purple-500 mr-3" />
-                  <div className="text-2xl font-bold">{stats.quotes}</div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl">Recent Shipments</CardTitle>
-              <CardDescription>Quick overview of the latest shipments</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[120px]">Tracking #</TableHead>
-                      <TableHead>Sender Name</TableHead>
-                      <TableHead>Sender Phone</TableHead>
-                      <TableHead>Recipient Name</TableHead>
-                      <TableHead>Recipient Phone</TableHead>
-                      <TableHead>Origin</TableHead>
-                      <TableHead>Destination</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead className="text-right">View</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {shipments.slice(0, 5).map((shipment) => {
-                      const contactInfo = getShipmentContactInfo(shipment);
-                      return (
-                        <TableRow key={shipment.id}>
-                          <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
-                          <TableCell>{contactInfo.senderName}</TableCell>
-                          <TableCell>{contactInfo.senderPhone}</TableCell>
-                          <TableCell>{contactInfo.recipientName}</TableCell>
-                          <TableCell>{contactInfo.recipientPhone}</TableCell>
-                          <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
-                          <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
-                          <TableCell>
-                            <Badge className={getStatusBadgeClass(shipment.status)}>
-                              {shipment.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {format(new Date(shipment.created_at), 'MMM d, yyyy')}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => navigate(`/shipment/${shipment.id}`)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-            <CardContent className="flex justify-between border-t pt-4">
-              <Button variant="outline" onClick={() => setActiveTab('shipments')}>
-                View All Shipments
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="relative">
+                <Bell className="h-4 w-4" />
+                {notifications.length > 0 && (
+                  <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full flex items-center justify-center text-white text-xs">
+                    {notifications.length}
+                  </span>
+                )}
               </Button>
-              <Button variant="outline" onClick={() => setActiveTab('quotes')}>
-                View Custom Quotes
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="shipments">
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle className="text-xl">Shipments Management</CardTitle>
-              <CardDescription>View and manage all shipments</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="relative flex-grow">
-                  <Input
-                    placeholder="Search by tracking #, origin, or destination"
-                    className="pl-10"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                  <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                </div>
-                <div className="flex gap-4">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[180px]">
-                      <div className="flex items-center">
-                        <Filter className="h-4 w-4 mr-2" />
-                        <SelectValue placeholder="Filter by status" />
+            </PopoverTrigger>
+            <PopoverContent className="w-80">
+              <div className="space-y-2">
+                <h3 className="font-medium">Notifications</h3>
+                {notifications.length > 0 ? (
+                  <div className="space-y-2 max-h-[300px] overflow-auto">
+                    {notifications.map((notification) => (
+                      <div key={notification.id} className="p-3 bg-muted rounded-md">
+                        <h4 className="font-medium text-sm">{notification.title}</h4>
+                        <p className="text-xs text-muted-foreground mt-1">{notification.message}</p>
                       </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      {STATUS_OPTIONS.map((status) => (
-                        <SelectItem key={status.toLowerCase()} value={status.toLowerCase()}>
-                          {status}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button 
-                    variant="outline"
-                    onClick={fetchShipments}
-                    className="h-10 px-4"
-                  >
-                    <RefreshCcw className="h-4 w-4 mr-2" />
-                    Refresh
-                  </Button>
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground">
+                    No new notifications
+                  </div>
+                )}
               </div>
-            </CardContent>
-          </Card>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
 
-          <Card>
-            <CardContent className="p-0">
-              {loading ? (
-                <div className="flex justify-center items-center p-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
+      {/* Dashboard Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Shipments</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalShipments}</div>
+            <Progress value={100} className="h-1 mt-2" />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Pending Shipments</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.pendingShipments}</div>
+            <Progress 
+              value={stats.totalShipments ? (stats.pendingShipments / stats.totalShipments) * 100 : 0} 
+              className="h-1 mt-2 bg-yellow-200 dark:bg-yellow-900" 
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Active Shipments</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.activeShipments}</div>
+            <Progress 
+              value={stats.totalShipments ? (stats.activeShipments / stats.totalShipments) * 100 : 0} 
+              className="h-1 mt-2 bg-blue-200 dark:bg-blue-900" 
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Delivered</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.deliveredShipments}</div>
+            <Progress 
+              value={stats.totalShipments ? (stats.deliveredShipments / stats.totalShipments) * 100 : 0} 
+              className="h-1 mt-2 bg-green-200 dark:bg-green-900" 
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Revenue</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">£{stats.totalRevenue.toFixed(2)}</div>
+            <Progress value={100} className="h-1 mt-2" />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Pending Quotes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.pendingQuotes}</div>
+            <div className="text-xs text-muted-foreground mt-1">Awaiting response</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main Navigation Tabs */}
+      {isMobile && showMobileMenu ? (
+        <div className="mb-6">
+          <Select value={activeTab} onValueChange={setActiveTab}>
+            <SelectTrigger className="w-full">
+              <span className="flex items-center gap-2">
+                {activeTab === 'shipments' && <Package className="h-4 w-4" />}
+                {activeTab === 'customers' && <User className="h-4 w-4" />}
+                {activeTab === 'pickupZones' && <MapPin className="h-4 w-4" />}
+                {activeTab === 'delivery' && <Truck className="h-4 w-4" />}
+                {activeTab === 'payments' && <CreditCard className="h-4 w-4" />}
+                {activeTab === 'reports' && <BarChart3 className="h-4 w-4" />}
+                {activeTab === 'notifications' && <Bell className="h-4 w-4" />}
+                {activeTab === 'schedule' && <Calendar className="h-4 w-4" />}
+                {activeTab === 'routes' && <RouteIcon className="h-4 w-4" />}
+                {activeTab === 'users' && <Users className="h-4 w-4" />}
+                {activeTab === 'settings' && <Settings className="h-4 w-4" />}
+                
+                {activeTab === 'shipments' && 'Shipment Management'}
+                {activeTab === 'customers' && 'Customer Management'}
+                {activeTab === 'pickupZones' && 'Pickup Zones'}
+                {activeTab === 'delivery' && 'Delivery Management'}
+                {activeTab === 'payments' && 'Payments & Invoicing'}
+                {activeTab === 'reports' && 'Reports & Analytics'}
+                {activeTab === 'notifications' && 'Notifications'}
+                {activeTab === 'schedule' && 'Collection Schedule'}
+                {activeTab === 'routes' && 'Route Management'}
+                {activeTab === 'users' && 'User Management'}
+                {activeTab === 'settings' && 'System Settings'}
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="shipments">
+                <div className="flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  <span>Shipment Management</span>
                 </div>
-              ) : filteredShipments.length === 0 ? (
-                <div className="text-center p-12">
-                  <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No shipments found</h3>
-                  <p className="text-gray-500">
-                    {searchQuery || statusFilter !== 'all' 
-                      ? "Try adjusting your filters" 
-                      : "There are no shipments in the system yet"}
-                  </p>
+              </SelectItem>
+              <SelectItem value="customers">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  <span>Customer Management</span>
                 </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[120px]">Tracking #</TableHead>
-                        <TableHead>Sender Name</TableHead>
-                        <TableHead>Sender Phone</TableHead>
-                        <TableHead>Recipient Name</TableHead>
-                        <TableHead>Recipient Phone</TableHead>
-                        <TableHead>Origin</TableHead>
-                        <TableHead>Destination</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredShipments.map((shipment) => {
-                        const contactInfo = getShipmentContactInfo(shipment);
-                        return (
-                          <TableRow key={shipment.id}>
-                            <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
-                            <TableCell>{contactInfo.senderName}</TableCell>
-                            <TableCell>{contactInfo.senderPhone}</TableCell>
-                            <TableCell>{contactInfo.recipientName}</TableCell>
-                            <TableCell>{contactInfo.recipientPhone}</TableCell>
-                            <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
-                            <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
-                            <TableCell>
-                              <Badge className={getStatusBadgeClass(shipment.status)}>
-                                {shipment.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {format(new Date(shipment.created_at), 'MMM d, yyyy')}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end space-x-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => navigate(`/shipment/${shipment.id}`)}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    setEditingShipment(shipment);
-                                    setNewStatus(shipment.status);
-                                  }}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+              </SelectItem>
+              <SelectItem value="pickupZones">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  <span>Pickup Zones</span>
                 </div>
-              )}
-            </CardContent>
-            <CardContent className="flex justify-between py-4">
-              <p className="text-sm text-gray-500">
-                Showing {filteredShipments.length} out of {shipments.length} shipments
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="quotes">
-          <CustomQuoteManagement />
-        </TabsContent>
-        
-        <TabsContent value="users">
-          <UserManagement />
-        </TabsContent>
-
-        <TabsContent value="analytics">
-          <AnalyticsReports />
-        </TabsContent>
-
-        <TabsContent value="settings">
-          <SettingsManagement />
-        </TabsContent>
-
-        <TabsContent value="schedule">
-          <CollectionScheduleManagement />
-        </TabsContent>
-
-        <TabsContent value="more">
-          <Tabs defaultValue="support">
-            <TabsList className="mb-6">
-              <TabsTrigger value="support" className="flex items-center gap-2">
-                <MessageSquare className="h-4 w-4" />
-                <span>Support Tickets</span>
+              </SelectItem>
+              <SelectItem value="delivery">
+                <div className="flex items-center gap-2">
+                  <Truck className="h-4 w-4" />
+                  <span>Delivery Management</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="payments">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="h-4 w-4" />
+                  <span>Payments & Invoicing</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="reports">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  <span>Reports & Analytics</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="notifications">
+                <div className="flex items-center gap-2">
+                  <Bell className="h-4 w-4" />
+                  <span>Notifications</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="schedule">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  <span>Collection Schedule</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="routes">
+                <div className="flex items-center gap-2">
+                  <RouteIcon className="h-4 w-4" />
+                  <span>Route Management</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="users">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  <span>User Management</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="settings">
+                <div className="flex items-center gap-2">
+                  <Settings className="h-4 w-4" />
+                  <span>System Settings</span>
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      ) : (
+        <Tabs defaultValue="shipments" value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <div className="border rounded-lg p-1 mb-6">
+            <TabsList className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-11 gap-2 h-auto p-1">
+              <TabsTrigger value="shipments" className="flex items-center gap-1 py-2 h-auto">
+                <Package className="h-4 w-4" />
+                <span className="hidden md:inline">Shipments</span>
               </TabsTrigger>
-              <TabsTrigger value="media" className="flex items-center gap-2">
-                <ImageIcon className="h-4 w-4" />
-                <span>Media Library</span>
+              
+              <TabsTrigger value="customers" className="flex items-center gap-1 py-2 h-auto">
+                <User className="h-4 w-4" />
+                <span className="hidden md:inline">Customers</span>
+              </TabsTrigger>
+              
+              <TabsTrigger value="pickupZones" className="flex items-center gap-1 py-2 h-auto">
+                <MapPin className="h-4 w-4" />
+                <span className="hidden md:inline">Pickup Zones</span>
+              </TabsTrigger>
+              
+              <TabsTrigger value="delivery" className="flex items-center gap-1 py-2 h-auto">
+                <Truck className="h-4 w-4" />
+                <span className="hidden md:inline">Delivery</span>
+              </TabsTrigger>
+              
+              <TabsTrigger value="payments" className="flex items-center gap-1 py-2 h-auto">
+                <CreditCard className="h-4 w-4" />
+                <span className="hidden md:inline">Payments</span>
+              </TabsTrigger>
+              
+              <TabsTrigger value="reports" className="flex items-center gap-1 py-2 h-auto">
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden md:inline">Reports</span>
+              </TabsTrigger>
+              
+              <TabsTrigger value="notifications" className="flex items-center gap-1 py-2 h-auto">
+                <Bell className="h-4 w-4" />
+                <span className="hidden md:inline">Notifications</span>
+              </TabsTrigger>
+              
+              <TabsTrigger value="schedule" className="flex items-center gap-1 py-2 h-auto">
+                <Calendar className="h-4 w-4" />
+                <span className="hidden md:inline">Schedule</span>
+              </TabsTrigger>
+              
+              <TabsTrigger value="routes" className="flex items-center gap-1 py-2 h-auto">
+                <RouteIcon className="h-4 w-4" />
+                <span className="hidden md:inline">Routes</span>
+              </TabsTrigger>
+              
+              <TabsTrigger value="users" className="flex items-center gap-1 py-2 h-auto">
+                <Users className="h-4 w-4" />
+                <span className="hidden md:inline">Users</span>
+              </TabsTrigger>
+              
+              <TabsTrigger value="settings" className="flex items-center gap-1 py-2 h-auto">
+                <Settings className="h-4 w-4" />
+                <span className="hidden md:inline">Settings</span>
               </TabsTrigger>
             </TabsList>
-            
-            <TabsContent value="support">
-              <SupportTickets />
-            </TabsContent>
-            
-            <TabsContent value="media">
-              <ContentManagement />
-            </TabsContent>
-          </Tabs>
-        </TabsContent>
-      </Tabs>
-      
-      {editingShipment && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-bold mb-4">Update Shipment Status</h3>
-            <div className="mb-4">
-              <p className="text-sm text-gray-500 mb-1">Tracking Number</p>
-              <p className="font-medium font-mono">{editingShipment.tracking_number}</p>
-            </div>
-            <div className="mb-6">
-              <p className="text-sm text-gray-500 mb-1">Current Status</p>
-              <Badge className={getStatusBadgeClass(editingShipment.status)}>
-                {editingShipment.status}
-              </Badge>
-            </div>
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-2">New Status</label>
-              <Select
-                value={newStatus}
-                onValueChange={setNewStatus}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUS_OPTIONS.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {status}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end space-x-3">
-              <Button 
-                variant="outline"
-                onClick={() => {
-                  setEditingShipment(null);
-                  setNewStatus('');
-                }}
-              >
-                Cancel
-              </Button>
-              <Button 
-                className="bg-zim-green hover:bg-zim-green/90"
-                onClick={updateShipmentStatus}
-              >
-                Update Status
-              </Button>
-            </div>
           </div>
-        </div>
+        </Tabs>
       )}
+
+      {/* Tab Contents */}
+      <TabsContent value={activeTab} className="mt-0 space-y-4">
+        {/* Shipment Management Tab */}
+        {activeTab === 'shipments' && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Shipment Management</CardTitle>
+                <CardDescription>
+                  Manage all shipments, update statuses, and handle custom quotes
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-center py-12 text-muted-foreground">
+                  Select options from this tab to manage shipments, update statuses, and handle custom quotes.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Customer Management Tab */}
+        {activeTab === 'customers' && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Customer Management</CardTitle>
+                <CardDescription>
+                  View and manage customer accounts
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-center py-12 text-muted-foreground">
+                  Select options from this tab to search, filter, and manage customer accounts.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Pickup Zones Management Tab */}
+        {activeTab === 'pickupZones' && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Pickup Zones Management</CardTitle>
+                <CardDescription>
+                  Manage shipments by pickup zone and schedule collections
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-center py-12 text-muted-foreground">
+                  Select options from this tab to manage pickup zones and schedule collections.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Delivery Management Tab */}
+        {activeTab === 'delivery' && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Delivery Management</CardTitle>
+                <CardDescription>
+                  Track and manage delivery operations
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-center py-12 text-muted-foreground">
+                  Select options from this tab to track and manage delivery operations.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Payments & Invoicing Tab */}
+        {activeTab === 'payments' && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Payments & Invoicing</CardTitle>
+                <CardDescription>
+                  Manage payments, generate invoices, and track financial transactions
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-center py-12 text-muted-foreground">
+                  Select options from this tab to manage payments and invoices.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Reports & Analytics Tab */}
+        {activeTab === 'reports' && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Reports & Analytics</CardTitle>
+                <CardDescription>
+                  Generate reports and view analytics
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-center py-12 text-muted-foreground">
+                  Select options from this tab to generate reports and view analytics.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Notifications & Alerts Tab */}
+        {activeTab === 'notifications' && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Notifications & Alerts</CardTitle>
+                <CardDescription>
+                  Manage system notifications and alerts
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-center py-12 text-muted-foreground">
+                  Select options from this tab to manage notifications and alerts.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Collection Schedule Tab */}
+        {activeTab === 'schedule' && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Collection Schedule</CardTitle>
+                <CardDescription>
+                  Manage collection schedules and calendar
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-center py-12 text-muted-foreground">
+                  Select options from this tab to manage collection schedules.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Route Management Tab */}
+        {activeTab === 'routes' && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Route Management</CardTitle>
+                <CardDescription>
+                  Plan and manage collection routes
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-center py-12 text-muted-foreground">
+                  Select options from this tab to manage routes and auto-assign customers.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* User Management Tab */}
+        {activeTab === 'users' && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>User Management</CardTitle>
+                <CardDescription>
+                  Add and manage user accounts
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-center py-12 text-muted-foreground">
+                  Select options from this tab to manage user accounts and permissions.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* System Settings Tab */}
+        {activeTab === 'settings' && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>System Settings</CardTitle>
+                <CardDescription>
+                  Configure system settings and preferences
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-center py-12 text-muted-foreground">
+                  Select options from this tab to configure system settings and preferences.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </TabsContent>
     </div>
   );
 };
