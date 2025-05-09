@@ -3,17 +3,25 @@ import React, { useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import AdminDashboardContent from '@/components/admin/AdminDashboardContent';
-import { useRole } from '@/contexts/RoleContext';
+import { useAuth } from '@/contexts/AuthContext'; 
 import { SetupAdmin } from '@/components/SetupAdmin';
 
 const AdminDashboard = () => {
-  const { hasPermission } = useRole();
-  const isAdmin = hasPermission('admin');
+  const { isAdmin, loading } = useAuth(); // Use isAdmin directly from AuthContext
   
   // Use effect to ensure permissions are properly loaded
   useEffect(() => {
     document.title = 'Admin Dashboard | UK to Zimbabwe Shipping';
   }, []);
+  
+  // Show loading indicator while checking admin status
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
+      </div>
+    );
+  }
   
   return (
     <div className="min-h-screen flex flex-col">

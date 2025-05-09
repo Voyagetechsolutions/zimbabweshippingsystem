@@ -38,15 +38,14 @@ export const RequireAuth: React.FC<AuthProps> = ({ children }) => {
 };
 
 export const RequireAdmin: React.FC<AuthProps> = ({ children }) => {
-  const { user, loading } = useAuth();
-  const { hasPermission, isLoading: roleLoading } = useRole();
+  const { user, loading, isAdmin } = useAuth();
   const { toast } = useToast();
   const [hasShownToast, setHasShownToast] = useState(false);
   
-  const isAdmin = hasPermission('admin');
-
+  // Use isAdmin directly from AuthContext instead of checking through RoleContext
+  
   useEffect(() => {
-    if (!loading && !roleLoading && !isAdmin && user && !hasShownToast) {
+    if (!loading && !isAdmin && user && !hasShownToast) {
       toast({
         title: "Admin access required",
         description: "You do not have permission to access this page.",
@@ -54,9 +53,9 @@ export const RequireAdmin: React.FC<AuthProps> = ({ children }) => {
       });
       setHasShownToast(true);
     }
-  }, [user, loading, roleLoading, isAdmin, toast, hasShownToast]);
+  }, [user, loading, isAdmin, toast, hasShownToast]);
 
-  if (loading || roleLoading) {
+  if (loading) {
     return <div className="flex justify-center items-center h-screen">Loading...</div>;
   }
 

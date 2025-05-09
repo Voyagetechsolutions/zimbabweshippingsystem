@@ -17,11 +17,11 @@ import CustomerDashboard from '@/components/dashboards/CustomerDashboard';
 import RoleElevationDialog from '@/components/RoleElevationDialog';
 
 const Dashboard = () => {
-  const { user } = useAuth();
-  const { role, isLoading, hasPermission } = useRole();
+  const { user, isAdmin } = useAuth();
+  const { role, isLoading } = useRole();
   const navigate = useNavigate();
   
-  console.log('Dashboard - User:', user?.id, 'Role:', role, 'isAdmin:', hasPermission('admin'));
+  console.log('Dashboard - User:', user?.id, 'Role:', role, 'isAdmin:', isAdmin);
   
   useEffect(() => {
     if (user && !isLoading && !role) {
@@ -30,10 +30,10 @@ const Dashboard = () => {
     }
     
     // Redirect admins to the admin dashboard
-    if (role === 'admin') {
+    if (isAdmin) {
       navigate('/admin');
     }
-  }, [user, role, isLoading, navigate]);
+  }, [user, role, isLoading, navigate, isAdmin]);
   
   // Handle loading state
   if (isLoading) {
@@ -47,9 +47,6 @@ const Dashboard = () => {
   // Render the appropriate dashboard based on user role
   const renderDashboard = () => {
     switch (role) {
-      case 'admin':
-        // This won't be reached due to the redirect in useEffect
-        return null;
       case 'logistics':
         return <LogisticsDashboard />;
       case 'driver':
