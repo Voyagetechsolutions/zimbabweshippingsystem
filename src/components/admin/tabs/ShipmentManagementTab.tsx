@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -258,67 +259,117 @@ const ShipmentManagementTab = () => {
     }
   };
   
-  // Function to extract sender's name from metadata
+  // Enhanced function to extract sender's name from metadata
   const getSenderName = (shipment: Shipment): string => {
     const metadata = shipment.metadata || {};
     
     // Check for different possible paths to sender name in metadata
     if (metadata.senderDetails?.name) {
       return metadata.senderDetails.name;
+    } else if (metadata.sender?.name) {
+      return metadata.sender.name;
+    } else if (metadata.sender?.firstName && metadata.sender?.lastName) {
+      return `${metadata.sender.firstName} ${metadata.sender.lastName}`;
     } else if (metadata.firstName && metadata.lastName) {
       return `${metadata.firstName} ${metadata.lastName}`;
     } else if (metadata.sender_name) {
       return metadata.sender_name;
     } else if (metadata.sender_details?.name) {
       return metadata.sender_details.name;
+    } else if (metadata.sender) {
+      // Handle case where sender might be structured differently
+      const sender = metadata.sender;
+      if (typeof sender === 'object') {
+        if ('firstName' in sender && 'lastName' in sender) {
+          return `${sender.firstName} ${sender.lastName}`;
+        }
+      }
+    }
+    
+    // Check if metadata has differently structured sender info directly
+    if (metadata.firstName && metadata.lastName) {
+      return `${metadata.firstName} ${metadata.lastName}`;
     }
     
     return 'No Name Provided';
   };
   
-  // Function to extract sender's phone from metadata
+  // Enhanced function to extract sender's email from metadata
+  const getSenderEmail = (shipment: Shipment): string => {
+    const metadata = shipment.metadata || {};
+    
+    if (metadata.senderDetails?.email) {
+      return metadata.senderDetails.email;
+    } else if (metadata.sender?.email) {
+      return metadata.sender.email;
+    } else if (metadata.email) {
+      return metadata.email;
+    } else if (metadata.sender_email) {
+      return metadata.sender_email;
+    }
+    
+    return 'No Email Provided';
+  };
+  
+  // Enhanced function to extract sender's phone from metadata
   const getSenderPhone = (shipment: Shipment): string => {
     const metadata = shipment.metadata || {};
     
     // Check for different possible paths to sender phone in metadata
     if (metadata.senderDetails?.phone) {
       return metadata.senderDetails.phone;
+    } else if (metadata.sender?.phone) {
+      return metadata.sender.phone;
     } else if (metadata.phone) {
       return metadata.phone;
     } else if (metadata.sender_phone) {
       return metadata.sender_phone;
     } else if (metadata.sender_details?.phone) {
       return metadata.sender_details.phone;
+    } else if (metadata.sender?.additionalPhone) {
+      return metadata.sender.additionalPhone;
+    } else if (metadata.additionalPhone) {
+      return metadata.additionalPhone;
     }
     
     return 'No Phone Provided';
   };
   
-  // Function to extract receiver's name from metadata
+  // Enhanced function to extract receiver's name from metadata
   const getReceiverName = (shipment: Shipment): string => {
     const metadata = shipment.metadata || {};
     
     // Check for different possible paths to receiver name in metadata
     if (metadata.recipientDetails?.name) {
       return metadata.recipientDetails.name;
+    } else if (metadata.recipient?.name) {
+      return metadata.recipient.name;
     } else if (metadata.recipientName) {
       return metadata.recipientName;
     } else if (metadata.receiver_name) {
       return metadata.receiver_name;
     } else if (metadata.recipient_details?.name) {
       return metadata.recipient_details.name;
+    } else if (metadata.recipient) {
+      // In case recipient is structured differently
+      const recipient = metadata.recipient;
+      if (typeof recipient === 'object' && recipient !== null) {
+        return recipient.name || 'No Name Provided';
+      }
     }
     
     return 'No Name Provided';
   };
   
-  // Function to extract receiver's phone from metadata
+  // Enhanced function to extract receiver's phone from metadata
   const getReceiverPhone = (shipment: Shipment): string => {
     const metadata = shipment.metadata || {};
     
     // Check for different possible paths to receiver phone in metadata
     if (metadata.recipientDetails?.phone) {
       return metadata.recipientDetails.phone;
+    } else if (metadata.recipient?.phone) {
+      return metadata.recipient.phone;
     } else if (metadata.recipientPhone) {
       return metadata.recipientPhone;
     } else if (metadata.receiver_phone) {
@@ -327,9 +378,50 @@ const ShipmentManagementTab = () => {
       return metadata.recipient_details.phone;
     } else if (metadata.additionalRecipientPhone) {
       return metadata.additionalRecipientPhone;
+    } else if (metadata.recipient?.additionalPhone) {
+      return metadata.recipient.additionalPhone;
     }
     
     return 'No Phone Provided';
+  };
+  
+  // Function to get delivery address
+  const getDeliveryAddress = (shipment: Shipment): string => {
+    const metadata = shipment.metadata || {};
+    
+    if (metadata.recipientDetails?.address) {
+      return metadata.recipientDetails.address;
+    } else if (metadata.recipient?.address) {
+      return metadata.recipient.address;
+    } else if (metadata.deliveryAddress) {
+      return metadata.deliveryAddress;
+    } else if (shipment.destination) {
+      return shipment.destination;
+    }
+    
+    return 'No Address Provided';
+  };
+  
+  // Function to get pickup address
+  const getPickupAddress = (shipment: Shipment): string => {
+    const metadata = shipment.metadata || {};
+    
+    if (metadata.senderDetails?.address) {
+      return metadata.senderDetails.address;
+    } else if (metadata.sender?.address) {
+      return metadata.sender.address;
+    } else if (metadata.pickupAddress) {
+      const address = metadata.pickupAddress;
+      const city = metadata.pickupCity || '';
+      const postcode = metadata.pickupPostcode || '';
+      const country = metadata.pickupCountry || '';
+      
+      return [address, city, postcode, country].filter(Boolean).join(', ');
+    } else if (shipment.origin) {
+      return shipment.origin;
+    }
+    
+    return 'No Address Provided';
   };
   
   // Filter shipments based on search and status filter
@@ -339,6 +431,7 @@ const ShipmentManagementTab = () => {
     const receiverName = getReceiverName(shipment);
     const senderPhone = getSenderPhone(shipment);
     const receiverPhone = getReceiverPhone(shipment);
+    const senderEmail = getSenderEmail(shipment);
     
     const matchesSearch = 
       searchQuery === '' ||
@@ -347,6 +440,7 @@ const ShipmentManagementTab = () => {
       receiverName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       senderPhone.toLowerCase().includes(searchQuery.toLowerCase()) ||
       receiverPhone.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      senderEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
       shipment.origin?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       shipment.destination?.toLowerCase().includes(searchQuery.toLowerCase());
     
@@ -359,7 +453,7 @@ const ShipmentManagementTab = () => {
 
   // Helper function to render status badge
   const renderStatusBadge = (status: string) => {
-    const statusLower = status.toLowerCase();
+    const statusLower = status?.toLowerCase() || '';
     let variant: "default" | "destructive" | "outline" | "secondary" = "default";
     
     if (statusLower.includes('cancelled')) {
@@ -543,7 +637,7 @@ const ShipmentManagementTab = () => {
                         <User className="h-4 w-4 mt-1 mr-2 text-gray-500" />
                         <div>
                           <p className="font-medium">{getSenderName(viewingShipment)}</p>
-                          <p className="text-sm text-gray-500">{viewingShipment.metadata?.email || viewingShipment.metadata?.senderDetails?.email || 'No email provided'}</p>
+                          <p className="text-sm text-gray-500">{getSenderEmail(viewingShipment)}</p>
                         </div>
                       </div>
                       <div className="flex items-start">
@@ -556,10 +650,7 @@ const ShipmentManagementTab = () => {
                         <MapPin className="h-4 w-4 mt-1 mr-2 text-gray-500" />
                         <div>
                           <p className="text-sm">
-                            {viewingShipment.metadata?.pickupAddress || 
-                             viewingShipment.metadata?.senderDetails?.address ||
-                             viewingShipment.origin || 
-                             'No address provided'}
+                            {getPickupAddress(viewingShipment)}
                           </p>
                         </div>
                       </div>
@@ -585,10 +676,7 @@ const ShipmentManagementTab = () => {
                         <MapPin className="h-4 w-4 mt-1 mr-2 text-gray-500" />
                         <div>
                           <p className="text-sm">
-                            {viewingShipment.metadata?.deliveryAddress || 
-                             viewingShipment.metadata?.recipientDetails?.address ||
-                             viewingShipment.destination || 
-                             'No address provided'}
+                            {getDeliveryAddress(viewingShipment)}
                           </p>
                         </div>
                       </div>
@@ -676,7 +764,39 @@ const ShipmentManagementTab = () => {
                     </div>
                   )}
                   
-                  {!viewingShipment.metadata?.shipmentDetails && (
+                  {!viewingShipment.metadata?.shipmentDetails && viewingShipment.metadata?.shipment && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-medium text-muted-foreground">Shipment Type</h4>
+                        <p>{viewingShipment.metadata.shipment.type || 'Not specified'}</p>
+                      </div>
+                      
+                      {viewingShipment.metadata.shipment.includeDrums && (
+                        <>
+                          <div className="space-y-1">
+                            <h4 className="text-sm font-medium text-muted-foreground">Drum Quantity</h4>
+                            <p>{viewingShipment.metadata.shipment.quantity || 'Not specified'}</p>
+                          </div>
+                        </>
+                      )}
+                      
+                      {viewingShipment.metadata.shipment.includeOtherItems && (
+                        <>
+                          <div className="space-y-1">
+                            <h4 className="text-sm font-medium text-muted-foreground">Item Category</h4>
+                            <p>{viewingShipment.metadata.shipment.category || 'Not specified'}</p>
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <h4 className="text-sm font-medium text-muted-foreground">Description</h4>
+                            <p>{viewingShipment.metadata.shipment.description || 'Not provided'}</p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  
+                  {!viewingShipment.metadata?.shipmentDetails && !viewingShipment.metadata?.shipment && (
                     <p className="text-gray-500">No detailed shipment information available</p>
                   )}
                 </div>
