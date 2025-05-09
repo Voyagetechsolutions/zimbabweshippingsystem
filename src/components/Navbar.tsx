@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, ChevronDown, User, ShoppingBag, LogOut, Shield } from 'lucide-react';
+import { Menu, X, ChevronDown, User, ShoppingBag, LogOut, Shield, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   NavigationMenu,
@@ -240,6 +239,14 @@ const Navbar = () => {
                     </DropdownMenuItem>
                   </Link>
                   
+                  {/* Add Switch to Admin option */}
+                  <Link to="/admin">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Switch to Admin</span>
+                    </DropdownMenuItem>
+                  </Link>
+                  
                   {isAdmin && (
                     <>
                       <DropdownMenuSeparator />
@@ -328,6 +335,11 @@ const Navbar = () => {
               </Link>
               <Link to="/shipments" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
                 My Shipments
+              </Link>
+              
+              {/* Add Switch to Admin option in mobile menu */}
+              <Link to="/admin" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
+                Switch to Admin
               </Link>
               
               {isAdmin && (
