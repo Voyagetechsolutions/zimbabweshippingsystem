@@ -17,13 +17,11 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
+// Tab Components
+import ShipmentManagementTab from '@/components/admin/tabs/ShipmentManagementTab';
+import CustomerManagementTab from '@/components/admin/tabs/CustomerManagementTab';
+import PickupZonesManagementTab from '@/components/admin/tabs/PickupZonesManagementTab';
 
 // Icons
 import { 
@@ -35,7 +33,7 @@ import {
   BarChart3, 
   Bell, 
   Calendar, 
-  Route as RouteIcon, 
+  Route, 
   Settings,
   Users,
   RefreshCcw,
@@ -50,7 +48,7 @@ const AdminDashboardContent = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   
-  // Basic dashboard stats
+  // Dashboard statistics
   const [stats, setStats] = useState({
     totalShipments: 0,
     pendingShipments: 0,
@@ -161,7 +159,7 @@ const AdminDashboardContent = () => {
         <h1 className="text-2xl font-bold">Admin Dashboard</h1>
         <div className="flex items-center gap-2">
           {isMobile && (
-            <Button variant="outline" size="icon" onClick={() => setShowMobileMenu(!showMobileMenu)}>
+            <Button variant="outline" size="sm" onClick={() => setShowMobileMenu(!showMobileMenu)}>
               <Menu className="h-4 w-4" />
             </Button>
           )}
@@ -289,7 +287,7 @@ const AdminDashboardContent = () => {
                 {activeTab === 'reports' && <BarChart3 className="h-4 w-4" />}
                 {activeTab === 'notifications' && <Bell className="h-4 w-4" />}
                 {activeTab === 'schedule' && <Calendar className="h-4 w-4" />}
-                {activeTab === 'routes' && <RouteIcon className="h-4 w-4" />}
+                {activeTab === 'routes' && <Route className="h-4 w-4" />}
                 {activeTab === 'users' && <Users className="h-4 w-4" />}
                 {activeTab === 'settings' && <Settings className="h-4 w-4" />}
                 
@@ -357,7 +355,7 @@ const AdminDashboardContent = () => {
               </SelectItem>
               <SelectItem value="routes">
                 <div className="flex items-center gap-2">
-                  <RouteIcon className="h-4 w-4" />
+                  <Route className="h-4 w-4" />
                   <span>Route Management</span>
                 </div>
               </SelectItem>
@@ -421,7 +419,7 @@ const AdminDashboardContent = () => {
               </TabsTrigger>
               
               <TabsTrigger value="routes" className="flex items-center gap-1 py-2 h-auto">
-                <RouteIcon className="h-4 w-4" />
+                <Route className="h-4 w-4" />
                 <span className="hidden md:inline">Routes</span>
               </TabsTrigger>
               
@@ -440,215 +438,144 @@ const AdminDashboardContent = () => {
       )}
 
       {/* Tab Contents */}
-      <TabsContent value={activeTab} className="mt-0 space-y-4">
-        {/* Shipment Management Tab */}
-        {activeTab === 'shipments' && (
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Shipment Management</CardTitle>
-                <CardDescription>
-                  Manage all shipments, update statuses, and handle custom quotes
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-center py-12 text-muted-foreground">
-                  Select options from this tab to manage shipments, update statuses, and handle custom quotes.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Customer Management Tab */}
-        {activeTab === 'customers' && (
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Customer Management</CardTitle>
-                <CardDescription>
-                  View and manage customer accounts
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-center py-12 text-muted-foreground">
-                  Select options from this tab to search, filter, and manage customer accounts.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Pickup Zones Management Tab */}
-        {activeTab === 'pickupZones' && (
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Pickup Zones Management</CardTitle>
-                <CardDescription>
-                  Manage shipments by pickup zone and schedule collections
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-center py-12 text-muted-foreground">
-                  Select options from this tab to manage pickup zones and schedule collections.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Delivery Management Tab */}
-        {activeTab === 'delivery' && (
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Delivery Management</CardTitle>
-                <CardDescription>
-                  Track and manage delivery operations
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-center py-12 text-muted-foreground">
-                  Select options from this tab to track and manage delivery operations.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Payments & Invoicing Tab */}
-        {activeTab === 'payments' && (
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Payments & Invoicing</CardTitle>
-                <CardDescription>
-                  Manage payments, generate invoices, and track financial transactions
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-center py-12 text-muted-foreground">
-                  Select options from this tab to manage payments and invoices.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Reports & Analytics Tab */}
-        {activeTab === 'reports' && (
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Reports & Analytics</CardTitle>
-                <CardDescription>
-                  Generate reports and view analytics
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-center py-12 text-muted-foreground">
-                  Select options from this tab to generate reports and view analytics.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Notifications & Alerts Tab */}
-        {activeTab === 'notifications' && (
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Notifications & Alerts</CardTitle>
-                <CardDescription>
-                  Manage system notifications and alerts
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-center py-12 text-muted-foreground">
-                  Select options from this tab to manage notifications and alerts.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Collection Schedule Tab */}
-        {activeTab === 'schedule' && (
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Collection Schedule</CardTitle>
-                <CardDescription>
-                  Manage collection schedules and calendar
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-center py-12 text-muted-foreground">
-                  Select options from this tab to manage collection schedules.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Route Management Tab */}
-        {activeTab === 'routes' && (
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Route Management</CardTitle>
-                <CardDescription>
-                  Plan and manage collection routes
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-center py-12 text-muted-foreground">
-                  Select options from this tab to manage routes and auto-assign customers.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* User Management Tab */}
-        {activeTab === 'users' && (
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>User Management</CardTitle>
-                <CardDescription>
-                  Add and manage user accounts
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-center py-12 text-muted-foreground">
-                  Select options from this tab to manage user accounts and permissions.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* System Settings Tab */}
-        {activeTab === 'settings' && (
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>System Settings</CardTitle>
-                <CardDescription>
-                  Configure system settings and preferences
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-center py-12 text-muted-foreground">
-                  Select options from this tab to configure system settings and preferences.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+      <TabsContent value="shipments" className="mt-0 space-y-4">
+        <ShipmentManagementTab />
+      </TabsContent>
+      
+      <TabsContent value="customers" className="mt-0 space-y-4">
+        <CustomerManagementTab />
+      </TabsContent>
+      
+      <TabsContent value="pickupZones" className="mt-0 space-y-4">
+        <PickupZonesManagementTab />
+      </TabsContent>
+      
+      <TabsContent value="delivery" className="mt-0 space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Delivery Management</CardTitle>
+            <CardDescription>
+              Track and manage delivery operations.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center py-12 text-muted-foreground">
+              Delivery management content will be implemented here.
+            </p>
+          </CardContent>
+        </Card>
+      </TabsContent>
+      
+      <TabsContent value="payments" className="mt-0 space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Payments & Invoicing</CardTitle>
+            <CardDescription>
+              Manage payments, generate invoices, and track financial transactions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center py-12 text-muted-foreground">
+              Payments and invoicing content will be implemented here.
+            </p>
+          </CardContent>
+        </Card>
+      </TabsContent>
+      
+      <TabsContent value="reports" className="mt-0 space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Reports & Analytics</CardTitle>
+            <CardDescription>
+              Generate reports and view analytics data.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center py-12 text-muted-foreground">
+              Reports and analytics content will be implemented here.
+            </p>
+          </CardContent>
+        </Card>
+      </TabsContent>
+      
+      <TabsContent value="notifications" className="mt-0 space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Notifications & Alerts</CardTitle>
+            <CardDescription>
+              Manage system notifications and alerts.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center py-12 text-muted-foreground">
+              Notifications and alerts content will be implemented here.
+            </p>
+          </CardContent>
+        </Card>
+      </TabsContent>
+      
+      <TabsContent value="schedule" className="mt-0 space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Collection Schedule Overview</CardTitle>
+            <CardDescription>
+              Manage collection schedules and calendar.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center py-12 text-muted-foreground">
+              Collection schedule overview content will be implemented here.
+            </p>
+          </CardContent>
+        </Card>
+      </TabsContent>
+      
+      <TabsContent value="routes" className="mt-0 space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Route Management & Monitoring</CardTitle>
+            <CardDescription>
+              Plan and manage collection routes.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center py-12 text-muted-foreground">
+              Route management and monitoring content will be implemented here.
+            </p>
+          </CardContent>
+        </Card>
+      </TabsContent>
+      
+      <TabsContent value="users" className="mt-0 space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>User Management</CardTitle>
+            <CardDescription>
+              Add and manage user accounts.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center py-12 text-muted-foreground">
+              User management content will be implemented here.
+            </p>
+          </CardContent>
+        </Card>
+      </TabsContent>
+      
+      <TabsContent value="settings" className="mt-0 space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>System Settings</CardTitle>
+            <CardDescription>
+              Configure system settings and preferences.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center py-12 text-muted-foreground">
+              System settings content will be implemented here.
+            </p>
+          </CardContent>
+        </Card>
       </TabsContent>
     </div>
   );
