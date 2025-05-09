@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -44,13 +43,20 @@ import {
   Settings,
   Users,
   RefreshCcw,
-  Menu
+  Menu,
+  MessageSquare,
+  ImageIcon
 } from 'lucide-react';
+
+// Additional component imports for the nested tabs
+import SupportTickets from '@/components/admin/SupportTickets';
+import ContentManagement from '@/components/admin/ContentManagement';
 
 const AdminDashboardContent = () => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState('shipments');
+  const [moreTabValue, setMoreTabValue] = useState('support'); // For managing the inner tab state
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -281,309 +287,333 @@ const AdminDashboardContent = () => {
       </div>
 
       {/* Main Navigation Tabs */}
-      {isMobile && showMobileMenu ? (
-        <div className="mb-6">
-          <Select value={activeTab} onValueChange={setActiveTab}>
-            <SelectTrigger className="w-full">
-              <span className="flex items-center gap-2">
-                {activeTab === 'shipments' && <Package className="h-4 w-4" />}
-                {activeTab === 'customers' && <User className="h-4 w-4" />}
-                {activeTab === 'pickupZones' && <MapPin className="h-4 w-4" />}
-                {activeTab === 'delivery' && <Truck className="h-4 w-4" />}
-                {activeTab === 'payments' && <CreditCard className="h-4 w-4" />}
-                {activeTab === 'reports' && <BarChart3 className="h-4 w-4" />}
-                {activeTab === 'notifications' && <Bell className="h-4 w-4" />}
-                {activeTab === 'schedule' && <Calendar className="h-4 w-4" />}
-                {activeTab === 'routes' && <Route className="h-4 w-4" />}
-                {activeTab === 'users' && <Users className="h-4 w-4" />}
-                {activeTab === 'settings' && <Settings className="h-4 w-4" />}
-                
-                {activeTab === 'shipments' && 'Shipment Management'}
-                {activeTab === 'customers' && 'Customer Management'}
-                {activeTab === 'pickupZones' && 'Pickup Zones'}
-                {activeTab === 'delivery' && 'Delivery Management'}
-                {activeTab === 'payments' && 'Payments & Invoicing'}
-                {activeTab === 'reports' && 'Reports & Analytics'}
-                {activeTab === 'notifications' && 'Notifications'}
-                {activeTab === 'schedule' && 'Collection Schedule'}
-                {activeTab === 'routes' && 'Route Management'}
-                {activeTab === 'users' && 'User Management'}
-                {activeTab === 'settings' && 'System Settings'}
-              </span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="shipments">
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  <span>Shipment Management</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="customers">
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  <span>Customer Management</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="pickupZones">
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  <span>Pickup Zones</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="delivery">
-                <div className="flex items-center gap-2">
-                  <Truck className="h-4 w-4" />
-                  <span>Delivery Management</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="payments">
-                <div className="flex items-center gap-2">
-                  <CreditCard className="h-4 w-4" />
-                  <span>Payments & Invoicing</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="reports">
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" />
-                  <span>Reports & Analytics</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="notifications">
-                <div className="flex items-center gap-2">
-                  <Bell className="h-4 w-4" />
-                  <span>Notifications</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="schedule">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  <span>Collection Schedule</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="routes">
-                <div className="flex items-center gap-2">
-                  <Route className="h-4 w-4" />
-                  <span>Route Management</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="users">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  <span>User Management</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="settings">
-                <div className="flex items-center gap-2">
-                  <Settings className="h-4 w-4" />
-                  <span>System Settings</span>
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      ) : (
-        <Tabs defaultValue="shipments" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="border rounded-lg p-1 mb-6">
-            <TabsList className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-11 gap-2 h-auto p-1">
-              <TabsTrigger value="shipments" className="flex items-center gap-1 py-2 h-auto">
-                <Package className="h-4 w-4" />
-                <span className="hidden md:inline">Shipments</span>
+      <Tabs defaultValue="shipments" value={activeTab} onValueChange={setActiveTab} className="w-full">
+        {isMobile && showMobileMenu ? (
+          <div className="mb-6">
+            <Select value={activeTab} onValueChange={setActiveTab}>
+              <SelectTrigger className="w-full">
+                <span className="flex items-center gap-2">
+                  {activeTab === 'shipments' && <Package className="h-4 w-4" />}
+                  {activeTab === 'customers' && <User className="h-4 w-4" />}
+                  {activeTab === 'pickupZones' && <MapPin className="h-4 w-4" />}
+                  {activeTab === 'delivery' && <Truck className="h-4 w-4" />}
+                  {activeTab === 'payments' && <CreditCard className="h-4 w-4" />}
+                  {activeTab === 'reports' && <BarChart3 className="h-4 w-4" />}
+                  {activeTab === 'notifications' && <Bell className="h-4 w-4" />}
+                  {activeTab === 'schedule' && <Calendar className="h-4 w-4" />}
+                  {activeTab === 'routes' && <Route className="h-4 w-4" />}
+                  {activeTab === 'users' && <Users className="h-4 w-4" />}
+                  {activeTab === 'settings' && <Settings className="h-4 w-4" />}
+                  
+                  {activeTab === 'shipments' && 'Shipment Management'}
+                  {activeTab === 'customers' && 'Customer Management'}
+                  {activeTab === 'pickupZones' && 'Pickup Zones'}
+                  {activeTab === 'delivery' && 'Delivery Management'}
+                  {activeTab === 'payments' && 'Payments & Invoicing'}
+                  {activeTab === 'reports' && 'Reports & Analytics'}
+                  {activeTab === 'notifications' && 'Notifications'}
+                  {activeTab === 'schedule' && 'Collection Schedule'}
+                  {activeTab === 'routes' && 'Route Management'}
+                  {activeTab === 'users' && 'User Management'}
+                  {activeTab === 'settings' && 'System Settings'}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="shipments">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    <span>Shipment Management</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="customers">
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    <span>Customer Management</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="pickupZones">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    <span>Pickup Zones</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="delivery">
+                  <div className="flex items-center gap-2">
+                    <Truck className="h-4 w-4" />
+                    <span>Delivery Management</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="payments">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="h-4 w-4" />
+                    <span>Payments & Invoicing</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="reports">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    <span>Reports & Analytics</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="notifications">
+                  <div className="flex items-center gap-2">
+                    <Bell className="h-4 w-4" />
+                    <span>Notifications</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="schedule">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    <span>Collection Schedule</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="routes">
+                  <div className="flex items-center gap-2">
+                    <Route className="h-4 w-4" />
+                    <span>Route Management</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="users">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    <span>User Management</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="settings">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    <span>System Settings</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        ) : (
+          <TabsList className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-11 gap-2 h-auto p-1">
+            <TabsTrigger value="shipments" className="flex items-center gap-1 py-2 h-auto">
+              <Package className="h-4 w-4" />
+              <span className="hidden md:inline">Shipments</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="customers" className="flex items-center gap-1 py-2 h-auto">
+              <User className="h-4 w-4" />
+              <span className="hidden md:inline">Customers</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="pickupZones" className="flex items-center gap-1 py-2 h-auto">
+              <MapPin className="h-4 w-4" />
+              <span className="hidden md:inline">Pickup Zones</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="delivery" className="flex items-center gap-1 py-2 h-auto">
+              <Truck className="h-4 w-4" />
+              <span className="hidden md:inline">Delivery</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="payments" className="flex items-center gap-1 py-2 h-auto">
+              <CreditCard className="h-4 w-4" />
+              <span className="hidden md:inline">Payments</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="reports" className="flex items-center gap-1 py-2 h-auto">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden md:inline">Reports</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="notifications" className="flex items-center gap-1 py-2 h-auto">
+              <Bell className="h-4 w-4" />
+              <span className="hidden md:inline">Notifications</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="schedule" className="flex items-center gap-1 py-2 h-auto">
+              <Calendar className="h-4 w-4" />
+              <span className="hidden md:inline">Schedule</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="routes" className="flex items-center gap-1 py-2 h-auto">
+              <Route className="h-4 w-4" />
+              <span className="hidden md:inline">Routes</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="users" className="flex items-center gap-1 py-2 h-auto">
+              <Users className="h-4 w-4" />
+              <span className="hidden md:inline">Users</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="settings" className="flex items-center gap-1 py-2 h-auto">
+              <Settings className="h-4 w-4" />
+              <span className="hidden md:inline">Settings</span>
+            </TabsTrigger>
+          </TabsList>
+        )}
+
+        {/* Tab Contents */}
+        <TabsContent value="shipments" className="mt-0 space-y-4">
+          <ShipmentManagementTab />
+        </TabsContent>
+        
+        <TabsContent value="customers" className="mt-0 space-y-4">
+          <CustomerManagementTab />
+        </TabsContent>
+        
+        <TabsContent value="pickupZones" className="mt-0 space-y-4">
+          <PickupZonesManagementTab />
+        </TabsContent>
+        
+        <TabsContent value="delivery" className="mt-0 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Delivery Management</CardTitle>
+              <CardDescription>
+                Track and manage delivery operations.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-center py-12 text-muted-foreground">
+                Delivery management content will be implemented here.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="payments" className="mt-0 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Payments & Invoicing</CardTitle>
+              <CardDescription>
+                Manage payments, generate invoices, and track financial transactions.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-center py-12 text-muted-foreground">
+                Payments and invoicing content will be implemented here.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="reports" className="mt-0 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Reports & Analytics</CardTitle>
+              <CardDescription>
+                Generate reports and view analytics data.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-center py-12 text-muted-foreground">
+                Reports and analytics content will be implemented here.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="notifications" className="mt-0 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Notifications & Alerts</CardTitle>
+              <CardDescription>
+                Manage system notifications and alerts.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-center py-12 text-muted-foreground">
+                Notifications and alerts content will be implemented here.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="schedule" className="mt-0 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Collection Schedule Overview</CardTitle>
+              <CardDescription>
+                Manage collection schedules and calendar.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-center py-12 text-muted-foreground">
+                Collection schedule overview content will be implemented here.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="routes" className="mt-0 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Route Management & Monitoring</CardTitle>
+              <CardDescription>
+                Plan and manage collection routes.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-center py-12 text-muted-foreground">
+                Route management and monitoring content will be implemented here.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="users" className="mt-0 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>User Management</CardTitle>
+              <CardDescription>
+                Add and manage user accounts.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-center py-12 text-muted-foreground">
+                User management content will be implemented here.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="settings" className="mt-0 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>System Settings</CardTitle>
+              <CardDescription>
+                Configure system settings and preferences.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-center py-12 text-muted-foreground">
+                System settings content will be implemented here.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="more" className="mt-0 space-y-4">
+          <Tabs defaultValue="support" value={moreTabValue} onValueChange={setMoreTabValue}>
+            <TabsList className="mb-6">
+              <TabsTrigger value="support" className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                <span>Support Tickets</span>
               </TabsTrigger>
-              
-              <TabsTrigger value="customers" className="flex items-center gap-1 py-2 h-auto">
-                <User className="h-4 w-4" />
-                <span className="hidden md:inline">Customers</span>
-              </TabsTrigger>
-              
-              <TabsTrigger value="pickupZones" className="flex items-center gap-1 py-2 h-auto">
-                <MapPin className="h-4 w-4" />
-                <span className="hidden md:inline">Pickup Zones</span>
-              </TabsTrigger>
-              
-              <TabsTrigger value="delivery" className="flex items-center gap-1 py-2 h-auto">
-                <Truck className="h-4 w-4" />
-                <span className="hidden md:inline">Delivery</span>
-              </TabsTrigger>
-              
-              <TabsTrigger value="payments" className="flex items-center gap-1 py-2 h-auto">
-                <CreditCard className="h-4 w-4" />
-                <span className="hidden md:inline">Payments</span>
-              </TabsTrigger>
-              
-              <TabsTrigger value="reports" className="flex items-center gap-1 py-2 h-auto">
-                <BarChart3 className="h-4 w-4" />
-                <span className="hidden md:inline">Reports</span>
-              </TabsTrigger>
-              
-              <TabsTrigger value="notifications" className="flex items-center gap-1 py-2 h-auto">
-                <Bell className="h-4 w-4" />
-                <span className="hidden md:inline">Notifications</span>
-              </TabsTrigger>
-              
-              <TabsTrigger value="schedule" className="flex items-center gap-1 py-2 h-auto">
-                <Calendar className="h-4 w-4" />
-                <span className="hidden md:inline">Schedule</span>
-              </TabsTrigger>
-              
-              <TabsTrigger value="routes" className="flex items-center gap-1 py-2 h-auto">
-                <Route className="h-4 w-4" />
-                <span className="hidden md:inline">Routes</span>
-              </TabsTrigger>
-              
-              <TabsTrigger value="users" className="flex items-center gap-1 py-2 h-auto">
-                <Users className="h-4 w-4" />
-                <span className="hidden md:inline">Users</span>
-              </TabsTrigger>
-              
-              <TabsTrigger value="settings" className="flex items-center gap-1 py-2 h-auto">
-                <Settings className="h-4 w-4" />
-                <span className="hidden md:inline">Settings</span>
+              <TabsTrigger value="media" className="flex items-center gap-2">
+                <ImageIcon className="h-4 w-4" />
+                <span>Media Library</span>
               </TabsTrigger>
             </TabsList>
-          </div>
-        </Tabs>
-      )}
-
-      {/* Tab Contents */}
-      <TabsContent value="shipments" className="mt-0 space-y-4">
-        <ShipmentManagementTab />
-      </TabsContent>
+            
+            <TabsContent value="support">
+              <SupportTickets />
+            </TabsContent>
+            
+            <TabsContent value="media">
+              <ContentManagement />
+            </TabsContent>
+          </Tabs>
+        </TabsContent>
+      </Tabs>
       
-      <TabsContent value="customers" className="mt-0 space-y-4">
-        <CustomerManagementTab />
-      </TabsContent>
-      
-      <TabsContent value="pickupZones" className="mt-0 space-y-4">
-        <PickupZonesManagementTab />
-      </TabsContent>
-      
-      <TabsContent value="delivery" className="mt-0 space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Delivery Management</CardTitle>
-            <CardDescription>
-              Track and manage delivery operations.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center py-12 text-muted-foreground">
-              Delivery management content will be implemented here.
-            </p>
-          </CardContent>
-        </Card>
-      </TabsContent>
-      
-      <TabsContent value="payments" className="mt-0 space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Payments & Invoicing</CardTitle>
-            <CardDescription>
-              Manage payments, generate invoices, and track financial transactions.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center py-12 text-muted-foreground">
-              Payments and invoicing content will be implemented here.
-            </p>
-          </CardContent>
-        </Card>
-      </TabsContent>
-      
-      <TabsContent value="reports" className="mt-0 space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Reports & Analytics</CardTitle>
-            <CardDescription>
-              Generate reports and view analytics data.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center py-12 text-muted-foreground">
-              Reports and analytics content will be implemented here.
-            </p>
-          </CardContent>
-        </Card>
-      </TabsContent>
-      
-      <TabsContent value="notifications" className="mt-0 space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Notifications & Alerts</CardTitle>
-            <CardDescription>
-              Manage system notifications and alerts.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center py-12 text-muted-foreground">
-              Notifications and alerts content will be implemented here.
-            </p>
-          </CardContent>
-        </Card>
-      </TabsContent>
-      
-      <TabsContent value="schedule" className="mt-0 space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Collection Schedule Overview</CardTitle>
-            <CardDescription>
-              Manage collection schedules and calendar.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center py-12 text-muted-foreground">
-              Collection schedule overview content will be implemented here.
-            </p>
-          </CardContent>
-        </Card>
-      </TabsContent>
-      
-      <TabsContent value="routes" className="mt-0 space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Route Management & Monitoring</CardTitle>
-            <CardDescription>
-              Plan and manage collection routes.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center py-12 text-muted-foreground">
-              Route management and monitoring content will be implemented here.
-            </p>
-          </CardContent>
-        </Card>
-      </TabsContent>
-      
-      <TabsContent value="users" className="mt-0 space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>User Management</CardTitle>
-            <CardDescription>
-              Add and manage user accounts.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center py-12 text-muted-foreground">
-              User management content will be implemented here.
-            </p>
-          </CardContent>
-        </Card>
-      </TabsContent>
-      
-      <TabsContent value="settings" className="mt-0 space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>System Settings</CardTitle>
-            <CardDescription>
-              Configure system settings and preferences.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center py-12 text-muted-foreground">
-              System settings content will be implemented here.
-            </p>
-          </CardContent>
-        </Card>
-      </TabsContent>
+      {/* Edit shipment modal */}
+      {/* ... keep existing code (edit shipment modal) */}
     </div>
   );
 };

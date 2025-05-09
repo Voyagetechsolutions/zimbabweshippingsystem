@@ -133,6 +133,7 @@ const AdminDashboard = () => {
   const [adminExists, setAdminExists] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [showFullMenu, setShowFullMenu] = useState(false);
+  const [moreTabActiveValue, setMoreTabActiveValue] = useState('support'); // For the nested tabs in "more" section
   
   const [stats, setStats] = useState({
     total: 0,
@@ -715,7 +716,7 @@ const AdminDashboard = () => {
         </TabsContent>
 
         <TabsContent value="more">
-          <Tabs defaultValue="support">
+          <Tabs defaultValue="support" value={moreTabActiveValue} onValueChange={setMoreTabActiveValue}>
             <TabsList className="mb-6">
               <TabsTrigger value="support" className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4" />
