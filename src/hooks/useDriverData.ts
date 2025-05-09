@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Shipment } from '@/types/shipment';
+import { Shipment, ShipmentMetadata } from '@/types/shipment';
 
 // Extending the Shipment interface to include profiles
 interface ShipmentWithProfiles extends Shipment {
@@ -10,6 +10,26 @@ interface ShipmentWithProfiles extends Shipment {
     email?: string;
     full_name?: string;
   };
+}
+
+// Type guard function to check if a value is a valid ShipmentMetadata object
+function isValidMetadata(metadata: any): metadata is ShipmentMetadata {
+  return typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata);
+}
+
+// Helper function to safely access nested properties
+function safeGetMetadataValue<T>(obj: any, path: string[], defaultValue: T): T {
+  if (!obj || typeof obj !== 'object') return defaultValue;
+  
+  let current = obj;
+  for (const key of path) {
+    if (!current || typeof current !== 'object' || !(key in current)) {
+      return defaultValue;
+    }
+    current = current[key];
+  }
+  
+  return (current as unknown) as T;
 }
 
 export const useDriverData = () => {
@@ -67,7 +87,7 @@ export const useDriverData = () => {
 
       const enrichShipments = async (shipments: any[]): Promise<ShipmentWithProfiles[]> => {
         const userFetches = shipments.map(async (shipment) => {
-          // Create a properly typed shipment object
+          // Create a properly typed shipment object with safe metadata handling
           const typedShipment: ShipmentWithProfiles = {
             id: shipment.id,
             tracking_number: shipment.tracking_number,
@@ -77,7 +97,7 @@ export const useDriverData = () => {
             user_id: shipment.user_id,
             created_at: shipment.created_at,
             updated_at: shipment.updated_at,
-            metadata: shipment.metadata || {},
+            metadata: isValidMetadata(shipment.metadata) ? shipment.metadata : {},
             can_cancel: shipment.can_cancel,
             can_modify: shipment.can_modify,
             profiles: undefined

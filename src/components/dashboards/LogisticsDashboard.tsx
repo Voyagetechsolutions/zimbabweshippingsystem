@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -46,7 +47,7 @@ import {
   Clock,
   RefreshCw
 } from 'lucide-react';
-import { Shipment } from '@/types/shipment';
+import { Shipment, ShipmentMetadata } from '@/types/shipment';
 
 // Define extended shipment type with profiles
 interface ShipmentWithProfiles extends Shipment {
@@ -54,6 +55,11 @@ interface ShipmentWithProfiles extends Shipment {
     email?: string;
     full_name?: string;
   };
+}
+
+// Type guard to check if a value is a valid ShipmentMetadata
+function isValidMetadata(metadata: any): metadata is ShipmentMetadata {
+  return typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata);
 }
 
 const LogisticsDashboard = () => {
@@ -86,10 +92,11 @@ const LogisticsDashboard = () => {
           const enrichedShipments = [];
           
           for (const shipment of shipmentsData) {
-            // Create a proper ShipmentWithProfiles object
+            // Create a proper ShipmentWithProfiles object with safe metadata handling
             const enrichedShipment: ShipmentWithProfiles = {
               ...shipment,
-              metadata: shipment.metadata || {},
+              // Ensure metadata is a valid object or provide a default empty object
+              metadata: isValidMetadata(shipment.metadata) ? shipment.metadata : {},
               profiles: undefined
             };
             

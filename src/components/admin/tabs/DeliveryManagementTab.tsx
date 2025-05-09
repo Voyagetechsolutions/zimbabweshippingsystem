@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -54,7 +55,7 @@ interface DeliveryRecord {
   destination: string;
   created_at: string;
   updated_at: string;
-  metadata?: any; // Using any for metadata field to avoid type issues
+  metadata?: Record<string, any>; // Using Record for metadata to avoid type issues
 }
 
 // Type guard to check if an object has specific properties
@@ -106,7 +107,9 @@ const DeliveryManagementTab = () => {
         let recipientName = 'No Name Provided';
         
         // Ensure metadata is an object before trying to access properties
-        const metadata = typeof shipment.metadata === 'object' ? shipment.metadata : {};
+        const metadata = typeof shipment.metadata === 'object' && shipment.metadata !== null 
+          ? shipment.metadata 
+          : {};
         
         // Try different paths to get recipient name
         const recipient = safeGet(metadata, ['recipient'], null);
@@ -140,7 +143,7 @@ const DeliveryManagementTab = () => {
           updated_at: shipment.updated_at,
           driver_id: hasProperty(deliveryInfo, 'driver_id') ? deliveryInfo.driver_id : undefined,
           driver_name: hasProperty(deliveryInfo, 'driver_name') ? deliveryInfo.driver_name : undefined,
-          metadata: shipment.metadata
+          metadata: typeof shipment.metadata === 'object' ? shipment.metadata : {}
         };
       });
 
@@ -281,7 +284,10 @@ const DeliveryManagementTab = () => {
       if (driverError) throw driverError;
       
       // Safely prepare the updated metadata
-      const existingMetadata = typeof shipment.metadata === 'object' ? shipment.metadata : {};
+      const existingMetadata = typeof shipment.metadata === 'object' && shipment.metadata !== null
+        ? shipment.metadata
+        : {};
+        
       const existingDelivery = safeGet(existingMetadata, ['delivery'], {});
       
       const updatedMetadata = {
