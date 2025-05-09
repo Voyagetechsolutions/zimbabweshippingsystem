@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -54,7 +53,7 @@ interface DeliveryRecord {
   destination: string;
   created_at: string;
   updated_at: string;
-  metadata?: Record<string, any>; // Added metadata property
+  metadata?: Record<string, any>; 
 }
 
 const DeliveryManagementTab = () => {
@@ -87,28 +86,40 @@ const DeliveryManagementTab = () => {
       const deliveryRecords: DeliveryRecord[] = (shipmentData || []).map(shipment => {
         const metadata = shipment.metadata || {};
         
-        // Safely extract recipient details from metadata (which could be any type)
-        const recipientDetails = typeof metadata === 'object' ? 
-          (metadata.recipient || metadata.recipientDetails || {}) : {};
+        // Safely extract recipient details from metadata
+        let recipientName = 'No Name Provided';
+        if (typeof metadata === 'object') {
+          const recipientDetails = metadata.recipient || metadata.recipientDetails;
+          if (recipientDetails) {
+            if (recipientDetails.name) {
+              recipientName = recipientDetails.name;
+            } else if (recipientDetails.firstName && recipientDetails.lastName) {
+              recipientName = `${recipientDetails.firstName} ${recipientDetails.lastName}`;
+            }
+          } else if (metadata.recipientName) {
+            recipientName = metadata.recipientName;
+          }
+        }
         
         // Safely extract delivery info
-        const deliveryInfo = typeof metadata === 'object' ? (metadata.delivery || {}) : {};
-        
-        const recipientName = getRecipientName(shipment);
+        let deliveryInfo = {};
+        if (typeof metadata === 'object' && metadata.delivery) {
+          deliveryInfo = metadata.delivery;
+        }
         
         return {
           id: shipment.id,
           tracking_number: shipment.tracking_number,
           status: shipment.status,
-          delivery_date: deliveryInfo.date || shipment.updated_at,
+          delivery_date: deliveryInfo?.date || shipment.updated_at,
           recipient_name: recipientName,
           origin: shipment.origin,
           destination: shipment.destination,
           timeliness: getTimeliness(shipment),
           created_at: shipment.created_at,
           updated_at: shipment.updated_at,
-          driver_id: deliveryInfo.driver_id,
-          driver_name: deliveryInfo.driver_name,
+          driver_id: deliveryInfo?.driver_id,
+          driver_name: deliveryInfo?.driver_name,
           metadata: shipment.metadata
         };
       });
@@ -179,9 +190,7 @@ const DeliveryManagementTab = () => {
       return 'on-time'; // Default if metadata is not an object
     }
     
-    const delivery = metadata.delivery || {};
-    
-    if (delivery.isLate) {
+    if (metadata.delivery && metadata.delivery.isLate) {
       return 'late';
     }
     
@@ -253,11 +262,12 @@ const DeliveryManagementTab = () => {
       if (driverError) throw driverError;
       
       // Update the shipment metadata with driver information
-      const metadata = shipment.metadata || {};
+      const metadata = typeof shipment.metadata === 'object' ? shipment.metadata : {};
+      
       const updatedMetadata = {
         ...metadata,
         delivery: {
-          ...(typeof metadata === 'object' ? (metadata.delivery || {}) : {}),
+          ...(metadata?.delivery || {}),
           driver_id: driverId,
           driver_name: driver.full_name,
           assigned_at: new Date().toISOString()

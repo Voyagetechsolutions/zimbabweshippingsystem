@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -84,7 +83,16 @@ const LogisticsDashboard = () => {
         
         // Fetch user details separately for each shipment
         if (shipmentsData && shipmentsData.length > 0) {
+          const enrichedShipments = [];
+          
           for (const shipment of shipmentsData) {
+            // Create a proper ShipmentWithProfiles object
+            const enrichedShipment: ShipmentWithProfiles = {
+              ...shipment,
+              metadata: shipment.metadata || {},
+              profiles: undefined
+            };
+            
             if (shipment.user_id) {
               const { data: userData, error: userError } = await supabase
                 .from('profiles')
@@ -93,14 +101,18 @@ const LogisticsDashboard = () => {
                 .single();
                 
               if (!userError && userData) {
-                shipment.profiles = userData;
+                enrichedShipment.profiles = userData;
               }
             }
+            
+            enrichedShipments.push(enrichedShipment);
           }
+          
+          console.log('Fetched shipments with profiles:', enrichedShipments.length);
+          return enrichedShipments as ShipmentWithProfiles[];
         }
         
-        console.log('Fetched shipments with profiles:', shipmentsData?.length);
-        return shipmentsData as ShipmentWithProfiles[];
+        return [] as ShipmentWithProfiles[];
       } catch (error: any) {
         console.error('Error in query function:', error);
         toast({
