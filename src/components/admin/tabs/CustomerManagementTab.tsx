@@ -66,7 +66,7 @@ interface ExtendedProfile {
   is_admin?: boolean;
   is_active?: boolean; // Add this property
   created_at: string;
-  communication_preferences?: Json; // Changed from { phone?: string } to Json
+  communication_preferences?: Json;
   avatar_url?: string;
   mfa_backup_codes?: string[];
   mfa_enabled?: boolean;
@@ -196,7 +196,7 @@ const CustomerManagementTab = () => {
   });
 
   // Helper function to render status badge
-  const renderStatusBadge = (isActive: boolean | null) => {
+  const renderStatusBadge = (isActive: boolean | undefined) => {
     if (isActive === false) {
       return <Badge variant="destructive">Suspended</Badge>;
     }
