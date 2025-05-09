@@ -18,7 +18,7 @@ const AdminDashboard = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      <main className="flex-grow py-8 bg-gray-50">
+      <main className="flex-grow py-8 bg-gray-50 dark:bg-gray-900">
         <div className="container mx-auto px-4">
           {isAdmin ? (
             <AdminDashboardContent />
