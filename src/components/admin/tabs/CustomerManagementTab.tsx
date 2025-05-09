@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -71,11 +72,6 @@ interface ExtendedProfile {
   mfa_enabled?: boolean;
   mfa_secret?: string;
   updated_at?: string;
-}
-
-// Define a specific type for profile updates
-interface ProfileUpdate {
-  is_active: boolean;
 }
 
 const CustomerManagementTab = () => {
@@ -155,10 +151,14 @@ const CustomerManagementTab = () => {
 
   const toggleCustomerStatus = async (customerId: string, currentStatus: boolean | undefined) => {
     try {
-      // For Supabase update operation, we need to explicitly type cast the update object
+      // For Supabase update operation, we need to specify the properties we want to update
+      // that match the expected profile structure in the database
       const { error } = await supabase
         .from('profiles')
-        .update({ is_active: !currentStatus } as ProfileUpdate)
+        .update({ 
+          is_active: !currentStatus,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', customerId);
 
       if (error) throw error;
