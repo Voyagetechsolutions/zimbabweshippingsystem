@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -36,6 +37,7 @@ import CollectionScheduleTab from '@/components/admin/tabs/CollectionScheduleTab
 import RouteManagementTab from '@/components/admin/tabs/RouteManagementTab';
 import UserManagementTab from '@/components/admin/tabs/UserManagementTab';
 import SystemSettingsTab from '@/components/admin/tabs/SystemSettingsTab';
+import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
 
 // Icons
 import { 
@@ -53,7 +55,8 @@ import {
   RefreshCcw,
   Menu,
   MessageSquare,
-  ImageIcon
+  ImageIcon,
+  Quote
 } from 'lucide-react';
 
 // Additional component imports for the nested tabs
@@ -312,6 +315,7 @@ const AdminDashboardContent = () => {
                   {activeTab === 'routes' && <Route className="h-4 w-4" />}
                   {activeTab === 'users' && <Users className="h-4 w-4" />}
                   {activeTab === 'settings' && <Settings className="h-4 w-4" />}
+                  {activeTab === 'customQuotes' && <Quote className="h-4 w-4" />}
                   
                   {activeTab === 'shipments' && 'Shipment Management'}
                   {activeTab === 'customers' && 'Customer Management'}
@@ -324,6 +328,7 @@ const AdminDashboardContent = () => {
                   {activeTab === 'routes' && 'Route Management'}
                   {activeTab === 'users' && 'User Management'}
                   {activeTab === 'settings' && 'System Settings'}
+                  {activeTab === 'customQuotes' && 'Custom Quotes'}
                 </span>
               </SelectTrigger>
               <SelectContent>
@@ -393,11 +398,17 @@ const AdminDashboardContent = () => {
                     <span>System Settings</span>
                   </div>
                 </SelectItem>
+                <SelectItem value="customQuotes">
+                  <div className="flex items-center gap-2">
+                    <Quote className="h-4 w-4" />
+                    <span>Custom Quotes</span>
+                  </div>
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
         ) : (
-          <TabsList className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-11 gap-2 h-auto p-1">
+          <TabsList className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-12 gap-2 h-auto p-1">
             <TabsTrigger value="shipments" className="flex items-center gap-1 py-2 h-auto">
               <Package className="h-4 w-4" />
               <span className="hidden md:inline">Shipments</span>
@@ -452,6 +463,11 @@ const AdminDashboardContent = () => {
               <Settings className="h-4 w-4" />
               <span className="hidden md:inline">Settings</span>
             </TabsTrigger>
+            
+            <TabsTrigger value="customQuotes" className="flex items-center gap-1 py-2 h-auto">
+              <Quote className="h-4 w-4" />
+              <span className="hidden md:inline">Custom Quotes</span>
+            </TabsTrigger>
           </TabsList>
         )}
 
@@ -498,6 +514,10 @@ const AdminDashboardContent = () => {
         
         <TabsContent value="settings" className="mt-0 space-y-4">
           <SystemSettingsTab />
+        </TabsContent>
+        
+        <TabsContent value="customQuotes" className="mt-0 space-y-4">
+          <CustomQuoteManagement />
         </TabsContent>
 
         <TabsContent value="more" className="mt-0 space-y-4">

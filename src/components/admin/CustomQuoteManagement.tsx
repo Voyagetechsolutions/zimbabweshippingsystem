@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
 import { 
   Card, 
@@ -48,8 +48,20 @@ import {
   FileEdit,
   Send,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Mail
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface CustomQuote {
   id: string;
@@ -61,6 +73,8 @@ interface CustomQuote {
   created_at: string;
   quoted_amount: number | null;
   admin_notes: string | null;
+  user_email?: string;
+  user_name?: string;
 }
 
 const CustomQuoteManagement = () => {
@@ -71,6 +85,8 @@ const CustomQuoteManagement = () => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
   
   // Form state for responding to a quote
   const [quoteAmount, setQuoteAmount] = useState('');
@@ -84,14 +100,28 @@ const CustomQuoteManagement = () => {
   const fetchQuotes = async () => {
     setLoading(true);
     try {
+      // Fetch custom quotes with user profiles
       const { data, error } = await supabase
         .from('custom_quotes')
-        .select('*')
+        .select(`
+          *,
+          profiles:user_id (
+            email,
+            full_name
+          )
+        `)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
       
-      setQuotes(data || []);
+      // Transform data to include user details
+      const transformedData = data.map((quote) => ({
+        ...quote,
+        user_email: quote.profiles?.email || undefined,
+        user_name: quote.profiles?.full_name || undefined
+      }));
+      
+      setQuotes(transformedData);
     } catch (error: any) {
       console.error('Error fetching custom quotes:', error);
       toast({
@@ -172,8 +202,13 @@ const CustomQuoteManagement = () => {
         description: 'The custom quote has been updated successfully',
       });
       
-      // Refresh the quotes list
-      fetchQuotes();
+      // If the user provided an email, show email confirmation dialog
+      if (selectedQuote.user_email && quoteAmount.trim() !== '') {
+        setShowEmailConfirmation(true);
+      } else {
+        // Refresh the quotes list if no email to send
+        fetchQuotes();
+      }
       
       // Update the selected quote
       setSelectedQuote({
@@ -193,6 +228,58 @@ const CustomQuoteManagement = () => {
     } finally {
       setIsUpdating(false);
     }
+  };
+  
+  const sendQuoteEmail = async () => {
+    if (!selectedQuote || !selectedQuote.user_email || !quoteAmount) return;
+    
+    setIsSendingEmail(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-quote-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          email: selectedQuote.user_email,
+          phone_number: selectedQuote.phone_number,
+          quoted_amount: parseFloat(quoteAmount),
+          item_description: selectedQuote.description,
+          admin_notes: adminNotes
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to send email');
+      }
+      
+      toast({
+        title: 'Email Sent',
+        description: 'Quote details have been emailed to the customer',
+      });
+      
+      // Close confirmation dialog and refresh quotes
+      setShowEmailConfirmation(false);
+      fetchQuotes();
+      
+    } catch (error: any) {
+      console.error('Error sending quote email:', error);
+      toast({
+        title: 'Email Failed',
+        description: error.message || 'Failed to send the quote email',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+  
+  const skipSendingEmail = () => {
+    setShowEmailConfirmation(false);
+    fetchQuotes(); // Refresh the quotes list
   };
   
   const updateQuoteStatus = async (quoteId: string, status: string) => {
@@ -235,7 +322,9 @@ const CustomQuoteManagement = () => {
     const matchesStatus = statusFilter === 'all' || quote.status === statusFilter;
     const matchesSearch = searchQuery === '' || 
       quote.phone_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      quote.description.toLowerCase().includes(searchQuery.toLowerCase());
+      quote.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (quote.user_email && quote.user_email.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (quote.user_name && quote.user_name.toLowerCase().includes(searchQuery.toLowerCase()));
     
     return matchesStatus && matchesSearch;
   });
@@ -268,7 +357,7 @@ const CustomQuoteManagement = () => {
           <div className="flex flex-col md:flex-row gap-4 mb-6">
             <div className="relative flex-grow">
               <Input
-                placeholder="Search by phone number or description"
+                placeholder="Search by phone number, description or email"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -323,7 +412,7 @@ const CustomQuoteManagement = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
-                    <TableHead>Phone</TableHead>
+                    <TableHead>Contact</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Images</TableHead>
                     <TableHead>Status</TableHead>
@@ -338,9 +427,17 @@ const CustomQuoteManagement = () => {
                         {format(new Date(quote.created_at), 'dd/MM/yyyy')}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center">
-                          <Phone className="h-4 w-4 mr-1 text-gray-500" />
-                          {quote.phone_number}
+                        <div className="flex flex-col">
+                          <div className="flex items-center">
+                            <Phone className="h-4 w-4 mr-1 text-gray-500" />
+                            {quote.phone_number}
+                          </div>
+                          {quote.user_email && (
+                            <div className="text-xs text-gray-500 mt-1 flex items-center">
+                              <Mail className="h-3 w-3 mr-1" />
+                              {quote.user_email}
+                            </div>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="max-w-[200px] truncate">
@@ -426,11 +523,22 @@ const CustomQuoteManagement = () => {
               </div>
               
               <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-1">Contact Number</h3>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">Contact Information</h3>
                 <p className="flex items-center">
                   <Phone className="h-4 w-4 mr-2 text-gray-500" />
                   {selectedQuote.phone_number}
                 </p>
+                {selectedQuote.user_email && (
+                  <p className="flex items-center mt-1">
+                    <Mail className="h-4 w-4 mr-2 text-gray-500" />
+                    {selectedQuote.user_email}
+                  </p>
+                )}
+                {selectedQuote.user_name && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Name: {selectedQuote.user_name}
+                  </p>
+                )}
               </div>
               
               <div>
@@ -539,6 +647,32 @@ const CustomQuoteManagement = () => {
           )}
         </SheetContent>
       </Sheet>
+      
+      {/* Email Confirmation Dialog */}
+      <AlertDialog open={showEmailConfirmation} onOpenChange={setShowEmailConfirmation}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send Quote by Email?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Would you like to send the quote details to the customer by email?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={skipSendingEmail}>Skip</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={sendQuoteEmail}
+              disabled={isSendingEmail}
+            >
+              {isSendingEmail ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Mail className="h-4 w-4 mr-2" />
+              )}
+              Send Email
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

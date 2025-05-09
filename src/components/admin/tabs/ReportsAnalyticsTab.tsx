@@ -2,378 +2,345 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle, 
+  CardDescription
 } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
-  BarChart, BarChart3, PieChart, LineChart, ArrowUpRight, Download, 
-  Calendar, TrendingUp, TrendingDown
-} from 'lucide-react';
-import { 
-  BarChart as RechartsBarChart, 
+  BarChart, 
   Bar, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  Legend, 
-  ResponsiveContainer,
-  LineChart as RechartsLineChart,
+  ResponsiveContainer, 
+  PieChart, 
+  Pie, 
+  Cell,
+  LineChart,
   Line,
-  PieChart as RechartsPieChart,
-  Pie,
-  Cell
+  Legend
 } from 'recharts';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { 
+  Download, 
+  RefreshCw 
+} from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A569BD', '#5DADE2', '#58D68D', '#F4D03F'];
+
+interface ShipmentStats {
+  Booking_Confirmed: number;
+  Ready_for_Pickup: number;
+  Processing_in_Warehouse_UK: number;
+  In_Transit: number;
+  Customs_Clearance: number;
+  Processing_in_Warehouse_ZW: number;
+  Out_for_Delivery: number;
+  Delivered: number;
+}
+
+interface RevenueData {
+  month: string;
+  revenue: number;
+}
 
 const ReportsAnalyticsTab = () => {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('reports');
   const [loading, setLoading] = useState(true);
-  const [reportPeriod, setReportPeriod] = useState('week');
-
-  // Sample data
-  const [shipmentData, setShipmentData] = useState([
-    { name: 'Mon', shipments: 12 },
-    { name: 'Tue', shipments: 19 },
-    { name: 'Wed', shipments: 15 },
-    { name: 'Thu', shipments: 22 },
-    { name: 'Fri', shipments: 30 },
-    { name: 'Sat', shipments: 14 },
-    { name: 'Sun', shipments: 8 },
-  ]);
-
-  const [revenueData, setRevenueData] = useState([
-    { name: 'Mon', revenue: 950 },
-    { name: 'Tue', revenue: 1200 },
-    { name: 'Wed', revenue: 800 },
-    { name: 'Thu', revenue: 1400 },
-    { name: 'Fri', revenue: 2200 },
-    { name: 'Sat', revenue: 900 },
-    { name: 'Sun', revenue: 750 },
-  ]);
-
-  const [pickupZonesData, setPickupZonesData] = useState([
-    { name: 'London', value: 35 },
-    { name: 'Manchester', value: 25 },
-    { name: 'Birmingham', value: 20 },
-    { name: 'Leeds', value: 15 },
-    { name: 'Other', value: 5 },
-  ]);
-
-  const [shipmentTypeData, setShipmentTypeData] = useState([
-    { name: 'Drums', value: 45 },
-    { name: 'Boxes', value: 30 },
-    { name: 'Suitcases', value: 15 },
-    { name: 'Other', value: 10 },
-  ]);
-
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
-
-  const generateReport = (type: string) => {
-    toast({
-      title: 'Report Generated',
-      description: `Your ${type} report has been generated and is ready to download.`,
-    });
-  };
+  const [timeRange, setTimeRange] = useState('6m');
+  const [shipmentStats, setShipmentStats] = useState<ShipmentStats>({
+    Booking_Confirmed: 0,
+    Ready_for_Pickup: 0,
+    Processing_in_Warehouse_UK: 0,
+    In_Transit: 0,
+    Customs_Clearance: 0,
+    Processing_in_Warehouse_ZW: 0,
+    Out_for_Delivery: 0,
+    Delivered: 0
+  });
+  const [routeData, setRouteData] = useState<any[]>([]);
+  const [revenueData, setRevenueData] = useState<RevenueData[]>([]);
 
   useEffect(() => {
-    // Simulate data fetching
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 1000);
+    fetchData();
+  }, [timeRange]);
 
-    return () => clearTimeout(timer);
-  }, []);
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        fetchShipmentStats(),
+        fetchRouteData(),
+        fetchRevenueData()
+      ]);
+    } catch (error: any) {
+      console.error('Error fetching analytics data:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load analytics data',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchShipmentStats = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('shipments')
+        .select('status')
+        .gte('created_at', getDateRange());
+      
+      if (error) throw error;
+      
+      const stats: ShipmentStats = {
+        Booking_Confirmed: 0,
+        Ready_for_Pickup: 0,
+        Processing_in_Warehouse_UK: 0,
+        In_Transit: 0,
+        Customs_Clearance: 0,
+        Processing_in_Warehouse_ZW: 0,
+        Out_for_Delivery: 0,
+        Delivered: 0
+      };
+      
+      data?.forEach(shipment => {
+        const normalizedStatus = shipment.status
+          .replace(/ /g, '_')
+          .replace(/\(/g, '')
+          .replace(/\)/g, '');
+        
+        if (stats.hasOwnProperty(normalizedStatus)) {
+          stats[normalizedStatus as keyof ShipmentStats]++;
+        }
+      });
+      
+      setShipmentStats(stats);
+    } catch (error) {
+      console.error('Error fetching shipment stats:', error);
+    }
+  };
+
+  const fetchRouteData = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('collection_schedules')
+        .select('route')
+        .gte('created_at', getDateRange());
+      
+      if (error) throw error;
+      
+      // Count shipments by route
+      const routeCounts: Record<string, number> = {};
+      
+      data?.forEach(record => {
+        routeCounts[record.route] = (routeCounts[record.route] || 0) + 1;
+      });
+      
+      // Transform to chart data
+      const chartData = Object.entries(routeCounts).map(([name, value]) => ({ name, value }));
+      setRouteData(chartData);
+    } catch (error) {
+      console.error('Error fetching route data:', error);
+    }
+  };
+
+  const fetchRevenueData = async () => {
+    try {
+      // Get the number of months to fetch based on timeRange
+      const monthsToFetch = parseInt(timeRange.replace('m', ''));
+      
+      // Get payments within the date range
+      const { data, error } = await supabase
+        .from('payments')
+        .select('amount, created_at')
+        .gte('created_at', format(subMonths(new Date(), monthsToFetch), 'yyyy-MM-dd'));
+      
+      if (error) throw error;
+      
+      // Group revenue by month
+      const monthlyRevenue: Record<string, number> = {};
+      
+      // Initialize all months with 0
+      for (let i = 0; i < monthsToFetch; i++) {
+        const monthDate = subMonths(new Date(), i);
+        const monthKey = format(monthDate, 'MMM yyyy');
+        monthlyRevenue[monthKey] = 0;
+      }
+      
+      // Sum up payments by month
+      data?.forEach(payment => {
+        const monthKey = format(new Date(payment.created_at), 'MMM yyyy');
+        if (monthlyRevenue.hasOwnProperty(monthKey)) {
+          monthlyRevenue[monthKey] += payment.amount;
+        }
+      });
+      
+      // Transform to chart data and sort by date
+      const chartData = Object.entries(monthlyRevenue)
+        .map(([month, revenue]) => ({ month, revenue }))
+        .reverse();
+      
+      setRevenueData(chartData);
+    } catch (error) {
+      console.error('Error fetching revenue data:', error);
+    }
+  };
+
+  const getDateRange = () => {
+    const months = parseInt(timeRange.replace('m', ''));
+    return format(subMonths(new Date(), months), 'yyyy-MM-dd');
+  };
+
+  const handleRefresh = () => {
+    fetchData();
+  };
+
+  // Format data for charts
+  const shipmentStatusData = Object.entries(shipmentStats).map(([status, count]) => ({
+    name: status.replace(/_/g, ' '),
+    value: count
+  }));
 
   return (
-    <>
-      <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-6 grid w-full grid-cols-2">
-          <TabsTrigger value="reports" className="flex items-center gap-2">
-            <BarChart className="h-4 w-4" />
-            <span>Exportable Reports</span>
-          </TabsTrigger>
-          <TabsTrigger value="dashboard" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            <span>KPIs Dashboard</span>
-          </TabsTrigger>
-        </TabsList>
+    <div className="space-y-6">
+      {/* Controls */}
+      <div className="flex justify-between items-center">
+        <Select value={timeRange} onValueChange={setTimeRange}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Select time range" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="1m">Last Month</SelectItem>
+            <SelectItem value="3m">Last 3 Months</SelectItem>
+            <SelectItem value="6m">Last 6 Months</SelectItem>
+            <SelectItem value="12m">Last Year</SelectItem>
+          </SelectContent>
+        </Select>
+        
+        <div className="space-x-2">
+          <Button variant="outline" onClick={handleRefresh}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          <Button variant="outline">
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
+        </div>
+      </div>
 
-        <TabsContent value="reports">
-          <Card>
-            <CardHeader>
-              <CardTitle>Exportable Reports</CardTitle>
-              <CardDescription>Generate and download various reports</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">Shipment Report</CardTitle>
-                    <CardDescription>Daily, weekly, or monthly shipment statistics</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center space-x-2">
-                        <div className="flex items-center space-x-1">
-                          <Calendar className="h-5 w-5 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">Choose period:</span>
-                        </div>
-                        <select 
-                          className="text-sm border rounded p-1"
-                          value={reportPeriod}
-                          onChange={(e) => setReportPeriod(e.target.value)}
-                        >
-                          <option value="day">Daily</option>
-                          <option value="week">Weekly</option>
-                          <option value="month">Monthly</option>
-                        </select>
-                      </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => generateReport('shipment')}
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Export
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+      {/* Revenue Over Time */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Revenue Over Time</CardTitle>
+          <CardDescription>
+            Monthly revenue for the {timeRange === '1m' ? 'last month' : `last ${timeRange.replace('m', '')} months`}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="h-80">
+          {loading ? (
+            <div className="flex flex-col gap-4">
+              <Skeleton className="h-[300px] w-full" />
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={revenueData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis tickFormatter={(value) => `£${value}`} />
+                <Tooltip formatter={(value) => `£${Number(value).toFixed(2)}`} />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="revenue" 
+                  stroke="#10B981" 
+                  activeDot={{ r: 8 }} 
+                  name="Revenue"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
 
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">Revenue Report</CardTitle>
-                    <CardDescription>Financial breakdown by time period</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center space-x-2">
-                        <div className="flex items-center space-x-1">
-                          <TrendingUp className="h-5 w-5 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">Choose period:</span>
-                        </div>
-                        <select 
-                          className="text-sm border rounded p-1"
-                          value={reportPeriod}
-                          onChange={(e) => setReportPeriod(e.target.value)}
-                        >
-                          <option value="day">Daily</option>
-                          <option value="week">Weekly</option>
-                          <option value="month">Monthly</option>
-                        </select>
-                      </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => generateReport('revenue')}
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Export
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">Pickup Zones Report</CardTitle>
-                    <CardDescription>Activity by pickup location</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center space-x-2">
-                        <div className="flex items-center space-x-1">
-                          <PieChart className="h-5 w-5 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">Choose period:</span>
-                        </div>
-                        <select 
-                          className="text-sm border rounded p-1"
-                          value={reportPeriod}
-                          onChange={(e) => setReportPeriod(e.target.value)}
-                        >
-                          <option value="day">Daily</option>
-                          <option value="week">Weekly</option>
-                          <option value="month">Monthly</option>
-                        </select>
-                      </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => generateReport('pickup-zones')}
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Export
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">Delivery Success Report</CardTitle>
-                    <CardDescription>Delivery performance statistics</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center space-x-2">
-                        <div className="flex items-center space-x-1">
-                          <LineChart className="h-5 w-5 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">Choose period:</span>
-                        </div>
-                        <select 
-                          className="text-sm border rounded p-1"
-                          value={reportPeriod}
-                          onChange={(e) => setReportPeriod(e.target.value)}
-                        >
-                          <option value="day">Daily</option>
-                          <option value="week">Weekly</option>
-                          <option value="month">Monthly</option>
-                        </select>
-                      </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => generateReport('delivery-success')}
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Export
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+      {/* Shipment Distribution & Route Charts */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Shipment Status Distribution */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Shipment Distribution</CardTitle>
+            <CardDescription>Shipments by status</CardDescription>
+          </CardHeader>
+          <CardContent className="h-80">
+            {loading ? (
+              <div className="flex flex-col gap-4">
+                <Skeleton className="h-[300px] w-full" />
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={shipmentStatusData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="value"
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {shipmentStatusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => [`${value} shipments`, 'Count']} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
 
-        <TabsContent value="dashboard">
-          <Card>
-            <CardHeader>
-              <CardTitle>Analytics Dashboard</CardTitle>
-              <CardDescription>Real-time business metrics and KPIs</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="flex justify-center items-center p-24">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
-                </div>
-              ) : (
-                <div className="space-y-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Weekly Shipments</CardTitle>
-                      </CardHeader>
-                      <CardContent className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RechartsBarChart
-                            data={shipmentData}
-                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip />
-                            <Legend />
-                            <Bar dataKey="shipments" fill="#3B82F6" />
-                          </RechartsBarChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Weekly Revenue (£)</CardTitle>
-                      </CardHeader>
-                      <CardContent className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RechartsLineChart
-                            data={revenueData}
-                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip />
-                            <Legend />
-                            <Line type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={2} />
-                          </RechartsLineChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Pickup Zones Distribution</CardTitle>
-                      </CardHeader>
-                      <CardContent className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RechartsPieChart>
-                            <Pie
-                              data={pickupZonesData}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={false}
-                              outerRadius={80}
-                              fill="#8884d8"
-                              dataKey="value"
-                              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                            >
-                              {pickupZonesData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip />
-                            <Legend />
-                          </RechartsPieChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Shipment Types</CardTitle>
-                      </CardHeader>
-                      <CardContent className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RechartsPieChart>
-                            <Pie
-                              data={shipmentTypeData}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={false}
-                              outerRadius={80}
-                              fill="#8884d8"
-                              dataKey="value"
-                              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                            >
-                              {shipmentTypeData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip />
-                            <Legend />
-                          </RechartsPieChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </>
+        {/* Shipments by Route */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Shipments by Route</CardTitle>
+            <CardDescription>Number of shipments per route</CardDescription>
+          </CardHeader>
+          <CardContent className="h-80">
+            {loading ? (
+              <div className="flex flex-col gap-4">
+                <Skeleton className="h-[300px] w-full" />
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={routeData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#6366F1" name="Shipments" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 };
 
