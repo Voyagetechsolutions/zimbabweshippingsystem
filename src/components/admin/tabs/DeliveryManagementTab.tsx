@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -58,18 +57,18 @@ interface DeliveryRecord {
   metadata?: Record<string, any>; // Using Record for metadata to avoid type issues
 }
 
-// Type guard to check if an object has specific properties
-const hasProperty = (obj: any, prop: string): boolean => {
-  return obj && typeof obj === 'object' && prop in obj;
-};
+// Type guard to check if a value is a valid object
+function isValidObject(obj: any): obj is Record<string, any> {
+  return obj !== null && typeof obj === 'object' && !Array.isArray(obj);
+}
 
 // Helper function to safely extract values from nested objects
 const safeGet = (obj: any, path: string[], defaultValue: any = undefined): any => {
-  if (!obj) return defaultValue;
+  if (!isValidObject(obj)) return defaultValue;
   
   let current = obj;
   for (const key of path) {
-    if (!hasProperty(current, key)) return defaultValue;
+    if (!isValidObject(current) || !(key in current)) return defaultValue;
     current = current[key];
   }
   return current;
@@ -107,24 +106,32 @@ const DeliveryManagementTab = () => {
         let recipientName = 'No Name Provided';
         
         // Ensure metadata is an object before trying to access properties
-        const metadata = typeof shipment.metadata === 'object' && shipment.metadata !== null 
-          ? shipment.metadata 
-          : {};
+        const metadata = isValidObject(shipment.metadata) ? shipment.metadata : {};
         
         // Try different paths to get recipient name
-        const recipient = safeGet(metadata, ['recipient'], null);
-        const recipientDetails = safeGet(metadata, ['recipientDetails'], null);
+        const recipientFromRecipient = safeGet(metadata, ['recipient', 'name'], null);
+        const recipientFromFirstLastName = safeGet(metadata, ['recipient', 'firstName'], null) && 
+          safeGet(metadata, ['recipient', 'lastName'], null) ? 
+          `${safeGet(metadata, ['recipient', 'firstName'], '')} ${safeGet(metadata, ['recipient', 'lastName'], '')}`.trim() : 
+          null;
         
-        if (hasProperty(recipient, 'name')) {
-          recipientName = recipient.name;
-        } else if (recipient && hasProperty(recipient, 'firstName') && hasProperty(recipient, 'lastName')) {
-          recipientName = `${recipient.firstName} ${recipient.lastName}`;
-        } else if (hasProperty(recipientDetails, 'name')) {
-          recipientName = recipientDetails.name;
-        } else if (recipientDetails && hasProperty(recipientDetails, 'firstName') && hasProperty(recipientDetails, 'lastName')) {
-          recipientName = `${recipientDetails.firstName} ${recipientDetails.lastName}`;
-        } else if (hasProperty(metadata, 'recipientName')) {
-          recipientName = metadata.recipientName;
+        const recipientFromRecipientDetails = safeGet(metadata, ['recipientDetails', 'name'], null);
+        const recipientFromDetailsFirstLastName = safeGet(metadata, ['recipientDetails', 'firstName'], null) && 
+          safeGet(metadata, ['recipientDetails', 'lastName'], null) ? 
+          `${safeGet(metadata, ['recipientDetails', 'firstName'], '')} ${safeGet(metadata, ['recipientDetails', 'lastName'], '')}`.trim() : 
+          null;
+        
+        // Try to get recipient name from different paths
+        if (recipientFromRecipient) {
+          recipientName = recipientFromRecipient;
+        } else if (recipientFromFirstLastName) {
+          recipientName = recipientFromFirstLastName;
+        } else if (recipientFromRecipientDetails) {
+          recipientName = recipientFromRecipientDetails;
+        } else if (recipientFromDetailsFirstLastName) {
+          recipientName = recipientFromDetailsFirstLastName;
+        } else if (safeGet(metadata, ['recipientName'], null)) {
+          recipientName = safeGet(metadata, ['recipientName'], 'No Name Provided');
         }
         
         // Safely extract delivery info
@@ -134,16 +141,16 @@ const DeliveryManagementTab = () => {
           id: shipment.id,
           tracking_number: shipment.tracking_number,
           status: shipment.status,
-          delivery_date: hasProperty(deliveryInfo, 'date') ? deliveryInfo.date : shipment.updated_at,
+          delivery_date: safeGet(deliveryInfo, ['date'], shipment.updated_at),
           recipient_name: recipientName,
           origin: shipment.origin,
           destination: shipment.destination,
           timeliness: getTimeliness(shipment),
           created_at: shipment.created_at,
           updated_at: shipment.updated_at,
-          driver_id: hasProperty(deliveryInfo, 'driver_id') ? deliveryInfo.driver_id : undefined,
-          driver_name: hasProperty(deliveryInfo, 'driver_name') ? deliveryInfo.driver_name : undefined,
-          metadata: typeof shipment.metadata === 'object' ? shipment.metadata : {}
+          driver_id: safeGet(deliveryInfo, ['driver_id'], undefined),
+          driver_name: safeGet(deliveryInfo, ['driver_name'], undefined),
+          metadata: isValidObject(shipment.metadata) ? shipment.metadata : {}
         };
       });
 
@@ -207,11 +214,7 @@ const DeliveryManagementTab = () => {
     }
     
     // Check if delivery was late based on metadata
-    const metadata = shipment.metadata || {};
-    
-    if (typeof metadata !== 'object') {
-      return 'on-time'; // Default if metadata is not an object
-    }
+    const metadata = isValidObject(shipment.metadata) ? shipment.metadata : {};
     
     // Safely check if delivery is marked as late
     const isLate = safeGet(metadata, ['delivery', 'isLate'], false);
@@ -284,10 +287,7 @@ const DeliveryManagementTab = () => {
       if (driverError) throw driverError;
       
       // Safely prepare the updated metadata
-      const existingMetadata = typeof shipment.metadata === 'object' && shipment.metadata !== null
-        ? shipment.metadata
-        : {};
-        
+      const existingMetadata = isValidObject(shipment.metadata) ? shipment.metadata : {};
       const existingDelivery = safeGet(existingMetadata, ['delivery'], {});
       
       const updatedMetadata = {

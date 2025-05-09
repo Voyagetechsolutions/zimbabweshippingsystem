@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -94,9 +93,18 @@ const LogisticsDashboard = () => {
           for (const shipment of shipmentsData) {
             // Create a proper ShipmentWithProfiles object with safe metadata handling
             const enrichedShipment: ShipmentWithProfiles = {
-              ...shipment,
+              id: shipment.id,
+              tracking_number: shipment.tracking_number,
+              status: shipment.status,
+              origin: shipment.origin,
+              destination: shipment.destination,
+              user_id: shipment.user_id,
+              created_at: shipment.created_at,
+              updated_at: shipment.updated_at,
               // Ensure metadata is a valid object or provide a default empty object
               metadata: isValidMetadata(shipment.metadata) ? shipment.metadata : {},
+              can_cancel: shipment.can_cancel,
+              can_modify: shipment.can_modify,
               profiles: undefined
             };
             
