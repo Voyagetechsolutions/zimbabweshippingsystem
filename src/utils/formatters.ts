@@ -1,5 +1,5 @@
 
-import { format, formatDistance, formatRelative } from 'date-fns';
+import { format, formatDistance, formatRelative, isValid } from 'date-fns';
 
 /**
  * Format a date to a standard display format
@@ -11,7 +11,9 @@ import { format, formatDistance, formatRelative } from 'date-fns';
 export function formatDate(date: string | Date | number, formatString = 'MMM d, yyyy'): string {
   if (!date) return 'N/A';
   try {
-    return format(new Date(date), formatString);
+    const dateObj = new Date(date);
+    if (!isValid(dateObj)) return 'Invalid date';
+    return format(dateObj, formatString);
   } catch (error) {
     console.error('Error formatting date:', error);
     return 'Invalid date';
@@ -37,7 +39,9 @@ export function formatDateTime(date: string | Date | number): string {
 export function formatRelativeTime(date: string | Date | number): string {
   if (!date) return 'N/A';
   try {
-    return formatDistance(new Date(date), new Date(), { addSuffix: true });
+    const dateObj = new Date(date);
+    if (!isValid(dateObj)) return 'Invalid date';
+    return formatDistance(dateObj, new Date(), { addSuffix: true });
   } catch (error) {
     console.error('Error formatting relative date:', error);
     return 'Invalid date';

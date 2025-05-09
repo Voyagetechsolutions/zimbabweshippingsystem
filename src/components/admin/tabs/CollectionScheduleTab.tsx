@@ -37,13 +37,14 @@ import {
   Edit, 
   Calendar 
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { formatDate } from '@/utils/formatters';
 
 interface CollectionSchedule {
   id: string;
@@ -146,7 +147,36 @@ const CollectionScheduleTab = () => {
   
   const handleEditClick = (schedule: CollectionSchedule) => {
     setEditingScheduleId(schedule.id);
-    setSelectedDate(new Date(schedule.pickup_date));
+    try {
+      // Try to parse the date, fallback to current date if invalid
+      const parsedDate = new Date(schedule.pickup_date);
+      setSelectedDate(isValid(parsedDate) ? parsedDate : new Date());
+    } catch (error) {
+      console.error('Error parsing date:', error);
+      setSelectedDate(new Date());
+    }
+  };
+
+  // Helper function to safely format dates
+  const safeFormatDate = (dateStr: string, formatStr: string = 'MMMM d, yyyy') => {
+    try {
+      const date = new Date(dateStr);
+      return isValid(date) ? format(date, formatStr) : dateStr;
+    } catch (error) {
+      console.error(`Error formatting date: ${dateStr}`, error);
+      return dateStr; // Return the original string if can't be formatted
+    }
+  };
+
+  // Helper function to safely format updated date
+  const safeFormatUpdatedDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return isValid(date) ? format(date, 'dd/MM/yyyy HH:mm') : 'Unknown date';
+    } catch (error) {
+      console.error(`Error formatting updated date: ${dateStr}`, error);
+      return 'Unknown date';
+    }
   };
 
   return (
@@ -197,10 +227,10 @@ const CollectionScheduleTab = () => {
                           </span>
                         </TableCell>
                         <TableCell>
-                          {format(new Date(schedule.pickup_date), 'MMMM d, yyyy')}
+                          {schedule.pickup_date}
                         </TableCell>
                         <TableCell className="text-gray-500 text-sm">
-                          {format(new Date(schedule.updated_at), 'dd/MM/yyyy HH:mm')}
+                          {safeFormatUpdatedDate(schedule.updated_at)}
                         </TableCell>
                         <TableCell className="text-right">
                           <Dialog
@@ -240,7 +270,7 @@ const CollectionScheduleTab = () => {
                                   <Label htmlFor="currentDate">Current Date</Label>
                                   <Input 
                                     id="currentDate" 
-                                    value={format(new Date(schedule.pickup_date), 'MMMM d, yyyy')}
+                                    value={schedule.pickup_date}
                                     disabled
                                     className="mt-1"
                                   />
@@ -265,6 +295,7 @@ const CollectionScheduleTab = () => {
                                           selected={selectedDate}
                                           onSelect={setSelectedDate}
                                           initialFocus
+                                          className="pointer-events-auto"
                                         />
                                       </PopoverContent>
                                     </Popover>
