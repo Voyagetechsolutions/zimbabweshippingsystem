@@ -240,22 +240,22 @@ const Navbar = () => {
                   </Link>
                   
                   {/* Add Switch to Admin option */}
-                  {/*<Link to="/admin">
-                    <DropdownMenuItem className="cursor-pointer">
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>Switch to Admin</span>
-                    </DropdownMenuItem>
-                  </Link>*/}
-                  
-                  {isAdmin && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <Link to="/admin">
+                  <Link to="/admin">
                     <DropdownMenuItem className="cursor-pointer">
                       <Settings className="mr-2 h-4 w-4" />
                       <span>Switch to Admin</span>
                     </DropdownMenuItem>
                   </Link>
+                  
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <Link to="/admin">
+                        <DropdownMenuItem className="cursor-pointer">
+                          <Shield className="mr-2 h-4 w-4" />
+                          <span>Admin Panel</span>
+                        </DropdownMenuItem>
+                      </Link>
                     </>
                   )}
                   
