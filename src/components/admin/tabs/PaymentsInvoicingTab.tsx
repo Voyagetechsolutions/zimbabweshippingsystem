@@ -77,28 +77,37 @@ const PaymentsInvoicingTab = () => {
   const fetchPayments = async () => {
     setLoading(true);
     try {
-      // Fetch payments with user profiles
-      const { data, error } = await supabase
+      // Get all payments
+      const { data: paymentsData, error: paymentsError } = await supabase
         .from('payments')
-        .select(`
-          *,
-          profiles:user_id (
-            email,
-            full_name
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      if (paymentsError) throw paymentsError;
       
-      // Transform data to include user details
-      const transformedData = data.map((payment) => ({
-        ...payment,
-        user_email: payment.profiles?.email || 'N/A',
-        user_name: payment.profiles?.full_name || 'Unknown User'
-      }));
+      // For each payment with a user_id, fetch the user profile data
+      const enhancedPayments = await Promise.all(
+        paymentsData.map(async (payment) => {
+          if (payment.user_id) {
+            const { data: profileData, error: profileError } = await supabase
+              .from('profiles')
+              .select('email, full_name')
+              .eq('id', payment.user_id)
+              .single();
+            
+            if (!profileError && profileData) {
+              return {
+                ...payment,
+                user_email: profileData.email,
+                user_name: profileData.full_name
+              };
+            }
+          }
+          return payment;
+        })
+      );
       
-      setPayments(transformedData);
+      setPayments(enhancedPayments);
     } catch (error: any) {
       console.error('Error fetching payments:', error);
       toast({
@@ -226,8 +235,8 @@ const PaymentsInvoicingTab = () => {
                             </TableCell>
                             <TableCell>
                               <div>
-                                <div className="font-medium">{payment.user_name}</div>
-                                <div className="text-sm text-gray-500">{payment.user_email}</div>
+                                <div className="font-medium">{payment.user_name || 'Unknown User'}</div>
+                                <div className="text-sm text-gray-500">{payment.user_email || 'No email'}</div>
                               </div>
                             </TableCell>
                             <TableCell className="whitespace-nowrap">

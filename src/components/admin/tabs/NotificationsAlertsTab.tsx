@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -80,28 +79,37 @@ const NotificationsAlertsTab = () => {
   const fetchNotifications = async () => {
     setLoading(true);
     try {
-      // Fetch notifications with user details
-      const { data, error } = await supabase
+      // Get all notifications first
+      const { data: notificationsData, error: notificationsError } = await supabase
         .from('notifications')
-        .select(`
-          *,
-          profiles:user_id (
-            email,
-            full_name
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      if (notificationsError) throw notificationsError;
       
-      // Transform data to include user details
-      const transformedData = data.map((notification) => ({
-        ...notification,
-        user_email: notification.profiles?.email || 'N/A',
-        user_name: notification.profiles?.full_name || 'Unknown User'
-      }));
+      // For each notification, fetch the user profile data if user_id exists
+      const enhancedNotifications = await Promise.all(
+        notificationsData.map(async (notification) => {
+          if (notification.user_id) {
+            const { data: profileData, error: profileError } = await supabase
+              .from('profiles')
+              .select('email, full_name')
+              .eq('id', notification.user_id)
+              .single();
+            
+            if (!profileError && profileData) {
+              return {
+                ...notification,
+                user_email: profileData.email,
+                user_name: profileData.full_name
+              };
+            }
+          }
+          return notification;
+        })
+      );
       
-      setNotifications(transformedData);
+      setNotifications(enhancedNotifications);
       setSelectedNotifications([]);
     } catch (error: any) {
       console.error('Error fetching notifications:', error);
@@ -458,8 +466,8 @@ const NotificationsAlertsTab = () => {
                           </TableCell>
                           <TableCell>
                             <div className="text-sm">
-                              <div>{notification.user_name}</div>
-                              <div className="text-gray-500 text-xs">{notification.user_email}</div>
+                              <div>{notification.user_name || 'Unknown User'}</div>
+                              <div className="text-gray-500 text-xs">{notification.user_email || 'No email'}</div>
                             </div>
                           </TableCell>
                           <TableCell className="whitespace-nowrap text-sm text-gray-500">

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -100,28 +99,38 @@ const CustomQuoteManagement = () => {
   const fetchQuotes = async () => {
     setLoading(true);
     try {
-      // Fetch custom quotes with user profiles
-      const { data, error } = await supabase
+      // Instead of using the nested select approach, use a more explicit query
+      // First fetch all custom quotes
+      const { data: quotesData, error: quotesError } = await supabase
         .from('custom_quotes')
-        .select(`
-          *,
-          profiles:user_id (
-            email,
-            full_name
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      if (quotesError) throw quotesError;
       
-      // Transform data to include user details
-      const transformedData = data.map((quote) => ({
-        ...quote,
-        user_email: quote.profiles?.email || undefined,
-        user_name: quote.profiles?.full_name || undefined
-      }));
+      // For quotes with user_id, fetch the corresponding user profiles
+      const enhancedQuotes = await Promise.all(
+        quotesData.map(async (quote) => {
+          if (quote.user_id) {
+            const { data: profileData, error: profileError } = await supabase
+              .from('profiles')
+              .select('email, full_name')
+              .eq('id', quote.user_id)
+              .single();
+            
+            if (!profileError && profileData) {
+              return {
+                ...quote,
+                user_email: profileData.email,
+                user_name: profileData.full_name
+              };
+            }
+          }
+          return quote;
+        })
+      );
       
-      setQuotes(transformedData);
+      setQuotes(enhancedQuotes);
     } catch (error: any) {
       console.error('Error fetching custom quotes:', error);
       toast({
