@@ -52,7 +52,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
 import {
   Popover,
@@ -304,6 +304,25 @@ const RouteManagementTab = () => {
     );
   });
 
+  // Helper function to safely format dates
+  const safeFormatDate = (dateStr: string | Date, formatStr: string = 'MMMM d, yyyy'): string => {
+    try {
+      if (!dateStr) return 'No date';
+      
+      const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+      
+      if (!isValid(date)) {
+        console.warn(`Invalid date value: ${dateStr}`);
+        return 'Invalid date';
+      }
+      
+      return format(date, formatStr);
+    } catch (error) {
+      console.error(`Error formatting date: ${dateStr}`, error);
+      return 'Invalid date';
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -384,6 +403,7 @@ const RouteManagementTab = () => {
                           selected={newRouteDate}
                           onSelect={setNewRouteDate}
                           initialFocus
+                          className="pointer-events-auto"
                         />
                       </PopoverContent>
                     </Popover>
@@ -469,9 +489,9 @@ const RouteManagementTab = () => {
                               ))}
                             </div>
                           </TableCell>
-                          <TableCell>{format(new Date(route.pickup_date), 'MMMM d, yyyy')}</TableCell>
+                          <TableCell>{route.pickup_date}</TableCell>
                           <TableCell className="text-gray-500 text-sm">
-                            {format(new Date(route.updated_at), 'dd/MM/yyyy HH:mm')}
+                            {safeFormatDate(route.updated_at, 'dd/MM/yyyy HH:mm')}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end space-x-2">
@@ -534,6 +554,7 @@ const RouteManagementTab = () => {
                                                 selected={editRouteDate}
                                                 onSelect={setEditRouteDate}
                                                 initialFocus
+                                                className="pointer-events-auto"
                                               />
                                             </PopoverContent>
                                           </Popover>
