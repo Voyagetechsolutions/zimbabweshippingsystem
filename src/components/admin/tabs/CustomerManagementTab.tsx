@@ -54,13 +54,26 @@ import {
   Mail
 } from 'lucide-react';
 
+// Define an extended profile type that includes is_active
+interface ExtendedProfile {
+  id: string;
+  full_name?: string;
+  email: string;
+  role?: string;
+  is_admin?: boolean;
+  is_active?: boolean; // Add this property
+  created_at: string;
+  communication_preferences?: { phone?: string };
+  // Add other properties as needed
+}
+
 const CustomerManagementTab = () => {
   const { toast } = useToast();
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<ExtendedProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [viewingCustomer, setViewingCustomer] = useState<any | null>(null);
+  const [viewingCustomer, setViewingCustomer] = useState<ExtendedProfile | null>(null);
   const [customerShipments, setCustomerShipments] = useState<any[]>([]);
   const [customerAddresses, setCustomerAddresses] = useState<any[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
@@ -179,7 +192,7 @@ const CustomerManagementTab = () => {
     if (isActive === false) {
       return <Badge variant="destructive">Suspended</Badge>;
     }
-    return <Badge variant="success">Active</Badge>;
+    return <Badge variant="secondary">Active</Badge>; // Changed from "success" to "secondary"
   };
 
   return (
