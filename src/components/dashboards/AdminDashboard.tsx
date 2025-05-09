@@ -340,6 +340,7 @@ const AdminDashboard = () => {
         onValueChange={setActiveTab}
         className="mb-8"
       >
+        {/* Tab selection UI */}
         {isMobile && !showFullMenu ? (
           <TabsList className="grid grid-cols-2 gap-2 mb-4">
             <TabsTrigger value="overview" className="flex items-center justify-center gap-2 p-3">
@@ -435,6 +436,7 @@ const AdminDashboard = () => {
           </TabsList>
         )}
         
+        {/* Tab Content */}
         <TabsContent value="overview">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
             <Card>
@@ -704,12 +706,12 @@ const AdminDashboard = () => {
           <AnalyticsReports />
         </TabsContent>
 
-        <TabsContent value="settings">
-          <SettingsManagement />
-        </TabsContent>
-
         <TabsContent value="schedule">
           <CollectionScheduleManagement />
+        </TabsContent>
+
+        <TabsContent value="settings">
+          <SettingsManagement />
         </TabsContent>
 
         <TabsContent value="more">
