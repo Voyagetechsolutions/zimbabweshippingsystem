@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -34,6 +33,9 @@ import PaymentsInvoicingTab from '@/components/admin/tabs/PaymentsInvoicingTab';
 import ReportsAnalyticsTab from '@/components/admin/tabs/ReportsAnalyticsTab';
 import NotificationsAlertsTab from '@/components/admin/tabs/NotificationsAlertsTab';
 import CollectionScheduleTab from '@/components/admin/tabs/CollectionScheduleTab';
+import RouteManagementTab from '@/components/admin/tabs/RouteManagementTab';
+import UserManagementTab from '@/components/admin/tabs/UserManagementTab';
+import SystemSettingsTab from '@/components/admin/tabs/SystemSettingsTab';
 
 // Icons
 import { 
@@ -487,51 +489,15 @@ const AdminDashboardContent = () => {
         </TabsContent>
         
         <TabsContent value="routes" className="mt-0 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Route Management & Monitoring</CardTitle>
-              <CardDescription>
-                Plan and manage collection routes.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-center py-12 text-muted-foreground">
-                Route management and monitoring content will be implemented here.
-              </p>
-            </CardContent>
-          </Card>
+          <RouteManagementTab />
         </TabsContent>
         
         <TabsContent value="users" className="mt-0 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>User Management</CardTitle>
-              <CardDescription>
-                Add and manage user accounts.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-center py-12 text-muted-foreground">
-                User management content will be implemented here.
-              </p>
-            </CardContent>
-          </Card>
+          <UserManagementTab />
         </TabsContent>
         
         <TabsContent value="settings" className="mt-0 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>System Settings</CardTitle>
-              <CardDescription>
-                Configure system settings and preferences.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-center py-12 text-muted-foreground">
-                System settings content will be implemented here.
-              </p>
-            </CardContent>
-          </Card>
+          <SystemSettingsTab />
         </TabsContent>
 
         <TabsContent value="more" className="mt-0 space-y-4">
