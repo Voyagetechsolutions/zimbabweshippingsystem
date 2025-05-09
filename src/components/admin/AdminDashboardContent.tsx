@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +29,11 @@ import {
 import ShipmentManagementTab from '@/components/admin/tabs/ShipmentManagementTab';
 import CustomerManagementTab from '@/components/admin/tabs/CustomerManagementTab';
 import PickupZonesManagementTab from '@/components/admin/tabs/PickupZonesManagementTab';
+import DeliveryManagementTab from '@/components/admin/tabs/DeliveryManagementTab';
+import PaymentsInvoicingTab from '@/components/admin/tabs/PaymentsInvoicingTab';
+import ReportsAnalyticsTab from '@/components/admin/tabs/ReportsAnalyticsTab';
+import NotificationsAlertsTab from '@/components/admin/tabs/NotificationsAlertsTab';
+import CollectionScheduleTab from '@/components/admin/tabs/CollectionScheduleTab';
 
 // Icons
 import { 
@@ -461,83 +467,23 @@ const AdminDashboardContent = () => {
         </TabsContent>
         
         <TabsContent value="delivery" className="mt-0 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Delivery Management</CardTitle>
-              <CardDescription>
-                Track and manage delivery operations.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-center py-12 text-muted-foreground">
-                Delivery management content will be implemented here.
-              </p>
-            </CardContent>
-          </Card>
+          <DeliveryManagementTab />
         </TabsContent>
         
         <TabsContent value="payments" className="mt-0 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Payments & Invoicing</CardTitle>
-              <CardDescription>
-                Manage payments, generate invoices, and track financial transactions.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-center py-12 text-muted-foreground">
-                Payments and invoicing content will be implemented here.
-              </p>
-            </CardContent>
-          </Card>
+          <PaymentsInvoicingTab />
         </TabsContent>
         
         <TabsContent value="reports" className="mt-0 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Reports & Analytics</CardTitle>
-              <CardDescription>
-                Generate reports and view analytics data.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-center py-12 text-muted-foreground">
-                Reports and analytics content will be implemented here.
-              </p>
-            </CardContent>
-          </Card>
+          <ReportsAnalyticsTab />
         </TabsContent>
         
         <TabsContent value="notifications" className="mt-0 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Notifications & Alerts</CardTitle>
-              <CardDescription>
-                Manage system notifications and alerts.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-center py-12 text-muted-foreground">
-                Notifications and alerts content will be implemented here.
-              </p>
-            </CardContent>
-          </Card>
+          <NotificationsAlertsTab />
         </TabsContent>
         
         <TabsContent value="schedule" className="mt-0 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Collection Schedule Overview</CardTitle>
-              <CardDescription>
-                Manage collection schedules and calendar.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-center py-12 text-muted-foreground">
-                Collection schedule overview content will be implemented here.
-              </p>
-            </CardContent>
-          </Card>
+          <CollectionScheduleTab />
         </TabsContent>
         
         <TabsContent value="routes" className="mt-0 space-y-4">
@@ -611,9 +557,6 @@ const AdminDashboardContent = () => {
           </Tabs>
         </TabsContent>
       </Tabs>
-      
-      {/* Edit shipment modal */}
-      {/* ... keep existing code (edit shipment modal) */}
     </div>
   );
 };
