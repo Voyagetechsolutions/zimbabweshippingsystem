@@ -52,7 +52,9 @@ import {
   Mail,
   Save,
   RefreshCcw,
-  AlertCircle
+  AlertCircle,
+  Plus,
+  Edit
 } from 'lucide-react';
 
 // Define form schemas
