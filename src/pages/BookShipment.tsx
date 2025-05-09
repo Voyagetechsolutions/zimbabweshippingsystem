@@ -9,6 +9,7 @@ import { PaymentMethodSection } from '@/components/PaymentMethodSection';
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 enum BookingStep {
   FORM,
@@ -22,6 +23,7 @@ const BookShipment = () => {
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     document.title = 'Book a Shipment | UK Shipping Service';

@@ -27,6 +27,7 @@ import { AlertCircle, CheckCircle2, Package, Ship, Info, User, Phone, FileBox, C
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { getRouteForPostalCode, getIrelandRouteForCity } from '@/utils/postalCodeUtils';
 import { Link } from 'react-router-dom';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 // Define the validation schema
 const formSchema = z.object({
@@ -98,6 +99,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
   const [collectionDate, setCollectionDate] = useState<string | null>(null);
   const [additionalAddresses, setAdditionalAddresses] = useState<string[]>(['']);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -366,19 +368,19 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
           <TabsList className="grid w-full grid-cols-4 mb-8">
             <TabsTrigger value="sender" className="flex items-center justify-center gap-2">
               <User className="h-4 w-4" />
-              <span>Sender Info</span>
+              {!isMobile && <span>Sender Info</span>}
             </TabsTrigger>
             <TabsTrigger value="recipient" className="flex items-center justify-center gap-2">
               <Phone className="h-4 w-4" />
-              <span>Receiver Info</span>
+              {!isMobile && <span>Receiver Info</span>}
             </TabsTrigger>
             <TabsTrigger value="shipment" className="flex items-center justify-center gap-2">
               <Package className="h-4 w-4" />
-              <span>Shipment Details</span>
+              {!isMobile && <span>Shipment Details</span>}
             </TabsTrigger>
             <TabsTrigger value="payment" className="flex items-center justify-center gap-2">
               <ClipboardList className="h-4 w-4" />
-              <span>Booking Summary</span>
+              {!isMobile && <span>Booking Summary</span>}
             </TabsTrigger>
           </TabsList>
           
@@ -389,7 +391,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
               <TabsContent value="sender" className="space-y-6">
                 <div className="text-xl font-semibold mb-4 flex items-center">
                   <User className="h-5 w-5 mr-2" />
-                  Sender Information
+                  {!isMobile && <span>Sender Information</span>}
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -590,7 +592,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
               <TabsContent value="recipient" className="space-y-6">
                 <div className="text-xl font-semibold mb-4 flex items-center">
                   <Phone className="h-5 w-5 mr-2" />
-                  Receiver Information
+                  {!isMobile && <span>Receiver Information</span>}
                 </div>
                 
                 <FormField
@@ -707,7 +709,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
               <TabsContent value="shipment" className="space-y-6">
                 <div className="text-xl font-semibold mb-4 flex items-center">
                   <Package className="h-5 w-5 mr-2" />
-                  Shipment Details
+                  {!isMobile && <span>Shipment Details</span>}
                 </div>
                 
                 <div className="space-y-4 bg-gray-50 dark:bg-gray-700 p-4 rounded-md">
@@ -963,7 +965,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
               <TabsContent value="payment" className="space-y-6">
                 <div className="text-xl font-semibold mb-4 flex items-center">
                   <ClipboardList className="h-5 w-5 mr-2" />
-                  Booking Summary
+                  {!isMobile && <span>Booking Summary</span>}
                 </div>
                 
                 <div className="border rounded-md p-4">
