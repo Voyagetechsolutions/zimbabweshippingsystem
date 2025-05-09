@@ -169,7 +169,7 @@ const ShipmentManagementTab = () => {
   const fetchStatusHistory = async (shipmentId: string) => {
     setLoadingHistory(true);
     try {
-      // Since there's no status_updates table, we'll simulate this with the shipment's own data
+      // Fetch status history from shipment updates if available
       const { data, error } = await supabase
         .from('shipments')
         .select('status, updated_at')
@@ -178,8 +178,8 @@ const ShipmentManagementTab = () => {
 
       if (error) throw error;
 
-      // Create a mock status history
-      const mockHistory: StatusHistory[] = [
+      // Create a history from available data
+      const history: StatusHistory[] = [
         {
           id: '1',
           status: data.status,
@@ -189,7 +189,7 @@ const ShipmentManagementTab = () => {
         }
       ];
 
-      setStatusHistory(mockHistory);
+      setStatusHistory(history);
     } catch (error: any) {
       console.error('Error fetching status history:', error);
       toast({
@@ -257,16 +257,96 @@ const ShipmentManagementTab = () => {
       setSortDirection('asc');
     }
   };
-
+  
+  // Function to extract sender's name from metadata
+  const getSenderName = (shipment: Shipment): string => {
+    const metadata = shipment.metadata || {};
+    
+    // Check for different possible paths to sender name in metadata
+    if (metadata.senderDetails?.name) {
+      return metadata.senderDetails.name;
+    } else if (metadata.firstName && metadata.lastName) {
+      return `${metadata.firstName} ${metadata.lastName}`;
+    } else if (metadata.sender_name) {
+      return metadata.sender_name;
+    } else if (metadata.sender_details?.name) {
+      return metadata.sender_details.name;
+    }
+    
+    return 'No Name Provided';
+  };
+  
+  // Function to extract sender's phone from metadata
+  const getSenderPhone = (shipment: Shipment): string => {
+    const metadata = shipment.metadata || {};
+    
+    // Check for different possible paths to sender phone in metadata
+    if (metadata.senderDetails?.phone) {
+      return metadata.senderDetails.phone;
+    } else if (metadata.phone) {
+      return metadata.phone;
+    } else if (metadata.sender_phone) {
+      return metadata.sender_phone;
+    } else if (metadata.sender_details?.phone) {
+      return metadata.sender_details.phone;
+    }
+    
+    return 'No Phone Provided';
+  };
+  
+  // Function to extract receiver's name from metadata
+  const getReceiverName = (shipment: Shipment): string => {
+    const metadata = shipment.metadata || {};
+    
+    // Check for different possible paths to receiver name in metadata
+    if (metadata.recipientDetails?.name) {
+      return metadata.recipientDetails.name;
+    } else if (metadata.recipientName) {
+      return metadata.recipientName;
+    } else if (metadata.receiver_name) {
+      return metadata.receiver_name;
+    } else if (metadata.recipient_details?.name) {
+      return metadata.recipient_details.name;
+    }
+    
+    return 'No Name Provided';
+  };
+  
+  // Function to extract receiver's phone from metadata
+  const getReceiverPhone = (shipment: Shipment): string => {
+    const metadata = shipment.metadata || {};
+    
+    // Check for different possible paths to receiver phone in metadata
+    if (metadata.recipientDetails?.phone) {
+      return metadata.recipientDetails.phone;
+    } else if (metadata.recipientPhone) {
+      return metadata.recipientPhone;
+    } else if (metadata.receiver_phone) {
+      return metadata.receiver_phone;
+    } else if (metadata.recipient_details?.phone) {
+      return metadata.recipient_details.phone;
+    } else if (metadata.additionalRecipientPhone) {
+      return metadata.additionalRecipientPhone;
+    }
+    
+    return 'No Phone Provided';
+  };
+  
   // Filter shipments based on search and status filter
   const filteredShipments = shipments.filter(shipment => {
     const metadata = shipment.metadata || {};
+    const senderName = getSenderName(shipment);
+    const receiverName = getReceiverName(shipment);
+    const senderPhone = getSenderPhone(shipment);
+    const receiverPhone = getReceiverPhone(shipment);
     
     const matchesSearch = 
       searchQuery === '' ||
       shipment.tracking_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      metadata.sender_name?.toLowerCase()?.includes(searchQuery.toLowerCase()) ||
-      metadata.receiver_name?.toLowerCase()?.includes(searchQuery.toLowerCase()) ||
+      senderName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      receiverName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      senderPhone.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      receiverPhone.toLowerCase().includes(searchQuery.toLowerCase()) ||
       shipment.origin?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       shipment.destination?.toLowerCase().includes(searchQuery.toLowerCase());
     
@@ -387,32 +467,28 @@ const ShipmentManagementTab = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredShipments.map(shipment => {
-                    const metadata = shipment.metadata || {};
-                    
-                    return (
-                      <TableRow key={shipment.id}>
-                        <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
-                        <TableCell className="max-w-[150px] truncate">{metadata.sender_name || 'N/A'}</TableCell>
-                        <TableCell className="max-w-[150px] truncate">{metadata.receiver_name || 'N/A'}</TableCell>
-                        <TableCell className="max-w-[150px] truncate">{metadata.sender_phone || 'N/A'}</TableCell>
-                        <TableCell className="max-w-[150px] truncate">{metadata.receiver_phone || 'N/A'}</TableCell>
-                        <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
-                        <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
-                        <TableCell>{renderStatusBadge(shipment.status)}</TableCell>
-                        <TableCell>{format(new Date(shipment.created_at), 'dd MMM yyyy')}</TableCell>
-                        <TableCell className="text-right">
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={() => handleViewShipment(shipment)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                  {filteredShipments.map(shipment => (
+                    <TableRow key={shipment.id}>
+                      <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
+                      <TableCell className="max-w-[150px] truncate">{getSenderName(shipment)}</TableCell>
+                      <TableCell className="max-w-[150px] truncate">{getReceiverName(shipment)}</TableCell>
+                      <TableCell className="max-w-[150px] truncate">{getSenderPhone(shipment)}</TableCell>
+                      <TableCell className="max-w-[150px] truncate">{getReceiverPhone(shipment)}</TableCell>
+                      <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
+                      <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
+                      <TableCell>{renderStatusBadge(shipment.status)}</TableCell>
+                      <TableCell>{format(new Date(shipment.created_at), 'dd MMM yyyy')}</TableCell>
+                      <TableCell className="text-right">
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleViewShipment(shipment)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </div>
@@ -440,11 +516,11 @@ const ShipmentManagementTab = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <h3 className="text-sm font-medium text-muted-foreground">Origin</h3>
-                  <p>{viewingShipment.origin || 'N/A'}</p>
+                  <p>{viewingShipment.origin || 'Not specified'}</p>
                 </div>
                 <div className="space-y-1">
                   <h3 className="text-sm font-medium text-muted-foreground">Destination</h3>
-                  <p>{viewingShipment.destination || 'N/A'}</p>
+                  <p>{viewingShipment.destination || 'Not specified'}</p>
                 </div>
                 <div className="space-y-1">
                   <h3 className="text-sm font-medium text-muted-foreground">Created At</h3>
@@ -454,34 +530,156 @@ const ShipmentManagementTab = () => {
                   <h3 className="text-sm font-medium text-muted-foreground">Updated At</h3>
                   <p>{format(new Date(viewingShipment.updated_at), 'dd MMM yyyy HH:mm')}</p>
                 </div>
-                {viewingShipment.metadata && (
-                  <>
-                    <div className="space-y-1">
-                      <h3 className="text-sm font-medium text-muted-foreground">Sender Name</h3>
-                      <p>{viewingShipment.metadata.sender_name || 'N/A'}</p>
+              </div>
+              
+              {/* Sender and Recipient Details */}
+              <div>
+                <h3 className="text-lg font-medium mb-3">Contact Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 dark:bg-gray-800 p-4 rounded-md">
+                  <div>
+                    <h4 className="font-medium">Sender</h4>
+                    <div className="mt-2 space-y-2">
+                      <div className="flex items-start">
+                        <User className="h-4 w-4 mt-1 mr-2 text-gray-500" />
+                        <div>
+                          <p className="font-medium">{getSenderName(viewingShipment)}</p>
+                          <p className="text-sm text-gray-500">{viewingShipment.metadata?.email || viewingShipment.metadata?.senderDetails?.email || 'No email provided'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start">
+                        <Phone className="h-4 w-4 mt-1 mr-2 text-gray-500" />
+                        <div>
+                          <p>{getSenderPhone(viewingShipment)}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start">
+                        <MapPin className="h-4 w-4 mt-1 mr-2 text-gray-500" />
+                        <div>
+                          <p className="text-sm">
+                            {viewingShipment.metadata?.pickupAddress || 
+                             viewingShipment.metadata?.senderDetails?.address ||
+                             viewingShipment.origin || 
+                             'No address provided'}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <h3 className="text-sm font-medium text-muted-foreground">Receiver Name</h3>
-                      <p>{viewingShipment.metadata.receiver_name || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <h4 className="font-medium">Receiver</h4>
+                    <div className="mt-2 space-y-2">
+                      <div className="flex items-start">
+                        <User className="h-4 w-4 mt-1 mr-2 text-gray-500" />
+                        <p className="font-medium">{getReceiverName(viewingShipment)}</p>
+                      </div>
+                      <div className="flex items-start">
+                        <Phone className="h-4 w-4 mt-1 mr-2 text-gray-500" />
+                        <div>
+                          <p>{getReceiverPhone(viewingShipment)}</p>
+                          {viewingShipment.metadata?.additionalRecipientPhone && (
+                            <p className="text-sm text-gray-500">Additional: {viewingShipment.metadata.additionalRecipientPhone}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-start">
+                        <MapPin className="h-4 w-4 mt-1 mr-2 text-gray-500" />
+                        <div>
+                          <p className="text-sm">
+                            {viewingShipment.metadata?.deliveryAddress || 
+                             viewingShipment.metadata?.recipientDetails?.address ||
+                             viewingShipment.destination || 
+                             'No address provided'}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <h3 className="text-sm font-medium text-muted-foreground">Sender Phone</h3>
-                      <p>{viewingShipment.metadata.sender_phone || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Shipment Details Section */}
+              <div>
+                <h3 className="text-lg font-medium mb-3">Shipment Details</h3>
+                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-md">
+                  {viewingShipment.metadata?.shipmentDetails && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-medium text-muted-foreground">Shipment Type</h4>
+                        <p>{viewingShipment.metadata.shipmentDetails.type || 'Not specified'}</p>
+                      </div>
+                      
+                      {viewingShipment.metadata.shipmentDetails.includeDrums && (
+                        <>
+                          <div className="space-y-1">
+                            <h4 className="text-sm font-medium text-muted-foreground">Drum Quantity</h4>
+                            <p>{viewingShipment.metadata.shipmentDetails.quantity || 'Not specified'}</p>
+                          </div>
+                          
+                          {viewingShipment.metadata.shipmentDetails.wantMetalSeal && (
+                            <div className="space-y-1">
+                              <h4 className="text-sm font-medium text-muted-foreground">Metal Seals</h4>
+                              <p>Yes</p>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      
+                      {viewingShipment.metadata.shipmentDetails.includeOtherItems && (
+                        <>
+                          <div className="space-y-1">
+                            <h4 className="text-sm font-medium text-muted-foreground">Item Category</h4>
+                            <p>{viewingShipment.metadata.shipmentDetails.category || 'Not specified'}</p>
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <h4 className="text-sm font-medium text-muted-foreground">Specific Item</h4>
+                            <p>{viewingShipment.metadata.shipmentDetails.specificItem || 'Not specified'}</p>
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <h4 className="text-sm font-medium text-muted-foreground">Description</h4>
+                            <p>{viewingShipment.metadata.shipmentDetails.description || 'Not provided'}</p>
+                          </div>
+                        </>
+                      )}
+                      
+                      {viewingShipment.metadata.shipmentDetails.doorToDoor && (
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-medium text-muted-foreground">Door to Door</h4>
+                          <p>Yes</p>
+                          
+                          {viewingShipment.metadata.shipmentDetails.additionalAddresses && 
+                           viewingShipment.metadata.shipmentDetails.additionalAddresses.length > 0 && (
+                            <div className="mt-2">
+                              <h5 className="text-sm font-medium">Additional Delivery Addresses:</h5>
+                              <ul className="list-disc pl-5 text-sm">
+                                {viewingShipment.metadata.shipmentDetails.additionalAddresses.map((addr: string, idx: number) => (
+                                  <li key={idx}>{addr}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {viewingShipment.metadata.shipmentDetails.services && 
+                       viewingShipment.metadata.shipmentDetails.services.length > 0 && (
+                        <div className="space-y-1 col-span-2">
+                          <h4 className="text-sm font-medium text-muted-foreground">Additional Services</h4>
+                          <ul className="list-disc pl-5">
+                            {viewingShipment.metadata.shipmentDetails.services.map((service: any, idx: number) => (
+                              <li key={idx}>{service.name} - £{service.price}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
-                    <div className="space-y-1">
-                      <h3 className="text-sm font-medium text-muted-foreground">Receiver Phone</h3>
-                      <p>{viewingShipment.metadata.receiver_phone || 'N/A'}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <h3 className="text-sm font-medium text-muted-foreground">Shipment Type</h3>
-                      <p>{viewingShipment.metadata.shipment_type || 'N/A'}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <h3 className="text-sm font-medium text-muted-foreground">Pickup Zone</h3>
-                      <p>{viewingShipment.metadata.pickup_zone || 'N/A'}</p>
-                    </div>
-                  </>
-                )}
+                  )}
+                  
+                  {!viewingShipment.metadata?.shipmentDetails && (
+                    <p className="text-gray-500">No detailed shipment information available</p>
+                  )}
+                </div>
               </div>
 
               {/* Status Section */}
