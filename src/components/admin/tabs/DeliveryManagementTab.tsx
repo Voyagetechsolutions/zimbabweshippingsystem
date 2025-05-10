@@ -234,7 +234,7 @@ const DeliveryManagementTab = () => {
         // Manual mapping of delivery assignments from metadata
         const deliveryAssignments: DeliveryAssignment[] = [];
         
-        for (const shipment of processedShipments) {
+        for (const shipment of pendingShipments) {
           const metadata = safeCastMetadata(shipment.metadata);
           
           // Check if metadata has delivery information safely
@@ -1108,3 +1108,4 @@ const DeliveryManagementTab = () => {
 };
 
 export default DeliveryManagementTab;
+
