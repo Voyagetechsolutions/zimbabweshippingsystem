@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -70,7 +71,7 @@ import {
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Shipment, ShipmentMetadata } from '@/types/shipment';
+import { Tables } from '@/integrations/supabase/db-types';
 import { BarChart } from '@/components/ui/charts';
 
 interface Driver {
@@ -97,6 +98,14 @@ interface DeliveryAssignment {
   tracking_number?: string;
   destination?: string;
 }
+
+// Define a Shipment type using Tables from db-types
+type Shipment = Tables['shipments'] & {
+  profiles?: {
+    full_name?: string;
+    email: string;
+  };
+};
 
 // Helper function to safely access nested properties in metadata
 const getMetadataValue = (metadata: any, path: string[], defaultValue: any = undefined) => {
@@ -160,20 +169,7 @@ const DeliveryManagementTab = () => {
       if (shipmentsError) throw shipmentsError;
       
       // Process shipment data with proper typing
-      const typedShipments: Shipment[] = (shipmentsData || []).map(shipment => ({
-        id: shipment.id,
-        tracking_number: shipment.tracking_number,
-        status: shipment.status,
-        origin: shipment.origin,
-        destination: shipment.destination,
-        user_id: shipment.user_id,
-        created_at: shipment.created_at,
-        updated_at: shipment.updated_at,
-        metadata: shipment.metadata || {},
-        can_cancel: shipment.can_cancel,
-        can_modify: shipment.can_modify,
-        profiles: shipment.profiles
-      }));
+      const typedShipments = shipmentsData as Shipment[] || [];
       
       setPendingShipments(typedShipments);
       
@@ -192,13 +188,24 @@ const DeliveryManagementTab = () => {
           ? driver.communication_preferences 
           : {};
         
+        // Safely access location and phone from communication preferences
+        let location = '';
+        let phoneNumber = '';
+        
+        if (communicationPrefs && typeof communicationPrefs === 'object') {
+          // TypeScript doesn't know the shape of communicationPrefs, so we cast it
+          const prefs = communicationPrefs as Record<string, any>;
+          location = prefs.location || '';
+          phoneNumber = prefs.phone || '';
+        }
+        
         return {
           id: driver.id,
           full_name: driver.full_name || 'Unnamed Driver',
           email: driver.email,
           role: driver.role,
-          location: communicationPrefs && typeof communicationPrefs === 'object' ? communicationPrefs.location : undefined,
-          phone_number: communicationPrefs && typeof communicationPrefs === 'object' ? communicationPrefs.phone : undefined,
+          location: location,
+          phone_number: phoneNumber,
           rating: Math.round((Math.random() * 2 + 3) * 10) / 10, // Random rating between 3.0-5.0 for demo
           deliveries_completed: Math.floor(Math.random() * 50) + 10, // Random number for demo
           on_time_rate: Math.round((Math.random() * 20 + 80) * 10) / 10, // 80-100% random for demo
@@ -207,18 +214,19 @@ const DeliveryManagementTab = () => {
       
       setDrivers(enhancedDrivers);
       
-      // 3. Check if delivery_assignments table exists and prepare deliveries data
+      // 3. Process delivery assignments from shipment metadata
       try {
         // Manual mapping of delivery assignments from metadata
         const deliveryAssignments: DeliveryAssignment[] = [];
         
         for (const shipment of typedShipments) {
-          const metadata = shipment.metadata;
-          // Check if metadata has delivery information
-          if (metadata && typeof metadata === 'object' && metadata.delivery) {
-            const delivery = metadata.delivery;
+          if (shipment.metadata && typeof shipment.metadata === 'object') {
+            const metadata = shipment.metadata as Record<string, any>;
             
-            if (delivery && typeof delivery === 'object') {
+            // Check if metadata has delivery information
+            if (metadata.delivery && typeof metadata.delivery === 'object') {
+              const delivery = metadata.delivery as Record<string, any>;
+              
               const assignment: DeliveryAssignment = {
                 id: `${shipment.id}-delivery`, // Generate an ID
                 shipment_id: shipment.id,
@@ -951,4 +959,115 @@ const DeliveryManagementTab = () => {
                 <SelectContent>
                   {drivers.map(driver => (
                     <SelectItem key={driver.id} value={driver.id}>
-                      {driver.full_name} {driver.location && `(${driver.location
+                      {driver.full_name} {driver.location && `(${driver.location})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="notes">Notes (Optional)</Label>
+              <Textarea
+                id="notes"
+                placeholder="Add any special delivery instructions..."
+                value={assignmentNotes}
+                onChange={(e) => setAssignmentNotes(e.target.value)}
+                className="resize-none"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAssignmentDialog(false)}>Cancel</Button>
+            <Button 
+              onClick={assignDelivery}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4 mr-2" />
+              )}
+              Assign Driver
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add New Driver Dialog */}
+      <Dialog open={showDriverDialog} onOpenChange={setShowDriverDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Driver</DialogTitle>
+            <DialogDescription>
+              Enter driver details to add them to the system
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="name">Full Name</Label>
+                <Input
+                  id="name"
+                  value={driverForm.full_name}
+                  onChange={(e) => setDriverForm({...driverForm, full_name: e.target.value})}
+                  placeholder="John Doe"
+                />
+              </div>
+              <div>
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={driverForm.email}
+                  onChange={(e) => setDriverForm({...driverForm, email: e.target.value})}
+                  placeholder="john.doe@example.com"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input
+                  id="phone"
+                  value={driverForm.phone_number}
+                  onChange={(e) => setDriverForm({...driverForm, phone_number: e.target.value})}
+                  placeholder="+1 (555) 123-4567"
+                />
+              </div>
+              <div>
+                <Label htmlFor="location">Location</Label>
+                <Input
+                  id="location"
+                  value={driverForm.location}
+                  onChange={(e) => setDriverForm({...driverForm, location: e.target.value})}
+                  placeholder="New York, NY"
+                />
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDriverDialog(false)}>Cancel</Button>
+            <Button 
+              onClick={addNewDriver}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4 mr-2" />
+              )}
+              Add Driver
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Tabs>
+  );
+};
+
+export default DeliveryManagementTab;
