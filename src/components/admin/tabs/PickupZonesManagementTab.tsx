@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format, isValid } from 'date-fns';
+import { Shipment } from '@/types/shipment';
 
 // UI Components
 import { 
@@ -81,20 +81,6 @@ interface CollectionSchedule {
   updated_at: string;
 }
 
-interface Shipment {
-  id: string;
-  tracking_number: string;
-  status: string;
-  origin: string;
-  destination: string;
-  user_id: string;
-  metadata: any;
-  profiles?: {
-    email?: string;
-    full_name?: string;
-  };
-}
-
 const PickupZonesManagementTab = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -134,16 +120,40 @@ const PickupZonesManagementTab = () => {
       // Then fetch shipments
       const { data: shipmentsData, error: shipmentsError } = await supabase
         .from('shipments')
-        .select('*, profiles:user_id(email, full_name)')
+        .select('*')
         .in('status', ['Booking Confirmed', 'Ready for Pickup'])
         .order('created_at', { ascending: false });
 
       if (shipmentsError) throw shipmentsError;
 
-      setShipments(shipmentsData || []);
+      // Now fetch profile data for each shipment
+      const enhancedShipments = await Promise.all(
+        (shipmentsData || []).map(async (shipment) => {
+          let profileData = undefined;
+          
+          if (shipment.user_id) {
+            const { data: userData, error: userError } = await supabase
+              .from('profiles')
+              .select('email, full_name')
+              .eq('id', shipment.user_id)
+              .single();
+              
+            if (!userError && userData) {
+              profileData = userData;
+            }
+          }
+          
+          return {
+            ...shipment,
+            profiles: profileData
+          } as Shipment;
+        })
+      );
+      
+      setShipments(enhancedShipments);
       
       console.log('Schedules fetched:', schedulesData);
-      console.log('Shipments fetched:', shipmentsData);
+      console.log('Shipments fetched:', enhancedShipments);
     } catch (error: any) {
       console.error('Error fetching data:', error);
       toast({
@@ -435,7 +445,7 @@ const PickupZonesManagementTab = () => {
       const shipmentDetails = metadata.shipment || metadata.shipmentDetails || {};
       
       if (shipmentDetails.type === 'Drums' || shipmentDetails.includeDrums) {
-        const quantity = parseInt(shipmentDetails.quantity) || 1;
+        const quantity = parseInt(String(shipmentDetails.quantity)) || 1;
         return total + quantity;
       }
       
