@@ -48,11 +48,6 @@ import {
 } from 'lucide-react';
 import { Shipment, ShipmentMetadata } from '@/types/shipment';
 
-// Define extended shipment type with profiles - ensuring it matches the base Shipment interface
-interface ShipmentWithProfiles extends Shipment {
-  // No need to redefine profiles as it's already correctly optional in the Shipment interface
-}
-
 // Type guard to check if a value is a valid ShipmentMetadata
 function isValidMetadata(metadata: any): metadata is ShipmentMetadata {
   return typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata);
@@ -72,7 +67,7 @@ const LogisticsDashboard = () => {
       try {
         console.log('Fetching all shipments for logistics dashboard');
         
-        // Fix: Use direct query without join to avoid relationship error
+        // First, fetch all shipments without trying to join with profiles
         const { data: shipmentsData, error: shipmentsError } = await supabase
           .from('shipments')
           .select('*')
@@ -83,29 +78,29 @@ const LogisticsDashboard = () => {
           throw shipmentsError;
         }
         
-        // Fetch user details separately for each shipment
-        if (shipmentsData && shipmentsData.length > 0) {
-          const enrichedShipments = [];
+        // Now manually fetch profile data for each shipment
+        const enrichedShipments: Shipment[] = [];
+        
+        for (const shipment of shipmentsData || []) {
+          // Create a proper Shipment object with safe metadata handling
+          const enrichedShipment: Shipment = {
+            id: shipment.id,
+            tracking_number: shipment.tracking_number,
+            status: shipment.status,
+            origin: shipment.origin,
+            destination: shipment.destination,
+            user_id: shipment.user_id,
+            created_at: shipment.created_at,
+            updated_at: shipment.updated_at,
+            // Ensure metadata is a valid object or provide a default empty object
+            metadata: isValidMetadata(shipment.metadata) ? shipment.metadata : {},
+            can_cancel: shipment.can_cancel !== undefined ? shipment.can_cancel : true,
+            can_modify: shipment.can_modify !== undefined ? shipment.can_modify : true,
+          };
           
-          for (const shipment of shipmentsData) {
-            // Create a proper ShipmentWithProfiles object with safe metadata handling
-            const enrichedShipment: ShipmentWithProfiles = {
-              id: shipment.id,
-              tracking_number: shipment.tracking_number,
-              status: shipment.status,
-              origin: shipment.origin,
-              destination: shipment.destination,
-              user_id: shipment.user_id,
-              created_at: shipment.created_at,
-              updated_at: shipment.updated_at,
-              // Ensure metadata is a valid object or provide a default empty object
-              metadata: isValidMetadata(shipment.metadata) ? shipment.metadata : {},
-              can_cancel: shipment.can_cancel,
-              can_modify: shipment.can_modify,
-              profiles: undefined
-            };
-            
-            if (shipment.user_id) {
+          // If user_id exists, fetch the related profile data separately
+          if (shipment.user_id) {
+            try {
               const { data: userData, error: userError } = await supabase
                 .from('profiles')
                 .select('email, full_name')
@@ -113,18 +108,22 @@ const LogisticsDashboard = () => {
                 .single();
                 
               if (!userError && userData) {
-                enrichedShipment.profiles = userData;
+                enrichedShipment.profiles = {
+                  email: userData.email,
+                  full_name: userData.full_name
+                };
               }
+            } catch (profileError) {
+              console.error(`Error fetching profile for user ${shipment.user_id}:`, profileError);
+              // Don't throw here, just continue without the profile data
             }
-            
-            enrichedShipments.push(enrichedShipment);
           }
           
-          console.log('Fetched shipments with profiles:', enrichedShipments.length);
-          return enrichedShipments as ShipmentWithProfiles[];
+          enrichedShipments.push(enrichedShipment);
         }
         
-        return [] as ShipmentWithProfiles[];
+        console.log('Fetched shipments with profiles:', enrichedShipments.length);
+        return enrichedShipments;
       } catch (error: any) {
         console.error('Error in query function:', error);
         toast({
@@ -521,7 +520,7 @@ const LogisticsDashboard = () => {
   );
   
   // Render shipments table
-  function renderShipmentsTable(shipmentsList: ShipmentWithProfiles[]) {
+  function renderShipmentsTable(shipmentsList: Shipment[]) {
     if (isLoading) {
       return (
         <div className="animate-pulse space-y-4">

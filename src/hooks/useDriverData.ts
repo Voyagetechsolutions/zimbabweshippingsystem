@@ -81,7 +81,9 @@ export const useDriverData = () => {
       console.log(`Got ${completedDeliveriesRes.data?.length || 0} completed deliveries`);
 
       const enrichShipments = async (shipments: any[]): Promise<Shipment[]> => {
-        const userFetches = shipments.map(async (shipment) => {
+        const enrichedShipments: Shipment[] = [];
+        
+        for (const shipment of shipments) {
           // Create a properly typed shipment object with safe metadata handling
           const typedShipment: Shipment = {
             id: shipment.id,
@@ -93,9 +95,8 @@ export const useDriverData = () => {
             created_at: shipment.created_at,
             updated_at: shipment.updated_at,
             metadata: isValidMetadata(shipment.metadata) ? shipment.metadata : {},
-            can_cancel: shipment.can_cancel,
-            can_modify: shipment.can_modify,
-            profiles: undefined
+            can_cancel: shipment.can_cancel !== undefined ? shipment.can_cancel : true,
+            can_modify: shipment.can_modify !== undefined ? shipment.can_modify : true,
           };
 
           if (shipment.user_id) {
@@ -108,8 +109,8 @@ export const useDriverData = () => {
               
               if (!error && userData) {
                 typedShipment.profiles = {
-                  email: userData.email || null,
-                  full_name: userData.full_name || null
+                  email: userData.email,
+                  full_name: userData.full_name
                 };
                 console.log(`Found user data for ${shipment.id}: ${userData.email}`);
               } else {
@@ -119,9 +120,11 @@ export const useDriverData = () => {
               console.error("Error fetching user data:", err);
             }
           }
-          return typedShipment;
-        });
-        return await Promise.all(userFetches);
+          
+          enrichedShipments.push(typedShipment);
+        }
+        
+        return enrichedShipments;
       };
 
       const [enrichedActive, enrichedCompleted] = await Promise.all([
