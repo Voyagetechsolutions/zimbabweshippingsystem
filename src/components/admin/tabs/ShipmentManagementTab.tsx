@@ -112,6 +112,8 @@ const ShipmentManagementTab = () => {
     setLoading(true);
     
     try {
+      console.log("Fetching shipments with tab:", activeTab);
+      
       // Construct query based on active tab
       let query = supabase
         .from('shipments')
@@ -140,52 +142,61 @@ const ShipmentManagementTab = () => {
       }
       
       // Apply status filter if provided
-      if (filters.status) {
+      if (filters.status && filters.status !== 'all') {
         query = query.eq('status', filters.status);
       }
       
+      console.log("Executing query");
       // Execute the query
       const { data, error } = await query.order('created_at', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase error:", error);
+        throw error;
+      }
+      
+      console.log("Fetched shipments:", data?.length || 0);
       
       // Process the data - Fixed to properly handle profiles data type
-      const shipmentData: Shipment[] = data.map(item => {
-        // Handle profiles correctly, whether it's an object or array
-        let profileData = {
-          email: null as string | null,
-          full_name: null as string | null
-        };
-        
-        // Check if profiles exists and extract data
-        if (item.profiles) {
-          // Handle case when profiles is an array (might happen with certain Supabase responses)
-          if (Array.isArray(item.profiles)) {
-            if (item.profiles.length > 0) {
-              // Type assertion to help TypeScript understand the structure
-              const profileItem = item.profiles[0] as { email?: string, full_name?: string };
-              profileData.email = profileItem.email || null;
-              profileData.full_name = profileItem.full_name || null;
+      if (data) {
+        const shipmentData: Shipment[] = data.map(item => {
+          // Create clean shipment object
+          const { profiles, ...shipmentFields } = item;
+          
+          // Initialize profiles object with default values
+          let profileData = {
+            email: null as string | null,
+            full_name: null as string | null
+          };
+          
+          // Handle profiles data from Supabase
+          if (profiles) {
+            if (Array.isArray(profiles)) {
+              // Handle case when profiles is returned as array
+              if (profiles.length > 0) {
+                const profileItem = profiles[0] as { email?: string, full_name?: string };
+                profileData.email = profileItem.email || null;
+                profileData.full_name = profileItem.full_name || null;
+              }
+            } else {
+              // Handle case when profiles is returned as object
+              const profileObj = profiles as { email?: string, full_name?: string };
+              profileData.email = profileObj.email || null;
+              profileData.full_name = profileObj.full_name || null;
             }
-          } else {
-            // Handle case when profiles is an object
-            const profileObj = item.profiles as { email?: string, full_name?: string };
-            profileData.email = profileObj.email || null;
-            profileData.full_name = profileObj.full_name || null;
           }
-        }
+          
+          return {
+            ...shipmentFields,
+            profiles: profileData
+          } as Shipment;
+        });
         
-        // Create clean shipment object
-        const { profiles: _, ...shipmentData } = item;
-        
-        return {
-          ...shipmentData,
-          profiles: profileData
-        } as Shipment;
-      });
-      
-      setShipments(shipmentData);
-    } catch (error) {
+        setShipments(shipmentData);
+      } else {
+        setShipments([]);
+      }
+    } catch (error: any) {
       console.error('Error fetching shipments:', error);
       toast({
         title: 'Failed to load shipments',

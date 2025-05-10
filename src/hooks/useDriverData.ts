@@ -1,16 +1,7 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Shipment, ShipmentMetadata } from '@/types/shipment';
-
-// Extending the Shipment interface to include profiles
-interface ShipmentWithProfiles extends Shipment {
-  profiles?: {
-    email?: string;
-    full_name?: string;
-  };
-}
 
 // Type guard function to check if a value is a valid ShipmentMetadata object
 function isValidMetadata(metadata: any): metadata is ShipmentMetadata {
@@ -33,10 +24,10 @@ function safeGetMetadataValue<T>(obj: any, path: string[], defaultValue: T): T {
 }
 
 export const useDriverData = () => {
-  const [activeDeliveries, setActiveDeliveries] = useState<ShipmentWithProfiles[]>([]);
-  const [completedDeliveries, setCompletedDeliveries] = useState<ShipmentWithProfiles[]>([]);
+  const [activeDeliveries, setActiveDeliveries] = useState<Shipment[]>([]);
+  const [completedDeliveries, setCompletedDeliveries] = useState<Shipment[]>([]);
   const [collectionSchedules, setCollectionSchedules] = useState<any[]>([]);
-  const [scheduleShipments, setScheduleShipments] = useState<Record<string, ShipmentWithProfiles[]>>({});
+  const [scheduleShipments, setScheduleShipments] = useState<Record<string, Shipment[]>>({});
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
@@ -52,6 +43,7 @@ export const useDriverData = () => {
   const fetchDriverData = async () => {
     try {
       setLoading(true);
+      console.log("Fetching driver data...");
 
       const [activeDeliveriesRes, completedDeliveriesRes, scheduleRes] = await Promise.all([
         supabase
@@ -85,10 +77,13 @@ export const useDriverData = () => {
       if (completedDeliveriesRes.error) throw completedDeliveriesRes.error;
       if (scheduleRes.error) throw scheduleRes.error;
 
-      const enrichShipments = async (shipments: any[]): Promise<ShipmentWithProfiles[]> => {
+      console.log(`Got ${activeDeliveriesRes.data?.length || 0} active deliveries`);
+      console.log(`Got ${completedDeliveriesRes.data?.length || 0} completed deliveries`);
+
+      const enrichShipments = async (shipments: any[]): Promise<Shipment[]> => {
         const userFetches = shipments.map(async (shipment) => {
           // Create a properly typed shipment object with safe metadata handling
-          const typedShipment: ShipmentWithProfiles = {
+          const typedShipment: Shipment = {
             id: shipment.id,
             tracking_number: shipment.tracking_number,
             status: shipment.status,
@@ -104,12 +99,25 @@ export const useDriverData = () => {
           };
 
           if (shipment.user_id) {
-            const { data: userData } = await supabase
-              .from('profiles')
-              .select('email, full_name')
-              .eq('id', shipment.user_id)
-              .single();
-            if (userData) typedShipment.profiles = userData;
+            try {
+              const { data: userData, error } = await supabase
+                .from('profiles')
+                .select('email, full_name')
+                .eq('id', shipment.user_id)
+                .single();
+              
+              if (!error && userData) {
+                typedShipment.profiles = {
+                  email: userData.email || null,
+                  full_name: userData.full_name || null
+                };
+                console.log(`Found user data for ${shipment.id}: ${userData.email}`);
+              } else {
+                console.log(`No user data found for ID ${shipment.user_id}`);
+              }
+            } catch (err) {
+              console.error("Error fetching user data:", err);
+            }
           }
           return typedShipment;
         });
@@ -125,7 +133,7 @@ export const useDriverData = () => {
       setCompletedDeliveries(enrichedCompleted);
       setCollectionSchedules(scheduleRes.data || []);
 
-      const schedulesWithShipments: Record<string, ShipmentWithProfiles[]> = {};
+      const schedulesWithShipments: Record<string, Shipment[]> = {};
 
       for (const schedule of scheduleRes.data || []) {
         const { data: shipments, error } = await supabase
@@ -135,14 +143,20 @@ export const useDriverData = () => {
           .eq('can_modify', false)
           .contains('metadata', { pickup_date: schedule.pickup_date });
 
-        if (error) continue;
+        if (error) {
+          console.error("Error fetching shipments for schedule:", error);
+          continue;
+        }
+        
         schedulesWithShipments[schedule.id] = shipments?.length
           ? await enrichShipments(shipments)
           : [];
       }
 
       setScheduleShipments(schedulesWithShipments);
+      console.log("Driver data fetch complete");
     } catch (error: any) {
+      console.error("Error in fetchDriverData:", error);
       toast({
         title: 'Error loading data',
         description: error.message,

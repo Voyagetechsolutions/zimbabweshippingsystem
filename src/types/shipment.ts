@@ -16,10 +16,10 @@ export interface Shipment {
   weight?: number | string;
   dimensions?: string;
   estimated_delivery?: string;
-  // Add profiles property for user data
+  // Profiles property for user data, properly typed
   profiles?: {
-    email?: string | null;
-    full_name?: string | null;
+    email: string | null;
+    full_name: string | null;
   };
 }
 
