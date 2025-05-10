@@ -169,6 +169,19 @@ export interface Tables {
     created_at: string;
     updated_at: string;
   };
+
+  // Adding a driver_performance table to track metrics
+  driver_performance: {
+    id: string;
+    driver_id: string;
+    total_deliveries: number;
+    completed_deliveries: number;
+    on_time_deliveries: number;
+    rating: number;
+    region: string; // UK or Zimbabwe 
+    created_at: string;
+    updated_at: string;
+  };
 }
 
 // Helper function to cast types safely when using tables not in the generated types

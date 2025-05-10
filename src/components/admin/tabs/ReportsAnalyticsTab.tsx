@@ -37,19 +37,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { format, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A569BD', '#5DADE2', '#58D68D', '#F4D03F'];
 
 interface ShipmentStats {
-  Booking_Confirmed: number;
-  Ready_for_Pickup: number;
-  Processing_in_Warehouse_UK: number;
-  In_Transit: number;
-  Customs_Clearance: number;
-  Processing_in_Warehouse_ZW: number;
-  Out_for_Delivery: number;
+  'Booking Confirmed': number;
+  'Ready for Pickup': number;
+  'Processing in Warehouse (UK)': number;
+  'In Transit': number;
+  'Customs Clearance': number;
+  'Processing in Warehouse (ZW)': number;
+  'Out for Delivery': number;
   Delivered: number;
+  Cancelled: number;
+  [key: string]: number; // Index signature
+}
+
+interface RouteData {
+  name: string;
+  value: number;
 }
 
 interface RevenueData {
@@ -62,16 +69,17 @@ const ReportsAnalyticsTab = () => {
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('6m');
   const [shipmentStats, setShipmentStats] = useState<ShipmentStats>({
-    Booking_Confirmed: 0,
-    Ready_for_Pickup: 0,
-    Processing_in_Warehouse_UK: 0,
-    In_Transit: 0,
-    Customs_Clearance: 0,
-    Processing_in_Warehouse_ZW: 0,
-    Out_for_Delivery: 0,
-    Delivered: 0
+    'Booking Confirmed': 0,
+    'Ready for Pickup': 0,
+    'Processing in Warehouse (UK)': 0,
+    'In Transit': 0,
+    'Customs Clearance': 0,
+    'Processing in Warehouse (ZW)': 0,
+    'Out for Delivery': 0,
+    'Delivered': 0,
+    'Cancelled': 0
   });
-  const [routeData, setRouteData] = useState<any[]>([]);
+  const [routeData, setRouteData] = useState<RouteData[]>([]);
   const [revenueData, setRevenueData] = useState<RevenueData[]>([]);
 
   useEffect(() => {
@@ -100,47 +108,52 @@ const ReportsAnalyticsTab = () => {
 
   const fetchShipmentStats = async () => {
     try {
+      const dateLimit = getDateRange();
+      
       const { data, error } = await supabase
         .from('shipments')
         .select('status')
-        .gte('created_at', getDateRange());
+        .gte('created_at', dateLimit);
       
       if (error) throw error;
       
       const stats: ShipmentStats = {
-        Booking_Confirmed: 0,
-        Ready_for_Pickup: 0,
-        Processing_in_Warehouse_UK: 0,
-        In_Transit: 0,
-        Customs_Clearance: 0,
-        Processing_in_Warehouse_ZW: 0,
-        Out_for_Delivery: 0,
-        Delivered: 0
+        'Booking Confirmed': 0,
+        'Ready for Pickup': 0,
+        'Processing in Warehouse (UK)': 0,
+        'In Transit': 0,
+        'Customs Clearance': 0,
+        'Processing in Warehouse (ZW)': 0,
+        'Out for Delivery': 0,
+        'Delivered': 0,
+        'Cancelled': 0
       };
       
       data?.forEach(shipment => {
-        const normalizedStatus = shipment.status
-          .replace(/ /g, '_')
-          .replace(/\(/g, '')
-          .replace(/\)/g, '');
-        
-        if (stats.hasOwnProperty(normalizedStatus)) {
-          stats[normalizedStatus as keyof ShipmentStats]++;
+        if (stats.hasOwnProperty(shipment.status)) {
+          stats[shipment.status]++;
+        } else {
+          // Handle any status that doesn't match our predefined keys
+          console.log(`Unknown status: ${shipment.status}`);
         }
       });
       
       setShipmentStats(stats);
     } catch (error) {
       console.error('Error fetching shipment stats:', error);
+      throw error;
     }
   };
 
   const fetchRouteData = async () => {
     try {
+      const dateLimit = getDateRange();
+      
+      // Fetch collection schedules
       const { data, error } = await supabase
         .from('collection_schedules')
         .select('route')
-        .gte('created_at', getDateRange());
+        .gte('created_at', dateLimit);
       
       if (error) throw error;
       
@@ -153,9 +166,10 @@ const ReportsAnalyticsTab = () => {
       
       // Transform to chart data
       const chartData = Object.entries(routeCounts).map(([name, value]) => ({ name, value }));
-      setRouteData(chartData);
+      setRouteData(chartData.length > 0 ? chartData : [{ name: 'No Data', value: 0 }]);
     } catch (error) {
       console.error('Error fetching route data:', error);
+      throw error;
     }
   };
 
@@ -184,7 +198,7 @@ const ReportsAnalyticsTab = () => {
       
       // Sum up payments by month
       data?.forEach(payment => {
-        const monthKey = format(new Date(payment.created_at), 'MMM yyyy');
+        const monthKey = format(parseISO(payment.created_at), 'MMM yyyy');
         if (monthlyRevenue.hasOwnProperty(monthKey)) {
           monthlyRevenue[monthKey] += payment.amount;
         }
@@ -198,6 +212,7 @@ const ReportsAnalyticsTab = () => {
       setRevenueData(chartData);
     } catch (error) {
       console.error('Error fetching revenue data:', error);
+      throw error;
     }
   };
 
@@ -210,11 +225,19 @@ const ReportsAnalyticsTab = () => {
     fetchData();
   };
 
+  const handleExport = () => {
+    // Implementation for exporting data as CSV or PDF would go here
+    toast({
+      title: 'Export Started',
+      description: 'Your report is being prepared for download',
+    });
+  };
+
   // Format data for charts
   const shipmentStatusData = Object.entries(shipmentStats).map(([status, count]) => ({
-    name: status.replace(/_/g, ' '),
+    name: status,
     value: count
-  }));
+  })).filter(item => item.value > 0); // Only show statuses with data
 
   return (
     <div className="space-y-6">
@@ -237,7 +260,7 @@ const ReportsAnalyticsTab = () => {
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
@@ -256,6 +279,10 @@ const ReportsAnalyticsTab = () => {
           {loading ? (
             <div className="flex flex-col gap-4">
               <Skeleton className="h-[300px] w-full" />
+            </div>
+          ) : revenueData.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-muted-foreground">No revenue data available for this period</p>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
@@ -291,6 +318,10 @@ const ReportsAnalyticsTab = () => {
               <div className="flex flex-col gap-4">
                 <Skeleton className="h-[300px] w-full" />
               </div>
+            ) : shipmentStatusData.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-muted-foreground">No shipment data available for this period</p>
+              </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -325,6 +356,10 @@ const ReportsAnalyticsTab = () => {
             {loading ? (
               <div className="flex flex-col gap-4">
                 <Skeleton className="h-[300px] w-full" />
+              </div>
+            ) : routeData.length === 0 || (routeData.length === 1 && routeData[0].name === 'No Data') ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-muted-foreground">No route data available for this period</p>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">

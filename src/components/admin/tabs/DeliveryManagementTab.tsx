@@ -1,11 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardHeader, 
   CardTitle
 } from '@/components/ui/card';
 import {
@@ -28,19 +29,52 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
-import { Truck, Package, UserCheck, RefreshCcw, Search, Filter, CheckCircle, XCircle, AlertCircle, UserX } from 'lucide-react';
+import { 
+  Truck, 
+  Package, 
+  UserCheck, 
+  RefreshCcw, 
+  Search, 
+  Filter, 
+  CheckCircle, 
+  XCircle, 
+  AlertCircle, 
+  UserX,
+  Plus,
+  Star 
+} from 'lucide-react';
 import { Shipment } from '@/types/shipment';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from '@/components/ui/label';
 
 // Define types for driver and delivery data
 interface Driver {
   id: string;
   name: string;
+  email: string;
+  region: string;
   total_deliveries?: number;
   on_time_rate?: number;
   active: boolean;
+  performance?: DriverPerformance;
 }
 
-// Update DeliveryRecord to use proper typing for metadata
+interface DriverPerformance {
+  total_deliveries: number;
+  completed_deliveries: number;
+  on_time_deliveries: number;
+  rating: number;
+}
+
+// Update DeliveryRecord to use proper typing
 interface DeliveryRecord {
   id: string;
   tracking_number: string;
@@ -54,7 +88,7 @@ interface DeliveryRecord {
   destination: string;
   created_at: string;
   updated_at: string;
-  metadata?: Record<string, any>; // Using Record for metadata to avoid type issues
+  metadata?: Record<string, any>; 
 }
 
 // Type guard to check if a value is a valid object
@@ -83,6 +117,13 @@ const DeliveryManagementTab = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
+  
+  // Form state for adding/editing drivers
+  const [formName, setFormName] = useState('');
+  const [formEmail, setFormEmail] = useState('');
+  const [formRegion, setFormRegion] = useState('UK');
 
   useEffect(() => {
     fetchData();
@@ -91,18 +132,36 @@ const DeliveryManagementTab = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch shipments that are in delivery states
-      const { data: shipmentData, error: shipmentError } = await supabase
+      await Promise.all([
+        fetchShipmentStats(),
+        fetchDrivers(),
+      ]);
+    } catch (error: any) {
+      console.error('Error fetching delivery data:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load delivery data',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchShipmentStats = async () => {
+    try {
+      // Fetch shipments that are in delivery states or recently delivered
+      const { data, error } = await supabase
         .from('shipments')
         .select('*')
-        .in('status', ['Out for Delivery', 'Processing in ZW Warehouse', 'Delivered', 'Failed Attempt'])
+        .in('status', ['Out for Delivery', 'Processing in Warehouse (ZW)', 'Delivered', 'Failed Attempt'])
         .order('created_at', { ascending: false });
-
-      if (shipmentError) throw shipmentError;
-
+      
+      if (error) throw error;
+      
       // Transform shipment data to delivery records with safe type handling
-      const deliveryRecords: DeliveryRecord[] = (shipmentData || []).map(shipment => {
-        // Safely extract recipient name using our helper function
+      const deliveryRecords: DeliveryRecord[] = (data || []).map(shipment => {
+        // Safely extract recipient name
         let recipientName = 'No Name Provided';
         
         // Ensure metadata is an object before trying to access properties
@@ -154,57 +213,58 @@ const DeliveryManagementTab = () => {
         };
       });
 
-      // Fetch active drivers from profiles table
-      const { data: driverData, error: driverError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'driver');
-
-      if (driverError) {
-        // If there's an error fetching drivers, we can still show the delivery data
-        console.error('Error fetching drivers:', driverError);
-        setDrivers([]);
-      } else {
-        const formattedDrivers: Driver[] = (driverData || []).map(driver => ({
-          id: driver.id,
-          name: driver.full_name || 'Unknown Driver',
-          active: true
-        }));
-        setDrivers(formattedDrivers);
-      }
-
       setDeliveries(deliveryRecords);
-    } catch (error: any) {
-      console.error('Error fetching delivery data:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load delivery data',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching shipment stats:', error);
     }
   };
 
-  // Helper function to extract recipient name from shipment metadata
-  const getRecipientName = (shipment: any): string => {
-    const metadata = shipment.metadata || {};
-    
-    if (typeof metadata !== 'object') {
-      return 'No Name Provided';
+  const fetchDrivers = async () => {
+    try {
+      // First fetch all driver profiles
+      const { data: driverProfilesData, error: driverProfilesError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'driver');
+        
+      if (driverProfilesError) throw driverProfilesError;
+      
+      // Then fetch driver performance data
+      const { data: performanceData, error: performanceError } = await supabase
+        .from('driver_performance')
+        .select('*');
+        
+      // We'll continue even if performance data has an error (might not exist yet)
+      
+      // Combine the data
+      const driversWithPerformance: Driver[] = (driverProfilesData || []).map(driver => {
+        // Find performance data for this driver
+        const performance = performanceData?.find(p => p.driver_id === driver.id);
+        
+        // Default region if not specified
+        const region = driver.communication_preferences?.region || 'UK';
+        
+        return {
+          id: driver.id,
+          name: driver.full_name || 'Unknown Driver',
+          email: driver.email,
+          region: region,
+          active: true,
+          performance: performance ? {
+            total_deliveries: performance.total_deliveries || 0,
+            completed_deliveries: performance.completed_deliveries || 0,
+            on_time_deliveries: performance.on_time_deliveries || 0,
+            rating: performance.rating || 5.0
+          } : undefined
+        };
+      });
+      
+      setDrivers(driversWithPerformance);
+    } catch (error) {
+      console.error('Error fetching drivers:', error);
+      // If there's an error, we can still show empty drivers list
+      setDrivers([]);
     }
-    
-    if (safeGet(metadata, ['recipientDetails', 'name'])) {
-      return metadata.recipientDetails.name;
-    } else if (safeGet(metadata, ['recipient', 'name'])) {
-      return metadata.recipient.name;
-    } else if (safeGet(metadata, ['recipient', 'firstName']) && safeGet(metadata, ['recipient', 'lastName'])) {
-      return `${metadata.recipient.firstName} ${metadata.recipient.lastName}`;
-    } else if (metadata.recipientName) {
-      return metadata.recipientName;
-    }
-    
-    return 'No Name Provided';
   };
 
   // Determine timeliness based on shipment data
@@ -230,11 +290,7 @@ const DeliveryManagementTab = () => {
         return 'bg-blue-100 text-blue-800 border-blue-300';
       case 'failed attempt':
         return 'bg-red-100 text-red-800 border-red-300';
-      case 'returned':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'cancelled':
-        return 'bg-gray-100 text-gray-800 border-gray-300';
-      case 'processing in zw warehouse':
+      case 'processing in warehouse (zw)':
         return 'bg-purple-100 text-purple-800 border-purple-300';
       default:
         return 'bg-gray-100 text-gray-600 border-gray-200';
@@ -316,6 +372,9 @@ const DeliveryManagementTab = () => {
         description: `The delivery has been assigned to ${driver.full_name}`,
       });
       
+      // Update driver performance metrics
+      await updateDriverPerformanceMetrics(driverId);
+      
       // Refresh data
       fetchData();
     } catch (error: any) {
@@ -326,6 +385,171 @@ const DeliveryManagementTab = () => {
         variant: 'destructive'
       });
     }
+  };
+
+  const updateDriverPerformanceMetrics = async (driverId: string) => {
+    try {
+      // Count deliveries for this driver
+      const driverDeliveries = deliveries.filter(d => d.driver_id === driverId);
+      const totalDeliveries = driverDeliveries.length;
+      const completedDeliveries = driverDeliveries.filter(d => d.status === 'Delivered').length;
+      const onTimeDeliveries = driverDeliveries.filter(d => d.status === 'Delivered' && d.timeliness === 'on-time').length;
+      
+      // Calculate rating (basic calculation as an example)
+      const rating = onTimeDeliveries > 0 && completedDeliveries > 0 
+        ? Math.min(5, (onTimeDeliveries / completedDeliveries) * 5) 
+        : 5; // Default 5-star rating
+      
+      // Check if entry exists
+      const { data, error: fetchError } = await supabase
+        .from('driver_performance')
+        .select('*')
+        .eq('driver_id', driverId);
+        
+      if (fetchError) throw fetchError;
+      
+      if (data && data.length > 0) {
+        // Update existing entry
+        const { error: updateError } = await supabase
+          .from('driver_performance')
+          .update({
+            total_deliveries: totalDeliveries,
+            completed_deliveries: completedDeliveries,
+            on_time_deliveries: onTimeDeliveries,
+            rating: rating,
+            updated_at: new Date().toISOString()
+          })
+          .eq('driver_id', driverId);
+          
+        if (updateError) throw updateError;
+      } else {
+        // Create new entry
+        const { error: insertError } = await supabase
+          .from('driver_performance')
+          .insert({
+            driver_id: driverId,
+            total_deliveries: totalDeliveries,
+            completed_deliveries: completedDeliveries,
+            on_time_deliveries: onTimeDeliveries,
+            rating: rating,
+            region: 'UK' // Default to UK if not specified
+          });
+          
+        if (insertError) throw insertError;
+      }
+    } catch (error) {
+      console.error('Error updating driver metrics:', error);
+      // We don't want to block the main flow if metrics update fails
+    }
+  };
+
+  const handleAddDriver = async () => {
+    try {
+      if (!formName || !formEmail) {
+        toast({
+          title: 'Missing Information',
+          description: 'Please provide name and email for the driver',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      if (editingDriver) {
+        // Update existing driver
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            full_name: formName,
+            email: formEmail,
+            role: 'driver',
+            communication_preferences: {
+              region: formRegion,
+              email: true,
+              sms: true
+            }
+          })
+          .eq('id', editingDriver.id);
+
+        if (error) throw error;
+
+        toast({
+          title: 'Driver Updated',
+          description: `${formName} has been updated successfully`
+        });
+      } else {
+        // This is a new driver
+        // First check if user already exists
+        const { data: existingUser, error: checkError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', formEmail)
+          .single();
+          
+        if (checkError && checkError.code !== 'PGRST116') { // PGRST116 means not found, which is good in this case
+          throw checkError;
+        }
+        
+        if (existingUser) {
+          // User exists, update role to driver
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({
+              full_name: formName,
+              role: 'driver',
+              communication_preferences: {
+                region: formRegion, 
+                email: true,
+                sms: true
+              }
+            })
+            .eq('id', existingUser.id);
+            
+          if (updateError) throw updateError;
+        } else {
+          // Need to create a new user and profile
+          // This is a complex operation that might require custom API endpoints
+          // For now, we'll show a message explaining the limitation
+          toast({
+            title: 'Action Required',
+            description: 'New drivers must first register an account in the system',
+            variant: 'destructive'
+          });
+          return;
+        }
+        
+        toast({
+          title: 'Driver Added',
+          description: `${formName} has been added as a driver`
+        });
+      }
+
+      // Refresh data and close dialog
+      resetDriverForm();
+      setDialogOpen(false);
+      fetchDrivers();
+    } catch (error: any) {
+      console.error('Error saving driver:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to save driver: ${error.message}`,
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleEditDriver = (driver: Driver) => {
+    setEditingDriver(driver);
+    setFormName(driver.name);
+    setFormEmail(driver.email);
+    setFormRegion(driver.region || 'UK');
+    setDialogOpen(true);
+  };
+
+  const resetDriverForm = () => {
+    setEditingDriver(null);
+    setFormName('');
+    setFormEmail('');
+    setFormRegion('UK');
   };
 
   return (
@@ -375,7 +599,7 @@ const DeliveryManagementTab = () => {
                       <SelectItem value="all">All Statuses</SelectItem>
                       <SelectItem value="delivered">Delivered</SelectItem>
                       <SelectItem value="out for delivery">Out for Delivery</SelectItem>
-                      <SelectItem value="processing in zw warehouse">Processing in ZW</SelectItem>
+                      <SelectItem value="processing in warehouse (zw)">Processing in ZW</SelectItem>
                       <SelectItem value="failed attempt">Failed Attempt</SelectItem>
                     </SelectContent>
                   </Select>
@@ -445,13 +669,15 @@ const DeliveryManagementTab = () => {
                             <TableCell className="font-mono">{delivery.tracking_number}</TableCell>
                             <TableCell>{delivery.recipient_name}</TableCell>
                             <TableCell>
-                              {drivers.length > 0 && (
+                              {drivers.length > 0 ? (
                                 <Select 
                                   defaultValue={delivery.driver_id}
                                   onValueChange={(value) => assignDriver(delivery.id, value)}
                                 >
                                   <SelectTrigger className="w-[140px]">
-                                    <SelectValue placeholder="Assign driver" />
+                                    <SelectValue placeholder="Assign driver">
+                                      {delivery.driver_name || "Assign driver"}
+                                    </SelectValue>
                                   </SelectTrigger>
                                   <SelectContent>
                                     {drivers.map(driver => (
@@ -461,8 +687,7 @@ const DeliveryManagementTab = () => {
                                     ))}
                                   </SelectContent>
                                 </Select>
-                              )}
-                              {drivers.length === 0 && (
+                              ) : (
                                 <span className="text-sm text-gray-500">No drivers available</span>
                               )}
                             </TableCell>
@@ -478,7 +703,11 @@ const DeliveryManagementTab = () => {
                               {delivery.destination}
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button variant="ghost" size="sm">View Details</Button>
+                              <Button variant="ghost" size="sm" onClick={() => {
+                                window.location.href = `/shipment/${delivery.id}`;
+                              }}>
+                                View Details
+                              </Button>
                             </TableCell>
                           </TableRow>
                         );
@@ -493,60 +722,90 @@ const DeliveryManagementTab = () => {
 
         <TabsContent value="drivers">
           <Card>
-            <CardHeader>
-              <CardTitle>Driver Performance</CardTitle>
-              <CardDescription>Monitor driver efficiency and delivery metrics</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Driver Performance</CardTitle>
+                <CardDescription>Monitor driver efficiency and delivery metrics</CardDescription>
+              </div>
+              <Dialog open={dialogOpen} onOpenChange={(open) => {
+                setDialogOpen(open);
+                if (!open) resetDriverForm();
+              }}>
+                <DialogTrigger asChild>
+                  <Button className="bg-zim-green hover:bg-zim-green/90">
+                    <Plus className="mr-2 h-4 w-4" /> Add Driver
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{editingDriver ? 'Edit Driver' : 'Add New Driver'}</DialogTitle>
+                    <DialogDescription>
+                      {editingDriver 
+                        ? 'Update the driver information' 
+                        : 'Enter the details for the new driver'}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="name">Full Name</Label>
+                      <Input
+                        id="name"
+                        value={formName}
+                        onChange={(e) => setFormName(e.target.value)}
+                        placeholder="Enter driver's full name"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={formEmail}
+                        onChange={(e) => setFormEmail(e.target.value)}
+                        placeholder="Enter driver's email"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="region">Region</Label>
+                      <Select value={formRegion} onValueChange={setFormRegion}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select region" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="UK">UK</SelectItem>
+                          <SelectItem value="Zimbabwe">Zimbabwe</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button className="bg-zim-green hover:bg-zim-green/90" onClick={handleAddDriver}>
+                      {editingDriver ? 'Update Driver' : 'Add Driver'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </CardHeader>
             <CardContent>
-              {drivers.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Driver Name</TableHead>
-                        <TableHead>Assigned Deliveries</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {drivers.map((driver) => {
-                        // Count assigned deliveries for this driver
-                        const assignedDeliveries = deliveries.filter(d => {
-                          return d.driver_id === driver.id;
-                        }).length;
-                        
-                        return (
-                          <TableRow key={driver.id}>
-                            <TableCell className="font-medium">{driver.name}</TableCell>
-                            <TableCell>{assignedDeliveries}</TableCell>
-                            <TableCell>
-                              <Badge className="bg-green-100 text-green-800">
-                                Active
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button variant="ghost" size="sm">View Details</Button>
-                              <Button variant="ghost" size="sm">Assign Tasks</Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                <div className="text-center p-12">
-                  <UserX className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No drivers found</h3>
-                  <p className="text-gray-500 mb-6">
-                    There are currently no drivers in the system
-                  </p>
-                  <Button variant="outline">
-                    Add New Driver
-                  </Button>
-                </div>
-              )}
+              <Tabs defaultValue="all">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="all">All Drivers</TabsTrigger>
+                  <TabsTrigger value="uk">UK Drivers</TabsTrigger>
+                  <TabsTrigger value="zimbabwe">Zimbabwe Drivers</TabsTrigger>
+                </TabsList>
+                <TabsContent value="all">
+                  {renderDriversTable(drivers)}
+                </TabsContent>
+                <TabsContent value="uk">
+                  {renderDriversTable(drivers.filter(d => d.region === 'UK'))}
+                </TabsContent>
+                <TabsContent value="zimbabwe">
+                  {renderDriversTable(drivers.filter(d => d.region === 'Zimbabwe'))}
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         </TabsContent>
@@ -574,6 +833,111 @@ const DeliveryManagementTab = () => {
       </Tabs>
     </>
   );
+  
+  function renderDriversTable(driversToShow: Driver[]) {
+    if (loading) {
+      return (
+        <div className="flex justify-center items-center p-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
+        </div>
+      );
+    }
+    
+    if (driversToShow.length === 0) {
+      return (
+        <div className="text-center p-12">
+          <UserX className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+          <h3 className="text-lg font-medium mb-2">No drivers found</h3>
+          <p className="text-gray-500 mb-6">
+            There are currently no drivers in the system
+          </p>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Driver Name</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Region</TableHead>
+              <TableHead>Total Deliveries</TableHead>
+              <TableHead>Completed</TableHead>
+              <TableHead>On-Time Rate</TableHead>
+              <TableHead>Rating</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {driversToShow.map((driver) => {
+              const performance = driver.performance || {
+                total_deliveries: 0,
+                completed_deliveries: 0,
+                on_time_deliveries: 0,
+                rating: 5
+              };
+              
+              const onTimeRate = performance.completed_deliveries > 0
+                ? ((performance.on_time_deliveries / performance.completed_deliveries) * 100).toFixed(0)
+                : "N/A";
+              
+              return (
+                <TableRow key={driver.id}>
+                  <TableCell className="font-medium">{driver.name}</TableCell>
+                  <TableCell>{driver.email}</TableCell>
+                  <TableCell>{driver.region || 'UK'}</TableCell>
+                  <TableCell>{performance.total_deliveries}</TableCell>
+                  <TableCell>{performance.completed_deliveries}</TableCell>
+                  <TableCell>
+                    <Badge className={
+                      onTimeRate === "N/A" ? "bg-gray-100 text-gray-800" :
+                      parseInt(onTimeRate) > 90 ? "bg-green-100 text-green-800" :
+                      parseInt(onTimeRate) > 75 ? "bg-yellow-100 text-yellow-800" :
+                      "bg-red-100 text-red-800"
+                    }>
+                      {onTimeRate === "N/A" ? onTimeRate : `${onTimeRate}%`}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center">
+                      <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                      <span className="ml-1">{performance.rating.toFixed(1)}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditDriver(driver)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          // View driver details
+                          toast({
+                            title: 'View Driver',
+                            description: `Viewing detailed performance for ${driver.name}`
+                          });
+                        }}
+                      >
+                        View Details
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    );
+  }
 };
 
 export default DeliveryManagementTab;
