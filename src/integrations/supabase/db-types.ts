@@ -1,4 +1,3 @@
-
 import { Database } from './types';
 import { Json } from './types';
 

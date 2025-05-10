@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,15 +22,14 @@ const ReviewsSection: React.FC = () => {
     try {
       setIsLoading(true);
       const { data, error } = await supabase
-        .from(tableFrom('reviews'))
+        .from('reviews')
         .select(`
-          id,
-          user_id,
-          shipment_id,
-          rating,
-          comment,
-          created_at,
-          profiles(id, full_name, email)
+          *,
+          profiles:user_id (
+            id, 
+            full_name, 
+            email
+          )
         `)
         .order('created_at', { ascending: false });
 

@@ -60,11 +60,12 @@ const CustomerManagementTab = () => {
 
       if (profilesError) throw profilesError;
 
-      // Fetch shipment counts for each user
+      // Fetch shipment counts for each user using a query
       const { data: shipmentCountsData, error: shipmentError } = await supabase
         .from('shipments')
+        .select('user_id, count')
         .select('user_id, count(*)')
-        .group('user_id');
+        .groupBy('user_id');
         
       if (shipmentError) throw shipmentError;
       
