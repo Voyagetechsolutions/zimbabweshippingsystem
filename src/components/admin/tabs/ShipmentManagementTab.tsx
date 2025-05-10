@@ -163,13 +163,16 @@ const ShipmentManagementTab = () => {
           // Handle case when profiles is an array (might happen with certain Supabase responses)
           if (Array.isArray(item.profiles)) {
             if (item.profiles.length > 0) {
-              profileData.email = item.profiles[0].email || null;
-              profileData.full_name = item.profiles[0].full_name || null;
+              // Type assertion to help TypeScript understand the structure
+              const profileItem = item.profiles[0] as { email?: string, full_name?: string };
+              profileData.email = profileItem.email || null;
+              profileData.full_name = profileItem.full_name || null;
             }
           } else {
             // Handle case when profiles is an object
-            profileData.email = item.profiles.email || null;
-            profileData.full_name = item.profiles.full_name || null;
+            const profileObj = item.profiles as { email?: string, full_name?: string };
+            profileData.email = profileObj.email || null;
+            profileData.full_name = profileObj.full_name || null;
           }
         }
         
