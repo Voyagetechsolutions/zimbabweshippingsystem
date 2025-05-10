@@ -56,7 +56,7 @@ import {
   Loader2,
   Check
 } from 'lucide-react';
-import { Shipment } from '@/types/shipment';
+import { Shipment, ShipmentMetadata } from '@/types/shipment';
 
 const shipmentStatuses = [
   'Booking Confirmed',
@@ -100,7 +100,40 @@ const ShipmentManagementTab = () => {
       
       if (error) throw error;
       
-      setShipments(data || []);
+      // Process the data to ensure it matches the Shipment type
+      const processedData = (data || []).map(item => {
+        let profiles = undefined;
+        if (item.profiles) {
+          if (typeof item.profiles === 'object') {
+            profiles = {
+              email: (item.profiles as any).email,
+              full_name: (item.profiles as any).full_name
+            };
+          }
+        }
+        
+        // Ensure metadata is properly typed
+        let metadata: ShipmentMetadata = {};
+        if (item.metadata) {
+          if (typeof item.metadata === 'object' && item.metadata !== null) {
+            metadata = item.metadata as unknown as ShipmentMetadata;
+          } else if (typeof item.metadata === 'string') {
+            try {
+              metadata = JSON.parse(item.metadata) as ShipmentMetadata;
+            } catch (e) {
+              console.error('Failed to parse metadata string:', e);
+            }
+          }
+        }
+        
+        return {
+          ...item,
+          profiles,
+          metadata
+        } as Shipment;
+      });
+      
+      setShipments(processedData);
     } catch (error: any) {
       console.error('Error fetching shipments:', error);
       toast({
@@ -175,7 +208,14 @@ const ShipmentManagementTab = () => {
       if (fetchError) throw fetchError;
       
       // Create/update delivery details in metadata
-      const metadata = shipment.metadata || {};
+      let metadata: any = shipment?.metadata || {};
+      
+      // Make sure metadata is an object
+      if (typeof metadata !== 'object' || metadata === null) {
+        metadata = {};
+      }
+      
+      // Add delivery object if it doesn't exist
       if (!metadata.delivery) {
         metadata.delivery = {
           date: new Date().toISOString(),
@@ -451,20 +491,28 @@ const ShipmentManagementTab = () => {
                       </div>
                       
                       {/* Collection Information */}
-                      {(viewShipment.metadata?.collection || viewShipment.metadata?.collectionDetails) && (
-                        <div className="mt-3">
-                          <h4 className="text-sm font-medium mb-1">Collection Information</h4>
-                          <div className="border p-2 rounded-md bg-gray-50">
-                            <div className="flex justify-between border-b pb-1">
-                              <span className="text-gray-500">Route:</span>
-                              <span>{viewShipment.metadata?.collection?.route || viewShipment.metadata?.collectionDetails?.route || "N/A"}</span>
-                            </div>
-                            <div className="flex justify-between border-b pb-1">
-                              <span className="text-gray-500">Collection Date:</span>
-                              <span>{viewShipment.metadata?.collection?.date || viewShipment.metadata?.collectionDetails?.date || "N/A"}</span>
+                      {viewShipment.metadata && (
+                        (viewShipment.metadata.collection || viewShipment.metadata.collectionDetails) && (
+                          <div className="mt-3">
+                            <h4 className="text-sm font-medium mb-1">Collection Information</h4>
+                            <div className="border p-2 rounded-md bg-gray-50">
+                              <div className="flex justify-between border-b pb-1">
+                                <span className="text-gray-500">Route:</span>
+                                <span>
+                                  {viewShipment.metadata.collection?.route || 
+                                   viewShipment.metadata.collectionDetails?.route || "N/A"}
+                                </span>
+                              </div>
+                              <div className="flex justify-between border-b pb-1">
+                                <span className="text-gray-500">Collection Date:</span>
+                                <span>
+                                  {viewShipment.metadata.collection?.date || 
+                                   viewShipment.metadata.collectionDetails?.date || "N/A"}
+                                </span>
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        )
                       )}
                     </div>
                   </div>
@@ -474,16 +522,22 @@ const ShipmentManagementTab = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <h4 className="text-xs font-medium">Sender</h4>
-                        {viewShipment.metadata?.sender || viewShipment.metadata?.senderDetails ? (
+                        {viewShipment.metadata && (viewShipment.metadata.sender || viewShipment.metadata.senderDetails) ? (
                           <div>
                             <p className="text-sm font-medium">
-                              {viewShipment.metadata?.sender?.name || 
-                               viewShipment.metadata?.senderDetails?.name ||
-                               `${viewShipment.metadata?.sender?.firstName || viewShipment.metadata?.senderDetails?.firstName || ''} ${viewShipment.metadata?.sender?.lastName || viewShipment.metadata?.senderDetails?.lastName || ''}`}
+                              {viewShipment.metadata.sender?.name || 
+                               viewShipment.metadata.senderDetails?.name ||
+                               `${viewShipment.metadata.sender?.firstName || viewShipment.metadata.senderDetails?.firstName || ''} ${viewShipment.metadata.sender?.lastName || viewShipment.metadata.senderDetails?.lastName || ''}`}
                             </p>
-                            <p className="text-xs text-gray-500">{viewShipment.metadata?.sender?.email || viewShipment.metadata?.senderDetails?.email}</p>
-                            <p className="text-xs text-gray-500">{viewShipment.metadata?.sender?.phone || viewShipment.metadata?.senderDetails?.phone}</p>
-                            <p className="text-xs text-gray-500">{viewShipment.metadata?.sender?.address || viewShipment.metadata?.senderDetails?.address}</p>
+                            <p className="text-xs text-gray-500">
+                              {viewShipment.metadata.sender?.email || viewShipment.metadata.senderDetails?.email}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {viewShipment.metadata.sender?.phone || viewShipment.metadata.senderDetails?.phone}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {viewShipment.metadata.sender?.address || viewShipment.metadata.senderDetails?.address}
+                            </p>
                           </div>
                         ) : (
                           <p className="text-gray-500 text-sm">No sender details</p>
@@ -492,15 +546,19 @@ const ShipmentManagementTab = () => {
                       
                       <div className="space-y-2">
                         <h4 className="text-xs font-medium">Recipient</h4>
-                        {viewShipment.metadata?.recipient || viewShipment.metadata?.recipientDetails ? (
+                        {viewShipment.metadata && (viewShipment.metadata.recipient || viewShipment.metadata.recipientDetails) ? (
                           <div>
                             <p className="text-sm font-medium">
-                              {viewShipment.metadata?.recipient?.name || 
-                               viewShipment.metadata?.recipientDetails?.name ||
-                               `${viewShipment.metadata?.recipient?.firstName || viewShipment.metadata?.recipientDetails?.firstName || ''} ${viewShipment.metadata?.recipient?.lastName || viewShipment.metadata?.recipientDetails?.lastName || ''}`}
+                              {viewShipment.metadata.recipient?.name || 
+                               viewShipment.metadata.recipientDetails?.name ||
+                               `${viewShipment.metadata.recipient?.firstName || viewShipment.metadata.recipientDetails?.firstName || ''} ${viewShipment.metadata.recipient?.lastName || viewShipment.metadata.recipientDetails?.lastName || ''}`}
                             </p>
-                            <p className="text-xs text-gray-500">{viewShipment.metadata?.recipient?.phone || viewShipment.metadata?.recipientDetails?.phone}</p>
-                            <p className="text-xs text-gray-500">{viewShipment.metadata?.recipient?.address || viewShipment.metadata?.recipientDetails?.address}</p>
+                            <p className="text-xs text-gray-500">
+                              {viewShipment.metadata.recipient?.phone || viewShipment.metadata.recipientDetails?.phone}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {viewShipment.metadata.recipient?.address || viewShipment.metadata.recipientDetails?.address}
+                            </p>
                           </div>
                         ) : (
                           <p className="text-gray-500 text-sm">No recipient details</p>
@@ -509,34 +567,49 @@ const ShipmentManagementTab = () => {
                     </div>
                     
                     <h3 className="text-sm font-medium mt-4 mb-2">Shipment Contents</h3>
-                    {viewShipment.metadata?.shipment || viewShipment.metadata?.shipmentDetails ? (
+                    {viewShipment.metadata && (viewShipment.metadata.shipment || viewShipment.metadata.shipmentDetails) ? (
                       <div className="space-y-2">
                         <div className="flex justify-between border-b pb-1">
                           <span className="text-gray-500">Type:</span>
-                          <span>{viewShipment.metadata?.shipment?.type || viewShipment.metadata?.shipmentDetails?.type || "N/A"}</span>
+                          <span>
+                            {viewShipment.metadata.shipment?.type || 
+                             viewShipment.metadata.shipmentDetails?.type || "N/A"}
+                          </span>
                         </div>
-                        {(viewShipment.metadata?.shipment?.quantity || viewShipment.metadata?.shipmentDetails?.quantity) && (
+                        {(viewShipment.metadata.shipment?.quantity || viewShipment.metadata.shipmentDetails?.quantity) && (
                           <div className="flex justify-between border-b pb-1">
                             <span className="text-gray-500">Quantity:</span>
-                            <span>{viewShipment.metadata?.shipment?.quantity || viewShipment.metadata?.shipmentDetails?.quantity}</span>
+                            <span>
+                              {viewShipment.metadata.shipment?.quantity || 
+                               viewShipment.metadata.shipmentDetails?.quantity}
+                            </span>
                           </div>
                         )}
-                        {(viewShipment.metadata?.shipment?.weight || viewShipment.metadata?.shipmentDetails?.weight) && (
+                        {(viewShipment.metadata.shipment?.weight || viewShipment.metadata.shipmentDetails?.weight) && (
                           <div className="flex justify-between border-b pb-1">
                             <span className="text-gray-500">Weight:</span>
-                            <span>{viewShipment.metadata?.shipment?.weight || viewShipment.metadata?.shipmentDetails?.weight}</span>
+                            <span>
+                              {viewShipment.metadata.shipment?.weight || 
+                               viewShipment.metadata.shipmentDetails?.weight}
+                            </span>
                           </div>
                         )}
-                        {(viewShipment.metadata?.shipment?.dimensions || viewShipment.metadata?.shipmentDetails?.dimensions) && (
+                        {(viewShipment.metadata.shipment?.dimensions || viewShipment.metadata.shipmentDetails?.dimensions) && (
                           <div className="flex justify-between border-b pb-1">
                             <span className="text-gray-500">Dimensions:</span>
-                            <span>{viewShipment.metadata?.shipment?.dimensions || viewShipment.metadata?.shipmentDetails?.dimensions}</span>
+                            <span>
+                              {viewShipment.metadata.shipment?.dimensions || 
+                               viewShipment.metadata.shipmentDetails?.dimensions}
+                            </span>
                           </div>
                         )}
-                        {(viewShipment.metadata?.shipment?.description || viewShipment.metadata?.shipmentDetails?.description) && (
+                        {(viewShipment.metadata.shipment?.description || viewShipment.metadata.shipmentDetails?.description) && (
                           <div className="flex flex-col border-b pb-1">
                             <span className="text-gray-500">Description:</span>
-                            <span className="text-sm mt-1">{viewShipment.metadata?.shipment?.description || viewShipment.metadata?.shipmentDetails?.description}</span>
+                            <span className="text-sm mt-1">
+                              {viewShipment.metadata.shipment?.description || 
+                               viewShipment.metadata.shipmentDetails?.description}
+                            </span>
                           </div>
                         )}
                       </div>

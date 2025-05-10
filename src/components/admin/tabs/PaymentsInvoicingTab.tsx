@@ -154,7 +154,34 @@ const PaymentsInvoicingTab = () => {
       
       if (paymentsError) throw paymentsError;
       
-      setPayments(paymentsData || []);
+      // Process the payment data to ensure correct typing
+      const processedPayments: Payment[] = (paymentsData || []).map(payment => {
+        // Process profiles to ensure it matches the expected format
+        let profilesData: { full_name: string | null; email: string } | undefined;
+        
+        if (payment.profiles) {
+          if (typeof payment.profiles === 'object' && payment.profiles !== null) {
+            // If profiles is an object (expected case)
+            profilesData = {
+              full_name: (payment.profiles as any).full_name || null,
+              email: (payment.profiles as any).email || 'No email'
+            };
+          } else {
+            // Handle unexpected cases
+            profilesData = {
+              full_name: null,
+              email: 'Unknown email'
+            };
+          }
+        }
+        
+        return {
+          ...payment,
+          profiles: profilesData
+        };
+      });
+      
+      setPayments(processedPayments);
       
       // Fetch shipments without payments (pending payment)
       const { data: shipmentsData, error: shipmentsError } = await supabase
@@ -303,8 +330,17 @@ const PaymentsInvoicingTab = () => {
         // Continue even if receipt creation fails
       }
       
+      // Create a properly formatted payment object
+      const newPayment: Payment = {
+        ...paymentData,
+        profiles: paymentData.profiles ? {
+          full_name: paymentData.profiles.full_name || null,
+          email: paymentData.profiles.email || 'No email'
+        } : undefined
+      };
+      
       // Update local state
-      setPayments(prev => [paymentData, ...prev]);
+      setPayments(prev => [newPayment, ...prev]);
       setPendingShipments(prev => prev.filter(s => s.id !== selectedShipment.id));
       
       // Close dialog and show success message
@@ -648,19 +684,17 @@ const PaymentsInvoicingTab = () => {
                         <TableCell>
                           {format(new Date(shipment.created_at), 'MMM d, yyyy')}
                         </TableCell>
-                        <TableCell className="max-w-[150px] truncate">
+                        <TableCell className="max-w-[200px] truncate">
                           {shipment.origin}
                         </TableCell>
-                        <TableCell className="max-w-[150px] truncate">
+                        <TableCell className="max-w-[200px] truncate">
                           {shipment.destination}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="default"
+                          <Button 
                             size="sm"
                             onClick={() => handleOpenPaymentForm(shipment)}
                           >
-                            <PoundSterling className="h-4 w-4 mr-2" />
                             Record Payment
                           </Button>
                         </TableCell>
@@ -671,142 +705,143 @@ const PaymentsInvoicingTab = () => {
               </div>
             )}
           </CardContent>
+          
+          {/* Record Payment Dialog */}
+          <Dialog open={showPaymentForm} onOpenChange={setShowPaymentForm}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Record Payment</DialogTitle>
+                <DialogDescription>
+                  Enter payment details for shipment {selectedShipment?.tracking_number}
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="amount">Amount</Label>
+                    <div className="flex items-center mt-1">
+                      <span className="bg-gray-100 px-3 py-2 border-y border-l border-gray-300 rounded-l-md">
+                        {paymentForm.currency === 'GBP' && '£'}
+                        {paymentForm.currency === 'USD' && '$'}
+                        {paymentForm.currency === 'EUR' && '€'}
+                      </span>
+                      <Input
+                        id="amount"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={paymentForm.amount}
+                        onChange={(e) => setPaymentForm({...paymentForm, amount: e.target.value})}
+                        className="rounded-l-none"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="currency">Currency</Label>
+                    <Select
+                      value={paymentForm.currency}
+                      onValueChange={(value) => setPaymentForm({...paymentForm, currency: value})}
+                    >
+                      <SelectTrigger id="currency" className="mt-1">
+                        <SelectValue placeholder="Select currency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="GBP">GBP (£)</SelectItem>
+                        <SelectItem value="USD">USD ($)</SelectItem>
+                        <SelectItem value="EUR">EUR (€)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="payment_method">Payment Method</Label>
+                  <Select
+                    value={paymentForm.payment_method}
+                    onValueChange={(value) => setPaymentForm({...paymentForm, payment_method: value})}
+                  >
+                    <SelectTrigger id="payment_method" className="mt-1">
+                      <SelectValue placeholder="Select payment method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="card_payment">Card Payment</SelectItem>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="mobile_money">Mobile Money</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="payment_status">Payment Status</Label>
+                  <Select
+                    value={paymentForm.payment_status}
+                    onValueChange={(value) => setPaymentForm({...paymentForm, payment_status: value})}
+                  >
+                    <SelectTrigger id="payment_status" className="mt-1">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="failed">Failed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="transaction_id">Transaction ID (Optional)</Label>
+                  <Input
+                    id="transaction_id"
+                    placeholder="e.g. TXN-12345"
+                    value={paymentForm.transaction_id}
+                    onChange={(e) => setPaymentForm({...paymentForm, transaction_id: e.target.value})}
+                    className="mt-1"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="receipt_url">Receipt URL (Optional)</Label>
+                  <Input
+                    id="receipt_url"
+                    placeholder="e.g. https://example.com/receipt.pdf"
+                    value={paymentForm.receipt_url}
+                    onChange={(e) => setPaymentForm({...paymentForm, receipt_url: e.target.value})}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              
+              <DialogFooter>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowPaymentForm(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={recordPayment}
+                  disabled={isSubmitting || !paymentForm.amount}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4 mr-2" />
+                      Record Payment
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </Card>
       </TabsContent>
-
-      {/* Record Payment Dialog */}
-      <Dialog open={showPaymentForm} onOpenChange={setShowPaymentForm}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Record Payment</DialogTitle>
-            <DialogDescription>
-              {selectedShipment && (
-                <>
-                  Recording payment for shipment <span className="font-mono">{selectedShipment.tracking_number}</span>
-                </>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="grid gap-4 py-4">
-            <div>
-              <Label htmlFor="amount">Amount</Label>
-              <div className="relative mt-1">
-                <span className="absolute left-3 top-2.5">£</span>
-                <Input
-                  id="amount"
-                  value={paymentForm.amount}
-                  onChange={(e) => setPaymentForm({...paymentForm, amount: e.target.value})}
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className="pl-7"
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-            
-            <div>
-              <Label htmlFor="currency">Currency</Label>
-              <Select
-                value={paymentForm.currency}
-                onValueChange={(value) => setPaymentForm({...paymentForm, currency: value})}
-              >
-                <SelectTrigger id="currency" className="mt-1">
-                  <SelectValue placeholder="Select currency" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="GBP">British Pound (£)</SelectItem>
-                  <SelectItem value="USD">US Dollar ($)</SelectItem>
-                  <SelectItem value="EUR">Euro (€)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div>
-              <Label htmlFor="payment_method">Payment Method</Label>
-              <Select
-                value={paymentForm.payment_method}
-                onValueChange={(value) => setPaymentForm({...paymentForm, payment_method: value})}
-              >
-                <SelectTrigger id="payment_method" className="mt-1">
-                  <SelectValue placeholder="Select method" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="credit_card">Credit Card</SelectItem>
-                  <SelectItem value="paypal">PayPal</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div>
-              <Label htmlFor="transaction_id">Transaction ID (Optional)</Label>
-              <Input
-                id="transaction_id"
-                value={paymentForm.transaction_id}
-                onChange={(e) => setPaymentForm({...paymentForm, transaction_id: e.target.value})}
-                className="mt-1"
-                placeholder="e.g. TR123456789"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="receipt_url">Receipt URL (Optional)</Label>
-              <Input
-                id="receipt_url"
-                value={paymentForm.receipt_url}
-                onChange={(e) => setPaymentForm({...paymentForm, receipt_url: e.target.value})}
-                className="mt-1"
-                placeholder="https://receipt.example.com/123"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="payment_status">Status</Label>
-              <Select
-                value={paymentForm.payment_status}
-                onValueChange={(value) => setPaymentForm({...paymentForm, payment_status: value})}
-              >
-                <SelectTrigger id="payment_status" className="mt-1">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowPaymentForm(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={recordPayment}
-              disabled={isSubmitting || !paymentForm.amount}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Check className="h-4 w-4 mr-2" />
-                  Record Payment
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </Tabs>
   );
 };

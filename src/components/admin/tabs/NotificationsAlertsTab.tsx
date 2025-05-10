@@ -95,9 +95,6 @@ const NotificationsAlertsTab = () => {
   
   // Function to setup real-time subscription
   const setupRealtimeSubscription = () => {
-    // First, add the notifications table to the realtime publication
-    supabase.rpc('enable_realtime_for_table', { table_name: 'notifications' });
-    
     // Set up subscription to notifications table
     const subscription = supabase
       .channel('schema-db-changes')
