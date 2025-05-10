@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -560,6 +561,92 @@ const DeliveryManagementTab = () => {
     setFormRegion('UK');
   };
 
+  const renderDriversTable = (driversToShow: Driver[]) => {
+    if (loading) {
+      return (
+        <div className="flex justify-center items-center p-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
+        </div>
+      );
+    }
+    
+    if (driversToShow.length === 0) {
+      return (
+        <div className="text-center p-12">
+          <UserX className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+          <h3 className="text-lg font-medium mb-2">No drivers found</h3>
+          <p className="text-gray-500 mb-6">
+            There are currently no drivers in the system
+          </p>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Driver Name</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Region</TableHead>
+              <TableHead>Total Deliveries</TableHead>
+              <TableHead>Completed</TableHead>
+              <TableHead>On-Time Rate</TableHead>
+              <TableHead>Rating</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {driversToShow.map((driver) => {
+              const performance = driver.performance || {
+                total_deliveries: 0,
+                completed_deliveries: 0,
+                on_time_deliveries: 0,
+                rating: 5
+              };
+              
+              const onTimeRate = performance.completed_deliveries > 0
+                ? ((performance.on_time_deliveries / performance.completed_deliveries) * 100).toFixed(0)
+                : "N/A";
+              
+              return (
+                <TableRow key={driver.id}>
+                  <TableCell className="font-medium">{driver.name}</TableCell>
+                  <TableCell>{driver.email}</TableCell>
+                  <TableCell>{driver.region || 'UK'}</TableCell>
+                  <TableCell>{performance.total_deliveries}</TableCell>
+                  <TableCell>{performance.completed_deliveries}</TableCell>
+                  <TableCell>
+                    <Badge className={
+                      onTimeRate === "N/A" ? "bg-gray-100 text-gray-800" :
+                      parseInt(onTimeRate) > 90 ? "bg-green-100 text-green-800" :
+                      parseInt(onTimeRate) > 75 ? "bg-yellow-100 text-yellow-800" :
+                      "bg-red-100 text-red-800"
+                    }>
+                      {onTimeRate === "N/A" ? onTimeRate : `${onTimeRate}%`}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center">
+                      <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                      <span className="ml-1">{performance.rating.toFixed(1)}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="sm" onClick={() => handleEditDriver(driver)}>
+                      Edit
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    );
+  };
+
   return (
     <>
       <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab}>
@@ -842,74 +929,6 @@ const DeliveryManagementTab = () => {
       </Tabs>
     </>
   );
-  
-  function renderDriversTable(driversToShow: Driver[]) {
-    if (loading) {
-      return (
-        <div className="flex justify-center items-center p-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
-        </div>
-      );
-    }
-    
-    if (driversToShow.length === 0) {
-      return (
-        <div className="text-center p-12">
-          <UserX className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium mb-2">No drivers found</h3>
-          <p className="text-gray-500 mb-6">
-            There are currently no drivers in the system
-          </p>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Driver Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Region</TableHead>
-              <TableHead>Total Deliveries</TableHead>
-              <TableHead>Completed</TableHead>
-              <TableHead>On-Time Rate</TableHead>
-              <TableHead>Rating</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {driversToShow.map((driver) => {
-              const performance = driver.performance || {
-                total_deliveries: 0,
-                completed_deliveries: 0,
-                on_time_deliveries: 0,
-                rating: 5
-              };
-              
-              const onTimeRate = performance.completed_deliveries > 0
-                ? ((performance.on_time_deliveries / performance.completed_deliveries) * 100).toFixed(0)
-                : "N/A";
-              
-              return (
-                <TableRow key={driver.id}>
-                  <TableCell className="font-medium">{driver.name}</TableCell>
-                  <TableCell>{driver.email}</TableCell>
-                  <TableCell>{driver.region || 'UK'}</TableCell>
-                  <TableCell>{performance.total_deliveries}</TableCell>
-                  <TableCell>{performance.completed_deliveries}</TableCell>
-                  <TableCell>
-                    <Badge className={
-                      onTimeRate === "N/A" ? "bg-gray-100 text-gray-800" :
-                      parseInt(onTimeRate) > 90 ? "bg-green-100 text-green-800" :
-                      parseInt(onTimeRate) > 75 ? "bg-yellow-100 text-yellow-800" :
-                      "bg-red-100 text-red-800"
-                    }>
-                      {onTimeRate === "N/A" ? onTimeRate : `${onTimeRate}%`}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center">
-                      <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                      <span className="ml-
+};
+
+export default DeliveryManagementTab;
