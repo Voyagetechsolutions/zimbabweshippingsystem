@@ -73,6 +73,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tables } from '@/integrations/supabase/db-types';
 import { BarChart } from '@/components/ui/charts';
+import { Json } from '@/integrations/supabase/types';
+import { Shipment, ShipmentMetadata } from '@/types/shipment';
 
 interface Driver {
   id: string;
@@ -98,14 +100,6 @@ interface DeliveryAssignment {
   tracking_number?: string;
   destination?: string;
 }
-
-// Define a Shipment type using Tables from db-types
-type Shipment = Tables['shipments'] & {
-  profiles?: {
-    full_name?: string;
-    email: string;
-  };
-};
 
 // Helper function to safely access nested properties in metadata
 const getMetadataValue = (metadata: any, path: string[], defaultValue: any = undefined) => {
@@ -169,9 +163,18 @@ const DeliveryManagementTab = () => {
       if (shipmentsError) throw shipmentsError;
       
       // Process shipment data with proper typing
-      const typedShipments = shipmentsData as Shipment[] || [];
-      
-      setPendingShipments(typedShipments);
+      if (shipmentsData) {
+        // Convert the data to the Shipment type
+        const typedShipments: Shipment[] = shipmentsData.map(shipment => ({
+          ...shipment,
+          metadata: shipment.metadata as ShipmentMetadata,
+          profiles: shipment.profiles as any
+        }));
+        
+        setPendingShipments(typedShipments);
+      } else {
+        setPendingShipments([]);
+      }
       
       // 2. Fetch drivers (profiles with driver role)
       const { data: driversData, error: driversError } = await supabase
@@ -184,17 +187,13 @@ const DeliveryManagementTab = () => {
       // Transform driver data to include performance metrics
       const enhancedDrivers: Driver[] = (driversData || []).map(driver => {
         // Safely access communication preferences
-        const communicationPrefs = typeof driver.communication_preferences === 'object' 
-          ? driver.communication_preferences 
-          : {};
-        
-        // Safely access location and phone from communication preferences
         let location = '';
         let phoneNumber = '';
         
-        if (communicationPrefs && typeof communicationPrefs === 'object') {
-          // TypeScript doesn't know the shape of communicationPrefs, so we cast it
-          const prefs = communicationPrefs as Record<string, any>;
+        if (driver.communication_preferences && 
+            typeof driver.communication_preferences === 'object') {
+          // Access properties safely using type assertion
+          const prefs = driver.communication_preferences as { [key: string]: any };
           location = prefs.location || '';
           phoneNumber = prefs.phone || '';
         }
@@ -203,7 +202,7 @@ const DeliveryManagementTab = () => {
           id: driver.id,
           full_name: driver.full_name || 'Unnamed Driver',
           email: driver.email,
-          role: driver.role,
+          role: driver.role || 'driver',
           location: location,
           phone_number: phoneNumber,
           rating: Math.round((Math.random() * 2 + 3) * 10) / 10, // Random rating between 3.0-5.0 for demo
@@ -221,30 +220,32 @@ const DeliveryManagementTab = () => {
         
         for (const shipment of typedShipments) {
           if (shipment.metadata && typeof shipment.metadata === 'object') {
-            const metadata = shipment.metadata as Record<string, any>;
+            const metadata = shipment.metadata as any;
             
-            // Check if metadata has delivery information
-            if (metadata.delivery && typeof metadata.delivery === 'object') {
-              const delivery = metadata.delivery as Record<string, any>;
-              
+            // Check if metadata has delivery information safely
+            const deliveryInfo = getMetadataValue(metadata, ['delivery'], null);
+            
+            if (deliveryInfo && typeof deliveryInfo === 'object') {
               const assignment: DeliveryAssignment = {
                 id: `${shipment.id}-delivery`, // Generate an ID
                 shipment_id: shipment.id,
-                driver_id: delivery.driver_id || '',
-                driver_name: delivery.driver_name || 'Unknown Driver',
-                assigned_at: delivery.assigned_at || shipment.updated_at,
+                driver_id: getMetadataValue(deliveryInfo, ['driver_id'], ''),
+                driver_name: getMetadataValue(deliveryInfo, ['driver_name'], 'Unknown Driver'),
+                assigned_at: getMetadataValue(deliveryInfo, ['assigned_at'], shipment.updated_at),
                 status: 'assigned',
                 tracking_number: shipment.tracking_number,
                 destination: shipment.destination
               };
               
-              if (delivery.completed_at) {
-                assignment.completed_at = delivery.completed_at;
+              const completedAt = getMetadataValue(deliveryInfo, ['completed_at'], null);
+              if (completedAt) {
+                assignment.completed_at = completedAt;
                 assignment.status = 'completed';
               }
               
-              if (delivery.notes) {
-                assignment.notes = delivery.notes;
+              const notes = getMetadataValue(deliveryInfo, ['notes'], null);
+              if (notes) {
+                assignment.notes = notes;
               }
               
               deliveryAssignments.push(assignment);
@@ -301,18 +302,22 @@ const DeliveryManagementTab = () => {
         ? { ...shipment.metadata }
         : {};
       
+      // Initialize the delivery object safely
       if (!metadata.delivery) {
         metadata.delivery = {};
       }
       
-      // Add delivery driver information
-      metadata.delivery = {
-        ...metadata.delivery,
-        driver_id: selectedDriver,
-        driver_name: driverInfo.full_name,
-        assigned_at: new Date().toISOString(),
-        notes: assignmentNotes,
-      };
+      // Check if metadata.delivery is an object before accessing
+      if (typeof metadata.delivery === 'object') {
+        // Add delivery driver information
+        metadata.delivery = {
+          ...metadata.delivery,
+          driver_id: selectedDriver,
+          driver_name: driverInfo.full_name,
+          assigned_at: new Date().toISOString(),
+          notes: assignmentNotes,
+        };
+      }
       
       // 3. Update the shipment metadata
       const { error: updateError } = await supabase
@@ -381,9 +386,10 @@ const DeliveryManagementTab = () => {
     
     try {
       // 1. Create or update the profile with the driver role
+      // Using insert instead of upsert since we don't know the id
       const { data, error } = await supabase
         .from('profiles')
-        .upsert({
+        .insert({
           email,
           full_name,
           role: 'driver',

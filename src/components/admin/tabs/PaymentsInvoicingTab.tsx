@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -559,10 +558,14 @@ const PaymentsInvoicingTab = () => {
                         </TableCell>
                         <TableCell>
                           <div className="font-medium">
-                            {payment.profiles?.full_name || "Unnamed Customer"}
+                            {payment.profiles && typeof payment.profiles === 'object' && 'full_name' in payment.profiles
+                              ? payment.profiles.full_name || payment.user_id 
+                              : payment.user_id}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {payment.profiles?.email || "No email"}
+                            {payment.profiles && typeof payment.profiles === 'object' && 'email' in payment.profiles
+                              ? payment.profiles.email
+                              : 'Unknown'}
                           </div>
                         </TableCell>
                         <TableCell className="font-medium">
@@ -675,10 +678,14 @@ const PaymentsInvoicingTab = () => {
                         </TableCell>
                         <TableCell>
                           <div className="font-medium">
-                            {shipment.profiles?.full_name || "Unnamed Customer"}
+                            {shipment.profiles && typeof shipment.profiles === 'object' && 'full_name' in shipment.profiles
+                              ? shipment.profiles.full_name || shipment.user_id 
+                              : shipment.user_id}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {shipment.profiles?.email || "No email"}
+                            {shipment.profiles && typeof shipment.profiles === 'object' && 'email' in shipment.profiles
+                              ? shipment.profiles.email
+                              : 'Unknown'}
                           </div>
                         </TableCell>
                         <TableCell>

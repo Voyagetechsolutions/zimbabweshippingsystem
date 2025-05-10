@@ -5,7 +5,7 @@ import NotificationsAlertsTab from '@/components/admin/tabs/NotificationsAlertsT
 import ShipmentManagementTab from '@/components/admin/tabs/ShipmentManagementTab';
 import PaymentsInvoicingTab from '@/components/admin/tabs/PaymentsInvoicingTab';
 import DeliveryManagementTab from '@/components/admin/tabs/DeliveryManagementTab';
-import AnalyticsReportingTab from '@/components/admin/tabs/AnalyticsReportingTab';
+import AnalyticsReports from '@/components/admin/AnalyticsReports';
 import UserManagementTab from '@/components/admin/tabs/UserManagementTab';
 import SystemSettingsTab from '@/components/admin/tabs/SystemSettingsTab';
 
@@ -34,7 +34,7 @@ const AdminDashboardContent = () => {
         <NotificationsAlertsTab />
       </TabsContent>
       <TabsContent value="analytics">
-        <AnalyticsReportingTab />
+        <AnalyticsReports />
       </TabsContent>
       <TabsContent value="users">
         <UserManagementTab />
