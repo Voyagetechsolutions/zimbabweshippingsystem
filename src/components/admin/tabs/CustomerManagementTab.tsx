@@ -60,26 +60,31 @@ const CustomerManagementTab = () => {
 
       if (profilesError) throw profilesError;
 
-      // Fetch shipment counts for each user
-      const shipmentCounts: Record<string, number> = {};
+      // Fetch shipment counts for each user - using count() aggregate function
       const { data: shipmentData, error: shipmentError } = await supabase
         .from('shipments')
-        .select('user_id, count')
-        .group('user_id');
+        .select('user_id, count(*)');
         
-      if (!shipmentError && shipmentData) {
+      if (shipmentError) throw shipmentError;
+      
+      // Convert the shipment data to a more usable format
+      const shipmentCounts: Record<string, number> = {};
+      if (shipmentData) {
         shipmentData.forEach((item: any) => {
-          shipmentCounts[item.user_id] = item.count;
+          shipmentCounts[item.user_id] = parseInt(item.count);
         });
       }
 
       // Fetch addresses for each user
-      const addressesByUser: Record<string, any[]> = {};
       const { data: addressData, error: addressError } = await supabase
         .from('addresses')
         .select('*');
         
-      if (!addressError && addressData) {
+      if (addressError) throw addressError;
+      
+      // Organize addresses by user_id
+      const addressesByUser: Record<string, any[]> = {};
+      if (addressData) {
         addressData.forEach((address: any) => {
           if (!addressesByUser[address.user_id]) {
             addressesByUser[address.user_id] = [];

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -44,6 +43,8 @@ import {
   Star 
 } from 'lucide-react';
 import { Shipment } from '@/types/shipment';
+import { Driver, DriverPerformance } from '@/types/driver';
+import { tableFrom } from '@/integrations/supabase/db-types';
 import {
   Dialog,
   DialogContent,
@@ -55,26 +56,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
 
-// Define types for driver and delivery data
-interface Driver {
-  id: string;
-  name: string;
-  email: string;
-  region: string;
-  total_deliveries?: number;
-  on_time_rate?: number;
-  active: boolean;
-  performance?: DriverPerformance;
-}
-
-interface DriverPerformance {
-  total_deliveries: number;
-  completed_deliveries: number;
-  on_time_deliveries: number;
-  rating: number;
-}
-
-// Update DeliveryRecord to use proper typing
+// Define types for delivery data
 interface DeliveryRecord {
   id: string;
   tracking_number: string;
@@ -229,35 +211,42 @@ const DeliveryManagementTab = () => {
         
       if (driverProfilesError) throw driverProfilesError;
       
-      // Then fetch driver performance data
-      const { data: performanceData, error: performanceError } = await supabase
-        .from('driver_performance')
-        .select('*');
-        
-      // We'll continue even if performance data has an error (might not exist yet)
+      // Create an array to hold all our driver data
+      const driversWithPerformance: Driver[] = [];
       
-      // Combine the data
-      const driversWithPerformance: Driver[] = (driverProfilesData || []).map(driver => {
-        // Find performance data for this driver
-        const performance = performanceData?.find(p => p.driver_id === driver.id);
+      // Process each driver profile
+      for (const driver of driverProfilesData || []) {
+        // Get region from communication preferences
+        const commPrefs = typeof driver.communication_preferences === 'object' ? 
+          driver.communication_preferences : {};
+        let region = 'UK'; // Default
         
-        // Default region if not specified
-        const region = driver.communication_preferences?.region || 'UK';
+        if (commPrefs && 'region' in commPrefs) {
+          region = commPrefs.region as string;
+        }
         
-        return {
+        // Check if we have performance data for this driver
+        const { data: performanceData, error: performanceError } = await supabase
+          .from(tableFrom('driver_performance'))
+          .select('*')
+          .eq('driver_id', driver.id)
+          .single();
+        
+        const driverObj: Driver = {
           id: driver.id,
           name: driver.full_name || 'Unknown Driver',
           email: driver.email,
           region: region,
-          active: true,
-          performance: performance ? {
-            total_deliveries: performance.total_deliveries || 0,
-            completed_deliveries: performance.completed_deliveries || 0,
-            on_time_deliveries: performance.on_time_deliveries || 0,
-            rating: performance.rating || 5.0
-          } : undefined
+          active: true
         };
-      });
+        
+        // Add performance data if it exists
+        if (performanceData && !performanceError) {
+          driverObj.performance = performanceData as unknown as DriverPerformance;
+        }
+        
+        driversWithPerformance.push(driverObj);
+      }
       
       setDrivers(driversWithPerformance);
     } catch (error) {
@@ -400,18 +389,36 @@ const DeliveryManagementTab = () => {
         ? Math.min(5, (onTimeDeliveries / completedDeliveries) * 5) 
         : 5; // Default 5-star rating
       
+      // Get the driver profile to determine region
+      const { data: driverProfile } = await supabase
+        .from('profiles')
+        .select('communication_preferences')
+        .eq('id', driverId)
+        .single();
+      
+      let regionValue = 'UK';
+      if (driverProfile && 
+          driverProfile.communication_preferences && 
+          typeof driverProfile.communication_preferences === 'object' &&
+          'region' in driverProfile.communication_preferences) {
+        regionValue = driverProfile.communication_preferences.region as string;
+      }
+      
       // Check if entry exists
       const { data, error: fetchError } = await supabase
-        .from('driver_performance')
-        .select('*')
+        .from(tableFrom('driver_performance'))
+        .select('id')
         .eq('driver_id', driverId);
         
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        console.error('Error checking driver performance:', fetchError);
+        return;
+      }
       
       if (data && data.length > 0) {
         // Update existing entry
-        const { error: updateError } = await supabase
-          .from('driver_performance')
+        await supabase
+          .from(tableFrom('driver_performance'))
           .update({
             total_deliveries: totalDeliveries,
             completed_deliveries: completedDeliveries,
@@ -420,23 +427,24 @@ const DeliveryManagementTab = () => {
             updated_at: new Date().toISOString()
           })
           .eq('driver_id', driverId);
-          
-        if (updateError) throw updateError;
       } else {
         // Create new entry
-        const { error: insertError } = await supabase
-          .from('driver_performance')
+        await supabase
+          .from(tableFrom('driver_performance'))
           .insert({
             driver_id: driverId,
             total_deliveries: totalDeliveries,
             completed_deliveries: completedDeliveries,
             on_time_deliveries: onTimeDeliveries,
             rating: rating,
-            region: 'UK' // Default to UK if not specified
+            region: regionValue || 'UK',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           });
-          
-        if (insertError) throw insertError;
       }
+      
+      // Refresh drivers to update performance data
+      await fetchDrivers();
     } catch (error) {
       console.error('Error updating driver metrics:', error);
       // We don't want to block the main flow if metrics update fails
@@ -570,6 +578,7 @@ const DeliveryManagementTab = () => {
           </TabsTrigger>
         </TabsList>
 
+        
         <TabsContent value="monitor">
           <Card>
             <CardHeader>
@@ -903,41 +912,4 @@ const DeliveryManagementTab = () => {
                   <TableCell>
                     <div className="flex items-center">
                       <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                      <span className="ml-1">{performance.rating.toFixed(1)}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditDriver(driver)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          // View driver details
-                          toast({
-                            title: 'View Driver',
-                            description: `Viewing detailed performance for ${driver.name}`
-                          });
-                        }}
-                      >
-                        View Details
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
-    );
-  }
-};
-
-export default DeliveryManagementTab;
+                      <span className="ml-
