@@ -85,6 +85,25 @@ const AdminDashboardContent = () => {
   useEffect(() => {
     fetchDashboardStats();
     fetchNotifications();
+    
+    // Set up real-time subscription for notifications
+    const channel = supabase
+      .channel('public:notifications')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications'
+      }, payload => {
+        // When a new notification is inserted, update our local state
+        const newNotification = payload.new;
+        setNotifications(prev => [newNotification, ...prev]);
+      })
+      .subscribe();
+      
+    // Clean up subscription
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchDashboardStats = async () => {

@@ -1,883 +1,784 @@
 
-import React, { useState, useEffect } from 'react';
-import { format } from 'date-fns';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Shipment } from '@/types/shipment';
-
-// UI Components
 import { 
   Card, 
-  CardContent, 
   CardHeader, 
   CardTitle, 
-  CardDescription,
-  CardFooter 
+  CardDescription, 
+  CardContent 
 } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle 
-} from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-
-// Icons
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from '@/components/ui/label';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { format } from 'date-fns';
 import { 
   Search, 
-  RefreshCcw,
-  Filter,
-  ArrowUpDown,
-  Eye,
-  Edit,
-  Trash,
-  AlertTriangle,
-  FileSpreadsheet,
+  Filter, 
+  RefreshCcw, 
   Package,
+  CheckCircle,
+  Calendar,
+  RotateCw,
   Truck,
-  ChevronRight,
-  Mail,
-  Phone,
-  MapPin,
-  User
+  Ship,
+  CircleAlert,
+  X,
+  Info,
+  Loader2
 } from 'lucide-react';
-
-// Define the Json type to match Supabase's Json type
-type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
-
-// Define the status history type
-interface StatusHistory {
-  id: string;
-  status: string;
-  created_at: string;
-  created_by: string;
-  notes: string;
-}
-
-const STATUS_OPTIONS = [
-  'Booking Confirmed',
-  'Ready for Pickup',
-  'Processing in UK Warehouse',
-  'Customs Clearance',
-  'Processing in ZW Warehouse',
-  'Out for Delivery',
-  'Delivered',
-  'Cancelled',
-];
+import { Shipment, ShipmentFilters } from '@/types/shipment';
 
 const ShipmentManagementTab = () => {
   const { toast } = useToast();
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [viewingShipment, setViewingShipment] = useState<Shipment | null>(null);
-  const [editingStatus, setEditingStatus] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState('');
-  const [statusNote, setStatusNote] = useState('');
-  const [statusHistory, setStatusHistory] = useState<StatusHistory[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const [activeTab, setActiveTab] = useState('allShipments');
-  const [customQuotes, setCustomQuotes] = useState<any[]>([]);
-  const [sortField, setSortField] = useState('created_at');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [activeTab, setActiveTab] = useState('all');
+  
+  // Selected shipment for detail view
+  const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  
+  // Collection route information
+  const [routes, setRoutes] = useState<{route: string; pickup_date: string; areas: string[]}[]>([]);
+  
+  // Filters
+  const [filters, setFilters] = useState<ShipmentFilters>({
+    status: '',
+    search: '',
+  });
 
+  // Status options for the dropdown
+  const statusOptions = [
+    'Booking Confirmed',
+    'Ready for Pickup',
+    'Processing in UK Warehouse',
+    'In Transit to Zimbabwe',
+    'Customs Clearance',
+    'Processing in ZW Warehouse',
+    'Out for Delivery',
+    'Delivered',
+    'Cancelled',
+    'Failed Attempt'
+  ];
+  
   useEffect(() => {
     fetchShipments();
-    fetchCustomQuotes();
-  }, [sortField, sortDirection]);
-
-  const fetchShipments = async () => {
-    setLoading(true);
+    fetchRoutes();
+  }, [activeTab]);
+  
+  const fetchRoutes = async () => {
     try {
       const { data, error } = await supabase
-        .from('shipments')
+        .from('collection_schedules')
         .select('*')
-        .order(sortField, { ascending: sortDirection === 'asc' });
-
-      if (error) throw error;
-
-      console.log('Shipments fetched:', data);
-      // Cast the data to ensure type compatibility
-      const typedData = data?.map(item => {
-        // Ensure metadata is in the correct shape for Shipment type
-        return {
-          ...item,
-          metadata: item.metadata || {},
-          // Add required fields from the Shipment type that might be missing
-          can_cancel: item.can_cancel !== undefined ? item.can_cancel : true,
-          can_modify: item.can_modify !== undefined ? item.can_modify : true
-        } as Shipment;
-      }) || [];
+        .order('pickup_date', { ascending: true });
       
-      setShipments(typedData);
-    } catch (error: any) {
+      if (error) throw error;
+      
+      setRoutes(data || []);
+    } catch (error) {
+      console.error('Failed to fetch collection routes:', error);
+    }
+  };
+  
+  const fetchShipments = useCallback(async () => {
+    setLoading(true);
+    
+    try {
+      // Construct query based on active tab
+      let query = supabase
+        .from('shipments')
+        .select('*, profiles(email, full_name)');
+      
+      // Apply tab filter
+      switch (activeTab) {
+        case 'pending':
+          query = query.in('status', ['Booking Confirmed', 'Ready for Pickup']);
+          break;
+        case 'processing':
+          query = query.in('status', ['Processing in UK Warehouse', 'In Transit to Zimbabwe', 'Customs Clearance', 'Processing in ZW Warehouse']);
+          break;
+        case 'delivery':
+          query = query.in('status', ['Out for Delivery', 'Delivered', 'Failed Attempt']);
+          break;
+        case 'cancelled':
+          query = query.eq('status', 'Cancelled');
+          break;
+        // 'all' tab doesn't need additional filtering
+      }
+      
+      // Apply search filter if provided
+      if (filters.search) {
+        query = query.or(`tracking_number.ilike.%${filters.search}%,origin.ilike.%${filters.search}%,destination.ilike.%${filters.search}%`);
+      }
+      
+      // Apply status filter if provided
+      if (filters.status) {
+        query = query.eq('status', filters.status);
+      }
+      
+      // Execute the query
+      const { data, error } = await query.order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      // Process the data
+      const shipmentData = data.map(item => {
+        const { profiles, ...shipment } = item;
+        return {
+          ...shipment,
+          profiles: {
+            email: profiles?.email,
+            full_name: profiles?.full_name,
+          }
+        };
+      });
+      
+      setShipments(shipmentData);
+    } catch (error) {
       console.error('Error fetching shipments:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to load shipments: ' + error.message,
+        title: 'Failed to load shipments',
+        description: 'There was a problem retrieving shipment data.',
         variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab, filters.search, filters.status, toast]);
 
-  const fetchCustomQuotes = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('custom_quotes')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      setCustomQuotes(data || []);
-    } catch (error: any) {
-      console.error('Error fetching custom quotes:', error);
-    }
-  };
-
-  const fetchStatusHistory = async (shipmentId: string) => {
-    setLoadingHistory(true);
-    try {
-      // Fetch status history from shipment updates if available
-      const { data, error } = await supabase
-        .from('shipments')
-        .select('status, updated_at')
-        .eq('id', shipmentId)
-        .single();
-
-      if (error) throw error;
-
-      // Create a history from available data
-      const history: StatusHistory[] = [
-        {
-          id: '1',
-          status: data.status,
-          created_at: data.updated_at,
-          created_by: 'System',
-          notes: 'Status updated',
-        }
-      ];
-
-      setStatusHistory(history);
-    } catch (error: any) {
-      console.error('Error fetching status history:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load status history',
-        variant: 'destructive',
-      });
-      setStatusHistory([]);
-    } finally {
-      setLoadingHistory(false);
-    }
-  };
-
-  const handleViewShipment = (shipment: Shipment) => {
-    setViewingShipment(shipment);
-    setSelectedStatus(shipment.status);
-    fetchStatusHistory(shipment.id);
-  };
-
-  const handleUpdateStatus = async () => {
-    if (!viewingShipment || !selectedStatus) return;
+  const handleStatusChange = async (shipmentId: string, newStatus: string) => {
+    setIsUpdating(true);
     
     try {
       // Update the shipment status
       const { error } = await supabase
         .from('shipments')
-        .update({
-          status: selectedStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', viewingShipment.id);
-
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', shipmentId);
+      
       if (error) throw error;
+      
+      // Update local state
+      setShipments(prevShipments => 
+        prevShipments.map(shipment => 
+          shipment.id === shipmentId 
+            ? { ...shipment, status: newStatus, updated_at: new Date().toISOString() }
+            : shipment
+        )
+      );
+      
+      // Update selected shipment if applicable
+      if (selectedShipment && selectedShipment.id === shipmentId) {
+        setSelectedShipment({
+          ...selectedShipment,
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        });
+      }
 
+      // Create notification for status change
+      await createNotification({
+        title: 'Shipment Status Updated',
+        message: `Shipment #${selectedShipment?.tracking_number} status changed to ${newStatus}`,
+        type: 'status_update',
+        related_id: shipmentId,
+        user_id: selectedShipment?.user_id
+      });
+      
+      // Show success message
       toast({
         title: 'Status Updated',
-        description: `Shipment ${viewingShipment.tracking_number} status updated to ${selectedStatus}`,
+        description: `Shipment status has been updated to ${newStatus}`,
       });
-
-      // Refresh shipments
-      fetchShipments();
       
-      // Reset state
-      setEditingStatus(false);
-      setStatusNote('');
-      
-      // Close the dialog
-      setViewingShipment(null);
-    } catch (error: any) {
-      console.error('Error updating status:', error);
+    } catch (error) {
+      console.error('Error updating shipment status:', error);
       toast({
-        title: 'Error',
-        description: `Failed to update status: ${error.message}`,
+        title: 'Update Failed',
+        description: 'Could not update shipment status.',
         variant: 'destructive',
       });
+    } finally {
+      setIsUpdating(false);
     }
+  };
+  
+  const handleSearch = (searchValue: string) => {
+    setFilters(prev => ({ ...prev, search: searchValue }));
+  };
+  
+  const handleFilterChange = (filterValue: string) => {
+    setFilters(prev => ({ ...prev, status: filterValue }));
+  };
+  
+  const resetFilters = () => {
+    setFilters({ status: '', search: '' });
+    fetchShipments();
+  };
+  
+  // Create notification function
+  const createNotification = async (notification: { 
+    title: string;
+    message: string;
+    type: string;
+    related_id?: string;
+    user_id?: string;
+  }) => {
+    try {
+      await supabase.from('notifications').insert([notification]);
+    } catch (error) {
+      console.error('Error creating notification:', error);
+    }
+  };
+  
+  useEffect(() => {
+    fetchShipments();
+  }, [filters, fetchShipments]);
+  
+  // Function to match postal code with route area
+  const findMatchingRoute = (postalCode: string | undefined) => {
+    if (!postalCode || !routes.length) return null;
+    
+    // First characters of the postal code often indicate the area
+    const postalPrefix = postalCode.substring(0, 2).toUpperCase();
+    
+    // Find matching route by checking if any route's area contains the postal prefix
+    return routes.find(route => 
+      route.areas.some(area => 
+        // Check if area contains the postal prefix (case insensitive)
+        area.toUpperCase().includes(postalPrefix) || 
+        // Or if the postal prefix contains the area (case insensitive)
+        postalPrefix.includes(area.toUpperCase())
+      )
+    );
+  };
+  
+  // Function to get collection info from shipment metadata and matching route
+  const getCollectionInfo = (shipment: Shipment) => {
+    if (!shipment.metadata) return null;
+    
+    const senderPostalCode = shipment.metadata.sender?.postcode || 
+                            shipment.metadata.senderDetails?.postcode ||
+                            undefined;
+    
+    // Get any existing collection info stored in metadata
+    const existingCollectionInfo = shipment.metadata.collection || {};
+    
+    // Find matching route based on postal code
+    const matchingRoute = findMatchingRoute(senderPostalCode);
+    
+    if (matchingRoute) {
+      return {
+        route: existingCollectionInfo.route || matchingRoute.route,
+        date: existingCollectionInfo.date || matchingRoute.pickup_date,
+        scheduled: existingCollectionInfo.scheduled || true
+      };
+    }
+    
+    return existingCollectionInfo;
   };
 
-  // Function to handle sorting
-  const handleSort = (field: string) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Booking Confirmed':
+        return <Badge className="bg-blue-100 text-blue-800 border border-blue-300">{status}</Badge>;
+      case 'Ready for Pickup':
+        return <Badge className="bg-yellow-100 text-yellow-800 border border-yellow-300">{status}</Badge>;
+      case 'Processing in UK Warehouse':
+        return <Badge className="bg-indigo-100 text-indigo-800 border border-indigo-300">{status}</Badge>;
+      case 'In Transit to Zimbabwe':
+        return <Badge className="bg-purple-100 text-purple-800 border border-purple-300">{status}</Badge>;
+      case 'Customs Clearance':
+        return <Badge className="bg-orange-100 text-orange-800 border border-orange-300">{status}</Badge>;
+      case 'Processing in ZW Warehouse':
+        return <Badge className="bg-emerald-100 text-emerald-800 border border-emerald-300">{status}</Badge>;
+      case 'Out for Delivery':
+        return <Badge className="bg-green-100 text-green-800 border border-green-300">{status}</Badge>;
+      case 'Delivered':
+        return <Badge className="bg-green-500 text-white">{status}</Badge>;
+      case 'Failed Attempt':
+        return <Badge className="bg-red-100 text-red-800 border border-red-300">{status}</Badge>;
+      case 'Cancelled':
+        return <Badge variant="destructive">{status}</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
   
-  // Enhanced function to extract sender's name from metadata
-  const getSenderName = (shipment: Shipment): string => {
-    const metadata = shipment.metadata || {};
-    
-    // Check for different possible paths to sender name in metadata
-    if (metadata.senderDetails?.name) {
-      return metadata.senderDetails.name;
-    } else if (metadata.sender?.name) {
-      return metadata.sender.name;
-    } else if (metadata.sender?.firstName && metadata.sender?.lastName) {
-      return `${metadata.sender.firstName} ${metadata.sender.lastName}`;
-    } else if (metadata.firstName && metadata.lastName) {
-      return `${metadata.firstName} ${metadata.lastName}`;
-    } else if (metadata.sender_name) {
-      return metadata.sender_name;
-    } else if (metadata.sender_details?.name) {
-      return metadata.sender_details.name;
-    } else if (metadata.sender) {
-      // Handle case where sender might be structured differently
-      const sender = metadata.sender;
-      if (typeof sender === 'object') {
-        if ('firstName' in sender && 'lastName' in sender) {
-          return `${sender.firstName} ${sender.lastName}`;
-        }
-      }
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'Booking Confirmed':
+        return <CheckCircle className="h-5 w-5 text-blue-500" />;
+      case 'Ready for Pickup':
+        return <Calendar className="h-5 w-5 text-yellow-500" />;
+      case 'Processing in UK Warehouse':
+        return <Package className="h-5 w-5 text-indigo-500" />;
+      case 'In Transit to Zimbabwe':
+        return <Ship className="h-5 w-5 text-purple-500" />;
+      case 'Customs Clearance':
+        return <CircleAlert className="h-5 w-5 text-orange-500" />;
+      case 'Processing in ZW Warehouse':
+        return <Package className="h-5 w-5 text-emerald-500" />;
+      case 'Out for Delivery':
+        return <Truck className="h-5 w-5 text-green-500" />;
+      case 'Delivered':
+        return <CheckCircle className="h-5 w-5 text-green-600" />;
+      case 'Failed Attempt':
+        return <X className="h-5 w-5 text-red-500" />;
+      case 'Cancelled':
+        return <X className="h-5 w-5 text-red-500" />;
+      default:
+        return <Info className="h-5 w-5 text-gray-500" />;
     }
-    
-    // Check if metadata has differently structured sender info directly
-    if (metadata.firstName && metadata.lastName) {
-      return `${metadata.firstName} ${metadata.lastName}`;
-    }
-    
-    return 'No Name Provided';
-  };
-  
-  // Enhanced function to extract sender's email from metadata
-  const getSenderEmail = (shipment: Shipment): string => {
-    const metadata = shipment.metadata || {};
-    
-    if (metadata.senderDetails?.email) {
-      return metadata.senderDetails.email;
-    } else if (metadata.sender?.email) {
-      return metadata.sender.email;
-    } else if (metadata.email) {
-      return metadata.email;
-    } else if (metadata.sender_email) {
-      return metadata.sender_email;
-    }
-    
-    return 'No Email Provided';
-  };
-  
-  // Enhanced function to extract sender's phone from metadata
-  const getSenderPhone = (shipment: Shipment): string => {
-    const metadata = shipment.metadata || {};
-    
-    // Check for different possible paths to sender phone in metadata
-    if (metadata.senderDetails?.phone) {
-      return metadata.senderDetails.phone;
-    } else if (metadata.sender?.phone) {
-      return metadata.sender.phone;
-    } else if (metadata.phone) {
-      return metadata.phone;
-    } else if (metadata.sender_phone) {
-      return metadata.sender_phone;
-    } else if (metadata.sender_details?.phone) {
-      return metadata.sender_details.phone;
-    } else if (metadata.sender?.additionalPhone) {
-      return metadata.sender.additionalPhone;
-    } else if (metadata.additionalPhone) {
-      return metadata.additionalPhone;
-    }
-    
-    return 'No Phone Provided';
-  };
-  
-  // Enhanced function to extract receiver's name from metadata
-  const getReceiverName = (shipment: Shipment): string => {
-    const metadata = shipment.metadata || {};
-    
-    // Check for different possible paths to receiver name in metadata
-    if (metadata.recipientDetails?.name) {
-      return metadata.recipientDetails.name;
-    } else if (metadata.recipient?.name) {
-      return metadata.recipient.name;
-    } else if (metadata.recipientName) {
-      return metadata.recipientName;
-    } else if (metadata.receiver_name) {
-      return metadata.receiver_name;
-    } else if (metadata.recipient_details?.name) {
-      return metadata.recipient_details.name;
-    } else if (metadata.recipient) {
-      // In case recipient is structured differently
-      const recipient = metadata.recipient;
-      if (typeof recipient === 'object' && recipient !== null) {
-        return recipient.name || 'No Name Provided';
-      }
-    }
-    
-    return 'No Name Provided';
-  };
-  
-  // Enhanced function to extract receiver's phone from metadata
-  const getReceiverPhone = (shipment: Shipment): string => {
-    const metadata = shipment.metadata || {};
-    
-    // Check for different possible paths to receiver phone in metadata
-    if (metadata.recipientDetails?.phone) {
-      return metadata.recipientDetails.phone;
-    } else if (metadata.recipient?.phone) {
-      return metadata.recipient.phone;
-    } else if (metadata.recipientPhone) {
-      return metadata.recipientPhone;
-    } else if (metadata.receiver_phone) {
-      return metadata.receiver_phone;
-    } else if (metadata.recipient_details?.phone) {
-      return metadata.recipient_details.phone;
-    } else if (metadata.additionalRecipientPhone) {
-      return metadata.additionalRecipientPhone;
-    } else if (metadata.recipient?.additionalPhone) {
-      return metadata.recipient.additionalPhone;
-    }
-    
-    return 'No Phone Provided';
-  };
-  
-  // Function to get delivery address
-  const getDeliveryAddress = (shipment: Shipment): string => {
-    const metadata = shipment.metadata || {};
-    
-    if (metadata.recipientDetails?.address) {
-      return metadata.recipientDetails.address;
-    } else if (metadata.recipient?.address) {
-      return metadata.recipient.address;
-    } else if (metadata.deliveryAddress) {
-      return metadata.deliveryAddress;
-    } else if (shipment.destination) {
-      return shipment.destination;
-    }
-    
-    return 'No Address Provided';
-  };
-  
-  // Function to get pickup address
-  const getPickupAddress = (shipment: Shipment): string => {
-    const metadata = shipment.metadata || {};
-    
-    if (metadata.senderDetails?.address) {
-      return metadata.senderDetails.address;
-    } else if (metadata.sender?.address) {
-      return metadata.sender.address;
-    } else if (metadata.pickupAddress) {
-      const address = metadata.pickupAddress;
-      const city = metadata.pickupCity || '';
-      const postcode = metadata.pickupPostcode || '';
-      const country = metadata.pickupCountry || '';
-      
-      return [address, city, postcode, country].filter(Boolean).join(', ');
-    } else if (shipment.origin) {
-      return shipment.origin;
-    }
-    
-    return 'No Address Provided';
-  };
-  
-  // Filter shipments based on search and status filter
-  const filteredShipments = shipments.filter(shipment => {
-    const metadata = shipment.metadata || {};
-    const senderName = getSenderName(shipment);
-    const receiverName = getReceiverName(shipment);
-    const senderPhone = getSenderPhone(shipment);
-    const receiverPhone = getReceiverPhone(shipment);
-    const senderEmail = getSenderEmail(shipment);
-    
-    const matchesSearch = 
-      searchQuery === '' ||
-      shipment.tracking_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      senderName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      receiverName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      senderPhone.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      receiverPhone.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      senderEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      shipment.origin?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      shipment.destination?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = 
-      statusFilter === 'all' ||
-      shipment.status?.toLowerCase() === statusFilter.toLowerCase();
-    
-    return matchesSearch && matchesStatus;
-  });
-
-  // Helper function to render status badge
-  const renderStatusBadge = (status: string) => {
-    const statusLower = status?.toLowerCase() || '';
-    let variant: "default" | "destructive" | "outline" | "secondary" = "default";
-    
-    if (statusLower.includes('cancelled')) {
-      variant = "destructive";
-    } else if (statusLower.includes('delivered')) {
-      variant = "secondary";
-    } else if (statusLower.includes('processing') || statusLower.includes('pickup') || statusLower.includes('transit')) {
-      variant = "outline";
-    }
-    
-    return <Badge variant={variant}>{status}</Badge>;
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Shipment Management</CardTitle>
-        <CardDescription>
-          View and manage all shipments
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Search and Filter Controls */}
-        <div className="flex flex-col md:flex-row gap-4 items-end">
-          <div className="relative flex-grow">
-            <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
-            <Input
-              placeholder="Search by tracking #, sender, receiver, origin, destination..."
-              className="pl-10"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          
-          <div className="flex gap-2">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <Filter className="h-4 w-4 mr-2" />
-                <span>Status</span>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                {STATUS_OPTIONS.map((status) => (
-                  <SelectItem key={status.toLowerCase()} value={status.toLowerCase()}>
-                    {status}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            <Button variant="outline" onClick={fetchShipments}>
-              <RefreshCcw className="h-4 w-4 mr-2" />
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-2 sm:space-y-0">
+            <div>
+              <CardTitle>Shipment Management</CardTitle>
+              <CardDescription>Track and manage shipments</CardDescription>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={resetFilters} 
+              disabled={loading}
+            >
+              <RefreshCcw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
           </div>
-        </div>
-
-        {/* Shipments Table */}
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-          </div>
-        ) : filteredShipments.length === 0 ? (
-          <div className="text-center py-8">
-            <Package className="h-16 w-16 mx-auto text-muted-foreground mb-2" />
-            <h3 className="text-lg font-medium">No shipments found</h3>
-            <p className="text-muted-foreground">Try adjusting your filters</p>
-          </div>
-        ) : (
-          <div className="border rounded-md overflow-hidden">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort('tracking_number')}>
-                      Tracking #
-                      {sortField === 'tracking_number' && (
-                        <ArrowUpDown className="inline-block ml-1 h-4 w-4" />
-                      )}
-                    </TableHead>
-                    <TableHead>Sender Name</TableHead>
-                    <TableHead>Receiver Name</TableHead>
-                    <TableHead>Sender number</TableHead>
-                    <TableHead>Receiver Number</TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort('origin')}>
-                      Origin
-                      {sortField === 'origin' && (
-                        <ArrowUpDown className="inline-block ml-1 h-4 w-4" />
-                      )}
-                    </TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort('destination')}>
-                      Destination
-                      {sortField === 'destination' && (
-                        <ArrowUpDown className="inline-block ml-1 h-4 w-4" />
-                      )}
-                    </TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort('created_at')}>
-                      Created
-                      {sortField === 'created_at' && (
-                        <ArrowUpDown className="inline-block ml-1 h-4 w-4" />
-                      )}
-                    </TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredShipments.map(shipment => (
-                    <TableRow key={shipment.id}>
-                      <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
-                      <TableCell className="max-w-[150px] truncate">{getSenderName(shipment)}</TableCell>
-                      <TableCell className="max-w-[150px] truncate">{getReceiverName(shipment)}</TableCell>
-                      <TableCell className="max-w-[150px] truncate">{getSenderPhone(shipment)}</TableCell>
-                      <TableCell className="max-w-[150px] truncate">{getReceiverPhone(shipment)}</TableCell>
-                      <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
-                      <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
-                      <TableCell>{renderStatusBadge(shipment.status)}</TableCell>
-                      <TableCell>{format(new Date(shipment.created_at), 'dd MMM yyyy')}</TableCell>
-                      <TableCell className="text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => handleViewShipment(shipment)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col space-y-4 md:flex-row md:space-y-0 md:space-x-4 mb-6">
+            <div className="relative flex-grow">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                className="pl-10"
+                placeholder="Search by tracking number, origin, or destination"
+                value={filters.search}
+                onChange={(e) => handleSearch(e.target.value)}
+              />
             </div>
-          </div>
-        )}
-        
-        <div className="text-sm text-muted-foreground mt-2">
-          Showing {filteredShipments.length} of {shipments.length} shipments
-        </div>
-      </CardContent>
-
-      {/* View Shipment Details Dialog */}
-      <Dialog open={!!viewingShipment} onOpenChange={(open) => !open && setViewingShipment(null)}>
-        <DialogContent className="max-w-[900px]">
-          <DialogHeader>
-            <DialogTitle>Shipment Details</DialogTitle>
-            <DialogDescription>
-              Tracking Number: {viewingShipment?.tracking_number}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {viewingShipment && (
-            <div className="space-y-6 py-4">
-              {/* Shipment Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">Origin</h3>
-                  <p>{viewingShipment.origin || 'Not specified'}</p>
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">Destination</h3>
-                  <p>{viewingShipment.destination || 'Not specified'}</p>
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">Created At</h3>
-                  <p>{format(new Date(viewingShipment.created_at), 'dd MMM yyyy HH:mm')}</p>
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">Updated At</h3>
-                  <p>{format(new Date(viewingShipment.updated_at), 'dd MMM yyyy HH:mm')}</p>
-                </div>
-              </div>
-              
-              {/* Sender and Recipient Details */}
-              <div>
-                <h3 className="text-lg font-medium mb-3">Contact Details</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 dark:bg-gray-800 p-4 rounded-md">
-                  <div>
-                    <h4 className="font-medium">Sender</h4>
-                    <div className="mt-2 space-y-2">
-                      <div className="flex items-start">
-                        <User className="h-4 w-4 mt-1 mr-2 text-gray-500" />
-                        <div>
-                          <p className="font-medium">{getSenderName(viewingShipment)}</p>
-                          <p className="text-sm text-gray-500">{getSenderEmail(viewingShipment)}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start">
-                        <Phone className="h-4 w-4 mt-1 mr-2 text-gray-500" />
-                        <div>
-                          <p>{getSenderPhone(viewingShipment)}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start">
-                        <MapPin className="h-4 w-4 mt-1 mr-2 text-gray-500" />
-                        <div>
-                          <p className="text-sm">
-                            {getPickupAddress(viewingShipment)}
-                          </p>
-                        </div>
-                      </div>
+            <div className="flex space-x-4">
+              <div className="w-full min-w-[200px] md:w-[200px]">
+                <Select
+                  value={filters.status || ''}
+                  onValueChange={handleFilterChange}
+                >
+                  <SelectTrigger className="w-full">
+                    <div className="flex items-center">
+                      <Filter className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Filter by status" />
                     </div>
-                  </div>
-                  <div>
-                    <h4 className="font-medium">Receiver</h4>
-                    <div className="mt-2 space-y-2">
-                      <div className="flex items-start">
-                        <User className="h-4 w-4 mt-1 mr-2 text-gray-500" />
-                        <p className="font-medium">{getReceiverName(viewingShipment)}</p>
-                      </div>
-                      <div className="flex items-start">
-                        <Phone className="h-4 w-4 mt-1 mr-2 text-gray-500" />
-                        <div>
-                          <p>{getReceiverPhone(viewingShipment)}</p>
-                          {viewingShipment.metadata?.additionalRecipientPhone && (
-                            <p className="text-sm text-gray-500">Additional: {viewingShipment.metadata.additionalRecipientPhone}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-start">
-                        <MapPin className="h-4 w-4 mt-1 mr-2 text-gray-500" />
-                        <div>
-                          <p className="text-sm">
-                            {getDeliveryAddress(viewingShipment)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Shipment Details Section */}
-              <div>
-                <h3 className="text-lg font-medium mb-3">Shipment Details</h3>
-                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-md">
-                  {viewingShipment.metadata?.shipmentDetails && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-medium text-muted-foreground">Shipment Type</h4>
-                        <p>{viewingShipment.metadata.shipmentDetails.type || 'Not specified'}</p>
-                      </div>
-                      
-                      {viewingShipment.metadata.shipmentDetails.includeDrums && (
-                        <>
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-medium text-muted-foreground">Drum Quantity</h4>
-                            <p>{viewingShipment.metadata.shipmentDetails.quantity || 'Not specified'}</p>
-                          </div>
-                          
-                          {viewingShipment.metadata.shipmentDetails.wantMetalSeal && (
-                            <div className="space-y-1">
-                              <h4 className="text-sm font-medium text-muted-foreground">Metal Seals</h4>
-                              <p>Yes</p>
-                            </div>
-                          )}
-                        </>
-                      )}
-                      
-                      {viewingShipment.metadata.shipmentDetails.includeOtherItems && (
-                        <>
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-medium text-muted-foreground">Item Category</h4>
-                            <p>{viewingShipment.metadata.shipmentDetails.category || 'Not specified'}</p>
-                          </div>
-                          
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-medium text-muted-foreground">Specific Item</h4>
-                            <p>{viewingShipment.metadata.shipmentDetails.specificItem || 'Not specified'}</p>
-                          </div>
-                          
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-medium text-muted-foreground">Description</h4>
-                            <p>{viewingShipment.metadata.shipmentDetails.description || 'Not provided'}</p>
-                          </div>
-                        </>
-                      )}
-                      
-                      {viewingShipment.metadata.shipmentDetails.doorToDoor && (
-                        <div className="space-y-1">
-                          <h4 className="text-sm font-medium text-muted-foreground">Door to Door</h4>
-                          <p>Yes</p>
-                          
-                          {viewingShipment.metadata.shipmentDetails.additionalAddresses && 
-                           viewingShipment.metadata.shipmentDetails.additionalAddresses.length > 0 && (
-                            <div className="mt-2">
-                              <h5 className="text-sm font-medium">Additional Delivery Addresses:</h5>
-                              <ul className="list-disc pl-5 text-sm">
-                                {viewingShipment.metadata.shipmentDetails.additionalAddresses.map((addr: string, idx: number) => (
-                                  <li key={idx}>{addr}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      
-                      {viewingShipment.metadata.shipmentDetails.services && 
-                       viewingShipment.metadata.shipmentDetails.services.length > 0 && (
-                        <div className="space-y-1 col-span-2">
-                          <h4 className="text-sm font-medium text-muted-foreground">Additional Services</h4>
-                          <ul className="list-disc pl-5">
-                            {viewingShipment.metadata.shipmentDetails.services.map((service: any, idx: number) => (
-                              <li key={idx}>{service.name} - £{service.price}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {!viewingShipment.metadata?.shipmentDetails && viewingShipment.metadata?.shipment && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-medium text-muted-foreground">Shipment Type</h4>
-                        <p>{viewingShipment.metadata.shipment.type || 'Not specified'}</p>
-                      </div>
-                      
-                      {viewingShipment.metadata.shipment.includeDrums && (
-                        <>
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-medium text-muted-foreground">Drum Quantity</h4>
-                            <p>{viewingShipment.metadata.shipment.quantity || 'Not specified'}</p>
-                          </div>
-                        </>
-                      )}
-                      
-                      {viewingShipment.metadata.shipment.includeOtherItems && (
-                        <>
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-medium text-muted-foreground">Item Category</h4>
-                            <p>{viewingShipment.metadata.shipment.category || 'Not specified'}</p>
-                          </div>
-                          
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-medium text-muted-foreground">Description</h4>
-                            <p>{viewingShipment.metadata.shipment.description || 'Not provided'}</p>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-                  
-                  {!viewingShipment.metadata?.shipmentDetails && !viewingShipment.metadata?.shipment && (
-                    <p className="text-gray-500">No detailed shipment information available</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Status Section */}
-              <div className="space-y-2">
-                <h3 className="text-lg font-medium">Status</h3>
-                <div className="flex items-center justify-between">
-                  <Badge variant="outline">{viewingShipment.status}</Badge>
-                  {!editingStatus ? (
-                    <Button variant="ghost" size="sm" onClick={() => setEditingStatus(true)}>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit Status
-                    </Button>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                        <SelectTrigger className="w-[180px]">
-                          <SelectValue placeholder="Select Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STATUS_OPTIONS.map((status) => (
-                            <SelectItem key={status} value={status}>
-                              {status}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button variant="outline" size="sm" onClick={handleUpdateStatus}>
-                        Update
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setEditingStatus(false)}>
-                        Cancel
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Status History */}
-              <div className="space-y-2">
-                <h3 className="text-lg font-medium">Status History</h3>
-                {loadingHistory ? (
-                  <div className="flex justify-center py-4">
-                    <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary"></div>
-                  </div>
-                ) : statusHistory.length === 0 ? (
-                  <div className="text-center py-4">
-                    <AlertTriangle className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
-                    <h4 className="text-sm font-medium">No status history found</h4>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {statusHistory.map(item => (
-                      <Card key={item.id}>
-                        <CardHeader>
-                          <CardTitle>Status: {item.status}</CardTitle>
-                          <CardDescription>
-                            Updated by {item.created_by} on {format(new Date(item.created_at), 'dd MMM yyyy HH:mm')}
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <p>{item.notes || 'No notes provided.'}</p>
-                        </CardContent>
-                      </Card>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All Statuses</SelectItem>
+                    {statusOptions.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status}
+                      </SelectItem>
                     ))}
-                  </div>
-                )}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-          )}
-          
-          <DialogFooter>
-            <Button onClick={() => setViewingShipment(null)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </Card>
+          </div>
+
+          <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="mt-6">
+            <TabsList className="grid grid-cols-5 mb-6">
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="pending">Pending</TabsTrigger>
+              <TabsTrigger value="processing">Processing</TabsTrigger>
+              <TabsTrigger value="delivery">Delivery</TabsTrigger>
+              <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
+            </TabsList>
+            
+            {loading ? (
+              <div className="flex justify-center py-10">
+                <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+              </div>
+            ) : (
+              <TabsContent value={activeTab}>
+                <div className="border rounded-md overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[120px]">Tracking #</TableHead>
+                        <TableHead>Customer</TableHead>
+                        <TableHead className="w-[140px]">Status</TableHead>
+                        <TableHead>Origin</TableHead>
+                        <TableHead>Destination</TableHead>
+                        <TableHead className="w-[120px]">Created</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {shipments.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-10">
+                            <Package className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+                            <p className="text-gray-500">No shipments found</p>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        shipments.map((shipment) => (
+                          <TableRow key={shipment.id}>
+                            <TableCell className="font-medium">
+                              {shipment.tracking_number}
+                            </TableCell>
+                            <TableCell>
+                              {shipment.profiles?.full_name || shipment.profiles?.email || 'Unknown User'}
+                            </TableCell>
+                            <TableCell>
+                              {getStatusBadge(shipment.status)}
+                            </TableCell>
+                            <TableCell className="max-w-[200px] truncate">
+                              {shipment.origin}
+                            </TableCell>
+                            <TableCell className="max-w-[200px] truncate">
+                              {shipment.destination}
+                            </TableCell>
+                            <TableCell>
+                              {format(new Date(shipment.created_at), 'MMM d, yyyy')}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={() => setSelectedShipment(shipment)}
+                                  >
+                                    View Details
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-3xl h-[90vh] overflow-y-auto">
+                                  {selectedShipment && (
+                                    <>
+                                      <DialogHeader>
+                                        <DialogTitle className="flex items-center gap-2">
+                                          <Package className="h-5 w-5" />
+                                          Shipment #{selectedShipment.tracking_number}
+                                        </DialogTitle>
+                                        <DialogDescription>
+                                          View and update shipment details
+                                        </DialogDescription>
+                                      </DialogHeader>
+                                      
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                                        {/* Left Column - Status and Basic Info */}
+                                        <div className="space-y-6">
+                                          {/* Status Section */}
+                                          <div>
+                                            <Label className="text-base font-semibold">Current Status</Label>
+                                            <div className="flex items-center mt-2 mb-4">
+                                              {getStatusIcon(selectedShipment.status)}
+                                              <span className="ml-2">{selectedShipment.status}</span>
+                                            </div>
+                                            
+                                            <div className="space-y-2">
+                                              <Label>Update Status</Label>
+                                              <Select
+                                                defaultValue={selectedShipment.status}
+                                                onValueChange={(value) => handleStatusChange(selectedShipment.id, value)}
+                                              >
+                                                <SelectTrigger>
+                                                  <SelectValue placeholder="Select a new status" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                  {statusOptions.map((status) => (
+                                                    <SelectItem key={status} value={status}>
+                                                      {status}
+                                                    </SelectItem>
+                                                  ))}
+                                                </SelectContent>
+                                              </Select>
+                                              
+                                              <Button 
+                                                className="w-full mt-2" 
+                                                disabled={isUpdating}
+                                                onClick={() => handleStatusChange(selectedShipment.id, selectedShipment.status)}
+                                              >
+                                                {isUpdating ? (
+                                                  <>
+                                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                    Updating...
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    <RotateCw className="h-4 w-4 mr-2" />
+                                                    Update Status
+                                                  </>
+                                                )}
+                                              </Button>
+                                            </div>
+                                          </div>
+                                          
+                                          {/* Shipment Basic Info */}
+                                          <div>
+                                            <Label className="text-base font-semibold">Shipment Information</Label>
+                                            <div className="mt-2 space-y-2 text-sm">
+                                              <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Created:</span>
+                                                <span>{format(new Date(selectedShipment.created_at), 'MMM d, yyyy HH:mm')}</span>
+                                              </div>
+                                              <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Last Updated:</span>
+                                                <span>{format(new Date(selectedShipment.updated_at), 'MMM d, yyyy HH:mm')}</span>
+                                              </div>
+                                              <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Origin:</span>
+                                                <span className="text-right max-w-[70%]">{selectedShipment.origin}</span>
+                                              </div>
+                                              <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Destination:</span>
+                                                <span className="text-right max-w-[70%]">{selectedShipment.destination}</span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                          
+                                          {/* Collection Information */}
+                                          <div>
+                                            <Label className="text-base font-semibold">Collection Information</Label>
+                                            {(() => {
+                                              const collectionInfo = getCollectionInfo(selectedShipment);
+                                              return collectionInfo ? (
+                                                <div className="mt-2 space-y-2 text-sm">
+                                                  <div className="flex justify-between">
+                                                    <span className="text-muted-foreground">Route:</span>
+                                                    <span>{collectionInfo.route || 'Not assigned'}</span>
+                                                  </div>
+                                                  <div className="flex justify-between">
+                                                    <span className="text-muted-foreground">Pickup Date:</span>
+                                                    <span>{collectionInfo.date || 'Not scheduled'}</span>
+                                                  </div>
+                                                  <div className="flex justify-between">
+                                                    <span className="text-muted-foreground">Status:</span>
+                                                    <span>{collectionInfo.scheduled ? 'Scheduled' : 'Not scheduled'}</span>
+                                                  </div>
+                                                </div>
+                                              ) : (
+                                                <div className="mt-2 text-sm text-muted-foreground">
+                                                  No collection information available
+                                                </div>
+                                              );
+                                            })()}
+                                          </div>
+                                        </div>
+                                        
+                                        {/* Right Column - Sender, Recipient, Shipment Details */}
+                                        <div className="space-y-6">
+                                          {/* Sender Information */}
+                                          <div>
+                                            <Label className="text-base font-semibold">Sender Details</Label>
+                                            <div className="mt-2 space-y-2 text-sm">
+                                              {(() => {
+                                                const sender = selectedShipment.metadata?.sender || selectedShipment.metadata?.senderDetails;
+                                                if (!sender) return <div className="text-muted-foreground">No sender details available</div>;
+                                                
+                                                const name = sender.name || 
+                                                  (sender.firstName && sender.lastName ? `${sender.firstName} ${sender.lastName}` : undefined);
+                                                
+                                                return (
+                                                  <>
+                                                    {name && (
+                                                      <div className="flex justify-between">
+                                                        <span className="text-muted-foreground">Name:</span>
+                                                        <span>{name}</span>
+                                                      </div>
+                                                    )}
+                                                    
+                                                    {sender.email && (
+                                                      <div className="flex justify-between">
+                                                        <span className="text-muted-foreground">Email:</span>
+                                                        <span>{sender.email}</span>
+                                                      </div>
+                                                    )}
+                                                    
+                                                    {sender.phone && (
+                                                      <div className="flex justify-between">
+                                                        <span className="text-muted-foreground">Phone:</span>
+                                                        <span>{sender.phone}</span>
+                                                      </div>
+                                                    )}
+                                                    
+                                                    {sender.address && (
+                                                      <div className="flex justify-between">
+                                                        <span className="text-muted-foreground">Address:</span>
+                                                        <span className="text-right max-w-[70%]">{sender.address}</span>
+                                                      </div>
+                                                    )}
+                                                    
+                                                    {sender.postcode && (
+                                                      <div className="flex justify-between">
+                                                        <span className="text-muted-foreground">Postcode:</span>
+                                                        <span>{sender.postcode}</span>
+                                                      </div>
+                                                    )}
+                                                  </>
+                                                );
+                                              })()}
+                                            </div>
+                                          </div>
+                                          
+                                          {/* Recipient Information */}
+                                          <div>
+                                            <Label className="text-base font-semibold">Recipient Details</Label>
+                                            <div className="mt-2 space-y-2 text-sm">
+                                              {(() => {
+                                                const recipient = selectedShipment.metadata?.recipient || selectedShipment.metadata?.recipientDetails;
+                                                if (!recipient) return <div className="text-muted-foreground">No recipient details available</div>;
+                                                
+                                                const name = recipient.name || 
+                                                  (recipient.firstName && recipient.lastName ? `${recipient.firstName} ${recipient.lastName}` : undefined);
+                                                
+                                                return (
+                                                  <>
+                                                    {name && (
+                                                      <div className="flex justify-between">
+                                                        <span className="text-muted-foreground">Name:</span>
+                                                        <span>{name}</span>
+                                                      </div>
+                                                    )}
+                                                    
+                                                    {recipient.phone && (
+                                                      <div className="flex justify-between">
+                                                        <span className="text-muted-foreground">Phone:</span>
+                                                        <span>{recipient.phone}</span>
+                                                      </div>
+                                                    )}
+                                                    
+                                                    {recipient.address && (
+                                                      <div className="flex justify-between">
+                                                        <span className="text-muted-foreground">Address:</span>
+                                                        <span className="text-right max-w-[70%]">{recipient.address}</span>
+                                                      </div>
+                                                    )}
+                                                    
+                                                    {recipient.city && (
+                                                      <div className="flex justify-between">
+                                                        <span className="text-muted-foreground">City:</span>
+                                                        <span>{recipient.city}</span>
+                                                      </div>
+                                                    )}
+                                                  </>
+                                                );
+                                              })()}
+                                            </div>
+                                          </div>
+                                          
+                                          {/* Shipment Details */}
+                                          <div>
+                                            <Label className="text-base font-semibold">Package Details</Label>
+                                            <div className="mt-2 space-y-2 text-sm">
+                                              {(() => {
+                                                const shipmentDetails = selectedShipment.metadata?.shipment || selectedShipment.metadata?.shipmentDetails;
+                                                if (!shipmentDetails) return <div className="text-muted-foreground">No package details available</div>;
+                                                
+                                                return (
+                                                  <>
+                                                    {shipmentDetails.type && (
+                                                      <div className="flex justify-between">
+                                                        <span className="text-muted-foreground">Type:</span>
+                                                        <span>{shipmentDetails.type}</span>
+                                                      </div>
+                                                    )}
+                                                    
+                                                    {shipmentDetails.quantity && (
+                                                      <div className="flex justify-between">
+                                                        <span className="text-muted-foreground">Quantity:</span>
+                                                        <span>{shipmentDetails.quantity}</span>
+                                                      </div>
+                                                    )}
+                                                    
+                                                    {shipmentDetails.category && (
+                                                      <div className="flex justify-between">
+                                                        <span className="text-muted-foreground">Category:</span>
+                                                        <span>{shipmentDetails.category}</span>
+                                                      </div>
+                                                    )}
+                                                    
+                                                    {shipmentDetails.description && (
+                                                      <div className="flex justify-between">
+                                                        <span className="text-muted-foreground">Description:</span>
+                                                        <span className="text-right max-w-[70%]">{shipmentDetails.description}</span>
+                                                      </div>
+                                                    )}
+                                                    
+                                                    {(typeof shipmentDetails.includeDrums !== 'undefined') && (
+                                                      <div className="flex justify-between">
+                                                        <span className="text-muted-foreground">Include Drums:</span>
+                                                        <span>{shipmentDetails.includeDrums ? 'Yes' : 'No'}</span>
+                                                      </div>
+                                                    )}
+                                                    
+                                                    {(typeof shipmentDetails.includeOtherItems !== 'undefined') && (
+                                                      <div className="flex justify-between">
+                                                        <span className="text-muted-foreground">Include Other Items:</span>
+                                                        <span>{shipmentDetails.includeOtherItems ? 'Yes' : 'No'}</span>
+                                                      </div>
+                                                    )}
+                                                  </>
+                                                );
+                                              })()}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <DialogFooter>
+                                        <Button variant="outline">Print Details</Button>
+                                        <Button>Close</Button>
+                                      </DialogFooter>
+                                    </>
+                                  )}
+                                </DialogContent>
+                              </Dialog>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
+            )}
+          </Tabs>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
