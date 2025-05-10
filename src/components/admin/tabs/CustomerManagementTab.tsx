@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -60,12 +59,12 @@ const CustomerManagementTab = () => {
 
       if (profilesError) throw profilesError;
 
-      // Fetch shipment counts for each user
+      // Fetch shipment counts for each user using a count aggregation
+      // This avoids using .group() which doesn't exist
       const { data: shipmentCountsData, error: shipmentError } = await supabase
         .from('shipments')
-        .select('user_id, count(*)')
         .select('user_id, count')
-        .group('user_id');
+        .select('user_id, count')
         
       if (shipmentError) throw shipmentError;
       
