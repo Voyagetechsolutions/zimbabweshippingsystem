@@ -70,6 +70,7 @@ import {
   Check,
   Search
 } from 'lucide-react';
+import { formatDate } from '@/utils/formatters'; // Import the utility function
 
 interface RouteData {
   id: string;
@@ -413,6 +414,7 @@ const RouteManagementTab = () => {
                           selected={newRouteDate}
                           onSelect={setNewRouteDate}
                           initialFocus
+                          className="pointer-events-auto"
                         />
                       </PopoverContent>
                     </Popover>
@@ -566,6 +568,7 @@ const RouteManagementTab = () => {
                                                 selected={editRouteDate}
                                                 onSelect={setEditRouteDate}
                                                 initialFocus
+                                                className="pointer-events-auto"
                                               />
                                             </PopoverContent>
                                           </Popover>

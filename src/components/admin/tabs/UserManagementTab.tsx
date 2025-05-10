@@ -35,6 +35,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -106,7 +107,6 @@ const UserManagementTab = () => {
       
       if (error) throw error;
       
-      console.log('Fetched user profiles:', data);
       setUsers(data || []);
     } catch (error: any) {
       console.error('Error fetching users:', error);
@@ -122,8 +122,8 @@ const UserManagementTab = () => {
 
   const handleOpenEditDialog = (user: UserProfile) => {
     setSelectedUser(user);
-    setEditRole(user.role || 'customer');
-    setEditIsAdmin(user.is_admin || false);
+    setEditRole(user.role);
+    setEditIsAdmin(user.is_admin);
   };
   
   const updateUserRole = async () => {
@@ -199,7 +199,7 @@ const UserManagementTab = () => {
       case 'warehouse':
         return <Badge className="bg-indigo-100 text-indigo-800 border border-indigo-300">Warehouse</Badge>;
       default:
-        return <Badge variant="outline">{user.role || 'No Role'}</Badge>;
+        return <Badge variant="outline">{user.role}</Badge>;
     }
   };
 
@@ -317,7 +317,7 @@ const UserManagementTab = () => {
                             {format(new Date(user.created_at), 'MMM d, yyyy')}
                           </TableCell>
                           <TableCell className="text-sm text-gray-500">
-                            {format(new Date(user.updated_at || user.created_at), 'MMM d, yyyy')}
+                            {format(new Date(user.updated_at), 'MMM d, yyyy')}
                           </TableCell>
                           <TableCell className="text-right">
                             <DropdownMenu>

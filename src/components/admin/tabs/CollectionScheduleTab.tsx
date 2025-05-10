@@ -4,42 +4,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Card, 
+  CardContent, 
   CardHeader, 
-  CardTitle, 
-  CardDescription, 
-  CardContent 
+  CardTitle,
+  CardDescription,
+  CardFooter
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { isValid, parseISO } from 'date-fns';
-import { 
-  CalendarIcon, 
-  MapPin, 
-  RefreshCcw, 
-  PlusCircle, 
-  Edit, 
-  TrashIcon, 
-  CheckCircle,
-  Loader2
-} from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -49,304 +22,171 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { 
+  Calendar as CalendarIcon, 
+  Loader2, 
+  Save, 
+  Edit, 
+  Calendar 
+} from 'lucide-react';
+import { format, isValid } from 'date-fns';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { formatDate } from '@/utils/formatters';
 
 interface CollectionSchedule {
   id: string;
   route: string;
-  pickup_date: string;
   areas: string[];
+  pickup_date: string;
   created_at: string;
   updated_at: string;
 }
 
-interface CalendarEvent {
-  date: Date;
-  route: string;
-  id: string;
-  areas: string[];
-}
-
 const CollectionScheduleTab = () => {
   const { toast } = useToast();
+  const [schedules, setSchedules] = useState<CollectionSchedule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [routes, setRoutes] = useState<CollectionSchedule[]>([]);
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   
-  // Form state for editing a schedule
-  const [isEditing, setIsEditing] = useState(false);
-  const [selectedRoute, setSelectedRoute] = useState<CollectionSchedule | null>(null);
-  const [selectedRouteId, setSelectedRouteId] = useState<string>('');
-  const [newPickupDate, setNewPickupDate] = useState<Date | undefined>(new Date());
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Today's schedules
-  const [todaySchedules, setTodaySchedules] = useState<CollectionSchedule[]>([]);
-  
   useEffect(() => {
-    fetchCollectionSchedules();
+    fetchSchedules();
   }, []);
   
-  const fetchCollectionSchedules = async () => {
+  const fetchSchedules = async () => {
     setLoading(true);
-    
     try {
       const { data, error } = await supabase
         .from('collection_schedules')
         .select('*')
-        .order('pickup_date', { ascending: true });
+        .order('route', { ascending: true });
       
       if (error) throw error;
       
-      setRoutes(data || []);
-      
-      // Transform the data for the calendar
-      const calendarEvents: CalendarEvent[] = [];
-      data?.forEach(route => {
-        try {
-          const date = parseISO(route.pickup_date);
-          if (isValid(date)) {
-            calendarEvents.push({
-              date,
-              route: route.route,
-              id: route.id,
-              areas: route.areas
-            });
-          }
-        } catch (err) {
-          console.error(`Invalid date format for route ${route.route}: ${route.pickup_date}`);
-        }
-      });
-      
-      setEvents(calendarEvents);
-      
-      // Find schedules for today
-      const today = new Date();
-      const todaysSchedules = data?.filter(route => {
-        try {
-          const pickupDate = parseISO(route.pickup_date);
-          return (
-            pickupDate.getDate() === today.getDate() &&
-            pickupDate.getMonth() === today.getMonth() &&
-            pickupDate.getFullYear() === today.getFullYear()
-          );
-        } catch {
-          return false;
-        }
-      }) || [];
-      
-      setTodaySchedules(todaysSchedules);
-      
-    } catch (error) {
+      setSchedules(data || []);
+    } catch (error: any) {
       console.error('Error fetching collection schedules:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load collection schedule data',
-        variant: 'destructive'
+        description: 'Failed to load collection schedules',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
   };
   
-  const updateCollectionDate = async () => {
-    if (!selectedRoute || !selectedRoute.id || !newPickupDate) {
+  const updateCollectionDate = async (id: string) => {
+    if (!selectedDate) {
       toast({
-        title: 'Missing information',
-        description: 'Please select a route and a new date',
-        variant: 'destructive'
+        title: 'Date required',
+        description: 'Please select a date for the collection',
+        variant: 'destructive',
       });
       return;
     }
     
-    setIsSubmitting(true);
-    
+    setIsEditing(true);
     try {
-      // Format the date as YYYY-MM-DD
-      const formattedDate = format(newPickupDate, 'yyyy-MM-dd');
+      // Format date as string (YYYY-MM-DD)
+      const formattedDate = format(selectedDate, 'yyyy-MM-dd');
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('collection_schedules')
-        .update({ 
+        .update({
           pickup_date: formattedDate,
           updated_at: new Date().toISOString()
         })
-        .eq('id', selectedRoute.id);
-      
-      if (error) throw error;
-      
-      // Update the local state
-      setRoutes(prevRoutes => 
-        prevRoutes.map(route => 
-          route.id === selectedRoute.id 
-            ? { ...route, pickup_date: formattedDate, updated_at: new Date().toISOString() } 
-            : route
-        )
-      );
-      
-      // Update the calendar events
-      setEvents(prevEvents => {
-        const updatedEvents = prevEvents.filter(event => event.id !== selectedRoute.id);
-        updatedEvents.push({
-          date: newPickupDate,
-          route: selectedRoute.route,
-          id: selectedRoute.id,
-          areas: selectedRoute.areas
-        });
-        return updatedEvents;
-      });
-      
-      // Reset form
-      setSelectedRoute(null);
-      setNewPickupDate(undefined);
-      setIsEditing(false);
-      
-      // Check if this affects today's schedules
-      const today = new Date();
-      const isToday = (
-        newPickupDate.getDate() === today.getDate() &&
-        newPickupDate.getMonth() === today.getMonth() &&
-        newPickupDate.getFullYear() === today.getFullYear()
-      );
-      
-      if (isToday) {
-        // Refresh today's schedules
-        fetchCollectionSchedules();
-      }
-      
-      toast({
-        title: 'Schedule Updated',
-        description: `Collection date for ${selectedRoute.route} has been updated.`,
-      });
-      
-    } catch (error) {
-      console.error('Error updating collection date:', error);
-      toast({
-        title: 'Update Failed',
-        description: 'Could not update the collection date.',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-  
-  const deleteSchedule = async (scheduleId: string) => {
-    try {
-      const { error } = await supabase
-        .from('collection_schedules')
-        .delete()
-        .eq('id', scheduleId);
+        .eq('id', id)
+        .select();
       
       if (error) throw error;
       
       // Update local state
-      setRoutes(prevRoutes => prevRoutes.filter(route => route.id !== scheduleId));
-      setEvents(prevEvents => prevEvents.filter(event => event.id !== scheduleId));
-      
-      // Update today's schedules if needed
-      setTodaySchedules(prevSchedules => prevSchedules.filter(schedule => schedule.id !== scheduleId));
-      
-      toast({
-        title: 'Schedule Deleted',
-        description: 'The collection schedule has been deleted.',
-      });
-      
-    } catch (error) {
-      console.error('Error deleting schedule:', error);
-      toast({
-        title: 'Delete Failed',
-        description: 'Could not delete the collection schedule.',
-        variant: 'destructive'
-      });
-    }
-  };
-  
-  // Handle route selection for editing
-  const handleRouteSelect = (routeId: string) => {
-    setSelectedRouteId(routeId);
-    const route = routes.find(r => r.id === routeId);
-    if (route) {
-      setSelectedRoute(route);
-      
-      // Parse the date from the route
-      try {
-        const pickupDate = parseISO(route.pickup_date);
-        if (isValid(pickupDate)) {
-          setNewPickupDate(pickupDate);
-        } else {
-          setNewPickupDate(new Date());
-        }
-      } catch {
-        setNewPickupDate(new Date());
+      if (data && data.length > 0) {
+        setSchedules(prevSchedules => 
+          prevSchedules.map(schedule => 
+            schedule.id === id ? data[0] : schedule
+          )
+        );
       }
+      
+      toast({
+        title: 'Date updated',
+        description: 'Collection date has been updated successfully',
+      });
+      
+      // Reset editing state
+      setEditingScheduleId(null);
+      setSelectedDate(new Date());
+    } catch (error: any) {
+      console.error('Error updating collection date:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update collection date',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsEditing(false);
     }
-  };
-
-  // Function to find events for a particular date
-  const getEventsForDate = (date: Date) => {
-    return events.filter(event => {
-      return (
-        event.date.getDate() === date.getDate() &&
-        event.date.getMonth() === date.getMonth() &&
-        event.date.getFullYear() === date.getFullYear()
-      );
-    });
-  };
-
-  // Define the custom component for calendar days
-  const renderCalendarDay = (day: Date) => {
-    const dayEvents = getEventsForDate(day);
-    
-    if (dayEvents.length > 0) {
-      return (
-        <div className="relative h-full w-full p-2">
-          <div className="absolute top-0 right-0">
-            <Badge variant="secondary" className="text-xs">
-              {dayEvents.length}
-            </Badge>
-          </div>
-          {day.getDate()}
-        </div>
-      );
-    }
-    
-    return day.getDate();
   };
   
-  // Get the selected date's events for display
-  const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : [];
+  const handleEditClick = (schedule: CollectionSchedule) => {
+    setEditingScheduleId(schedule.id);
+    try {
+      // Try to parse the date, fallback to current date if invalid
+      const parsedDate = new Date(schedule.pickup_date);
+      setSelectedDate(isValid(parsedDate) ? parsedDate : new Date());
+    } catch (error) {
+      console.error('Error parsing date:', error);
+      setSelectedDate(new Date());
+    }
+  };
+
+  // Helper function to safely format dates
+  const safeFormatDate = (dateStr: string, formatStr: string = 'MMMM d, yyyy') => {
+    try {
+      const date = new Date(dateStr);
+      return isValid(date) ? format(date, formatStr) : dateStr;
+    } catch (error) {
+      console.error(`Error formatting date: ${dateStr}`, error);
+      return dateStr; // Return the original string if can't be formatted
+    }
+  };
+
+  // Helper function to safely format updated date
+  const safeFormatUpdatedDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return isValid(date) ? format(date, 'dd/MM/yyyy HH:mm') : 'Unknown date';
+    } catch (error) {
+      console.error(`Error formatting updated date: ${dateStr}`, error);
+      return 'Unknown date';
+    }
+  };
 
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <div>
-            <CardTitle className="text-lg font-medium">Collection Schedule</CardTitle>
-            <CardDescription>
-              Manage pickup schedules for routes
-            </CardDescription>
-          </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={fetchCollectionSchedules}
-            disabled={loading}
-          >
-            <RefreshCcw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg font-medium">Collection Schedule</CardTitle>
+          <CardDescription>
+            View and manage upcoming collection dates for different routes
+          </CardDescription>
         </CardHeader>
         
         <CardContent>
@@ -355,354 +195,152 @@ const CollectionScheduleTab = () => {
               <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Today's Schedule Card */}
-              <Card className="md:col-span-1">
-                <CardHeader>
-                  <CardTitle className="text-base">Today's Schedule</CardTitle>
-                  <CardDescription>
-                    Pickups scheduled for today
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {todaySchedules.length === 0 ? (
-                    <div className="text-center py-8 border border-dashed rounded-lg">
-                      <CalendarIcon className="h-8 w-8 mx-auto text-gray-300 mb-2" />
-                      <p className="text-gray-500">No collections scheduled for today</p>
-                    </div>
+            <div className="rounded-md border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Route</TableHead>
+                    <TableHead>Areas</TableHead>
+                    <TableHead>Pickup Date</TableHead>
+                    <TableHead>Last Updated</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {schedules.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-6 text-gray-500">
+                        <Calendar className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                        <p>No collection schedules found</p>
+                        <p className="text-sm">Create routes first to add collection schedules</p>
+                      </TableCell>
+                    </TableRow>
                   ) : (
-                    <ul className="space-y-4">
-                      {todaySchedules.map(schedule => (
-                        <li key={schedule.id} className="p-3 bg-muted rounded-lg">
-                          <div className="flex items-center justify-between mb-2">
-                            <Badge className="bg-blue-100 text-blue-800 border-blue-300">
-                              {schedule.route}
-                            </Badge>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={() => {
-                                setIsEditing(true);
-                                handleRouteSelect(schedule.id);
-                              }}
-                            >
-                              <Edit className="h-4 w-4" />
-                              <span className="sr-only">Edit</span>
-                            </Button>
-                          </div>
-                          
-                          <div className="flex items-start space-x-2 text-sm">
-                            <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
-                            <div>
-                              <span className="text-gray-600">Areas:</span>{' '}
-                              <span>
-                                {schedule.areas.join(', ')}
-                              </span>
-                            </div>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </CardContent>
-              </Card>
-              
-              {/* Calendar Card */}
-              <Card className="md:col-span-2">
-                <CardHeader>
-                  <CardTitle className="text-base">Collection Calendar</CardTitle>
-                  <CardDescription>
-                    Schedule overview by date
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={setSelectedDate}
-                    className="rounded-md border"
-                    classNames={{
-                      day_today: "bg-muted",
-                      day_selected: "bg-primary text-white hover:bg-primary hover:text-primary-foreground"
-                    }}
-                  />
-                  
-                  {/* Selected date's schedules */}
-                  <div className="mt-6">
-                    <h3 className="text-sm font-medium mb-3">
-                      {selectedDate ? format(selectedDate, 'MMMM d, yyyy') : "Select a date"}
-                    </h3>
-                    
-                    {selectedDate && selectedDateEvents.length === 0 ? (
-                      <div className="text-center py-6 border border-dashed rounded-lg">
-                        <p className="text-gray-500">No collections scheduled for selected date</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {selectedDateEvents.map(event => (
-                          <div key={event.id} className="p-3 bg-muted rounded-lg">
-                            <div className="flex items-center justify-between mb-1">
-                              <Badge className="bg-blue-100 text-blue-800 border-blue-300">
-                                {event.route}
-                              </Badge>
+                    schedules.map((schedule) => (
+                      <TableRow key={schedule.id}>
+                        <TableCell className="font-medium">
+                          {schedule.route}
+                        </TableCell>
+                        <TableCell>
+                          <span className="max-w-xs truncate block">
+                            {schedule.areas.join(', ')}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {schedule.pickup_date}
+                        </TableCell>
+                        <TableCell className="text-gray-500 text-sm">
+                          {safeFormatUpdatedDate(schedule.updated_at)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Dialog
+                            open={editingScheduleId === schedule.id}
+                            onOpenChange={(open) => !open && setEditingScheduleId(null)}
+                          >
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditClick(schedule)}
+                              >
+                                <Edit className="h-4 w-4 mr-2" />
+                                Change Date
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Update Collection Date</DialogTitle>
+                                <DialogDescription>
+                                  Set a new collection date for {schedule.route}
+                                </DialogDescription>
+                              </DialogHeader>
                               
-                              <div className="flex items-center space-x-1">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-8 w-8 p-0" 
-                                  onClick={() => {
-                                    setIsEditing(true);
-                                    handleRouteSelect(event.id);
-                                  }}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                  <span className="sr-only">Edit</span>
-                                </Button>
-                                
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
-                                    >
-                                      <TrashIcon className="h-4 w-4" />
-                                      <span className="sr-only">Delete</span>
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Delete Collection Schedule</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Are you sure you want to delete this collection schedule?
-                                        This action cannot be undone.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        className="bg-red-600"
-                                        onClick={() => deleteSchedule(event.id)}
-                                      >
-                                        Delete
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-start space-x-2 text-sm">
-                              <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
-                              <div>
-                                <span className="text-gray-600">Areas:</span>{' '}
-                                <span>
-                                  {event.areas.join(', ')}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-              
-              {/* Collection Routes List */}
-              <Card className="md:col-span-3">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="text-base">All Collection Routes</CardTitle>
-                    <CardDescription>
-                      View and edit scheduled routes
-                    </CardDescription>
-                  </div>
-                  <Button asChild>
-                    <a href="#/admin/routes">
-                      <PlusCircle className="h-4 w-4 mr-2" />
-                      Manage Routes
-                    </a>
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  {routes.length === 0 ? (
-                    <div className="text-center py-10">
-                      <MapPin className="h-12 w-12 mx-auto text-gray-300 mb-3" />
-                      <p className="text-gray-500">No collection routes have been set up</p>
-                      <Button className="mt-4" asChild>
-                        <a href="#/admin/routes">
-                          <PlusCircle className="h-4 w-4 mr-2" />
-                          Create a Route
-                        </a>
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="border rounded-md overflow-hidden">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Route Name</TableHead>
-                            <TableHead>Areas</TableHead>
-                            <TableHead>Collection Date</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {routes.map(route => (
-                            <TableRow key={route.id}>
-                              <TableCell className="font-medium">
-                                {route.route}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex flex-wrap gap-1">
-                                  {route.areas.slice(0, 3).map((area, i) => (
-                                    <Badge key={i} variant="outline" className="text-xs">
-                                      {area}
-                                    </Badge>
-                                  ))}
-                                  {route.areas.length > 3 && (
-                                    <Badge variant="outline" className="text-xs">
-                                      +{route.areas.length - 3}
-                                    </Badge>
-                                  )}
+                              <div className="grid gap-4 py-4">
+                                <div>
+                                  <Label htmlFor="route">Route</Label>
+                                  <Input 
+                                    id="route" 
+                                    value={schedule.route}
+                                    disabled
+                                    className="mt-1"
+                                  />
                                 </div>
-                              </TableCell>
-                              <TableCell>
-                                {(() => {
-                                  try {
-                                    const date = parseISO(route.pickup_date);
-                                    return isValid(date) ? format(date, 'MMMM d, yyyy') : 'Invalid date';
-                                  } catch {
-                                    return 'Invalid date';
-                                  }
-                                })()}
-                              </TableCell>
-                              <TableCell className="text-right space-x-2">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  onClick={() => {
-                                    setIsEditing(true);
-                                    handleRouteSelect(route.id);
-                                  }}
-                                >
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit Date
+                                
+                                <div>
+                                  <Label htmlFor="currentDate">Current Date</Label>
+                                  <Input 
+                                    id="currentDate" 
+                                    value={schedule.pickup_date}
+                                    disabled
+                                    className="mt-1"
+                                  />
+                                </div>
+                                
+                                <div>
+                                  <Label htmlFor="newDate">New Collection Date</Label>
+                                  <div className="flex mt-1">
+                                    <Popover>
+                                      <PopoverTrigger asChild>
+                                        <Button
+                                          variant="outline"
+                                          className="w-full justify-start text-left font-normal"
+                                        >
+                                          <CalendarIcon className="mr-2 h-4 w-4" />
+                                          {selectedDate ? format(selectedDate, 'PPP') : <span>Pick a date</span>}
+                                        </Button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-auto p-0">
+                                        <CalendarComponent
+                                          mode="single"
+                                          selected={selectedDate}
+                                          onSelect={setSelectedDate}
+                                          initialFocus
+                                          className="pointer-events-auto"
+                                        />
+                                      </PopoverContent>
+                                    </Popover>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <DialogFooter>
+                                <Button variant="outline" onClick={() => setEditingScheduleId(null)}>
+                                  Cancel
                                 </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
+                                <Button 
+                                  onClick={() => updateCollectionDate(schedule.id)} 
+                                  disabled={isEditing}
+                                >
+                                  {isEditing ? (
+                                    <>
+                                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                      Saving...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Save className="h-4 w-4 mr-2" />
+                                      Save Date
+                                    </>
+                                  )}
+                                </Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                        </TableCell>
+                      </TableRow>
+                    ))
                   )}
-                </CardContent>
-              </Card>
+                </TableBody>
+              </Table>
             </div>
           )}
-          
-          {/* Edit Schedule Dialog */}
-          <Dialog open={isEditing} onOpenChange={setIsEditing}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Edit Collection Date</DialogTitle>
-                <DialogDescription>
-                  Update the collection date for this route
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="grid gap-4 py-4">
-                {routes.length > 0 && (
-                  <div>
-                    <Label htmlFor="route">Route</Label>
-                    <Select 
-                      value={selectedRouteId} 
-                      onValueChange={handleRouteSelect}
-                    >
-                      <SelectTrigger id="route" className="mt-1">
-                        <SelectValue placeholder="Select a route" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {routes.map(route => (
-                          <SelectItem key={route.id} value={route.id}>
-                            {route.route}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                
-                {selectedRoute && (
-                  <>
-                    <div>
-                      <Label>Areas</Label>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {selectedRoute.areas.map((area, i) => (
-                          <Badge key={i} variant="outline">
-                            {area}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <Label>Current Date</Label>
-                      <div className="mt-1">
-                        {(() => {
-                          try {
-                            const date = parseISO(selectedRoute.pickup_date);
-                            return isValid(date) ? format(date, 'MMMM d, yyyy') : 'Invalid date';
-                          } catch {
-                            return 'Invalid date';
-                          }
-                        })()}
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <Label>New Collection Date</Label>
-                      <Calendar
-                        mode="single"
-                        selected={newPickupDate}
-                        onSelect={setNewPickupDate}
-                        className="mt-1 border rounded-md"
-                        disabled={(date) => date < new Date()}
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-              
-              <DialogFooter>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsEditing(false)}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={updateCollectionDate} 
-                  disabled={!selectedRoute || !newPickupDate || isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Updating...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Update Date
-                    </>
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </CardContent>
+        
+        <CardFooter className="flex justify-end">
+          <Button variant="outline" onClick={fetchSchedules}>
+            Refresh Data
+          </Button>
+        </CardFooter>
       </Card>
     </div>
   );

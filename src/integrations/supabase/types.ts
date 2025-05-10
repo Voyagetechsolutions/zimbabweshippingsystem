@@ -692,10 +692,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json[]
       }
-      get_driver_performance: {
-        Args: { driver_id_param: string }
-        Returns: Json
-      }
       get_gallery_images: {
         Args: Record<PropertyKey, never>
         Returns: Json[]
@@ -724,10 +720,6 @@ export type Database = {
       update_admin_password: {
         Args: { current_password: string; new_password: string }
         Returns: boolean
-      }
-      update_driver_performance_metrics: {
-        Args: { driver_id_param: string }
-        Returns: Json
       }
       verify_mfa_login: {
         Args: { user_id: string; token: string }

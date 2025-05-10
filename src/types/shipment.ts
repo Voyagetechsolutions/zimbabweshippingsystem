@@ -16,10 +16,10 @@ export interface Shipment {
   weight?: number | string;
   dimensions?: string;
   estimated_delivery?: string;
-  // Profiles property for user data, with optional fields
+  // Add profiles property for user data
   profiles?: {
-    email: string | null;
-    full_name: string | null;
+    email?: string;
+    full_name?: string;
   };
 }
 
@@ -44,7 +44,6 @@ export interface SenderDetails {
   phone?: string;
   address?: string;
   additionalPhone?: string;
-  postcode?: string;
   [key: string]: any;
 }
 
@@ -55,7 +54,6 @@ export interface RecipientDetails {
   phone?: string;
   address?: string;
   additionalPhone?: string;
-  city?: string;
   [key: string]: any;
 }
 

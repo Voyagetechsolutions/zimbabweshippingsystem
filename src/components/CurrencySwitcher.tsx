@@ -31,7 +31,7 @@ const CurrencySwitcher = () => {
         <SelectContent>
           <SelectGroup>
             {currencies.map((currency) => (
-              <SelectItem key={currency.code} value={currency.code || "unknown"}>
+              <SelectItem key={currency.code} value={currency.code}>
                 {currency.symbol} {currency.code}
               </SelectItem>
             ))}
