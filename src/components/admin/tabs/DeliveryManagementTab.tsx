@@ -116,6 +116,18 @@ const getMetadataValue = (metadata: any, path: string[], defaultValue: any = und
   return current;
 };
 
+// Helper to safely cast the metadata to the correct types
+const safeCastMetadata = (metadata: Json | null): { [key: string]: any } => {
+  if (!metadata) return {};
+  
+  // Handle both object and array cases
+  if (typeof metadata === 'object' && !Array.isArray(metadata)) {
+    return metadata as { [key: string]: any };
+  }
+  
+  return {};
+};
+
 const DeliveryManagementTab = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('pending');
@@ -164,14 +176,18 @@ const DeliveryManagementTab = () => {
       
       // Process shipment data with proper typing
       if (shipmentsData) {
-        // Convert the data to the Shipment type
-        const typedShipments: Shipment[] = shipmentsData.map(shipment => ({
-          ...shipment,
-          metadata: shipment.metadata as ShipmentMetadata,
-          profiles: shipment.profiles as any
-        }));
+        // Convert the data to the Shipment type with proper type casting
+        const processedShipments: Shipment[] = shipmentsData.map(shipment => {
+          const typedShipment: Shipment = {
+            ...shipment,
+            metadata: shipment.metadata as ShipmentMetadata,
+            profiles: shipment.profiles as any
+          };
+          
+          return typedShipment;
+        });
         
-        setPendingShipments(typedShipments);
+        setPendingShipments(processedShipments);
       } else {
         setPendingShipments([]);
       }
@@ -192,8 +208,8 @@ const DeliveryManagementTab = () => {
         
         if (driver.communication_preferences && 
             typeof driver.communication_preferences === 'object') {
-          // Access properties safely using type assertion
-          const prefs = driver.communication_preferences as { [key: string]: any };
+          // Cast to appropriate type for safe property access
+          const prefs = safeCastMetadata(driver.communication_preferences);
           location = prefs.location || '';
           phoneNumber = prefs.phone || '';
         }
@@ -218,34 +234,32 @@ const DeliveryManagementTab = () => {
         // Manual mapping of delivery assignments from metadata
         const deliveryAssignments: DeliveryAssignment[] = [];
         
-        for (const shipment of typedShipments) {
-          if (shipment.metadata && typeof shipment.metadata === 'object') {
-            const metadata = shipment.metadata as any;
-            
-            // Check if metadata has delivery information safely
-            const deliveryInfo = getMetadataValue(metadata, ['delivery'], null);
+        for (const shipment of processedShipments) {
+          const metadata = safeCastMetadata(shipment.metadata);
+          
+          // Check if metadata has delivery information safely
+          if (metadata && 'delivery' in metadata) {
+            const deliveryInfo = metadata.delivery;
             
             if (deliveryInfo && typeof deliveryInfo === 'object') {
               const assignment: DeliveryAssignment = {
                 id: `${shipment.id}-delivery`, // Generate an ID
                 shipment_id: shipment.id,
-                driver_id: getMetadataValue(deliveryInfo, ['driver_id'], ''),
-                driver_name: getMetadataValue(deliveryInfo, ['driver_name'], 'Unknown Driver'),
-                assigned_at: getMetadataValue(deliveryInfo, ['assigned_at'], shipment.updated_at),
+                driver_id: deliveryInfo.driver_id || '',
+                driver_name: deliveryInfo.driver_name || 'Unknown Driver',
+                assigned_at: deliveryInfo.assigned_at || shipment.updated_at,
                 status: 'assigned',
                 tracking_number: shipment.tracking_number,
                 destination: shipment.destination
               };
               
-              const completedAt = getMetadataValue(deliveryInfo, ['completed_at'], null);
-              if (completedAt) {
-                assignment.completed_at = completedAt;
+              if (deliveryInfo.completed_at) {
+                assignment.completed_at = deliveryInfo.completed_at;
                 assignment.status = 'completed';
               }
               
-              const notes = getMetadataValue(deliveryInfo, ['notes'], null);
-              if (notes) {
-                assignment.notes = notes;
+              if (deliveryInfo.notes) {
+                assignment.notes = deliveryInfo.notes;
               }
               
               deliveryAssignments.push(assignment);
@@ -302,27 +316,27 @@ const DeliveryManagementTab = () => {
         ? { ...shipment.metadata }
         : {};
       
+      // Cast metadata to the expected type
+      const typedMetadata = safeCastMetadata(metadata);
+      
       // Initialize the delivery object safely
-      if (!metadata.delivery) {
-        metadata.delivery = {};
+      if (!typedMetadata.delivery) {
+        typedMetadata.delivery = {};
       }
       
-      // Check if metadata.delivery is an object before accessing
-      if (typeof metadata.delivery === 'object') {
-        // Add delivery driver information
-        metadata.delivery = {
-          ...metadata.delivery,
-          driver_id: selectedDriver,
-          driver_name: driverInfo.full_name,
-          assigned_at: new Date().toISOString(),
-          notes: assignmentNotes,
-        };
-      }
+      // Add delivery driver information
+      typedMetadata.delivery = {
+        ...typedMetadata.delivery,
+        driver_id: selectedDriver,
+        driver_name: driverInfo.full_name,
+        assigned_at: new Date().toISOString(),
+        notes: assignmentNotes,
+      };
       
       // 3. Update the shipment metadata
       const { error: updateError } = await supabase
         .from('shipments')
-        .update({ metadata })
+        .update({ metadata: typedMetadata })
         .eq('id', selectedShipment.id);
       
       if (updateError) throw updateError;
@@ -385,12 +399,29 @@ const DeliveryManagementTab = () => {
     setIsSubmitting(true);
     
     try {
-      // 1. Create or update the profile with the driver role
-      // Using insert instead of upsert since we don't know the id
+      // Create the user in auth first to get an ID
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password: `Temp${Math.random().toString(36).substring(2, 10)}!`, // Generate a secure temporary password
+        options: {
+          data: {
+            full_name
+          }
+        }
+      });
+      
+      if (authError) throw authError;
+      
+      const userId = authData.user?.id;
+      
+      if (!userId) {
+        throw new Error("Failed to create user account");
+      }
+      
+      // Update the profile with additional driver information
       const { data, error } = await supabase
         .from('profiles')
-        .insert({
-          email,
+        .update({
           full_name,
           role: 'driver',
           communication_preferences: {
@@ -400,12 +431,13 @@ const DeliveryManagementTab = () => {
             location: location
           }
         })
+        .eq('id', userId)
         .select()
         .single();
       
       if (error) throw error;
       
-      // 2. Add the driver to our local state
+      // Add the driver to our local state
       const newDriver: Driver = {
         id: data.id,
         full_name: data.full_name || 'Unnamed Driver',
@@ -420,7 +452,7 @@ const DeliveryManagementTab = () => {
       
       setDrivers([...drivers, newDriver]);
       
-      // 3. Reset form and close dialog
+      // Reset form and close dialog
       setDriverForm({
         full_name: '',
         email: '',
@@ -574,10 +606,9 @@ const DeliveryManagementTab = () => {
                   <TableBody>
                     {filteredShipments.map((shipment) => {
                       // Extract delivery info from metadata safely
-                      const deliveryInfo = shipment.metadata && 
-                                        typeof shipment.metadata === 'object' && 
-                                        shipment.metadata !== null ? 
-                                          getMetadataValue(shipment.metadata, ['delivery'], null) : null;
+                      const metadata = safeCastMetadata(shipment.metadata);
+                      const deliveryInfo = metadata && 'delivery' in metadata ? 
+                        metadata.delivery : null;
                       
                       return (
                         <TableRow key={shipment.id}>
