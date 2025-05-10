@@ -27,6 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
 import {
@@ -149,16 +150,19 @@ const ShipmentManagementTab = () => {
       
       if (error) throw error;
       
-      // Process the data
-      const shipmentData = data.map(item => {
-        const { profiles, ...shipment } = item;
+      // Process the data - Fixed to correctly extract profile data from the nested profiles object
+      const shipmentData: Shipment[] = data.map(item => {
+        const profiles = item.profiles;
+        // Remove profiles from item to avoid type conflicts
+        const { profiles: _, ...shipment } = item;
+        
         return {
           ...shipment,
           profiles: {
-            email: profiles?.email,
-            full_name: profiles?.full_name,
+            email: profiles?.email || null,
+            full_name: profiles?.full_name || null
           }
-        };
+        } as Shipment;
       });
       
       setShipments(shipmentData);
@@ -210,7 +214,7 @@ const ShipmentManagementTab = () => {
         message: `Shipment #${selectedShipment?.tracking_number} status changed to ${newStatus}`,
         type: 'status_update',
         related_id: shipmentId,
-        user_id: selectedShipment?.user_id
+        user_id: selectedShipment?.user_id || ''
       });
       
       // Show success message
@@ -244,13 +248,13 @@ const ShipmentManagementTab = () => {
     fetchShipments();
   };
   
-  // Create notification function
+  // Create notification function - Fixed to ensure user_id is always provided when required
   const createNotification = async (notification: { 
     title: string;
     message: string;
     type: string;
     related_id?: string;
-    user_id?: string;
+    user_id: string; // Made required to match Supabase schema
   }) => {
     try {
       await supabase.from('notifications').insert([notification]);

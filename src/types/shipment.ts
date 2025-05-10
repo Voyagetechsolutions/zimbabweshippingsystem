@@ -18,8 +18,8 @@ export interface Shipment {
   estimated_delivery?: string;
   // Add profiles property for user data
   profiles?: {
-    email?: string;
-    full_name?: string;
+    email?: string | null;
+    full_name?: string | null;
   };
 }
 
@@ -44,6 +44,7 @@ export interface SenderDetails {
   phone?: string;
   address?: string;
   additionalPhone?: string;
+  postcode?: string;
   [key: string]: any;
 }
 
@@ -54,6 +55,7 @@ export interface RecipientDetails {
   phone?: string;
   address?: string;
   additionalPhone?: string;
+  city?: string;
   [key: string]: any;
 }
 
