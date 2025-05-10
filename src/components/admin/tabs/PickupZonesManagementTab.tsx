@@ -1,124 +1,164 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
+import { format, isValid } from 'date-fns';
+import { Shipment } from '@/types/shipment';
+
+// UI Components
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardHeader, 
+  CardTitle,
+  CardFooter
 } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
+import { Button } from '@/components/ui/button';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger
-} from '@/components/ui/dialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
 } from '@/components/ui/table';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Calendar, Plus, Edit, RefreshCcw } from 'lucide-react';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle 
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Progress } from '@/components/ui/progress';
 
-interface RouteItem {
-  name: string;
-  areas: string[];
-  pickupDays: string[];
-}
+// Icons
+import { 
+  MapPin, 
+  RefreshCcw, 
+  Download, 
+  Calendar, 
+  Package, 
+  AlertCircle,
+  Check,
+  User,
+  Clock,
+  Loader2
+} from 'lucide-react';
 
-const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const UK_CITIES = [
-  'London', 'Birmingham', 'Manchester', 'Glasgow', 'Newcastle', 'Liverpool', 
-  'Sheffield', 'Leeds', 'Edinburgh', 'Bristol', 'Cardiff', 'Belfast',
-  'Nottingham', 'Southampton', 'Portsmouth', 'Oxford', 'Cambridge', 'York'
+// Define the standard routes used across the app
+const ROUTES = [
+  'London Route', 
+  'Leeds Route', 
+  'Manchester Route', 
+  'Birmingham Route', 
+  'Nottingham Route', 
+  'Cardiff Route',
+  'Bournemouth Route', 
+  'Southend Route', 
+  'Northampton Route', 
+  'Brighton Route', 
+  'Scotland Route'
 ];
+
+interface CollectionSchedule {
+  id: string;
+  route: string;
+  areas: string[];
+  pickup_date: string;
+  created_at: string;
+  updated_at: string;
+}
 
 const PickupZonesManagementTab = () => {
   const { toast } = useToast();
-  const [routes, setRoutes] = useState<RouteItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  
-  // Form state
-  const [formRoute, setFormRoute] = useState('');
-  const [formAreas, setFormAreas] = useState<string[]>([]);
-  const [formPickupDays, setFormPickupDays] = useState<string[]>([]);
-  const [formPickupDate, setFormPickupDate] = useState('');
+  const [selectedRoute, setSelectedRoute] = useState('all');
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [schedules, setSchedules] = useState<CollectionSchedule[]>([]);
+  const [groupedShipments, setGroupedShipments] = useState<{[key: string]: Shipment[]}>({});
+  const [schedulingPickups, setSchedulingPickups] = useState(false);
+  const [pickupDate, setPickupDate] = useState('');
+  const [schedulingRoute, setSchedulingRoute] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [fetchingUsers, setFetchingUsers] = useState(false);
 
   useEffect(() => {
-    fetchRoutes();
+    fetchShipmentsAndSchedules();
   }, []);
 
   useEffect(() => {
-    // When selectedRoute changes, update the form values
-    if (selectedRoute) {
-      const route = routes.find(r => r.name === selectedRoute);
-      if (route) {
-        setFormRoute(route.name);
-        setFormAreas(route.areas);
-        setFormPickupDays(route.pickupDays);
-      }
+    if (shipments.length > 0) {
+      groupShipmentsByRoute();
     }
-  }, [selectedRoute, routes]);
+  }, [shipments, selectedRoute, schedules]);
 
-  const fetchRoutes = async () => {
+  const fetchShipmentsAndSchedules = async () => {
     setLoading(true);
     try {
-      // Fetch routes from collection_schedules table
-      const { data, error } = await supabase
+      // Fetch collection schedules first
+      const { data: schedulesData, error: schedulesError } = await supabase
         .from('collection_schedules')
         .select('*')
-        .order('route', { ascending: true });
+        .order('pickup_date', { ascending: true });
+
+      if (schedulesError) throw schedulesError;
       
-      if (error) throw error;
+      setSchedules(schedulesData || []);
       
-      // Transform the data into the expected format
-      const routesData: RouteItem[] = data.map(item => ({
-        name: item.route,
-        areas: item.areas || [],
-        pickupDays: [item.pickup_date]
-      }));
+      // Then fetch shipments
+      const { data: shipmentsData, error: shipmentsError } = await supabase
+        .from('shipments')
+        .select('*')
+        .in('status', ['Booking Confirmed', 'Ready for Pickup'])
+        .order('created_at', { ascending: false });
+
+      if (shipmentsError) throw shipmentsError;
+
+      // Now fetch profile data for each shipment
+      const enhancedShipments = await Promise.all(
+        (shipmentsData || []).map(async (shipment) => {
+          let profileData = undefined;
+          
+          if (shipment.user_id) {
+            const { data: userData, error: userError } = await supabase
+              .from('profiles')
+              .select('email, full_name')
+              .eq('id', shipment.user_id)
+              .single();
+              
+            if (!userError && userData) {
+              profileData = userData;
+            }
+          }
+          
+          return {
+            ...shipment,
+            profiles: profileData
+          } as Shipment;
+        })
+      );
       
-      // Group by route name to combine areas
-      const routeMap = new Map<string, RouteItem>();
-      routesData.forEach(route => {
-        if (routeMap.has(route.name)) {
-          const existingRoute = routeMap.get(route.name)!;
-          existingRoute.areas = [...new Set([...existingRoute.areas, ...route.areas])];
-          existingRoute.pickupDays = [...new Set([...existingRoute.pickupDays, ...route.pickupDays])];
-        } else {
-          routeMap.set(route.name, route);
-        }
-      });
+      setShipments(enhancedShipments);
       
-      setRoutes(Array.from(routeMap.values()));
-    } catch (error) {
-      console.error('Error fetching routes:', error);
+      console.log('Schedules fetched:', schedulesData);
+      console.log('Shipments fetched:', enhancedShipments);
+    } catch (error: any) {
+      console.error('Error fetching data:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load routes data',
+        description: 'Failed to load data: ' + error.message,
         variant: 'destructive',
       });
     } finally {
@@ -126,335 +166,685 @@ const PickupZonesManagementTab = () => {
     }
   };
 
-  const handleRouteSelect = (value: string) => {
-    console.log("Route selected:", value);
-    setSelectedRoute(value);
+  const groupShipmentsByRoute = () => {
+    const grouped: {[key: string]: Shipment[]} = {};
+    
+    // Initialize all routes
+    ROUTES.forEach(route => {
+      grouped[route] = [];
+    });
+    
+    // Group shipments by route
+    shipments.forEach(shipment => {
+      const routeName = determineShipmentRoute(shipment);
+      if (!grouped[routeName]) {
+        grouped[routeName] = [];
+      }
+      grouped[routeName].push(shipment);
+    });
+    
+    setGroupedShipments(grouped);
   };
 
-  const handleSaveRoute = async () => {
+  const determineShipmentRoute = (shipment: Shipment) => {
+    // First check if the shipment has a route assigned in its metadata
+    const metadata = shipment.metadata || {};
+    const collection = metadata.collection || {};
+    
+    if (collection.route) {
+      // If the route doesn't include "Route" suffix, add it
+      const routeName = collection.route.includes('Route') 
+        ? collection.route 
+        : `${collection.route} Route`;
+        
+      // Check if it's one of our standard routes
+      if (ROUTES.includes(routeName)) {
+        return routeName;
+      }
+    }
+    
+    // If no route in metadata, determine from origin address
+    if (!shipment.origin) return 'Other';
+    
+    const origin = shipment.origin.toLowerCase();
+    
+    for (const route of ROUTES) {
+      const routeCity = route.split(' ')[0].toLowerCase();
+      if (origin.includes(routeCity)) {
+        return route;
+      }
+    }
+    
+    // Check for regions/counties that map to specific routes
+    if (origin.includes('manchester') || 
+        origin.includes('salford') || 
+        origin.includes('bolton')) {
+      return 'Manchester Route';
+    }
+    
+    if (origin.includes('london') || 
+        origin.includes('croydon') || 
+        origin.includes('barnet')) {
+      return 'London Route';
+    }
+    
+    if (origin.includes('birmingham') || 
+        origin.includes('solihull') || 
+        origin.includes('wolverhampton')) {
+      return 'Birmingham Route';
+    }
+    
+    // Default
+    return 'Other';
+  };
+
+  const schedulePickups = async () => {
+    if (!schedulingRoute || !pickupDate) {
+      toast({
+        title: 'Missing Information',
+        description: 'Please select a route and pickup date.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     try {
-      if (!formRoute || formAreas.length === 0 || !formPickupDate) {
+      setSchedulingPickups(true);
+      
+      // Get shipments for the selected route
+      const routeShipments = groupedShipments[schedulingRoute] || [];
+      
+      if (routeShipments.length === 0) {
         toast({
-          title: 'Validation Error',
-          description: 'Please fill in all required fields',
-          variant: 'destructive',
+          title: 'No Shipments',
+          description: 'There are no shipments to schedule for this route.',
+          variant: 'default',
         });
         return;
       }
       
-      if (isEditMode) {
-        // Delete existing entries for this route before adding updated ones
-        const { error: deleteError } = await supabase
+      // First check if we need to update the collection_schedules table
+      const routeName = schedulingRoute.replace(' Route', ''); // Strip "Route" if needed
+      
+      // Check if this route already exists in the collection_schedules
+      const { data: existingSchedule } = await supabase
+        .from('collection_schedules')
+        .select('*')
+        .eq('route', routeName)
+        .maybeSingle();
+      
+      if (existingSchedule) {
+        // Update the existing schedule
+        await supabase
           .from('collection_schedules')
-          .delete()
-          .eq('route', formRoute);
-        
-        if (deleteError) throw deleteError;
+          .update({
+            pickup_date: pickupDate,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingSchedule.id);
+      } else {
+        // Create a new schedule
+        await supabase
+          .from('collection_schedules')
+          .insert({
+            route: routeName,
+            areas: routeShipments.map(shipment => 
+              shipment.origin.split(',')[0].trim()
+            ).filter((value, index, self) => 
+              self.indexOf(value) === index
+            ), // Get unique areas
+            pickup_date: pickupDate
+          });
       }
       
-      // Create new entry in collection_schedules
-      const { error } = await supabase
-        .from('collection_schedules')
-        .insert({
-          route: formRoute,
-          areas: formAreas,
-          pickup_date: formPickupDate
-        });
-      
-      if (error) throw error;
-      
-      toast({
-        title: isEditMode ? 'Route Updated' : 'Route Added',
-        description: `${formRoute} has been ${isEditMode ? 'updated' : 'added'} successfully`,
+      // Update all shipments in this route
+      const updates = routeShipments.map(shipment => {
+        // Update shipment metadata
+        const updatedMetadata = {
+          ...shipment.metadata,
+          collection: {
+            ...(shipment.metadata?.collection || {}),
+            route: routeName,
+            date: pickupDate,
+            scheduled: true
+          }
+        };
+        
+        return supabase
+          .from('shipments')
+          .update({
+            status: 'Ready for Pickup',
+            metadata: updatedMetadata
+          })
+          .eq('id', shipment.id);
       });
       
-      // Refresh routes
-      fetchRoutes();
+      await Promise.all(updates);
       
-      // Reset form and close dialog
-      resetForm();
-      setDialogOpen(false);
-    } catch (error) {
-      console.error('Error saving route:', error);
+      toast({
+        title: 'Pickups Scheduled',
+        description: `Successfully scheduled ${routeShipments.length} pickups for ${schedulingRoute} on ${pickupDate}`,
+      });
+      
+      // Refresh data
+      fetchShipmentsAndSchedules();
+      
+    } catch (error: any) {
+      console.error('Error scheduling pickups:', error);
       toast({
         title: 'Error',
-        description: `Failed to ${isEditMode ? 'update' : 'add'} route`,
+        description: 'Failed to schedule pickups: ' + error.message,
         variant: 'destructive',
       });
+    } finally {
+      setSchedulingPickups(false);
+      setPickupDate('');
+      setSchedulingRoute('');
     }
   };
 
-  const handleEditRoute = (routeName: string) => {
-    const route = routes.find(r => r.name === routeName);
-    if (route) {
-      setFormRoute(route.name);
-      setFormAreas(route.areas);
-      setFormPickupDays(route.pickupDays);
-      setFormPickupDate(route.pickupDays[0] || '');
-      setIsEditMode(true);
-      setDialogOpen(true);
+  const exportPickupList = (route: string) => {
+    try {
+      setExporting(true);
+      
+      const shipmentsToExport = route === 'all' ? shipments : groupedShipments[route] || [];
+      
+      if (shipmentsToExport.length === 0) {
+        toast({
+          title: 'No Data',
+          description: 'There are no shipments to export for this route.',
+          variant: 'default',
+        });
+        setExporting(false);
+        return;
+      }
+      
+      // Format data for CSV
+      const headers = [
+        'Tracking Number',
+        'Sender Name',
+        'Sender Phone',
+        'Pickup Address',
+        'Shipment Type',
+        'Status',
+        'Pickup Date'
+      ];
+      
+      const rows = shipmentsToExport.map(shipment => {
+        const metadata = shipment.metadata || {};
+        const senderDetails = metadata.sender || metadata.senderDetails || {};
+        const shipmentDetails = metadata.shipment || metadata.shipmentDetails || {};
+        const collectionDetails = metadata.collection || {};
+        
+        // Get sender name from metadata or profiles
+        const senderName = shipment.profiles?.full_name || 
+          `${senderDetails.firstName || ''} ${senderDetails.lastName || ''}`.trim() || 
+          'N/A';
+        
+        // Get pickup date from collection details or matching schedule
+        let pickupDate = collectionDetails.date || 'Not scheduled';
+        
+        // If no date in collection details, check the schedules
+        if (!collectionDetails.date) {
+          const routeName = schedulingRoute.replace(' Route', '');
+          const schedule = schedules.find(s => s.route === routeName);
+          if (schedule) {
+            pickupDate = schedule.pickup_date;
+          }
+        }
+        
+        return [
+          shipment.tracking_number || '',
+          senderName || '',
+          senderDetails.phone || '',
+          shipment.origin || '',
+          shipmentDetails.type || '',
+          shipment.status || '',
+          pickupDate
+        ];
+      });
+      
+      // Create CSV content
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.join(','))
+      ].join('\n');
+      
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${route === 'all' ? 'All' : route}_Pickups_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: 'Export Successful',
+        description: 'Pickup list has been exported.',
+      });
+    } catch (error: any) {
+      console.error('Error exporting pickup list:', error);
+      toast({
+        title: 'Export Failed',
+        description: 'Failed to export pickup list: ' + error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setExporting(false);
     }
   };
 
-  const resetForm = () => {
-    setFormRoute('');
-    setFormAreas([]);
-    setFormPickupDays([]);
-    setFormPickupDate('');
-    setIsEditMode(false);
+  // Count drums in a route's shipments
+  const countDrums = (route: string) => {
+    const routeShipments = groupedShipments[route] || [];
+    return routeShipments.reduce((total, shipment) => {
+      const metadata = shipment.metadata || {};
+      const shipmentDetails = metadata.shipment || metadata.shipmentDetails || {};
+      
+      if (shipmentDetails.type === 'Drums' || shipmentDetails.includeDrums) {
+        const quantity = parseInt(String(shipmentDetails.quantity)) || 1;
+        return total + quantity;
+      }
+      
+      return total;
+    }, 0);
+  };
+
+  // Check if a route is overbooked (more than 10 drums)
+  const isRouteOverbooked = (route: string) => {
+    return countDrums(route) >= 10;
+  };
+
+  // Get the pickup date for a specific route from the schedules
+  const getPickupDateForRoute = (route: string) => {
+    const routeName = route.replace(' Route', '');
+    const schedule = schedules.find(s => s.route === routeName);
+    
+    if (schedule) {
+      return schedule.pickup_date;
+    }
+    
+    return 'Not scheduled';
+  };
+
+  // Safely format dates ensuring they are valid
+  const safeFormatDate = (dateStr: string, formatStr: string = 'dd/MM/yyyy') => {
+    try {
+      if (!dateStr) return 'Not set';
+      
+      const date = new Date(dateStr);
+      
+      if (!isValid(date)) {
+        return dateStr; // Return the original string if it's not a valid date
+      }
+      
+      return format(date, formatStr);
+    } catch (error) {
+      console.error(`Error formatting date: ${dateStr}`, error);
+      return dateStr; // Return the original string if there's an error
+    }
+  };
+
+  const notifyCustomers = (route: string) => {
+    toast({
+      title: 'Notifications Sent',
+      description: `Customers have been notified about their pickup in the ${route} area.`,
+    });
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-3xl font-bold">Pickup Zones</h2>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline"
-            onClick={fetchRoutes}
-            className="flex items-center gap-2"
-          >
-            <RefreshCcw className="h-4 w-4" />
-            Refresh
-          </Button>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button 
-                className="bg-zim-green hover:bg-zim-green/90" 
-                onClick={() => {
-                  resetForm();
-                  setDialogOpen(true);
-                }}
-              >
-                <Plus className="mr-2 h-4 w-4" /> Add Route
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[525px]">
-              <DialogHeader>
-                <DialogTitle>{isEditMode ? 'Edit Route' : 'Add New Route'}</DialogTitle>
-                <DialogDescription>
-                  Define a new pickup route with areas and schedule.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="route">Route Name</Label>
-                  <Input
-                    id="route"
-                    placeholder="e.g., North London"
-                    value={formRoute}
-                    onChange={(e) => setFormRoute(e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Areas Covered</Label>
-                  <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto p-2 border rounded-md">
-                    {UK_CITIES.map((area) => (
-                      <div key={area} className="flex items-center space-x-2">
-                        <Checkbox 
-                          id={`area-${area}`} 
-                          checked={formAreas.includes(area)} 
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setFormAreas([...formAreas, area]);
-                            } else {
-                              setFormAreas(formAreas.filter(a => a !== area));
-                            }
-                          }}
-                        />
-                        <label htmlFor={`area-${area}`} className="text-sm">{area}</label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="pickupDate">Pickup Date</Label>
-                  <Input
-                    id="pickupDate"
-                    type="date"
-                    value={formPickupDate}
-                    onChange={(e) => setFormPickupDate(e.target.value)}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button 
-                  className="bg-zim-green hover:bg-zim-green/90"
-                  onClick={handleSaveRoute}
-                >
-                  {isEditMode ? 'Update Route' : 'Add Route'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="md:col-span-1">
-          <CardHeader>
-            <CardTitle>Routes</CardTitle>
-            <CardDescription>Select a route to view details</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Select value={selectedRoute || ''} onValueChange={handleRouteSelect}>
+    <Card>
+      <CardHeader>
+        <CardTitle>Pickup Zones Management</CardTitle>
+        <CardDescription>
+          Manage shipments by pickup zone and schedule collections
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="flex flex-col md:flex-row gap-4 items-end">
+          <div className="flex-grow">
+            <Select value={selectedRoute} onValueChange={setSelectedRoute}>
               <SelectTrigger>
-                <SelectValue placeholder="Select a route" />
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  <span>Select Route</span>
+                </div>
               </SelectTrigger>
               <SelectContent>
-                {routes.map((route) => (
-                  <SelectItem key={route.name} value={route.name}>
-                    {route.name}
+                <SelectItem value="all">All Routes</SelectItem>
+                {ROUTES.map(route => (
+                  <SelectItem key={route} value={route}>
+                    {route} ({(groupedShipments[route] || []).length})
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {loading ? (
-              <div className="flex justify-center py-6">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zim-green"></div>
-              </div>
-            ) : routes.length === 0 ? (
-              <div className="text-center py-6">
-                <MapPin className="h-10 w-10 mx-auto text-gray-400 mb-2" />
-                <p className="text-gray-500">No routes defined yet</p>
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
-
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>Route Details</CardTitle>
-            <CardDescription>
-              {selectedRoute ? `Details for ${selectedRoute}` : 'Select a route to view details'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!selectedRoute ? (
-              <div className="text-center py-12">
-                <MapPin className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium mb-2">No Route Selected</h3>
-                <p className="text-gray-500">
-                  Select a route from the list to view its details
-                </p>
-              </div>
-            ) : loading ? (
-              <div className="flex justify-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-medium mb-2">Areas Covered</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {routes.find(r => r.name === selectedRoute)?.areas.map((area) => (
-                      <Badge key={area} className="bg-blue-100 text-blue-800 border-blue-300">
-                        {area}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <h3 className="text-lg font-medium mb-2">Pickup Schedule</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {routes.find(r => r.name === selectedRoute)?.pickupDays.map((day) => (
-                      <Badge key={day} className="bg-green-100 text-green-800 border-green-300 flex items-center gap-1">
-                        <Calendar className="h-3 w-3" /> {day}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-                <Button 
-                  variant="outline" 
-                  className="flex items-center gap-2"
-                  onClick={() => handleEditRoute(selectedRoute)}
+          </div>
+          
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => exportPickupList(selectedRoute)}
+              disabled={exporting}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export List
+            </Button>
+            
+            <Button
+              variant="outline"
+              onClick={fetchShipmentsAndSchedules}
+              disabled={loading}
+            >
+              <RefreshCcw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+            
+            <Button
+              onClick={() => {
+                // Pre-select the current pickup date from schedules if available
+                if (selectedRoute !== 'all') {
+                  const currentDate = getPickupDateForRoute(selectedRoute);
+                  if (currentDate !== 'Not scheduled') {
+                    setPickupDate(currentDate);
+                  } else {
+                    setPickupDate('');
+                  }
+                  setSchedulingRoute(selectedRoute);
+                } else {
+                  setPickupDate('');
+                  setSchedulingRoute('');
+                }
+                setSchedulingPickups(true);
+              }}
+              disabled={selectedRoute === 'all' || loading}
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Schedule Pickups
+            </Button>
+          </div>
+        </div>
+        
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          </div>
+        ) : shipments.length === 0 ? (
+          <div className="text-center py-8">
+            <Package className="h-16 w-16 mx-auto text-muted-foreground mb-2" />
+            <h3 className="text-lg font-medium">No shipments found</h3>
+            <p className="text-muted-foreground">There are no shipments ready for pickup</p>
+          </div>
+        ) : selectedRoute === 'all' ? (
+          // Show all routes summary
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Object.keys(groupedShipments).map(route => {
+              const routeShipments = groupedShipments[route] || [];
+              if (routeShipments.length === 0) return null;
+              
+              const drumCount = countDrums(route);
+              const isOverbooked = isRouteOverbooked(route);
+              const pickupDate = getPickupDateForRoute(route);
+              
+              return (
+                <Card 
+                  key={route}
+                  className={isOverbooked ? 'border-red-500 dark:border-red-700' : ''}
                 >
-                  <Edit className="h-4 w-4" /> Edit Route
-                </Button>
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-center">
+                      <CardTitle className="text-lg">{route}</CardTitle>
+                      <Badge 
+                        variant={isOverbooked ? 'destructive' : 'outline'}
+                        className="ml-2"
+                      >
+                        {drumCount} drums
+                      </Badge>
+                    </div>
+                    <CardDescription className="flex flex-col gap-1">
+                      <div>{routeShipments.length} shipments ready for pickup</div>
+                      <div className="flex items-center text-sm mt-1">
+                        <Clock className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
+                        <span>{pickupDate !== 'Not scheduled' ? pickupDate : 'No pickup date'}</span>
+                      </div>
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pb-3">
+                    <Progress 
+                      value={drumCount > 10 ? 100 : (drumCount / 10) * 100}
+                      className={`h-2 ${isOverbooked ? 'bg-red-200 dark:bg-red-900' : ''}`}
+                    />
+                  </CardContent>
+                  <CardFooter className="flex justify-between pt-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedRoute(route)}
+                    >
+                      View Details
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => exportPickupList(route)}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Export
+                    </Button>
+                  </CardFooter>
+                </Card>
+              );
+            })}
+          </div>
+        ) : (
+          // Show selected route details
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold">{selectedRoute} Route</h2>
+                <div className="flex items-center text-muted-foreground gap-2">
+                  <span>{(groupedShipments[selectedRoute] || []).length} shipments, {countDrums(selectedRoute)} drums</span>
+                  <Badge variant="outline" className="flex items-center ml-2">
+                    <Calendar className="h-3 w-3 mr-1" />
+                    {getPickupDateForRoute(selectedRoute)}
+                  </Badge>
+                </div>
+              </div>
+              
+              {isRouteOverbooked(selectedRoute) && (
+                <Badge variant="destructive" className="flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4" />
+                  Overbooked ({countDrums(selectedRoute)} drums)
+                </Badge>
+              )}
+            </div>
+            
+            <div className="border rounded-md overflow-hidden">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[140px]">Tracking #</TableHead>
+                      <TableHead>Sender</TableHead>
+                      <TableHead>Pickup Address</TableHead>
+                      <TableHead>Shipment Type</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Collection Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(groupedShipments[selectedRoute] || []).length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-6 text-gray-500">
+                          No shipments found for this route
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      (groupedShipments[selectedRoute] || []).map(shipment => {
+                        const metadata = shipment.metadata || {};
+                        const senderDetails = metadata.sender || metadata.senderDetails || {};
+                        const shipmentDetails = metadata.shipment || metadata.shipmentDetails || {};
+                        const collectionDetails = metadata.collection || {};
+                        
+                        // Get sender name from either profiles or metadata
+                        const senderName = shipment.profiles?.full_name || 
+                          `${senderDetails.firstName || ''} ${senderDetails.lastName || ''}`.trim() || 
+                          'N/A';
+                        
+                        return (
+                          <TableRow key={shipment.id}>
+                            <TableCell className="font-mono text-sm">
+                              {shipment.tracking_number}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <User className="h-4 w-4 text-gray-400" />
+                                <div>
+                                  <div className="text-sm font-medium">{senderName}</div>
+                                  <div className="text-xs text-muted-foreground">{senderDetails.phone || 'N/A'}</div>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="max-w-[200px] truncate">
+                              {shipment.origin}
+                            </TableCell>
+                            <TableCell>
+                              {shipmentDetails.type || 'N/A'}
+                            </TableCell>
+                            <TableCell>
+                              {shipmentDetails.type === 'Drums' && shipmentDetails.quantity ? shipmentDetails.quantity : 'N/A'}
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                variant={shipment.status === 'Ready for Pickup' ? 'default' : 'outline'}
+                              >
+                                {shipment.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {collectionDetails.date || getPickupDateForRoute(selectedRoute)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => notifyCustomers(selectedRoute)}
+              >
+                Notify Customers
+              </Button>
+              <Button
+                onClick={() => {
+                  const currentDate = getPickupDateForRoute(selectedRoute);
+                  if (currentDate !== 'Not scheduled') {
+                    setPickupDate(currentDate);
+                  }
+                  setSchedulingRoute(selectedRoute);
+                  setSchedulingPickups(true);
+                }}
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Schedule Pickups
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+
+      {/* Schedule Pickups Dialog */}
+      <Dialog open={schedulingPickups} onOpenChange={setSchedulingPickups}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Schedule Pickups</DialogTitle>
+            <DialogDescription>
+              Set a collection date for shipments
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="route">Route</Label>
+              <Select value={schedulingRoute} onValueChange={setSchedulingRoute}>
+                <SelectTrigger id="route">
+                  <SelectValue placeholder="Select route" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROUTES.map(route => (
+                    <SelectItem key={route} value={route}>
+                      {route} ({(groupedShipments[route] || []).length} shipments)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="pickup-date">Pickup Date</Label>
+              <Input 
+                id="pickup-date"
+                type="date"
+                value={pickupDate}
+                onChange={(e) => setPickupDate(e.target.value)}
+              />
+            </div>
+            
+            {schedulingRoute && isRouteOverbooked(schedulingRoute) && (
+              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
+                <div className="text-sm text-red-600 dark:text-red-400">
+                  <p className="font-medium">Warning: Route is overbooked</p>
+                  <p>This route has {countDrums(schedulingRoute)} drums, which exceeds the recommended maximum of 10.</p>
+                </div>
               </div>
             )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>All Routes</CardTitle>
-          <CardDescription>Overview of all pickup routes</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
-            </div>
-          ) : routes.length === 0 ? (
-            <div className="text-center py-12">
-              <MapPin className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium mb-2">No Routes Defined</h3>
-              <p className="text-gray-500">
-                Add your first pickup route to get started
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Route</TableHead>
-                    <TableHead>Areas Covered</TableHead>
-                    <TableHead>Pickup Days</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {routes.map((route) => (
-                    <TableRow key={route.name}>
-                      <TableCell className="font-medium">{route.name}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {route.areas.slice(0, 3).map((area) => (
-                            <Badge key={area} className="bg-blue-100 text-blue-800 border-blue-300">
-                              {area}
-                            </Badge>
-                          ))}
-                          {route.areas.length > 3 && (
-                            <Badge className="bg-gray-100 text-gray-800 border-gray-300">
-                              +{route.areas.length - 3} more
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {route.pickupDays.map((day) => (
-                            <Badge key={day} className="bg-green-100 text-green-800 border-green-300 flex items-center gap-1">
-                              <Calendar className="h-3 w-3" /> {day}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditRoute(route.name)}
-                          className="flex items-center gap-1"
-                        >
-                          <Edit className="h-4 w-4" /> Edit
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+            
+            {/* Show current pickup date if available */}
+            {schedulingRoute && getPickupDateForRoute(schedulingRoute) !== 'Not scheduled' && (
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md flex items-start gap-2">
+                <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                <div className="text-sm text-blue-600 dark:text-blue-400">
+                  <p className="font-medium">Current Pickup Date</p>
+                  <p>This route currently has a pickup date of {getPickupDateForRoute(schedulingRoute)}.</p>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSchedulingPickups(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={schedulePickups}
+              disabled={!schedulingRoute || !pickupDate}
+            >
+              {schedulingPickups ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  Schedule Pickups
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 };
 
