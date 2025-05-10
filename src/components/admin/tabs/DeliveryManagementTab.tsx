@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -71,7 +70,7 @@ import {
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Shipment } from '@/types/shipment';
+import { Shipment, ShipmentMetadata } from '@/types/shipment';
 import { BarChart } from '@/components/ui/charts';
 
 interface Driver {
@@ -98,6 +97,21 @@ interface DeliveryAssignment {
   tracking_number?: string;
   destination?: string;
 }
+
+// Helper function to safely access nested properties in metadata
+const getMetadataValue = (metadata: any, path: string[], defaultValue: any = undefined) => {
+  if (!metadata || typeof metadata !== 'object') return defaultValue;
+  
+  let current = metadata;
+  for (const key of path) {
+    if (current === null || typeof current !== 'object' || !(key in current)) {
+      return defaultValue;
+    }
+    current = current[key];
+  }
+  
+  return current;
+};
 
 const DeliveryManagementTab = () => {
   const { toast } = useToast();
@@ -145,8 +159,23 @@ const DeliveryManagementTab = () => {
       
       if (shipmentsError) throw shipmentsError;
       
-      // Type cast since we know the structure matches our Shipment type
-      setPendingShipments(shipmentsData as unknown as Shipment[]);
+      // Process shipment data with proper typing
+      const typedShipments: Shipment[] = (shipmentsData || []).map(shipment => ({
+        id: shipment.id,
+        tracking_number: shipment.tracking_number,
+        status: shipment.status,
+        origin: shipment.origin,
+        destination: shipment.destination,
+        user_id: shipment.user_id,
+        created_at: shipment.created_at,
+        updated_at: shipment.updated_at,
+        metadata: shipment.metadata || {},
+        can_cancel: shipment.can_cancel,
+        can_modify: shipment.can_modify,
+        profiles: shipment.profiles
+      }));
+      
+      setPendingShipments(typedShipments);
       
       // 2. Fetch drivers (profiles with driver role)
       const { data: driversData, error: driversError } = await supabase
@@ -157,46 +186,68 @@ const DeliveryManagementTab = () => {
       if (driversError) throw driversError;
       
       // Transform driver data to include performance metrics
-      const enhancedDrivers: Driver[] = (driversData || []).map(driver => ({
-        id: driver.id,
-        full_name: driver.full_name || 'Unnamed Driver',
-        email: driver.email,
-        role: driver.role,
-        location: driver.communication_preferences?.location || 'Unknown',
-        phone_number: driver.communication_preferences?.phone || 'Not provided',
-        rating: Math.round((Math.random() * 2 + 3) * 10) / 10, // Random rating between 3.0-5.0 for demo
-        deliveries_completed: Math.floor(Math.random() * 50) + 10, // Random number for demo
-        on_time_rate: Math.round((Math.random() * 20 + 80) * 10) / 10, // 80-100% random for demo
-      }));
+      const enhancedDrivers: Driver[] = (driversData || []).map(driver => {
+        // Safely access communication preferences
+        const communicationPrefs = typeof driver.communication_preferences === 'object' 
+          ? driver.communication_preferences 
+          : {};
+        
+        return {
+          id: driver.id,
+          full_name: driver.full_name || 'Unnamed Driver',
+          email: driver.email,
+          role: driver.role,
+          location: communicationPrefs && typeof communicationPrefs === 'object' ? communicationPrefs.location : undefined,
+          phone_number: communicationPrefs && typeof communicationPrefs === 'object' ? communicationPrefs.phone : undefined,
+          rating: Math.round((Math.random() * 2 + 3) * 10) / 10, // Random rating between 3.0-5.0 for demo
+          deliveries_completed: Math.floor(Math.random() * 50) + 10, // Random number for demo
+          on_time_rate: Math.round((Math.random() * 20 + 80) * 10) / 10, // 80-100% random for demo
+        };
+      });
       
       setDrivers(enhancedDrivers);
       
-      // 3. Fetch delivery assignments
-      const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from('delivery_assignments')
-        .select('*, shipments:shipment_id(tracking_number, destination)')
-        .order('assigned_at', { ascending: false });
-      
-      if (assignmentsError) {
-        console.error("Error fetching delivery assignments:", assignmentsError);
-        // If table doesn't exist yet, just continue
-        setDeliveries([]);
-      } else {
-        // Process assignment data
-        const processedDeliveries = (assignmentsData || []).map(assignment => ({
-          id: assignment.id,
-          shipment_id: assignment.shipment_id,
-          driver_id: assignment.driver_id,
-          assigned_at: assignment.assigned_at,
-          completed_at: assignment.completed_at,
-          status: assignment.status,
-          notes: assignment.notes,
-          driver_name: assignment.driver_name,
-          tracking_number: assignment.shipments?.tracking_number,
-          destination: assignment.shipments?.destination
-        }));
+      // 3. Check if delivery_assignments table exists and prepare deliveries data
+      try {
+        // Manual mapping of delivery assignments from metadata
+        const deliveryAssignments: DeliveryAssignment[] = [];
         
-        setDeliveries(processedDeliveries);
+        for (const shipment of typedShipments) {
+          const metadata = shipment.metadata;
+          // Check if metadata has delivery information
+          if (metadata && typeof metadata === 'object' && metadata.delivery) {
+            const delivery = metadata.delivery;
+            
+            if (delivery && typeof delivery === 'object') {
+              const assignment: DeliveryAssignment = {
+                id: `${shipment.id}-delivery`, // Generate an ID
+                shipment_id: shipment.id,
+                driver_id: delivery.driver_id || '',
+                driver_name: delivery.driver_name || 'Unknown Driver',
+                assigned_at: delivery.assigned_at || shipment.updated_at,
+                status: 'assigned',
+                tracking_number: shipment.tracking_number,
+                destination: shipment.destination
+              };
+              
+              if (delivery.completed_at) {
+                assignment.completed_at = delivery.completed_at;
+                assignment.status = 'completed';
+              }
+              
+              if (delivery.notes) {
+                assignment.notes = delivery.notes;
+              }
+              
+              deliveryAssignments.push(assignment);
+            }
+          }
+        }
+        
+        setDeliveries(deliveryAssignments);
+      } catch (error) {
+        console.error("Error processing delivery assignments:", error);
+        setDeliveries([]);
       }
     } catch (error: any) {
       console.error('Error fetching delivery data:', error);
@@ -263,41 +314,20 @@ const DeliveryManagementTab = () => {
       
       if (updateError) throw updateError;
       
-      // 4. Create delivery assignment record
-      // Check if the delivery_assignments table exists, if not try to create it
-      let tableExists = true;
+      // 4. Create delivery assignment record (in memory only)
+      const newAssignment: DeliveryAssignment = {
+        id: `${selectedShipment.id}-delivery-${Date.now()}`,
+        shipment_id: selectedShipment.id,
+        driver_id: selectedDriver,
+        driver_name: driverInfo.full_name,
+        assigned_at: new Date().toISOString(),
+        status: 'assigned',
+        notes: assignmentNotes,
+        tracking_number: selectedShipment.tracking_number,
+        destination: selectedShipment.destination
+      };
       
-      try {
-        // Try to query the table
-        const { error: checkError } = await supabase
-          .from('delivery_assignments')
-          .select('id')
-          .limit(1);
-        
-        if (checkError && checkError.message.includes('relation "delivery_assignments" does not exist')) {
-          tableExists = false;
-        }
-      } catch (error) {
-        tableExists = false;
-      }
-      
-      if (tableExists) {
-        const { error: assignmentError } = await supabase
-          .from('delivery_assignments')
-          .insert({
-            shipment_id: selectedShipment.id,
-            driver_id: selectedDriver,
-            driver_name: driverInfo.full_name,
-            assigned_at: new Date().toISOString(),
-            status: 'assigned',
-            notes: assignmentNotes
-          });
-        
-        if (assignmentError) {
-          console.error('Error creating assignment record:', assignmentError);
-          // Continue anyway since we updated the shipment metadata
-        }
-      }
+      setDeliveries([newAssignment, ...deliveries]);
       
       // 5. Success
       toast({
@@ -529,12 +559,11 @@ const DeliveryManagementTab = () => {
                   </TableHeader>
                   <TableBody>
                     {filteredShipments.map((shipment) => {
-                      // Extract delivery info from metadata
+                      // Extract delivery info from metadata safely
                       const deliveryInfo = shipment.metadata && 
-                                         typeof shipment.metadata === 'object' && 
-                                         shipment.metadata !== null && 
-                                         'delivery' in shipment.metadata ? 
-                                           shipment.metadata.delivery : null;
+                                        typeof shipment.metadata === 'object' && 
+                                        shipment.metadata !== null ? 
+                                          getMetadataValue(shipment.metadata, ['delivery'], null) : null;
                       
                       return (
                         <TableRow key={shipment.id}>
@@ -922,137 +951,4 @@ const DeliveryManagementTab = () => {
                 <SelectContent>
                   {drivers.map(driver => (
                     <SelectItem key={driver.id} value={driver.id}>
-                      {driver.full_name} {driver.location && `(${driver.location})`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {drivers.length === 0 && (
-                <p className="text-sm text-amber-500 mt-2">
-                  No drivers available. Please add drivers first.
-                </p>
-              )}
-            </div>
-            
-            <div>
-              <Label htmlFor="notes">Delivery Notes (Optional)</Label>
-              <Textarea
-                id="notes"
-                placeholder="Any special instructions for the driver..."
-                value={assignmentNotes}
-                onChange={(e) => setAssignmentNotes(e.target.value)}
-              />
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setShowAssignmentDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={assignDelivery}
-              disabled={isSubmitting || !selectedDriver}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Assigning...
-                </>
-              ) : (
-                <>
-                  <Check className="h-4 w-4 mr-2" />
-                  Assign Delivery
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Add Driver Dialog */}
-      <Dialog open={showDriverDialog} onOpenChange={setShowDriverDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Driver</DialogTitle>
-            <DialogDescription>
-              Enter the driver details to add them to the system
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="grid gap-4 py-4">
-            <div>
-              <Label htmlFor="driver-name">Full Name</Label>
-              <Input
-                id="driver-name"
-                placeholder="John Smith"
-                value={driverForm.full_name}
-                onChange={(e) => setDriverForm({...driverForm, full_name: e.target.value})}
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="driver-email">Email Address</Label>
-              <Input
-                id="driver-email"
-                type="email"
-                placeholder="john.smith@example.com"
-                value={driverForm.email}
-                onChange={(e) => setDriverForm({...driverForm, email: e.target.value})}
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="driver-phone">Phone Number</Label>
-              <Input
-                id="driver-phone"
-                placeholder="+1 (234) 567-8901"
-                value={driverForm.phone_number}
-                onChange={(e) => setDriverForm({...driverForm, phone_number: e.target.value})}
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="driver-location">Location/Base</Label>
-              <Input
-                id="driver-location"
-                placeholder="London, UK"
-                value={driverForm.location}
-                onChange={(e) => setDriverForm({...driverForm, location: e.target.value})}
-              />
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setShowDriverDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={addNewDriver}
-              disabled={isSubmitting || !driverForm.full_name || !driverForm.email}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Adding...
-                </>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Driver
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </Tabs>
-  );
-};
-
-export default DeliveryManagementTab;
+                      {driver.full_name} {driver.location && `(${driver.location

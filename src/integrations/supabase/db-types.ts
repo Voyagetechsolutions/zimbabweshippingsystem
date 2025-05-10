@@ -169,6 +169,18 @@ export interface Tables {
     created_at: string;
     updated_at: string;
   };
+  
+  // Add the delivery_assignments table
+  delivery_assignments: {
+    id: string;
+    shipment_id: string;
+    driver_id: string;
+    driver_name: string;
+    assigned_at: string;
+    completed_at?: string;
+    status: string;
+    notes?: string;
+  };
 }
 
 // Helper function to cast types safely when using tables not in the generated types
