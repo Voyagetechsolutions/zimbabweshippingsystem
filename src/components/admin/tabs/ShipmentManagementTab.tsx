@@ -150,18 +150,35 @@ const ShipmentManagementTab = () => {
       
       if (error) throw error;
       
-      // Process the data - Fixed to correctly extract profile data from the nested profiles object
+      // Process the data - Fixed to properly handle profiles data type
       const shipmentData: Shipment[] = data.map(item => {
-        const profiles = item.profiles;
-        // Remove profiles from item to avoid type conflicts
-        const { profiles: _, ...shipment } = item;
+        // Handle profiles correctly, whether it's an object or array
+        let profileData = {
+          email: null as string | null,
+          full_name: null as string | null
+        };
+        
+        // Check if profiles exists and extract data
+        if (item.profiles) {
+          // Handle case when profiles is an array (might happen with certain Supabase responses)
+          if (Array.isArray(item.profiles)) {
+            if (item.profiles.length > 0) {
+              profileData.email = item.profiles[0].email || null;
+              profileData.full_name = item.profiles[0].full_name || null;
+            }
+          } else {
+            // Handle case when profiles is an object
+            profileData.email = item.profiles.email || null;
+            profileData.full_name = item.profiles.full_name || null;
+          }
+        }
+        
+        // Create clean shipment object
+        const { profiles: _, ...shipmentData } = item;
         
         return {
-          ...shipment,
-          profiles: {
-            email: profiles?.email || null,
-            full_name: profiles?.full_name || null
-          }
+          ...shipmentData,
+          profiles: profileData
         } as Shipment;
       });
       
