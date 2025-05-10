@@ -8,7 +8,7 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle
+  CardTitle,
 } from '@/components/ui/card';
 import {
   Table,
@@ -16,7 +16,7 @@ import {
   TableCell,
   TableHead,
   TableHeader,
-  TableRow
+  TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,59 +30,48 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  CreditCard,
   Search,
-  Filter,
   RefreshCcw,
+  Filter,
+  CreditCard,
+  Check,
+  X,
+  AlertCircle,
   Download,
-  FileText,
-  Edit,
-  Check
+  CheckCircle,
+  Receipt,
+  UserCheck,
 } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from '@/components/ui/label';
 
 interface Payment {
   id: string;
-  user_id: string | null;
-  shipment_id: string | null;
   amount: number;
   currency: string;
   payment_method: string;
   payment_status: string;
+  created_at: string;
   transaction_id: string | null;
   receipt_url: string | null;
-  created_at: string;
+  user_id: string | null;
+  shipment_id: string | null;
   profiles?: {
     full_name: string | null;
     email: string;
   } | null;
   shipments?: {
     tracking_number: string;
+    status: string;
   } | null;
 }
 
 const PaymentsInvoicingTab = () => {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("payments");
+  const [activeTab, setActiveTab] = useState('all');
   const [payments, setPayments] = useState<Payment[]>([]);
   const [filteredPayments, setFilteredPayments] = useState<Payment[]>([]);
-  const [pendingPayments, setPendingPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState('all');
-  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState('');
-  const [transactionId, setTransactionId] = useState('');
 
   useEffect(() => {
     fetchPayments();
@@ -90,28 +79,58 @@ const PaymentsInvoicingTab = () => {
 
   useEffect(() => {
     filterPayments();
-  }, [payments, searchQuery, statusFilter, dateFilter]);
+  }, [payments, searchQuery, statusFilter, activeTab]);
 
   const fetchPayments = async () => {
     setLoading(true);
     try {
-      // Fetch all payments with user and shipment information
-      const { data, error } = await supabase
+      // Fetch payments
+      const { data: paymentsData, error: paymentsError } = await supabase
         .from('payments')
-        .select(`
-          *,
-          profiles:user_id (email, full_name),
-          shipments:shipment_id (tracking_number)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      
-      const formattedPayments = (data as Payment[]) || [];
-      setPayments(formattedPayments);
-      
-      // Set pending payments separately for easy access
-      setPendingPayments(formattedPayments.filter(p => p.payment_status === 'pending'));
+      if (paymentsError) throw paymentsError;
+
+      // Enhance payments with related data
+      const enhancedPayments = await Promise.all((paymentsData || []).map(async (payment) => {
+        let profileData = null;
+        let shipmentData = null;
+        
+        // Get profile data
+        if (payment.user_id) {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', payment.user_id)
+            .single();
+            
+          if (!profileError) {
+            profileData = profile;
+          }
+        }
+        
+        // Get shipment data
+        if (payment.shipment_id) {
+          const { data: shipment, error: shipmentError } = await supabase
+            .from('shipments')
+            .select('tracking_number, status')
+            .eq('id', payment.shipment_id)
+            .single();
+            
+          if (!shipmentError) {
+            shipmentData = shipment;
+          }
+        }
+        
+        return {
+          ...payment,
+          profiles: profileData,
+          shipments: shipmentData
+        };
+      }));
+
+      setPayments(enhancedPayments as Payment[]);
     } catch (error: any) {
       console.error('Error fetching payments:', error);
       toast({
@@ -125,470 +144,248 @@ const PaymentsInvoicingTab = () => {
   };
 
   const filterPayments = () => {
-    if (payments.length === 0) {
-      setFilteredPayments([]);
-      return;
+    let filtered = [...payments];
+
+    // Filter by tab
+    if (activeTab === 'pending') {
+      filtered = filtered.filter(p => p.payment_status?.toLowerCase() === 'pending');
+    } else if (activeTab === 'completed') {
+      filtered = filtered.filter(p => p.payment_status?.toLowerCase() === 'completed');
+    } else if (activeTab === 'failed') {
+      filtered = filtered.filter(p => p.payment_status?.toLowerCase() === 'failed');
     }
 
-    let filtered = [...payments];
-    
     // Filter by search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(payment => 
+        payment.transaction_id?.toLowerCase().includes(query) ||
+        payment.shipments?.tracking_number?.toLowerCase().includes(query) ||
+        payment.profiles?.email?.toLowerCase().includes(query) ||
         payment.profiles?.full_name?.toLowerCase().includes(query) ||
-        payment.profiles?.email.toLowerCase().includes(query) ||
-        payment.shipments?.tracking_number.toLowerCase().includes(query) ||
-        (payment.transaction_id && payment.transaction_id.toLowerCase().includes(query))
+        payment.payment_method?.toLowerCase().includes(query)
       );
     }
-    
+
     // Filter by status
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(payment => payment.payment_status.toLowerCase() === statusFilter.toLowerCase());
+      filtered = filtered.filter(p => p.payment_status?.toLowerCase() === statusFilter.toLowerCase());
     }
-    
-    // Filter by date
-    if (dateFilter !== 'all') {
-      const now = new Date();
-      let startDate = new Date();
-      
-      if (dateFilter === 'today') {
-        startDate.setHours(0, 0, 0, 0);
-      } else if (dateFilter === 'week') {
-        startDate.setDate(startDate.getDate() - 7);
-      } else if (dateFilter === 'month') {
-        startDate.setMonth(startDate.getMonth() - 1);
-      }
-      
-      filtered = filtered.filter(payment => new Date(payment.created_at) >= startDate);
-    }
-    
+
     setFilteredPayments(filtered);
   };
 
-  const handlePaymentAction = (payment: Payment) => {
-    setSelectedPayment(payment);
-    setPaymentMethod(payment.payment_method || 'Credit Card');
-    setTransactionId(payment.transaction_id || '');
-    setIsPaymentDialogOpen(true);
-  };
-
-  const markAsPaid = async () => {
-    if (!selectedPayment) return;
-    
+  const updatePaymentStatus = async (paymentId: string, newStatus: string) => {
     try {
-      // Update payment status
-      const { error: updateError } = await supabase
+      const { error } = await supabase
         .from('payments')
-        .update({
-          payment_status: 'paid',
-          payment_method: paymentMethod,
-          transaction_id: transactionId || null
-        })
-        .eq('id', selectedPayment.id);
+        .update({ payment_status: newStatus })
+        .eq('id', paymentId);
         
-      if (updateError) throw updateError;
+      if (error) throw error;
       
-      // Create a receipt entry
-      const { error: receiptError } = await supabase
-        .from('receipts')
-        .insert({
-          payment_id: selectedPayment.id,
-          shipment_id: selectedPayment.shipment_id,
-          receipt_number: `RECEIPT-${Date.now().toString().substring(5)}`,
-          payment_method: paymentMethod,
-          amount: selectedPayment.amount,
-          currency: selectedPayment.currency,
-          status: 'completed',
-          created_at: new Date().toISOString()
-        });
-        
-      if (receiptError) throw receiptError;
-      
-      // Update notification for payment
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: selectedPayment.user_id,
-          title: 'Payment Confirmed',
-          message: `Your payment of ${selectedPayment.currency} ${selectedPayment.amount} has been confirmed.`,
-          type: 'payment_confirmation',
-          related_id: selectedPayment.id
-        });
+      // Update local state
+      setPayments(payments.map(payment => 
+        payment.id === paymentId ? { ...payment, payment_status: newStatus } : payment
+      ));
       
       toast({
         title: 'Payment Updated',
-        description: 'Payment has been marked as paid and receipt generated',
+        description: `Payment status changed to ${newStatus}`,
       });
-      
-      fetchPayments();
-      setIsPaymentDialogOpen(false);
     } catch (error: any) {
-      console.error('Error updating payment:', error);
+      console.error('Error updating payment status:', error);
       toast({
-        title: 'Update Failed',
-        description: error.message || 'Failed to update payment',
+        title: 'Error',
+        description: 'Failed to update payment status',
         variant: 'destructive'
       });
     }
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'paid':
-        return <Badge className="bg-green-100 text-green-800 border-green-300">Paid</Badge>;
+    switch (status?.toLowerCase()) {
+      case 'completed':
+        return <Badge className="bg-green-100 text-green-800 border-green-300">Completed</Badge>;
       case 'pending':
         return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">Pending</Badge>;
       case 'failed':
         return <Badge className="bg-red-100 text-red-800 border-red-300">Failed</Badge>;
       case 'refunded':
-        return <Badge className="bg-purple-100 text-purple-800 border-purple-300">Refunded</Badge>;
+        return <Badge className="bg-blue-100 text-blue-800 border-blue-300">Refunded</Badge>;
       default:
-        return <Badge className="bg-gray-100 text-gray-800 border-gray-300">{status}</Badge>;
+        return <Badge className="bg-gray-100 text-gray-800 border-gray-300">{status || 'Unknown'}</Badge>;
     }
   };
 
   return (
     <div className="space-y-6">
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-3 mb-4">
-          <TabsTrigger value="payments" className="flex items-center gap-2">
+      <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-6 grid w-full grid-cols-4">
+          <TabsTrigger value="all" className="flex items-center gap-2">
             <CreditCard className="h-4 w-4" />
             <span>All Payments</span>
           </TabsTrigger>
           <TabsTrigger value="pending" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            <span>Pending Payments</span>
-            {pendingPayments.length > 0 && (
-              <Badge className="ml-2 bg-yellow-100 text-yellow-800 border-yellow-300">
-                {pendingPayments.length}
-              </Badge>
-            )}
+            <AlertCircle className="h-4 w-4" />
+            <span>Pending</span>
           </TabsTrigger>
-          <TabsTrigger value="invoices" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            <span>Invoices & Receipts</span>
+          <TabsTrigger value="completed" className="flex items-center gap-2">
+            <Check className="h-4 w-4" />
+            <span>Completed</span>
+          </TabsTrigger>
+          <TabsTrigger value="failed" className="flex items-center gap-2">
+            <X className="h-4 w-4" />
+            <span>Failed</span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="payments">
-          <Card>
-            <CardHeader>
-              <CardTitle>Payments</CardTitle>
-              <CardDescription>Manage and track all payment transactions</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="relative flex-grow">
-                  <Input
-                    placeholder="Search by customer, tracking number, or transaction ID"
-                    className="pl-10"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                  <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                </div>
-                <div className="flex gap-4 flex-wrap">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[180px]">
-                      <div className="flex items-center">
-                        <Filter className="h-4 w-4 mr-2" />
-                        <SelectValue placeholder="Payment Status" />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="paid">Paid</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="failed">Failed</SelectItem>
-                      <SelectItem value="refunded">Refunded</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={dateFilter} onValueChange={setDateFilter}>
-                    <SelectTrigger className="w-[150px]">
-                      <div className="flex items-center">
-                        <Filter className="h-4 w-4 mr-2" />
-                        <SelectValue placeholder="Date" />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Time</SelectItem>
-                      <SelectItem value="today">Today</SelectItem>
-                      <SelectItem value="week">Last 7 Days</SelectItem>
-                      <SelectItem value="month">Last 30 Days</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button 
-                    variant="outline" 
-                    onClick={fetchPayments}
-                    className="flex items-center gap-2"
-                  >
-                    <RefreshCcw className="h-4 w-4" />
-                    Refresh
-                  </Button>
-                </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Payments & Invoicing</CardTitle>
+            <CardDescription>Manage all payment transactions</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col md:flex-row gap-4 mb-6">
+              <div className="relative flex-grow">
+                <Input
+                  placeholder="Search by transaction ID, customer or shipment..."
+                  className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
               </div>
-
-              {loading ? (
-                <div className="flex justify-center items-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
-                </div>
-              ) : filteredPayments.length === 0 ? (
-                <div className="text-center py-12">
-                  <CreditCard className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No payments found</h3>
-                  <p className="text-gray-500">
-                    {searchQuery || statusFilter !== 'all' || dateFilter !== 'all'
-                      ? "Try adjusting your search filters"
-                      : "No payment records available"}
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Tracking #</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Method</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Transaction ID</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredPayments.map((payment) => (
-                        <TableRow key={payment.id}>
-                          <TableCell>{format(new Date(payment.created_at), 'MMM d, yyyy')}</TableCell>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">{payment.profiles?.full_name || 'N/A'}</div>
-                              <div className="text-xs text-muted-foreground">{payment.profiles?.email || 'No email'}</div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-mono">
-                            {payment.shipments?.tracking_number || 'N/A'}
-                          </TableCell>
-                          <TableCell>
-                            <div className="font-medium">{payment.currency} {payment.amount.toFixed(2)}</div>
-                          </TableCell>
-                          <TableCell>{payment.payment_method || 'N/A'}</TableCell>
-                          <TableCell>{getStatusBadge(payment.payment_status)}</TableCell>
-                          <TableCell className="font-mono text-xs">
-                            {payment.transaction_id || '-'}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end space-x-2">
-                              {payment.payment_status === 'pending' && (
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  className="flex items-center gap-1"
-                                  onClick={() => handlePaymentAction(payment)}
-                                >
-                                  <Check className="h-4 w-4" />
-                                  <span>Mark as Paid</span>
-                                </Button>
-                              )}
-                              <Button
-                                variant="ghost" 
-                                size="sm"
-                                className="flex items-center gap-1"
-                                onClick={() => {
-                                  // View receipt/details
-                                  if (payment.receipt_url) {
-                                    window.open(payment.receipt_url, '_blank');
-                                  } else {
-                                    toast({
-                                      title: 'Receipt Not Available',
-                                      description: 'No receipt has been generated for this payment yet'
-                                    });
-                                  }
-                                }}
-                              >
-                                <FileText className="h-4 w-4" />
-                                <span>Receipt</span>
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="pending">
-          <Card>
-            <CardHeader>
-              <CardTitle>Pending Payments</CardTitle>
-              <CardDescription>Review and process payments awaiting confirmation</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="flex justify-center items-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
-                </div>
-              ) : pendingPayments.length === 0 ? (
-                <div className="text-center py-12">
-                  <CreditCard className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No pending payments</h3>
-                  <p className="text-gray-500">All payments have been processed</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Tracking #</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {pendingPayments.map((payment) => (
-                        <TableRow key={payment.id}>
-                          <TableCell>{format(new Date(payment.created_at), 'MMM d, yyyy')}</TableCell>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">{payment.profiles?.full_name || 'N/A'}</div>
-                              <div className="text-xs text-muted-foreground">{payment.profiles?.email || 'No email'}</div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-mono">
-                            {payment.shipments?.tracking_number || 'N/A'}
-                          </TableCell>
-                          <TableCell>
-                            <div className="font-medium">{payment.currency} {payment.amount.toFixed(2)}</div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button 
-                              variant="default"
-                              size="sm"
-                              className="bg-zim-green hover:bg-zim-green/90 flex items-center gap-1"
-                              onClick={() => handlePaymentAction(payment)}
-                            >
-                              <Check className="h-4 w-4" />
-                              <span>Mark as Paid</span>
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="invoices">
-          <Card>
-            <CardHeader>
-              <CardTitle>Invoices & Receipts</CardTitle>
-              <CardDescription>Manage all invoice and receipt documents</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12">
-                <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium mb-2">Receipt Management</h3>
-                <p className="text-gray-500 mb-6">
-                  View and download payment receipts for all transactions
-                </p>
-                <Button 
-                  variant="outline"
-                  onClick={() => {
-                    toast({
-                      title: 'Download Started',
-                      description: 'Generating receipt archive for download'
-                    });
-                  }}
-                >
-                  <Download className="h-4 w-4 mr-2" /> Download All Receipts
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* Payment Dialog */}
-      <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Mark Payment as Paid</DialogTitle>
-            <DialogDescription>
-              Enter payment details to confirm this transaction
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedPayment && (
-            <div className="space-y-4 py-4">
-              <div className="space-y-1">
-                <p className="text-sm font-medium">Amount</p>
-                <p className="text-xl font-bold">{selectedPayment.currency} {selectedPayment.amount.toFixed(2)}</p>
-              </div>
-              
-              <div className="space-y-1">
-                <p className="text-sm font-medium">Customer</p>
-                <p>{selectedPayment.profiles?.full_name || 'N/A'}</p>
-                <p className="text-sm text-muted-foreground">{selectedPayment.profiles?.email || 'No email'}</p>
-              </div>
-              
-              {selectedPayment.shipments?.tracking_number && (
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Tracking Number</p>
-                  <p className="font-mono">{selectedPayment.shipments.tracking_number}</p>
-                </div>
-              )}
-              
-              <div className="space-y-2">
-                <Label htmlFor="paymentMethod">Payment Method</Label>
-                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select payment method" />
+              <div className="flex gap-4">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[180px]">
+                    <div className="flex items-center">
+                      <Filter className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Payment status" />
+                    </div>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Credit Card">Credit Card</SelectItem>
-                    <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                    <SelectItem value="Cash">Cash</SelectItem>
-                    <SelectItem value="PayPal">PayPal</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="failed">Failed</SelectItem>
+                    <SelectItem value="refunded">Refunded</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="transactionId">Transaction ID (Optional)</Label>
-                <Input
-                  id="transactionId"
-                  value={transactionId}
-                  onChange={(e) => setTransactionId(e.target.value)}
-                  placeholder="Enter transaction reference"
-                />
+                <Button 
+                  variant="outline"
+                  onClick={fetchPayments}
+                >
+                  <RefreshCcw className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
               </div>
             </div>
-          )}
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)}>Cancel</Button>
-            <Button 
-              className="bg-zim-green hover:bg-zim-green/90"
-              onClick={markAsPaid}
-            >
-              Confirm Payment
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            
+            {loading ? (
+              <div className="flex justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
+              </div>
+            ) : filteredPayments.length === 0 ? (
+              <div className="text-center py-12">
+                <CreditCard className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium mb-2">No payments found</h3>
+                <p className="text-gray-500">
+                  {searchQuery || statusFilter !== 'all' 
+                    ? "Try adjusting your search filters" 
+                    : "No payment records available"}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Transaction ID</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Shipment</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Method</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredPayments.map((payment) => (
+                      <TableRow key={payment.id}>
+                        <TableCell className="font-mono text-xs">
+                          {payment.transaction_id || 'N/A'}
+                        </TableCell>
+                        <TableCell>
+                          {payment.profiles ? (
+                            <div>
+                              <div className="font-medium">{payment.profiles.full_name || 'Unnamed'}</div>
+                              <div className="text-xs text-muted-foreground">{payment.profiles.email}</div>
+                            </div>
+                          ) : (
+                            "No customer data"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {payment.shipments ? (
+                            <div className="font-mono">{payment.shipments.tracking_number}</div>
+                          ) : (
+                            "No shipment"
+                          )}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {payment.currency} {payment.amount.toFixed(2)}
+                        </TableCell>
+                        <TableCell>
+                          {payment.payment_method || 'Unknown'}
+                        </TableCell>
+                        <TableCell>
+                          {getStatusBadge(payment.payment_status)}
+                        </TableCell>
+                        <TableCell>
+                          {format(new Date(payment.created_at), 'MMM d, yyyy')}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end space-x-2">
+                            {payment.payment_status?.toLowerCase() === 'pending' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => updatePaymentStatus(payment.id, 'Completed')}
+                                className="flex items-center gap-1"
+                              >
+                                <CheckCircle className="h-4 w-4" />
+                                <span className="hidden md:inline">Mark Paid</span>
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (payment.receipt_url) {
+                                  window.open(payment.receipt_url, '_blank');
+                                } else {
+                                  // Navigate to generate receipt page
+                                  window.location.href = `/receipt/${payment.id}`;
+                                }
+                              }}
+                              className="flex items-center gap-1"
+                            >
+                              <Receipt className="h-4 w-4" />
+                              <span className="hidden md:inline">Receipt</span>
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </Tabs>
     </div>
   );
 };

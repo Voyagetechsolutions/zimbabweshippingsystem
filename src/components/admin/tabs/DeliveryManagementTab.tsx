@@ -226,12 +226,10 @@ const DeliveryManagementTab = () => {
           region = commPrefs.region as string;
         }
         
-        // Check if we have performance data for this driver
+        // Since we're having type issues with driver_performance table
+        // Let's not use table helper and use a custom raw query instead
         const { data: performanceData, error: performanceError } = await supabase
-          .from(tableFrom('driver_performance'))
-          .select('*')
-          .eq('driver_id', driver.id)
-          .single();
+          .rpc('get_driver_performance', { driver_id_param: driver.id });
         
         const driverObj: Driver = {
           id: driver.id,
@@ -362,8 +360,8 @@ const DeliveryManagementTab = () => {
         description: `The delivery has been assigned to ${driver.full_name}`,
       });
       
-      // Update driver performance metrics
-      await updateDriverPerformanceMetrics(driverId);
+      // Update driver performance metrics with RPC
+      await supabase.rpc('update_driver_performance_metrics', { driver_id_param: driverId });
       
       // Refresh data
       fetchData();
@@ -374,81 +372,6 @@ const DeliveryManagementTab = () => {
         description: 'Failed to assign driver: ' + error.message,
         variant: 'destructive'
       });
-    }
-  };
-
-  const updateDriverPerformanceMetrics = async (driverId: string) => {
-    try {
-      // Count deliveries for this driver
-      const driverDeliveries = deliveries.filter(d => d.driver_id === driverId);
-      const totalDeliveries = driverDeliveries.length;
-      const completedDeliveries = driverDeliveries.filter(d => d.status === 'Delivered').length;
-      const onTimeDeliveries = driverDeliveries.filter(d => d.status === 'Delivered' && d.timeliness === 'on-time').length;
-      
-      // Calculate rating (basic calculation as an example)
-      const rating = onTimeDeliveries > 0 && completedDeliveries > 0 
-        ? Math.min(5, (onTimeDeliveries / completedDeliveries) * 5) 
-        : 5; // Default 5-star rating
-      
-      // Get the driver profile to determine region
-      const { data: driverProfile } = await supabase
-        .from('profiles')
-        .select('communication_preferences')
-        .eq('id', driverId)
-        .single();
-      
-      let regionValue = 'UK';
-      if (driverProfile && 
-          driverProfile.communication_preferences && 
-          typeof driverProfile.communication_preferences === 'object' &&
-          'region' in driverProfile.communication_preferences) {
-        regionValue = driverProfile.communication_preferences.region as string;
-      }
-      
-      // Check if entry exists
-      const { data, error: fetchError } = await supabase
-        .from(tableFrom('driver_performance'))
-        .select('id')
-        .eq('driver_id', driverId);
-        
-      if (fetchError) {
-        console.error('Error checking driver performance:', fetchError);
-        return;
-      }
-      
-      if (data && data.length > 0) {
-        // Update existing entry
-        await supabase
-          .from(tableFrom('driver_performance'))
-          .update({
-            total_deliveries: totalDeliveries,
-            completed_deliveries: completedDeliveries,
-            on_time_deliveries: onTimeDeliveries,
-            rating: rating,
-            updated_at: new Date().toISOString()
-          })
-          .eq('driver_id', driverId);
-      } else {
-        // Create new entry
-        await supabase
-          .from(tableFrom('driver_performance'))
-          .insert({
-            driver_id: driverId,
-            total_deliveries: totalDeliveries,
-            completed_deliveries: completedDeliveries,
-            on_time_deliveries: onTimeDeliveries,
-            rating: rating,
-            region: regionValue || 'UK',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
-      }
-      
-      // Refresh drivers to update performance data
-      await fetchDrivers();
-    } catch (error) {
-      console.error('Error updating driver metrics:', error);
-      // We don't want to block the main flow if metrics update fails
     }
   };
 

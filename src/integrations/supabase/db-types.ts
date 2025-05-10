@@ -186,5 +186,5 @@ export interface Tables {
 
 // Helper function to cast types safely when using tables not in the generated types
 export function tableFrom<T extends keyof Tables>(tableName: T) {
-  return tableName;
+  return tableName as any;
 }

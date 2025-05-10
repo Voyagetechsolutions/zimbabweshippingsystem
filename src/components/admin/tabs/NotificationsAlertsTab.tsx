@@ -110,20 +110,33 @@ const NotificationsAlertsTab = () => {
   const fetchNotifications = async () => {
     setLoading(true);
     try {
+      // Get notifications without join
       const { data, error } = await supabase
         .from('notifications')
-        .select(`
-          *,
-          user:user_id (
-            full_name,
-            email
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      setNotifications(data || []);
+      // Now get user information separately for each notification
+      const notificationsWithUsers = await Promise.all((data || []).map(async (notification) => {
+        if (!notification.user_id) {
+          return { ...notification, user: null };
+        }
+        
+        const { data: userData, error: userError } = await supabase
+          .from('profiles')
+          .select('full_name, email')
+          .eq('id', notification.user_id)
+          .single();
+          
+        return {
+          ...notification,
+          user: userError ? null : userData
+        };
+      }));
+
+      setNotifications(notificationsWithUsers as Notification[]);
     } catch (error: any) {
       console.error('Error fetching notifications:', error);
       toast({

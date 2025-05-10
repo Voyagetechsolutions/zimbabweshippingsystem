@@ -61,18 +61,17 @@ const CustomerManagementTab = () => {
       if (profilesError) throw profilesError;
 
       // Fetch shipment counts for each user
-      const { data: shipmentData, error: shipmentError } = await supabase
+      const { data: shipmentCountsData, error: shipmentError } = await supabase
         .from('shipments')
-        .select('user_id, count')
-        .select('count(*)', { count: 'exact' })
-        .groupBy('user_id');
+        .select('user_id, count(*)')
+        .group('user_id');
         
       if (shipmentError) throw shipmentError;
       
       // Convert the shipment data to a more usable format
       const shipmentCounts: Record<string, number> = {};
-      if (shipmentData) {
-        shipmentData.forEach((item: any) => {
+      if (shipmentCountsData) {
+        shipmentCountsData.forEach((item: any) => {
           shipmentCounts[item.user_id] = parseInt(item.count || '0');
         });
       }
