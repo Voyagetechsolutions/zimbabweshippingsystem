@@ -1,1111 +1,579 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle,
+import {
+  Card,
+  CardContent,
   CardDescription,
-  CardFooter
+  CardHeader,
+  CardTitle
 } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { 
+import {
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
-  TableRow,
+  TableRow
 } from '@/components/ui/table';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
+  SelectValue
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { 
-  Truck, 
-  Search, 
-  Filter, 
-  MoreHorizontal, 
-  User,
-  Package,
-  FileText,
-  RefreshCw,
-  CheckCircle2,
-  Loader2,
-  Check,
-  MapPin,
-  Phone,
-  Star,
-  FileDown,
-  Plus
-} from 'lucide-react';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Tables } from '@/integrations/supabase/db-types';
-import { BarChart } from '@/components/ui/charts';
-import { Json } from '@/integrations/supabase/types';
-import { Shipment, ShipmentMetadata } from '@/types/shipment';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { format } from 'date-fns';
+import { Truck, Package, UserCheck, RefreshCcw, Search, Filter, CheckCircle, XCircle, AlertCircle, UserX } from 'lucide-react';
+import { Shipment } from '@/types/shipment';
 
+// Define types for driver and delivery data
 interface Driver {
   id: string;
-  full_name: string;
-  email: string;
-  role: string;
-  location?: string;
-  phone_number?: string;
-  rating?: number;
-  deliveries_completed?: number;
+  name: string;
+  total_deliveries?: number;
   on_time_rate?: number;
+  active: boolean;
 }
 
-interface DeliveryAssignment {
+// Update DeliveryRecord to use proper typing for metadata
+interface DeliveryRecord {
   id: string;
-  shipment_id: string;
-  driver_id: string;
-  assigned_at: string;
-  completed_at?: string;
-  status: string;
-  notes?: string;
+  tracking_number: string;
+  driver_id?: string; 
   driver_name?: string;
-  tracking_number?: string;
-  destination?: string;
+  status: string;
+  delivery_date?: string;
+  recipient_name: string;
+  timeliness?: 'on-time' | 'late' | 'failed';
+  origin: string;
+  destination: string;
+  created_at: string;
+  updated_at: string;
+  metadata?: Record<string, any>; // Using Record for metadata to avoid type issues
 }
 
-// Helper function to safely access nested properties in metadata
-const getMetadataValue = (metadata: any, path: string[], defaultValue: any = undefined) => {
-  if (!metadata || typeof metadata !== 'object') return defaultValue;
+// Type guard to check if a value is a valid object
+function isValidObject(obj: any): obj is Record<string, any> {
+  return obj !== null && typeof obj === 'object' && !Array.isArray(obj);
+}
+
+// Helper function to safely extract values from nested objects
+const safeGet = (obj: any, path: string[], defaultValue: any = undefined): any => {
+  if (!isValidObject(obj)) return defaultValue;
   
-  let current = metadata;
+  let current = obj;
   for (const key of path) {
-    if (current === null || typeof current !== 'object' || !(key in current)) {
-      return defaultValue;
-    }
+    if (!isValidObject(current) || !(key in current)) return defaultValue;
     current = current[key];
   }
-  
   return current;
-};
-
-// Helper to safely cast the metadata to the correct types
-const safeCastMetadata = (metadata: Json | null): { [key: string]: any } => {
-  if (!metadata) return {};
-  
-  // Handle both object and array cases
-  if (typeof metadata === 'object' && !Array.isArray(metadata)) {
-    return metadata as { [key: string]: any };
-  }
-  
-  return {};
 };
 
 const DeliveryManagementTab = () => {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('pending');
+  const [activeTab, setActiveTab] = useState('monitor');
+  const [timeFilter, setTimeFilter] = useState('week');
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [deliveries, setDeliveries] = useState<DeliveryRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  
-  // Shipments data
-  const [pendingShipments, setPendingShipments] = useState<Shipment[]>([]);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [deliveries, setDeliveries] = useState<DeliveryAssignment[]>([]);
-  
-  // UI states
-  const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
-  const [selectedDriver, setSelectedDriver] = useState<string>('');
-  const [assignmentNotes, setAssignmentNotes] = useState('');
-  const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Driver management states
-  const [showDriverDialog, setShowDriverDialog] = useState(false);
-  const [driverForm, setDriverForm] = useState({
-    full_name: '',
-    email: '',
-    phone_number: '',
-    location: '',
-  });
-  
-  // Selected timeframe for performance stats
-  const [timeframe, setTimeframe] = useState('week');
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [timeFilter]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch shipments ready for delivery
-      const { data: shipmentsData, error: shipmentsError } = await supabase
+      // Fetch shipments that are in delivery states
+      const { data: shipmentData, error: shipmentError } = await supabase
         .from('shipments')
-        .select('*, profiles:user_id(email, full_name)')
-        .eq('status', 'Out for Delivery');
-      
-      if (shipmentsError) throw shipmentsError;
-      
-      // Process shipment data with proper typing
-      if (shipmentsData) {
-        // Convert the data to the Shipment type with proper type casting
-        const processedShipments: Shipment[] = shipmentsData.map(shipment => {
-          const typedShipment: Shipment = {
-            ...shipment,
-            metadata: shipment.metadata as ShipmentMetadata,
-            profiles: shipment.profiles as any
-          };
-          
-          return typedShipment;
-        });
+        .select('*')
+        .in('status', ['Out for Delivery', 'Processing in ZW Warehouse', 'Delivered', 'Failed Attempt'])
+        .order('created_at', { ascending: false });
+
+      if (shipmentError) throw shipmentError;
+
+      // Transform shipment data to delivery records with safe type handling
+      const deliveryRecords: DeliveryRecord[] = (shipmentData || []).map(shipment => {
+        // Safely extract recipient name using our helper function
+        let recipientName = 'No Name Provided';
         
-        setPendingShipments(processedShipments);
-      } else {
-        setPendingShipments([]);
-      }
-      
-      // 2. Fetch drivers (profiles with driver role)
-      const { data: driversData, error: driversError } = await supabase
+        // Ensure metadata is an object before trying to access properties
+        const metadata = isValidObject(shipment.metadata) ? shipment.metadata : {};
+        
+        // Try different paths to get recipient name
+        const recipientFromRecipient = safeGet(metadata, ['recipient', 'name'], null);
+        const recipientFromFirstLastName = safeGet(metadata, ['recipient', 'firstName'], null) && 
+          safeGet(metadata, ['recipient', 'lastName'], null) ? 
+          `${safeGet(metadata, ['recipient', 'firstName'], '')} ${safeGet(metadata, ['recipient', 'lastName'], '')}`.trim() : 
+          null;
+        
+        const recipientFromRecipientDetails = safeGet(metadata, ['recipientDetails', 'name'], null);
+        const recipientFromDetailsFirstLastName = safeGet(metadata, ['recipientDetails', 'firstName'], null) && 
+          safeGet(metadata, ['recipientDetails', 'lastName'], null) ? 
+          `${safeGet(metadata, ['recipientDetails', 'firstName'], '')} ${safeGet(metadata, ['recipientDetails', 'lastName'], '')}`.trim() : 
+          null;
+        
+        // Try to get recipient name from different paths
+        if (recipientFromRecipient) {
+          recipientName = recipientFromRecipient;
+        } else if (recipientFromFirstLastName) {
+          recipientName = recipientFromFirstLastName;
+        } else if (recipientFromRecipientDetails) {
+          recipientName = recipientFromRecipientDetails;
+        } else if (recipientFromDetailsFirstLastName) {
+          recipientName = recipientFromDetailsFirstLastName;
+        } else if (safeGet(metadata, ['recipientName'], null)) {
+          recipientName = safeGet(metadata, ['recipientName'], 'No Name Provided');
+        }
+        
+        // Safely extract delivery info
+        const deliveryInfo = safeGet(metadata, ['delivery'], {});
+        
+        return {
+          id: shipment.id,
+          tracking_number: shipment.tracking_number,
+          status: shipment.status,
+          delivery_date: safeGet(deliveryInfo, ['date'], shipment.updated_at),
+          recipient_name: recipientName,
+          origin: shipment.origin,
+          destination: shipment.destination,
+          timeliness: getTimeliness(shipment),
+          created_at: shipment.created_at,
+          updated_at: shipment.updated_at,
+          driver_id: safeGet(deliveryInfo, ['driver_id'], undefined),
+          driver_name: safeGet(deliveryInfo, ['driver_name'], undefined),
+          metadata: isValidObject(shipment.metadata) ? shipment.metadata : {}
+        };
+      });
+
+      // Fetch active drivers from profiles table
+      const { data: driverData, error: driverError } = await supabase
         .from('profiles')
         .select('*')
         .eq('role', 'driver');
-      
-      if (driversError) throw driversError;
-      
-      // Transform driver data to include performance metrics
-      const enhancedDrivers: Driver[] = (driversData || []).map(driver => {
-        // Safely access communication preferences
-        let location = '';
-        let phoneNumber = '';
-        
-        if (driver.communication_preferences && 
-            typeof driver.communication_preferences === 'object') {
-          // Cast to appropriate type for safe property access
-          const prefs = safeCastMetadata(driver.communication_preferences);
-          location = prefs.location || '';
-          phoneNumber = prefs.phone || '';
-        }
-        
-        return {
+
+      if (driverError) {
+        // If there's an error fetching drivers, we can still show the delivery data
+        console.error('Error fetching drivers:', driverError);
+        setDrivers([]);
+      } else {
+        const formattedDrivers: Driver[] = (driverData || []).map(driver => ({
           id: driver.id,
-          full_name: driver.full_name || 'Unnamed Driver',
-          email: driver.email,
-          role: driver.role || 'driver',
-          location: location,
-          phone_number: phoneNumber,
-          rating: Math.round((Math.random() * 2 + 3) * 10) / 10, // Random rating between 3.0-5.0 for demo
-          deliveries_completed: Math.floor(Math.random() * 50) + 10, // Random number for demo
-          on_time_rate: Math.round((Math.random() * 20 + 80) * 10) / 10, // 80-100% random for demo
-        };
-      });
-      
-      setDrivers(enhancedDrivers);
-      
-      // 3. Process delivery assignments from shipment metadata
-      try {
-        // Manual mapping of delivery assignments from metadata
-        const deliveryAssignments: DeliveryAssignment[] = [];
-        
-        for (const shipment of pendingShipments) {
-          const metadata = safeCastMetadata(shipment.metadata);
-          
-          // Check if metadata has delivery information safely
-          if (metadata && 'delivery' in metadata) {
-            const deliveryInfo = metadata.delivery;
-            
-            if (deliveryInfo && typeof deliveryInfo === 'object') {
-              const assignment: DeliveryAssignment = {
-                id: `${shipment.id}-delivery`, // Generate an ID
-                shipment_id: shipment.id,
-                driver_id: deliveryInfo.driver_id || '',
-                driver_name: deliveryInfo.driver_name || 'Unknown Driver',
-                assigned_at: deliveryInfo.assigned_at || shipment.updated_at,
-                status: 'assigned',
-                tracking_number: shipment.tracking_number,
-                destination: shipment.destination
-              };
-              
-              if (deliveryInfo.completed_at) {
-                assignment.completed_at = deliveryInfo.completed_at;
-                assignment.status = 'completed';
-              }
-              
-              if (deliveryInfo.notes) {
-                assignment.notes = deliveryInfo.notes;
-              }
-              
-              deliveryAssignments.push(assignment);
-            }
-          }
-        }
-        
-        setDeliveries(deliveryAssignments);
-      } catch (error) {
-        console.error("Error processing delivery assignments:", error);
-        setDeliveries([]);
+          name: driver.full_name || 'Unknown Driver',
+          active: true
+        }));
+        setDrivers(formattedDrivers);
       }
+
+      setDeliveries(deliveryRecords);
     } catch (error: any) {
       console.error('Error fetching delivery data:', error);
       toast({
         title: 'Error',
         description: 'Failed to load delivery data',
-        variant: 'destructive',
+        variant: 'destructive'
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const assignDelivery = async () => {
-    if (!selectedShipment || !selectedDriver) {
-      toast({
-        title: 'Missing information',
-        description: 'Please select both a shipment and a driver',
-        variant: 'destructive',
-      });
-      return;
+  // Helper function to extract recipient name from shipment metadata
+  const getRecipientName = (shipment: any): string => {
+    const metadata = shipment.metadata || {};
+    
+    if (typeof metadata !== 'object') {
+      return 'No Name Provided';
     }
     
-    setIsSubmitting(true);
+    if (safeGet(metadata, ['recipientDetails', 'name'])) {
+      return metadata.recipientDetails.name;
+    } else if (safeGet(metadata, ['recipient', 'name'])) {
+      return metadata.recipient.name;
+    } else if (safeGet(metadata, ['recipient', 'firstName']) && safeGet(metadata, ['recipient', 'lastName'])) {
+      return `${metadata.recipient.firstName} ${metadata.recipient.lastName}`;
+    } else if (metadata.recipientName) {
+      return metadata.recipientName;
+    }
     
+    return 'No Name Provided';
+  };
+
+  // Determine timeliness based on shipment data
+  const getTimeliness = (shipment: any): 'on-time' | 'late' | 'failed' => {
+    if (shipment.status === 'Failed Attempt') {
+      return 'failed';
+    }
+    
+    // Check if delivery was late based on metadata
+    const metadata = isValidObject(shipment.metadata) ? shipment.metadata : {};
+    
+    // Safely check if delivery is marked as late
+    const isLate = safeGet(metadata, ['delivery', 'isLate'], false);
+    
+    return isLate ? 'late' : 'on-time';
+  };
+
+  const getStatusBadgeClass = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'delivered':
+        return 'bg-green-100 text-green-800 border-green-300';
+      case 'out for delivery':
+        return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'failed attempt':
+        return 'bg-red-100 text-red-800 border-red-300';
+      case 'returned':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case 'cancelled':
+        return 'bg-gray-100 text-gray-800 border-gray-300';
+      case 'processing in zw warehouse':
+        return 'bg-purple-100 text-purple-800 border-purple-300';
+      default:
+        return 'bg-gray-100 text-gray-600 border-gray-200';
+    }
+  };
+
+  const getTimelinessIcon = (timeliness: string) => {
+    switch (timeliness) {
+      case 'on-time':
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'late':
+        return <AlertCircle className="h-4 w-4 text-yellow-500" />;
+      case 'failed':
+        return <XCircle className="h-4 w-4 text-red-500" />;
+      default:
+        return null;
+    }
+  };
+
+  const filteredDeliveries = deliveries.filter(delivery => {
+    const matchesSearch = searchQuery === '' || 
+      delivery.tracking_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      delivery.recipient_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      delivery.destination.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesStatus = statusFilter === 'all' || 
+      delivery.status.toLowerCase() === statusFilter.toLowerCase();
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  const assignDriver = async (deliveryId: string, driverId: string) => {
     try {
-      // 1. Get driver details
-      const driverInfo = drivers.find(d => d.id === selectedDriver);
-      
-      if (!driverInfo) throw new Error('Driver not found');
-      
-      // 2. Update shipment metadata to include delivery driver info
-      const { data: shipment, error: shipmentError } = await supabase
+      // Get the shipment
+      const { data: shipment, error: fetchError } = await supabase
         .from('shipments')
-        .select('metadata')
-        .eq('id', selectedShipment.id)
+        .select('*')
+        .eq('id', deliveryId)
         .single();
+        
+      if (fetchError) throw fetchError;
       
-      if (shipmentError) throw shipmentError;
+      // Get the driver's name
+      const { data: driver, error: driverError } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', driverId)
+        .single();
+        
+      if (driverError) throw driverError;
       
-      // Prepare updated metadata with delivery information
-      const metadata = typeof shipment.metadata === 'object' && shipment.metadata !== null
-        ? { ...shipment.metadata }
-        : {};
+      // Safely prepare the updated metadata
+      const existingMetadata = isValidObject(shipment.metadata) ? shipment.metadata : {};
+      const existingDelivery = safeGet(existingMetadata, ['delivery'], {});
       
-      // Cast metadata to the expected type
-      const typedMetadata = safeCastMetadata(metadata);
-      
-      // Initialize the delivery object safely
-      if (!typedMetadata.delivery) {
-        typedMetadata.delivery = {};
-      }
-      
-      // Add delivery driver information
-      typedMetadata.delivery = {
-        ...typedMetadata.delivery,
-        driver_id: selectedDriver,
-        driver_name: driverInfo.full_name,
-        assigned_at: new Date().toISOString(),
-        notes: assignmentNotes,
+      const updatedMetadata = {
+        ...existingMetadata,
+        delivery: {
+          ...existingDelivery,
+          driver_id: driverId,
+          driver_name: driver.full_name,
+          assigned_at: new Date().toISOString()
+        }
       };
       
-      // 3. Update the shipment metadata
+      // Update the shipment
       const { error: updateError } = await supabase
         .from('shipments')
-        .update({ metadata: typedMetadata })
-        .eq('id', selectedShipment.id);
-      
+        .update({
+          metadata: updatedMetadata
+        })
+        .eq('id', deliveryId);
+        
       if (updateError) throw updateError;
       
-      // 4. Create delivery assignment record (in memory only)
-      const newAssignment: DeliveryAssignment = {
-        id: `${selectedShipment.id}-delivery-${Date.now()}`,
-        shipment_id: selectedShipment.id,
-        driver_id: selectedDriver,
-        driver_name: driverInfo.full_name,
-        assigned_at: new Date().toISOString(),
-        status: 'assigned',
-        notes: assignmentNotes,
-        tracking_number: selectedShipment.tracking_number,
-        destination: selectedShipment.destination
-      };
-      
-      setDeliveries([newAssignment, ...deliveries]);
-      
-      // 5. Success
+      // Success message
       toast({
-        title: 'Delivery Assigned',
-        description: `Shipment assigned to ${driverInfo.full_name} successfully`,
+        title: 'Driver assigned',
+        description: `The delivery has been assigned to ${driver.full_name}`,
       });
       
-      // 6. Refresh data
+      // Refresh data
       fetchData();
-      
-      // 7. Reset form and close dialog
-      setAssignmentNotes('');
-      setSelectedDriver('');
-      setSelectedShipment(null);
-      setShowAssignmentDialog(false);
-      
     } catch (error: any) {
-      console.error('Error assigning delivery:', error);
+      console.error('Error assigning driver:', error);
       toast({
-        title: 'Error',
-        description: error.message || 'Failed to assign delivery',
-        variant: 'destructive',
+        title: 'Assignment failed',
+        description: 'Failed to assign driver: ' + error.message,
+        variant: 'destructive'
       });
-    } finally {
-      setIsSubmitting(false);
     }
-  };
-
-  // Add new driver
-  const addNewDriver = async () => {
-    const { full_name, email, phone_number, location } = driverForm;
-    
-    if (!full_name || !email) {
-      toast({
-        title: 'Missing information',
-        description: 'Please provide driver name and email',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    setIsSubmitting(true);
-    
-    try {
-      // Create the user in auth first to get an ID
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password: `Temp${Math.random().toString(36).substring(2, 10)}!`, // Generate a secure temporary password
-        options: {
-          data: {
-            full_name
-          }
-        }
-      });
-      
-      if (authError) throw authError;
-      
-      const userId = authData.user?.id;
-      
-      if (!userId) {
-        throw new Error("Failed to create user account");
-      }
-      
-      // Update the profile with additional driver information
-      const { data, error } = await supabase
-        .from('profiles')
-        .update({
-          full_name,
-          role: 'driver',
-          communication_preferences: {
-            email: true,
-            sms: true,
-            phone: phone_number,
-            location: location
-          }
-        })
-        .eq('id', userId)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      
-      // Add the driver to our local state
-      const newDriver: Driver = {
-        id: data.id,
-        full_name: data.full_name || 'Unnamed Driver',
-        email: data.email,
-        role: 'driver',
-        phone_number: phone_number || 'Not provided',
-        location: location || 'Unknown',
-        rating: 5.0,
-        deliveries_completed: 0,
-        on_time_rate: 100
-      };
-      
-      setDrivers([...drivers, newDriver]);
-      
-      // Reset form and close dialog
-      setDriverForm({
-        full_name: '',
-        email: '',
-        phone_number: '',
-        location: '',
-      });
-      setShowDriverDialog(false);
-      
-      toast({
-        title: 'Driver Added',
-        description: `${full_name} has been added as a driver`,
-      });
-      
-    } catch (error: any) {
-      console.error('Error adding driver:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to add driver',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Filter pending shipments based on search
-  const filteredShipments = pendingShipments.filter(shipment => {
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      shipment.tracking_number.toLowerCase().includes(searchLower) ||
-      shipment.destination.toLowerCase().includes(searchLower) ||
-      (shipment.profiles?.full_name && shipment.profiles.full_name.toLowerCase().includes(searchLower)) ||
-      (shipment.profiles?.email && shipment.profiles.email.toLowerCase().includes(searchLower))
-    );
-  });
-  
-  // Filter drivers based on search
-  const filteredDrivers = drivers.filter(driver => {
-    if (!searchQuery) return true;
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      driver.full_name.toLowerCase().includes(searchLower) ||
-      driver.email.toLowerCase().includes(searchLower) ||
-      (driver.location && driver.location.toLowerCase().includes(searchLower))
-    );
-  });
-
-  // Get performance data
-  const getPerformanceData = () => {
-    // We'd typically fetch this from the server based on timeframe
-    // For now, generate some example data
-    const performanceData = [
-      { name: 'On-Time Rate', value: 92 },
-      { name: 'Customer Rating', value: 4.7 * 20 }, // Scale 0-5 to 0-100
-      { name: 'Completion Rate', value: 98 },
-    ];
-    
-    return performanceData;
-  };
-  
-  // Get driver performance chart data
-  const getDriverPerformanceData = () => {
-    // Generate data for each driver (limited to top 5 for chart readability)
-    return drivers
-      .slice(0, 5)
-      .map(driver => ({
-        name: driver.full_name.split(' ')[0], // Just first name for chart display
-        onTime: driver.on_time_rate || 0,
-        rating: (driver.rating || 0) * 20, // Scale 0-5 to 0-100
-        deliveries: Math.min(100, ((driver.deliveries_completed || 0) / 50) * 100) // Scale based on max 50 deliveries
-      }));
   };
 
   return (
-    <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab}>
-      <TabsList className="mb-6 grid w-full grid-cols-3">
-        <TabsTrigger value="pending" className="flex items-center gap-2">
-          <Truck className="h-4 w-4" />
-          <span>Pending Deliveries</span>
-        </TabsTrigger>
-        <TabsTrigger value="performance" className="flex items-center gap-2">
-          <Star className="h-4 w-4" />
-          <span>Driver Performance</span>
-        </TabsTrigger>
-        <TabsTrigger value="drivers" className="flex items-center gap-2">
-          <User className="h-4 w-4" />
-          <span>Driver Management</span>
-        </TabsTrigger>
-      </TabsList>
-      
-      {/* Pending Deliveries Tab */}
-      <TabsContent value="pending">
-        <Card>
-          <CardHeader>
-            <CardTitle>Pending Deliveries</CardTitle>
-            <CardDescription>
-              Shipments that are out for delivery
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col md:flex-row gap-4 mb-6">
-              <div className="relative flex-grow">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search deliveries by tracking # or destination..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              
-              <div className="flex gap-4">
-                <Button 
-                  variant="outline" 
-                  onClick={fetchData}
-                  disabled={loading}
-                >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
-              </div>
-            </div>
-            
-            {loading ? (
-              <div className="flex justify-center items-center p-12">
-                <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-              </div>
-            ) : filteredShipments.length === 0 ? (
-              <div className="text-center p-12">
-                <Truck className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium mb-2">No pending deliveries</h3>
-                <p className="text-gray-500">
-                  {searchQuery ? 
-                    "Try adjusting your search query" : 
-                    "There are no shipments out for delivery at the moment"}
-                </p>
-              </div>
-            ) : (
-              <div className="rounded-md border overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tracking #</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Destination</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Assigned Driver</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredShipments.map((shipment) => {
-                      // Extract delivery info from metadata safely
-                      const metadata = safeCastMetadata(shipment.metadata);
-                      const deliveryInfo = metadata && 'delivery' in metadata ? 
-                        metadata.delivery : null;
-                      
-                      return (
-                        <TableRow key={shipment.id}>
-                          <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
-                          <TableCell>
-                            {shipment.profiles?.full_name || shipment.profiles?.email || "Unknown Customer"}
-                          </TableCell>
-                          <TableCell className="max-w-[200px] truncate">{shipment.destination}</TableCell>
-                          <TableCell>
-                            <Badge className="bg-cyan-100 text-cyan-800 border-cyan-300">
-                              Out for Delivery
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {deliveryInfo && deliveryInfo.driver_name ? (
-                              <div className="flex items-center gap-2">
-                                <User className="h-4 w-4 text-gray-500" />
-                                <span>{deliveryInfo.driver_name}</span>
-                              </div>
-                            ) : (
-                              <Badge variant="outline" className="text-gray-500">
-                                Not Assigned
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {!deliveryInfo || !deliveryInfo.driver_name ? (
-                              <Button 
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedShipment(shipment);
-                                  setShowAssignmentDialog(true);
-                                }}
-                              >
-                                Assign Driver
-                              </Button>
-                            ) : (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                    <span className="sr-only">Actions</span>
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                  <DropdownMenuItem>
-                                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                                    Mark as Delivered
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem>
-                                    <User className="h-4 w-4 mr-2" />
-                                    Reassign Driver
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </TabsContent>
-      
-      {/* Driver Performance Tab */}
-      <TabsContent value="performance">
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
-              <div>
-                <CardTitle>Driver Performance</CardTitle>
-                <CardDescription>
-                  Monitor delivery performance metrics
-                </CardDescription>
-              </div>
-              
-              <Select 
-                value={timeframe}
-                onValueChange={setTimeframe}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select timeframe" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="week">This Week</SelectItem>
-                  <SelectItem value="month">This Month</SelectItem>
-                  <SelectItem value="quarter">This Quarter</SelectItem>
-                  <SelectItem value="year">This Year</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {drivers.length === 0 ? (
-              <div className="text-center p-12">
-                <User className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium mb-2">No drivers available</h3>
-                <p className="text-gray-500">
-                  Add drivers to see performance metrics
-                </p>
-                <Button
-                  className="mt-4"
-                  onClick={() => {
-                    setActiveTab('drivers');
-                    setShowDriverDialog(true);
-                  }}
-                >
-                  Add Drivers
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-8">
-                {/* Overall Performance Chart */}
-                <div>
-                  <h3 className="text-lg font-medium mb-4">Overall Fleet Performance</h3>
-                  <div className="h-80">
-                    <BarChart
-                      data={getPerformanceData()}
-                      index="name"
-                      categories={['value']}
-                      valueFormatter={(value) => `${value}%`}
-                      className="h-80"
-                    />
-                  </div>
+    <>
+      <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-6 grid w-full grid-cols-2 md:grid-cols-3">
+          <TabsTrigger value="monitor" className="flex items-center gap-2">
+            <Truck className="h-4 w-4" />
+            <span>Monitor Deliveries</span>
+          </TabsTrigger>
+          <TabsTrigger value="drivers" className="flex items-center gap-2">
+            <UserCheck className="h-4 w-4" />
+            <span>Driver Performance</span>
+          </TabsTrigger>
+          <TabsTrigger value="issues" className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" />
+            <span>Issues & Complaints</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="monitor">
+          <Card>
+            <CardHeader>
+              <CardTitle>Delivery Monitoring</CardTitle>
+              <CardDescription>Track and manage all deliveries</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col md:flex-row gap-4 mb-6">
+                <div className="relative flex-grow">
+                  <Input
+                    placeholder="Search by tracking # or recipient..."
+                    className="pl-10"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
                 </div>
-                
-                {/* Driver Comparison Chart */}
-                <div>
-                  <h3 className="text-lg font-medium mb-4">Driver Comparison</h3>
-                  <div className="h-80">
-                    <BarChart
-                      data={getDriverPerformanceData()}
-                      index="name"
-                      categories={['onTime', 'rating', 'deliveries']}
-                      valueFormatter={(value) => `${value}%`}
-                      className="h-80"
-                    />
-                  </div>
-                </div>
-                
-                {/* Driver Performance Table */}
-                <div>
-                  <h3 className="text-lg font-medium mb-4">Individual Performance</h3>
-                  <div className="rounded-md border overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Driver</TableHead>
-                          <TableHead>Location</TableHead>
-                          <TableHead>Deliveries Completed</TableHead>
-                          <TableHead>On-Time Rate</TableHead>
-                          <TableHead>Rating</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {drivers.map((driver) => (
-                          <TableRow key={driver.id}>
-                            <TableCell>
-                              <div className="font-medium">{driver.full_name}</div>
-                              <div className="text-sm text-gray-500">{driver.email}</div>
-                            </TableCell>
-                            <TableCell>
-                              {driver.location || 'Unknown'}
-                            </TableCell>
-                            <TableCell>{driver.deliveries_completed || 0}</TableCell>
-                            <TableCell>
-                              <Badge className={`${
-                                (driver.on_time_rate || 0) > 90 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : (driver.on_time_rate || 0) > 80 
-                                  ? 'bg-yellow-100 text-yellow-800' 
-                                  : 'bg-red-100 text-red-800'
-                              }`}>
-                                {driver.on_time_rate || 0}%
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center">
-                                <span className="font-medium mr-1">{driver.rating || 0}</span>
-                                <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-                
-                <div className="flex justify-end">
-                  <Button>
-                    <FileDown className="h-4 w-4 mr-2" />
-                    Export Performance Report
+                <div className="flex gap-4">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-[180px]">
+                      <div className="flex items-center">
+                        <Filter className="h-4 w-4 mr-2" />
+                        <SelectValue placeholder="Filter by status" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="delivered">Delivered</SelectItem>
+                      <SelectItem value="out for delivery">Out for Delivery</SelectItem>
+                      <SelectItem value="processing in zw warehouse">Processing in ZW</SelectItem>
+                      <SelectItem value="failed attempt">Failed Attempt</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={timeFilter} onValueChange={setTimeFilter}>
+                    <SelectTrigger className="w-[150px]">
+                      <div className="flex items-center">
+                        <Filter className="h-4 w-4 mr-2" />
+                        <SelectValue placeholder="Time period" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="day">Today</SelectItem>
+                      <SelectItem value="week">This Week</SelectItem>
+                      <SelectItem value="month">This Month</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setStatusFilter('all');
+                      setTimeFilter('week');
+                      fetchData();
+                    }}
+                  >
+                    <RefreshCcw className="h-4 w-4 mr-2" />
+                    Refresh
                   </Button>
                 </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </TabsContent>
-      
-      {/* Driver Management Tab */}
-      <TabsContent value="drivers">
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
-              <div>
-                <CardTitle>Driver Management</CardTitle>
-                <CardDescription>
-                  Manage delivery drivers and their assignments
-                </CardDescription>
-              </div>
               
-              <Button onClick={() => setShowDriverDialog(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Driver
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col md:flex-row gap-4 mb-6">
-              <div className="relative flex-grow">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search drivers by name, email or location..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              
-              <Button 
-                variant="outline" 
-                onClick={fetchData}
-                disabled={loading}
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
-            </div>
-            
-            {loading ? (
-              <div className="flex justify-center items-center p-12">
-                <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-              </div>
-            ) : filteredDrivers.length === 0 ? (
-              <div className="text-center p-12">
-                <User className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium mb-2">No drivers found</h3>
-                <p className="text-gray-500">
-                  {searchQuery ? 
-                    "Try adjusting your search query" : 
-                    "There are no drivers added yet"}
+              {loading ? (
+                <div className="flex justify-center items-center p-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
+                </div>
+              ) : filteredDeliveries.length === 0 ? (
+                <div className="text-center p-12">
+                  <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No deliveries found</h3>
+                  <p className="text-gray-500">
+                    Try adjusting your filters to see more results
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[120px]">Tracking #</TableHead>
+                        <TableHead>Recipient</TableHead>
+                        <TableHead>Driver</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Delivery Date</TableHead>
+                        <TableHead>Destination</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredDeliveries.map((delivery) => {
+                        // Format the delivery date 
+                        const formattedDate = delivery.delivery_date
+                          ? format(new Date(delivery.delivery_date), 'MMM d, yyyy')
+                          : 'Not scheduled';
+                            
+                        return (
+                          <TableRow key={delivery.id}>
+                            <TableCell className="font-mono">{delivery.tracking_number}</TableCell>
+                            <TableCell>{delivery.recipient_name}</TableCell>
+                            <TableCell>
+                              {drivers.length > 0 && (
+                                <Select 
+                                  defaultValue={delivery.driver_id}
+                                  onValueChange={(value) => assignDriver(delivery.id, value)}
+                                >
+                                  <SelectTrigger className="w-[140px]">
+                                    <SelectValue placeholder="Assign driver" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {drivers.map(driver => (
+                                      <SelectItem key={driver.id} value={driver.id}>
+                                        {driver.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                              {drivers.length === 0 && (
+                                <span className="text-sm text-gray-500">No drivers available</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={getStatusBadgeClass(delivery.status)}>
+                                {delivery.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {formattedDate}
+                            </TableCell>
+                            <TableCell className="max-w-[200px] truncate">
+                              {delivery.destination}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="sm">View Details</Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="drivers">
+          <Card>
+            <CardHeader>
+              <CardTitle>Driver Performance</CardTitle>
+              <CardDescription>Monitor driver efficiency and delivery metrics</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {drivers.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Driver Name</TableHead>
+                        <TableHead>Assigned Deliveries</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {drivers.map((driver) => {
+                        // Count assigned deliveries for this driver
+                        const assignedDeliveries = deliveries.filter(d => {
+                          return d.driver_id === driver.id;
+                        }).length;
+                        
+                        return (
+                          <TableRow key={driver.id}>
+                            <TableCell className="font-medium">{driver.name}</TableCell>
+                            <TableCell>{assignedDeliveries}</TableCell>
+                            <TableCell>
+                              <Badge className="bg-green-100 text-green-800">
+                                Active
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="sm">View Details</Button>
+                              <Button variant="ghost" size="sm">Assign Tasks</Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center p-12">
+                  <UserX className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No drivers found</h3>
+                  <p className="text-gray-500 mb-6">
+                    There are currently no drivers in the system
+                  </p>
+                  <Button variant="outline">
+                    Add New Driver
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="issues">
+          <Card>
+            <CardHeader>
+              <CardTitle>Delivery Issues & Complaints</CardTitle>
+              <CardDescription>Track and resolve delivery-related issues</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12">
+                <AlertCircle className="h-12 w-12 mx-auto text-orange-500 mb-4" />
+                <h3 className="text-lg font-medium mb-2">No active issues</h3>
+                <p className="text-gray-500 mb-6">
+                  There are currently no reported issues or complaints
                 </p>
-                <Button 
-                  className="mt-4"
-                  onClick={() => setShowDriverDialog(true)}
-                >
-                  Add Driver
+                <Button variant="outline">
+                  View Resolved Issues
                 </Button>
               </div>
-            ) : (
-              <div className="rounded-md border overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Driver</TableHead>
-                      <TableHead>Contact</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead>Performance</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredDrivers.map((driver) => (
-                      <TableRow key={driver.id}>
-                        <TableCell>
-                          <div className="font-medium">{driver.full_name}</div>
-                          <div className="text-sm text-gray-500">{driver.email}</div>
-                        </TableCell>
-                        <TableCell>
-                          {driver.phone_number && (
-                            <div className="flex items-center gap-1">
-                              <Phone className="h-3.5 w-3.5 text-gray-500" />
-                              <span>{driver.phone_number}</span>
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <MapPin className="h-3.5 w-3.5 text-gray-500" />
-                            <span>{driver.location || 'Unknown'}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <span className="font-medium">{driver.rating || 'N/A'}</span>
-                            {driver.rating && <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {driver.deliveries_completed || 0} deliveries completed
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Actions</span>
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuItem>
-                                Edit Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                View Assignments
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                Performance Report
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-red-600">
-                                Deactivate Driver
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </TabsContent>
-
-      {/* Driver Assignment Dialog */}
-      <Dialog open={showAssignmentDialog} onOpenChange={setShowAssignmentDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Assign Delivery Driver</DialogTitle>
-            <DialogDescription>
-              Select a driver to handle this delivery
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="grid gap-4 py-4">
-            {selectedShipment && (
-              <>
-                <div className="grid grid-cols-2 gap-2 border-b pb-3">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Tracking #:</p>
-                    <p className="font-mono">{selectedShipment.tracking_number}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Customer:</p>
-                    <p>{selectedShipment.profiles?.full_name || selectedShipment.profiles?.email || "Unknown"}</p>
-                  </div>
-                  <div className="col-span-2 mt-2">
-                    <p className="text-sm font-medium text-gray-500">Destination:</p>
-                    <p>{selectedShipment.destination}</p>
-                  </div>
-                </div>
-              </>
-            )}
-            
-            <div>
-              <Label htmlFor="driver">Select Driver</Label>
-              <Select 
-                value={selectedDriver} 
-                onValueChange={setSelectedDriver}
-              >
-                <SelectTrigger id="driver">
-                  <SelectValue placeholder="Select a driver" />
-                </SelectTrigger>
-                <SelectContent>
-                  {drivers.map(driver => (
-                    <SelectItem key={driver.id} value={driver.id}>
-                      {driver.full_name} {driver.location && `(${driver.location})`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="notes">Notes (Optional)</Label>
-              <Textarea
-                id="notes"
-                placeholder="Add any special delivery instructions..."
-                value={assignmentNotes}
-                onChange={(e) => setAssignmentNotes(e.target.value)}
-                className="resize-none"
-              />
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAssignmentDialog(false)}>Cancel</Button>
-            <Button 
-              onClick={assignDelivery}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Check className="h-4 w-4 mr-2" />
-              )}
-              Assign Driver
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add New Driver Dialog */}
-      <Dialog open={showDriverDialog} onOpenChange={setShowDriverDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Driver</DialogTitle>
-            <DialogDescription>
-              Enter driver details to add them to the system
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="name">Full Name</Label>
-                <Input
-                  id="name"
-                  value={driverForm.full_name}
-                  onChange={(e) => setDriverForm({...driverForm, full_name: e.target.value})}
-                  placeholder="John Doe"
-                />
-              </div>
-              <div>
-                <Label htmlFor="email">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={driverForm.email}
-                  onChange={(e) => setDriverForm({...driverForm, email: e.target.value})}
-                  placeholder="john.doe@example.com"
-                />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  value={driverForm.phone_number}
-                  onChange={(e) => setDriverForm({...driverForm, phone_number: e.target.value})}
-                  placeholder="+1 (555) 123-4567"
-                />
-              </div>
-              <div>
-                <Label htmlFor="location">Location</Label>
-                <Input
-                  id="location"
-                  value={driverForm.location}
-                  onChange={(e) => setDriverForm({...driverForm, location: e.target.value})}
-                  placeholder="New York, NY"
-                />
-              </div>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDriverDialog(false)}>Cancel</Button>
-            <Button 
-              onClick={addNewDriver}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Plus className="h-4 w-4 mr-2" />
-              )}
-              Add Driver
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </Tabs>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </>
   );
 };
 
 export default DeliveryManagementTab;
-

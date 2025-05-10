@@ -1,17 +1,14 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardFooter,
+import { format } from 'date-fns';
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle
 } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -20,6 +17,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { 
+  CreditCard, 
+  Search, 
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+  Loader2
+} from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -28,87 +36,80 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  CreditCard,
-  Download,
-  FileText,
-  Filter,
-  Mail,
-  MoreHorizontal,
-  Plus,
-  Printer,
-  Search,
-  Send,
-  Trash,
-  DollarSign,
-} from 'lucide-react';
-import { format } from 'date-fns';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
-// Helper function to safely extract profile information
-const extractProfileInfo = (profiles: any) => {
-  if (!profiles) return { full_name: "Unknown", email: "Unknown" };
-  
-  // If it's a SelectQueryError, return default values
-  if (profiles.error === true) {
-    return { full_name: "Unknown", email: "Unknown" };
-  }
-  
-  // Otherwise, extract the actual data
-  return {
-    full_name: profiles.full_name || "Unknown",
-    email: profiles.email || "Unknown Email"
-  };
-};
+interface Payment {
+  id: string;
+  user_id: string | null;
+  shipment_id: string | null;
+  amount: number;
+  currency: string;
+  payment_method: string;
+  payment_status: string;
+  transaction_id: string | null;
+  receipt_url: string | null;
+  created_at: string;
+  user_email?: string;
+  user_name?: string;
+}
 
 const PaymentsInvoicingTab = () => {
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [payments, setPayments] = useState([]);
-  const [invoices, setInvoices] = useState([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [currentTab, setCurrentTab] = useState('payments');
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    fetchData();
+    fetchPayments();
   }, []);
 
-  const fetchData = async () => {
+  const fetchPayments = async () => {
     setLoading(true);
     try {
-      // Fetch payments data
+      // Get all payments
       const { data: paymentsData, error: paymentsError } = await supabase
         .from('payments')
-        .select('*, profiles:user_id(*), shipments:shipment_id(*)');
-
-      if (paymentsError) {
-        throw paymentsError;
-      }
-
-      setPayments(paymentsData || []);
-
-      // We can fetch invoices or use the same data and filter differently
-      // For demo, we'll just use payments as invoices too
-      setInvoices(paymentsData || []);
-    } catch (error) {
-      console.error('Error fetching payment data:', error);
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (paymentsError) throw paymentsError;
+      
+      // For each payment with a user_id, fetch the user profile data
+      const enhancedPayments = await Promise.all(
+        paymentsData.map(async (payment) => {
+          if (payment.user_id) {
+            const { data: profileData, error: profileError } = await supabase
+              .from('profiles')
+              .select('email, full_name')
+              .eq('id', payment.user_id)
+              .single();
+            
+            if (!profileError && profileData) {
+              return {
+                ...payment,
+                user_email: profileData.email,
+                user_name: profileData.full_name
+              };
+            }
+          }
+          return payment;
+        })
+      );
+      
+      setPayments(enhancedPayments);
+    } catch (error: any) {
+      console.error('Error fetching payments:', error);
       toast({
         title: 'Error',
         description: 'Failed to load payment data',
@@ -119,351 +120,189 @@ const PaymentsInvoicingTab = () => {
     }
   };
 
-  const getStatusBadge = (status) => {
-    switch (status) {
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchPayments();
+    setRefreshing(false);
+  };
+
+  // Filter payments based on search query and status filter
+  const filteredPayments = payments.filter((payment) => {
+    const matchesStatus = 
+      statusFilter === 'all' ||
+      payment.payment_status.toLowerCase() === statusFilter;
+    
+    const matchesSearch =
+      payment.user_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      payment.user_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      payment.transaction_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      payment.payment_method.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    return matchesStatus && matchesSearch;
+  });
+
+  const getStatusBadge = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'succeeded':
       case 'completed':
-        return (
-          <Badge className="bg-green-100 text-green-800 border-green-300">
-            Completed
-          </Badge>
-        );
+        return <Badge className="bg-green-100 text-green-800 border border-green-300">Completed</Badge>;
       case 'pending':
-        return (
-          <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">
-            Pending
-          </Badge>
-        );
+        return <Badge className="bg-yellow-100 text-yellow-800 border border-yellow-300">Pending</Badge>;
       case 'failed':
-        return (
-          <Badge className="bg-red-100 text-red-800 border-red-300">
-            Failed
-          </Badge>
-        );
+        return <Badge className="bg-red-100 text-red-800 border border-red-300">Failed</Badge>;
+      case 'refunded':
+        return <Badge className="bg-blue-100 text-blue-800 border border-blue-300">Refunded</Badge>;
       default:
-        return (
-          <Badge className="bg-gray-100 text-gray-800 border-gray-300">
-            {status}
-          </Badge>
-        );
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
 
-  // Filter payments based on search query and status
-  const filteredPayments = payments.filter((payment) => {
-    const profileInfo = extractProfileInfo(payment.profiles);
-    
-    // Always true if no filter selected
-    let matchesFilter = statusFilter === 'all' || payment.payment_status === statusFilter;
-
-    // Check if searchQuery matches any of the fields
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      const matchesSearch =
-        (payment.transaction_id && payment.transaction_id.toLowerCase().includes(query)) ||
-        profileInfo.full_name.toLowerCase().includes(query) ||
-        profileInfo.email.toLowerCase().includes(query) ||
-        (payment.shipment_id && payment.shipment_id.toLowerCase().includes(query)) ||
-        payment.payment_method.toLowerCase().includes(query);
-
-      return matchesFilter && matchesSearch;
-    }
-
-    return matchesFilter;
-  });
-
-  // Filter invoices similarly
-  const filteredInvoices = invoices.filter((invoice) => {
-    // Similar filtering logic for invoices
-    // For now, they're the same as payments
-    return true;
-  });
-
   return (
-    <Tabs
-      value={currentTab}
-      onValueChange={setCurrentTab}
-      className="w-full"
-    >
-      <TabsList className="mb-6 grid grid-cols-2">
-        <TabsTrigger value="payments" className="flex items-center gap-2">
-          <CreditCard className="h-4 w-4" />
-          <span>Payments</span>
-        </TabsTrigger>
-        <TabsTrigger value="invoices" className="flex items-center gap-2">
-          <FileText className="h-4 w-4" />
-          <span>Invoices</span>
-        </TabsTrigger>
-      </TabsList>
-
-      <TabsContent value="payments">
-        <Card>
-          <CardHeader>
-            <CardTitle>Payment Transactions</CardTitle>
-            <CardDescription>
-              Manage all payment transactions in the system
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {/* Search and filter */}
-            <div className="flex flex-col md:flex-row gap-4 mb-6">
-              <div className="relative flex-grow">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search transactions..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <Select
-                value={statusFilter}
-                onValueChange={setStatusFilter}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="failed">Failed</SelectItem>
-                </SelectContent>
-              </Select>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-lg font-medium">Payments & Invoices</CardTitle>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRefresh} 
+            disabled={refreshing}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </CardHeader>
+        
+        <CardContent>
+          <div className="flex flex-col md:flex-row gap-4 mb-6">
+            <div className="relative flex-grow">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search payments..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
             </div>
+            
+            <Select 
+              value={statusFilter} 
+              onValueChange={setStatusFilter}
+            >
+              <SelectTrigger className="w-full md:w-[180px]">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="succeeded">Completed</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="failed">Failed</SelectItem>
+                <SelectItem value="refunded">Refunded</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-            {/* Payments table */}
-            {loading ? (
-              <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
-              </div>
-            ) : (
-              <div className="rounded-md border overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Transaction ID</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Method</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredPayments.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-10">
-                          No payment records found
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredPayments.map((payment) => {
-                        const profileInfo = extractProfileInfo(payment.profiles);
-                        
-                        return (
+          {loading ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+            </div>
+          ) : (
+            <>
+              {filteredPayments.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-gray-500">No payments found</p>
+                </div>
+              ) : (
+                <div className="rounded-md border overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Customer</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Method</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Transaction ID</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredPayments.map((payment) => (
                           <TableRow key={payment.id}>
-                            <TableCell className="font-mono">
-                              {payment.transaction_id || 'N/A'}
+                            <TableCell className="font-medium whitespace-nowrap">
+                              {format(new Date(payment.created_at), 'dd/MM/yyyy HH:mm')}
                             </TableCell>
                             <TableCell>
-                              <div className="font-medium">{profileInfo.full_name}</div>
-                              <div className="text-gray-500 text-sm">{profileInfo.email}</div>
+                              <div>
+                                <div className="font-medium">{payment.user_name || 'Unknown User'}</div>
+                                <div className="text-sm text-gray-500">{payment.user_email || 'No email'}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              {payment.currency === 'USD' ? '$' : '£'}{payment.amount.toFixed(2)}
                             </TableCell>
                             <TableCell>
-                              <div className="font-medium">{`${payment.currency} ${payment.amount}`}</div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="capitalize">{payment.payment_method}</div>
+                              <div className="flex items-center">
+                                <CreditCard className="h-4 w-4 mr-2 text-gray-500" />
+                                {payment.payment_method}
+                              </div>
                             </TableCell>
                             <TableCell>
                               {getStatusBadge(payment.payment_status)}
                             </TableCell>
-                            <TableCell>
-                              {format(new Date(payment.created_at), 'MMM dd, yyyy')}
+                            <TableCell className="font-mono text-xs">
+                              {payment.transaction_id || 'N/A'}
                             </TableCell>
                             <TableCell className="text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                  <DropdownMenuItem onClick={() => {
-                                    window.open(payment.receipt_url, '_blank');
-                                  }}>
-                                    <FileText className="h-4 w-4 mr-2" />
+                              <div className="flex justify-end space-x-2">
+                                {payment.receipt_url && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={() => window.open(payment.receipt_url, '_blank')}
+                                  >
                                     View Receipt
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem>
-                                    <Mail className="h-4 w-4 mr-2" />
-                                    Email Receipt
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem>
-                                    <Download className="h-4 w-4 mr-2" />
-                                    Download
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem>
-                                    <Trash className="h-4 w-4 mr-2" />
-                                    Delete Record
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-
-            <div className="mt-4 flex justify-between">
-              <Button variant="outline">
-                <Download className="h-4 w-4 mr-2" />
-                Export Payments
-              </Button>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Payment
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-
-      <TabsContent value="invoices">
-        <Card>
-          <CardHeader>
-            <CardTitle>Invoices</CardTitle>
-            <CardDescription>
-              Manage all invoices in the system
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {/* Invoices table with similar layout to payments */}
-            <div className="flex flex-col md:flex-row gap-4 mb-6">
-              <div className="relative flex-grow">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search invoices..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Invoice
-              </Button>
-            </div>
-
-            {loading ? (
-              <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
-              </div>
-            ) : (
-              <div className="rounded-md border overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Invoice #</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredInvoices.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center py-10">
-                          No invoice records found
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredInvoices.map((invoice, index) => {
-                        const invoiceNumber = `INV-${String(index + 1000).padStart(4, '0')}`;
-                        const profileInfo = extractProfileInfo(invoice.profiles);
-                        
-                        return (
-                          <TableRow key={invoice.id}>
-                            <TableCell className="font-mono">
-                              {invoiceNumber}
-                            </TableCell>
-                            <TableCell>
-                              <div className="font-medium">{profileInfo.full_name}</div>
-                              <div className="text-gray-500 text-sm">{profileInfo.email}</div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="font-medium">{`${invoice.currency} ${invoice.amount}`}</div>
-                            </TableCell>
-                            <TableCell>
-                              {invoice.payment_status === 'completed' ? (
-                                <Badge className="bg-green-100 text-green-800 border-green-300">
-                                  Paid
-                                </Badge>
-                              ) : (
-                                <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">
-                                  Unpaid
-                                </Badge>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {format(new Date(invoice.created_at), 'MMM dd, yyyy')}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreHorizontal className="h-4 w-4" />
                                   </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                  <DropdownMenuItem>
-                                    <FileText className="h-4 w-4 mr-2" />
-                                    View Invoice
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem>
-                                    <Send className="h-4 w-4 mr-2" />
-                                    Send to Customer
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem>
-                                    <Printer className="h-4 w-4 mr-2" />
-                                    Print
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem>
-                                    <Download className="h-4 w-4 mr-2" />
-                                    Download
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  {invoice.payment_status !== 'completed' && (
-                                    <DropdownMenuItem>
-                                      <DollarSign className="h-4 w-4 mr-2" />
-                                      Mark as Paid
-                                    </DropdownMenuItem>
-                                  )}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                                )}
+                                
+                                {payment.payment_status.toLowerCase() === 'pending' && (
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="outline" size="sm">
+                                        Mark Paid
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Confirm Payment Status</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Are you sure you want to mark this payment as completed? This action cannot be undone.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction className="bg-green-600">
+                                          Mark as Completed
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
