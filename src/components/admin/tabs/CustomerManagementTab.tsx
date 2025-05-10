@@ -1,88 +1,91 @@
 
 import React, { useState, useEffect } from 'react';
-import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-
-// UI Components
 import { 
   Card, 
   CardContent, 
   CardHeader, 
-  CardTitle, 
-  CardDescription 
+  CardTitle,
+  CardDescription
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle 
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Switch } from '@/components/ui/switch';
-
-// Icons
+import { format } from 'date-fns';
 import { 
-  Search, 
-  RefreshCcw,
-  Filter,
-  Eye,
-  MapPin,
   User,
+  Search,
+  MoreHorizontal,
+  RefreshCw,
   Package,
+  Mail,
   Phone,
-  Mail
+  Calendar,
+  MapPin,
+  Loader2
 } from 'lucide-react';
 
-// Define the Json type to match Supabase's Json type
-type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
-
-// Define an extended profile type that includes is_active
-interface ExtendedProfile {
+interface Customer {
   id: string;
-  full_name?: string;
+  full_name: string | null;
   email: string;
-  role?: string;
-  is_admin?: boolean;
-  is_active?: boolean;
   created_at: string;
-  communication_preferences?: Json;
-  avatar_url?: string;
-  mfa_backup_codes?: string[];
-  mfa_enabled?: boolean;
-  mfa_secret?: string;
-  updated_at?: string;
+  role: string;
+  is_admin: boolean;
+  updated_at: string;
+  avatar_url: string | null;
+  shipment_count?: number;
+}
+
+interface Address {
+  id: string;
+  user_id: string;
+  street_address: string;
+  city: string;
+  state: string | null;
+  postal_code: string | null;
+  country: string;
+  is_default: boolean;
+  recipient_name: string;
+  address_name: string;
+  created_at: string;
 }
 
 const CustomerManagementTab = () => {
   const { toast } = useToast();
-  const [customers, setCustomers] = useState<ExtendedProfile[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [viewingCustomer, setViewingCustomer] = useState<ExtendedProfile | null>(null);
+  
+  // View customer details state
+  const [viewCustomer, setViewCustomer] = useState<Customer | null>(null);
+  const [customerAddresses, setCustomerAddresses] = useState<Address[]>([]);
   const [customerShipments, setCustomerShipments] = useState<any[]>([]);
-  const [customerAddresses, setCustomerAddresses] = useState<any[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
   useEffect(() => {
@@ -92,21 +95,37 @@ const CustomerManagementTab = () => {
   const fetchCustomers = async () => {
     setLoading(true);
     try {
+      // Fetch all profiles with customer role
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
+        .eq('role', 'customer')
         .order('created_at', { ascending: false });
-
+      
       if (error) throw error;
-
-      console.log('Customers fetched:', data);
-      // Cast the data to ExtendedProfile[] to ensure type compatibility
-      setCustomers(data as ExtendedProfile[] || []);
+      
+      // Now get shipment counts for each customer
+      const customersWithCounts = await Promise.all((data || []).map(async (customer) => {
+        // Get shipment count
+        const { count, error: countError } = await supabase
+          .from('shipments')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', customer.id);
+        
+        if (countError) {
+          console.error('Error fetching shipment count:', countError);
+          return { ...customer, shipment_count: 0 };
+        }
+        
+        return { ...customer, shipment_count: count || 0 };
+      }));
+      
+      setCustomers(customersWithCounts);
     } catch (error: any) {
       console.error('Error fetching customers:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load customers: ' + error.message,
+        description: 'Failed to load customer data',
         variant: 'destructive',
       });
     } finally {
@@ -114,34 +133,38 @@ const CustomerManagementTab = () => {
     }
   };
 
-  const fetchCustomerDetails = async (customerId: string) => {
+  const viewCustomerDetails = async (customer: Customer) => {
+    setViewCustomer(customer);
     setLoadingDetails(true);
+    
     try {
-      // Fetch customer's shipments
-      const { data: shipments, error: shipmentsError } = await supabase
-        .from('shipments')
-        .select('*')
-        .eq('user_id', customerId)
-        .order('created_at', { ascending: false });
-
-      if (shipmentsError) throw shipmentsError;
-
-      // Fetch customer's addresses
-      const { data: addresses, error: addressesError } = await supabase
+      // Fetch customer addresses
+      const { data: addressData, error: addressError } = await supabase
         .from('addresses')
         .select('*')
-        .eq('user_id', customerId)
+        .eq('user_id', customer.id)
+        .order('is_default', { ascending: false });
+      
+      if (addressError) throw addressError;
+      
+      setCustomerAddresses(addressData || []);
+      
+      // Fetch customer shipments
+      const { data: shipmentData, error: shipmentError } = await supabase
+        .from('shipments')
+        .select('*')
+        .eq('user_id', customer.id)
         .order('created_at', { ascending: false });
-
-      if (addressesError) throw addressesError;
-
-      setCustomerShipments(shipments || []);
-      setCustomerAddresses(addresses || []);
+      
+      if (shipmentError) throw shipmentError;
+      
+      setCustomerShipments(shipmentData || []);
+      
     } catch (error: any) {
       console.error('Error fetching customer details:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load customer details: ' + error.message,
+        description: 'Failed to load customer details',
         variant: 'destructive',
       });
     } finally {
@@ -149,370 +172,295 @@ const CustomerManagementTab = () => {
     }
   };
 
-  const toggleCustomerStatus = async (customerId: string, currentStatus: boolean | undefined) => {
-    try {
-      // For Supabase update operation, we need to specify the properties we want to update
-      // that match the expected profile structure in the database
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          is_active: !currentStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', customerId);
-
-      if (error) throw error;
-
-      toast({
-        title: 'Status Updated',
-        description: `Customer status has been ${!currentStatus ? 'activated' : 'suspended'}.`,
-      });
-
-      // Update the local state with the correct typing
-      setCustomers(prevCustomers => 
-        prevCustomers.map(customer => 
-          customer.id === customerId 
-            ? { ...customer, is_active: !currentStatus }
-            : customer
-        )
-      );
-    } catch (error: any) {
-      console.error('Error updating customer status:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update customer status: ' + error.message,
-        variant: 'destructive',
-      });
-    }
-  };
-
-  // Filter customers based on search and status filter
+  // Filter customers based on search query
   const filteredCustomers = customers.filter(customer => {
-    const matchesSearch = 
-      searchQuery === '' ||
-      customer.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      customer.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      customer.id?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = 
-      statusFilter === 'all' ||
-      (statusFilter === 'active' && customer.is_active !== false) ||
-      (statusFilter === 'suspended' && customer.is_active === false);
-    
-    return matchesSearch && matchesStatus;
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      (customer.full_name && customer.full_name.toLowerCase().includes(searchLower)) ||
+      customer.email.toLowerCase().includes(searchLower)
+    );
   });
 
-  // Helper function to render status badge
-  const renderStatusBadge = (isActive: boolean | undefined) => {
-    if (isActive === false) {
-      return <Badge variant="destructive">Suspended</Badge>;
+  const getStatusBadge = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'booking confirmed':
+        return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Booking Confirmed</Badge>;
+      case 'ready for pickup':
+        return <Badge className="bg-purple-100 text-purple-800 border-purple-200">Ready for Pickup</Badge>;
+      case 'processing in uk warehouse':
+        return <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200">UK Warehouse</Badge>;
+      case 'departed uk':
+        return <Badge className="bg-amber-100 text-amber-800 border-amber-200">Departed UK</Badge>;
+      case 'customs clearance':
+        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Customs</Badge>;
+      case 'processing in zw warehouse':
+        return <Badge className="bg-orange-100 text-orange-800 border-orange-200">ZW Warehouse</Badge>;
+      case 'out for delivery':
+        return <Badge className="bg-cyan-100 text-cyan-800 border-cyan-200">Out for Delivery</Badge>;
+      case 'delivered':
+        return <Badge className="bg-green-100 text-green-800 border-green-200">Delivered</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
     }
-    return <Badge variant="secondary">Active</Badge>; // Changed from "success" to "secondary"
-  };
-
-  // Helper function to safely extract phone number from JSON
-  const getPhoneNumber = (preferences: Json | undefined): string => {
-    if (!preferences) return 'N/A';
-    
-    if (typeof preferences === 'object' && preferences !== null && 'phone' in preferences) {
-      return preferences.phone as string || 'N/A';
-    }
-    
-    return 'N/A';
   };
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Customer Management</CardTitle>
-        <CardDescription>
-          View and manage all customer accounts
-        </CardDescription>
+        <CardDescription>View and manage customer accounts</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Search and Filter Controls */}
-        <div className="flex flex-col md:flex-row gap-4 items-end">
+      <CardContent>
+        <div className="flex flex-col md:flex-row gap-4 mb-6">
           <div className="relative flex-grow">
-            <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Search by name, email, phone..."
-              className="pl-10"
+              placeholder="Search customers by name or email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
             />
           </div>
           
-          <div className="flex gap-2">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[160px]">
-                <Filter className="h-4 w-4 mr-2" />
-                <span>Status</span>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Customers</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="suspended">Suspended</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Button variant="outline" onClick={fetchCustomers}>
-              <RefreshCcw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-          </div>
+          <Button 
+            variant="outline" 
+            onClick={fetchCustomers}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
         </div>
         
-        {/* Customers Table */}
         {loading ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          <div className="flex justify-center py-10">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
           </div>
         ) : filteredCustomers.length === 0 ? (
-          <div className="text-center py-8">
-            <User className="h-16 w-16 mx-auto text-muted-foreground mb-2" />
-            <h3 className="text-lg font-medium">No customers found</h3>
-            <p className="text-muted-foreground">Try adjusting your filters</p>
+          <div className="text-center py-10">
+            <User className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+            <p className="text-gray-500">No customers found</p>
+            <p className="text-gray-400 text-sm mt-1">
+              {searchQuery ? "Try adjusting your search" : "There are no customers in the system yet"}
+            </p>
           </div>
         ) : (
-          <div className="border rounded-md overflow-hidden">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Full Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredCustomers.map(customer => {
-                    const phoneNumber = getPhoneNumber(customer.communication_preferences);
-                    
-                    return (
-                      <TableRow key={customer.id}>
-                        <TableCell>
-                          {customer.full_name || 'N/A'}
-                        </TableCell>
-                        <TableCell>{customer.email}</TableCell>
-                        <TableCell>{phoneNumber}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="capitalize">
-                            {customer.role || 'customer'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {renderStatusBadge(customer.is_active)}
-                        </TableCell>
-                        <TableCell>
-                          {format(new Date(customer.created_at), 'dd MMM yyyy')}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => {
-                                setViewingCustomer(customer);
-                                fetchCustomerDetails(customer.id);
-                              }}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Switch
-                              checked={customer.is_active !== false}
-                              onCheckedChange={() => toggleCustomerStatus(customer.id, customer.is_active)}
+          <div className="rounded-md border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Registered</TableHead>
+                  <TableHead>Shipments</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredCustomers.map((customer) => (
+                  <TableRow key={customer.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="rounded-full bg-gray-100 w-8 h-8 flex items-center justify-center">
+                          {customer.avatar_url ? (
+                            <img
+                              src={customer.avatar_url}
+                              alt={customer.full_name || "User"}
+                              className="rounded-full w-8 h-8 object-cover"
                             />
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                          ) : (
+                            <User className="h-4 w-4 text-gray-500" />
+                          )}
+                        </div>
+                        <span className="font-medium">
+                          {customer.full_name || "Unnamed Customer"}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>{customer.email}</TableCell>
+                    <TableCell className="text-gray-500">
+                      {format(new Date(customer.created_at), 'MMM d, yyyy')}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="bg-blue-50 text-blue-700">
+                        {customer.shipment_count} shipments
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Actions</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => viewCustomerDetails(customer)}>
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Mail className="h-4 w-4 mr-2" />
+                            Send Message
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem>
+                            Edit Details
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         )}
         
-        <div className="text-sm text-muted-foreground mt-2">
-          Showing {filteredCustomers.length} of {customers.length} customers
-        </div>
-      </CardContent>
-
-      {/* View Customer Details Dialog */}
-      {viewingCustomer && (
-        <Dialog open={!!viewingCustomer} onOpenChange={(open) => !open && setViewingCustomer(null)}>
-          <DialogContent className="max-w-[700px]">
-            <DialogHeader>
-              <DialogTitle>Customer Details</DialogTitle>
-              <DialogDescription>
-                {viewingCustomer.full_name || viewingCustomer.email}
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-6 py-4">
-              {/* Basic Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">Full Name</h3>
-                  <p>{viewingCustomer.full_name || 'N/A'}</p>
+        {/* View Customer Details Dialog */}
+        {viewCustomer && (
+          <Dialog open={!!viewCustomer} onOpenChange={(open) => !open && setViewCustomer(null)}>
+            <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Customer Details</DialogTitle>
+                <DialogDescription>
+                  View complete information for {viewCustomer.full_name || viewCustomer.email}
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="grid gap-6 py-4">
+                {/* Basic Info Section */}
+                <div>
+                  <h3 className="text-lg font-medium mb-3">Basic Information</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div className="flex items-start">
+                        <User className="h-5 w-5 text-gray-400 mr-2 mt-0.5" />
+                        <div>
+                          <p className="text-sm text-gray-500">Full Name</p>
+                          <p className="font-medium">{viewCustomer.full_name || "Not provided"}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start">
+                        <Mail className="h-5 w-5 text-gray-400 mr-2 mt-0.5" />
+                        <div>
+                          <p className="text-sm text-gray-500">Email</p>
+                          <p className="font-medium">{viewCustomer.email}</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-start">
+                        <Calendar className="h-5 w-5 text-gray-400 mr-2 mt-0.5" />
+                        <div>
+                          <p className="text-sm text-gray-500">Registered On</p>
+                          <p className="font-medium">{format(new Date(viewCustomer.created_at), 'MMMM d, yyyy')}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start">
+                        <Package className="h-5 w-5 text-gray-400 mr-2 mt-0.5" />
+                        <div>
+                          <p className="text-sm text-gray-500">Total Shipments</p>
+                          <p className="font-medium">{viewCustomer.shipment_count || 0}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">Email</h3>
-                  <p>{viewingCustomer.email}</p>
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">Role</h3>
-                  <Badge variant="outline" className="capitalize">
-                    {viewingCustomer.role || 'customer'}
-                  </Badge>
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">Status</h3>
-                  {renderStatusBadge(viewingCustomer.is_active)}
-                </div>
+                
+                {/* Loading indicator for details */}
+                {loadingDetails ? (
+                  <div className="flex justify-center py-6">
+                    <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
+                  </div>
+                ) : (
+                  <>
+                    {/* Addresses Section */}
+                    <div>
+                      <h3 className="text-lg font-medium mb-3">Saved Addresses</h3>
+                      {customerAddresses.length === 0 ? (
+                        <p className="text-gray-500 italic">No saved addresses</p>
+                      ) : (
+                        <div className="grid md:grid-cols-2 gap-4">
+                          {customerAddresses.map(address => (
+                            <div 
+                              key={address.id} 
+                              className={`border rounded-lg p-3 ${address.is_default ? 'border-blue-400 bg-blue-50' : ''}`}
+                            >
+                              <div className="flex justify-between mb-2">
+                                <span className="font-medium">{address.address_name}</span>
+                                {address.is_default && (
+                                  <Badge variant="outline" className="bg-blue-100 text-blue-800">Default</Badge>
+                                )}
+                              </div>
+                              
+                              <div className="text-sm">
+                                <p className="text-gray-700 mb-1">{address.recipient_name}</p>
+                                <p className="text-gray-600">{address.street_address}</p>
+                                <p className="text-gray-600">
+                                  {address.city}{address.state ? `, ${address.state}` : ''} {address.postal_code || ''}
+                                </p>
+                                <p className="text-gray-600">{address.country}</p>
+                              </div>
+                              
+                              <div className="flex items-center mt-2 text-xs text-gray-500">
+                                <MapPin className="h-3 w-3 mr-1" />
+                                Added {format(new Date(address.created_at), 'MMM d, yyyy')}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Recent Shipments Section */}
+                    <div>
+                      <h3 className="text-lg font-medium mb-3">Recent Shipments</h3>
+                      {customerShipments.length === 0 ? (
+                        <p className="text-gray-500 italic">No shipments found</p>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Tracking #</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>From</TableHead>
+                              <TableHead>To</TableHead>
+                              <TableHead>Date</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {customerShipments.slice(0, 5).map(shipment => (
+                              <TableRow key={shipment.id}>
+                                <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
+                                <TableCell>{getStatusBadge(shipment.status)}</TableCell>
+                                <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
+                                <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
+                                <TableCell>{format(new Date(shipment.created_at), 'MMM d, yyyy')}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
               
-              {/* Tabs for Shipments and Addresses */}
-              <Tabs defaultValue="shipments">
-                <TabsList>
-                  <TabsTrigger value="shipments" className="flex items-center gap-2">
-                    <Package className="h-4 w-4" />
-                    <span>Shipment History</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="addresses" className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    <span>Address History</span>
-                  </TabsTrigger>
-                </TabsList>
-                
-                {/* Shipments Tab */}
-                <TabsContent value="shipments" className="mt-4">
-                  {loadingDetails ? (
-                    <div className="flex justify-center py-6">
-                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-                    </div>
-                  ) : customerShipments.length === 0 ? (
-                    <div className="text-center py-6">
-                      <Package className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-                      <h3 className="text-base font-medium">No shipments found</h3>
-                      <p className="text-sm text-muted-foreground">
-                        This customer has not created any shipments yet.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="border rounded-md overflow-hidden">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Tracking #</TableHead>
-                            <TableHead>Origin</TableHead>
-                            <TableHead>Destination</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Created</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {customerShipments.map(shipment => (
-                            <TableRow key={shipment.id}>
-                              <TableCell className="font-mono text-sm">
-                                {shipment.tracking_number}
-                              </TableCell>
-                              <TableCell className="max-w-[150px] truncate">
-                                {shipment.origin}
-                              </TableCell>
-                              <TableCell className="max-w-[150px] truncate">
-                                {shipment.destination}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline">{shipment.status}</Badge>
-                              </TableCell>
-                              <TableCell>
-                                {format(new Date(shipment.created_at), 'dd MMM yyyy')}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </TabsContent>
-                
-                {/* Addresses Tab */}
-                <TabsContent value="addresses" className="mt-4">
-                  {loadingDetails ? (
-                    <div className="flex justify-center py-6">
-                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-                    </div>
-                  ) : customerAddresses.length === 0 ? (
-                    <div className="text-center py-6">
-                      <MapPin className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-                      <h3 className="text-base font-medium">No addresses found</h3>
-                      <p className="text-sm text-muted-foreground">
-                        This customer has not saved any addresses yet.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {customerAddresses.map(address => (
-                        <Card key={address.id}>
-                          <CardHeader className="pb-2">
-                            <div className="flex justify-between items-center">
-                              <CardTitle className="text-base">
-                                {address.address_name || 'Address'}
-                              </CardTitle>
-                              {address.is_default && (
-                                <Badge>Default</Badge>
-                              )}
-                            </div>
-                          </CardHeader>
-                          <CardContent className="space-y-2">
-                            <div className="flex items-start gap-2">
-                              <User className="h-4 w-4 text-muted-foreground mt-0.5" />
-                              <div>{address.recipient_name}</div>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-                              <div>{address.street_address}, {address.city}{address.state ? `, ${address.state}` : ''}, {address.postal_code}, {address.country}</div>
-                            </div>
-                            {address.phone_number && (
-                              <div className="flex items-start gap-2">
-                                <Phone className="h-4 w-4 text-muted-foreground mt-0.5" />
-                                <div>{address.phone_number}</div>
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
-            </div>
-            
-            <DialogFooter>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  const email = viewingCustomer.email;
-                  if (email) {
-                    window.location.href = `mailto:${email}`;
-                  }
-                }}
-              >
-                <Mail className="h-4 w-4 mr-2" />
-                Email Customer
-              </Button>
-              <Button onClick={() => setViewingCustomer(null)}>
-                Close
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setViewCustomer(null)}>Close</Button>
+                <Button>
+                  <Mail className="h-4 w-4 mr-2" />
+                  Contact Customer
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+      </CardContent>
     </Card>
   );
 };

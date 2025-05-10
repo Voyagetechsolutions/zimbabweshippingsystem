@@ -1,97 +1,74 @@
 
 import React, { useState, useEffect } from 'react';
-import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Shipment } from '@/types/shipment';
-
-// UI Components
+import { format } from 'date-fns';
 import { 
   Card, 
   CardContent, 
   CardHeader, 
-  CardTitle, 
-  CardDescription,
-  CardFooter 
+  CardTitle,
+  CardDescription
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle 
-} from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-
-// Icons
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { 
+  Package, 
   Search, 
-  RefreshCcw,
-  Filter,
-  ArrowUpDown,
+  Filter, 
+  MoreHorizontal, 
   Eye,
-  Edit,
-  Trash,
-  AlertTriangle,
-  FileSpreadsheet,
-  Package,
-  Truck,
-  ChevronRight,
-  Mail,
-  Phone,
-  MapPin,
-  User
+  Clipboard, 
+  Trash2, 
+  RefreshCw,
+  Loader2,
+  Check
 } from 'lucide-react';
+import { Shipment } from '@/types/shipment';
 
-// Define the Json type to match Supabase's Json type
-type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
-
-// Define the status history type
-interface StatusHistory {
-  id: string;
-  status: string;
-  created_at: string;
-  created_by: string;
-  notes: string;
-}
-
-const STATUS_OPTIONS = [
+const shipmentStatuses = [
   'Booking Confirmed',
   'Ready for Pickup',
   'Processing in UK Warehouse',
+  'Departed UK',
   'Customs Clearance',
   'Processing in ZW Warehouse',
   'Out for Delivery',
   'Delivered',
-  'Cancelled',
+  'Failed Attempt',
+  'Cancelled'
 ];
 
 const ShipmentManagementTab = () => {
@@ -100,51 +77,35 @@ const ShipmentManagementTab = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [viewingShipment, setViewingShipment] = useState<Shipment | null>(null);
-  const [editingStatus, setEditingStatus] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState('');
-  const [statusNote, setStatusNote] = useState('');
-  const [statusHistory, setStatusHistory] = useState<StatusHistory[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const [activeTab, setActiveTab] = useState('allShipments');
-  const [customQuotes, setCustomQuotes] = useState<any[]>([]);
-  const [sortField, setSortField] = useState('created_at');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  
+  // State for viewing shipment details
+  const [viewShipment, setViewShipment] = useState<Shipment | null>(null);
+  
+  // State for updating shipment status
+  const [updatingShipment, setUpdatingShipment] = useState<Shipment | null>(null);
+  const [newStatus, setNewStatus] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     fetchShipments();
-    fetchCustomQuotes();
-  }, [sortField, sortDirection]);
+  }, []);
 
   const fetchShipments = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from('shipments')
-        .select('*')
-        .order(sortField, { ascending: sortDirection === 'asc' });
-
-      if (error) throw error;
-
-      console.log('Shipments fetched:', data);
-      // Cast the data to ensure type compatibility
-      const typedData = data?.map(item => {
-        // Ensure metadata is in the correct shape for Shipment type
-        return {
-          ...item,
-          metadata: item.metadata || {},
-          // Add required fields from the Shipment type that might be missing
-          can_cancel: item.can_cancel !== undefined ? item.can_cancel : true,
-          can_modify: item.can_modify !== undefined ? item.can_modify : true
-        } as Shipment;
-      }) || [];
+        .select('*, profiles:user_id(email, full_name)')
+        .order('created_at', { ascending: false });
       
-      setShipments(typedData);
+      if (error) throw error;
+      
+      setShipments(data || []);
     } catch (error: any) {
       console.error('Error fetching shipments:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load shipments: ' + error.message,
+        description: 'Failed to load shipment data',
         variant: 'destructive',
       });
     } finally {
@@ -152,731 +113,506 @@ const ShipmentManagementTab = () => {
     }
   };
 
-  const fetchCustomQuotes = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('custom_quotes')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      setCustomQuotes(data || []);
-    } catch (error: any) {
-      console.error('Error fetching custom quotes:', error);
-    }
-  };
-
-  const fetchStatusHistory = async (shipmentId: string) => {
-    setLoadingHistory(true);
-    try {
-      // Fetch status history from shipment updates if available
-      const { data, error } = await supabase
-        .from('shipments')
-        .select('status, updated_at')
-        .eq('id', shipmentId)
-        .single();
-
-      if (error) throw error;
-
-      // Create a history from available data
-      const history: StatusHistory[] = [
-        {
-          id: '1',
-          status: data.status,
-          created_at: data.updated_at,
-          created_by: 'System',
-          notes: 'Status updated',
-        }
-      ];
-
-      setStatusHistory(history);
-    } catch (error: any) {
-      console.error('Error fetching status history:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load status history',
-        variant: 'destructive',
-      });
-      setStatusHistory([]);
-    } finally {
-      setLoadingHistory(false);
-    }
-  };
-
-  const handleViewShipment = (shipment: Shipment) => {
-    setViewingShipment(shipment);
-    setSelectedStatus(shipment.status);
-    fetchStatusHistory(shipment.id);
-  };
-
-  const handleUpdateStatus = async () => {
-    if (!viewingShipment || !selectedStatus) return;
+  // Function to update shipment status
+  const updateShipmentStatus = async () => {
+    if (!updatingShipment || !newStatus) return;
     
+    setIsUpdating(true);
     try {
-      // Update the shipment status
       const { error } = await supabase
         .from('shipments')
-        .update({
-          status: selectedStatus,
+        .update({ 
+          status: newStatus,
           updated_at: new Date().toISOString()
         })
-        .eq('id', viewingShipment.id);
-
+        .eq('id', updatingShipment.id);
+      
       if (error) throw error;
-
+      
+      // Update local state
+      setShipments(prevShipments =>
+        prevShipments.map(shipment =>
+          shipment.id === updatingShipment.id
+            ? { ...shipment, status: newStatus }
+            : shipment
+        )
+      );
+      
+      // Show success message and close dialog
       toast({
         title: 'Status Updated',
-        description: `Shipment ${viewingShipment.tracking_number} status updated to ${selectedStatus}`,
+        description: `Shipment ${updatingShipment.tracking_number} status has been updated to ${newStatus}`,
       });
-
-      // Refresh shipments
-      fetchShipments();
+      setUpdatingShipment(null);
       
-      // Reset state
-      setEditingStatus(false);
-      setStatusNote('');
+      // If status is now "Out for Delivery", make sure it has delivery details
+      if (newStatus === 'Out for Delivery') {
+        await ensureDeliveryDetails(updatingShipment.id);
+      }
       
-      // Close the dialog
-      setViewingShipment(null);
     } catch (error: any) {
-      console.error('Error updating status:', error);
+      console.error('Error updating shipment status:', error);
       toast({
-        title: 'Error',
-        description: `Failed to update status: ${error.message}`,
+        title: 'Update Failed',
+        description: 'Could not update shipment status',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Make sure shipment has delivery details when set to "Out for Delivery"
+  const ensureDeliveryDetails = async (shipmentId: string) => {
+    try {
+      // First get the shipment to check existing metadata
+      const { data: shipment, error: fetchError } = await supabase
+        .from('shipments')
+        .select('metadata')
+        .eq('id', shipmentId)
+        .single();
+        
+      if (fetchError) throw fetchError;
+      
+      // Create/update delivery details in metadata
+      const metadata = shipment.metadata || {};
+      if (!metadata.delivery) {
+        metadata.delivery = {
+          date: new Date().toISOString(),
+          isLate: false,
+        };
+        
+        // Update the metadata
+        const { error: updateError } = await supabase
+          .from('shipments')
+          .update({ metadata })
+          .eq('id', shipmentId);
+          
+        if (updateError) throw updateError;
+      }
+    } catch (error) {
+      console.error('Error ensuring delivery details:', error);
+    }
+  };
+  
+  // Filter shipments based on search and filter criteria
+  const filteredShipments = shipments.filter(shipment => {
+    const matchesStatus = statusFilter === 'all' || shipment.status === statusFilter;
+    
+    const matchesSearch = 
+      shipment.tracking_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      shipment.origin.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      shipment.destination.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (shipment.profiles?.email && shipment.profiles.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (shipment.profiles?.full_name && shipment.profiles.full_name.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    return matchesStatus && matchesSearch;
+  });
+
+  // Function to copy tracking number to clipboard
+  const copyTrackingNumber = (trackingNumber: string) => {
+    navigator.clipboard.writeText(trackingNumber);
+    toast({
+      title: 'Copied',
+      description: 'Tracking number copied to clipboard',
+    });
+  };
+
+  // Function to delete a shipment
+  const deleteShipment = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this shipment? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('shipments')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      // Remove from local state
+      setShipments(shipments.filter(s => s.id !== id));
+      
+      toast({
+        title: 'Shipment Deleted',
+        description: 'The shipment has been permanently deleted',
+      });
+    } catch (error: any) {
+      console.error('Error deleting shipment:', error);
+      toast({
+        title: 'Delete Failed',
+        description: 'Could not delete shipment',
         variant: 'destructive',
       });
     }
   };
 
-  // Function to handle sorting
-  const handleSort = (field: string) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
+  // Function to get appropriate badge color for status
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Booking Confirmed':
+        return <Badge className="bg-blue-100 text-blue-800 border border-blue-300">Booking Confirmed</Badge>;
+      case 'Ready for Pickup':
+        return <Badge className="bg-purple-100 text-purple-800 border border-purple-300">Ready for Pickup</Badge>;
+      case 'Processing in UK Warehouse':
+        return <Badge className="bg-indigo-100 text-indigo-800 border border-indigo-300">UK Warehouse</Badge>;
+      case 'Departed UK':
+        return <Badge className="bg-sky-100 text-sky-800 border border-sky-300">Departed UK</Badge>;
+      case 'Customs Clearance':
+        return <Badge className="bg-amber-100 text-amber-800 border border-amber-300">Customs Clearance</Badge>;
+      case 'Processing in ZW Warehouse':
+        return <Badge className="bg-orange-100 text-orange-800 border border-orange-300">ZW Warehouse</Badge>;
+      case 'Out for Delivery':
+        return <Badge className="bg-cyan-100 text-cyan-800 border border-cyan-300">Out for Delivery</Badge>;
+      case 'Delivered':
+        return <Badge className="bg-green-100 text-green-800 border border-green-300">Delivered</Badge>;
+      case 'Failed Attempt':
+        return <Badge className="bg-red-100 text-red-800 border border-red-300">Failed Attempt</Badge>;
+      case 'Cancelled':
+        return <Badge variant="outline" className="text-gray-800">Cancelled</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
     }
-  };
-  
-  // Enhanced function to extract sender's name from metadata
-  const getSenderName = (shipment: Shipment): string => {
-    const metadata = shipment.metadata || {};
-    
-    // Check for different possible paths to sender name in metadata
-    if (metadata.senderDetails?.name) {
-      return metadata.senderDetails.name;
-    } else if (metadata.sender?.name) {
-      return metadata.sender.name;
-    } else if (metadata.sender?.firstName && metadata.sender?.lastName) {
-      return `${metadata.sender.firstName} ${metadata.sender.lastName}`;
-    } else if (metadata.firstName && metadata.lastName) {
-      return `${metadata.firstName} ${metadata.lastName}`;
-    } else if (metadata.sender_name) {
-      return metadata.sender_name;
-    } else if (metadata.sender_details?.name) {
-      return metadata.sender_details.name;
-    } else if (metadata.sender) {
-      // Handle case where sender might be structured differently
-      const sender = metadata.sender;
-      if (typeof sender === 'object') {
-        if ('firstName' in sender && 'lastName' in sender) {
-          return `${sender.firstName} ${sender.lastName}`;
-        }
-      }
-    }
-    
-    // Check if metadata has differently structured sender info directly
-    if (metadata.firstName && metadata.lastName) {
-      return `${metadata.firstName} ${metadata.lastName}`;
-    }
-    
-    return 'No Name Provided';
-  };
-  
-  // Enhanced function to extract sender's email from metadata
-  const getSenderEmail = (shipment: Shipment): string => {
-    const metadata = shipment.metadata || {};
-    
-    if (metadata.senderDetails?.email) {
-      return metadata.senderDetails.email;
-    } else if (metadata.sender?.email) {
-      return metadata.sender.email;
-    } else if (metadata.email) {
-      return metadata.email;
-    } else if (metadata.sender_email) {
-      return metadata.sender_email;
-    }
-    
-    return 'No Email Provided';
-  };
-  
-  // Enhanced function to extract sender's phone from metadata
-  const getSenderPhone = (shipment: Shipment): string => {
-    const metadata = shipment.metadata || {};
-    
-    // Check for different possible paths to sender phone in metadata
-    if (metadata.senderDetails?.phone) {
-      return metadata.senderDetails.phone;
-    } else if (metadata.sender?.phone) {
-      return metadata.sender.phone;
-    } else if (metadata.phone) {
-      return metadata.phone;
-    } else if (metadata.sender_phone) {
-      return metadata.sender_phone;
-    } else if (metadata.sender_details?.phone) {
-      return metadata.sender_details.phone;
-    } else if (metadata.sender?.additionalPhone) {
-      return metadata.sender.additionalPhone;
-    } else if (metadata.additionalPhone) {
-      return metadata.additionalPhone;
-    }
-    
-    return 'No Phone Provided';
-  };
-  
-  // Enhanced function to extract receiver's name from metadata
-  const getReceiverName = (shipment: Shipment): string => {
-    const metadata = shipment.metadata || {};
-    
-    // Check for different possible paths to receiver name in metadata
-    if (metadata.recipientDetails?.name) {
-      return metadata.recipientDetails.name;
-    } else if (metadata.recipient?.name) {
-      return metadata.recipient.name;
-    } else if (metadata.recipientName) {
-      return metadata.recipientName;
-    } else if (metadata.receiver_name) {
-      return metadata.receiver_name;
-    } else if (metadata.recipient_details?.name) {
-      return metadata.recipient_details.name;
-    } else if (metadata.recipient) {
-      // In case recipient is structured differently
-      const recipient = metadata.recipient;
-      if (typeof recipient === 'object' && recipient !== null) {
-        return recipient.name || 'No Name Provided';
-      }
-    }
-    
-    return 'No Name Provided';
-  };
-  
-  // Enhanced function to extract receiver's phone from metadata
-  const getReceiverPhone = (shipment: Shipment): string => {
-    const metadata = shipment.metadata || {};
-    
-    // Check for different possible paths to receiver phone in metadata
-    if (metadata.recipientDetails?.phone) {
-      return metadata.recipientDetails.phone;
-    } else if (metadata.recipient?.phone) {
-      return metadata.recipient.phone;
-    } else if (metadata.recipientPhone) {
-      return metadata.recipientPhone;
-    } else if (metadata.receiver_phone) {
-      return metadata.receiver_phone;
-    } else if (metadata.recipient_details?.phone) {
-      return metadata.recipient_details.phone;
-    } else if (metadata.additionalRecipientPhone) {
-      return metadata.additionalRecipientPhone;
-    } else if (metadata.recipient?.additionalPhone) {
-      return metadata.recipient.additionalPhone;
-    }
-    
-    return 'No Phone Provided';
-  };
-  
-  // Function to get delivery address
-  const getDeliveryAddress = (shipment: Shipment): string => {
-    const metadata = shipment.metadata || {};
-    
-    if (metadata.recipientDetails?.address) {
-      return metadata.recipientDetails.address;
-    } else if (metadata.recipient?.address) {
-      return metadata.recipient.address;
-    } else if (metadata.deliveryAddress) {
-      return metadata.deliveryAddress;
-    } else if (shipment.destination) {
-      return shipment.destination;
-    }
-    
-    return 'No Address Provided';
-  };
-  
-  // Function to get pickup address
-  const getPickupAddress = (shipment: Shipment): string => {
-    const metadata = shipment.metadata || {};
-    
-    if (metadata.senderDetails?.address) {
-      return metadata.senderDetails.address;
-    } else if (metadata.sender?.address) {
-      return metadata.sender.address;
-    } else if (metadata.pickupAddress) {
-      const address = metadata.pickupAddress;
-      const city = metadata.pickupCity || '';
-      const postcode = metadata.pickupPostcode || '';
-      const country = metadata.pickupCountry || '';
-      
-      return [address, city, postcode, country].filter(Boolean).join(', ');
-    } else if (shipment.origin) {
-      return shipment.origin;
-    }
-    
-    return 'No Address Provided';
-  };
-  
-  // Filter shipments based on search and status filter
-  const filteredShipments = shipments.filter(shipment => {
-    const metadata = shipment.metadata || {};
-    const senderName = getSenderName(shipment);
-    const receiverName = getReceiverName(shipment);
-    const senderPhone = getSenderPhone(shipment);
-    const receiverPhone = getReceiverPhone(shipment);
-    const senderEmail = getSenderEmail(shipment);
-    
-    const matchesSearch = 
-      searchQuery === '' ||
-      shipment.tracking_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      senderName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      receiverName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      senderPhone.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      receiverPhone.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      senderEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      shipment.origin?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      shipment.destination?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = 
-      statusFilter === 'all' ||
-      shipment.status?.toLowerCase() === statusFilter.toLowerCase();
-    
-    return matchesSearch && matchesStatus;
-  });
-
-  // Helper function to render status badge
-  const renderStatusBadge = (status: string) => {
-    const statusLower = status?.toLowerCase() || '';
-    let variant: "default" | "destructive" | "outline" | "secondary" = "default";
-    
-    if (statusLower.includes('cancelled')) {
-      variant = "destructive";
-    } else if (statusLower.includes('delivered')) {
-      variant = "secondary";
-    } else if (statusLower.includes('processing') || statusLower.includes('pickup') || statusLower.includes('transit')) {
-      variant = "outline";
-    }
-    
-    return <Badge variant={variant}>{status}</Badge>;
   };
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Shipment Management</CardTitle>
-        <CardDescription>
-          View and manage all shipments
-        </CardDescription>
+        <CardDescription>View and manage all shipments</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Search and Filter Controls */}
-        <div className="flex flex-col md:flex-row gap-4 items-end">
+      <CardContent>
+        <div className="flex flex-col md:flex-row gap-4 mb-6">
           <div className="relative flex-grow">
-            <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Search by tracking #, sender, receiver, origin, destination..."
-              className="pl-10"
+              placeholder="Search by tracking #, origin, destination or customer..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
             />
           </div>
           
-          <div className="flex gap-2">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <div className="flex gap-4">
+            <Select 
+              value={statusFilter} 
+              onValueChange={setStatusFilter}
+            >
               <SelectTrigger className="w-[180px]">
-                <Filter className="h-4 w-4 mr-2" />
-                <span>Status</span>
+                <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
-                {STATUS_OPTIONS.map((status) => (
-                  <SelectItem key={status.toLowerCase()} value={status.toLowerCase()}>
+                {shipmentStatuses.map((status) => (
+                  <SelectItem key={status} value={status}>
                     {status}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             
-            <Button variant="outline" onClick={fetchShipments}>
-              <RefreshCcw className="h-4 w-4 mr-2" />
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setSearchQuery('');
+                setStatusFilter('all');
+                fetchShipments();
+              }}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
           </div>
         </div>
-
-        {/* Shipments Table */}
+        
         {loading ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          <div className="flex justify-center items-center p-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
           </div>
         ) : filteredShipments.length === 0 ? (
-          <div className="text-center py-8">
-            <Package className="h-16 w-16 mx-auto text-muted-foreground mb-2" />
-            <h3 className="text-lg font-medium">No shipments found</h3>
-            <p className="text-muted-foreground">Try adjusting your filters</p>
+          <div className="text-center p-12">
+            <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+            <h3 className="text-lg font-medium mb-2">No shipments found</h3>
+            <p className="text-gray-500">
+              {searchQuery || statusFilter !== 'all'
+                ? "Try adjusting your filters to see more results"
+                : "There are no shipments in the system yet"}
+            </p>
           </div>
         ) : (
-          <div className="border rounded-md overflow-hidden">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort('tracking_number')}>
-                      Tracking #
-                      {sortField === 'tracking_number' && (
-                        <ArrowUpDown className="inline-block ml-1 h-4 w-4" />
-                      )}
-                    </TableHead>
-                    <TableHead>Sender Name</TableHead>
-                    <TableHead>Receiver Name</TableHead>
-                    <TableHead>Sender number</TableHead>
-                    <TableHead>Receiver Number</TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort('origin')}>
-                      Origin
-                      {sortField === 'origin' && (
-                        <ArrowUpDown className="inline-block ml-1 h-4 w-4" />
-                      )}
-                    </TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort('destination')}>
-                      Destination
-                      {sortField === 'destination' && (
-                        <ArrowUpDown className="inline-block ml-1 h-4 w-4" />
-                      )}
-                    </TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort('created_at')}>
-                      Created
-                      {sortField === 'created_at' && (
-                        <ArrowUpDown className="inline-block ml-1 h-4 w-4" />
-                      )}
-                    </TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tracking #</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Origin</TableHead>
+                  <TableHead>Destination</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredShipments.map((shipment) => (
+                  <TableRow key={shipment.id}>
+                    <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
+                    <TableCell>
+                      {shipment.profiles?.full_name || shipment.profiles?.email || "Unknown User"}
+                    </TableCell>
+                    <TableCell className="max-w-[200px] truncate">{shipment.origin}</TableCell>
+                    <TableCell className="max-w-[200px] truncate">{shipment.destination}</TableCell>
+                    <TableCell>{getStatusBadge(shipment.status)}</TableCell>
+                    <TableCell>{format(new Date(shipment.created_at), 'MMM d, yyyy')}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Actions</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => setViewShipment(shipment)}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => {
+                            setUpdatingShipment(shipment);
+                            setNewStatus(shipment.status);
+                          }}>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Update Status
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => copyTrackingNumber(shipment.tracking_number)}>
+                            <Clipboard className="h-4 w-4 mr-2" />
+                            Copy Tracking #
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            className="text-red-600" 
+                            onClick={() => deleteShipment(shipment.id)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredShipments.map(shipment => (
-                    <TableRow key={shipment.id}>
-                      <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
-                      <TableCell className="max-w-[150px] truncate">{getSenderName(shipment)}</TableCell>
-                      <TableCell className="max-w-[150px] truncate">{getReceiverName(shipment)}</TableCell>
-                      <TableCell className="max-w-[150px] truncate">{getSenderPhone(shipment)}</TableCell>
-                      <TableCell className="max-w-[150px] truncate">{getReceiverPhone(shipment)}</TableCell>
-                      <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
-                      <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
-                      <TableCell>{renderStatusBadge(shipment.status)}</TableCell>
-                      <TableCell>{format(new Date(shipment.created_at), 'dd MMM yyyy')}</TableCell>
-                      <TableCell className="text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => handleViewShipment(shipment)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         )}
         
-        <div className="text-sm text-muted-foreground mt-2">
-          Showing {filteredShipments.length} of {shipments.length} shipments
-        </div>
-      </CardContent>
-
-      {/* View Shipment Details Dialog */}
-      <Dialog open={!!viewingShipment} onOpenChange={(open) => !open && setViewingShipment(null)}>
-        <DialogContent className="max-w-[900px]">
-          <DialogHeader>
-            <DialogTitle>Shipment Details</DialogTitle>
-            <DialogDescription>
-              Tracking Number: {viewingShipment?.tracking_number}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {viewingShipment && (
-            <div className="space-y-6 py-4">
-              {/* Shipment Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">Origin</h3>
-                  <p>{viewingShipment.origin || 'Not specified'}</p>
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">Destination</h3>
-                  <p>{viewingShipment.destination || 'Not specified'}</p>
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">Created At</h3>
-                  <p>{format(new Date(viewingShipment.created_at), 'dd MMM yyyy HH:mm')}</p>
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">Updated At</h3>
-                  <p>{format(new Date(viewingShipment.updated_at), 'dd MMM yyyy HH:mm')}</p>
+        {/* View Shipment Details Dialog */}
+        {viewShipment && (
+          <Dialog open={!!viewShipment} onOpenChange={(open) => !open && setViewShipment(null)}>
+            <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Shipment Details</DialogTitle>
+                <DialogDescription>
+                  Tracking Number: {viewShipment.tracking_number}
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">General Information</h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between border-b pb-1">
+                        <span className="text-gray-500">Status:</span>
+                        <span>{getStatusBadge(viewShipment.status)}</span>
+                      </div>
+                      <div className="flex justify-between border-b pb-1">
+                        <span className="text-gray-500">Created:</span>
+                        <span>{format(new Date(viewShipment.created_at), 'PPP')}</span>
+                      </div>
+                      <div className="flex justify-between border-b pb-1">
+                        <span className="text-gray-500">Last Updated:</span>
+                        <span>{format(new Date(viewShipment.updated_at), 'PPP')}</span>
+                      </div>
+                      <div className="flex justify-between border-b pb-1">
+                        <span className="text-gray-500">Origin:</span>
+                        <span className="text-right">{viewShipment.origin}</span>
+                      </div>
+                      <div className="flex justify-between border-b pb-1">
+                        <span className="text-gray-500">Destination:</span>
+                        <span className="text-right">{viewShipment.destination}</span>
+                      </div>
+                      <div className="flex justify-between border-b pb-1">
+                        <span className="text-gray-500">Customer:</span>
+                        <span>{viewShipment.profiles?.full_name || viewShipment.profiles?.email || "Unknown User"}</span>
+                      </div>
+                      
+                      {/* Collection Information */}
+                      {(viewShipment.metadata?.collection || viewShipment.metadata?.collectionDetails) && (
+                        <div className="mt-3">
+                          <h4 className="text-sm font-medium mb-1">Collection Information</h4>
+                          <div className="border p-2 rounded-md bg-gray-50">
+                            <div className="flex justify-between border-b pb-1">
+                              <span className="text-gray-500">Route:</span>
+                              <span>{viewShipment.metadata?.collection?.route || viewShipment.metadata?.collectionDetails?.route || "N/A"}</span>
+                            </div>
+                            <div className="flex justify-between border-b pb-1">
+                              <span className="text-gray-500">Collection Date:</span>
+                              <span>{viewShipment.metadata?.collection?.date || viewShipment.metadata?.collectionDetails?.date || "N/A"}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">Sender & Recipient</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-medium">Sender</h4>
+                        {viewShipment.metadata?.sender || viewShipment.metadata?.senderDetails ? (
+                          <div>
+                            <p className="text-sm font-medium">
+                              {viewShipment.metadata?.sender?.name || 
+                               viewShipment.metadata?.senderDetails?.name ||
+                               `${viewShipment.metadata?.sender?.firstName || viewShipment.metadata?.senderDetails?.firstName || ''} ${viewShipment.metadata?.sender?.lastName || viewShipment.metadata?.senderDetails?.lastName || ''}`}
+                            </p>
+                            <p className="text-xs text-gray-500">{viewShipment.metadata?.sender?.email || viewShipment.metadata?.senderDetails?.email}</p>
+                            <p className="text-xs text-gray-500">{viewShipment.metadata?.sender?.phone || viewShipment.metadata?.senderDetails?.phone}</p>
+                            <p className="text-xs text-gray-500">{viewShipment.metadata?.sender?.address || viewShipment.metadata?.senderDetails?.address}</p>
+                          </div>
+                        ) : (
+                          <p className="text-gray-500 text-sm">No sender details</p>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-medium">Recipient</h4>
+                        {viewShipment.metadata?.recipient || viewShipment.metadata?.recipientDetails ? (
+                          <div>
+                            <p className="text-sm font-medium">
+                              {viewShipment.metadata?.recipient?.name || 
+                               viewShipment.metadata?.recipientDetails?.name ||
+                               `${viewShipment.metadata?.recipient?.firstName || viewShipment.metadata?.recipientDetails?.firstName || ''} ${viewShipment.metadata?.recipient?.lastName || viewShipment.metadata?.recipientDetails?.lastName || ''}`}
+                            </p>
+                            <p className="text-xs text-gray-500">{viewShipment.metadata?.recipient?.phone || viewShipment.metadata?.recipientDetails?.phone}</p>
+                            <p className="text-xs text-gray-500">{viewShipment.metadata?.recipient?.address || viewShipment.metadata?.recipientDetails?.address}</p>
+                          </div>
+                        ) : (
+                          <p className="text-gray-500 text-sm">No recipient details</p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <h3 className="text-sm font-medium mt-4 mb-2">Shipment Contents</h3>
+                    {viewShipment.metadata?.shipment || viewShipment.metadata?.shipmentDetails ? (
+                      <div className="space-y-2">
+                        <div className="flex justify-between border-b pb-1">
+                          <span className="text-gray-500">Type:</span>
+                          <span>{viewShipment.metadata?.shipment?.type || viewShipment.metadata?.shipmentDetails?.type || "N/A"}</span>
+                        </div>
+                        {(viewShipment.metadata?.shipment?.quantity || viewShipment.metadata?.shipmentDetails?.quantity) && (
+                          <div className="flex justify-between border-b pb-1">
+                            <span className="text-gray-500">Quantity:</span>
+                            <span>{viewShipment.metadata?.shipment?.quantity || viewShipment.metadata?.shipmentDetails?.quantity}</span>
+                          </div>
+                        )}
+                        {(viewShipment.metadata?.shipment?.weight || viewShipment.metadata?.shipmentDetails?.weight) && (
+                          <div className="flex justify-between border-b pb-1">
+                            <span className="text-gray-500">Weight:</span>
+                            <span>{viewShipment.metadata?.shipment?.weight || viewShipment.metadata?.shipmentDetails?.weight}</span>
+                          </div>
+                        )}
+                        {(viewShipment.metadata?.shipment?.dimensions || viewShipment.metadata?.shipmentDetails?.dimensions) && (
+                          <div className="flex justify-between border-b pb-1">
+                            <span className="text-gray-500">Dimensions:</span>
+                            <span>{viewShipment.metadata?.shipment?.dimensions || viewShipment.metadata?.shipmentDetails?.dimensions}</span>
+                          </div>
+                        )}
+                        {(viewShipment.metadata?.shipment?.description || viewShipment.metadata?.shipmentDetails?.description) && (
+                          <div className="flex flex-col border-b pb-1">
+                            <span className="text-gray-500">Description:</span>
+                            <span className="text-sm mt-1">{viewShipment.metadata?.shipment?.description || viewShipment.metadata?.shipmentDetails?.description}</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 text-sm">No shipment content details</p>
+                    )}
+                  </div>
                 </div>
               </div>
               
-              {/* Sender and Recipient Details */}
-              <div>
-                <h3 className="text-lg font-medium mb-3">Contact Details</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 dark:bg-gray-800 p-4 rounded-md">
-                  <div>
-                    <h4 className="font-medium">Sender</h4>
-                    <div className="mt-2 space-y-2">
-                      <div className="flex items-start">
-                        <User className="h-4 w-4 mt-1 mr-2 text-gray-500" />
-                        <div>
-                          <p className="font-medium">{getSenderName(viewingShipment)}</p>
-                          <p className="text-sm text-gray-500">{getSenderEmail(viewingShipment)}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start">
-                        <Phone className="h-4 w-4 mt-1 mr-2 text-gray-500" />
-                        <div>
-                          <p>{getSenderPhone(viewingShipment)}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start">
-                        <MapPin className="h-4 w-4 mt-1 mr-2 text-gray-500" />
-                        <div>
-                          <p className="text-sm">
-                            {getPickupAddress(viewingShipment)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <h4 className="font-medium">Receiver</h4>
-                    <div className="mt-2 space-y-2">
-                      <div className="flex items-start">
-                        <User className="h-4 w-4 mt-1 mr-2 text-gray-500" />
-                        <p className="font-medium">{getReceiverName(viewingShipment)}</p>
-                      </div>
-                      <div className="flex items-start">
-                        <Phone className="h-4 w-4 mt-1 mr-2 text-gray-500" />
-                        <div>
-                          <p>{getReceiverPhone(viewingShipment)}</p>
-                          {viewingShipment.metadata?.additionalRecipientPhone && (
-                            <p className="text-sm text-gray-500">Additional: {viewingShipment.metadata.additionalRecipientPhone}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-start">
-                        <MapPin className="h-4 w-4 mt-1 mr-2 text-gray-500" />
-                        <div>
-                          <p className="text-sm">
-                            {getDeliveryAddress(viewingShipment)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Shipment Details Section */}
-              <div>
-                <h3 className="text-lg font-medium mb-3">Shipment Details</h3>
-                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-md">
-                  {viewingShipment.metadata?.shipmentDetails && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-medium text-muted-foreground">Shipment Type</h4>
-                        <p>{viewingShipment.metadata.shipmentDetails.type || 'Not specified'}</p>
-                      </div>
-                      
-                      {viewingShipment.metadata.shipmentDetails.includeDrums && (
-                        <>
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-medium text-muted-foreground">Drum Quantity</h4>
-                            <p>{viewingShipment.metadata.shipmentDetails.quantity || 'Not specified'}</p>
-                          </div>
-                          
-                          {viewingShipment.metadata.shipmentDetails.wantMetalSeal && (
-                            <div className="space-y-1">
-                              <h4 className="text-sm font-medium text-muted-foreground">Metal Seals</h4>
-                              <p>Yes</p>
-                            </div>
-                          )}
-                        </>
-                      )}
-                      
-                      {viewingShipment.metadata.shipmentDetails.includeOtherItems && (
-                        <>
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-medium text-muted-foreground">Item Category</h4>
-                            <p>{viewingShipment.metadata.shipmentDetails.category || 'Not specified'}</p>
-                          </div>
-                          
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-medium text-muted-foreground">Specific Item</h4>
-                            <p>{viewingShipment.metadata.shipmentDetails.specificItem || 'Not specified'}</p>
-                          </div>
-                          
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-medium text-muted-foreground">Description</h4>
-                            <p>{viewingShipment.metadata.shipmentDetails.description || 'Not provided'}</p>
-                          </div>
-                        </>
-                      )}
-                      
-                      {viewingShipment.metadata.shipmentDetails.doorToDoor && (
-                        <div className="space-y-1">
-                          <h4 className="text-sm font-medium text-muted-foreground">Door to Door</h4>
-                          <p>Yes</p>
-                          
-                          {viewingShipment.metadata.shipmentDetails.additionalAddresses && 
-                           viewingShipment.metadata.shipmentDetails.additionalAddresses.length > 0 && (
-                            <div className="mt-2">
-                              <h5 className="text-sm font-medium">Additional Delivery Addresses:</h5>
-                              <ul className="list-disc pl-5 text-sm">
-                                {viewingShipment.metadata.shipmentDetails.additionalAddresses.map((addr: string, idx: number) => (
-                                  <li key={idx}>{addr}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      
-                      {viewingShipment.metadata.shipmentDetails.services && 
-                       viewingShipment.metadata.shipmentDetails.services.length > 0 && (
-                        <div className="space-y-1 col-span-2">
-                          <h4 className="text-sm font-medium text-muted-foreground">Additional Services</h4>
-                          <ul className="list-disc pl-5">
-                            {viewingShipment.metadata.shipmentDetails.services.map((service: any, idx: number) => (
-                              <li key={idx}>{service.name} - £{service.price}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {!viewingShipment.metadata?.shipmentDetails && viewingShipment.metadata?.shipment && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-medium text-muted-foreground">Shipment Type</h4>
-                        <p>{viewingShipment.metadata.shipment.type || 'Not specified'}</p>
-                      </div>
-                      
-                      {viewingShipment.metadata.shipment.includeDrums && (
-                        <>
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-medium text-muted-foreground">Drum Quantity</h4>
-                            <p>{viewingShipment.metadata.shipment.quantity || 'Not specified'}</p>
-                          </div>
-                        </>
-                      )}
-                      
-                      {viewingShipment.metadata.shipment.includeOtherItems && (
-                        <>
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-medium text-muted-foreground">Item Category</h4>
-                            <p>{viewingShipment.metadata.shipment.category || 'Not specified'}</p>
-                          </div>
-                          
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-medium text-muted-foreground">Description</h4>
-                            <p>{viewingShipment.metadata.shipment.description || 'Not provided'}</p>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-                  
-                  {!viewingShipment.metadata?.shipmentDetails && !viewingShipment.metadata?.shipment && (
-                    <p className="text-gray-500">No detailed shipment information available</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Status Section */}
-              <div className="space-y-2">
-                <h3 className="text-lg font-medium">Status</h3>
-                <div className="flex items-center justify-between">
-                  <Badge variant="outline">{viewingShipment.status}</Badge>
-                  {!editingStatus ? (
-                    <Button variant="ghost" size="sm" onClick={() => setEditingStatus(true)}>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit Status
-                    </Button>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                        <SelectTrigger className="w-[180px]">
-                          <SelectValue placeholder="Select Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STATUS_OPTIONS.map((status) => (
-                            <SelectItem key={status} value={status}>
-                              {status}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button variant="outline" size="sm" onClick={handleUpdateStatus}>
-                        Update
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setEditingStatus(false)}>
-                        Cancel
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Status History */}
-              <div className="space-y-2">
-                <h3 className="text-lg font-medium">Status History</h3>
-                {loadingHistory ? (
-                  <div className="flex justify-center py-4">
-                    <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary"></div>
-                  </div>
-                ) : statusHistory.length === 0 ? (
-                  <div className="text-center py-4">
-                    <AlertTriangle className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
-                    <h4 className="text-sm font-medium">No status history found</h4>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {statusHistory.map(item => (
-                      <Card key={item.id}>
-                        <CardHeader>
-                          <CardTitle>Status: {item.status}</CardTitle>
-                          <CardDescription>
-                            Updated by {item.created_by} on {format(new Date(item.created_at), 'dd MMM yyyy HH:mm')}
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <p>{item.notes || 'No notes provided.'}</p>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setViewShipment(null)}>Close</Button>
+                <Button onClick={() => {
+                  setUpdatingShipment(viewShipment);
+                  setNewStatus(viewShipment.status);
+                  setViewShipment(null);
+                }}>
+                  Update Status
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+        
+        {/* Update Status Dialog */}
+        <Dialog open={!!updatingShipment} onOpenChange={(open) => !open && setUpdatingShipment(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Update Shipment Status</DialogTitle>
+              <DialogDescription>
+                Change status for tracking number: {updatingShipment?.tracking_number}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid gap-4 py-4">
+              <Select value={newStatus} onValueChange={setNewStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select new status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {shipmentStatuses.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {status}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          )}
-          
-          <DialogFooter>
-            <Button onClick={() => setViewingShipment(null)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setUpdatingShipment(null)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={updateShipmentStatus}
+                disabled={isUpdating || newStatus === updatingShipment?.status}
+              >
+                {isUpdating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Update Status
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </CardContent>
     </Card>
   );
 };

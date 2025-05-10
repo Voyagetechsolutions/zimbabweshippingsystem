@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -6,7 +7,8 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle
+  CardTitle,
+  CardFooter
 } from '@/components/ui/card';
 import {
   Table,
@@ -27,14 +29,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Label } from '@/components/ui/label';
 import { format } from 'date-fns';
-import { Truck, Package, UserCheck, RefreshCcw, Search, Filter, CheckCircle, XCircle, AlertCircle, UserX } from 'lucide-react';
+import { Truck, Package, UserCheck, RefreshCw, Search, Filter, CheckCircle, XCircle, AlertCircle, UserX, PlusCircle, Save, UserPlus, Loader2 } from 'lucide-react';
 import { Shipment } from '@/types/shipment';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 
 // Define types for driver and delivery data
 interface Driver {
   id: string;
   name: string;
+  full_name?: string;
+  email?: string;
+  location: 'UK' | 'Zimbabwe';
+  phone?: string;
   total_deliveries?: number;
   on_time_rate?: number;
   active: boolean;
@@ -83,6 +99,23 @@ const DeliveryManagementTab = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  
+  // New driver form state
+  const [isAddingDriver, setIsAddingDriver] = useState(false);
+  const [newDriver, setNewDriver] = useState<{
+    full_name: string;
+    email: string;
+    phone: string;
+    location: 'UK' | 'Zimbabwe';
+    active: boolean;
+  }>({
+    full_name: '',
+    email: '',
+    phone: '',
+    location: 'UK',
+    active: true
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -154,25 +187,58 @@ const DeliveryManagementTab = () => {
         };
       });
 
-      // Fetch active drivers from profiles table
-      const { data: driverData, error: driverError } = await supabase
+      // Fetch all drivers from profiles table
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('role', 'driver');
-
-      if (driverError) {
-        // If there's an error fetching drivers, we can still show the delivery data
-        console.error('Error fetching drivers:', driverError);
-        setDrivers([]);
-      } else {
-        const formattedDrivers: Driver[] = (driverData || []).map(driver => ({
-          id: driver.id,
-          name: driver.full_name || 'Unknown Driver',
-          active: true
-        }));
-        setDrivers(formattedDrivers);
+        
+      if (profileError) {
+        console.error('Error fetching driver profiles:', profileError);
       }
 
+      // Format driver data
+      let driversFromProfiles: Driver[] = [];
+      if (profileData) {
+        driversFromProfiles = profileData.map(profile => ({
+          id: profile.id,
+          name: profile.full_name || profile.email || 'Unknown Driver',
+          full_name: profile.full_name || '',
+          email: profile.email || '',
+          location: profile.driver_location === 'Zimbabwe' ? 'Zimbabwe' : 'UK',
+          phone: profile.phone || '',
+          active: true,
+          total_deliveries: 0,
+          on_time_rate: 0
+        }));
+      }
+      
+      // Count deliveries for each driver and calculate on-time rate
+      if (driversFromProfiles.length > 0 && deliveryRecords.length > 0) {
+        driversFromProfiles = driversFromProfiles.map(driver => {
+          const driverDeliveries = deliveryRecords.filter(delivery => 
+            delivery.driver_id === driver.id
+          );
+          
+          const totalDeliveries = driverDeliveries.length;
+          
+          const onTimeDeliveries = driverDeliveries.filter(delivery => 
+            delivery.timeliness === 'on-time'
+          ).length;
+          
+          const onTimeRate = totalDeliveries > 0 
+            ? Math.round((onTimeDeliveries / totalDeliveries) * 100) 
+            : 0;
+            
+          return {
+            ...driver,
+            total_deliveries: totalDeliveries,
+            on_time_rate: onTimeRate
+          };
+        });
+      }
+      
+      setDrivers(driversFromProfiles);
       setDeliveries(deliveryRecords);
     } catch (error: any) {
       console.error('Error fetching delivery data:', error);
@@ -184,27 +250,6 @@ const DeliveryManagementTab = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Helper function to extract recipient name from shipment metadata
-  const getRecipientName = (shipment: any): string => {
-    const metadata = shipment.metadata || {};
-    
-    if (typeof metadata !== 'object') {
-      return 'No Name Provided';
-    }
-    
-    if (safeGet(metadata, ['recipientDetails', 'name'])) {
-      return metadata.recipientDetails.name;
-    } else if (safeGet(metadata, ['recipient', 'name'])) {
-      return metadata.recipient.name;
-    } else if (safeGet(metadata, ['recipient', 'firstName']) && safeGet(metadata, ['recipient', 'lastName'])) {
-      return `${metadata.recipient.firstName} ${metadata.recipient.lastName}`;
-    } else if (metadata.recipientName) {
-      return metadata.recipientName;
-    }
-    
-    return 'No Name Provided';
   };
 
   // Determine timeliness based on shipment data
@@ -327,6 +372,81 @@ const DeliveryManagementTab = () => {
       });
     }
   };
+  
+  // Function to add a new driver
+  const addNewDriver = async () => {
+    // Validate form
+    if (!newDriver.full_name.trim() || !newDriver.email.trim()) {
+      toast({
+        title: 'Missing information',
+        description: 'Please provide at least name and email for the driver',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    setIsSubmitting(true);
+    try {
+      // Create new auth user
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: newDriver.email,
+        email_confirm: true,
+        user_metadata: { 
+          full_name: newDriver.full_name,
+          phone: newDriver.phone 
+        },
+        password: 'TemporaryPassword123!' // This would be replaced with a random password in production
+      });
+      
+      if (authError) throw authError;
+      
+      if (!authData.user) {
+        throw new Error('Failed to create user account');
+      }
+      
+      // Update the profile with driver role and location
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ 
+          role: 'driver',
+          driver_location: newDriver.location,
+          phone: newDriver.phone,
+          is_admin: false
+        })
+        .eq('id', authData.user.id);
+      
+      if (profileError) throw profileError;
+      
+      // Success message
+      toast({
+        title: 'Driver added',
+        description: `${newDriver.full_name} has been added as a driver`
+      });
+      
+      // Reset form and close dialog
+      setNewDriver({
+        full_name: '',
+        email: '',
+        phone: '',
+        location: 'UK',
+        active: true
+      });
+      
+      setIsAddingDriver(false);
+      
+      // Refresh data
+      fetchData();
+    } catch (error: any) {
+      console.error('Error adding driver:', error);
+      toast({
+        title: 'Failed to add driver',
+        description: error.message || 'An unexpected error occurred',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <>
@@ -401,7 +521,7 @@ const DeliveryManagementTab = () => {
                       fetchData();
                     }}
                   >
-                    <RefreshCcw className="h-4 w-4 mr-2" />
+                    <RefreshCw className="h-4 w-4 mr-2" />
                     Refresh
                   </Button>
                 </div>
@@ -445,7 +565,7 @@ const DeliveryManagementTab = () => {
                             <TableCell className="font-mono">{delivery.tracking_number}</TableCell>
                             <TableCell>{delivery.recipient_name}</TableCell>
                             <TableCell>
-                              {drivers.length > 0 && (
+                              {drivers.length > 0 ? (
                                 <Select 
                                   defaultValue={delivery.driver_id}
                                   onValueChange={(value) => assignDriver(delivery.id, value)}
@@ -461,9 +581,18 @@ const DeliveryManagementTab = () => {
                                     ))}
                                   </SelectContent>
                                 </Select>
-                              )}
-                              {drivers.length === 0 && (
-                                <span className="text-sm text-gray-500">No drivers available</span>
+                              ) : (
+                                <div className="flex items-center">
+                                  <span className="text-sm text-gray-500 mr-2">No drivers</span>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-6 w-6 p-0" 
+                                    onClick={() => setIsAddingDriver(true)}
+                                  >
+                                    <PlusCircle className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               )}
                             </TableCell>
                             <TableCell>
@@ -493,9 +622,15 @@ const DeliveryManagementTab = () => {
 
         <TabsContent value="drivers">
           <Card>
-            <CardHeader>
-              <CardTitle>Driver Performance</CardTitle>
-              <CardDescription>Monitor driver efficiency and delivery metrics</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Driver Performance</CardTitle>
+                <CardDescription>Monitor driver efficiency and delivery metrics</CardDescription>
+              </div>
+              <Button onClick={() => setIsAddingDriver(true)}>
+                <UserPlus className="h-4 w-4 mr-2" />
+                Add Driver
+              </Button>
             </CardHeader>
             <CardContent>
               {drivers.length > 0 ? (
@@ -504,7 +639,10 @@ const DeliveryManagementTab = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Driver Name</TableHead>
+                        <TableHead>Location</TableHead>
+                        <TableHead>Contact</TableHead>
                         <TableHead>Assigned Deliveries</TableHead>
+                        <TableHead>On-Time Rate</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
@@ -512,22 +650,45 @@ const DeliveryManagementTab = () => {
                     <TableBody>
                       {drivers.map((driver) => {
                         // Count assigned deliveries for this driver
-                        const assignedDeliveries = deliveries.filter(d => {
-                          return d.driver_id === driver.id;
-                        }).length;
+                        const assignedDeliveries = deliveries.filter(d => d.driver_id === driver.id).length;
                         
                         return (
                           <TableRow key={driver.id}>
                             <TableCell className="font-medium">{driver.name}</TableCell>
-                            <TableCell>{assignedDeliveries}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={driver.location === 'UK' ? 
+                                'bg-blue-50 text-blue-700 border-blue-200' : 
+                                'bg-green-50 text-green-700 border-green-200'}>
+                                {driver.location}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              <div>{driver.email}</div>
+                              {driver.phone && <div className="text-gray-500">{driver.phone}</div>}
+                            </TableCell>
+                            <TableCell>{driver.total_deliveries || assignedDeliveries}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center">
+                                <div className="w-24 h-2 bg-gray-200 rounded-full mr-2">
+                                  <div 
+                                    className={`h-2 rounded-full ${
+                                      driver.on_time_rate >= 90 ? 'bg-green-500' : 
+                                      driver.on_time_rate >= 70 ? 'bg-yellow-500' : 
+                                      'bg-red-500'
+                                    }`}
+                                    style={{ width: `${driver.on_time_rate || 0}%` }}
+                                  ></div>
+                                </div>
+                                <span>{driver.on_time_rate || 0}%</span>
+                              </div>
+                            </TableCell>
                             <TableCell>
                               <Badge className="bg-green-100 text-green-800">
                                 Active
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button variant="ghost" size="sm">View Details</Button>
-                              <Button variant="ghost" size="sm">Assign Tasks</Button>
+                              <Button variant="ghost" size="sm">Edit</Button>
                             </TableCell>
                           </TableRow>
                         );
@@ -542,7 +703,8 @@ const DeliveryManagementTab = () => {
                   <p className="text-gray-500 mb-6">
                     There are currently no drivers in the system
                   </p>
-                  <Button variant="outline">
+                  <Button onClick={() => setIsAddingDriver(true)}>
+                    <UserPlus className="h-4 w-4 mr-2" />
                     Add New Driver
                   </Button>
                 </div>
@@ -572,6 +734,108 @@ const DeliveryManagementTab = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Add New Driver Dialog */}
+      <Dialog open={isAddingDriver} onOpenChange={setIsAddingDriver}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Driver</DialogTitle>
+            <DialogDescription>
+              Add a new driver to the system
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div>
+              <Label htmlFor="fullName">Full Name</Label>
+              <Input
+                id="fullName"
+                value={newDriver.full_name}
+                onChange={(e) => setNewDriver({...newDriver, full_name: e.target.value})}
+                placeholder="John Doe"
+                className="mt-1"
+                required
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                value={newDriver.email}
+                onChange={(e) => setNewDriver({...newDriver, email: e.target.value})}
+                placeholder="driver@example.com"
+                type="email"
+                className="mt-1"
+                required
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="phone">Phone Number</Label>
+              <Input
+                id="phone"
+                value={newDriver.phone}
+                onChange={(e) => setNewDriver({...newDriver, phone: e.target.value})}
+                placeholder="+447000000000"
+                className="mt-1"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="location">Location</Label>
+              <Select
+                value={newDriver.location}
+                onValueChange={(value: 'UK' | 'Zimbabwe') => setNewDriver({...newDriver, location: value})}
+              >
+                <SelectTrigger id="location" className="mt-1">
+                  <SelectValue placeholder="Select location" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="UK">United Kingdom</SelectItem>
+                  <SelectItem value="Zimbabwe">Zimbabwe</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex items-center space-x-2 mt-2">
+              <input
+                id="active"
+                type="checkbox"
+                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                checked={newDriver.active}
+                onChange={(e) => setNewDriver({...newDriver, active: e.target.checked})}
+              />
+              <Label htmlFor="active" className="text-sm">Active for immediate assignments</Label>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsAddingDriver(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={addNewDriver}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Driver
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
