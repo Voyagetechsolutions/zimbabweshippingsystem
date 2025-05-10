@@ -77,21 +77,46 @@ const ShipmentManagementTab = () => {
   const fetchShipments = async () => {
     setLoading(true);
     try {
-      let query = supabase
+      // First get all shipments
+      const { data: shipmentsData, error: shipmentsError } = await supabase
         .from('shipments')
-        .select('*, profiles(email, full_name)')
+        .select('*')
         .order('created_at', { ascending: false });
 
-      const { data, error } = await query;
+      if (shipmentsError) throw shipmentsError;
 
-      if (error) throw error;
+      // Then get all profiles for lookup
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, email, full_name');
+        
+      if (profilesError) throw profilesError;
 
-      const formattedData = data.map(item => ({
-        ...item,
-        profiles: item.profiles || {}
-      })) as Shipment[];
+      // Create a lookup object for profiles
+      const profilesLookup: Record<string, {email: string, full_name: string | null}> = {};
+      if (profilesData) {
+        profilesData.forEach((profile: any) => {
+          profilesLookup[profile.id] = {
+            email: profile.email,
+            full_name: profile.full_name
+          };
+        });
+      }
 
-      setShipments(formattedData);
+      // Combine the data
+      const formattedShipments = shipmentsData.map((shipment: any) => {
+        const userProfile = shipment.user_id ? profilesLookup[shipment.user_id] : null;
+        
+        return {
+          ...shipment,
+          profiles: userProfile ? {
+            email: userProfile.email,
+            full_name: userProfile.full_name
+          } : null
+        };
+      });
+
+      setShipments(formattedShipments);
     } catch (error: any) {
       console.error('Error fetching shipments:', error);
       toast({
