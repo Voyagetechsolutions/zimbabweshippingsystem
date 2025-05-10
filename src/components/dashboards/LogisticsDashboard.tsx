@@ -48,12 +48,9 @@ import {
 } from 'lucide-react';
 import { Shipment, ShipmentMetadata } from '@/types/shipment';
 
-// Define extended shipment type with profiles
+// Define extended shipment type with profiles - ensuring it matches the base Shipment interface
 interface ShipmentWithProfiles extends Shipment {
-  profiles?: {
-    email?: string;
-    full_name?: string;
-  };
+  // No need to redefine profiles as it's already correctly optional in the Shipment interface
 }
 
 // Type guard to check if a value is a valid ShipmentMetadata
