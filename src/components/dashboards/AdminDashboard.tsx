@@ -764,7 +764,7 @@ const AdminDashboard = () => {
                 </SelectTrigger>
                 <SelectContent>
                   {STATUS_OPTIONS.map((status) => (
-                    <SelectItem key={status} value={status}>
+                    <SelectItem key={status} value={status || "unknown"}>
                       {status}
                     </SelectItem>
                   ))}
