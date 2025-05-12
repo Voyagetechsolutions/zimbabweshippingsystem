@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { PhoneIcon } from 'lucide-react';
-import { getRouteForPostalCode, getIrelandRouteForCity } from '@/utils/postalCodeUtils';
+import { getRouteForPostalCode, getIrelandRouteForCity, restrictedPostalCodes } from '@/utils/postalCodeUtils';
 import { getDateByRoute, getDateForIrelandCity } from '@/data/collectionSchedule';
 
 interface CollectionInfoProps {
@@ -22,6 +22,7 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
   const [isDataReady, setIsDataReady] = useState(false);
   const [route, setRoute] = useState<string | null>(null);
   const [collectionDate, setCollectionDate] = useState<string | null>(null);
+  const [isRestricted, setIsRestricted] = useState(false);
   
   // Process the collection information when props change
   useEffect(() => {
@@ -30,13 +31,25 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
     
     let newRoute: string | null = null;
     let newCollectionDate: string | null = null;
+    let restricted = false;
 
-    // Always determine a route and collection date regardless of inputs
+    // Check for restricted postal codes first
     if (country === 'England' && postalCode) {
-      newRoute = getRouteForPostalCode(postalCode);
-      if (newRoute) {
-        newCollectionDate = getDateByRoute(newRoute);
-        console.log("Retrieved England route and date:", { newRoute, newCollectionDate });
+      const postCodePrefix = postalCode.toUpperCase().match(/^[A-Z]{1,2}/)?.[0];
+      if (postCodePrefix && restrictedPostalCodes.includes(postCodePrefix)) {
+        restricted = true;
+        setIsRestricted(true);
+        
+        // For restricted areas, set route and date to null
+        newRoute = null;
+        newCollectionDate = null;
+      } else {
+        // Normal route determination for non-restricted areas
+        newRoute = getRouteForPostalCode(postalCode);
+        if (newRoute) {
+          newCollectionDate = getDateByRoute(newRoute);
+          console.log("Retrieved England route and date:", { newRoute, newCollectionDate });
+        }
       }
     } else if (country === 'Ireland' && city) {
       const normalizedCity = city.trim().toUpperCase();
@@ -47,8 +60,8 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
       }
     }
     
-    // If we couldn't determine a route and date based on inputs, use fallbacks
-    if (!newRoute || !newCollectionDate) {
+    // If we couldn't determine a route and date based on inputs and it's not restricted, use fallbacks
+    if (!restricted && (!newRoute || !newCollectionDate)) {
       if (country === 'England') {
         newRoute = "Default England Route";
         newCollectionDate = "Next available collection date";
@@ -71,10 +84,10 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
     
     // ALWAYS call the callback with determined values
     if (onCollectionInfoReady) {
-      console.log("Calling onCollectionInfoReady with:", { route: newRoute, collectionDate: newCollectionDate });
+      console.log("Calling onCollectionInfoReady with:", { route: newRoute, collectionDate: newCollectionDate, restricted });
       onCollectionInfoReady({ 
-        route: newRoute, 
-        collectionDate: newCollectionDate 
+        route: restricted ? null : newRoute, 
+        collectionDate: restricted ? null : newCollectionDate 
       });
     } else {
       console.warn("onCollectionInfoReady callback is not provided to CollectionInfo component");
@@ -84,6 +97,18 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
   // Don't render anything if data isn't ready yet
   if (!isDataReady) {
     return <div className="text-center p-4">Loading collection information...</div>;
+  }
+
+  // Show specific message for restricted postal codes
+  if (isRestricted) {
+    return (
+      <Alert className="bg-amber-50 border-amber-200 mt-4">
+        <AlertTitle className="text-amber-800 font-semibold">Restricted Postal Code</AlertTitle>
+        <AlertDescription className="text-amber-700">
+          <p>Please contact +44 7584 100552 to place a booking manually. We currently don't have a schedule for this route unless manually booking.</p>
+        </AlertDescription>
+      </Alert>
+    );
   }
 
   // Show an alert if we couldn't determine a specific route or collection date

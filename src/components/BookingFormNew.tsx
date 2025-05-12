@@ -98,6 +98,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
   const [detectedRoute, setDetectedRoute] = useState<string | null>(null);
   const [collectionDate, setCollectionDate] = useState<string | null>(null);
   const [additionalAddresses, setAdditionalAddresses] = useState<string[]>(['']);
+  const [isRestrictedPostcode, setIsRestrictedPostcode] = useState(false);
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -156,8 +157,10 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
   useEffect(() => {
     if (watchCountry === 'England' && watchPostcode) {
       // Check if this is a restricted postal code
-      const isRestricted = restrictedPostalCodes.some(code => 
-        watchPostcode.toUpperCase().startsWith(code));
+      const postCodePrefix = watchPostcode.toUpperCase().match(/^[A-Z]{1,2}/)?.[0];
+      const isRestricted = postCodePrefix && restrictedPostalCodes.includes(postCodePrefix);
+      
+      setIsRestrictedPostcode(isRestricted);
       
       if (isRestricted) {
         toast({
@@ -180,6 +183,8 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
         }
       }
     } else if (watchCountry === 'Ireland' && watchPickupCity) {
+      setIsRestrictedPostcode(false);
+      
       const route = getIrelandRouteForCity(watchPickupCity);
       setDetectedRoute(route);
       
@@ -214,6 +219,16 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
 
   // Handle form submission
   const onSubmit = async (values: FormValues) => {
+    // Prevent submission if postcode is restricted
+    if (isRestrictedPostcode) {
+      toast({
+        title: "Booking Unavailable",
+        description: "Please contact +44 7584 100552 to place a booking manually for this postal code area.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
@@ -577,7 +592,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
                   />
                 </div>
                 
-                {detectedRoute && (
+                {detectedRoute && !isRestrictedPostcode && (
                   <div className="border rounded-md p-4 bg-gray-50">
                     <h3 className="font-medium mb-2">Collection Information</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -591,10 +606,19 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
                   </div>
                 )}
                 
+                {isRestrictedPostcode && (
+                  <Alert className="bg-amber-50 border-amber-200">
+                    <AlertDescription className="text-amber-700">
+                      Please contact +44 7584 100552 to place a booking manually. We currently don't have a schedule for this route unless manually booking.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
                 <div className="flex justify-end">
                   <Button 
                     type="button"
                     onClick={() => setActiveTab('recipient')}
+                    disabled={isRestrictedPostcode}
                   >
                     Next: Receiver Information
                   </Button>
@@ -712,6 +736,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
                   <Button 
                     type="button"
                     onClick={() => setActiveTab('shipment')}
+                    disabled={isRestrictedPostcode}
                   >
                     Next: Shipment Details
                   </Button>
@@ -968,6 +993,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
                   <Button 
                     type="button"
                     onClick={() => setActiveTab('payment')}
+                    disabled={isRestrictedPostcode}
                   >
                     Next: Booking Summary
                   </Button>
@@ -1074,11 +1100,19 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
                   </Button>
                   <Button 
                     type="submit"
-                    disabled={isLoading}
+                    disabled={isLoading || isRestrictedPostcode}
                   >
                     {isLoading ? 'Processing...' : 'Submit Booking'}
                   </Button>
                 </div>
+                
+                {isRestrictedPostcode && (
+                  <Alert className="bg-amber-50 border-amber-200">
+                    <AlertDescription className="text-amber-700">
+                      Booking is not available for this postal code area. Please contact +44 7584 100552 to place a booking manually.
+                    </AlertDescription>
+                  </Alert>
+                )}
               </TabsContent>
             </form>
           </Form>
