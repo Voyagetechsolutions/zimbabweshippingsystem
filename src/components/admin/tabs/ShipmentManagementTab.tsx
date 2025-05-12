@@ -597,7 +597,7 @@ const ShipmentManagementTab = () => {
                         <ArrowUpDown className="inline-block ml-1 h-4 w-4" />
                       )}
                     </TableHead>
-                    <TableHead className="cursor-pointer" onClick={()={() => handleSort('destination')}}>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort('destination')}>
                       Destination
                       {sortField === 'destination' && (
                         <ArrowUpDown className="inline-block ml-1 h-4 w-4" />
@@ -902,4 +902,23 @@ const ShipmentManagementTab = () => {
                     <AlertTriangle className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
                     <h4 className="text-sm font-medium">No status history found</h4>
                   </div>
-                ) :
+                ) : (
+                  <div className="space-y-2">
+                    {statusHistory.map((history, index) => (
+                      <div key={history.id} className="flex items-center justify-between">
+                        <Badge variant="outline">{history.status}</Badge>
+                        <p>{format(new Date(history.created_at), 'dd MMM yyyy HH:mm')}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+};
+
+export default ShipmentManagementTab;
