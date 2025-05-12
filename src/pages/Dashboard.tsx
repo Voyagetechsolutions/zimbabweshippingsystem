@@ -2,7 +2,7 @@
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import CustomerDashboard from '@/components/dashboards/CustomerDashboard';
-import AdminDashboard from '@/components/dashboards/AdminDashboard';
+import AdminDashboardContent from '@/components/admin/AdminDashboardContent';
 import DriverDashboard from '@/components/dashboards/DriverDashboard';
 import LogisticsDashboard from '@/components/dashboards/LogisticsDashboard';
 import SupportDashboard from '@/components/dashboards/SupportDashboard';
@@ -55,7 +55,7 @@ const Dashboard = () => {
   // Show the appropriate dashboard based on user role
   const getDashboardComponent = () => {
     if (isAdmin) {
-      return <AdminDashboard />;
+      return <AdminDashboardContent />;
     }
 
     switch (role) {

@@ -85,18 +85,21 @@ serve(async (req) => {
     const shipment = {
       id: shipmentId,
       tracking_number: trackingNumber,
-      status: 'Booking Confirmed', // Ensuring consistent status
+      status: 'Booking Confirmed', // Always ensure consistent default status
       origin: origin,
       destination: destination,
       user_id: user?.id || shipmentData.userId || null,
       metadata: {
-        ...shipmentData.metadata,
         sender: formattedSender,
         recipient: formattedRecipient,
         senderDetails: formattedSender,
         recipientDetails: formattedRecipient,
         shipmentDetails: shipmentData.shipmentDetails || shipmentData.metadata?.shipmentDetails,
-        shipment: shipmentData.shipmentDetails || shipmentData.metadata?.shipmentDetails
+        shipment: shipmentData.shipmentDetails || shipmentData.metadata?.shipmentDetails,
+        collectionDetails: shipmentData.collectionDetails || shipmentData.metadata?.collectionDetails,
+        collection: shipmentData.collectionDetails || shipmentData.metadata?.collectionDetails,
+        services: shipmentData.services || shipmentData.metadata?.services,
+        payment: shipmentData.payment || shipmentData.metadata?.payment
       }
     };
     

@@ -91,7 +91,7 @@ export const createShipment = async (data: ShipmentData): Promise<{ shipmentId: 
     const shipment = {
       id: shipmentId,
       tracking_number: trackingNumber,
-      status: 'Booking Confirmed', // Ensuring this is consistently 'Booking Confirmed'
+      status: 'Booking Confirmed', // Always set this consistent default status
       origin: senderFullAddress,
       destination: recipientFullAddress,
       user_id: user?.id || null,
@@ -104,6 +104,7 @@ export const createShipment = async (data: ShipmentData): Promise<{ shipmentId: 
         shipment: data.shipmentDetails,
         shipmentDetails: data.shipmentDetails,
         collection: data.collectionDetails,
+        collectionDetails: data.collectionDetails,
         services: data.services,
         payment: data.payment
       }

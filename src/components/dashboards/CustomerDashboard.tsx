@@ -253,6 +253,8 @@ const CustomerDashboard: React.FC = () => {
       return <Badge className="bg-red-100 text-red-800 hover:bg-red-200">{status}</Badge>;
     } else if (statusLower.includes('booked') || statusLower.includes('booking')) { 
       return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200">{status}</Badge>;
+    } else if (statusLower.includes('pending_collection') || statusLower.includes('pending collection')) {
+      return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">{status}</Badge>;
     } else {
       return <Badge variant="outline">{status}</Badge>;
     }
