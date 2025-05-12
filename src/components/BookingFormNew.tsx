@@ -164,7 +164,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
       
       if (isRestricted) {
         toast({
-          title: "Restricted Postal Code",
+          title: "Contact Support",
           description: "Please contact +44 7584 100552 to place a booking manually. We currently don't have a schedule for this route unless manually booking.",
           variant: "destructive"
         });
