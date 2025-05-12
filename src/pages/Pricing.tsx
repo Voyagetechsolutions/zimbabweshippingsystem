@@ -114,11 +114,11 @@ const Pricing = () => {
                       </div>
                       <div className="flex justify-between items-center pb-2 border-b">
                         <span className="font-medium">2-4 Drums</span>
-                        <span className="text-xl font-bold">£240 <span className="text-sm font-normal">per drum</span></span>
+                        <span className="text-xl font-bold">£250 <span className="text-sm font-normal">per drum</span></span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="font-medium">5+ Drums</span>
-                        <span className="text-xl font-bold">£220 <span className="text-sm font-normal">per drum</span></span>
+                        <span className="text-xl font-bold">£240 <span className="text-sm font-normal">per drum</span></span>
                       </div>
                     </CardContent>
                     <CardFooter>
@@ -140,11 +140,11 @@ const Pricing = () => {
                       </div>
                       <div className="flex justify-between items-center pb-2 border-b">
                         <span className="font-medium">2-4 Drums</span>
-                        <span className="text-xl font-bold">£260 <span className="text-sm font-normal">per drum</span></span>
+                        <span className="text-xl font-bold">£270 <span className="text-sm font-normal">per drum</span></span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="font-medium">5+ Drums</span>
-                        <span className="text-xl font-bold">£240 <span className="text-sm font-normal">per drum</span></span>
+                        <span className="text-xl font-bold">£260 <span className="text-sm font-normal">per drum</span></span>
                       </div>
                     </CardContent>
                     <CardFooter>
@@ -192,6 +192,22 @@ const Pricing = () => {
                         <div className="text-lg font-medium mb-2">2-4 Drums</div>
                         <div className="flex justify-between items-center text-sm pb-2 border-b">
                           <span>Base Price</span>
+                          <span>£270 per drum</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm pb-2 border-b">
+                          <span>Premium (20%)</span>
+                          <span>£54 per drum</span>
+                        </div>
+                        <div className="flex justify-between items-center font-bold pt-1">
+                          <span>Total</span>
+                          <span>£324 per drum</span>
+                        </div>
+                      </div>
+                      
+                      <div className="border rounded-md p-4">
+                        <div className="text-lg font-medium mb-2">5+ Drums</div>
+                        <div className="flex justify-between items-center text-sm pb-2 border-b">
+                          <span>Base Price</span>
                           <span>£260 per drum</span>
                         </div>
                         <div className="flex justify-between items-center text-sm pb-2 border-b">
@@ -201,22 +217,6 @@ const Pricing = () => {
                         <div className="flex justify-between items-center font-bold pt-1">
                           <span>Total</span>
                           <span>£312 per drum</span>
-                        </div>
-                      </div>
-                      
-                      <div className="border rounded-md p-4">
-                        <div className="text-lg font-medium mb-2">5+ Drums</div>
-                        <div className="flex justify-between items-center text-sm pb-2 border-b">
-                          <span>Base Price</span>
-                          <span>£240 per drum</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm pb-2 border-b">
-                          <span>Premium (20%)</span>
-                          <span>£48 per drum</span>
-                        </div>
-                        <div className="flex justify-between items-center font-bold pt-1">
-                          <span>Total</span>
-                          <span>£288 per drum</span>
                         </div>
                       </div>
                     </div>
