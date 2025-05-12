@@ -66,6 +66,28 @@ export const createShipment = async (data: ShipmentData): Promise<{ shipmentId: 
     const senderFullAddress = `${data.senderDetails.address}, ${data.senderDetails.city}, ${data.senderDetails.postcode}, ${data.senderDetails.country}`;
     const recipientFullAddress = `${data.recipientDetails.address}, ${data.recipientDetails.city}, Zimbabwe`;
     
+    // Ensure we have consistent data structure for sender and recipient
+    const formattedSender = {
+      firstName: data.senderDetails.firstName,
+      lastName: data.senderDetails.lastName,
+      name: `${data.senderDetails.firstName} ${data.senderDetails.lastName}`,
+      email: data.senderDetails.email,
+      phone: data.senderDetails.phone,
+      additionalPhone: data.senderDetails.additionalPhone,
+      address: data.senderDetails.address,
+      city: data.senderDetails.city,
+      postcode: data.senderDetails.postcode,
+      country: data.senderDetails.country
+    };
+    
+    const formattedRecipient = {
+      name: data.recipientDetails.name,
+      phone: data.recipientDetails.phone,
+      additionalPhone: data.recipientDetails.additionalPhone,
+      address: data.recipientDetails.address,
+      city: data.recipientDetails.city,
+    };
+    
     const shipment = {
       id: shipmentId,
       tracking_number: trackingNumber,
@@ -74,28 +96,11 @@ export const createShipment = async (data: ShipmentData): Promise<{ shipmentId: 
       destination: recipientFullAddress,
       user_id: user?.id || null,
       metadata: {
-        sender: {
-          firstName: data.senderDetails.firstName,
-          lastName: data.senderDetails.lastName,
-          name: `${data.senderDetails.firstName} ${data.senderDetails.lastName}`,
-          email: data.senderDetails.email,
-          phone: data.senderDetails.phone,
-          additionalPhone: data.senderDetails.additionalPhone,
-          address: data.senderDetails.address,
-          city: data.senderDetails.city,
-          postcode: data.senderDetails.postcode,
-          country: data.senderDetails.country
-        },
-        recipient: {
-          name: data.recipientDetails.name,
-          phone: data.recipientDetails.phone,
-          additionalPhone: data.recipientDetails.additionalPhone,
-          address: data.recipientDetails.address,
-          city: data.recipientDetails.city,
-        },
+        sender: formattedSender,
+        recipient: formattedRecipient,
         // Keep the original structure too for backward compatibility
-        senderDetails: data.senderDetails,
-        recipientDetails: data.recipientDetails,
+        senderDetails: formattedSender,
+        recipientDetails: formattedRecipient,
         shipment: data.shipmentDetails,
         shipmentDetails: data.shipmentDetails,
         collection: data.collectionDetails,

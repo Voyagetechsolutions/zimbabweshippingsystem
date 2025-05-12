@@ -10,6 +10,9 @@ import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/contexts/AuthContext';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 enum BookingStep {
   FORM,
@@ -21,20 +24,60 @@ const BookShipment = () => {
   const [currentStep, setCurrentStep] = useState<BookingStep>(BookingStep.FORM);
   const [bookingData, setBookingData] = useState<any>(null);
   const [totalAmount, setTotalAmount] = useState<number>(0);
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const [savedFormData, setSavedFormData] = useState<any>(null);
+  const [savedShipmentId, setSavedShipmentId] = useState<string | null>(null);
+  const [savedAmount, setSavedAmount] = useState<number>(0);
+  
   const navigate = useNavigate();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const { user } = useAuth();
 
   useEffect(() => {
     document.title = 'Book a Shipment | UK Shipping Service';
-  }, []);
+    
+    // If we've returned from auth and have saved form data
+    const hasSavedData = localStorage.getItem('pendingBookingData');
+    
+    if (hasSavedData && user) {
+      try {
+        const savedData = JSON.parse(localStorage.getItem('pendingBookingData') || '{}');
+        const savedId = localStorage.getItem('pendingShipmentId');
+        const amount = parseFloat(localStorage.getItem('pendingAmount') || '0');
+        
+        if (savedData && Object.keys(savedData).length > 0) {
+          // We've returned from auth with data, continue the booking
+          handleFormSubmit(savedData, savedId || '', amount);
+          
+          // Clear the stored data
+          localStorage.removeItem('pendingBookingData');
+          localStorage.removeItem('pendingShipmentId');
+          localStorage.removeItem('pendingAmount');
+        }
+      } catch (error) {
+        console.error('Error parsing saved booking data:', error);
+        localStorage.removeItem('pendingBookingData');
+        localStorage.removeItem('pendingShipmentId');
+        localStorage.removeItem('pendingAmount');
+      }
+    }
+  }, [user]);
 
   const handleFormSubmit = async (data: any, shipmentId: string, amount: number) => {
     console.log("Form submitted with data:", { data, shipmentId, amount });
     
+    // Check if the user is authenticated
+    if (!user) {
+      // Save the form data to continue after auth
+      setSavedFormData(data);
+      setSavedShipmentId(shipmentId);
+      setSavedAmount(amount);
+      setShowAuthDialog(true);
+      return;
+    }
+    
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
       if (data.shipmentType === 'other' && !data.includeDrums) {
         setBookingData({
           ...data,
@@ -174,6 +217,17 @@ const BookShipment = () => {
   };
 
   const handleCustomQuoteSubmit = async (customQuoteData: any) => {
+    // Check if the user is authenticated
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in or create an account to submit a custom quote request.",
+        variant: "destructive",
+      });
+      setShowAuthDialog(true);
+      return;
+    }
+    
     try {
       console.log("Submitting custom quote with data:", {
         ...customQuoteData,
@@ -197,7 +251,7 @@ const BookShipment = () => {
       }
       
       const { data, error } = await supabase.from('custom_quotes').insert({
-        user_id: bookingData.user_id,
+        user_id: user.id,
         shipment_id: shipmentUuid,
         phone_number: customQuoteData.phoneNumber || bookingData.senderDetails.phone,
         description: customQuoteData.description || bookingData.shipmentDetails.description,
@@ -216,7 +270,7 @@ const BookShipment = () => {
       });
       
       await supabase.from('notifications').insert({
-        user_id: bookingData.user_id || '00000000-0000-0000-0000-000000000000',
+        user_id: user.id,
         title: 'New Custom Quote Request',
         message: `A new custom quote request has been submitted for: ${customQuoteData.specificItem || customQuoteData.description}`,
         type: 'custom_quote',
@@ -246,6 +300,17 @@ const BookShipment = () => {
   };
 
   const handlePaymentComplete = async (paymentData: any) => {
+    // Check if the user is authenticated
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in or create an account to complete your payment.",
+        variant: "destructive",
+      });
+      setShowAuthDialog(true);
+      return false;
+    }
+    
     try {
       const updatedBookingData = {
         ...bookingData,
@@ -255,48 +320,46 @@ const BookShipment = () => {
       setBookingData(updatedBookingData);
       
       // Store the booking in the database after payment
-      if (bookingData.user_id) {
-        try {
-          let shipmentUuid = bookingData.shipment_id;
-          if (typeof shipmentUuid === 'string' && shipmentUuid.startsWith('shp_')) {
-            shipmentUuid = shipmentUuid.substring(4);
-          }
-          
-          // Update the shipment status
-          const { error: shipmentError } = await supabase
-            .from('shipments')
-            .update({ 
-              status: 'pending_collection',
-              metadata: {
-                ...bookingData.shipmentDetails,
-                payment_status: 'pending'
-              }
-            })
-            .eq('id', shipmentUuid);
-            
-          if (shipmentError) {
-            console.error('Error updating shipment:', shipmentError);
-          }
-          
-          // Create a payment record in the database
-          const { error: paymentError } = await supabase
-            .from('payments')
-            .insert({
-              user_id: bookingData.user_id,
-              shipment_id: shipmentUuid,
-              amount: paymentData.finalAmount,
-              currency: paymentData.currency || 'GBP',
-              payment_method: paymentData.method,
-              payment_status: paymentData.status || 'pending',
-              transaction_id: null
-            });
-            
-          if (paymentError) {
-            console.error('Error storing payment:', paymentError);
-          }
-        } catch (error) {
-          console.error("Error storing data:", error);
+      try {
+        let shipmentUuid = bookingData.shipment_id;
+        if (typeof shipmentUuid === 'string' && shipmentUuid.startsWith('shp_')) {
+          shipmentUuid = shipmentUuid.substring(4);
         }
+        
+        // Update the shipment status
+        const { error: shipmentError } = await supabase
+          .from('shipments')
+          .update({ 
+            status: 'pending_collection',
+            metadata: {
+              ...bookingData.shipmentDetails,
+              payment_status: 'pending'
+            }
+          })
+          .eq('id', shipmentUuid);
+          
+        if (shipmentError) {
+          console.error('Error updating shipment:', shipmentError);
+        }
+        
+        // Create a payment record in the database
+        const { error: paymentError } = await supabase
+          .from('payments')
+          .insert({
+            user_id: user.id,
+            shipment_id: shipmentUuid,
+            amount: paymentData.finalAmount,
+            currency: paymentData.currency || 'GBP',
+            payment_method: paymentData.method,
+            payment_status: paymentData.status || 'pending',
+            transaction_id: null
+          });
+          
+        if (paymentError) {
+          console.error('Error storing payment:', paymentError);
+        }
+      } catch (error) {
+        console.error("Error storing data:", error);
       }
       
       console.log("Payment completed successfully, data prepared for confirmation page", {
@@ -314,6 +377,24 @@ const BookShipment = () => {
       });
       return false;
     }
+  };
+
+  const handleAuthAction = () => {
+    // Save the form data to localStorage to retrieve after auth
+    if (savedFormData) {
+      localStorage.setItem('pendingBookingData', JSON.stringify(savedFormData));
+    }
+    
+    if (savedShipmentId) {
+      localStorage.setItem('pendingShipmentId', savedShipmentId);
+    }
+    
+    if (savedAmount) {
+      localStorage.setItem('pendingAmount', savedAmount.toString());
+    }
+    
+    setShowAuthDialog(false);
+    navigate('/auth');
   };
 
   return (
@@ -360,6 +441,21 @@ const BookShipment = () => {
           )}
         </div>
       </main>
+      
+      <Dialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Authentication Required</DialogTitle>
+            <DialogDescription>
+              You need to be signed in to complete your booking. Please sign in or create an account to continue.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAuthDialog(false)}>Cancel</Button>
+            <Button onClick={handleAuthAction}>Sign In / Sign Up</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       <Footer />
     </>

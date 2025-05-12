@@ -1,92 +1,83 @@
 
-import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRole, UserRoleType } from '@/contexts/RoleContext';
+import CustomerDashboard from '@/components/dashboards/CustomerDashboard';
+import AdminDashboard from '@/components/dashboards/AdminDashboard';
+import DriverDashboard from '@/components/dashboards/DriverDashboard';
+import LogisticsDashboard from '@/components/dashboards/LogisticsDashboard';
+import SupportDashboard from '@/components/dashboards/SupportDashboard';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import WhatsAppButton from '@/components/WhatsAppButton';
-
-// Role-specific dashboards
-import LogisticsDashboard from '@/components/dashboards/LogisticsDashboard';
-import DriverDashboard from '@/components/dashboards/DriverDashboard';
-import SupportDashboard from '@/components/dashboards/SupportDashboard';
-import CustomerDashboard from '@/components/dashboards/CustomerDashboard';
-
-// Show role elevation dialog for testing
-import RoleElevationDialog from '@/components/RoleElevationDialog';
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 
 const Dashboard = () => {
-  const { user, isAdmin } = useAuth();
-  const { role, isLoading } = useRole();
-  const navigate = useNavigate();
-  
-  console.log('Dashboard - User:', user?.id, 'Role:', role, 'isAdmin:', isAdmin);
-  
-  useEffect(() => {
-    if (user && !isLoading && !role) {
-      // If no role is assigned, default to customer
-      console.log('No role assigned, defaulting to customer');
-    }
-    
-    // Redirect admins to the admin dashboard
-    if (isAdmin) {
-      navigate('/admin');
-    }
-  }, [user, role, isLoading, navigate, isAdmin]);
-  
-  // Handle loading state
-  if (isLoading) {
+  const { user, loading, isAdmin } = useAuth();
+  const role = user?.user_metadata?.role || 'customer';
+
+  // Loading state
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
-      </div>
+      <>
+        <Navbar />
+        <main className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading your dashboard...</p>
+          </div>
+        </main>
+        <Footer />
+      </>
     );
   }
 
-  // Render the appropriate dashboard based on user role
-  const renderDashboard = () => {
+  // Not authenticated state
+  if (!user) {
+    return (
+      <>
+        <Navbar />
+        <main className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center max-w-md px-4">
+            <h1 className="text-2xl font-bold mb-4">Authentication Required</h1>
+            <p className="mb-6 text-gray-600">
+              Please sign in or create an account to view your dashboard.
+            </p>
+            <Link to="/auth">
+              <Button>Sign In / Sign Up</Button>
+            </Link>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
+  // Show the appropriate dashboard based on user role
+  const getDashboardComponent = () => {
+    if (isAdmin) {
+      return <AdminDashboard />;
+    }
+
     switch (role) {
-      case 'logistics':
-        return <LogisticsDashboard />;
       case 'driver':
         return <DriverDashboard />;
+      case 'logistics':
+        return <LogisticsDashboard />;
       case 'support':
         return <SupportDashboard />;
-      case 'customer':
       default:
         return <CustomerDashboard />;
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <>
       <Navbar />
-      <main className="flex-grow container mx-auto px-4 py-4 md:py-8">
-        <div className="mb-4 md:mb-8 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold">
-              {role === 'logistics' ? 'Logistics Dashboard' :
-               role === 'driver' ? 'Driver Dashboard' :
-               role === 'support' ? 'Support Dashboard' :
-               'My Dashboard'}
-            </h1>
-            <p className="text-gray-500 text-sm md:text-base">
-              Welcome back, {user?.user_metadata?.full_name || user?.email}
-            </p>
-          </div>
-          
-          {/* Role elevation dialog for testing purposes */}
-          <div className="self-start md:self-auto">
-            <RoleElevationDialog />
-          </div>
-        </div>
-        
-        {renderDashboard()}
+      <main className="container max-w-7xl mx-auto px-4 py-8">
+        {getDashboardComponent()}
       </main>
       <Footer />
-      <WhatsAppButton />
-    </div>
+    </>
   );
 };
 

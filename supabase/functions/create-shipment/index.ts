@@ -40,33 +40,63 @@ serve(async (req) => {
     // Get authenticated user if available
     const { data: { user } } = await supabaseClient.auth.getUser();
     
-    // Format sender and recipient data for consistency
-    const formattedSenderDetails = shipmentData.sender ? shipmentData.sender : {
-      name: shipmentData.metadata?.senderDetails?.name || 
-            `${shipmentData.metadata?.senderDetails?.firstName || ''} ${shipmentData.metadata?.senderDetails?.lastName || ''}`.trim(),
-      email: shipmentData.metadata?.senderDetails?.email,
-      phone: shipmentData.metadata?.senderDetails?.phone,
-      address: shipmentData.metadata?.senderDetails?.address
-    };
+    // Ensure consistent data structure for sender
+    const formattedSender = shipmentData.sender ? shipmentData.sender : 
+      shipmentData.senderDetails ? {
+        firstName: shipmentData.senderDetails.firstName,
+        lastName: shipmentData.senderDetails.lastName,
+        name: `${shipmentData.senderDetails.firstName} ${shipmentData.senderDetails.lastName}`,
+        email: shipmentData.senderDetails.email,
+        phone: shipmentData.senderDetails.phone,
+        address: shipmentData.senderDetails.address,
+        city: shipmentData.senderDetails.city,
+        postcode: shipmentData.senderDetails.postcode,
+        country: shipmentData.senderDetails.country
+      } : {
+        firstName: shipmentData.firstName,
+        lastName: shipmentData.lastName,
+        name: `${shipmentData.firstName} ${shipmentData.lastName}`,
+        email: shipmentData.email,
+        phone: shipmentData.phone,
+        address: shipmentData.pickupAddress,
+        city: shipmentData.pickupCity || '',
+        postcode: shipmentData.pickupPostcode || '',
+        country: shipmentData.pickupCountry || 'UK'
+      };
     
-    const formattedRecipientDetails = shipmentData.recipient ? shipmentData.recipient : {
-      name: shipmentData.metadata?.recipientDetails?.name,
-      phone: shipmentData.metadata?.recipientDetails?.phone,
-      address: shipmentData.metadata?.recipientDetails?.address
-    };
+    // Ensure consistent data structure for recipient
+    const formattedRecipient = shipmentData.recipient ? shipmentData.recipient : 
+      shipmentData.recipientDetails ? shipmentData.recipientDetails : {
+        name: shipmentData.recipientName,
+        phone: shipmentData.recipientPhone,
+        additionalPhone: shipmentData.additionalRecipientPhone,
+        address: shipmentData.deliveryAddress,
+        city: shipmentData.deliveryCity
+      };
+    
+    // Create origin and destination strings
+    const origin = shipmentData.origin || 
+      `${formattedSender.address}, ${formattedSender.city}, ${formattedSender.postcode}, ${formattedSender.country}`;
+    
+    const destination = shipmentData.destination || 
+      `${formattedRecipient.address}, ${formattedRecipient.city}, Zimbabwe`;
     
     // Prepare shipment record with properly formatted metadata
     const shipment = {
       id: shipmentId,
       tracking_number: trackingNumber,
       status: 'Booking Confirmed', // Ensuring consistent status
-      origin: shipmentData.origin,
-      destination: shipmentData.destination,
+      origin: origin,
+      destination: destination,
       user_id: user?.id || shipmentData.userId || null,
       metadata: {
         ...shipmentData.metadata,
-        sender: formattedSenderDetails,
-        recipient: formattedRecipientDetails
+        sender: formattedSender,
+        recipient: formattedRecipient,
+        senderDetails: formattedSender,
+        recipientDetails: formattedRecipient,
+        shipmentDetails: shipmentData.shipmentDetails || shipmentData.metadata?.shipmentDetails,
+        shipment: shipmentData.shipmentDetails || shipmentData.metadata?.shipmentDetails
       }
     };
     
