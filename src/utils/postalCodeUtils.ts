@@ -1,4 +1,3 @@
-
 /**
  * UK Postal Code validation utilities
  */
@@ -21,7 +20,7 @@ export const postalCodeToRouteMap: Record<string, string> = {
   'BR': 'LONDON ROUTE',
   'UB': 'LONDON ROUTE',
   'HA': 'LONDON ROUTE',
-  'WD': 'LONDON ROUTE'
+  'WD': 'LONDON ROUTE',
   // Birmingham area
   'B': 'BIRMINGHAM ROUTE',
   'CV': 'BIRMINGHAM ROUTE',
@@ -40,13 +39,12 @@ export const postalCodeToRouteMap: Record<string, string> = {
   'ST': 'MANCHESTER ROUTE',
   'BB': 'MANCHESTER ROUTE',
   'PR': 'MANCHESTER ROUTE',
-  'FY': 'MANCHESTER ROUTE',
+  'FY': 'FY ROUTE',
   'BL': 'MANCHESTER ROUTE',
   'WN': 'MANCHESTER ROUTE',
   'CW': 'MANCHESTER ROUTE',
   'CH': 'MANCHESTER ROUTE',
   'LL': 'MANCHESTER ROUTE',
-  'BL': 'MANCHESTER ROUTE',
   // Leeds area
   'LS': 'LEEDS ROUTE',
   'WF': 'LEEDS ROUTE',
@@ -141,7 +139,7 @@ export const irelandCityToRouteMap: Record<string, string> = {
   'BANBRIDGE': 'BELFAST ROUTE',
   'MOY': 'BELFAST ROUTE',
   'DUNGANNON': 'BELFAST ROUTE',
-  'ARMAGH': 'BELFAST ROUTE',
+  'ARMAGH': 'ARMAGH ROUTE',
   // Cavan Route
   'MAYNOOTH': 'CAVAN ROUTE',
   'ASHBOURNE': 'CAVAN ROUTE',
@@ -152,68 +150,67 @@ export const irelandCityToRouteMap: Record<string, string> = {
   'CAVAN': 'CAVAN ROUTE',
   'VIRGINIA': 'CAVAN ROUTE',
   'KELLS': 'CAVAN ROUTE',
-  'NAVAN': 'CAVAN ROUTE',
-  'TRIM': 'CAVAN ROUTE',
+  'NAVAN': 'NAVAN ROUTE',
+  'TRIM': 'TRIM ROUTE',
   // Athlone Route
   'MALIGURAR': 'ATHLONE ROUTE',
   'LONGFORD': 'ATHLONE ROUTE',
   'ROSECOMMON': 'ATHLONE ROUTE',
   'BOYLE': 'ATHLONE ROUTE',
-  'SLIGO': 'ATHLONE ROUTE',
-  'BALLINA': 'ATHLONE ROUTE',
-  'SWINFORD': 'ATHLONE ROUTE',
-  'CASTLEBAR': 'ATHLONE ROUTE',
+  'SLIGO': 'SLIGO ROUTE',
+  'BALLINA': 'BALLINA ROUTE',
+  'SWINFORD': 'SWINFORD ROUTE',
+  'CASTLEBAR': 'CASTLEBAR ROUTE',
   'TAURM': 'ATHLONE ROUTE',
-  'GALWAY': 'ATHLONE ROUTE',
+  'GALWAY': 'GALWAY ROUTE',
   'ATERNY': 'ATHLONE ROUTE',
   'ATHLONE': 'ATHLONE ROUTE',
   // Limerick Route
   'NEWBRIDGE': 'LIMERICK ROUTE',
   'PORTLAOISE': 'LIMERICK ROUTE',
-  'ROSCREA': 'LIMERICK ROUTE',
+  'ROSCREA': 'ROSCREA ROUTE',
   'LIMERICK': 'LIMERICK ROUTE',
-  'ENNIS': 'LIMERICK ROUTE',
-  'DOOLIN': 'LIMERICK ROUTE',
-  'LOUGHREA': 'LIMERICK ROUTE',
-  'BALLINASLOE': 'LIMERICK ROUTE',
-  'TULLAMORE': 'LIMERICK ROUTE',
+  'ENNIS': 'ENNIS ROUTE',
+  'DOOLIN': 'DOOLIN ROUTE',
+  'LOUGHREA': 'LOUGHREA ROUTE',
+  'BALLINASLOE': 'BALLINASLOE ROUTE',
+  'TULLAMORE': 'TULLAMORE ROUTE',
   // Dublin City Route
   'SANDFORD': 'DUBLIN CITY ROUTE',
   'RIATO': 'DUBLIN CITY ROUTE',
   'BALLYMOUNT': 'DUBLIN CITY ROUTE',
   'CABRA': 'DUBLIN CITY ROUTE',
   'BEAUMONT': 'DUBLIN CITY ROUTE',
-  'MALAHIDE': 'DUBLIN CITY ROUTE',
-  'PORTMANOCK': 'DUBLIN CITY ROUTE',
-  'DALKEY': 'DUBLIN CITY ROUTE',
-  'SHANDKILL': 'DUBLIN CITY ROUTE',
-  'BRAY': 'DUBLIN CITY ROUTE',
+  'MALAHIDE': 'MALAHIDE ROUTE',
+  'PORTMANOCK': 'PORTMANOCK ROUTE',
+  'DALKEY': 'DALKEY ROUTE',
+  'SHANDKILL': 'SHANDKILL ROUTE',
+  'BRAY': 'BRAY ROUTE',
   'DUBLIN': 'DUBLIN CITY ROUTE',
   // Cork Route
   'PORTALOUSE': 'CORK ROUTE',
-  'CASHEL': 'CORK ROUTE',
-  'FERMOY': 'CORK ROUTE',
+  'CASHEL': 'CASHEL ROUTE',
+  'FERMOY': 'FERMOY ROUTE',
   'CORK': 'CORK ROUTE',
   'DUNGARVEAN': 'CORK ROUTE',
-  'WATERFORD': 'CORK ROUTE',
-  'NEW ROSS': 'CORK ROUTE',
-  'WEXFORD': 'CORK ROUTE',
-  'GOREY': 'CORK ROUTE',
-  'GREYSTONE': 'CORK ROUTE'
+  'WATERFORD': 'WATERFORD ROUTE',
+  'NEW ROSS': 'NEW ROSS ROUTE',
+  'WEXFORD': 'WEXFORD ROUTE',
+  'GOREY': 'GOREY ROUTE',
+  'GREYSTONE': 'GREYSTONE ROUTE'
 };
 
 // List of restricted postal codes
 export const restrictedPostalCodes: string[] = [
-  // Add restricted postal codes here if needed
-  'EX, TQ, DT, LD, HR, IP, NR, HU'
-'TS, DL, SR, CA, NE, TD, EH, ML'
-'KA, DG, G, DH, KY, PA, IV, AB, DD'
+  'EX', 'TQ', 'DT', 'LD', 'HR', 'IP', 'NR', 'HU',
+  'TS', 'DL', 'SR', 'CA', 'NE', 'TD', 'EH', 'ML',
+  'KA', 'DG', 'G', 'DH', 'KY', 'PA', 'IV', 'AB', 'DD'
 ];
 
 // Check if a postal code matches the required format (starts with 1-2 letters followed by numbers)
 export const isValidUKPostcode = (postcode: string): boolean => {
-  // Basic UK postcode validation: 
-  // Should start with 1-2 letters followed by at least one number
+  // Updated UK postcode validation: 
+  // Should start with 1-2 letters, or 1 letter followed by 1 number
   const regex = /^[A-Z]{1,2}[0-9]/i;
   return regex.test(postcode.trim());
 };
@@ -247,8 +244,10 @@ export const getRouteForPostalCode = (postalCode: string): string | null => {
   const formattedCode = formatUKPostcode(postalCode);
   
   // Check if it's a restricted postal code
-  if (restrictedPostalCodes.includes(formattedCode)) {
-    return null;
+  for (const restrictedCode of restrictedPostalCodes) {
+    if (formattedCode.startsWith(restrictedCode)) {
+      return null;
+    }
   }
   
   // Extract the prefix (first 1-2 letters)

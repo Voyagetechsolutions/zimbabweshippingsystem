@@ -155,6 +155,19 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
   
   useEffect(() => {
     if (watchCountry === 'England' && watchPostcode) {
+      // Check if this is a restricted postal code
+      const isRestricted = restrictedPostalCodes.some(code => 
+        watchPostcode.toUpperCase().startsWith(code));
+      
+      if (isRestricted) {
+        toast({
+          title: "Restricted Postal Code",
+          description: "Please contact +44 7584 100552 to place a booking manually. We currently don't have a schedule for this route unless manually booking.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
       const route = getRouteForPostalCode(watchPostcode);
       setDetectedRoute(route);
       
@@ -179,7 +192,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
         }
       }
     }
-  }, [watchPostcode, watchCountry, watchPickupCity, availableRoutes, form]);
+  }, [watchPostcode, watchCountry, watchPickupCity, availableRoutes, form, toast]);
   
   // Handle adding/removing additional delivery addresses
   const addDeliveryAddress = () => {
