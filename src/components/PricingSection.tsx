@@ -92,7 +92,7 @@ const PricingSection: React.FC = () => {
     },
     {
       title: "Bulk Shipping (5+)",
-      price: "£250",
+      price: "£260",
       priceDetail: "per drum",
       description: "Best value for large shipments with flexible payment",
       features: [
