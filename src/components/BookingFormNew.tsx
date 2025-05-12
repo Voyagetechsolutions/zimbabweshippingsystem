@@ -25,7 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertCircle, CheckCircle2, Package, Ship, Info, User, Phone, FileBox, ClipboardList } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { getRouteForPostalCode, getIrelandRouteForCity } from '@/utils/postalCodeUtils';
+import { getRouteForPostalCode, getIrelandRouteForCity, restrictedPostalCodes } from '@/utils/postalCodeUtils';
 import { Link } from 'react-router-dom';
 import { useIsMobile } from '@/hooks/use-mobile';
 

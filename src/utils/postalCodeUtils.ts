@@ -1,3 +1,4 @@
+
 /**
  * UK Postal Code validation utilities
  */
@@ -39,7 +40,7 @@ export const postalCodeToRouteMap: Record<string, string> = {
   'ST': 'MANCHESTER ROUTE',
   'BB': 'MANCHESTER ROUTE',
   'PR': 'MANCHESTER ROUTE',
-  'FY': 'FY ROUTE',
+  'FY': 'MANCHESTER ROUTE',
   'BL': 'MANCHESTER ROUTE',
   'WN': 'MANCHESTER ROUTE',
   'CW': 'MANCHESTER ROUTE',
@@ -82,7 +83,6 @@ export const postalCodeToRouteMap: Record<string, string> = {
   'BN': 'BRIGHTON ROUTE',
   'RH': 'BRIGHTON ROUTE',
   'SL': 'BRIGHTON ROUTE',
-  'HP': 'BRIGHTON ROUTE',
   'TN': 'BRIGHTON ROUTE',
   'CT': 'BRIGHTON ROUTE',
   'CR': 'BRIGHTON ROUTE',
@@ -102,14 +102,7 @@ export const postalCodeToRouteMap: Record<string, string> = {
   'LU': 'NORTHAMPTON ROUTE',
   'AL': 'NORTHAMPTON ROUTE',
   'HP': 'NORTHAMPTON ROUTE',
-  'NN': 'NORTHAMPTON ROUTE',
-  // Scotland area
-  'G': 'SCOTLAND ROUTE',
-  'EH': 'SCOTLAND ROUTE',
-  'NE': 'SCOTLAND ROUTE',
-  'TS': 'SCOTLAND ROUTE',
-  'PR': 'SCOTLAND ROUTE',
-  'CA': 'SCOTLAND ROUTE'
+  'NN': 'NORTHAMPTON ROUTE'
 };
 
 // Map of Ireland cities to routes
