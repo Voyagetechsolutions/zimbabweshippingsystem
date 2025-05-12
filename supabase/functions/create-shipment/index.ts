@@ -44,7 +44,7 @@ serve(async (req) => {
     const shipment = {
       id: shipmentId,
       tracking_number: trackingNumber,
-      status: 'pending',
+      status: 'Booking Confirmed', // Changed from 'pending' to 'Booking Confirmed'
       origin: shipmentData.origin,
       destination: shipmentData.destination,
       user_id: user?.id || shipmentData.userId || null,

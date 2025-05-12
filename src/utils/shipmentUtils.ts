@@ -66,7 +66,7 @@ export const createShipment = async (data: ShipmentData): Promise<{ shipmentId: 
     const shipment = {
       id: shipmentId,
       tracking_number: trackingNumber,
-      status: 'pending',
+      status: 'Booking Confirmed', // Changed from 'pending' to 'Booking Confirmed'
       origin: `${data.senderDetails.address}, ${data.senderDetails.city}, ${data.senderDetails.postcode}, ${data.senderDetails.country}`,
       destination: `${data.recipientDetails.address}, ${data.recipientDetails.city}, Zimbabwe`,
       user_id: user?.id || null,

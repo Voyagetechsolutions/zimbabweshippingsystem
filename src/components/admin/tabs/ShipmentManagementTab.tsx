@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -261,34 +260,44 @@ const ShipmentManagementTab = () => {
   
   // Enhanced function to extract sender's name from metadata
   const getSenderName = (shipment: Shipment): string => {
-    const metadata = shipment.metadata || {};
+    if (!shipment || !shipment.metadata) {
+      return 'No Name Provided';
+    }
     
-    // Check for different possible paths to sender name in metadata
-    if (metadata.senderDetails?.name) {
-      return metadata.senderDetails.name;
-    } else if (metadata.sender?.name) {
-      return metadata.sender.name;
-    } else if (metadata.sender?.firstName && metadata.sender?.lastName) {
-      return `${metadata.sender.firstName} ${metadata.sender.lastName}`;
-    } else if (metadata.firstName && metadata.lastName) {
-      return `${metadata.firstName} ${metadata.lastName}`;
-    } else if (metadata.sender_name) {
-      return metadata.sender_name;
-    } else if (metadata.sender_details?.name) {
-      return metadata.sender_details.name;
-    } else if (metadata.sender) {
-      // Handle case where sender might be structured differently
-      const sender = metadata.sender;
-      if (typeof sender === 'object') {
-        if ('firstName' in sender && 'lastName' in sender) {
-          return `${sender.firstName} ${sender.lastName}`;
-        }
+    const metadata = shipment.metadata;
+    
+    // First check senderDetails which should be our primary path
+    if (metadata.senderDetails) {
+      if (metadata.senderDetails.firstName && metadata.senderDetails.lastName) {
+        return `${metadata.senderDetails.firstName} ${metadata.senderDetails.lastName}`;
+      }
+      if (metadata.senderDetails.name) {
+        return metadata.senderDetails.name;
       }
     }
     
-    // Check if metadata has differently structured sender info directly
+    // Then check sender which is the second most common path
+    if (metadata.sender) {
+      if (metadata.sender.firstName && metadata.sender.lastName) {
+        return `${metadata.sender.firstName} ${metadata.sender.lastName}`;
+      }
+      if (metadata.sender.name) {
+        return metadata.sender.name;
+      }
+    }
+    
+    // Check for directly nested properties
     if (metadata.firstName && metadata.lastName) {
       return `${metadata.firstName} ${metadata.lastName}`;
+    }
+    
+    // Check other possible paths
+    if (metadata.sender_name) {
+      return metadata.sender_name;
+    }
+    
+    if (metadata.sender_details?.name) {
+      return metadata.sender_details.name;
     }
     
     return 'No Name Provided';
@@ -296,15 +305,25 @@ const ShipmentManagementTab = () => {
   
   // Enhanced function to extract sender's email from metadata
   const getSenderEmail = (shipment: Shipment): string => {
-    const metadata = shipment.metadata || {};
+    if (!shipment || !shipment.metadata) {
+      return 'No Email Provided';
+    }
+    
+    const metadata = shipment.metadata;
     
     if (metadata.senderDetails?.email) {
       return metadata.senderDetails.email;
-    } else if (metadata.sender?.email) {
+    }
+    
+    if (metadata.sender?.email) {
       return metadata.sender.email;
-    } else if (metadata.email) {
+    }
+    
+    if (metadata.email) {
       return metadata.email;
-    } else if (metadata.sender_email) {
+    }
+    
+    if (metadata.sender_email) {
       return metadata.sender_email;
     }
     
@@ -313,22 +332,37 @@ const ShipmentManagementTab = () => {
   
   // Enhanced function to extract sender's phone from metadata
   const getSenderPhone = (shipment: Shipment): string => {
-    const metadata = shipment.metadata || {};
+    if (!shipment || !shipment.metadata) {
+      return 'No Phone Provided';
+    }
     
-    // Check for different possible paths to sender phone in metadata
+    const metadata = shipment.metadata;
+    
     if (metadata.senderDetails?.phone) {
       return metadata.senderDetails.phone;
-    } else if (metadata.sender?.phone) {
+    }
+    
+    if (metadata.sender?.phone) {
       return metadata.sender.phone;
-    } else if (metadata.phone) {
+    }
+    
+    if (metadata.phone) {
       return metadata.phone;
-    } else if (metadata.sender_phone) {
+    }
+    
+    if (metadata.sender_phone) {
       return metadata.sender_phone;
-    } else if (metadata.sender_details?.phone) {
+    }
+    
+    if (metadata.sender_details?.phone) {
       return metadata.sender_details.phone;
-    } else if (metadata.sender?.additionalPhone) {
+    }
+    
+    if (metadata.sender?.additionalPhone) {
       return metadata.sender.additionalPhone;
-    } else if (metadata.additionalPhone) {
+    }
+    
+    if (metadata.additionalPhone) {
       return metadata.additionalPhone;
     }
     
@@ -337,25 +371,30 @@ const ShipmentManagementTab = () => {
   
   // Enhanced function to extract receiver's name from metadata
   const getReceiverName = (shipment: Shipment): string => {
-    const metadata = shipment.metadata || {};
+    if (!shipment || !shipment.metadata) {
+      return 'No Name Provided';
+    }
     
-    // Check for different possible paths to receiver name in metadata
+    const metadata = shipment.metadata;
+    
     if (metadata.recipientDetails?.name) {
       return metadata.recipientDetails.name;
-    } else if (metadata.recipient?.name) {
+    }
+    
+    if (metadata.recipient?.name) {
       return metadata.recipient.name;
-    } else if (metadata.recipientName) {
+    }
+    
+    if (metadata.recipientName) {
       return metadata.recipientName;
-    } else if (metadata.receiver_name) {
+    }
+    
+    if (metadata.receiver_name) {
       return metadata.receiver_name;
-    } else if (metadata.recipient_details?.name) {
+    }
+    
+    if (metadata.recipient_details?.name) {
       return metadata.recipient_details.name;
-    } else if (metadata.recipient) {
-      // In case recipient is structured differently
-      const recipient = metadata.recipient;
-      if (typeof recipient === 'object' && recipient !== null) {
-        return recipient.name || 'No Name Provided';
-      }
     }
     
     return 'No Name Provided';
@@ -363,22 +402,37 @@ const ShipmentManagementTab = () => {
   
   // Enhanced function to extract receiver's phone from metadata
   const getReceiverPhone = (shipment: Shipment): string => {
-    const metadata = shipment.metadata || {};
+    if (!shipment || !shipment.metadata) {
+      return 'No Phone Provided';
+    }
     
-    // Check for different possible paths to receiver phone in metadata
+    const metadata = shipment.metadata;
+    
     if (metadata.recipientDetails?.phone) {
       return metadata.recipientDetails.phone;
-    } else if (metadata.recipient?.phone) {
+    }
+    
+    if (metadata.recipient?.phone) {
       return metadata.recipient.phone;
-    } else if (metadata.recipientPhone) {
+    }
+    
+    if (metadata.recipientPhone) {
       return metadata.recipientPhone;
-    } else if (metadata.receiver_phone) {
+    }
+    
+    if (metadata.receiver_phone) {
       return metadata.receiver_phone;
-    } else if (metadata.recipient_details?.phone) {
+    }
+    
+    if (metadata.recipient_details?.phone) {
       return metadata.recipient_details.phone;
-    } else if (metadata.additionalRecipientPhone) {
+    }
+    
+    if (metadata.additionalRecipientPhone) {
       return metadata.additionalRecipientPhone;
-    } else if (metadata.recipient?.additionalPhone) {
+    }
+    
+    if (metadata.recipient?.additionalPhone) {
       return metadata.recipient.additionalPhone;
     }
     
@@ -439,7 +493,6 @@ const ShipmentManagementTab = () => {
       senderName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       receiverName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       senderPhone.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      receiverPhone.toLowerCase().includes(searchQuery.toLowerCase()) ||
       senderEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
       shipment.origin?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       shipment.destination?.toLowerCase().includes(searchQuery.toLowerCase());
@@ -544,7 +597,7 @@ const ShipmentManagementTab = () => {
                         <ArrowUpDown className="inline-block ml-1 h-4 w-4" />
                       )}
                     </TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort('destination')}>
+                    <TableHead className="cursor-pointer" onClick={()={() => handleSort('destination')}}>
                       Destination
                       {sortField === 'destination' && (
                         <ArrowUpDown className="inline-block ml-1 h-4 w-4" />
@@ -849,36 +902,4 @@ const ShipmentManagementTab = () => {
                     <AlertTriangle className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
                     <h4 className="text-sm font-medium">No status history found</h4>
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    {statusHistory.map(item => (
-                      <Card key={item.id}>
-                        <CardHeader>
-                          <CardTitle>Status: {item.status}</CardTitle>
-                          <CardDescription>
-                            Updated by {item.created_by} on {format(new Date(item.created_at), 'dd MMM yyyy HH:mm')}
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <p>{item.notes || 'No notes provided.'}</p>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          
-          <DialogFooter>
-            <Button onClick={() => setViewingShipment(null)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </Card>
-  );
-};
-
-export default ShipmentManagementTab;
+                ) :

@@ -35,7 +35,7 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
 
     // Check for restricted postal codes first
     if (country === 'England' && postalCode) {
-      const postCodePrefix = postalCode.toUpperCase().match(/^[A-Z]{1,2}/)?.[0];
+      const postCodePrefix = postalCode.toUpperCase().match(/^[A-Z]{1,2}[0-9]{0,1}/)?.[0];
       if (postCodePrefix && restrictedPostalCodes.includes(postCodePrefix)) {
         restricted = true;
         setIsRestricted(true);

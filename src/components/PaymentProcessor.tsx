@@ -154,13 +154,14 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
         throw receiptError;
       }
 
+      // Changed status from 'pending_collection' to 'Booking Confirmed'
       const { error: shipmentError } = await supabase
         .from('shipments')
         .update({ 
-          status: 'pending_collection',
+          status: 'Booking Confirmed',
           user_id: currentUserId,
           metadata: {
-            ...bookingData.shipmentDetails,
+            ...bookingData,
             payment_status: 'pending'
           }
         })
