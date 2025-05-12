@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -63,17 +62,42 @@ export const createShipment = async (data: ShipmentData): Promise<{ shipmentId: 
     // Get authenticated user if available
     const { data: { user } } = await supabase.auth.getUser();
     
+    // Properly format sender and recipient details for consistent storage
+    const senderFullAddress = `${data.senderDetails.address}, ${data.senderDetails.city}, ${data.senderDetails.postcode}, ${data.senderDetails.country}`;
+    const recipientFullAddress = `${data.recipientDetails.address}, ${data.recipientDetails.city}, Zimbabwe`;
+    
     const shipment = {
       id: shipmentId,
       tracking_number: trackingNumber,
-      status: 'Booking Confirmed', // Changed from 'pending' to 'Booking Confirmed'
-      origin: `${data.senderDetails.address}, ${data.senderDetails.city}, ${data.senderDetails.postcode}, ${data.senderDetails.country}`,
-      destination: `${data.recipientDetails.address}, ${data.recipientDetails.city}, Zimbabwe`,
+      status: 'Booking Confirmed', // Ensuring this is consistently 'Booking Confirmed'
+      origin: senderFullAddress,
+      destination: recipientFullAddress,
       user_id: user?.id || null,
       metadata: {
-        sender: data.senderDetails,
-        recipient: data.recipientDetails,
+        sender: {
+          firstName: data.senderDetails.firstName,
+          lastName: data.senderDetails.lastName,
+          name: `${data.senderDetails.firstName} ${data.senderDetails.lastName}`,
+          email: data.senderDetails.email,
+          phone: data.senderDetails.phone,
+          additionalPhone: data.senderDetails.additionalPhone,
+          address: data.senderDetails.address,
+          city: data.senderDetails.city,
+          postcode: data.senderDetails.postcode,
+          country: data.senderDetails.country
+        },
+        recipient: {
+          name: data.recipientDetails.name,
+          phone: data.recipientDetails.phone,
+          additionalPhone: data.recipientDetails.additionalPhone,
+          address: data.recipientDetails.address,
+          city: data.recipientDetails.city,
+        },
+        // Keep the original structure too for backward compatibility
+        senderDetails: data.senderDetails,
+        recipientDetails: data.recipientDetails,
         shipment: data.shipmentDetails,
+        shipmentDetails: data.shipmentDetails,
         collection: data.collectionDetails,
         services: data.services,
         payment: data.payment
@@ -125,7 +149,10 @@ export const updateShipmentStatus = async (shipmentId: string, status: string) =
   try {
     const { data, error } = await supabase
       .from('shipments')
-      .update({ status })
+      .update({ 
+        status: status,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', shipmentId)
       .select()
       .single();

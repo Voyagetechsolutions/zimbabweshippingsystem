@@ -213,6 +213,8 @@ const ShipmentManagementTab = () => {
     if (!viewingShipment || !selectedStatus) return;
     
     try {
+      console.log(`Updating shipment status for ID: ${viewingShipment.id} to "${selectedStatus}"`);
+      
       // Update the shipment status
       const { error } = await supabase
         .from('shipments')
@@ -222,22 +224,44 @@ const ShipmentManagementTab = () => {
         })
         .eq('id', viewingShipment.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error in Supabase update:', error);
+        throw error;
+      }
 
       toast({
         title: 'Status Updated',
         description: `Shipment ${viewingShipment.tracking_number} status updated to ${selectedStatus}`,
       });
 
-      // Refresh shipments
-      fetchShipments();
+      // Update the local state to reflect the change
+      setShipments(shipments.map(s => 
+        s.id === viewingShipment.id 
+          ? {...s, status: selectedStatus, updated_at: new Date().toISOString()} 
+          : s
+      ));
+      
+      // Update the viewing shipment with the new status
+      setViewingShipment({
+        ...viewingShipment,
+        status: selectedStatus,
+        updated_at: new Date().toISOString()
+      });
+
+      // Create a new history entry
+      const newHistoryEntry: StatusHistory = {
+        id: Date.now().toString(),
+        status: selectedStatus,
+        created_at: new Date().toISOString(),
+        created_by: 'Admin',
+        notes: statusNote || 'Status updated'
+      };
+      
+      setStatusHistory([newHistoryEntry, ...statusHistory]);
       
       // Reset state
       setEditingStatus(false);
       setStatusNote('');
-      
-      // Close the dialog
-      setViewingShipment(null);
     } catch (error: any) {
       console.error('Error updating status:', error);
       toast({
@@ -258,7 +282,7 @@ const ShipmentManagementTab = () => {
     }
   };
   
-  // Enhanced function to extract sender's name from metadata
+  // Enhanced function to extract sender's name from metadata with improved fallbacks
   const getSenderName = (shipment: Shipment): string => {
     if (!shipment || !shipment.metadata) {
       return 'No Name Provided';
@@ -266,23 +290,23 @@ const ShipmentManagementTab = () => {
     
     const metadata = shipment.metadata;
     
-    // First check senderDetails which should be our primary path
+    // First check sender which is our primary path after refactoring
+    if (metadata.sender) {
+      if (metadata.sender.name) {
+        return metadata.sender.name;
+      }
+      if (metadata.sender.firstName && metadata.sender.lastName) {
+        return `${metadata.sender.firstName} ${metadata.sender.lastName}`;
+      }
+    }
+    
+    // Check senderDetails which is our secondary path
     if (metadata.senderDetails) {
       if (metadata.senderDetails.firstName && metadata.senderDetails.lastName) {
         return `${metadata.senderDetails.firstName} ${metadata.senderDetails.lastName}`;
       }
       if (metadata.senderDetails.name) {
         return metadata.senderDetails.name;
-      }
-    }
-    
-    // Then check sender which is the second most common path
-    if (metadata.sender) {
-      if (metadata.sender.firstName && metadata.sender.lastName) {
-        return `${metadata.sender.firstName} ${metadata.sender.lastName}`;
-      }
-      if (metadata.sender.name) {
-        return metadata.sender.name;
       }
     }
     
@@ -311,12 +335,12 @@ const ShipmentManagementTab = () => {
     
     const metadata = shipment.metadata;
     
-    if (metadata.senderDetails?.email) {
-      return metadata.senderDetails.email;
-    }
-    
     if (metadata.sender?.email) {
       return metadata.sender.email;
+    }
+    
+    if (metadata.senderDetails?.email) {
+      return metadata.senderDetails.email;
     }
     
     if (metadata.email) {
@@ -338,12 +362,12 @@ const ShipmentManagementTab = () => {
     
     const metadata = shipment.metadata;
     
-    if (metadata.senderDetails?.phone) {
-      return metadata.senderDetails.phone;
-    }
-    
     if (metadata.sender?.phone) {
       return metadata.sender.phone;
+    }
+    
+    if (metadata.senderDetails?.phone) {
+      return metadata.senderDetails.phone;
     }
     
     if (metadata.phone) {
@@ -377,12 +401,12 @@ const ShipmentManagementTab = () => {
     
     const metadata = shipment.metadata;
     
-    if (metadata.recipientDetails?.name) {
-      return metadata.recipientDetails.name;
-    }
-    
     if (metadata.recipient?.name) {
       return metadata.recipient.name;
+    }
+    
+    if (metadata.recipientDetails?.name) {
+      return metadata.recipientDetails.name;
     }
     
     if (metadata.recipientName) {
@@ -408,12 +432,12 @@ const ShipmentManagementTab = () => {
     
     const metadata = shipment.metadata;
     
-    if (metadata.recipientDetails?.phone) {
-      return metadata.recipientDetails.phone;
-    }
-    
     if (metadata.recipient?.phone) {
       return metadata.recipient.phone;
+    }
+    
+    if (metadata.recipientDetails?.phone) {
+      return metadata.recipientDetails.phone;
     }
     
     if (metadata.recipientPhone) {
@@ -866,7 +890,7 @@ const ShipmentManagementTab = () => {
                       Edit Status
                     </Button>
                   ) : (
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                         <SelectTrigger className="w-[180px]">
                           <SelectValue placeholder="Select Status" />
@@ -879,15 +903,29 @@ const ShipmentManagementTab = () => {
                           ))}
                         </SelectContent>
                       </Select>
-                      <Button variant="outline" size="sm" onClick={handleUpdateStatus}>
-                        Update
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setEditingStatus(false)}>
-                        Cancel
-                      </Button>
+                      <div className="flex gap-2 mt-2 md:mt-0">
+                        <Button variant="outline" size="sm" onClick={handleUpdateStatus}>
+                          Update
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setEditingStatus(false)}>
+                          Cancel
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
+                {editingStatus && (
+                  <div className="mt-2">
+                    <Label htmlFor="statusNote">Add a note (optional)</Label>
+                    <Textarea 
+                      id="statusNote"
+                      value={statusNote} 
+                      onChange={(e) => setStatusNote(e.target.value)}
+                      placeholder="Add a note about this status change"
+                      className="mt-1"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Status History */}

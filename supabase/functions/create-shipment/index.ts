@@ -40,16 +40,33 @@ serve(async (req) => {
     // Get authenticated user if available
     const { data: { user } } = await supabaseClient.auth.getUser();
     
-    // Prepare shipment record
+    // Format sender and recipient data for consistency
+    const formattedSenderDetails = shipmentData.sender ? shipmentData.sender : {
+      name: shipmentData.metadata?.senderDetails?.name || 
+            `${shipmentData.metadata?.senderDetails?.firstName || ''} ${shipmentData.metadata?.senderDetails?.lastName || ''}`.trim(),
+      email: shipmentData.metadata?.senderDetails?.email,
+      phone: shipmentData.metadata?.senderDetails?.phone,
+      address: shipmentData.metadata?.senderDetails?.address
+    };
+    
+    const formattedRecipientDetails = shipmentData.recipient ? shipmentData.recipient : {
+      name: shipmentData.metadata?.recipientDetails?.name,
+      phone: shipmentData.metadata?.recipientDetails?.phone,
+      address: shipmentData.metadata?.recipientDetails?.address
+    };
+    
+    // Prepare shipment record with properly formatted metadata
     const shipment = {
       id: shipmentId,
       tracking_number: trackingNumber,
-      status: 'Booking Confirmed', // Changed from 'pending' to 'Booking Confirmed'
+      status: 'Booking Confirmed', // Ensuring consistent status
       origin: shipmentData.origin,
       destination: shipmentData.destination,
       user_id: user?.id || shipmentData.userId || null,
       metadata: {
-        ...shipmentData.metadata
+        ...shipmentData.metadata,
+        sender: formattedSenderDetails,
+        recipient: formattedRecipientDetails
       }
     };
     
