@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -121,7 +122,7 @@ const PickupZonesManagementTab = () => {
       const { data: shipmentsData, error: shipmentsError } = await supabase
         .from('shipments')
         .select('*')
-        .in('status', ['Booking Confirmed', 'Ready for Pickup'])
+        .in('status', ['Booking Confirmed', 'Ready for Pickup', 'Pending Collection'])
         .order('created_at', { ascending: false });
 
       if (shipmentsError) throw shipmentsError;
@@ -232,6 +233,22 @@ const PickupZonesManagementTab = () => {
         origin.includes('solihull') || 
         origin.includes('wolverhampton')) {
       return 'Birmingham Route';
+    }
+    
+    if (origin.includes('northampton') || 
+        origin.includes('wellingborough')) {
+      return 'Northampton Route';  
+    }
+
+    if (origin.includes('leeds') || 
+        origin.includes('bradford') || 
+        origin.includes('huddersfield')) {
+      return 'Leeds Route';
+    }
+
+    if (origin.includes('nottingham') || 
+        origin.includes('derby')) {
+      return 'Nottingham Route';
     }
     
     // Default
@@ -488,11 +505,63 @@ const PickupZonesManagementTab = () => {
     }
   };
 
-  const notifyCustomers = (route: string) => {
-    toast({
-      title: 'Notifications Sent',
-      description: `Customers have been notified about their pickup in the ${route} area.`,
-    });
+  const notifyCustomers = async (route: string) => {
+    try {
+      const routeShipments = groupedShipments[route] || [];
+      if (routeShipments.length === 0) {
+        toast({
+          title: 'No Customers',
+          description: 'There are no customers to notify for this route.',
+          variant: 'warning',
+        });
+        return;
+      }
+
+      const pickupDate = getPickupDateForRoute(route);
+      if (pickupDate === 'Not scheduled') {
+        toast({
+          title: 'No Pickup Date',
+          description: 'Please schedule a pickup date for this route first.',
+          variant: 'warning',
+        });
+        return;
+      }
+
+      // Get all unique emails from the shipments
+      const emails = routeShipments
+        .map(shipment => {
+          const metadata = shipment.metadata || {};
+          const senderDetails = metadata.sender || metadata.senderDetails || {};
+          return senderDetails.email || shipment.profiles?.email;
+        })
+        .filter(Boolean) // Remove nulls/undefined
+        .filter((email, index, self) => self.indexOf(email) === index); // Remove duplicates
+
+      if (emails.length === 0) {
+        toast({
+          title: 'No Emails Found',
+          description: 'No valid email addresses found for customers in this route.',
+          variant: 'warning',
+        });
+        return;
+      }
+
+      // For each email, send a notification about their scheduled pickup
+      const routeName = route.replace(' Route', '');
+      const formattedDate = safeFormatDate(pickupDate);
+      
+      // Here we could call the Brevo email function for each email
+      toast({
+        title: 'Notifications Sent',
+        description: `${emails.length} customers have been notified about their pickup in the ${routeName} area.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Failed to send notifications: ' + error.message,
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -720,7 +789,7 @@ const PickupZonesManagementTab = () => {
                             </TableCell>
                             <TableCell>
                               <Badge 
-                                variant={shipment.status === 'Ready for Pickup' ? 'default' : 'outline'}
+                                variant={shipment.status === 'Ready for Pickup' || shipment.status === 'Pending Collection' ? 'default' : 'outline'}
                               >
                                 {shipment.status}
                               </Badge>

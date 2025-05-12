@@ -90,6 +90,9 @@ connection_string = "postgres://supabase:supabase@localhost:54322/postgres"
 [functions.send-email]
 verify_jwt = true
 
+[functions.send-brevo-email]
+verify_jwt = true
+
 [functions.create-payment]
 verify_jwt = true
 

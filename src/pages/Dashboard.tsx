@@ -2,10 +2,7 @@
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import CustomerDashboard from '@/components/dashboards/CustomerDashboard';
-import AdminDashboard from '@/components/dashboards/AdminDashboard';
-import DriverDashboard from '@/components/dashboards/DriverDashboard';
-import LogisticsDashboard from '@/components/dashboards/LogisticsDashboard';
-import SupportDashboard from '@/components/dashboards/SupportDashboard';
+import AdminDashboardContent from '@/components/admin/AdminDashboardContent';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
@@ -53,28 +50,11 @@ const Dashboard = () => {
   }
 
   // Show the appropriate dashboard based on user role
-  const getDashboardComponent = () => {
-    if (isAdmin) {
-      return <AdminDashboard />;
-    }
-
-    switch (role) {
-      case 'driver':
-        return <DriverDashboard />;
-      case 'logistics':
-        return <LogisticsDashboard />;
-      case 'support':
-        return <SupportDashboard />;
-      default:
-        return <CustomerDashboard />;
-    }
-  };
-
   return (
     <>
       <Navbar />
       <main className="container max-w-7xl mx-auto px-4 py-8">
-        {getDashboardComponent()}
+        {isAdmin ? <AdminDashboardContent /> : <CustomerDashboard />}
       </main>
       <Footer />
     </>

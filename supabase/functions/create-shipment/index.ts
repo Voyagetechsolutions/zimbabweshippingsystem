@@ -96,7 +96,8 @@ serve(async (req) => {
         senderDetails: formattedSender,
         recipientDetails: formattedRecipient,
         shipmentDetails: shipmentData.shipmentDetails || shipmentData.metadata?.shipmentDetails,
-        shipment: shipmentData.shipmentDetails || shipmentData.metadata?.shipmentDetails
+        shipment: shipmentData.shipmentDetails || shipmentData.metadata?.shipmentDetails,
+        collection: shipmentData.collectionDetails || shipmentData.metadata?.collection || {}
       }
     };
     
