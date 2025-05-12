@@ -14,12 +14,23 @@ export const postalCodeToRouteMap: Record<string, string> = {
   'SE': 'LONDON ROUTE',
   'SW': 'LONDON ROUTE',
   'W': 'LONDON ROUTE',
+  'EN': 'LONDON ROUTE',
+  'IG': 'LONDON ROUTE',
+  'RM': 'LONDON ROUTE',
+  'DA': 'LONDON ROUTE',
+  'BR': 'LONDON ROUTE',
+  'UB': 'LONDON ROUTE',
+  'HA': 'LONDON ROUTE',
+  'WD': 'LONDON ROUTE'
   // Birmingham area
   'B': 'BIRMINGHAM ROUTE',
   'CV': 'BIRMINGHAM ROUTE',
   'WV': 'BIRMINGHAM ROUTE',
   'DY': 'BIRMINGHAM ROUTE',
   'WS': 'BIRMINGHAM ROUTE',
+  'WR': 'BIRMINGHAM ROUTE',
+  'SY': 'BIRMINGHAM ROUTE',
+  'TF': 'BIRMINGHAM ROUTE',
   // Manchester area
   'M': 'MANCHESTER ROUTE',
   'L': 'MANCHESTER ROUTE',
@@ -27,6 +38,15 @@ export const postalCodeToRouteMap: Record<string, string> = {
   'OL': 'MANCHESTER ROUTE',
   'SK': 'MANCHESTER ROUTE',
   'ST': 'MANCHESTER ROUTE',
+  'BB': 'MANCHESTER ROUTE',
+  'PR': 'MANCHESTER ROUTE',
+  'FY': 'MANCHESTER ROUTE',
+  'BL': 'MANCHESTER ROUTE',
+  'WN': 'MANCHESTER ROUTE',
+  'CW': 'MANCHESTER ROUTE',
+  'CH': 'MANCHESTER ROUTE',
+  'LL': 'MANCHESTER ROUTE',
+  'BL': 'MANCHESTER ROUTE',
   // Leeds area
   'LS': 'LEEDS ROUTE',
   'WF': 'LEEDS ROUTE',
@@ -35,6 +55,8 @@ export const postalCodeToRouteMap: Record<string, string> = {
   'S': 'LEEDS ROUTE',
   'HD': 'LEEDS ROUTE',
   'YO': 'LEEDS ROUTE',
+  'BD': 'LEEDS ROUTE',
+  'HG': 'LEEDS ROUTE',
   // Cardiff area
   'CF': 'CARDIFF ROUTE',
   'GL': 'CARDIFF ROUTE',
@@ -42,17 +64,22 @@ export const postalCodeToRouteMap: Record<string, string> = {
   'SN': 'CARDIFF ROUTE',
   'BA': 'CARDIFF ROUTE',
   'SP': 'CARDIFF ROUTE',
+  'NP': 'CARDIFF ROUTE',
+  'CP': 'CARDIFF ROUTE',
+  'SA': 'CARDIFF ROUTE',  
   // Bournemouth area
   'SO': 'BOURNEMOUTH ROUTE',
   'PO': 'BOURNEMOUTH ROUTE',
   'RG': 'BOURNEMOUTH ROUTE',
   'GU': 'BOURNEMOUTH ROUTE',
+  'BH': 'BOURNEMOUTH ROUTE',
+  'OX': 'BOURNEMOUTH ROUTE',
   // Nottingham area
   'NG': 'NOTTINGHAM ROUTE',
   'LE': 'NOTTINGHAM ROUTE',
   'DE': 'NOTTINGHAM ROUTE',
   'PE': 'NOTTINGHAM ROUTE',
-  'NN': 'NOTTINGHAM ROUTE',
+  'LN': 'NOTTINGHAM ROUTE',
   // Brighton area
   'BN': 'BRIGHTON ROUTE',
   'RH': 'BRIGHTON ROUTE',
@@ -60,6 +87,10 @@ export const postalCodeToRouteMap: Record<string, string> = {
   'HP': 'BRIGHTON ROUTE',
   'TN': 'BRIGHTON ROUTE',
   'CT': 'BRIGHTON ROUTE',
+  'CR': 'BRIGHTON ROUTE',
+  'TW': 'BRIGHTON ROUTE',
+  'KT': 'BRIGHTON ROUTE',
+  'ME': 'BRIGHTON ROUTE',
   // Southend area
   'NR': 'SOUTHEND ROUTE',
   'IP': 'SOUTHEND ROUTE',
@@ -67,12 +98,13 @@ export const postalCodeToRouteMap: Record<string, string> = {
   'CM': 'SOUTHEND ROUTE',
   'CB': 'SOUTHEND ROUTE',
   'SS': 'SOUTHEND ROUTE',
+  'SG': 'SOUTHEND ROUTE',
   // Northampton area
   'MK': 'NORTHAMPTON ROUTE',
   'LU': 'NORTHAMPTON ROUTE',
   'AL': 'NORTHAMPTON ROUTE',
-  'SG': 'NORTHAMPTON ROUTE',
-  'OX': 'NORTHAMPTON ROUTE',
+  'HP': 'NORTHAMPTON ROUTE',
+  'NN': 'NORTHAMPTON ROUTE',
   // Scotland area
   'G': 'SCOTLAND ROUTE',
   'EH': 'SCOTLAND ROUTE',
@@ -173,6 +205,9 @@ export const irelandCityToRouteMap: Record<string, string> = {
 // List of restricted postal codes
 export const restrictedPostalCodes: string[] = [
   // Add restricted postal codes here if needed
+  'EX, TQ, DT, LD, HR, IP, NR, HU'
+'TS, DL, SR, CA, NE, TD, EH, ML'
+'KA, DG, G, DH, KY, PA, IV, AB, DD'
 ];
 
 // Check if a postal code matches the required format (starts with 1-2 letters followed by numbers)
