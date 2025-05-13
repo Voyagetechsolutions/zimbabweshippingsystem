@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Package, Plus, ArrowRight, Bell, Truck, Globe, History, Quote } from 'lucide-react';
-import RecentShipments from '@/components/customer/RecentShipments';
+import { RecentShipments } from '@/components/customer/RecentShipments';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 

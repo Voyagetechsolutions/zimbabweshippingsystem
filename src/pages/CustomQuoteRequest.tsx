@@ -47,10 +47,12 @@ const CustomQuoteRequest = () => {
       if (error) throw error;
       
       if (data) {
+        // Fix: Properly type the metadata fields
+        const metadata = data.metadata as Record<string, any>;
         setInitialData({
-          shipmentDetails: data.metadata || {},
-          senderDetails: data.metadata?.sender_details || {},
-          recipientDetails: data.metadata?.recipient_details || {}
+          shipmentDetails: metadata || {},
+          senderDetails: metadata?.sender_details || {},
+          recipientDetails: metadata?.recipient_details || {}
         });
       }
     } catch (error) {

@@ -118,7 +118,9 @@ const PickupZonesManagementTab = () => {
       const groupedShipments: { [key: string]: any[] } = {};
       
       data?.forEach(shipment => {
-        const route = shipment.metadata?.collection_info?.route || 'Unassigned';
+        // Fix: Properly type and access metadata.collection_info
+        const metadata = shipment.metadata as Record<string, any>;
+        const route = metadata?.collection_info?.route || 'Unassigned';
         
         if (!groupedShipments[route]) {
           groupedShipments[route] = [];
@@ -461,7 +463,8 @@ const PickupZonesManagementTab = () => {
     const customerEmails = new Set<string>();
     
     shipments.forEach(shipment => {
-      const email = shipment.metadata?.sender_details?.email;
+      const metadata = shipment.metadata as Record<string, any>;
+      const email = metadata?.sender_details?.email;
       if (email) {
         customerEmails.add(email);
       }
@@ -502,8 +505,9 @@ UK to Zimbabwe Shipping Team`);
       const customers: Array<{ email: string, name: string }> = [];
       
       shipments.forEach(shipment => {
-        const email = shipment.metadata?.sender_details?.email;
-        const name = shipment.metadata?.sender_details?.name || 'Customer';
+        const metadata = shipment.metadata as Record<string, any>;
+        const email = metadata?.sender_details?.email;
+        const name = metadata?.sender_details?.name || 'Customer';
         
         if (email && !customers.some(c => c.email === email)) {
           customers.push({ email, name });
