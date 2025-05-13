@@ -1,18 +1,13 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import BookingFormNew from '@/components/BookingFormNew';
 import CustomQuoteForm from '@/components/CustomQuoteForm';
-import { PaymentMethodSection } from '@/components/PaymentMethodSection';
+import PaymentProcessor from '@/components/PaymentProcessor';
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { useAuth } from '@/contexts/AuthContext';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 
 enum BookingStep {
   FORM,
@@ -24,60 +19,19 @@ const BookShipment = () => {
   const [currentStep, setCurrentStep] = useState<BookingStep>(BookingStep.FORM);
   const [bookingData, setBookingData] = useState<any>(null);
   const [totalAmount, setTotalAmount] = useState<number>(0);
-  const [showAuthDialog, setShowAuthDialog] = useState(false);
-  const [savedFormData, setSavedFormData] = useState<any>(null);
-  const [savedShipmentId, setSavedShipmentId] = useState<string | null>(null);
-  const [savedAmount, setSavedAmount] = useState<number>(0);
-  
   const navigate = useNavigate();
   const { toast } = useToast();
-  const isMobile = useIsMobile();
-  const { user } = useAuth();
 
   useEffect(() => {
     document.title = 'Book a Shipment | UK Shipping Service';
-    
-    // If we've returned from auth and have saved form data
-    const hasSavedData = localStorage.getItem('pendingBookingData');
-    
-    if (hasSavedData && user) {
-      try {
-        const savedData = JSON.parse(localStorage.getItem('pendingBookingData') || '{}');
-        const savedId = localStorage.getItem('pendingShipmentId');
-        const amount = parseFloat(localStorage.getItem('pendingAmount') || '0');
-        
-        if (savedData && Object.keys(savedData).length > 0) {
-          // We've returned from auth with data, continue the booking
-          handleFormSubmit(savedData, savedId || '', amount);
-          
-          // Clear the stored data
-          localStorage.removeItem('pendingBookingData');
-          localStorage.removeItem('pendingShipmentId');
-          localStorage.removeItem('pendingAmount');
-        }
-      } catch (error) {
-        console.error('Error parsing saved booking data:', error);
-        localStorage.removeItem('pendingBookingData');
-        localStorage.removeItem('pendingShipmentId');
-        localStorage.removeItem('pendingAmount');
-      }
-    }
-  }, [user]);
+  }, []);
 
   const handleFormSubmit = async (data: any, shipmentId: string, amount: number) => {
     console.log("Form submitted with data:", { data, shipmentId, amount });
     
-    // Check if the user is authenticated
-    if (!user) {
-      // Save the form data to continue after auth
-      setSavedFormData(data);
-      setSavedShipmentId(shipmentId);
-      setSavedAmount(amount);
-      setShowAuthDialog(true);
-      return;
-    }
-    
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
       if (data.shipmentType === 'other' && !data.includeDrums) {
         setBookingData({
           ...data,
@@ -112,26 +66,10 @@ const BookShipment = () => {
       const doorToDoorCost = doorToDoorAddresses * 25;
       const finalAmount = amount + metalSealCost + doorToDoorCost;
       
-      // Improved structure to ensure data is properly formatted for the confirmation
       setBookingData({
         ...data,
         shipment_id: shipmentId,
         user_id: user?.id || null,
-        // Add these for flat access
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email: data.email,
-        phone: data.phone,
-        pickupAddress: data.pickupAddress,
-        pickupPostcode: data.pickupPostcode,
-        pickupCity: data.pickupCity,
-        pickupCountry: data.pickupCountry,
-        recipientName: data.recipientName,
-        recipientPhone: data.recipientPhone,
-        additionalRecipientPhone: data.additionalRecipientPhone,
-        deliveryAddress: data.deliveryAddress,
-        deliveryCity: data.deliveryCity,
-        // Properly formatted nested objects for the confirmation
         senderDetails: {
           name: `${data.firstName} ${data.lastName}`,
           email: data.email,
@@ -217,17 +155,6 @@ const BookShipment = () => {
   };
 
   const handleCustomQuoteSubmit = async (customQuoteData: any) => {
-    // Check if the user is authenticated
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in or create an account to submit a custom quote request.",
-        variant: "destructive",
-      });
-      setShowAuthDialog(true);
-      return;
-    }
-    
     try {
       console.log("Submitting custom quote with data:", {
         ...customQuoteData,
@@ -251,7 +178,7 @@ const BookShipment = () => {
       }
       
       const { data, error } = await supabase.from('custom_quotes').insert({
-        user_id: user.id,
+        user_id: bookingData.user_id,
         shipment_id: shipmentUuid,
         phone_number: customQuoteData.phoneNumber || bookingData.senderDetails.phone,
         description: customQuoteData.description || bookingData.shipmentDetails.description,
@@ -270,7 +197,7 @@ const BookShipment = () => {
       });
       
       await supabase.from('notifications').insert({
-        user_id: user.id,
+        user_id: bookingData.user_id || '00000000-0000-0000-0000-000000000000',
         title: 'New Custom Quote Request',
         message: `A new custom quote request has been submitted for: ${customQuoteData.specificItem || customQuoteData.description}`,
         type: 'custom_quote',
@@ -279,7 +206,7 @@ const BookShipment = () => {
       });
       
       if (bookingData.paymentCompleted) {
-        navigate('/confirm-booking', { 
+        navigate('/receipt', { 
           state: { 
             bookingData,
             paymentData: bookingData.paymentData,
@@ -299,102 +226,24 @@ const BookShipment = () => {
     }
   };
 
-  const handlePaymentComplete = async (paymentData: any) => {
-    // Check if the user is authenticated
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in or create an account to complete your payment.",
-        variant: "destructive",
-      });
-      setShowAuthDialog(true);
-      return false;
-    }
+  const handlePaymentComplete = (paymentData: any) => {
+    const updatedBookingData = {
+      ...bookingData,
+      paymentCompleted: true,
+      paymentData
+    };
+    setBookingData(updatedBookingData);
     
-    try {
-      const updatedBookingData = {
-        ...bookingData,
-        paymentCompleted: true,
-        paymentData
-      };
-      setBookingData(updatedBookingData);
-      
-      // Store the booking in the database after payment
-      try {
-        let shipmentUuid = bookingData.shipment_id;
-        if (typeof shipmentUuid === 'string' && shipmentUuid.startsWith('shp_')) {
-          shipmentUuid = shipmentUuid.substring(4);
+    if (bookingData.shipmentDetails.includeOtherItems) {
+      setCurrentStep(BookingStep.CUSTOM_QUOTE);
+    } else {
+      navigate('/receipt', { 
+        state: { 
+          bookingData: updatedBookingData,
+          paymentData
         }
-        
-        // Update the shipment status
-        const { error: shipmentError } = await supabase
-          .from('shipments')
-          .update({ 
-            status: 'pending_collection',
-            metadata: {
-              ...bookingData.shipmentDetails,
-              payment_status: 'pending'
-            }
-          })
-          .eq('id', shipmentUuid);
-          
-        if (shipmentError) {
-          console.error('Error updating shipment:', shipmentError);
-        }
-        
-        // Create a payment record in the database
-        const { error: paymentError } = await supabase
-          .from('payments')
-          .insert({
-            user_id: user.id,
-            shipment_id: shipmentUuid,
-            amount: paymentData.finalAmount,
-            currency: paymentData.currency || 'GBP',
-            payment_method: paymentData.method,
-            payment_status: paymentData.status || 'pending',
-            transaction_id: null
-          });
-          
-        if (paymentError) {
-          console.error('Error storing payment:', paymentError);
-        }
-      } catch (error) {
-        console.error("Error storing data:", error);
-      }
-      
-      console.log("Payment completed successfully, data prepared for confirmation page", {
-        bookingData: updatedBookingData,
-        paymentData
       });
-      
-      return true;
-    } catch (error) {
-      console.error("Error during payment completion:", error);
-      toast({
-        title: "Error",
-        description: "Failed to process your booking. Please try again.",
-        variant: "destructive"
-      });
-      return false;
     }
-  };
-
-  const handleAuthAction = () => {
-    // Save the form data to localStorage to retrieve after auth
-    if (savedFormData) {
-      localStorage.setItem('pendingBookingData', JSON.stringify(savedFormData));
-    }
-    
-    if (savedShipmentId) {
-      localStorage.setItem('pendingShipmentId', savedShipmentId);
-    }
-    
-    if (savedAmount) {
-      localStorage.setItem('pendingAmount', savedAmount.toString());
-    }
-    
-    setShowAuthDialog(false);
-    navigate('/auth');
   };
 
   return (
@@ -426,11 +275,11 @@ const BookShipment = () => {
           {currentStep === BookingStep.FORM ? (
             <BookingFormNew onSubmitComplete={handleFormSubmit} />
           ) : currentStep === BookingStep.PAYMENT ? (
-            <PaymentMethodSection 
+            <PaymentProcessor 
               bookingData={bookingData}
               totalAmount={totalAmount}
               onCancel={handleBackToForm}
-              onComplete={handlePaymentComplete}
+              onPaymentComplete={handlePaymentComplete}
             />
           ) : (
             <CustomQuoteForm 
@@ -441,21 +290,6 @@ const BookShipment = () => {
           )}
         </div>
       </main>
-      
-      <Dialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Authentication Required</DialogTitle>
-            <DialogDescription>
-              You need to be signed in to complete your booking. Please sign in or create an account to continue.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAuthDialog(false)}>Cancel</Button>
-            <Button onClick={handleAuthAction}>Sign In / Sign Up</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
       
       <Footer />
     </>
