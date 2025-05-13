@@ -850,4 +850,4 @@ import {
 import {
   Accordion as AccordionNewNewNewNewNew,
   AccordionContent as AccordionContentNewNewNewNewNew,
-  AccordionItem as AccordionItemNewNewNew
+  AccordionItem as AccordionItem
