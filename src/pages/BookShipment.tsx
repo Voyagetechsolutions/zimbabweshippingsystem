@@ -1,10 +1,9 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import BookingFormNew from '@/components/BookingFormNew';
-import CustomQuoteForm from '@/components/CustomQuoteForm';
+import CustomQuoteFormNew from '@/components/CustomQuoteFormNew';
 import { PaymentMethodSection } from '@/components/PaymentMethodSection';
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -254,6 +253,8 @@ const BookShipment = () => {
         user_id: user.id,
         shipment_id: shipmentUuid,
         phone_number: customQuoteData.phoneNumber || bookingData.senderDetails.phone,
+        name: customQuoteData.name || `${bookingData.firstName} ${bookingData.lastName}`,
+        email: customQuoteData.email || bookingData.email,
         description: customQuoteData.description || bookingData.shipmentDetails.description,
         category: customQuoteData.category || bookingData.shipmentDetails.category,
         image_urls: customQuoteData.imageUrls || [],
@@ -433,7 +434,7 @@ const BookShipment = () => {
               onComplete={handlePaymentComplete}
             />
           ) : (
-            <CustomQuoteForm 
+            <CustomQuoteFormNew
               bookingData={bookingData}
               onSubmit={handleCustomQuoteSubmit}
               onCancel={handleBackToForm}
