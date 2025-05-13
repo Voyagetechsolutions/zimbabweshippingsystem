@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Link, useLocation } from 'react-router-dom';
 import { ThemeProvider } from "@/components/theme-provider"
@@ -850,4 +851,5 @@ import {
 import {
   Accordion as AccordionNewNewNewNewNew,
   AccordionContent as AccordionContentNewNewNewNewNew,
-  AccordionItem as AccordionItem
+  AccordionItem as AccordionItemNewNewNewNewNew,
+} from "@/components/ui/accordion"
