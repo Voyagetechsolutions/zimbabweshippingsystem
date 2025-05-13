@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import RecentShipments from '@/components/customer/RecentShipments';
+import { RecentShipments } from '@/components/customer/RecentShipments';
 import PaymentHistorySection from '@/components/PaymentHistorySection';
 import CustomQuotesTab from './CustomQuotesTab';
 import { Card, CardContent } from '@/components/ui/card';
