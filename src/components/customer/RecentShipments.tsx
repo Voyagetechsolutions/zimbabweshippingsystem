@@ -11,16 +11,21 @@ import { ChevronRight, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { Shipment } from '@/types/shipment';
 
-export const RecentShipments = () => {
+interface RecentShipmentsProps {
+  shipments?: Shipment[];
+  loading?: boolean;
+}
+
+export const RecentShipments = ({ shipments: providedShipments, loading: providedLoading }: RecentShipmentsProps = {}) => {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const { data: shipments, isLoading, refetch, isRefetching } = useQuery({
+  const { data: fetchedShipments, isLoading: isFetching, refetch, isRefetching } = useQuery({
     queryKey: ['recentShipments', user?.id],
     queryFn: async () => {
-      if (!user?.id) {
-        console.error('No user ID available for fetching recent shipments');
+      if (!user?.id || providedShipments) {
         return [];
       }
       
@@ -39,9 +44,13 @@ export const RecentShipments = () => {
       console.log('Fetched recent shipments:', data?.length);
       return data || [];
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !providedShipments,
     refetchInterval: 60000, // Auto-refresh every minute
   });
+
+  // Use provided shipments if available, otherwise use fetched shipments
+  const shipmentData = providedShipments || fetchedShipments;
+  const isLoading = providedLoading !== undefined ? providedLoading : isFetching;
 
   const handleRefresh = async () => {
     try {
@@ -83,7 +92,7 @@ export const RecentShipments = () => {
     );
   }
 
-  if (!shipments || shipments.length === 0) {
+  if (!shipmentData || shipmentData.length === 0) {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -141,7 +150,7 @@ export const RecentShipments = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {shipments.map((shipment) => (
+          {shipmentData.map((shipment) => (
             <div key={shipment.id} className="flex items-center justify-between">
               <div>
                 <p className="font-medium text-sm">{shipment.tracking_number}</p>
