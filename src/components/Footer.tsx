@@ -99,8 +99,11 @@ const Footer = () => {
               <li className="flex items-start">
                 <MapPin className="h-5 w-5 text-zim-red mr-2 mt-0.5" />
                 <span className="text-gray-300">
-                  Pastures Lodge Farm, Raunds Road<br />
-                  Chelveston, Wellingborough, NN9 6AA
+                  Pastures lodge farm
+Chelveston rd
+Wellingborough
+Northamptonshire
+NN96AA
                 </span>
               </li>
               <li className="flex items-center">
