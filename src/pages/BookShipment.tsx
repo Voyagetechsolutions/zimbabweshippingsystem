@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { BookingFormNew } from '@/components/BookingFormNew';
-import { PaymentProcessor } from '@/components/PaymentProcessor';
+import BookingFormNew from '@/components/BookingFormNew';
+import PaymentProcessor from '@/components/PaymentProcessor';
 
 const BookShipment = () => {
   const [step, setStep] = useState(1);

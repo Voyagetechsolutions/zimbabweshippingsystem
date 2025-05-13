@@ -1,16 +1,15 @@
-
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Link, useLocation } from 'react-router-dom';
-import { ThemeProvider } from "@/components/theme-provider"
-import { cn } from "@/lib/utils"
-import { siteConfig } from "@/config/site"
-import { Toaster } from "@/components/ui/toaster"
-import { Navbar } from "@/components/Navbar"
-import { Footer } from "@/components/Footer"
-import { Button } from "@/components/ui/button"
-import { useToast } from "@/hooks/use-toast"
-import { useIsAdmin } from "@/hooks/use-admin"
-import { useSession } from "@/hooks/use-session"
+import { ThemeProvider } from "./components/theme-provider";
+import { cn } from "@/lib/utils";
+import { siteConfig } from "./config/site";
+import { Toaster } from "@/components/ui/toaster";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { useIsAdmin } from "./hooks/use-admin";
+import { useSession } from "./hooks/use-session";
 import {
   Dialog,
   DialogContent,
@@ -18,14 +17,14 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { AspectRatio } from "@/components/ui/aspect-ratio"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Card, CardContent } from "@/components/ui/card"
-import { Calendar } from "@/components/ui/calendar"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Drawer,
   DrawerClose,
@@ -852,4 +851,3 @@ import {
   Accordion as AccordionNewNewNewNewNew,
   AccordionContent as AccordionContentNewNewNewNewNew,
   AccordionItem as AccordionItemNewNewNewNewNew,
-} from "@/components/ui/accordion"
