@@ -89,9 +89,16 @@ type FormValues = z.infer<typeof formSchema>;
 
 interface BookingFormNewProps {
   onSubmitComplete: (data: any, shipmentId: string, amount: number) => void;
+  customQuoteData?: {
+    id: string;
+    amount: number;
+    description: string;
+    specificItem?: string;
+    category?: string;
+  } | null;
 }
 
-const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => {
+const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, customQuoteData }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('sender');
   const [availableRoutes, setAvailableRoutes] = useState<{ route: string; pickupDate: string }[]>([]);
@@ -216,6 +223,25 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
     setAdditionalAddresses(newAddresses);
     form.setValue('additionalDeliveryAddresses', newAddresses.filter(addr => addr.trim() !== ''));
   };
+
+  // Use effect to prepopulate form if custom quote data is provided
+  useEffect(() => {
+    if (customQuoteData) {
+      form.setValue('includeOtherItems', true);
+      form.setValue('otherItemDescription', customQuoteData.description);
+      
+      if (customQuoteData.specificItem) {
+        form.setValue('specificItem', customQuoteData.specificItem);
+      }
+      
+      if (customQuoteData.category) {
+        form.setValue('itemCategory', customQuoteData.category);
+      }
+      
+      // Auto-select the payment tab
+      setActiveTab('payment');
+    }
+  }, [customQuoteData, form]);
 
   // Handle form submission
   const onSubmit = async (values: FormValues) => {
@@ -350,6 +376,12 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
 
   // Calculate total cost for the booking summary
   const calculateTotal = () => {
+    // If we have a custom quote, use its amount
+    if (customQuoteData?.amount) {
+      return customQuoteData.amount;
+    }
+    
+    // Otherwise calculate based on selections
     const values = form.getValues();
     let total = 0;
     
@@ -1010,39 +1042,54 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
                 <div className="border rounded-md p-4">
                   <h3 className="font-medium mb-4">Order Summary</h3>
                   
-                  {form.watch('includeDrums') && (
+                  {customQuoteData ? (
                     <div className="space-y-2">
                       <div className="flex justify-between">
-                        <span>Drums ({form.watch('drumQuantity') || '1'} × {
-                          parseInt(form.watch('drumQuantity') || '1') >= 5 ? '£260' : 
-                          parseInt(form.watch('drumQuantity') || '1') >= 2 ? '£270' : '£280'
-                        })</span>
-                        <span>£{
-                          parseInt(form.watch('drumQuantity') || '1') >= 5 ? 
-                            parseInt(form.watch('drumQuantity') || '1') * 260 : 
-                          parseInt(form.watch('drumQuantity') || '1') >= 2 ? 
-                            parseInt(form.watch('drumQuantity') || '1') * 270 : 280
-                        }</span>
+                        <span>Custom Quote - {customQuoteData.specificItem || customQuoteData.category || 'Special Item'}</span>
+                        <span>£{customQuoteData.amount.toFixed(2)}</span>
                       </div>
-                      
-                      {form.watch('wantMetalSeal') && (
-                        <div className="flex justify-between">
-                          <span>Metal Coded Seals ({form.watch('drumQuantity') || '1'} × £5)</span>
-                          <span>£{parseInt(form.watch('drumQuantity') || '1') * 5}</span>
+                      <div className="text-sm text-gray-500 mt-1">
+                        {customQuoteData.description.substring(0, 100)}
+                        {customQuoteData.description.length > 100 ? '...' : ''}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {form.watch('includeDrums') && (
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span>Drums ({form.watch('drumQuantity') || '1'} × {
+                              parseInt(form.watch('drumQuantity') || '1') >= 5 ? '£260' : 
+                              parseInt(form.watch('drumQuantity') || '1') >= 2 ? '£270' : '£280'
+                            })</span>
+                            <span>£{
+                              parseInt(form.watch('drumQuantity') || '1') >= 5 ? 
+                                parseInt(form.watch('drumQuantity') || '1') * 260 : 
+                              parseInt(form.watch('drumQuantity') || '1') >= 2 ? 
+                                parseInt(form.watch('drumQuantity') || '1') * 270 : 280
+                            }</span>
+                          </div>
+                          
+                          {form.watch('wantMetalSeal') && (
+                            <div className="flex justify-between">
+                              <span>Metal Coded Seals ({form.watch('drumQuantity') || '1'} × £5)</span>
+                              <span>£{parseInt(form.watch('drumQuantity') || '1') * 5}</span>
+                            </div>
+                          )}
                         </div>
                       )}
-                    </div>
-                  )}
-                  
-                  {form.watch('doorToDoor') && (
-                    <div className="flex justify-between mt-2">
-                      <span>Door-to-Door Delivery ({additionalAddresses.filter(a => a.trim() !== '').length || 1} address{additionalAddresses.filter(a => a.trim() !== '').length > 1 ? 'es' : ''})</span>
-                      <span>£{(additionalAddresses.filter(a => a.trim() !== '').length || 1) * 25}</span>
-                    </div>
-                  )}
-                  
-                  {!form.watch('includeDrums') && !form.watch('includeOtherItems') && (
-                    <div className="text-gray-500">No items selected yet</div>
+                      
+                      {form.watch('doorToDoor') && (
+                        <div className="flex justify-between mt-2">
+                          <span>Door-to-Door Delivery ({additionalAddresses.filter(a => a.trim() !== '').length || 1} address{additionalAddresses.filter(a => a.trim() !== '').length > 1 ? 'es' : ''})</span>
+                          <span>£{(additionalAddresses.filter(a => a.trim() !== '').length || 1) * 25}</span>
+                        </div>
+                      )}
+                      
+                      {!form.watch('includeDrums') && !form.watch('includeOtherItems') && (
+                        <div className="text-gray-500">No items selected yet</div>
+                      )}
+                    </>
                   )}
                   
                   <div className="border-t mt-4 pt-4">

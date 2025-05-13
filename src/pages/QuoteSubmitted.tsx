@@ -1,57 +1,97 @@
 
-import React, { useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
-import { CheckCircle2, ArrowRight } from 'lucide-react';
+import React from 'react';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { CheckCircle, ArrowRight, Clock } from 'lucide-react';
+
+interface QuoteData {
+  id: string;
+  description: string;
+  phone_number: string;
+  created_at: string;
+}
 
 const QuoteSubmitted = () => {
-  useEffect(() => {
-    document.title = 'Quote Submitted | UK to Zimbabwe Shipping';
-  }, []);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const quoteData = location.state?.quoteData as QuoteData;
   
+  // Format the date nicely
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-GB', {
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric'
+    });
+  };
+  
+  // Redirect if no quote data is available
+  React.useEffect(() => {
+    if (!quoteData) {
+      navigate('/custom-quote-new', { replace: true });
+    }
+  }, [quoteData, navigate]);
+  
+  if (!quoteData) {
+    return null;
+  }
+
   return (
-    <>
-      <Navbar />
-      
-      <main className="min-h-screen bg-gray-50 py-12 px-4">
-        <div className="container mx-auto max-w-4xl">
-          <div className="bg-white rounded-lg shadow-md p-6 md:p-10 text-center">
-            <div className="flex justify-center mb-6">
-              <div className="bg-green-50 border border-green-200 rounded-full p-3">
-                <CheckCircle2 className="h-12 w-12 text-green-500" />
-              </div>
-            </div>
-            
-            <h1 className="text-3xl md:text-4xl font-bold mb-4">Quote Request Received!</h1>
-            
-            <p className="text-gray-600 max-w-2xl mx-auto text-lg mb-8">
-              Thank you for submitting your quote request. Our team will review your details and get back to you shortly with a custom price for your shipment.
-            </p>
-            
-            <div className="bg-blue-50 border border-blue-100 rounded-md p-4 md:p-6 mb-8 max-w-lg mx-auto text-left">
-              <h3 className="font-semibold text-blue-800 mb-2">What happens next?</h3>
-              <ol className="list-decimal ml-5 space-y-2 text-blue-700">
-                <li>Our team will review your request within 24 hours.</li>
-                <li>You'll receive a price quote via phone or email.</li>
-                <li>Once you accept the quote, we'll arrange collection.</li>
-                <li>Your shipment will be on its way to Zimbabwe!</li>
-              </ol>
-            </div>
-            
-            <Link to="/">
-              <Button className="bg-zim-green hover:bg-zim-green/90">
-                Return to Home
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
+    <div className="container max-w-lg mx-auto py-10 px-4">
+      <Card>
+        <CardHeader className="text-center">
+          <div className="mx-auto bg-green-100 w-16 h-16 flex items-center justify-center rounded-full mb-4">
+            <CheckCircle className="h-8 w-8 text-green-600" />
           </div>
-        </div>
-      </main>
-      
-      <Footer />
-    </>
+          <CardTitle className="text-2xl">Quote Request Submitted!</CardTitle>
+          <CardDescription>
+            Your custom quote request was successfully received.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="border-t border-b py-4">
+            <h3 className="font-medium mb-2">Request Details:</h3>
+            <p className="text-sm text-gray-600 mb-1">
+              <strong>Reference ID:</strong> {quoteData.id.substring(0, 8)}
+            </p>
+            <p className="text-sm text-gray-600 mb-1">
+              <strong>Submitted:</strong> {formatDate(quoteData.created_at)}
+            </p>
+            <p className="text-sm text-gray-600 mb-1">
+              <strong>Contact Number:</strong> {quoteData.phone_number}
+            </p>
+            <p className="text-sm text-gray-600">
+              <strong>Description:</strong> {quoteData.description.substring(0, 100)}
+              {quoteData.description.length > 100 ? '...' : ''}
+            </p>
+          </div>
+          
+          <div className="bg-blue-50 p-4 rounded-md flex items-start">
+            <Clock className="h-5 w-5 text-blue-600 mr-3 mt-0.5" />
+            <div>
+              <h4 className="font-medium text-blue-800 mb-1">What happens next?</h4>
+              <p className="text-sm text-blue-700">
+                Our team will review your request and provide a quote within 24 hours.
+                You'll be notified when your quote is ready to view in your dashboard.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter className="flex flex-col space-y-3">
+          <Button 
+            className="w-full" 
+            onClick={() => navigate('/dashboard')}
+          >
+            Go to Dashboard
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+          <Link to="/" className="text-sm text-center text-gray-500 hover:text-gray-700">
+            Return to Home
+          </Link>
+        </CardFooter>
+      </Card>
+    </div>
   );
 };
 
