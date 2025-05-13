@@ -90,8 +90,11 @@ export type Database = {
           category: string | null
           created_at: string
           description: string
+          email: string | null
           id: string
           image_urls: string[]
+          name: string | null
+          payment_status: string | null
           phone_number: string
           quoted_amount: number | null
           recipient_details: Json | null
@@ -107,8 +110,11 @@ export type Database = {
           category?: string | null
           created_at?: string
           description: string
+          email?: string | null
           id?: string
           image_urls?: string[]
+          name?: string | null
+          payment_status?: string | null
           phone_number: string
           quoted_amount?: number | null
           recipient_details?: Json | null
@@ -124,8 +130,11 @@ export type Database = {
           category?: string | null
           created_at?: string
           description?: string
+          email?: string | null
           id?: string
           image_urls?: string[]
+          name?: string | null
+          payment_status?: string | null
           phone_number?: string
           quoted_amount?: number | null
           recipient_details?: Json | null
@@ -735,7 +744,13 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      custom_quote_status:
+        | "pending"
+        | "reviewed"
+        | "quoted"
+        | "accepted"
+        | "rejected"
+        | "paid"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -850,6 +865,15 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      custom_quote_status: [
+        "pending",
+        "reviewed",
+        "quoted",
+        "accepted",
+        "rejected",
+        "paid",
+      ],
+    },
   },
 } as const

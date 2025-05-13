@@ -10,3 +10,13 @@ export const generateUniqueId = (prefix?: string): string => {
   
   return prefix ? `${prefix}${uuid}` : uuid;
 };
+
+/**
+ * Safe function to get a fallback value if the provided value is null or undefined
+ * @param value The value to check
+ * @param fallback The fallback value to use if value is null or undefined
+ * @returns Either the original value or the fallback
+ */
+export const getFallbackValue = <T>(value: T | null | undefined, fallback: T): T => {
+  return value !== null && value !== undefined ? value : fallback;
+};

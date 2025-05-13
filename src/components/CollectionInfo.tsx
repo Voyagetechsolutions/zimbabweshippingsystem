@@ -4,6 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { PhoneIcon } from 'lucide-react';
 import { getRouteForPostalCode, getIrelandRouteForCity, restrictedPostalCodes } from '@/utils/postalCodeUtils';
 import { getDateByRoute, getDateForIrelandCity } from '@/data/collectionSchedule';
+import { generateUniqueId } from '@/utils/utils';
 
 interface CollectionInfoProps {
   country: string;
@@ -40,9 +41,9 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
         restricted = true;
         setIsRestricted(true);
         
-        // For restricted areas, set route and date to null
-        newRoute = null;
-        newCollectionDate = null;
+        // For restricted areas, provide fallback date instead of null
+        newRoute = "Restricted Route";
+        newCollectionDate = "Contact support for booking";
       } else {
         // Normal route determination for non-restricted areas
         newRoute = getRouteForPostalCode(postalCode);
@@ -60,24 +61,30 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
       }
     }
     
-    // If we couldn't determine a route and date based on inputs and it's not restricted, use fallbacks
-    if (!restricted && (!newRoute || !newCollectionDate)) {
+    // IMPORTANT: Always ensure we have a route and collection date
+    // If we couldn't determine a route and date based on inputs, use appropriate fallbacks
+    if (!newRoute) {
       if (country === 'England') {
         newRoute = "Default England Route";
-        newCollectionDate = "Next available collection date";
+        newCollectionDate = newCollectionDate || "Next available collection date";
         console.log("Using fallback route for England");
       } else if (country === 'Ireland') {
         newRoute = "Default Ireland Route";
-        newCollectionDate = "Next available collection date";
+        newCollectionDate = newCollectionDate || "Next available collection date";
         console.log("Using fallback route for Ireland");
       } else {
         newRoute = "Standard Route";
-        newCollectionDate = "Next available collection date";
+        newCollectionDate = newCollectionDate || "Next available collection date";
         console.log("Using standard fallback route");
       }
     }
+    
+    // Make sure collectionDate is never null
+    if (!newCollectionDate) {
+      newCollectionDate = "Next available collection date";
+    }
 
-    // Update state
+    // Update state with guaranteed values
     setRoute(newRoute);
     setCollectionDate(newCollectionDate);
     setIsDataReady(true);
@@ -86,8 +93,8 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
     if (onCollectionInfoReady) {
       console.log("Calling onCollectionInfoReady with:", { route: newRoute, collectionDate: newCollectionDate, restricted });
       onCollectionInfoReady({ 
-        route: restricted ? null : newRoute, 
-        collectionDate: restricted ? null : newCollectionDate 
+        route: restricted ? "Restricted Route" : newRoute, 
+        collectionDate: restricted ? "Contact support for booking" : newCollectionDate 
       });
     } else {
       console.warn("onCollectionInfoReady callback is not provided to CollectionInfo component");
@@ -111,24 +118,7 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
     );
   }
 
-  // Show an alert if we couldn't determine a specific route or collection date
-  if (!route || !collectionDate) {
-    return (
-      <Alert className="bg-amber-50 border-amber-200 mt-4">
-        <AlertTitle className="text-amber-800 font-semibold">Area Not Available</AlertTitle>
-        <AlertDescription className="text-amber-700">
-          <p>Your area is not available but will be considered.</p>
-          <p className="flex items-center mt-2">
-            Contact support to make a booking: 
-            <a href="tel:+353871954910" className="text-blue-600 font-semibold flex items-center ml-2">
-              <PhoneIcon className="h-4 w-4 mr-1" /> +353 871954910
-            </a>
-          </p>
-        </AlertDescription>
-      </Alert>
-    );
-  }
-
+  // Always show the collection information since we now guarantee route and date will have values
   return (
     <Alert className="bg-green-50 border-green-200 mt-4">
       <AlertTitle className="text-green-800 font-semibold">Collection Information</AlertTitle>
