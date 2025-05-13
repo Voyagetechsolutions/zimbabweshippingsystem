@@ -52,6 +52,22 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Could not fetch quote details');
     }
 
+    // Update the quote with the quoted amount and status
+    const { error: updateError } = await supabase
+      .from('custom_quotes')
+      .update({ 
+        quoted_amount: amount,
+        admin_notes: notes || null,
+        status: 'quoted',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', quoteId);
+
+    if (updateError) {
+      console.error('Error updating quote:', updateError);
+      throw new Error('Could not update the quote with the amount');
+    }
+
     // Use Brevo to send the email
     const brevoApiKey = Deno.env.get('BREVO_API_KEY');
     if (!brevoApiKey) {
@@ -90,6 +106,7 @@ const handler = async (req: Request): Promise<Response> => {
             <div style="background-color: #f9f9f9; border-left: 4px solid #4CAF50; padding: 15px; margin: 20px 0;">
               <h3 style="margin-top: 0; color: #333;">Quote Details</h3>
               <p><strong>Item Description:</strong> ${quoteData.description}</p>
+              <p><strong>Category:</strong> ${quoteData.category || 'Not specified'}</p>
               <p><strong>Quoted Amount:</strong> £${formattedAmount}</p>
               ${notes ? `<p><strong>Additional Notes:</strong> ${notes}</p>` : ''}
             </div>
@@ -111,7 +128,7 @@ const handler = async (req: Request): Promise<Response> => {
           </div>
           
           <div style="background-color: #333; color: #fff; padding: 15px; text-align: center; font-size: 12px;">
-            <p>© 2025 UK to Zimbabwe Shipping. All rights reserved.</p>
+            <p>© ${new Date().getFullYear()} UK to Zimbabwe Shipping. All rights reserved.</p>
             <p>Contact: info@uktozimbabweshipping.com | +44 123 456 7890</p>
           </div>
         </div>
@@ -134,6 +151,18 @@ const handler = async (req: Request): Promise<Response> => {
       console.error('Error from Brevo API:', brevoData);
       throw new Error(`Failed to send email: ${brevoData.message || 'Unknown error'}`);
     }
+
+    // Also create a notification for the user
+    await supabase
+      .from('notifications')
+      .insert({
+        user_id: quoteData.user_id,
+        title: 'Custom Quote Ready',
+        message: `Your custom quote for ${quoteData.category || 'item shipment'} is ready! Quoted amount: £${formattedAmount}`,
+        type: 'custom_quote',
+        related_id: quoteId,
+        is_read: false
+      });
 
     console.log('Email sent successfully:', brevoData);
 
