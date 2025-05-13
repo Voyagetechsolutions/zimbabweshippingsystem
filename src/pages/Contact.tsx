@@ -40,9 +40,11 @@ const Contact = () => {
                       <div>
                         <h3 className="font-semibold text-lg mb-1">Office Address</h3>
                         <p className="text-gray-600 dark:text-gray-300">
-                          Pastures Lodge Farm, Raunds Road<br />
-                          Chelveston, Wellingborough<br />
-                          Northamptonshire, NN9 6AA
+                          Pastures lodge farm<br/>
+Chelveston rd<br/>
+Wellingborough
+Northamptonshire
+NN96AA
                         </p>
                       </div>
                     </div>
