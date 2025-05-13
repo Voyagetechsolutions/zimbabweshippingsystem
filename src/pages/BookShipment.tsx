@@ -150,6 +150,26 @@ const BookShipment = () => {
     }
   };
 
+  const handleRequestCustomQuote = () => {
+    setCurrentStep(BookingStep.CUSTOM_QUOTE);
+    
+    // If we have form data from the main form, use it to pre-populate the custom quote form
+    const formData = {
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      // Add any other fields you want to pre-populate
+    };
+    
+    setBookingData(formData);
+    
+    toast({
+      title: "Custom Quote Request",
+      description: "Please provide details about your item for a custom shipping quote."
+    });
+  };
+
   const handleBackToForm = () => {
     setCurrentStep(BookingStep.FORM);
   };
@@ -273,7 +293,10 @@ const BookShipment = () => {
           </div>
           
           {currentStep === BookingStep.FORM ? (
-            <BookingFormNew onSubmitComplete={handleFormSubmit} />
+            <BookingFormNew 
+              onSubmitComplete={handleFormSubmit} 
+              onRequestCustomQuote={handleRequestCustomQuote}
+            />
           ) : currentStep === BookingStep.PAYMENT ? (
             <PaymentProcessor 
               bookingData={bookingData}

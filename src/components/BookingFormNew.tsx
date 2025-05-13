@@ -26,7 +26,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertCircle, CheckCircle2, Package, Ship, Info, User, Phone, FileBox, ClipboardList } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { getRouteForPostalCode, getIrelandRouteForCity, restrictedPostalCodes } from '@/utils/postalCodeUtils';
-import { Link } from 'react-router-dom';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 // Define the validation schema
@@ -89,9 +88,10 @@ type FormValues = z.infer<typeof formSchema>;
 
 interface BookingFormNewProps {
   onSubmitComplete: (data: any, shipmentId: string, amount: number) => void;
+  onRequestCustomQuote?: () => void; // Add new prop for custom quote request
 }
 
-const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => {
+const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onRequestCustomQuote }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('sender');
   const [availableRoutes, setAvailableRoutes] = useState<{ route: string; pickupDate: string }[]>([]);
@@ -962,21 +962,27 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete }) => 
                       )}
                       
                       <div className="flex flex-col space-y-4">
-                        <Link 
-                          to="/custom-quote"
-                          className="w-full"
+                        <Button 
+                          className="w-full" 
+                          variant="secondary"
+                          type="button"
+                          onClick={() => {
+                            if (onRequestCustomQuote) {
+                              onRequestCustomQuote();
+                            }
+                          }}
                         >
-                          <Button className="w-full" variant="secondary">
-                            Request Custom Quote for Other Items
-                          </Button>
-                        </Link>
+                          Request Custom Quote for Other Items
+                        </Button>
                         
-                        <Link
-                          to="/pricing"
+                        <Button
+                          type="button"
+                          variant="link"
                           className="text-blue-600 hover:underline text-center"
+                          onClick={() => window.open('/pricing', '_blank')}
                         >
                           View Items We Ship
-                        </Link>
+                        </Button>
                       </div>
                     </div>
                   </div>
