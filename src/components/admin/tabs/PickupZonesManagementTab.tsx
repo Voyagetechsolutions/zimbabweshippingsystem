@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -512,7 +511,7 @@ const PickupZonesManagementTab = () => {
         toast({
           title: 'No Customers',
           description: 'There are no customers to notify for this route.',
-          variant: 'warning',
+          variant: 'default',
         });
         return;
       }
@@ -522,7 +521,7 @@ const PickupZonesManagementTab = () => {
         toast({
           title: 'No Pickup Date',
           description: 'Please schedule a pickup date for this route first.',
-          variant: 'warning',
+          variant: 'default',
         });
         return;
       }
@@ -541,7 +540,7 @@ const PickupZonesManagementTab = () => {
         toast({
           title: 'No Emails Found',
           description: 'No valid email addresses found for customers in this route.',
-          variant: 'warning',
+          variant: 'default',
         });
         return;
       }
