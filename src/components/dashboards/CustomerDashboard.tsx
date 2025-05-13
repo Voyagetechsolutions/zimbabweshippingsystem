@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -12,7 +13,6 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/EmptyState';
 import html2pdf from 'html2pdf.js';
-import { CustomQuotesList } from '@/components/customer/CustomQuotesList';
 
 import { 
   PackageCheck, 
@@ -23,11 +23,7 @@ import {
   MapPin,
   User,
   Phone,
-  Mail,
-  CreditCard,
-  Bell,
-  FileBox,
-  Settings
+  Mail
 } from 'lucide-react';
 
 const CustomerDashboard: React.FC = () => {
@@ -263,36 +259,28 @@ const CustomerDashboard: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto p-4 md:p-6">
+    <div className="space-y-6">
       <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
       <p className="text-muted-foreground">
         Welcome back! Here you can see your shipments, receipts and manage your account.
       </p>
 
-      <Tabs defaultValue="shipments" className="mt-6">
-        <TabsList className="grid w-full grid-cols-1 md:grid-cols-5">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="mb-4">
           <TabsTrigger value="shipments" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
-            <span>Shipments</span>
+            <span>My Shipments</span>
           </TabsTrigger>
-          <TabsTrigger value="payments" className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4" />
-            <span>Payments</span>
+          <TabsTrigger value="receipts" className="flex items-center gap-2">
+            <ReceiptIcon className="h-4 w-4" />
+            <span>My Receipts</span>
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center gap-2">
-            <Bell className="h-4 w-4" />
-            <span>Notifications</span>
-          </TabsTrigger>
-          <TabsTrigger value="quotes" className="flex items-center gap-2">
-            <FileBox className="h-4 w-4" />
-            <span>Custom Quotes</span>
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            <span>Settings</span>
+          <TabsTrigger value="addresses" className="flex items-center gap-2">
+            <MapPin className="h-4 w-4" />
+            <span>Saved Addresses</span>
           </TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="shipments" className="space-y-4">
           <Card>
             <CardHeader>
@@ -351,12 +339,12 @@ const CustomerDashboard: React.FC = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        
-        <TabsContent value="payments" className="space-y-4">
+
+        <TabsContent value="receipts" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>My Payments</CardTitle>
-              <CardDescription>View and manage your payment history</CardDescription>
+              <CardTitle>My Receipts</CardTitle>
+              <CardDescription>View and download payment receipts</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoadingReceipts ? (
@@ -410,7 +398,7 @@ const CustomerDashboard: React.FC = () => {
               ) : (
                 <EmptyState 
                   icon={<ReceiptIcon className="h-12 w-12 text-gray-400" />}
-                  title="No Payments Yet"
+                  title="No Receipts Yet"
                   description="When you make a payment, your receipt will appear here"
                   action={
                     <Link to="/book-shipment">
@@ -422,158 +410,71 @@ const CustomerDashboard: React.FC = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        
-        <TabsContent value="notifications" className="space-y-4">
+
+        <TabsContent value="addresses" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Notifications</CardTitle>
-              <CardDescription>View and manage your notifications</CardDescription>
+              <CardTitle>Saved Addresses</CardTitle>
+              <CardDescription>Manage your saved addresses for faster checkout</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="bg-white p-4 rounded-lg shadow">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-medium">New Shipment</h4>
-                    <Badge variant="outline">Pending</Badge>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1">
-                        <PackageCheck className="h-4 w-4 text-gray-500" />
-                        <p className="text-sm">Tracking #: 12345678</p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <User className="h-4 w-4 text-gray-500" />
-                        <p className="text-sm">Sender: John Doe</p>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-start gap-1">
-                        <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
-                        <p className="text-sm">123 Main St, Anytown, USA</p>
-                      </div>
-                    </div>
-                  </div>
+              {isLoadingAddresses ? (
+                <div className="min-h-[200px] flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
                 </div>
-                <div className="bg-white p-4 rounded-lg shadow">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-medium">Payment Received</h4>
-                    <Badge variant="outline">Completed</Badge>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1">
-                        <ReceiptIcon className="h-4 w-4 text-gray-500" />
-                        <p className="text-sm">Receipt #12345678</p>
+              ) : addresses && addresses.length > 0 ? (
+                <div className="space-y-4">
+                  {addresses.map((address: any) => (
+                    <div key={address.id} className="bg-white p-4 rounded-lg shadow">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-medium">{address.address_name}</h4>
+                        {address.is_default && (
+                          <Badge variant="outline">Default</Badge>
+                        )}
                       </div>
-                      <div className="flex items-center gap-1">
-                        <User className="h-4 w-4 text-gray-500" />
-                        <p className="text-sm">Recipient: Jane Doe</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1">
+                            <User className="h-4 w-4 text-gray-500" />
+                            <p className="text-sm">{address.recipient_name}</p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Phone className="h-4 w-4 text-gray-500" />
+                            <p className="text-sm">{address.phone_number || 'No phone provided'}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-start gap-1">
+                            <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
+                            <p className="text-sm">
+                              {address.street_address}, {address.city}
+                              {address.state && `, ${address.state}`}
+                              {address.postal_code && ` ${address.postal_code}`}, 
+                              {address.country}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex justify-end space-x-2">
+                        <Link to={`/address-book?edit=${address.id}`}>
+                          <Button variant="outline" size="sm">Edit</Button>
+                        </Link>
                       </div>
                     </div>
-                    <div className="space-y-1">
-                      <div className="flex items-start gap-1">
-                        <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
-                        <p className="text-sm">456 Elm St, Anytown, USA</p>
-                      </div>
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="quotes" className="space-y-4">
-          <CustomQuotesList />
-        </TabsContent>
-        
-        <TabsContent value="settings" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Settings</CardTitle>
-              <CardDescription>Manage your account settings</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="bg-white p-4 rounded-lg shadow">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-medium">Profile</h4>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1">
-                        <User className="h-4 w-4 text-gray-500" />
-                        <p className="text-sm">Name: John Doe</p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Phone className="h-4 w-4 text-gray-500" />
-                        <p className="text-sm">Phone: 123-456-7890</p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Mail className="h-4 w-4 text-gray-500" />
-                        <p className="text-sm">Email: john.doe@example.com</p>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-start gap-1">
-                        <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
-                        <p className="text-sm">123 Main St, Anytown, USA</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-white p-4 rounded-lg shadow">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-medium">Address Book</h4>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1">
-                        <User className="h-4 w-4 text-gray-500" />
-                        <p className="text-sm">Name: Jane Doe</p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Phone className="h-4 w-4 text-gray-500" />
-                        <p className="text-sm">Phone: 098-765-4321</p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Mail className="h-4 w-4 text-gray-500" />
-                        <p className="text-sm">Email: jane.doe@example.com</p>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-start gap-1">
-                        <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
-                        <p className="text-sm">456 Elm St, Anytown, USA</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-white p-4 rounded-lg shadow">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-medium">Payment Methods</h4>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1">
-                        <CreditCard className="h-4 w-4 text-gray-500" />
-                        <p className="text-sm">Card Number: 1234-5678-9012-3456</p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <User className="h-4 w-4 text-gray-500" />
-                        <p className="text-sm">Name: John Doe</p>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex items-start gap-1">
-                        <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
-                        <p className="text-sm">123 Main St, Anytown, USA</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              ) : (
+                <EmptyState 
+                  icon={<MapPin className="h-12 w-12 text-gray-400" />}
+                  title="No Saved Addresses"
+                  description="Add addresses to your address book for faster checkout"
+                  action={
+                    <Link to="/address-book">
+                      <Button>Add Address</Button>
+                    </Link>
+                  }
+                />
+              )}
             </CardContent>
           </Card>
         </TabsContent>
