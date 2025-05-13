@@ -1,85 +1,133 @@
 
+# A string used to distinguish different Supabase projects on the same host. Defaults to the project ref.
 project_id = "oncsaunsqtekwwbzvvyh"
 
 [api]
 enabled = true
 port = 54321
 schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
 
 [db]
 port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 15
+max_client_conn = 100
+
+[realtime]
+enabled = true
+ip_version = "IPV6"
 
 [studio]
 enabled = true
 port = 54323
 api_url = "http://localhost"
 
+# Email testing server. Emails sent with the local dev setup are not actually sent - the
+# server will log the email message and you can view the emails in the server logs.
+[inbucket]
+enabled = true
+port = 54324
+smtp_port = 54325
+pop3_port = 54326
+
 [storage]
 enabled = true
+file_size_limit = "50MiB"
 
 [auth]
 enabled = true
-site_url = "http://localhost:5173"
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://127.0.0.1:3000", "http://localhost:5173", "http://127.0.0.1:5173"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
 
-[realtime]
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[auth.external.github]
 enabled = true
+client_id = ""
+secret = ""
+redirect_uri = "http://localhost:8000/auth/v1/callback"
 
-[[functions]]
-name = "create-payment"
+[auth.external.google]
+enabled = true
+client_id = ""
+secret = ""
+redirect_uri = "http://localhost:8000/auth/v1/callback"
+
+[auth.external.facebook]
+enabled = true
+client_id = ""
+secret = ""
+redirect_uri = "http://localhost:8000/auth/v1/callback"
+
+[analytics]
+enabled = false
+port = 54327
+vector_port = 54328
+backend = "postgres"
+[analytics.options]
+endpoint = "http://localhost:54327"
+
+# Configure one of the supported drivers (postgres, clickhouse or bigquery)
+[experimental.analytics.postgres]
+enabled = true
+connection_string = "postgres://supabase:supabase@localhost:54322/postgres"
+
+[functions.send-email]
 verify_jwt = true
 
-[[functions]]
-name = "create-paypal-payment"
+[functions.send-brevo-email]
 verify_jwt = true
 
-[[functions]]
-name = "create-shipment"
+[functions.create-payment]
 verify_jwt = true
 
-[[functions]]
-name = "email-receipt"
+[functions.create-paypal-payment]
 verify_jwt = true
 
-[[functions]]
-name = "enable-mfa"
+[functions.create-shipment]
 verify_jwt = true
 
-[[functions]]
-name = "generate-mfa-secret"
+[functions.email-receipt]
 verify_jwt = true
 
-[[functions]]
-name = "get-collection-schedules"
+[functions.enable-mfa]
+verify_jwt = true 
+
+[functions.generate-mfa-secret]
 verify_jwt = true
 
-[[functions]]
-name = "send-announcement-notification"
+[functions.get-collection-schedules]
 verify_jwt = true
 
-[[functions]]
-name = "send-brevo-email"
+[functions.send-announcement-notification]
 verify_jwt = true
 
-[[functions]]
-name = "send-email"
+[functions.send-support-notification]
 verify_jwt = true
 
-[[functions]]
-name = "send-quote-email"
+[functions.verify-mfa-code]
 verify_jwt = true
 
-[[functions]]
-name = "send-support-notification"
+[functions.verify-mfa-login]
 verify_jwt = true
 
-[[functions]]
-name = "verify-mfa-code"
+[functions.verify-payment]
 verify_jwt = true
 
-[[functions]]
-name = "verify-mfa-login"
-verify_jwt = true
-
-[[functions]]
-name = "verify-payment"
+[functions.send-quote-email]
 verify_jwt = true

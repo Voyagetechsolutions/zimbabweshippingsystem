@@ -32,8 +32,6 @@ import QuoteSubmitted from '@/pages/QuoteSubmitted';
 import TermsAndConditions from './pages/TermsAndConditions';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import ConfirmBooking from './pages/ConfirmBooking';
-import CustomQuoteRequest from './pages/CustomQuoteRequest';
-import CustomQuoteFormNew from './pages/CustomQuoteFormNew'; // Added the new page import
 
 // Components
 import { RequireAuth, RequireAdmin, RedirectIfAuthenticated, RequireRole } from './components/RouteGuard';
@@ -125,22 +123,6 @@ function App() {
                       element={
                         <RequireAuth>
                           <Notifications />
-                        </RequireAuth>
-                      }
-                    />
-                    <Route
-                      path="/custom-quote-request"
-                      element={
-                        <RequireAuth>
-                          <CustomQuoteRequest />
-                        </RequireAuth>
-                      }
-                    />
-                    <Route
-                      path="/custom-quote-form"
-                      element={
-                        <RequireAuth>
-                          <CustomQuoteFormNew />
                         </RequireAuth>
                       }
                     />

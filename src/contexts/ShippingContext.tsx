@@ -23,7 +23,6 @@ interface ShippingContextType {
   setSelectedCurrency: (currency: Currency) => void;
   convertPrice: (priceInGBP: number) => number;
   formatPrice: (price: number) => string;
-  calculateShippingCost: (country: string, postalCode: string, shipmentType: string, weight?: string) => number;
 }
 
 const ShippingContext = createContext<ShippingContextType | undefined>(undefined);
@@ -57,39 +56,6 @@ export function ShippingProvider({ children }: { children: React.ReactNode }) {
     return `${selectedCurrency.symbol}${price.toFixed(2)}`;
   };
 
-  // Calculate shipping cost based on destination and shipment type
-  const calculateShippingCost = (country: string, postalCode: string, shipmentType: string, weight?: string): number => {
-    // Base costs in GBP
-    const baseCosts = {
-      'drum': {
-        'England': 125,
-        'Ireland': 150,
-        'Zimbabwe': 250
-      },
-      'parcel': {
-        'England': 25,
-        'Ireland': 35,
-        'Zimbabwe': 75
-      }
-    };
-    
-    // Get the base cost or default to a reasonable value if not found
-    const baseShippingType = shipmentType === 'drum' ? 'drum' : 'parcel';
-    const baseCost = baseCosts[baseShippingType]?.[country] || 100;
-    
-    // For parcels, adjust by weight if provided
-    if (shipmentType === 'parcel' && weight) {
-      const weightNumber = parseFloat(weight);
-      if (!isNaN(weightNumber)) {
-        // £5 per kg additional fee for parcels over 2kg
-        const additionalWeight = Math.max(0, weightNumber - 2);
-        return baseCost + (additionalWeight * 5);
-      }
-    }
-    
-    return baseCost;
-  };
-
   return (
     <ShippingContext.Provider
       value={{
@@ -97,8 +63,7 @@ export function ShippingProvider({ children }: { children: React.ReactNode }) {
         selectedCurrency,
         setSelectedCurrency,
         convertPrice,
-        formatPrice,
-        calculateShippingCost
+        formatPrice
       }}
     >
       {children}

@@ -11,21 +11,16 @@ import { ChevronRight, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { Shipment } from '@/types/shipment';
 
-interface RecentShipmentsProps {
-  shipments?: Shipment[];
-  loading?: boolean;
-}
-
-export const RecentShipments = ({ shipments: providedShipments, loading: providedLoading }: RecentShipmentsProps = {}) => {
+export const RecentShipments = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const { data: fetchedShipments, isLoading: isFetching, refetch, isRefetching } = useQuery({
+  const { data: shipments, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['recentShipments', user?.id],
     queryFn: async () => {
-      if (!user?.id || providedShipments) {
+      if (!user?.id) {
+        console.error('No user ID available for fetching recent shipments');
         return [];
       }
       
@@ -44,13 +39,9 @@ export const RecentShipments = ({ shipments: providedShipments, loading: provide
       console.log('Fetched recent shipments:', data?.length);
       return data || [];
     },
-    enabled: !!user?.id && !providedShipments,
+    enabled: !!user?.id,
     refetchInterval: 60000, // Auto-refresh every minute
   });
-
-  // Use provided shipments if available, otherwise use fetched shipments
-  const shipmentData = providedShipments || fetchedShipments;
-  const isLoading = providedLoading !== undefined ? providedLoading : isFetching;
 
   const handleRefresh = async () => {
     try {
@@ -92,7 +83,7 @@ export const RecentShipments = ({ shipments: providedShipments, loading: provide
     );
   }
 
-  if (!shipmentData || shipmentData.length === 0) {
+  if (!shipments || shipments.length === 0) {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -150,7 +141,7 @@ export const RecentShipments = ({ shipments: providedShipments, loading: provide
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {shipmentData.map((shipment) => (
+          {shipments.map((shipment) => (
             <div key={shipment.id} className="flex items-center justify-between">
               <div>
                 <p className="font-medium text-sm">{shipment.tracking_number}</p>
