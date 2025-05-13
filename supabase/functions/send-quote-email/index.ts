@@ -1,99 +1,164 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Resend } from "npm:resend@2.0.0";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.43.0';
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 interface QuoteEmailRequest {
-  email: string;
-  phone_number: string; 
-  quoted_amount: number;
-  item_description: string;
-  admin_notes?: string;
+  quoteId: string;
+  amount: string | number;
+  notes?: string;
+  recipientEmail: string;
+  recipientName: string;
 }
 
-const handler = async (req: Request) => {
+const handler = async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { email, phone_number, quoted_amount, item_description, admin_notes }: QuoteEmailRequest = await req.json();
+    const { quoteId, amount, notes, recipientEmail, recipientName }: QuoteEmailRequest = await req.json();
 
-    if (!email) {
-      throw new Error("Email is required");
+    if (!quoteId || !amount || !recipientEmail) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Missing required fields: quoteId, amount, and recipientEmail are required" 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
     }
 
-    if (!quoted_amount) {
-      throw new Error("Quote amount is required");
+    // Get the quote details to include in the email
+    const { data: quoteData, error: quoteError } = await supabase
+      .from('custom_quotes')
+      .select('*')
+      .eq('id', quoteId)
+      .single();
+    
+    if (quoteError) {
+      console.error('Error fetching quote details:', quoteError);
+      throw new Error('Could not fetch quote details');
     }
 
-    console.log(`Sending custom quote email to ${email} for £${quoted_amount}`);
+    // Use Brevo to send the email
+    const brevoApiKey = Deno.env.get('BREVO_API_KEY');
+    if (!brevoApiKey) {
+      throw new Error('BREVO_API_KEY is not set');
+    }
 
-    const { data, error } = await resend.emails.send({
-      from: "Zimbabwe Shipping <noreply@zimbabweshipping.com>",
-      to: [email],
-      subject: "Your Custom Shipping Quote",
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
-          <h1 style="color: #4CAF50; font-size: 24px;">Your Custom Shipping Quote</h1>
-          <p>Dear Customer,</p>
-          <p>Thank you for requesting a custom shipping quote. We're pleased to provide you with the following quote:</p>
-          
-          <div style="background-color: #f8f8f8; padding: 15px; border-radius: 5px; margin: 20px 0;">
-            <h2 style="color: #333; font-size: 18px;">Quote Details</h2>
-            <p><strong>Item Description:</strong> ${item_description}</p>
-            <p><strong>Contact Number:</strong> ${phone_number}</p>
-            <p><strong>Quoted Amount:</strong> <span style="color: #4CAF50; font-size: 18px; font-weight: bold;">£${quoted_amount.toFixed(2)}</span></p>
-            ${admin_notes ? `<p><strong>Additional Information:</strong> ${admin_notes}</p>` : ''}
+    // Format the amount as a string with 2 decimal places if it's a number
+    const formattedAmount = typeof amount === 'number' 
+      ? amount.toFixed(2) 
+      : parseFloat(amount).toFixed(2);
+
+    // Prepare the email data for Brevo
+    const emailData = {
+      sender: {
+        name: "UK to Zimbabwe Shipping",
+        email: "info@uktozimbabweshipping.com"
+      },
+      to: [
+        {
+          email: recipientEmail,
+          name: recipientName
+        }
+      ],
+      subject: "Your Custom Shipping Quote is Ready",
+      htmlContent: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background-color: #f4f4f4; padding: 20px; text-align: center; border-bottom: 3px solid #4CAF50;">
+            <h1 style="color: #333;">Your Custom Quote is Ready</h1>
           </div>
           
-          <p>To proceed with this quote, please log in to your account on our website or contact us directly at the phone number below.</p>
-          <p>This quote is valid for 7 days from the date of this email.</p>
+          <div style="padding: 20px; background-color: #fff;">
+            <p>Hello ${recipientName},</p>
+            
+            <p>We're pleased to provide you with a custom quote for your shipping request:</p>
+            
+            <div style="background-color: #f9f9f9; border-left: 4px solid #4CAF50; padding: 15px; margin: 20px 0;">
+              <h3 style="margin-top: 0; color: #333;">Quote Details</h3>
+              <p><strong>Item Description:</strong> ${quoteData.description}</p>
+              <p><strong>Quoted Amount:</strong> £${formattedAmount}</p>
+              ${notes ? `<p><strong>Additional Notes:</strong> ${notes}</p>` : ''}
+            </div>
+            
+            <p>To proceed with this quote, please log in to your account and select the "Pay Quote" option in your dashboard.</p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${supabaseUrl}/auth/v1/authorize?provider=magiclink&redirect_to=${encodeURIComponent(`${req.headers.get('origin') || 'https://uktozimbabweshipping.com'}/dashboard?tab=quotes`)}" 
+                style="background-color: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;">
+                Log In to Your Account
+              </a>
+            </div>
+            
+            <p>If you have any questions about this quote, please don't hesitate to contact us.</p>
+            
+            <p>Thank you for choosing UK to Zimbabwe Shipping for your shipping needs.</p>
+            
+            <p style="margin-top: 30px;">Best regards,<br>The UK to Zimbabwe Shipping Team</p>
+          </div>
           
-          <div style="margin-top: 30px; border-top: 1px solid #e0e0e0; padding-top: 20px;">
-            <p style="color: #666; font-size: 14px;">
-              <strong>UK to Zimbabwe Shipping</strong><br>
-              Phone: +44 2071122233<br>
-              Email: contact@zimbabweshipping.com<br>
-              Website: <a href="https://zimbabweshipping.com" style="color: #4CAF50;">zimbabweshipping.com</a>
-            </p>
+          <div style="background-color: #333; color: #fff; padding: 15px; text-align: center; font-size: 12px;">
+            <p>© 2025 UK to Zimbabwe Shipping. All rights reserved.</p>
+            <p>Contact: info@uktozimbabweshipping.com | +44 123 456 7890</p>
           </div>
         </div>
-      `,
+      `
+    };
+
+    // Send the email via Brevo's API
+    const brevoResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": brevoApiKey
+      },
+      body: JSON.stringify(emailData)
     });
 
-    if (error) {
-      throw error;
+    const brevoData = await brevoResponse.json();
+
+    if (!brevoResponse.ok) {
+      console.error('Error from Brevo API:', brevoData);
+      throw new Error(`Failed to send email: ${brevoData.message || 'Unknown error'}`);
     }
 
+    console.log('Email sent successfully:', brevoData);
+
     return new Response(
-      JSON.stringify({
-        success: true,
+      JSON.stringify({ 
+        success: true, 
         message: "Quote email sent successfully",
-        data
+        messageId: brevoData.messageId
       }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
       }
     );
+
   } catch (error) {
-    console.error("Error sending quote email:", error);
+    console.error("Error in send-quote-email function:", error);
+    
     return new Response(
-      JSON.stringify({
-        success: false,
-        message: error instanceof Error ? error.message : "Unknown error"
+      JSON.stringify({ 
+        error: error.message || "Failed to send quote email" 
       }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
       }
     );
   }

@@ -1,26 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 // UI Components
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
-  CardDescription 
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
 import { 
   Table, 
   TableBody, 
@@ -29,61 +12,58 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardFooter, 
+  CardHeader, 
+  CardTitle 
+} from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Switch } from '@/components/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 // Icons
 import { 
   Search, 
-  RefreshCcw,
-  Filter,
-  Eye,
-  MapPin,
-  User,
+  RefreshCw, 
+  User, 
+  Mail, 
+  Phone, 
+  MapPin, 
   Package,
-  Phone,
-  Mail
+  MoreHorizontal,
+  UserPlus,
+  Send,
+  ExternalLink
 } from 'lucide-react';
 
-// Define the Json type to match Supabase's Json type
-type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
-
-// Define an extended profile type that includes is_active
-interface ExtendedProfile {
-  id: string;
-  full_name?: string;
-  email: string;
-  role?: string;
-  is_admin?: boolean;
-  is_active?: boolean;
-  created_at: string;
-  communication_preferences?: Json;
-  avatar_url?: string;
-  mfa_backup_codes?: string[];
-  mfa_enabled?: boolean;
-  mfa_secret?: string;
-  updated_at?: string;
-}
-
 const CustomerManagementTab = () => {
-  const { toast } = useToast();
-  const [customers, setCustomers] = useState<ExtendedProfile[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [viewingCustomer, setViewingCustomer] = useState<ExtendedProfile | null>(null);
-  const [customerShipments, setCustomerShipments] = useState<any[]>([]);
-  const [customerAddresses, setCustomerAddresses] = useState<any[]>([]);
-  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailContent, setEmailContent] = useState('');
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchCustomers();
@@ -92,428 +72,357 @@ const CustomerManagementTab = () => {
   const fetchCustomers = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // Fetch profiles from Supabase
+      const { data: profiles, error } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
-
+      
       if (error) throw error;
-
-      console.log('Customers fetched:', data);
-      // Cast the data to ExtendedProfile[] to ensure type compatibility
-      setCustomers(data as ExtendedProfile[] || []);
-    } catch (error: any) {
+      
+      // Fetch shipment counts for each customer
+      const enhancedProfiles = await Promise.all(
+        (profiles || []).map(async (profile) => {
+          const { count, error: countError } = await supabase
+            .from('shipments')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', profile.id);
+          
+          if (countError) {
+            console.error('Error fetching shipment count:', countError);
+            return { ...profile, shipmentCount: 0 };
+          }
+          
+          return { ...profile, shipmentCount: count || 0 };
+        })
+      );
+      
+      setCustomers(enhancedProfiles);
+    } catch (error) {
       console.error('Error fetching customers:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load customers: ' + error.message,
-        variant: 'destructive',
+        description: 'Failed to load customer data',
+        variant: 'destructive'
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchCustomerDetails = async (customerId: string) => {
-    setLoadingDetails(true);
-    try {
-      // Fetch customer's shipments
-      const { data: shipments, error: shipmentsError } = await supabase
-        .from('shipments')
-        .select('*')
-        .eq('user_id', customerId)
-        .order('created_at', { ascending: false });
-
-      if (shipmentsError) throw shipmentsError;
-
-      // Fetch customer's addresses
-      const { data: addresses, error: addressesError } = await supabase
-        .from('addresses')
-        .select('*')
-        .eq('user_id', customerId)
-        .order('created_at', { ascending: false });
-
-      if (addressesError) throw addressesError;
-
-      setCustomerShipments(shipments || []);
-      setCustomerAddresses(addresses || []);
-    } catch (error: any) {
-      console.error('Error fetching customer details:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load customer details: ' + error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setLoadingDetails(false);
-    }
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
   };
 
-  const toggleCustomerStatus = async (customerId: string, currentStatus: boolean | undefined) => {
-    try {
-      // For Supabase update operation, we need to specify the properties we want to update
-      // that match the expected profile structure in the database
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          is_active: !currentStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', customerId);
-
-      if (error) throw error;
-
-      toast({
-        title: 'Status Updated',
-        description: `Customer status has been ${!currentStatus ? 'activated' : 'suspended'}.`,
-      });
-
-      // Update the local state with the correct typing
-      setCustomers(prevCustomers => 
-        prevCustomers.map(customer => 
-          customer.id === customerId 
-            ? { ...customer, is_active: !currentStatus }
-            : customer
-        )
-      );
-    } catch (error: any) {
-      console.error('Error updating customer status:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update customer status: ' + error.message,
-        variant: 'destructive',
-      });
-    }
-  };
-
-  // Filter customers based on search and status filter
   const filteredCustomers = customers.filter(customer => {
-    const matchesSearch = 
-      searchQuery === '' ||
-      customer.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      customer.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      customer.id?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = 
-      statusFilter === 'all' ||
-      (statusFilter === 'active' && customer.is_active !== false) ||
-      (statusFilter === 'suspended' && customer.is_active === false);
-    
-    return matchesSearch && matchesStatus;
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      (customer.full_name && customer.full_name.toLowerCase().includes(searchLower)) ||
+      (customer.email && customer.email.toLowerCase().includes(searchLower))
+    );
   });
 
-  // Helper function to render status badge
-  const renderStatusBadge = (isActive: boolean | undefined) => {
-    if (isActive === false) {
-      return <Badge variant="destructive">Suspended</Badge>;
-    }
-    return <Badge variant="secondary">Active</Badge>; // Changed from "success" to "secondary"
+  const viewCustomerDetails = (customer: any) => {
+    setSelectedCustomer(customer);
+    setShowDetailsDialog(true);
   };
 
-  // Helper function to safely extract phone number from JSON
-  const getPhoneNumber = (preferences: Json | undefined): string => {
-    if (!preferences) return 'N/A';
-    
-    if (typeof preferences === 'object' && preferences !== null && 'phone' in preferences) {
-      return preferences.phone as string || 'N/A';
+  const emailCustomer = (customer: any) => {
+    setSelectedCustomer(customer);
+    setEmailSubject('');
+    setEmailContent(`Dear ${customer.full_name || 'Valued Customer'},
+
+`);
+    setShowEmailDialog(true);
+  };
+
+  const sendEmail = async () => {
+    if (!selectedCustomer || !selectedCustomer.email) {
+      toast({
+        title: 'Error',
+        description: 'No email address available for this customer',
+        variant: 'destructive'
+      });
+      return;
     }
     
-    return 'N/A';
+    try {
+      // Use the brevo edge function to send the email
+      await supabase.functions.invoke('send-brevo-email', {
+        body: {
+          to: selectedCustomer.email,
+          name: selectedCustomer.full_name || 'Valued Customer',
+          subject: emailSubject,
+          content: emailContent,
+          templateId: 1 // Use a default template ID
+        }
+      });
+      
+      toast({
+        title: 'Success',
+        description: `Email sent to ${selectedCustomer.email}`
+      });
+      
+      setShowEmailDialog(false);
+    } catch (error) {
+      console.error('Error sending email:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to send email',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const getRoleColor = (role: string) => {
+    switch (role?.toLowerCase()) {
+      case 'admin':
+        return 'bg-red-500 hover:bg-red-600';
+      case 'customer':
+        return 'bg-blue-500 hover:bg-blue-600';
+      case 'driver':
+        return 'bg-green-500 hover:bg-green-600';
+      case 'logistics':
+        return 'bg-purple-500 hover:bg-purple-600';
+      case 'support':
+        return 'bg-yellow-500 hover:bg-yellow-600';
+      default:
+        return 'bg-gray-500 hover:bg-gray-600';
+    }
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Customer Management</CardTitle>
-        <CardDescription>
-          View and manage all customer accounts
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Search and Filter Controls */}
-        <div className="flex flex-col md:flex-row gap-4 items-end">
-          <div className="relative flex-grow">
-            <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold">Customer Management</h2>
+          <p className="text-muted-foreground">
+            Manage and communicate with your customers
+          </p>
+        </div>
+        <div className="flex w-full sm:w-auto gap-2">
+          <div className="relative w-full sm:w-auto">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name, email, phone..."
-              className="pl-10"
+              placeholder="Search customers..."
+              className="w-full sm:w-[250px] pl-8"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={handleSearch}
             />
           </div>
-          
-          <div className="flex gap-2">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[160px]">
-                <Filter className="h-4 w-4 mr-2" />
-                <span>Status</span>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Customers</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="suspended">Suspended</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Button variant="outline" onClick={fetchCustomers}>
-              <RefreshCcw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-          </div>
+          <Button variant="outline" size="icon" onClick={fetchCustomers}>
+            <RefreshCw className="h-4 w-4" />
+          </Button>
         </div>
-        
-        {/* Customers Table */}
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-          </div>
-        ) : filteredCustomers.length === 0 ? (
-          <div className="text-center py-8">
-            <User className="h-16 w-16 mx-auto text-muted-foreground mb-2" />
-            <h3 className="text-lg font-medium">No customers found</h3>
-            <p className="text-muted-foreground">Try adjusting your filters</p>
-          </div>
-        ) : (
-          <div className="border rounded-md overflow-hidden">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Full Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredCustomers.map(customer => {
-                    const phoneNumber = getPhoneNumber(customer.communication_preferences);
-                    
-                    return (
-                      <TableRow key={customer.id}>
-                        <TableCell>
-                          {customer.full_name || 'N/A'}
-                        </TableCell>
-                        <TableCell>{customer.email}</TableCell>
-                        <TableCell>{phoneNumber}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="capitalize">
-                            {customer.role || 'customer'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {renderStatusBadge(customer.is_active)}
-                        </TableCell>
-                        <TableCell>
-                          {format(new Date(customer.created_at), 'dd MMM yyyy')}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => {
-                                setViewingCustomer(customer);
-                                fetchCustomerDetails(customer.id);
-                              }}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Switch
-                              checked={customer.is_active !== false}
-                              onCheckedChange={() => toggleCustomerStatus(customer.id, customer.is_active)}
-                            />
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        )}
-        
-        <div className="text-sm text-muted-foreground mt-2">
-          Showing {filteredCustomers.length} of {customers.length} customers
-        </div>
-      </CardContent>
+      </div>
 
-      {/* View Customer Details Dialog */}
-      {viewingCustomer && (
-        <Dialog open={!!viewingCustomer} onOpenChange={(open) => !open && setViewingCustomer(null)}>
-          <DialogContent className="max-w-[700px]">
-            <DialogHeader>
-              <DialogTitle>Customer Details</DialogTitle>
-              <DialogDescription>
-                {viewingCustomer.full_name || viewingCustomer.email}
-              </DialogDescription>
-            </DialogHeader>
-            
+      {loading ? (
+        <div className="flex justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
+        </div>
+      ) : filteredCustomers.length > 0 ? (
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Shipments</TableHead>
+                <TableHead>Joined</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredCustomers.map((customer) => (
+                <TableRow key={customer.id}>
+                  <TableCell className="font-medium">
+                    {customer.full_name || 'Not specified'}
+                  </TableCell>
+                  <TableCell>{customer.email}</TableCell>
+                  <TableCell>
+                    <Badge className={getRoleColor(customer.role)}>
+                      {customer.role || 'Customer'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{customer.shipmentCount}</TableCell>
+                  <TableCell>
+                    {new Date(customer.created_at).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => viewCustomerDetails(customer)}
+                      >
+                        <User className="mr-1 h-4 w-4" />
+                        Details
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => emailCustomer(customer)}
+                      >
+                        <Mail className="mr-1 h-4 w-4" />
+                        Email
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <User className="h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-center text-muted-foreground mb-4">
+              {searchQuery
+                ? 'No customers found matching your search'
+                : 'No customers available'}
+            </p>
+            {searchQuery && (
+              <Button variant="outline" onClick={() => setSearchQuery('')}>
+                Clear search
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Customer Details Dialog */}
+      <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Customer Details</DialogTitle>
+            <DialogDescription>
+              View detailed information for this customer
+            </DialogDescription>
+          </DialogHeader>
+          {selectedCustomer && (
             <div className="space-y-6 py-4">
-              {/* Basic Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">Full Name</h3>
-                  <p>{viewingCustomer.full_name || 'N/A'}</p>
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <User className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">Full Name</p>
+                    <p>{selectedCustomer.full_name || 'Not specified'}</p>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">Email</h3>
-                  <p>{viewingCustomer.email}</p>
+                <div className="flex items-center gap-2">
+                  <Mail className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">Email</p>
+                    <p>{selectedCustomer.email}</p>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">Role</h3>
-                  <Badge variant="outline" className="capitalize">
-                    {viewingCustomer.role || 'customer'}
+                <div className="flex items-center gap-2">
+                  <Badge className={getRoleColor(selectedCustomer.role)}>
+                    {selectedCustomer.role || 'Customer'}
                   </Badge>
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">Status</h3>
-                  {renderStatusBadge(viewingCustomer.is_active)}
+                  {selectedCustomer.is_admin && (
+                    <Badge variant="outline">Admin</Badge>
+                  )}
                 </div>
               </div>
               
-              {/* Tabs for Shipments and Addresses */}
-              <Tabs defaultValue="shipments">
-                <TabsList>
-                  <TabsTrigger value="shipments" className="flex items-center gap-2">
-                    <Package className="h-4 w-4" />
-                    <span>Shipment History</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="addresses" className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    <span>Address History</span>
-                  </TabsTrigger>
-                </TabsList>
-                
-                {/* Shipments Tab */}
-                <TabsContent value="shipments" className="mt-4">
-                  {loadingDetails ? (
-                    <div className="flex justify-center py-6">
-                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+              <div className="border-t pt-4">
+                <p className="text-sm font-medium mb-2">Account Information</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Joined</p>
+                    <p>{new Date(selectedCustomer.created_at).toLocaleDateString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Shipments</p>
+                    <p>{selectedCustomer.shipmentCount}</p>
+                  </div>
+                </div>
+              </div>
+              
+              {selectedCustomer.communication_preferences && (
+                <div className="border-t pt-4">
+                  <p className="text-sm font-medium mb-2">Communication Preferences</p>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Email</p>
+                      <p>{selectedCustomer.communication_preferences.email ? 'Enabled' : 'Disabled'}</p>
                     </div>
-                  ) : customerShipments.length === 0 ? (
-                    <div className="text-center py-6">
-                      <Package className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-                      <h3 className="text-base font-medium">No shipments found</h3>
-                      <p className="text-sm text-muted-foreground">
-                        This customer has not created any shipments yet.
-                      </p>
+                    <div>
+                      <p className="text-sm text-muted-foreground">SMS</p>
+                      <p>{selectedCustomer.communication_preferences.sms ? 'Enabled' : 'Disabled'}</p>
                     </div>
-                  ) : (
-                    <div className="border rounded-md overflow-hidden">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Tracking #</TableHead>
-                            <TableHead>Origin</TableHead>
-                            <TableHead>Destination</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Created</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {customerShipments.map(shipment => (
-                            <TableRow key={shipment.id}>
-                              <TableCell className="font-mono text-sm">
-                                {shipment.tracking_number}
-                              </TableCell>
-                              <TableCell className="max-w-[150px] truncate">
-                                {shipment.origin}
-                              </TableCell>
-                              <TableCell className="max-w-[150px] truncate">
-                                {shipment.destination}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline">{shipment.status}</Badge>
-                              </TableCell>
-                              <TableCell>
-                                {format(new Date(shipment.created_at), 'dd MMM yyyy')}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Push</p>
+                      <p>{selectedCustomer.communication_preferences.push ? 'Enabled' : 'Disabled'}</p>
                     </div>
-                  )}
-                </TabsContent>
-                
-                {/* Addresses Tab */}
-                <TabsContent value="addresses" className="mt-4">
-                  {loadingDetails ? (
-                    <div className="flex justify-center py-6">
-                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-                    </div>
-                  ) : customerAddresses.length === 0 ? (
-                    <div className="text-center py-6">
-                      <MapPin className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-                      <h3 className="text-base font-medium">No addresses found</h3>
-                      <p className="text-sm text-muted-foreground">
-                        This customer has not saved any addresses yet.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {customerAddresses.map(address => (
-                        <Card key={address.id}>
-                          <CardHeader className="pb-2">
-                            <div className="flex justify-between items-center">
-                              <CardTitle className="text-base">
-                                {address.address_name || 'Address'}
-                              </CardTitle>
-                              {address.is_default && (
-                                <Badge>Default</Badge>
-                              )}
-                            </div>
-                          </CardHeader>
-                          <CardContent className="space-y-2">
-                            <div className="flex items-start gap-2">
-                              <User className="h-4 w-4 text-muted-foreground mt-0.5" />
-                              <div>{address.recipient_name}</div>
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-                              <div>{address.street_address}, {address.city}{address.state ? `, ${address.state}` : ''}, {address.postal_code}, {address.country}</div>
-                            </div>
-                            {address.phone_number && (
-                              <div className="flex items-start gap-2">
-                                <Phone className="h-4 w-4 text-muted-foreground mt-0.5" />
-                                <div>{address.phone_number}</div>
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
+                  </div>
+                </div>
+              )}
             </div>
-            
-            <DialogFooter>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  const email = viewingCustomer.email;
-                  if (email) {
-                    window.location.href = `mailto:${email}`;
-                  }
-                }}
-              >
-                <Mail className="h-4 w-4 mr-2" />
-                Email Customer
-              </Button>
-              <Button onClick={() => setViewingCustomer(null)}>
-                Close
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-    </Card>
+          )}
+          <DialogFooter className="flex justify-between">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowDetailsDialog(false)}
+            >
+              Close
+            </Button>
+            <Button onClick={() => {
+              setShowDetailsDialog(false);
+              emailCustomer(selectedCustomer);
+            }}>
+              <Mail className="mr-2 h-4 w-4" />
+              Email Customer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Email Dialog */}
+      <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Email Customer</DialogTitle>
+            <DialogDescription>
+              {selectedCustomer?.email
+                ? `Send an email to ${selectedCustomer.email}`
+                : 'Compose an email to this customer'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Subject</label>
+              <Input
+                placeholder="Email subject"
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Message</label>
+              <textarea
+                className="w-full h-48 p-2 border rounded-md resize-none"
+                placeholder="Type your message here..."
+                value={emailContent}
+                onChange={(e) => setEmailContent(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEmailDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={sendEmail} disabled={!emailSubject || !emailContent}>
+              <Send className="mr-2 h-4 w-4" />
+              Send Email
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 };
 
