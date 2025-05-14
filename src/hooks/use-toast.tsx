@@ -3,7 +3,7 @@ import * as React from "react";
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast";
 
 const TOAST_LIMIT = 5;
-const TOAST_REMOVE_DELAY = 1000000;
+const TOAST_REMOVE_DELAY = 5000;
 
 type ToasterToast = ToastProps & {
   id: string;
@@ -138,10 +138,10 @@ function useToast() {
   }, [state.toasts]);
 
   const toast = React.useMemo(() => {
-    const baseToast = (props: ToastProps) => {
+    const baseToast = (props: Omit<ToasterToast, "id">) => {
       const id = genId();
 
-      const update = (props: ToastProps) =>
+      const update = (props: ToasterToast) =>
         dispatch({
           type: "UPDATE_TOAST",
           toast: { ...props, id },
@@ -207,14 +207,14 @@ function useToast() {
 }
 
 export type { ToastActionElement, ToastProps };
-export { useToast, toast };
+export { useToast };
 
-export type ToastMethod = typeof useToast extends () => { toast: infer T } ? T : never;
+export type ToastMethod = ReturnType<typeof useToast>["toast"];
 export interface ToastAPI {
   toast: ToastMethod;
   toasts: ToasterToast[];
   dismiss: (toastId?: string) => void;
 }
 
-// For direct import - to allow consistent usage
 const { toast } = useToast();
+export { toast };

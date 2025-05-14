@@ -9,7 +9,7 @@ const GalleryPage = () => {
     <>
       <Navbar />
       <main className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-6">Our Gallery</h1>
+        <h1 className="text-3xl font-bold mb-6">Gallery</h1>
         <ShippingGallerySlideshow />
       </main>
       <Footer />
