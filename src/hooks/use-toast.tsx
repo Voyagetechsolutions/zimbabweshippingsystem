@@ -114,7 +114,22 @@ const reducer = (state: State, action: Action): State => {
   }
 };
 
-function useToast() {
+// Create a React context for toast
+type ToastContextValue = {
+  toast: ToastMethod;
+  toasts: ToasterToast[];
+  dismiss: (toastId?: string) => void;
+};
+
+const ToastContext = React.createContext<ToastContextValue | undefined>(
+  undefined
+);
+
+export function ToastProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [state, dispatch] = React.useReducer(reducer, {
     toasts: [],
   });
@@ -194,27 +209,29 @@ function useToast() {
     return baseToast;
   }, [dispatch]);
 
-  return {
-    toast,
-    toasts: state.toasts,
-    dismiss: React.useCallback(
-      (toastId?: string) => {
-        dispatch({ type: "DISMISS_TOAST", toastId });
-      },
-      [dispatch]
-    ),
-  };
+  const dismiss = React.useCallback((toastId?: string) => {
+    dispatch({ type: "DISMISS_TOAST", toastId });
+  }, [dispatch]);
+
+  return (
+    <ToastContext.Provider value={{ toast, toasts: state.toasts, dismiss }}>
+      {children}
+    </ToastContext.Provider>
+  );
 }
 
-export type { ToastActionElement, ToastProps };
-export { useToast };
+// Create a custom hook to use toast context
+export function useToast() {
+  const context = React.useContext(ToastContext);
+  
+  if (context === undefined) {
+    throw new Error("useToast must be used within a ToastProvider");
+  }
+  
+  return context;
+}
 
 export type ToastMethod = ReturnType<typeof useToast>["toast"];
-export interface ToastAPI {
-  toast: ToastMethod;
-  toasts: ToasterToast[];
-  dismiss: (toastId?: string) => void;
-}
+export type ToastAPI = ReturnType<typeof useToast>;
 
-const { toast } = useToast();
-export { toast };
+export type { ToastActionElement, ToastProps };
