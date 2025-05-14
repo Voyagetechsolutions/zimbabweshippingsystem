@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -258,7 +259,7 @@ const BookShipment = () => {
         description: "We'll contact you shortly with a price for your shipment.",
       });
       
-      // Fix the Promise chain issue by using try/catch instead
+      // Fix the promise handling by using try-catch for the nested promise
       try {
         await supabase.from('notifications').insert({
           user_id: user?.id || bookingData.user_id || '00000000-0000-0000-0000-000000000000',
