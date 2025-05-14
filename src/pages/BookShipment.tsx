@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import BookingFormNew from '@/components/BookingFormNew';
@@ -20,7 +20,41 @@ const BookShipment = () => {
   const [bookingData, setBookingData] = useState<any>(null);
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
+
+  // Check if we're coming from a custom quote
+  useEffect(() => {
+    if (location.state?.quoteData) {
+      const { quoteData } = location.state;
+      
+      // Pre-populate booking data with quote information
+      setBookingData({
+        customQuote: quoteData,
+        firstName: quoteData.name?.split(' ')[0] || '',
+        lastName: quoteData.name?.split(' ').slice(1).join(' ') || '',
+        email: quoteData.email || '',
+        phone: quoteData.phone_number || '',
+        specificItem: quoteData.specific_item || '',
+        otherItemDescription: quoteData.description || '',
+        itemCategory: quoteData.category || '',
+        includeOtherItems: true,
+        shipmentType: 'other',
+        paymentMethod: 'card',
+        senderDetails: quoteData.sender_details || {
+          name: quoteData.name,
+          email: quoteData.email,
+          phone: quoteData.phone_number
+        }
+      });
+      
+      // If it has a quoted amount, set the payment step
+      if (quoteData.quoted_amount) {
+        setTotalAmount(quoteData.quoted_amount);
+        setCurrentStep(BookingStep.PAYMENT);
+      }
+    }
+  }, [location.state]);
 
   useEffect(() => {
     document.title = 'Book a Shipment | UK Shipping Service';
@@ -197,12 +231,17 @@ const BookShipment = () => {
         }
       }
       
+      const { data: { user } } = await supabase.auth.getUser();
+      
       const { data, error } = await supabase.from('custom_quotes').insert({
-        user_id: bookingData.user_id,
+        user_id: user?.id || bookingData.user_id,
         shipment_id: shipmentUuid,
-        phone_number: customQuoteData.phoneNumber || bookingData.senderDetails.phone,
-        description: customQuoteData.description || bookingData.shipmentDetails.description,
-        category: customQuoteData.category || bookingData.shipmentDetails.category,
+        name: customQuoteData.name,
+        email: customQuoteData.email,
+        phone_number: customQuoteData.phoneNumber || bookingData.senderDetails?.phone,
+        description: customQuoteData.description || bookingData.shipmentDetails?.description,
+        category: customQuoteData.category || bookingData.shipmentDetails?.category,
+        specific_item: customQuoteData.specificItem || bookingData.shipmentDetails?.specificItem,
         image_urls: customQuoteData.imageUrls || [],
         status: 'pending',
         sender_details: bookingData.senderDetails,
@@ -217,7 +256,7 @@ const BookShipment = () => {
       });
       
       await supabase.from('notifications').insert({
-        user_id: bookingData.user_id || '00000000-0000-0000-0000-000000000000',
+        user_id: user?.id || bookingData.user_id || '00000000-0000-0000-0000-000000000000',
         title: 'New Custom Quote Request',
         message: `A new custom quote request has been submitted for: ${customQuoteData.specificItem || customQuoteData.description}`,
         type: 'custom_quote',
@@ -254,7 +293,23 @@ const BookShipment = () => {
     };
     setBookingData(updatedBookingData);
     
-    if (bookingData.shipmentDetails.includeOtherItems) {
+    // If this came from a custom quote that was already quoted, update its status
+    if (bookingData.customQuote?.id) {
+      supabase.from('custom_quotes')
+        .update({ 
+          status: 'paid',
+          payment_status: 'paid'
+        })
+        .eq('id', bookingData.customQuote.id)
+        .then(() => {
+          console.log('Updated custom quote status to paid');
+        })
+        .catch(err => {
+          console.error('Error updating custom quote status:', err);
+        });
+    }
+    
+    if (bookingData.shipmentDetails?.includeOtherItems) {
       setCurrentStep(BookingStep.CUSTOM_QUOTE);
     } else {
       navigate('/receipt', { 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -13,6 +12,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/EmptyState';
 import html2pdf from 'html2pdf.js';
+import CustomQuotesTab from '@/components/customer/CustomQuotesTab';
 
 import { 
   PackageCheck, 
@@ -23,7 +23,8 @@ import {
   MapPin,
   User,
   Phone,
-  Mail
+  Mail,
+  FileText
 } from 'lucide-react';
 
 const CustomerDashboard: React.FC = () => {
@@ -275,6 +276,10 @@ const CustomerDashboard: React.FC = () => {
             <ReceiptIcon className="h-4 w-4" />
             <span>My Receipts</span>
           </TabsTrigger>
+          <TabsTrigger value="quotes" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            <span>Custom Quotes</span>
+          </TabsTrigger>
           <TabsTrigger value="addresses" className="flex items-center gap-2">
             <MapPin className="h-4 w-4" />
             <span>Saved Addresses</span>
@@ -407,6 +412,18 @@ const CustomerDashboard: React.FC = () => {
                   }
                 />
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="quotes" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Custom Quotes</CardTitle>
+              <CardDescription>View and manage your custom shipping quote requests</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CustomQuotesTab />
             </CardContent>
           </Card>
         </TabsContent>
