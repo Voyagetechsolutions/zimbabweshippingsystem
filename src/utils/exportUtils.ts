@@ -1,5 +1,5 @@
 import { formatDate } from 'date-fns';
-import type { ToastMethod } from '@/hooks/use-toast';
+import { type ToastAPI } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -19,7 +19,7 @@ interface Shipment {
 /**
  * Exports shipment data to CSV format
  */
-export const exportToCsv = async (data: Shipment[], toast: ToastMethod): Promise<void> => {
+export const exportToCsv = async (data: Shipment[], toast: ToastAPI['toast']): Promise<void> => {
   // Convert data to CSV
   const headers = [
     'Tracking Number',
@@ -69,7 +69,7 @@ export const exportToCsv = async (data: Shipment[], toast: ToastMethod): Promise
 /**
  * Exports shipment data to PDF format
  */
-export const exportToPdf = async (data: Shipment[], toast: ToastMethod): Promise<void> => {
+export const exportToPdf = async (data: Shipment[], toast: ToastAPI['toast']): Promise<void> => {
   // For PDF, we need to dynamically import html2pdf
   const html2pdf = await import('html2pdf.js');
   
@@ -190,7 +190,7 @@ export const exportToPdf = async (data: Shipment[], toast: ToastMethod): Promise
 /**
  * Exports an HTML element to PDF
  */
-export const exportElementToPdf = async (element: HTMLElement, filename: string, toast: ToastMethod): Promise<void> => {
+export const exportElementToPdf = async (element: HTMLElement, filename: string, toast: ToastAPI['toast']): Promise<void> => {
   try {
     const canvas = await html2canvas(element, {
       scale: 2,
