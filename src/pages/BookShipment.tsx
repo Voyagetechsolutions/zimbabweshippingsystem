@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -255,16 +254,9 @@ const BookShipment = () => {
     };
     setBookingData(updatedBookingData);
     
-    if (bookingData.shipmentDetails.includeOtherItems) {
+    if (bookingData.shipmentDetails.includeOtherItems && !updatedBookingData.customQuoteRequested) {
       setCurrentStep(BookingStep.CUSTOM_QUOTE);
-    } else {
-      navigate('/receipt', { 
-        state: { 
-          bookingData: updatedBookingData,
-          paymentData
-        }
-      });
-    }
+    } 
   };
 
   return (

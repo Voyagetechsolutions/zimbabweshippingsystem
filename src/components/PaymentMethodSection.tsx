@@ -120,10 +120,10 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
         recipientDetails: enhancedRecipientDetails
       });
       
-      // Call the parent component's onComplete handler
+      // Call the parent component's onComplete handler with payment data
       await onComplete(paymentData);
       
-      // Navigate to confirmation page with all the necessary data
+      // Navigate directly to the confirm-booking route
       navigate('/confirm-booking', { 
         state: { 
           bookingData: finalBookingData,
