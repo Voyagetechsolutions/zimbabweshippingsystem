@@ -61,11 +61,6 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
           // Use the improved getDateForIrelandCity function which always returns a string now
           newCollectionDate = getDateForIrelandCity(normalizedCity);
           console.log("Retrieved Ireland route and date:", { newRoute, newCollectionDate });
-        } else {
-          // If no specific route found for the city, use a default Ireland route
-          newRoute = "Default Ireland Route";
-          newCollectionDate = "Next available collection date";
-          console.log("No specific route found for Ireland city, using default");
         }
       }
     } catch (error) {
@@ -82,25 +77,23 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
     if (!newRoute) {
       if (country === 'England') {
         newRoute = "Default England Route";
-        newCollectionDate = "Next available collection date";
+        newCollectionDate = newCollectionDate || "Next available collection date";
         console.log("Using fallback route for England");
       } else if (country === 'Ireland') {
         newRoute = "Default Ireland Route";
-        newCollectionDate = "Next available collection date";
+        newCollectionDate = newCollectionDate || "Next available collection date";
         console.log("Using fallback route for Ireland");
       } else {
         newRoute = "Standard Route";
-        newCollectionDate = "Next available collection date";
+        newCollectionDate = newCollectionDate || "Next available collection date";
         console.log("Using standard fallback route");
       }
     }
     
-    // Make sure collectionDate is never null or undefined or "Not Available"
-    if (!newCollectionDate || newCollectionDate === "Not Available") {
+    // Make sure collectionDate is never null or undefined
+    if (!newCollectionDate) {
       newCollectionDate = "Next available collection date";
     }
-
-    console.log("Final route and date values:", { newRoute, newCollectionDate });
 
     // Update state with guaranteed values
     setRoute(newRoute);

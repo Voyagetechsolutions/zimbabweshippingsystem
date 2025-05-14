@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { postalCodeToRouteMap, restrictedPostalCodes, irelandCityToRouteMap } from '@/utils/postalCodeUtils';
 
@@ -231,11 +230,6 @@ export function getDateByRoute(routeName: string): string {
       return "Next available collection date";
     }
     
-    if (route.date === "null" || route.date.toLowerCase() === "not available") {
-      console.warn(`Invalid date value for route: ${routeName}`);
-      return "Next available collection date";
-    }
-    
     return route.date;
   } catch (error) {
     console.error(`Error in getDateByRoute for ${routeName}:`, error);
@@ -260,21 +254,14 @@ export function getDateForIrelandCity(city: string): string {
     }
     
     const schedule = collectionSchedules.find(s => s.route === route);
-    const dateValue = schedule?.date;
-    
-    if (!dateValue || dateValue === "null" || dateValue.toLowerCase() === "not available") {
-      console.warn(`Invalid date value for city: ${city}, route: ${route}`);
-      return "Next available collection date";
-    }
-    
-    return dateValue;
+    return schedule?.date || "Next available collection date";
   } catch (error) {
     console.error(`Error in getDateForIrelandCity for ${city}:`, error);
     return "Next available collection date";
   }
 }
 
-// Update route date for a specific route and sync with database
+// Update route date for a specific route and sync with database - Fixed to properly update the database
 export async function updateRouteDate(routeName: string, newDate: string): Promise<boolean> {
   try {
     console.log(`Updating route date for ${routeName} to ${newDate}`);
@@ -505,16 +492,8 @@ export function getIrelandCities(): string[] {
 
 // Get route for an Ireland city
 export function getRouteForIrelandCity(city: string): string | null {
-  if (!city) return null;
-  
   const normalizedCity = city.trim().toUpperCase();
   
-  // First try exact match in the irelandCityToRouteMap
-  if (irelandCityToRouteMap[normalizedCity]) {
-    return irelandCityToRouteMap[normalizedCity];
-  }
-  
-  // Then check collection schedules
   for (const schedule of collectionSchedules) {
     if (schedule.country === 'Ireland' && 
         schedule.areas.includes(normalizedCity)) {
@@ -522,19 +501,5 @@ export function getRouteForIrelandCity(city: string): string | null {
     }
   }
   
-  // If no match found, check for partial matches
-  for (const schedule of collectionSchedules) {
-    if (schedule.country === 'Ireland') {
-      for (const area of schedule.areas) {
-        if (area.includes(normalizedCity) || normalizedCity.includes(area)) {
-          console.log(`Found partial match for city: ${normalizedCity}, matching area: ${area}, route: ${schedule.route}`);
-          return schedule.route;
-        }
-      }
-    }
-  }
-  
-  // No match found
-  console.warn(`No route found for Ireland city: ${normalizedCity}`);
   return null;
 }
