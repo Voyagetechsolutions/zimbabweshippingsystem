@@ -166,7 +166,7 @@ const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({ bookingData, onSubmit
           </div>
           
           <div>
-            <Label>Upload Images (Optional)</Label>
+            {/* <Label>Upload Images (Optional)</Label>
             <Input
               type="file"
               multiple
@@ -204,7 +204,7 @@ const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({ bookingData, onSubmit
                 </div>
               </div>
             )}
-          </div>
+          </div>*/}
           
           <div className="flex justify-between mt-6">
             <Button variant="ghost" onClick={onCancel}>
