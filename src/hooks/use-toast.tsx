@@ -1,4 +1,3 @@
-
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +23,7 @@ type ToastContextType = {
 
 export type ToastAPI = {
   toast: (toast: ToastProps) => void;
+  toasts: Toast[]; // Add the toasts property
 };
 
 export type ToastMethod = (toast: ToastProps) => void;
@@ -79,8 +79,8 @@ export const useToast = (): ToastAPI => {
     throw new Error("useToast must be used within a ToastProvider");
   }
 
-  const { showToast } = context;
-  return { toast: showToast };
+  const { showToast, toasts } = context;
+  return { toast: showToast, toasts };
 };
 
 export const toast: ToastMethod = (props) => {
