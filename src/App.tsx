@@ -21,34 +21,37 @@ import CollectionSchedulePage from '@/pages/CollectionSchedulePage';
 import QuoteSubmitted from '@/pages/QuoteSubmitted';
 import { Toaster } from '@/components/ui/toaster';
 import { ToastProvider } from '@/hooks/use-toast';
+import { ShippingProvider } from '@/contexts/ShippingContext';
 
 function App() {
   return (
     // Ensure ToastProvider is the outer wrapper so it's available to AuthProvider
     <ToastProvider>
       <AuthProvider>
-        <Router>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/book-shipment" element={<BookShipment />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/admin-dashboard" element={<AdminDashboard />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/address-book" element={<AddressBook />} />
-            <Route path="/shipment/:id" element={<ShipmentDetails />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/privacy" element={<Privacy />} />
-            <Route path="/faq" element={<FAQ />} />
-            <Route path="/reviews" element={<ReviewPage />} />
-            <Route path="/gallery" element={<GalleryPage />} />
-            <Route path="/collection-schedule" element={<CollectionSchedulePage />} />
-            <Route path="/quote-submitted" element={<QuoteSubmitted />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          <Toaster />
-        </Router>
+        <ShippingProvider>
+          <Router>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/book-shipment" element={<BookShipment />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/admin-dashboard" element={<AdminDashboard />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/address-book" element={<AddressBook />} />
+              <Route path="/shipment/:id" element={<ShipmentDetails />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/faq" element={<FAQ />} />
+              <Route path="/reviews" element={<ReviewPage />} />
+              <Route path="/gallery" element={<GalleryPage />} />
+              <Route path="/collection-schedule" element={<CollectionSchedulePage />} />
+              <Route path="/quote-submitted" element={<QuoteSubmitted />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <Toaster />
+          </Router>
+        </ShippingProvider>
       </AuthProvider>
     </ToastProvider>
   );
