@@ -204,7 +204,7 @@ const BookShipment = () => {
         phone_number: customQuoteData.phoneNumber || bookingData.senderDetails.phone,
         description: customQuoteData.description || bookingData.shipmentDetails.description,
         category: customQuoteData.category || bookingData.shipmentDetails.category,
-        image_urls: customQuoteData.imageUrls || [],
+        // Removed image_urls field
         status: 'pending',
         sender_details: bookingData.senderDetails,
         recipient_details: bookingData.recipientDetails
