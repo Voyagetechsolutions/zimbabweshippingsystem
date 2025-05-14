@@ -1,12 +1,13 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import BookingFormNew from '@/components/BookingFormNew';
 import CustomQuoteForm from '@/components/CustomQuoteForm';
-import PaymentProcessor from '@/components/PaymentProcessor';
+import { PaymentMethodSection } from '@/components/PaymentMethodSection';
 import { ArrowLeft } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 enum BookingStep {
@@ -257,7 +258,7 @@ const BookShipment = () => {
     if (bookingData.shipmentDetails.includeOtherItems) {
       setCurrentStep(BookingStep.CUSTOM_QUOTE);
     } else {
-      navigate('/receipt', { 
+      navigate('/confirm-booking', { 
         state: { 
           bookingData: updatedBookingData,
           paymentData
@@ -298,11 +299,11 @@ const BookShipment = () => {
               onRequestCustomQuote={handleRequestCustomQuote}
             />
           ) : currentStep === BookingStep.PAYMENT ? (
-            <PaymentProcessor 
+            <PaymentMethodSection 
               bookingData={bookingData}
               totalAmount={totalAmount}
               onCancel={handleBackToForm}
-              onPaymentComplete={handlePaymentComplete}
+              onComplete={handlePaymentComplete}
             />
           ) : (
             <CustomQuoteForm 

@@ -1,3 +1,5 @@
+
+// This file is the source of truth for toast functionality
 import * as React from "react"
 import { type ToastActionElement, type ToastProps } from "@/components/ui/toast"
 
