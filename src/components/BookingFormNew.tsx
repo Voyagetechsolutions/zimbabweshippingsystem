@@ -6,7 +6,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/hooks/use-toast';
 import { isValidEmail, isValidPhoneNumber } from '@/utils/formValidation';
-import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -102,7 +101,6 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
   const [isRestrictedPostcode, setIsRestrictedPostcode] = useState(false);
   const { toast } = useToast();
   const isMobile = useIsMobile();
-  const navigate = useNavigate();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -335,31 +333,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
       
       if (error) throw error;
       
-      // For regular bookings, if there's a selectedQuote, store it in localStorage
-      if (!values.includeOtherItems && values.includeDrums) {
-        const quoteDetails = {
-          id: data.id,
-          description: `${values.drumQuantity || '1'} Drums`,
-          category: 'Drums',
-          specificItem: `${values.drumQuantity || '1'} x 200-220L Drums`,
-          amount: basePrice,
-          adminNotes: `Collection on ${values.collectionDate || 'scheduled date'}`
-        };
-        
-        localStorage.setItem('selectedQuote', JSON.stringify(quoteDetails));
-        
-        // Navigate to confirm booking page for drum shipments
-        toast({
-          title: 'Booking Created',
-          description: 'Your booking has been created successfully. Please confirm the details.',
-        });
-        
-        // Redirect to confirmation page
-        navigate('/confirm-booking');
-        return;
-      }
-      
-      // Call the onSubmitComplete callback with the relevant data for other types of bookings
+      // Call the onSubmitComplete callback with the relevant data
       onSubmitComplete(values, data.id, basePrice);
       
     } catch (error: any) {
