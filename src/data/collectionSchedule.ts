@@ -215,50 +215,18 @@ export function getAreasByRoute(routeName: string): string[] {
   return route?.areas || [];
 }
 
-// Get date for a specific route - IMPROVED with better error handling
+// Get date for a specific route
 export function getDateByRoute(routeName: string): string {
-  try {
-    if (!routeName) {
-      console.warn("getDateByRoute called with empty route name");
-      return "Next available collection date";
-    }
-    
-    const route = collectionSchedules.find(schedule => schedule.route === routeName);
-    
-    if (!route || !route.date) {
-      console.warn(`No date found for route: ${routeName}`);
-      return "Next available collection date";
-    }
-    
-    return route.date;
-  } catch (error) {
-    console.error(`Error in getDateByRoute for ${routeName}:`, error);
-    return "Next available collection date";
-  }
+  const route = collectionSchedules.find(schedule => schedule.route === routeName);
+  return route?.date || "No date available";
 }
 
-// Get date for an Ireland city - IMPROVED with better error handling
-export function getDateForIrelandCity(city: string): string {
-  try {
-    if (!city) {
-      console.warn("getDateForIrelandCity called with empty city");
-      return "Next available collection date";
-    }
-    
-    const normalizedCity = city.trim().toUpperCase();
-    const route = getRouteForIrelandCity(normalizedCity);
-    
-    if (!route) {
-      console.warn(`No route found for city: ${city}`);
-      return "Next available collection date";
-    }
-    
-    const schedule = collectionSchedules.find(s => s.route === route);
-    return schedule?.date || "Next available collection date";
-  } catch (error) {
-    console.error(`Error in getDateForIrelandCity for ${city}:`, error);
-    return "Next available collection date";
-  }
+// Get date by route and area
+export function getDateByRouteAndArea(routeName: string, areaName: string): string {
+  const route = collectionSchedules.find(schedule => 
+    schedule.route === routeName && schedule.areas.includes(areaName)
+  );
+  return route?.date || "No date available";
 }
 
 // Update route date for a specific route and sync with database - Fixed to properly update the database
@@ -502,4 +470,13 @@ export function getRouteForIrelandCity(city: string): string | null {
   }
   
   return null;
+}
+
+// Get date for an Ireland city
+export function getDateForIrelandCity(city: string): string | null {
+  const route = getRouteForIrelandCity(city);
+  if (!route) return null;
+  
+  const schedule = collectionSchedules.find(s => s.route === route);
+  return schedule?.date || null;
 }
