@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -271,6 +270,7 @@ const BookShipment = () => {
         });
       } catch (notifError) {
         console.error('Error creating notification:', notifError);
+        // Continue execution even if notification creation fails
       }
       
       if (bookingData.paymentCompleted) {
