@@ -309,13 +309,13 @@ const AdminDashboardContent = () => {
                   {activeTab === 'customers' && <User className="h-4 w-4" />}
                   {activeTab === 'pickupZones' && <MapPin className="h-4 w-4" />}
                   {activeTab === 'delivery' && <Truck className="h-4 w-4" />}
-                  {/*activeTab === 'payments' && <CreditCard className="h-4 w-4" />*/}
+                  {/*{activeTab === 'payments' && <CreditCard className="h-4 w-4" />}*/}
                   {activeTab === 'reports' && <BarChart3 className="h-4 w-4" />}
-                  {/*activeTab === 'notifications' && <Bell className="h-4 w-4" />*/}
+                  {/*{activeTab === 'notifications' && <Bell className="h-4 w-4" />}*/}
                   {activeTab === 'schedule' && <Calendar className="h-4 w-4" />}
                   {activeTab === 'routes' && <Route className="h-4 w-4" />}
                   {activeTab === 'users' && <Users className="h-4 w-4" />}
-                  {/*activeTab === 'settings' && <Settings className="h-4 w-4" />*/}
+                  {/*{activeTab === 'settings' && <Settings className="h-4 w-4" />}*/}
 
         
                   {activeTab === 'shipments' && 'Shipment Management'}
