@@ -1,3 +1,4 @@
+
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
@@ -107,6 +108,7 @@ export const toast: ToastMethod = (props) => {
   const titleEl = document.createElement("div");
   titleEl.className = "text-sm font-semibold";
   titleEl.textContent = props.title;
+  toastEl.appendChild(titleEl);
   
   // Create description if provided
   if (props.description) {
