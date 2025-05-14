@@ -75,7 +75,6 @@ function App() {
                     <Route path="/book-shipment" element={<BookShipment />} />
                     <Route path="/payment-success" element={<PaymentSuccess />} />
                     <Route path="/quote-submitted" element={<QuoteSubmitted />} />
-                    <Route path="/confirm-booking" element={<ConfirmBooking />} />
                     <Route path="/reviews" element={<Reviews />} />
                     <Route path="/support" element={<Support />} />
                     <Route path="/pricing" element={<Pricing />} />
@@ -123,6 +122,14 @@ function App() {
                       element={
                         <RequireAuth>
                           <Notifications />
+                        </RequireAuth>
+                      }
+                    />
+                    <Route
+                      path="/confirm-booking"
+                      element={
+                        <RequireAuth>
+                          <ConfirmBooking />
                         </RequireAuth>
                       }
                     />

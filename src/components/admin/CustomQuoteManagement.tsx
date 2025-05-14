@@ -1,25 +1,16 @@
+
 import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/components/ui/use-toast';
-import { format } from 'date-fns';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -28,661 +19,385 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import {
-  Phone,
-  MessageSquare,
-  Image as ImageIcon,
-  CheckCircle,
-  XCircle,
-  Loader2,
-  Eye,
-  FileEdit,
-  Send,
-  Clock,
-  AlertCircle,
-  Mail
-} from 'lucide-react';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { formatCurrency, formatDate } from '@/utils/formatters';
 
-interface CustomQuote {
+type CustomQuote = {
   id: string;
   user_id: string | null;
+  shipment_id: string | null;
   status: string;
   phone_number: string;
   description: string;
+  category: string | null;
+  specific_item: string | null;
   image_urls: string[];
-  created_at: string;
   quoted_amount: number | null;
   admin_notes: string | null;
-  user_email?: string;
-  user_name?: string;
-}
+  sender_details: any;
+  recipient_details: any;
+  created_at: string;
+  updated_at: string;
+  name: string | null;
+  email: string | null;
+};
 
-const CustomQuoteManagement = () => {
+type User = {
+  email: string;
+  id: string;
+};
+
+const CustomQuoteManagement: React.FC = () => {
   const { toast } = useToast();
-  const [quotes, setQuotes] = useState<CustomQuote[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState('pending');
   const [selectedQuote, setSelectedQuote] = useState<CustomQuote | null>(null);
-  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSendingEmail, setIsSendingEmail] = useState(false);
-  const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
-  
-  // Form state for responding to a quote
-  const [quoteAmount, setQuoteAmount] = useState('');
-  const [adminNotes, setAdminNotes] = useState('');
-  const [isUpdating, setIsUpdating] = useState(false);
-  
-  useEffect(() => {
-    fetchQuotes();
-  }, []);
-  
-  const fetchQuotes = async () => {
-    setLoading(true);
-    try {
-      // Instead of using the nested select approach, use a more explicit query
-      // First fetch all custom quotes
-      const { data: quotesData, error: quotesError } = await supabase
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [quoteAmount, setQuoteAmount] = useState<string>('');
+  const [adminNotes, setAdminNotes] = useState<string>('');
+
+  // Fetch all quotes
+  const { data: quotes, isLoading } = useQuery({
+    queryKey: ['adminQuotes'],
+    queryFn: async () => {
+      const { data, error } = await supabase
         .from('custom_quotes')
         .select('*')
         .order('created_at', { ascending: false });
-      
-      if (quotesError) throw quotesError;
-      
-      // For quotes with user_id, fetch the corresponding user profiles
-      const enhancedQuotes = await Promise.all(
-        quotesData.map(async (quote) => {
-          if (quote.user_id) {
-            const { data: profileData, error: profileError } = await supabase
-              .from('profiles')
-              .select('email, full_name')
-              .eq('id', quote.user_id)
-              .single();
-            
-            if (!profileError && profileData) {
-              return {
-                ...quote,
-                user_email: profileData.email,
-                user_name: profileData.full_name
-              };
-            }
-          }
-          return quote;
+
+      if (error) throw error;
+      return data as CustomQuote[];
+    },
+  });
+
+  // Mutation for updating quote
+  const updateQuoteMutation = useMutation({
+    mutationFn: async (updatedQuote: { id: string; status: string; quoted_amount?: number | null; admin_notes?: string | null }) => {
+      const { data, error } = await supabase
+        .from('custom_quotes')
+        .update({
+          status: updatedQuote.status,
+          quoted_amount: updatedQuote.quoted_amount,
+          admin_notes: updatedQuote.admin_notes,
+          updated_at: new Date().toISOString(),
         })
-      );
-      
-      setQuotes(enhancedQuotes);
-    } catch (error: any) {
-      console.error('Error fetching custom quotes:', error);
+        .eq('id', updatedQuote.id)
+        .select();
+
+      if (error) throw error;
+
+      // If the status is 'quoted', send an email notification
+      if (updatedQuote.status === 'quoted' && selectedQuote?.email) {
+        try {
+          await fetch(`https://oncsaunsqtekwwbzvvyh.supabase.co/functions/v1/send-quote-email`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${process.env.VITE_SUPABASE_ANON_KEY || ''}`,
+            },
+            body: JSON.stringify({
+              email: selectedQuote.email,
+              phone_number: selectedQuote.phone_number,
+              quoted_amount: updatedQuote.quoted_amount,
+              item_description: selectedQuote.description,
+              admin_notes: updatedQuote.admin_notes,
+            }),
+          });
+        } catch (emailError) {
+          console.error('Failed to send email notification:', emailError);
+        }
+      }
+
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminQuotes'] });
       toast({
-        title: 'Error',
-        description: 'Failed to load custom quotes',
+        title: 'Quote Updated',
+        description: 'The quote has been successfully updated.',
+      });
+      setIsDialogOpen(false);
+    },
+    onError: (error) => {
+      console.error('Error updating quote:', error);
+      toast({
+        title: 'Update Failed',
+        description: 'Failed to update the quote. Please try again.',
         variant: 'destructive',
       });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
+    },
+  });
+
   const handleViewQuote = (quote: CustomQuote) => {
     setSelectedQuote(quote);
     setQuoteAmount(quote.quoted_amount?.toString() || '');
     setAdminNotes(quote.admin_notes || '');
-    setIsDetailsOpen(true);
-    
-    // Mark associated notification as read
-    updateNotificationStatus(quote.id);
+    setIsDialogOpen(true);
   };
-  
-  const updateNotificationStatus = async (quoteId: string) => {
-    try {
-      await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('related_id', quoteId)
-        .eq('type', 'custom_quote');
-    } catch (error) {
-      console.error('Error updating notification status:', error);
-    }
-  };
-  
-  const handleUpdateQuote = async () => {
+
+  const handleUpdateQuote = () => {
     if (!selectedQuote) return;
-    
-    setIsUpdating(true);
-    
-    try {
-      const amount = parseFloat(quoteAmount);
-      
-      if (isNaN(amount) && quoteAmount.trim() !== '') {
-        toast({
-          title: 'Invalid Amount',
-          description: 'Please enter a valid number for the quote amount',
-          variant: 'destructive',
-        });
-        setIsUpdating(false);
-        return;
-      }
-      
-      const { error } = await supabase
-        .from('custom_quotes')
-        .update({
-          quoted_amount: quoteAmount.trim() === '' ? null : amount,
-          admin_notes: adminNotes,
-          status: quoteAmount.trim() === '' ? 'pending' : 'quoted'
-        })
-        .eq('id', selectedQuote.id);
-      
-      if (error) throw error;
-      
-      // Add a notification for the user
-      if (selectedQuote.user_id && quoteAmount.trim() !== '') {
-        await supabase.from('notifications').insert({
-          user_id: selectedQuote.user_id,
-          title: 'Custom Quote Ready',
-          message: `Your custom quote request has been priced at £${amount}. Please check your account for details.`,
-          type: 'quote_response',
-          related_id: selectedQuote.id,
-          is_read: false
-        });
-      }
-      
-      toast({
-        title: 'Quote Updated',
-        description: 'The custom quote has been updated successfully',
-      });
-      
-      // If the user provided an email, show email confirmation dialog
-      if (selectedQuote.user_email && quoteAmount.trim() !== '') {
-        setShowEmailConfirmation(true);
-      } else {
-        // Refresh the quotes list if no email to send
-        fetchQuotes();
-      }
-      
-      // Update the selected quote
-      setSelectedQuote({
-        ...selectedQuote,
-        quoted_amount: quoteAmount.trim() === '' ? null : amount,
-        admin_notes: adminNotes,
-        status: quoteAmount.trim() === '' ? 'pending' : 'quoted'
-      });
-      
-    } catch (error: any) {
-      console.error('Error updating quote:', error);
-      toast({
-        title: 'Update Failed',
-        description: error.message || 'Failed to update the quote',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsUpdating(false);
-    }
+
+    const amount = quoteAmount ? parseFloat(quoteAmount) : null;
+
+    updateQuoteMutation.mutate({
+      id: selectedQuote.id,
+      status: 'quoted',
+      quoted_amount: amount,
+      admin_notes: adminNotes || null,
+    });
   };
-  
-  const sendQuoteEmail = async () => {
-    if (!selectedQuote || !selectedQuote.user_email || !quoteAmount) return;
-    
-    setIsSendingEmail(true);
-    try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-quote-email`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify({
-          email: selectedQuote.user_email,
-          phone_number: selectedQuote.phone_number,
-          quoted_amount: parseFloat(quoteAmount),
-          item_description: selectedQuote.description,
-          admin_notes: adminNotes
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to send email');
-      }
-      
-      toast({
-        title: 'Email Sent',
-        description: 'Quote details have been emailed to the customer',
-      });
-      
-      // Close confirmation dialog and refresh quotes
-      setShowEmailConfirmation(false);
-      fetchQuotes();
-      
-    } catch (error: any) {
-      console.error('Error sending quote email:', error);
-      toast({
-        title: 'Email Failed',
-        description: error.message || 'Failed to send the quote email',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSendingEmail(false);
-    }
+
+  const handleRejectQuote = () => {
+    if (!selectedQuote) return;
+
+    updateQuoteMutation.mutate({
+      id: selectedQuote.id,
+      status: 'rejected',
+      admin_notes: adminNotes || 'Quote request rejected',
+    });
   };
-  
-  const skipSendingEmail = () => {
-    setShowEmailConfirmation(false);
-    fetchQuotes(); // Refresh the quotes list
-  };
-  
-  const updateQuoteStatus = async (quoteId: string, status: string) => {
-    try {
-      const { error } = await supabase
-        .from('custom_quotes')
-        .update({ status })
-        .eq('id', quoteId);
-      
-      if (error) throw error;
-      
-      toast({
-        title: 'Status Updated',
-        description: `Quote status changed to ${status}`,
-      });
-      
-      // Refresh the quotes list
-      fetchQuotes();
-      
-      // Update the selected quote if it's open
-      if (selectedQuote && selectedQuote.id === quoteId) {
-        setSelectedQuote({
-          ...selectedQuote,
-          status
-        });
-      }
-      
-    } catch (error: any) {
-      console.error('Error updating status:', error);
-      toast({
-        title: 'Update Failed',
-        description: error.message || 'Failed to update the status',
-        variant: 'destructive',
-      });
-    }
-  };
-  
-  // Filter quotes based on status and search query
-  const filteredQuotes = quotes.filter(quote => {
-    const matchesStatus = statusFilter === 'all' || quote.status === statusFilter;
-    const matchesSearch = searchQuery === '' || 
-      quote.phone_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      quote.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (quote.user_email && quote.user_email.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (quote.user_name && quote.user_name.toLowerCase().includes(searchQuery.toLowerCase()));
-    
-    return matchesStatus && matchesSearch;
-  });
-  
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+
+  const filteredQuotes = React.useMemo(() => {
+    if (!quotes) return [];
+
+    switch (activeTab) {
       case 'pending':
-        return <Badge className="bg-yellow-100 text-yellow-800 border border-yellow-300">Pending</Badge>;
+        return quotes.filter(q => q.status === 'pending');
       case 'quoted':
-        return <Badge className="bg-blue-100 text-blue-800 border border-blue-300">Quoted</Badge>;
-      case 'accepted':
-        return <Badge className="bg-green-100 text-green-800 border border-green-300">Accepted</Badge>;
-      case 'rejected':
-        return <Badge className="bg-red-100 text-red-800 border border-red-300">Rejected</Badge>;
+        return quotes.filter(q => q.status === 'quoted');
+      case 'all':
+        return quotes;
       default:
-        return <Badge className="bg-gray-100 text-gray-800 border border-gray-300">{status}</Badge>;
+        return quotes;
+    }
+  }, [quotes, activeTab]);
+
+  const getStatusBadge = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return <Badge variant="outline" className="bg-amber-100 text-amber-800">Pending Review</Badge>;
+      case 'reviewed':
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800">Reviewed</Badge>;
+      case 'quoted':
+        return <Badge variant="outline" className="bg-green-100 text-green-800">Price Quoted</Badge>;
+      case 'accepted':
+        return <Badge className="bg-green-600">Accepted</Badge>;
+      case 'rejected':
+        return <Badge variant="destructive">Rejected</Badge>;
+      case 'paid':
+        return <Badge className="bg-purple-600">Paid</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
-  
+
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle>Custom Quote Requests</CardTitle>
-          <CardDescription>
-            Manage and respond to customer requests for custom shipping quotes
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="relative flex-grow">
-              <Input
-                placeholder="Search by phone number, description or email"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-              <MessageSquare className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-            </div>
-            <Select 
-              value={statusFilter} 
-              onValueChange={setStatusFilter}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="quoted">Quoted</SelectItem>
-                <SelectItem value="accepted">Accepted</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button 
-              variant="outline" 
-              onClick={fetchQuotes}
-              disabled={loading}
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                'Refresh'
-              )}
-            </Button>
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle>Custom Quote Management</CardTitle>
+        <CardDescription>Review and manage custom shipping quote requests</CardDescription>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="pending">Pending Requests</TabsTrigger>
+            <TabsTrigger value="quoted">Quoted</TabsTrigger>
+            <TabsTrigger value="all">All Requests</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex justify-center p-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
           </div>
-          
-          {loading ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-zim-green" />
-            </div>
-          ) : filteredQuotes.length === 0 ? (
-            <div className="text-center py-12">
-              <AlertCircle className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium mb-2">No quotes found</h3>
-              <p className="text-gray-500">
-                {searchQuery || statusFilter !== 'all' 
-                  ? "Try adjusting your filters" 
-                  : "There are no custom quote requests yet"}
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Images</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+        ) : filteredQuotes.length > 0 ? (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Item</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Quoted Amount</TableHead>
+                  <TableHead>Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredQuotes.map((quote) => (
+                  <TableRow key={quote.id}>
+                    <TableCell className="whitespace-nowrap">{formatDate(quote.created_at)}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {quote.name || quote.email || 'Anonymous'}
+                      <div className="text-xs text-muted-foreground">{quote.phone_number}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{quote.specific_item || quote.category || 'Custom Item'}</div>
+                      <div className="text-xs line-clamp-1">{quote.description}</div>
+                    </TableCell>
+                    <TableCell>{getStatusBadge(quote.status)}</TableCell>
+                    <TableCell>
+                      {quote.quoted_amount ? formatCurrency(quote.quoted_amount, 'GBP') : '-'}
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="outline" size="sm" onClick={() => handleViewQuote(quote)}>
+                        {quote.status === 'pending' ? 'Review' : 'View'}
+                      </Button>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredQuotes.map((quote) => (
-                    <TableRow key={quote.id}>
-                      <TableCell>
-                        {format(new Date(quote.created_at), 'dd/MM/yyyy')}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <div className="flex items-center">
-                            <Phone className="h-4 w-4 mr-1 text-gray-500" />
-                            {quote.phone_number}
-                          </div>
-                          {quote.user_email && (
-                            <div className="text-xs text-gray-500 mt-1 flex items-center">
-                              <Mail className="h-3 w-3 mr-1" />
-                              {quote.user_email}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-[200px] truncate">
-                        {quote.description}
-                      </TableCell>
-                      <TableCell>
-                        {quote.image_urls.length > 0 ? (
-                          <Badge variant="outline">
-                            <ImageIcon className="h-3 w-3 mr-1" /> 
-                            {quote.image_urls.length}
-                          </Badge>
-                        ) : (
-                          <span className="text-gray-500 text-sm">None</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(quote.status)}
-                      </TableCell>
-                      <TableCell>
-                        {quote.quoted_amount 
-                          ? `£${quote.quoted_amount.toFixed(2)}` 
-                          : quote.status === 'pending' 
-                            ? <span className="text-yellow-600 text-sm flex items-center"><Clock className="h-3 w-3 mr-1" /> Pending</span>
-                            : '—'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end space-x-2">
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => handleViewQuote(quote)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          {quote.status === 'pending' && (
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => handleViewQuote(quote)}
-                            >
-                              <FileEdit className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      
-      {/* Quote Details Sheet */}
-      <Sheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Custom Quote Request</SheetTitle>
-            <SheetDescription>
-              View and respond to this quote request
-            </SheetDescription>
-          </SheetHeader>
-          
-          {selectedQuote && (
-            <div className="py-6 space-y-6">
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-1">Requested On</h3>
-                <p>{format(new Date(selectedQuote.created_at), 'dd MMMM yyyy, HH:mm')}</p>
-              </div>
-              
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-1">Status</h3>
-                <div className="flex items-center space-x-2">
-                  {getStatusBadge(selectedQuote.status)}
-                  
-                  {selectedQuote.status === 'pending' && (
-                    <div className="ml-2 text-sm text-yellow-600 flex items-center">
-                      <Clock className="h-4 w-4 mr-1" /> Waiting for quote
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-1">Contact Information</h3>
-                <p className="flex items-center">
-                  <Phone className="h-4 w-4 mr-2 text-gray-500" />
-                  {selectedQuote.phone_number}
-                </p>
-                {selectedQuote.user_email && (
-                  <p className="flex items-center mt-1">
-                    <Mail className="h-4 w-4 mr-2 text-gray-500" />
-                    {selectedQuote.user_email}
-                  </p>
-                )}
-                {selectedQuote.user_name && (
-                  <p className="text-sm text-gray-500 mt-1">
-                    Name: {selectedQuote.user_name}
-                  </p>
-                )}
-              </div>
-              
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-1">Item Description</h3>
-                <div className="bg-gray-50 p-3 rounded border text-sm">
-                  {selectedQuote.description}
-                </div>
-              </div>
-              
-              {selectedQuote.image_urls.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">Images</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    {selectedQuote.image_urls.map((url, index) => (
-                      <div key={index} className="relative">
-                        <a href={url} target="_blank" rel="noopener noreferrer">
-                          <img 
-                            src={url} 
-                            alt={`Item image ${index + 1}`} 
-                            className="w-full h-32 object-cover rounded border"
-                          />
-                        </a>
-                      </div>
-                    ))}
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">No quotes found for the selected filter.</p>
+          </div>
+        )}
+
+        {/* Quote Details Dialog */}
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="max-w-xl">
+            <DialogHeader>
+              <DialogTitle>Custom Quote Details</DialogTitle>
+              <DialogDescription>
+                {selectedQuote?.status === 'pending'
+                  ? 'Review this request and provide a quote'
+                  : 'View details for this quote request'}
+              </DialogDescription>
+            </DialogHeader>
+
+            {selectedQuote && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Status</Label>
+                    <div className="mt-1">{getStatusBadge(selectedQuote.status)}</div>
+                  </div>
+                  <div>
+                    <Label>Date Requested</Label>
+                    <div className="mt-1">{formatDate(selectedQuote.created_at)}</div>
                   </div>
                 </div>
-              )}
-              
-              <div className="border-t pt-4">
-                <h3 className="font-medium mb-2">Provide Quote Response</h3>
-                
+
                 <div className="space-y-4">
+                  <div>
+                    <Label>Customer Information</Label>
+                    <div className="mt-1 p-3 bg-muted rounded-md">
+                      <div className="text-sm font-medium">{selectedQuote.name || 'Name not provided'}</div>
+                      <div className="text-sm">{selectedQuote.email || 'Email not provided'}</div>
+                      <div className="text-sm">{selectedQuote.phone_number}</div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Item Details</Label>
+                    <div className="mt-1 p-3 bg-muted rounded-md">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-sm font-medium">Category: </span>
+                          <span className="text-sm">{selectedQuote.category || 'N/A'}</span>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium">Specific Item: </span>
+                          <span className="text-sm">{selectedQuote.specific_item || 'N/A'}</span>
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <span className="text-sm font-medium">Description: </span>
+                        <div className="text-sm whitespace-pre-wrap">{selectedQuote.description}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {selectedQuote.image_urls && selectedQuote.image_urls.length > 0 && (
+                    <div>
+                      <Label>Images</Label>
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        {selectedQuote.image_urls.map((url, index) => (
+                          <img 
+                            key={index} 
+                            src={url} 
+                            alt={`Item image ${index + 1}`}
+                            className="h-20 w-20 object-cover rounded-md border" 
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <Label htmlFor="quoteAmount">Quote Amount (£)</Label>
                     <Input
                       id="quoteAmount"
                       type="number"
                       step="0.01"
-                      placeholder="Enter amount"
+                      min="0"
                       value={quoteAmount}
                       onChange={(e) => setQuoteAmount(e.target.value)}
+                      className="mt-1"
+                      disabled={selectedQuote.status !== 'pending'}
                     />
                   </div>
-                  
+
                   <div>
-                    <Label htmlFor="adminNotes">Notes (Internal)</Label>
+                    <Label htmlFor="adminNotes">Admin Notes</Label>
                     <Textarea
                       id="adminNotes"
-                      placeholder="Add internal notes about this quote"
                       value={adminNotes}
                       onChange={(e) => setAdminNotes(e.target.value)}
-                      rows={3}
+                      className="mt-1"
+                      placeholder="Add notes about this quote (will be visible to customer)"
+                      disabled={selectedQuote.status !== 'pending'}
                     />
                   </div>
-                  
-                  <div className="flex space-x-3">
-                    <Button
-                      onClick={handleUpdateQuote}
-                      disabled={isUpdating}
-                      className="bg-zim-green hover:bg-zim-green/90 flex-1"
-                    >
-                      {isUpdating ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <Send className="h-4 w-4 mr-2" />
-                      )}
-                      {selectedQuote.quoted_amount ? 'Update Quote' : 'Send Quote'}
-                    </Button>
-                  </div>
-                  
-                  <div className="pt-4 border-t flex justify-between">
-                    {selectedQuote.status === 'quoted' && (
-                      <>
-                        <Button
-                          variant="outline"
-                          className="border-green-500 text-green-600 hover:bg-green-50"
-                          onClick={() => updateQuoteStatus(selectedQuote.id, 'accepted')}
-                        >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Mark as Accepted
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="border-red-500 text-red-600 hover:bg-red-50"
-                          onClick={() => updateQuoteStatus(selectedQuote.id, 'rejected')}
-                        >
-                          <XCircle className="h-4 w-4 mr-2" />
-                          Mark as Rejected
-                        </Button>
-                      </>
-                    )}
-                    
-                    {(selectedQuote.status === 'accepted' || selectedQuote.status === 'rejected') && (
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => updateQuoteStatus(selectedQuote.id, 'quoted')}
-                      >
-                        Reset to Quoted Status
-                      </Button>
-                    )}
-                  </div>
                 </div>
-              </div>
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
-      
-      {/* Email Confirmation Dialog */}
-      <AlertDialog open={showEmailConfirmation} onOpenChange={setShowEmailConfirmation}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Send Quote by Email?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Would you like to send the quote details to the customer by email?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={skipSendingEmail}>Skip</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={sendQuoteEmail}
-              disabled={isSendingEmail}
-            >
-              {isSendingEmail ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Mail className="h-4 w-4 mr-2" />
-              )}
-              Send Email
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+
+                <DialogFooter>
+                  {selectedQuote.status === 'pending' ? (
+                    <>
+                      <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button variant="destructive" onClick={handleRejectQuote}>
+                        Reject
+                      </Button>
+                      <Button onClick={handleUpdateQuote} disabled={!quoteAmount}>
+                        Send Quote
+                      </Button>
+                    </>
+                  ) : (
+                    <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                      Close
+                    </Button>
+                  )}
+                </DialogFooter>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
   );
 };
 
