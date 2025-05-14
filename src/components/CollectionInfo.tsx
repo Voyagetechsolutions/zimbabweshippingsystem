@@ -58,7 +58,8 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
         const normalizedCity = city.trim().toUpperCase();
         newRoute = getIrelandRouteForCity(normalizedCity);
         if (newRoute) {
-          newCollectionDate = getDateForIrelandCity(normalizedCity) || getDateByRoute(newRoute);
+          // Use the improved getDateForIrelandCity function which always returns a string now
+          newCollectionDate = getDateForIrelandCity(normalizedCity);
           console.log("Retrieved Ireland route and date:", { newRoute, newCollectionDate });
         }
       }

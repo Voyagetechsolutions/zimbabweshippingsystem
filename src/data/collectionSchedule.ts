@@ -238,7 +238,7 @@ export function getDateByRoute(routeName: string): string {
 }
 
 // Get date for an Ireland city - IMPROVED with better error handling
-export function getDateForIrelandCity(city: string): string | null {
+export function getDateForIrelandCity(city: string): string {
   try {
     if (!city) {
       console.warn("getDateForIrelandCity called with empty city");
@@ -502,13 +502,4 @@ export function getRouteForIrelandCity(city: string): string | null {
   }
   
   return null;
-}
-
-// Get date for an Ireland city
-export function getDateForIrelandCity(city: string): string | null {
-  const route = getRouteForIrelandCity(city);
-  if (!route) return null;
-  
-  const schedule = collectionSchedules.find(s => s.route === route);
-  return schedule?.date || null;
 }
