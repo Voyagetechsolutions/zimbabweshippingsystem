@@ -259,7 +259,7 @@ const BookShipment = () => {
         description: "We'll contact you shortly with a price for your shipment.",
       });
       
-      // Fix the promise handling by using try-catch for the nested promise
+      // Properly handle notification creation with try/catch
       try {
         await supabase.from('notifications').insert({
           user_id: user?.id || bookingData.user_id || '00000000-0000-0000-0000-000000000000',
