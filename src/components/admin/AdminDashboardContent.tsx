@@ -416,6 +416,11 @@ const AdminDashboardContent = () => {
               <Package className="h-4 w-4" />
               <span className="hidden md:inline">Shipments</span>
             </TabsTrigger>
+
+            <TabsTrigger value="customQuotes" className="flex items-center gap-1 py-2 h-auto">
+              <Quote className="h-4 w-4" />
+              <span className="hidden md:inline">Custom Quotes</span>
+            </TabsTrigger>
             
             <TabsTrigger value="customers" className="flex items-center gap-1 py-2 h-auto">
               <User className="h-4 w-4" />
@@ -432,20 +437,20 @@ const AdminDashboardContent = () => {
               <span className="hidden md:inline">Delivery</span>
             </TabsTrigger>
             
-            <TabsTrigger value="payments" className="flex items-center gap-1 py-2 h-auto">
+            {/*<TabsTrigger value="payments" className="flex items-center gap-1 py-2 h-auto">
               <CreditCard className="h-4 w-4" />
               <span className="hidden md:inline">Payments</span>
-            </TabsTrigger>
+            </TabsTrigger>*/}
             
             <TabsTrigger value="reports" className="flex items-center gap-1 py-2 h-auto">
               <BarChart3 className="h-4 w-4" />
               <span className="hidden md:inline">Reports</span>
             </TabsTrigger>
             
-            <TabsTrigger value="notifications" className="flex items-center gap-1 py-2 h-auto">
+            {/*<TabsTrigger value="notifications" className="flex items-center gap-1 py-2 h-auto">
               <Bell className="h-4 w-4" />
               <span className="hidden md:inline">Notifications</span>
-            </TabsTrigger>
+            </TabsTrigger>*/}
             
             <TabsTrigger value="schedule" className="flex items-center gap-1 py-2 h-auto">
               <Calendar className="h-4 w-4" />
@@ -462,7 +467,7 @@ const AdminDashboardContent = () => {
               <span className="hidden md:inline">Users</span>
             </TabsTrigger>
             
-            <TabsTrigger value="settings" className="flex items-center gap-1 py-2 h-auto">
+            {/*<TabsTrigger value="settings" className="flex items-center gap-1 py-2 h-auto">
               <Settings className="h-4 w-4" />
               <span className="hidden md:inline">Settings</span>
             </TabsTrigger>
@@ -470,7 +475,7 @@ const AdminDashboardContent = () => {
             <TabsTrigger value="customQuotes" className="flex items-center gap-1 py-2 h-auto">
               <Quote className="h-4 w-4" />
               <span className="hidden md:inline">Custom Quotes</span>
-            </TabsTrigger>
+            </TabsTrigger>*/}
           </TabsList>
         )}
 
