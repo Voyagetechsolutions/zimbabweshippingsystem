@@ -1,13 +1,12 @@
-
 import React, { useEffect, useRef } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { CheckCircle2, Printer, ArrowRight, MapPin, Calendar, Package, Download, Mail } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { useShipping } from '@/contexts/ShippingContext';
 import { supabase } from '@/integrations/supabase/client';
 import { exportElementToPdf } from '@/utils/exportUtils';
