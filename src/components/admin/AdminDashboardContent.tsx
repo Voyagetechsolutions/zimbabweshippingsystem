@@ -305,30 +305,32 @@ const AdminDashboardContent = () => {
               <SelectTrigger className="w-full">
                 <span className="flex items-center gap-2">
                   {activeTab === 'shipments' && <Package className="h-4 w-4" />}
+                  {activeTab === 'customQuotes' && <Quote className="h-4 w-4" />}
                   {activeTab === 'customers' && <User className="h-4 w-4" />}
                   {activeTab === 'pickupZones' && <MapPin className="h-4 w-4" />}
                   {activeTab === 'delivery' && <Truck className="h-4 w-4" />}
-                  {activeTab === 'payments' && <CreditCard className="h-4 w-4" />}
+                  {/*activeTab === 'payments' && <CreditCard className="h-4 w-4" />*/}
                   {activeTab === 'reports' && <BarChart3 className="h-4 w-4" />}
-                  {activeTab === 'notifications' && <Bell className="h-4 w-4" />}
+                  {/*activeTab === 'notifications' && <Bell className="h-4 w-4" />*/}
                   {activeTab === 'schedule' && <Calendar className="h-4 w-4" />}
                   {activeTab === 'routes' && <Route className="h-4 w-4" />}
                   {activeTab === 'users' && <Users className="h-4 w-4" />}
-                  {activeTab === 'settings' && <Settings className="h-4 w-4" />}
-                  {activeTab === 'customQuotes' && <Quote className="h-4 w-4" />}
-                  
+                  {/*activeTab === 'settings' && <Settings className="h-4 w-4" />*/}
+
+        
                   {activeTab === 'shipments' && 'Shipment Management'}
+                  {activeTab === 'customQuotes' && 'Custom Quotes'}
                   {activeTab === 'customers' && 'Customer Management'}
                   {activeTab === 'pickupZones' && 'Pickup Zones'}
                   {activeTab === 'delivery' && 'Delivery Management'}
-                  {activeTab === 'payments' && 'Payments & Invoicing'}
+                  {/*activeTab === 'payments' && 'Payments & Invoicing'*/}
                   {activeTab === 'reports' && 'Reports & Analytics'}
-                  {activeTab === 'notifications' && 'Notifications'}
+                  {/*activeTab === 'notifications' && 'Notifications'*/}
                   {activeTab === 'schedule' && 'Collection Schedule'}
                   {activeTab === 'routes' && 'Route Management'}
                   {activeTab === 'users' && 'User Management'}
-                  {activeTab === 'settings' && 'System Settings'}
-                  {activeTab === 'customQuotes' && 'Custom Quotes'}
+                  {/*activeTab === 'settings' && 'System Settings'*/}
+                  
                 </span>
               </SelectTrigger>
               <SelectContent>
@@ -336,6 +338,12 @@ const AdminDashboardContent = () => {
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4" />
                     <span>Shipment Management</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="customQuotes">
+                  <div className="flex items-center gap-2">
+                    <Quote className="h-4 w-4" />
+                    <span>Custom Quotes</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="customers">
@@ -356,24 +364,24 @@ const AdminDashboardContent = () => {
                     <span>Delivery Management</span>
                   </div>
                 </SelectItem>
-                <SelectItem value="payments">
+                {/*<SelectItem value="payments">
                   <div className="flex items-center gap-2">
                     <CreditCard className="h-4 w-4" />
                     <span>Payments & Invoicing</span>
                   </div>
-                </SelectItem>
+                </SelectItem>*/}
                 <SelectItem value="reports">
                   <div className="flex items-center gap-2">
                     <BarChart3 className="h-4 w-4" />
                     <span>Reports & Analytics</span>
                   </div>
                 </SelectItem>
-                <SelectItem value="notifications">
+                {/*<SelectItem value="notifications">
                   <div className="flex items-center gap-2">
                     <Bell className="h-4 w-4" />
                     <span>Notifications</span>
                   </div>
-                </SelectItem>
+                </SelectItem>*/}
                 <SelectItem value="schedule">
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
@@ -392,18 +400,13 @@ const AdminDashboardContent = () => {
                     <span>User Management</span>
                   </div>
                 </SelectItem>
-                <SelectItem value="settings">
+                {/*<SelectItem value="settings">
                   <div className="flex items-center gap-2">
                     <Settings className="h-4 w-4" />
                     <span>System Settings</span>
                   </div>
-                </SelectItem>
-                <SelectItem value="customQuotes">
-                  <div className="flex items-center gap-2">
-                    <Quote className="h-4 w-4" />
-                    <span>Custom Quotes</span>
-                  </div>
-                </SelectItem>
+                </SelectItem>*/}
+                
               </SelectContent>
             </Select>
           </div>
