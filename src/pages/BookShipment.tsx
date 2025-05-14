@@ -1,11 +1,10 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import BookingFormNew from '@/components/BookingFormNew';
 import CustomQuoteForm from '@/components/CustomQuoteForm';
-import { PaymentMethodSection } from '@/components/PaymentMethodSection';
+import PaymentProcessor from '@/components/PaymentProcessor';
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -299,11 +298,11 @@ const BookShipment = () => {
               onRequestCustomQuote={handleRequestCustomQuote}
             />
           ) : currentStep === BookingStep.PAYMENT ? (
-            <PaymentMethodSection 
+            <PaymentProcessor 
               bookingData={bookingData}
               totalAmount={totalAmount}
               onCancel={handleBackToForm}
-              onComplete={handlePaymentComplete}
+              onPaymentComplete={handlePaymentComplete}
             />
           ) : (
             <CustomQuoteForm 

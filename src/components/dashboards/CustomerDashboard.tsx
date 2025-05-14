@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -11,7 +12,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/EmptyState';
-import CustomerQuotes from './CustomerQuotes';
 import html2pdf from 'html2pdf.js';
 
 import { 
@@ -23,8 +23,7 @@ import {
   MapPin,
   User,
   Phone,
-  Mail,
-  Quote
+  Mail
 } from 'lucide-react';
 
 const CustomerDashboard: React.FC = () => {
@@ -272,10 +271,6 @@ const CustomerDashboard: React.FC = () => {
             <Package className="h-4 w-4" />
             <span>My Shipments</span>
           </TabsTrigger>
-          <TabsTrigger value="quotes" className="flex items-center gap-2">
-            <Quote className="h-4 w-4" />
-            <span>My Quotes</span>
-          </TabsTrigger>
           <TabsTrigger value="receipts" className="flex items-center gap-2">
             <ReceiptIcon className="h-4 w-4" />
             <span>My Receipts</span>
@@ -343,10 +338,6 @@ const CustomerDashboard: React.FC = () => {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="quotes" className="space-y-4">
-          <CustomerQuotes />
         </TabsContent>
 
         <TabsContent value="receipts" className="space-y-4">
