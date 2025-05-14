@@ -248,13 +248,17 @@ const BookShipment = () => {
         recipient_details: bookingData.recipientDetails
       }).select().single();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error submitting custom quote:', error);
+        throw error;
+      }
       
       toast({
         title: "Custom Quote Requested",
         description: "We'll contact you shortly with a price for your shipment.",
       });
       
+      // This section is modified to properly handle the Promise
       await supabase.from('notifications').insert({
         user_id: user?.id || bookingData.user_id || '00000000-0000-0000-0000-000000000000',
         title: 'New Custom Quote Request',
