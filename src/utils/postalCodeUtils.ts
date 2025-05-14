@@ -1,3 +1,4 @@
+
 /**
  * UK Postal Code validation utilities
  */
@@ -236,7 +237,7 @@ export const getRouteForPostalCode = (postalCode: string): string | null => {
   
   try {
     // Format and clean the postal code
-    const formattedCode = formatUKPostcode(postcode);
+    const formattedCode = formatUKPostcode(postalCode);
     
     // Check if it's a restricted postal code
     for (const restrictedCode of restrictedPostalCodes) {
