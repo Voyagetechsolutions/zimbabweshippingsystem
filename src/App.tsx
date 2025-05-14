@@ -15,7 +15,6 @@ import Privacy from '@/pages/Privacy';
 import FAQ from '@/pages/FAQ';
 import NotFound from '@/pages/NotFound';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { Toast } from '@/components/ui/toast';
 import ReviewPage from '@/pages/ReviewPage';
 import GalleryPage from '@/pages/GalleryPage';
 import CollectionSchedulePage from '@/pages/CollectionSchedulePage';
@@ -25,8 +24,9 @@ import { ToastProvider } from '@/hooks/use-toast';
 
 function App() {
   return (
-    <AuthProvider>
-      <ToastProvider>
+    // Ensure ToastProvider is the outer wrapper so it's available to AuthProvider
+    <ToastProvider>
+      <AuthProvider>
         <Router>
           <Routes>
             <Route path="/" element={<Index />} />
@@ -49,8 +49,8 @@ function App() {
           </Routes>
           <Toaster />
         </Router>
-      </ToastProvider>
-    </AuthProvider>
+      </AuthProvider>
+    </ToastProvider>
   );
 }
 
