@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
@@ -152,7 +153,7 @@ const BookShipment = () => {
             category: formData.category || '',
             specific_item: formData.specificItem || '',
             admin_notes: formData.additionalNotes || '',
-            name: user.displayName || user.email,
+            name: user.email.split('@')[0] || user.email, // Use username part of email as fallback
             email: user.email
           })
           .select()
@@ -262,7 +263,7 @@ const BookShipment = () => {
                     control={control}
                     name="includeDrums"
                     render={({ field }) => (
-                      <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex flex-row space-x-2">
+                      <RadioGroup onValueChange={(value) => field.onChange(value === "true")} defaultValue={field.value ? "true" : "false"} className="flex flex-row space-x-2">
                         <RadioGroupItem value="true" id="drums-yes" />
                         <Label htmlFor="drums-yes">Yes</Label>
                         <RadioGroupItem value="false" id="drums-no" />
@@ -272,7 +273,7 @@ const BookShipment = () => {
                   />
                   {errors.includeDrums && <p className="text-red-500 text-sm">{errors.includeDrums?.message}</p>}
                 </div>
-                {includeDrumsValue === 'true' && (
+                {includeDrumsValue && (
                   <div className="grid gap-2">
                     <Label htmlFor="quantity">Number of Drums</Label>
                     <Input
@@ -296,7 +297,7 @@ const BookShipment = () => {
                     control={control}
                     name="includeOtherItems"
                     render={({ field }) => (
-                      <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex flex-row space-x-2">
+                      <RadioGroup onValueChange={(value) => field.onChange(value === "true")} defaultValue={field.value ? "true" : "false"} className="flex flex-row space-x-2">
                         <RadioGroupItem value="true" id="other-items-yes" />
                         <Label htmlFor="other-items-yes">Yes</Label>
                         <RadioGroupItem value="false" id="other-items-no" />
@@ -306,7 +307,7 @@ const BookShipment = () => {
                   />
                   {errors.includeOtherItems && <p className="text-red-500 text-sm">{errors.includeOtherItems?.message}</p>}
                 </div>
-                {includeOtherItemsValue === 'true' && (
+                {includeOtherItemsValue && (
                   <>
                     <div className="grid gap-2">
                       <Label htmlFor="category">Category</Label>
