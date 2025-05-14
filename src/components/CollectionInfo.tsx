@@ -5,6 +5,7 @@ import { PhoneIcon } from 'lucide-react';
 import { getRouteForPostalCode, getIrelandRouteForCity, restrictedPostalCodes } from '@/utils/postalCodeUtils';
 import { getDateByRoute, getDateForIrelandCity } from '@/data/collectionSchedule';
 import { generateUniqueId } from '@/utils/utils';
+import { toast } from '@/hooks/use-toast';
 
 interface CollectionInfoProps {
   country: string;
@@ -34,31 +35,40 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
     let newCollectionDate: string | null = null;
     let restricted = false;
 
-    // Check for restricted postal codes first
-    if (country === 'England' && postalCode) {
-      const postCodePrefix = postalCode.toUpperCase().match(/^[A-Z]{1,2}[0-9]{0,1}/)?.[0];
-      if (postCodePrefix && restrictedPostalCodes.includes(postCodePrefix)) {
-        restricted = true;
-        setIsRestricted(true);
-        
-        // For restricted areas, provide fallback date instead of null
-        newRoute = "Restricted Route";
-        newCollectionDate = "Contact support for booking";
-      } else {
-        // Normal route determination for non-restricted areas
-        newRoute = getRouteForPostalCode(postalCode);
+    try {
+      // Check for restricted postal codes first
+      if (country === 'England' && postalCode) {
+        const postCodePrefix = postalCode.toUpperCase().match(/^[A-Z]{1,2}[0-9]{0,1}/)?.[0];
+        if (postCodePrefix && restrictedPostalCodes.includes(postCodePrefix)) {
+          restricted = true;
+          setIsRestricted(true);
+          
+          // For restricted areas, provide fallback date instead of null
+          newRoute = "Restricted Route";
+          newCollectionDate = "Contact support for booking";
+        } else {
+          // Normal route determination for non-restricted areas
+          newRoute = getRouteForPostalCode(postalCode);
+          if (newRoute) {
+            newCollectionDate = getDateByRoute(newRoute);
+            console.log("Retrieved England route and date:", { newRoute, newCollectionDate });
+          }
+        }
+      } else if (country === 'Ireland' && city) {
+        const normalizedCity = city.trim().toUpperCase();
+        newRoute = getIrelandRouteForCity(normalizedCity);
         if (newRoute) {
-          newCollectionDate = getDateByRoute(newRoute);
-          console.log("Retrieved England route and date:", { newRoute, newCollectionDate });
+          newCollectionDate = getDateForIrelandCity(normalizedCity) || getDateByRoute(newRoute);
+          console.log("Retrieved Ireland route and date:", { newRoute, newCollectionDate });
         }
       }
-    } else if (country === 'Ireland' && city) {
-      const normalizedCity = city.trim().toUpperCase();
-      newRoute = getIrelandRouteForCity(normalizedCity);
-      if (newRoute) {
-        newCollectionDate = getDateForIrelandCity(normalizedCity) || getDateByRoute(newRoute);
-        console.log("Retrieved Ireland route and date:", { newRoute, newCollectionDate });
-      }
+    } catch (error) {
+      console.error("Error determining collection information:", error);
+      toast({
+        title: "Notice",
+        description: "There was an issue determining your collection information. Using default values.",
+        variant: "default",
+      });
     }
     
     // IMPORTANT: Always ensure we have a route and collection date
@@ -79,7 +89,7 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
       }
     }
     
-    // Make sure collectionDate is never null
+    // Make sure collectionDate is never null or undefined
     if (!newCollectionDate) {
       newCollectionDate = "Next available collection date";
     }
