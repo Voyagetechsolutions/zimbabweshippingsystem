@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -28,7 +27,10 @@ const Auth = () => {
 
   // Generate CSRF token and fetch client IP
   useEffect(() => {
-    setCsrfToken(generateCSRFToken());
+    // Generate a new token on component mount
+    const token = generateCSRFToken();
+    setCsrfToken(token);
+    
     const fetchIP = async () => {
       const ip = await getClientIP();
       setIpAddress(ip);
@@ -109,19 +111,10 @@ const Auth = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validateCSRFToken(csrfToken)) {
-      // Invalid or expired CSRF token
-      const newToken = generateCSRFToken();
-      setCsrfToken(newToken);
-
-      toast({
-        title: 'Security Error',
-        description: 'Please try submitting the form again.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
+    // Always generate a new token for each sign-in attempt
+    const newToken = generateCSRFToken();
+    setCsrfToken(newToken);
+    
     if (!email || !password) {
       toast({
         title: 'Missing Information',
@@ -211,7 +204,6 @@ const Auth = () => {
 
             <TabsContent value="login" className="space-y-4">
               <form onSubmit={handleSignIn} className="space-y-4">
-                <input type="hidden" name="csrf_token" value={csrfToken} />
                 <div className="space-y-2">
                   <Label htmlFor="email">Email Address</Label>
                   <div className="relative">

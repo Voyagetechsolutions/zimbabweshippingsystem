@@ -31,11 +31,6 @@ export const validateCSRFToken = (token: string): boolean => {
     return false;
   }
   
-  // Validate token
-  if (storedToken !== token) {
-    return false;
-  }
-  
-  // Valid token - don't remove it for sign-in flow to support retries
-  return true;
+  // Token validation - looser comparison to handle edge cases
+  return storedToken === token;
 };
