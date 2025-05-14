@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useShipping } from '@/contexts/ShippingContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,6 +22,7 @@ type QuoteDetails = {
 
 const ConfirmBooking: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
   const { setShipmentDetails } = useShipping();
@@ -33,31 +33,52 @@ const ConfirmBooking: React.FC = () => {
     // Set document title
     document.title = 'Confirm Booking | UK to Zimbabwe Shipping';
     
-    // Get quote details from localStorage
-    const storedQuote = localStorage.getItem('selectedQuote');
-    if (storedQuote) {
+    // Check for state data first (coming from PaymentMethodSection)
+    const stateData = location.state?.bookingData;
+    
+    if (stateData) {
       try {
-        const parsedQuote = JSON.parse(storedQuote);
-        setQuoteDetails(parsedQuote);
+        // Use data passed via state
+        const quoteData: QuoteDetails = {
+          id: stateData.shipment_id || stateData.id || '',
+          description: stateData.shipmentDetails?.description || '',
+          category: stateData.shipmentDetails?.category || '',
+          specificItem: stateData.shipmentDetails?.specificItem || '',
+          amount: location.state?.paymentData?.finalAmount || 0,
+          adminNotes: stateData.collection?.date ? `Collection on ${stateData.collection.date}` : undefined
+        };
+        
+        setQuoteDetails(quoteData);
       } catch (error) {
-        console.error('Error parsing stored quote:', error);
+        console.error('Error parsing state data:', error);
+      }
+    } else {
+      // Fall back to localStorage if no state data
+      const storedQuote = localStorage.getItem('selectedQuote');
+      if (storedQuote) {
+        try {
+          const parsedQuote = JSON.parse(storedQuote);
+          setQuoteDetails(parsedQuote);
+        } catch (error) {
+          console.error('Error parsing stored quote:', error);
+          toast({
+            title: 'Error',
+            description: 'Could not load quote details. Please try again.',
+            variant: 'destructive',
+          });
+          navigate('/dashboard');
+        }
+      } else {
+        // No quote found, redirect to dashboard
         toast({
-          title: 'Error',
-          description: 'Could not load quote details. Please try again.',
+          title: 'No Quote Selected',
+          description: 'No quote was selected for booking.',
           variant: 'destructive',
         });
         navigate('/dashboard');
       }
-    } else {
-      // No quote found, redirect to dashboard
-      toast({
-        title: 'No Quote Selected',
-        description: 'No quote was selected for booking.',
-        variant: 'destructive',
-      });
-      navigate('/dashboard');
     }
-  }, [navigate, toast]);
+  }, [navigate, toast, location.state]);
 
   const handleProceedToPayment = async () => {
     if (!quoteDetails || !user) {
