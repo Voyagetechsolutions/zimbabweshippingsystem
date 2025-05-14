@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -36,7 +37,7 @@ import CollectionScheduleTab from '@/components/admin/tabs/CollectionScheduleTab
 import RouteManagementTab from '@/components/admin/tabs/RouteManagementTab';
 import UserManagementTab from '@/components/admin/tabs/UserManagementTab';
 import SystemSettingsTab from '@/components/admin/tabs/SystemSettingsTab';
-import CustomQuoteManagement from './CustomQuoteManagement';
+import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
 
 // Icons
 import { 
@@ -62,7 +63,7 @@ import {
 import SupportTickets from '@/components/admin/SupportTickets';
 import ContentManagement from '@/components/admin/ContentManagement';
 
-const AdminDashboardContent: React.FC = () => {
+const AdminDashboardContent = () => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState('shipments');
@@ -176,7 +177,7 @@ const AdminDashboardContent: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header with title and notification bell */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Admin Dashboard</h1>
@@ -297,36 +298,249 @@ const AdminDashboardContent: React.FC = () => {
       </div>
 
       {/* Main Navigation Tabs */}
-      <Tabs defaultValue="shipments" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="shipments">Shipments</TabsTrigger>
-          <TabsTrigger value="quotes">Custom Quotes</TabsTrigger>
-          <TabsTrigger value="customers">Customers</TabsTrigger>
-          <TabsTrigger value="collections">Collections</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-        </TabsList>
-        
+      <Tabs defaultValue="shipments" value={activeTab} onValueChange={setActiveTab} className="w-full">
+        {isMobile && showMobileMenu ? (
+          <div className="mb-6">
+            <Select value={activeTab} onValueChange={setActiveTab}>
+              <SelectTrigger className="w-full">
+                <span className="flex items-center gap-2">
+                  {activeTab === 'shipments' && <Package className="h-4 w-4" />}
+                  {activeTab === 'customers' && <User className="h-4 w-4" />}
+                  {activeTab === 'pickupZones' && <MapPin className="h-4 w-4" />}
+                  {activeTab === 'delivery' && <Truck className="h-4 w-4" />}
+                  {activeTab === 'payments' && <CreditCard className="h-4 w-4" />}
+                  {activeTab === 'reports' && <BarChart3 className="h-4 w-4" />}
+                  {activeTab === 'notifications' && <Bell className="h-4 w-4" />}
+                  {activeTab === 'schedule' && <Calendar className="h-4 w-4" />}
+                  {activeTab === 'routes' && <Route className="h-4 w-4" />}
+                  {activeTab === 'users' && <Users className="h-4 w-4" />}
+                  {activeTab === 'settings' && <Settings className="h-4 w-4" />}
+                  {activeTab === 'customQuotes' && <Quote className="h-4 w-4" />}
+                  
+                  {activeTab === 'shipments' && 'Shipment Management'}
+                  {activeTab === 'customers' && 'Customer Management'}
+                  {activeTab === 'pickupZones' && 'Pickup Zones'}
+                  {activeTab === 'delivery' && 'Delivery Management'}
+                  {activeTab === 'payments' && 'Payments & Invoicing'}
+                  {activeTab === 'reports' && 'Reports & Analytics'}
+                  {activeTab === 'notifications' && 'Notifications'}
+                  {activeTab === 'schedule' && 'Collection Schedule'}
+                  {activeTab === 'routes' && 'Route Management'}
+                  {activeTab === 'users' && 'User Management'}
+                  {activeTab === 'settings' && 'System Settings'}
+                  {activeTab === 'customQuotes' && 'Custom Quotes'}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="shipments">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    <span>Shipment Management</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="customers">
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    <span>Customer Management</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="pickupZones">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    <span>Pickup Zones</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="delivery">
+                  <div className="flex items-center gap-2">
+                    <Truck className="h-4 w-4" />
+                    <span>Delivery Management</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="payments">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="h-4 w-4" />
+                    <span>Payments & Invoicing</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="reports">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    <span>Reports & Analytics</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="notifications">
+                  <div className="flex items-center gap-2">
+                    <Bell className="h-4 w-4" />
+                    <span>Notifications</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="schedule">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    <span>Collection Schedule</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="routes">
+                  <div className="flex items-center gap-2">
+                    <Route className="h-4 w-4" />
+                    <span>Route Management</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="users">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    <span>User Management</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="settings">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    <span>System Settings</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="customQuotes">
+                  <div className="flex items-center gap-2">
+                    <Quote className="h-4 w-4" />
+                    <span>Custom Quotes</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        ) : (
+          <TabsList className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-12 gap-2 h-auto p-1">
+            <TabsTrigger value="shipments" className="flex items-center gap-1 py-2 h-auto">
+              <Package className="h-4 w-4" />
+              <span className="hidden md:inline">Shipments</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="customers" className="flex items-center gap-1 py-2 h-auto">
+              <User className="h-4 w-4" />
+              <span className="hidden md:inline">Customers</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="pickupZones" className="flex items-center gap-1 py-2 h-auto">
+              <MapPin className="h-4 w-4" />
+              <span className="hidden md:inline">Pickup Zones</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="delivery" className="flex items-center gap-1 py-2 h-auto">
+              <Truck className="h-4 w-4" />
+              <span className="hidden md:inline">Delivery</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="payments" className="flex items-center gap-1 py-2 h-auto">
+              <CreditCard className="h-4 w-4" />
+              <span className="hidden md:inline">Payments</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="reports" className="flex items-center gap-1 py-2 h-auto">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden md:inline">Reports</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="notifications" className="flex items-center gap-1 py-2 h-auto">
+              <Bell className="h-4 w-4" />
+              <span className="hidden md:inline">Notifications</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="schedule" className="flex items-center gap-1 py-2 h-auto">
+              <Calendar className="h-4 w-4" />
+              <span className="hidden md:inline">Schedule</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="routes" className="flex items-center gap-1 py-2 h-auto">
+              <Route className="h-4 w-4" />
+              <span className="hidden md:inline">Routes</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="users" className="flex items-center gap-1 py-2 h-auto">
+              <Users className="h-4 w-4" />
+              <span className="hidden md:inline">Users</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="settings" className="flex items-center gap-1 py-2 h-auto">
+              <Settings className="h-4 w-4" />
+              <span className="hidden md:inline">Settings</span>
+            </TabsTrigger>
+            
+            <TabsTrigger value="customQuotes" className="flex items-center gap-1 py-2 h-auto">
+              <Quote className="h-4 w-4" />
+              <span className="hidden md:inline">Custom Quotes</span>
+            </TabsTrigger>
+          </TabsList>
+        )}
+
         {/* Tab Contents */}
-        <TabsContent value="shipments">
+        <TabsContent value="shipments" className="mt-0 space-y-4">
           <ShipmentManagementTab />
         </TabsContent>
         
-        <TabsContent value="quotes">
-          <div className="space-y-6">
-            <CustomQuoteManagement />
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="customers">
+        <TabsContent value="customers" className="mt-0 space-y-4">
           <CustomerManagementTab />
         </TabsContent>
         
-        <TabsContent value="collections">
+        <TabsContent value="pickupZones" className="mt-0 space-y-4">
+          <PickupZonesManagementTab />
+        </TabsContent>
+        
+        <TabsContent value="delivery" className="mt-0 space-y-4">
+          <DeliveryManagementTab />
+        </TabsContent>
+        
+        <TabsContent value="payments" className="mt-0 space-y-4">
+          <PaymentsInvoicingTab />
+        </TabsContent>
+        
+        <TabsContent value="reports" className="mt-0 space-y-4">
+          <ReportsAnalyticsTab />
+        </TabsContent>
+        
+        <TabsContent value="notifications" className="mt-0 space-y-4">
+          <NotificationsAlertsTab />
+        </TabsContent>
+        
+        <TabsContent value="schedule" className="mt-0 space-y-4">
           <CollectionScheduleTab />
         </TabsContent>
         
-        <TabsContent value="settings">
+        <TabsContent value="routes" className="mt-0 space-y-4">
+          <RouteManagementTab />
+        </TabsContent>
+        
+        <TabsContent value="users" className="mt-0 space-y-4">
+          <UserManagementTab />
+        </TabsContent>
+        
+        <TabsContent value="settings" className="mt-0 space-y-4">
           <SystemSettingsTab />
+        </TabsContent>
+        
+        <TabsContent value="customQuotes" className="mt-0 space-y-4">
+          <CustomQuoteManagement />
+        </TabsContent>
+
+        <TabsContent value="more" className="mt-0 space-y-4">
+          <Tabs defaultValue="support" value={moreTabValue} onValueChange={setMoreTabValue}>
+            <TabsList className="mb-6">
+              <TabsTrigger value="support" className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                <span>Support Tickets</span>
+              </TabsTrigger>
+              <TabsTrigger value="media" className="flex items-center gap-2">
+                <ImageIcon className="h-4 w-4" />
+                <span>Media Library</span>
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="support">
+              <SupportTickets />
+            </TabsContent>
+            
+            <TabsContent value="media">
+              <ContentManagement />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
     </div>

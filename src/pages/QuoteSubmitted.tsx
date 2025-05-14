@@ -1,53 +1,55 @@
 
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import { CheckCircle2, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const QuoteSubmitted = () => {
   useEffect(() => {
-    document.title = 'Quote Submitted | UK Shipping Service';
+    document.title = 'Quote Submitted | UK to Zimbabwe Shipping';
   }, []);
-
+  
   return (
     <>
       <Navbar />
-      <main className="min-h-screen bg-gray-50 py-16 px-4">
-        <div className="container mx-auto max-w-lg text-center">
-          <div className="bg-white p-8 rounded-lg shadow-sm">
-            <div className="flex justify-center">
-              <div className="rounded-full bg-green-100 p-3 mb-6">
-                <CheckCircle2 className="h-12 w-12 text-green-600" />
+      
+      <main className="min-h-screen bg-gray-50 py-12 px-4">
+        <div className="container mx-auto max-w-4xl">
+          <div className="bg-white rounded-lg shadow-md p-6 md:p-10 text-center">
+            <div className="flex justify-center mb-6">
+              <div className="bg-green-50 border border-green-200 rounded-full p-3">
+                <CheckCircle2 className="h-12 w-12 text-green-500" />
               </div>
             </div>
             
-            <h1 className="text-2xl md:text-3xl font-bold mb-4">Quote Request Submitted!</h1>
+            <h1 className="text-3xl md:text-4xl font-bold mb-4">Quote Request Received!</h1>
             
-            <div className="space-y-4 mb-8">
-              <p className="text-gray-600">
-                Thank you for submitting your custom quote request. Our team will review your request 
-                and provide a personalized quote as soon as possible.
-              </p>
-              
-              <p className="text-gray-600">
-                You'll receive a notification when your quote is ready. You can also check the status 
-                of your quote in your dashboard under the "Custom Quotes" tab.
-              </p>
+            <p className="text-gray-600 max-w-2xl mx-auto text-lg mb-8">
+              Thank you for submitting your quote request. Our team will review your details and get back to you shortly with a custom price for your shipment.
+            </p>
+            
+            <div className="bg-blue-50 border border-blue-100 rounded-md p-4 md:p-6 mb-8 max-w-lg mx-auto text-left">
+              <h3 className="font-semibold text-blue-800 mb-2">What happens next?</h3>
+              <ol className="list-decimal ml-5 space-y-2 text-blue-700">
+                <li>Our team will review your request within 24 hours.</li>
+                <li>You'll receive a price quote via phone or email.</li>
+                <li>Once you accept the quote, we'll arrange collection.</li>
+                <li>Your shipment will be on its way to Zimbabwe!</li>
+              </ol>
             </div>
             
-            <div className="flex flex-col md:flex-row gap-4 justify-center">
-              <Link to="/dashboard">
-                <Button>View in Dashboard</Button>
-              </Link>
-              <Link to="/">
-                <Button variant="outline">Return to Home</Button>
-              </Link>
-            </div>
+            <Link to="/">
+              <Button className="bg-zim-green hover:bg-zim-green/90">
+                Return to Home
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
           </div>
         </div>
       </main>
+      
       <Footer />
     </>
   );
