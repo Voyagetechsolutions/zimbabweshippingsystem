@@ -114,12 +114,31 @@ const reducer = (state: State, action: Action): State => {
   }
 };
 
+// Define our base toast function type first (before using it)
+interface ToastFunctionBase {
+  (props: Omit<ToasterToast, "id">): {
+    id: string;
+    dismiss: () => void;
+    update: (props: ToasterToast) => void;
+  };
+}
+
+// Define additional helper methods
+interface ToastHelperMethods {
+  error: (message: string) => void;
+  success: (message: string) => void;
+  loading: (message: string) => void;
+}
+
+// Combine them for our full toast function type
+type ToastFunction = ToastFunctionBase & ToastHelperMethods;
+
 // Create a React context for toast
-type ToastContextValue = {
-  toast: ToastMethod;
+interface ToastContextValue {
+  toast: ToastFunction;
   toasts: ToasterToast[];
   dismiss: (toastId?: string) => void;
-};
+}
 
 const ToastContext = React.createContext<ToastContextValue | undefined>(
   undefined
@@ -184,7 +203,9 @@ export function ToastProvider({
     };
 
     // Add convenience methods
-    baseToast.error = (message: string) => {
+    const toastWithMethods = baseToast as ToastFunction;
+    
+    toastWithMethods.error = (message: string) => {
       baseToast({ 
         title: "Error", 
         description: message, 
@@ -192,21 +213,21 @@ export function ToastProvider({
       });
     };
     
-    baseToast.success = (message: string) => {
+    toastWithMethods.success = (message: string) => {
       baseToast({ 
         title: "Success", 
         description: message 
       });
     };
     
-    baseToast.loading = (message: string) => {
+    toastWithMethods.loading = (message: string) => {
       baseToast({ 
         title: "Loading", 
         description: message 
       });
     };
 
-    return baseToast;
+    return toastWithMethods;
   }, [dispatch]);
 
   const dismiss = React.useCallback((toastId?: string) => {
@@ -231,7 +252,6 @@ export function useToast() {
   return context;
 }
 
-export type ToastMethod = ReturnType<typeof useToast>["toast"];
+// Export API type without circular references
 export type ToastAPI = ReturnType<typeof useToast>;
-
-export type { ToastActionElement, ToastProps };
+export { type ToastActionElement, type ToastProps };

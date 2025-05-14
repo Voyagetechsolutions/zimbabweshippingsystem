@@ -5,7 +5,5 @@ export {
   ToastProvider,
   type ToastActionElement, 
   type ToastProps, 
-  type ToastAPI, 
-  type ToastMethod 
+  type ToastAPI 
 } from "@/hooks/use-toast";
-

@@ -2,7 +2,7 @@
 import React from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { ShippingGallerySlideshow } from '@/components/ShippingGallerySlideshow';
+import ShippingGallerySlideshow from '@/components/ShippingGallerySlideshow';
 
 const GalleryPage = () => {
   return (

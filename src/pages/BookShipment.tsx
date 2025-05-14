@@ -259,7 +259,7 @@ const BookShipment = () => {
         description: "We'll contact you shortly with a price for your shipment.",
       });
       
-      // Fix the Promise chain issue
+      // Fix the Promise chain issue by using try/catch instead of .catch()
       try {
         await supabase.from('notifications').insert({
           user_id: user?.id || bookingData.user_id || '00000000-0000-0000-0000-000000000000',
