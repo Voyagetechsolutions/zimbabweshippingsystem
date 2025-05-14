@@ -180,6 +180,8 @@ export const irelandCityToRouteMap: Record<string, string> = {
   'SHANDKILL': 'SHANDKILL ROUTE',
   'BRAY': 'BRAY ROUTE',
   'DUBLIN': 'DUBLIN CITY ROUTE',
+  'DUBLIN CITY': 'DUBLIN CITY ROUTE',
+  'DUBLIN AREA': 'DUBLIN CITY ROUTE',
   // Cork Route
   'PORTALOUSE': 'CORK ROUTE',
   'CASHEL': 'CASHEL ROUTE',
@@ -233,31 +235,60 @@ export const getInwardPostcode = (postcode: string): string => {
 export const getRouteForPostalCode = (postalCode: string): string | null => {
   if (!postalCode) return null;
   
-  // Format and clean the postal code
-  const formattedCode = formatUKPostcode(postalCode);
-  
-  // Check if it's a restricted postal code
-  for (const restrictedCode of restrictedPostalCodes) {
-    if (formattedCode.startsWith(restrictedCode)) {
-      return null;
+  try {
+    // Format and clean the postal code
+    const formattedCode = formatUKPostcode(postalCode);
+    
+    // Check if it's a restricted postal code
+    for (const restrictedCode of restrictedPostalCodes) {
+      if (formattedCode.startsWith(restrictedCode)) {
+        return null;
+      }
     }
+    
+    // Extract the prefix (first 1-2 letters)
+    const prefix = formattedCode.match(/^[A-Z]{1,2}/i);
+    if (!prefix) return null;
+    
+    // Look up the route based on the prefix
+    return postalCodeToRouteMap[prefix[0]] || null;
+  } catch (error) {
+    console.error("Error in getRouteForPostalCode:", error);
+    return null;
   }
-  
-  // Extract the prefix (first 1-2 letters)
-  const prefix = formattedCode.match(/^[A-Z]{1,2}/i);
-  if (!prefix) return null;
-  
-  // Look up the route based on the prefix
-  return postalCodeToRouteMap[prefix[0]] || null;
 };
 
 // Determine the route for an Ireland city
 export const getIrelandRouteForCity = (city: string): string | null => {
   if (!city) return null;
   
-  // Clean and format city name
-  const formattedCity = city.trim().toUpperCase();
-  
-  // Look up the route based on the city
-  return irelandCityToRouteMap[formattedCity] || null;
+  try {
+    // Clean and format city name
+    const formattedCity = city.trim().toUpperCase();
+    
+    // First try direct lookup
+    const directRoute = irelandCityToRouteMap[formattedCity];
+    if (directRoute) {
+      return directRoute;
+    }
+    
+    // Try partial matches if direct lookup fails
+    for (const [knownCity, route] of Object.entries(irelandCityToRouteMap)) {
+      if (formattedCity.includes(knownCity) || knownCity.includes(formattedCity)) {
+        console.log(`Found partial match for city: ${formattedCity}, matching: ${knownCity}, route: ${route}`);
+        return route;
+      }
+    }
+    
+    // Default to Dublin City Route for unrecognized cities
+    if (formattedCity.includes("DUBLIN") || formattedCity.includes("IRELAND")) {
+      console.log(`No exact match for city: ${formattedCity}, defaulting to DUBLIN CITY ROUTE`);
+      return "DUBLIN CITY ROUTE";
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("Error in getIrelandRouteForCity:", error);
+    return null;
+  }
 };

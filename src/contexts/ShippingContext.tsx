@@ -1,75 +1,90 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 
-// Define the currency type
-export interface Currency {
+// Define currency type
+type Currency = {
   code: string;
   symbol: string;
-  name: string;
-  exchangeRate: number; // Exchange rate relative to GBP (base currency)
-}
+  rate: number;
+};
 
-// Available currencies
-const availableCurrencies: Currency[] = [
-  { code: 'GBP', symbol: '£', name: 'British Pound', exchangeRate: 1 },
-  { code: 'USD', symbol: '$', name: 'US Dollar', exchangeRate: 1.35 },
-  { code: 'EUR', symbol: '€', name: 'Euro', exchangeRate: 1.15 },
-  { code: 'ZWL', symbol: 'Z$', name: 'Zimbabwean Dollar', exchangeRate: 487.25 }
-];
+type ShipmentDetails = {
+  originCountry: string;
+  destinationCountry: string;
+  includeDrums: boolean;
+  quantity: number;
+  includeOtherItems: boolean;
+  category?: string;
+  description?: string;
+  specificItem?: string;
+  totalAmount?: number;
+  customQuoteId?: string;
+  isCustomQuote?: boolean;
+};
 
-interface ShippingContextType {
+type ShippingContextType = {
+  shipmentDetails: ShipmentDetails | null;
+  setShipmentDetails: React.Dispatch<React.SetStateAction<ShipmentDetails | null>>;
+  recipientDetails: any;
+  setRecipientDetails: React.Dispatch<React.SetStateAction<any>>;
+  senderDetails: any;
+  setSenderDetails: React.Dispatch<React.SetStateAction<any>>;
+  clearShippingData: () => void;
+  // Add the missing properties
   currencies: Currency[];
   selectedCurrency: Currency;
-  setSelectedCurrency: (currency: Currency) => void;
-  convertPrice: (priceInGBP: number) => number;
-  formatPrice: (price: number) => string;
-}
+  setSelectedCurrency: React.Dispatch<React.SetStateAction<Currency>>;
+  formatPrice: (amount: number) => string;
+};
 
 const ShippingContext = createContext<ShippingContextType | undefined>(undefined);
 
-export function ShippingProvider({ children }: { children: React.ReactNode }) {
-  // Get the currency from localStorage or default to GBP
-  const [selectedCurrency, setSelectedCurrency] = useState<Currency>(() => {
-    const savedCurrency = localStorage.getItem('selectedCurrency');
-    if (savedCurrency) {
-      try {
-        return JSON.parse(savedCurrency);
-      } catch (e) {
-        return availableCurrencies[0]; // Default to GBP
-      }
-    }
-    return availableCurrencies[0]; // Default to GBP
-  });
+export const ShippingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [shipmentDetails, setShipmentDetails] = useState<ShipmentDetails | null>(null);
+  const [recipientDetails, setRecipientDetails] = useState<any>(null);
+  const [senderDetails, setSenderDetails] = useState<any>(null);
+  
+  // Add currencies state
+  const [currencies] = useState<Currency[]>([
+    { code: 'GBP', symbol: '£', rate: 1 },
+    { code: 'USD', symbol: '$', rate: 1.27 },
+    { code: 'EUR', symbol: '€', rate: 1.17 },
+  ]);
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency>(currencies[0]);
 
-  // Save selected currency to localStorage when it changes
-  useEffect(() => {
-    localStorage.setItem('selectedCurrency', JSON.stringify(selectedCurrency));
-  }, [selectedCurrency]);
-
-  // Convert price from GBP to selected currency
-  const convertPrice = (priceInGBP: number): number => {
-    return priceInGBP * selectedCurrency.exchangeRate;
+  const clearShippingData = () => {
+    setShipmentDetails(null);
+    setRecipientDetails(null);
+    setSenderDetails(null);
   };
 
-  // Format price with currency symbol
-  const formatPrice = (price: number): string => {
-    return `${selectedCurrency.symbol}${price.toFixed(2)}`;
+  // Add formatPrice function
+  const formatPrice = (amount: number): string => {
+    const convertedAmount = amount * selectedCurrency.rate;
+    return `${selectedCurrency.symbol}${convertedAmount.toFixed(2)}`;
   };
 
   return (
     <ShippingContext.Provider
       value={{
-        currencies: availableCurrencies,
+        shipmentDetails,
+        setShipmentDetails,
+        recipientDetails,
+        setRecipientDetails,
+        senderDetails,
+        setSenderDetails,
+        clearShippingData,
+        // Add the new properties to the context value
+        currencies,
         selectedCurrency,
         setSelectedCurrency,
-        convertPrice,
-        formatPrice
+        formatPrice,
       }}
     >
       {children}
     </ShippingContext.Provider>
   );
-}
+};
 
 export const useShipping = () => {
   const context = useContext(ShippingContext);
