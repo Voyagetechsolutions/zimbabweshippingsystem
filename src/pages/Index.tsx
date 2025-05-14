@@ -42,7 +42,7 @@ const Index = () => {
                 </Link>
               </div>
               
-              <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+              {/*<div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
                 <div className="flex items-center mb-4">
                   <div className="w-12 h-12 rounded-full bg-zim-yellow/10 flex items-center justify-center mr-4">
                     <Package className="h-6 w-6 text-zim-yellow" />
@@ -55,7 +55,7 @@ const Index = () => {
                     Get Quote <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
-              </div>
+              </div>*/}
               
               <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
                 <div className="flex items-center mb-4">
