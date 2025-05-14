@@ -17,12 +17,29 @@ const availableCurrencies: Currency[] = [
   { code: 'ZWL', symbol: 'Z$', name: 'Zimbabwean Dollar', exchangeRate: 487.25 }
 ];
 
+// Define shipment details type
+export interface ShipmentDetailsType {
+  originCountry?: string;
+  destinationCountry?: string;
+  includeDrums?: boolean;
+  quantity?: number;
+  includeOtherItems?: boolean;
+  category?: string;
+  description?: string;
+  specificItem?: string;
+  additionalNotes?: string;
+  contactPreference?: string;
+  [key: string]: any; // Allow for additional properties
+}
+
 interface ShippingContextType {
   currencies: Currency[];
   selectedCurrency: Currency;
   setSelectedCurrency: (currency: Currency) => void;
   convertPrice: (priceInGBP: number) => number;
   formatPrice: (price: number) => string;
+  shipmentDetails: ShipmentDetailsType | null;
+  setShipmentDetails: (details: ShipmentDetailsType) => void;
 }
 
 const ShippingContext = createContext<ShippingContextType | undefined>(undefined);
@@ -40,6 +57,9 @@ export function ShippingProvider({ children }: { children: React.ReactNode }) {
     }
     return availableCurrencies[0]; // Default to GBP
   });
+
+  // Shipment details state
+  const [shipmentDetails, setShipmentDetails] = useState<ShipmentDetailsType | null>(null);
 
   // Save selected currency to localStorage when it changes
   useEffect(() => {
@@ -63,7 +83,9 @@ export function ShippingProvider({ children }: { children: React.ReactNode }) {
         selectedCurrency,
         setSelectedCurrency,
         convertPrice,
-        formatPrice
+        formatPrice,
+        shipmentDetails,
+        setShipmentDetails
       }}
     >
       {children}

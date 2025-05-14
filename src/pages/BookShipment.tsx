@@ -138,30 +138,23 @@ const BookShipment = () => {
         return;
       }
 
-      const shipmentDetails = {
-        originCountry: watch('originCountry'),
-        destinationCountry: watch('destinationCountry'),
-        includeDrums: watch('includeDrums'),
-        quantity: watch('quantity'),
-        includeOtherItems: watch('includeOtherItems'),
-        category: watch('category'),
-        description: watch('description'),
-        specificItem: watch('specificItem'),
-      };
-      const additionalNotes = watch('additionalNotes');
-      const contactPreference = watch('contactPreference');
+      const formData = watch();
       
       // Create a custom quote in the database
       try {
         const { data: quoteData, error: quoteError } = await supabase
           .from('custom_quotes')
-          .insert([{
+          .insert({
             user_id: user.id,
-            shipment_details: shipmentDetails,
+            description: formData.description || `Shipping from ${formData.originCountry} to ${formData.destinationCountry}`,
+            phone_number: user.phone || '000-000-0000', // Fallback if user doesn't have phone number
             status: 'pending',
-            additional_notes: additionalNotes || null,
-            contact_preference: contactPreference
-          }])
+            category: formData.category || '',
+            specific_item: formData.specificItem || '',
+            admin_notes: formData.additionalNotes || '',
+            name: user.displayName || user.email,
+            email: user.email
+          })
           .select()
           .single();
 
@@ -185,7 +178,7 @@ const BookShipment = () => {
               message: 'Your custom quote request has been received. We will contact you soon.',
               type: 'quote',
               related_id: quoteData.id,
-              read: false
+              is_read: false
             }]);
         } catch (notificationError) {
           // Just log the notification error, don't interrupt the flow
