@@ -165,8 +165,8 @@ const CustomQuoteForm: React.FC<CustomQuoteFormProps> = ({ bookingData, onSubmit
             />
           </div>
           
-          <div>
-            {/* <Label>Upload Images (Optional)</Label>
+          {/*<div>
+            <Label>Upload Images (Optional)</Label>
             <Input
               type="file"
               multiple
