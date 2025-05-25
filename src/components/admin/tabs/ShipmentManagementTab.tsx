@@ -764,7 +764,7 @@ const ShipmentManagementTab = () => {
               
               {/* Shipment Details Section */}
               <div>
-                <h3 className="text-lg font-medium mb-3">Shipment Details</h3>
+                <h3 className="text-lg font-medium mb-3">Shipment Details today</h3>
                 <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-md">
                   {viewingShipment.metadata?.shipmentDetails && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
