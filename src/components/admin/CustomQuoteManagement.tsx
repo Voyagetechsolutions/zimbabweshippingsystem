@@ -195,6 +195,26 @@ const CustomQuoteManagement = () => {
     }
   };
 
+  // Helper function to get the display name
+  const getDisplayName = (quote: CustomQuote): string => {
+    if (quote.name && quote.name.trim() !== '') {
+      return quote.name;
+    }
+    
+    // Check sender_details for name
+    if (quote.sender_details && typeof quote.sender_details === 'object') {
+      const senderDetails = quote.sender_details as any;
+      if (senderDetails.name && senderDetails.name.trim() !== '') {
+        return senderDetails.name;
+      }
+      if (senderDetails.firstName && senderDetails.lastName) {
+        return `${senderDetails.firstName} ${senderDetails.lastName}`;
+      }
+    }
+    
+    return 'Anonymous';
+  };
+
   if (loading) {
     return (
       <Card>
@@ -231,7 +251,7 @@ const CustomQuoteManagement = () => {
                 <div className="flex justify-between items-start">
                   <div>
                     <CardTitle className="text-lg">
-                      {quote.name || 'Anonymous'} - {quote.phone_number}
+                      {getDisplayName(quote)} - {quote.phone_number}
                     </CardTitle>
                     <p className="text-sm text-muted-foreground">
                       {formatDate(quote.created_at)}
@@ -288,7 +308,7 @@ const CustomQuoteManagement = () => {
                         <div className="space-y-4">
                           <div>
                             <Label>Contact Information</Label>
-                            <p>{quote.name || 'Anonymous'}</p>
+                            <p>{getDisplayName(quote)}</p>
                             <p>{quote.email || 'No email provided'}</p>
                             <p>{quote.phone_number}</p>
                           </div>

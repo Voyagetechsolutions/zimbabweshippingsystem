@@ -464,6 +464,28 @@ const ShipmentManagementTab = () => {
     };
   };
   
+  // Function to get payment amount from metadata
+  const getPaymentAmount = (shipment: Shipment): string => {
+    const metadata = shipment.metadata || {};
+    
+    // Check various places where payment amount might be stored
+    if (metadata.payment?.amount) {
+      return `£${metadata.payment.amount}`;
+    } else if (metadata.amount) {
+      return `£${metadata.amount}`;
+    } else if (metadata.totalAmount) {
+      return `£${metadata.totalAmount}`;
+    } else if (metadata.total) {
+      return `£${metadata.total}`;
+    } else if (metadata.pricing?.total) {
+      return `£${metadata.pricing.total}`;
+    } else if (metadata.cost) {
+      return `£${metadata.cost}`;
+    }
+    
+    return 'Not specified';
+  };
+  
   // Filter shipments based on search and status filter
   const filteredShipments = shipments.filter(shipment => {
     const metadata = shipment.metadata || {};
@@ -662,6 +684,10 @@ const ShipmentManagementTab = () => {
                 <div className="space-y-1">
                   <h3 className="text-sm font-medium text-muted-foreground">Updated At</h3>
                   <p>{format(new Date(viewingShipment.updated_at), 'dd MMM yyyy HH:mm')}</p>
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-medium text-muted-foreground">Payment Amount</h3>
+                  <p>{getPaymentAmount(viewingShipment)}</p>
                 </div>
               </div>
               

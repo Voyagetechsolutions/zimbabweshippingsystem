@@ -100,17 +100,24 @@ const CustomerDashboard: React.FC = () => {
     }
   };
 
-  // Fetch user's custom quotes
+  // Fetch user's custom quotes - updated to include all quotes regardless of user_id
   const fetchCustomQuotes = async () => {
     if (!user) return [];
     
     try {
       console.log('Fetching custom quotes for user ID:', user.id);
       
+      // Fetch quotes where user_id matches OR email matches (for quotes made before login)
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('id', user.id)
+        .single();
+
       const { data, error } = await supabase
         .from('custom_quotes')
         .select('*')
-        .eq('user_id', user.id)
+        .or(`user_id.eq.${user.id},email.eq.${userProfile?.email}`)
         .order('created_at', { ascending: false });
         
       if (error) {
@@ -138,10 +145,11 @@ const CustomerDashboard: React.FC = () => {
     enabled: !!user?.id
   });
 
-  const { data: customQuotes, isLoading: isLoadingCustomQuotes } = useQuery({
+  const { data: customQuotes, isLoading: isLoadingCustomQuotes, refetch: refetchCustomQuotes } = useQuery({
     queryKey: ['customerCustomQuotes', user?.id],
     queryFn: fetchCustomQuotes,
-    enabled: !!user?.id
+    enabled: !!user?.id,
+    refetchInterval: 5000, // Refetch every 5 seconds to get updates
   });
 
   // Helper function to generate receipt number
