@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -100,24 +101,32 @@ const CustomerDashboard: React.FC = () => {
     }
   };
 
-  // Fetch user's custom quotes - updated to include all quotes regardless of user_id
+  // Fetch user's custom quotes - fixed to properly get all user quotes
   const fetchCustomQuotes = async () => {
     if (!user) return [];
     
     try {
       console.log('Fetching custom quotes for user ID:', user.id);
       
-      // Fetch quotes where user_id matches OR email matches (for quotes made before login)
-      const { data: userProfile } = await supabase
+      // First get the user's email from their profile
+      const { data: userProfile, error: profileError } = await supabase
         .from('profiles')
         .select('email')
         .eq('id', user.id)
         .single();
 
+      if (profileError) {
+        console.error('Error fetching user profile:', profileError);
+      }
+
+      const userEmail = userProfile?.email || user.email;
+      console.log('User email for matching:', userEmail);
+
+      // Fetch quotes with multiple conditions to ensure we get all user quotes
       const { data, error } = await supabase
         .from('custom_quotes')
         .select('*')
-        .or(`user_id.eq.${user.id},email.eq.${userProfile?.email}`)
+        .or(`user_id.eq.${user.id}${userEmail ? `,email.eq.${userEmail}` : ''}`)
         .order('created_at', { ascending: false });
         
       if (error) {
