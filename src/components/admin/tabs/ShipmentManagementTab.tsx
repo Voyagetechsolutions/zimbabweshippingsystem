@@ -103,8 +103,6 @@ const ShipmentManagementTab = () => {
   const [editingStatus, setEditingStatus] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
   const [statusNote, setStatusNote] = useState('');
-  const [statusHistory, setStatusHistory] = useState<StatusHistory[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
   const [activeTab, setActiveTab] = useState('allShipments');
   const [customQuotes, setCustomQuotes] = useState<any[]>([]);
   const [sortField, setSortField] = useState('created_at');
@@ -166,47 +164,9 @@ const ShipmentManagementTab = () => {
     }
   };
 
-  const fetchStatusHistory = async (shipmentId: string) => {
-    setLoadingHistory(true);
-    try {
-      // Fetch status history from shipment updates if available
-      const { data, error } = await supabase
-        .from('shipments')
-        .select('status, updated_at')
-        .eq('id', shipmentId)
-        .single();
-
-      if (error) throw error;
-
-      // Create a history from available data
-      const history: StatusHistory[] = [
-        {
-          id: '1',
-          status: data.status,
-          created_at: data.updated_at,
-          created_by: 'System',
-          notes: 'Status updated',
-        }
-      ];
-
-      setStatusHistory(history);
-    } catch (error: any) {
-      console.error('Error fetching status history:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load status history',
-        variant: 'destructive',
-      });
-      setStatusHistory([]);
-    } finally {
-      setLoadingHistory(false);
-    }
-  };
-
   const handleViewShipment = (shipment: Shipment) => {
     setViewingShipment(shipment);
     setSelectedStatus(shipment.status);
-    fetchStatusHistory(shipment.id);
   };
 
   const handleUpdateStatus = async () => {
@@ -248,17 +208,6 @@ const ShipmentManagementTab = () => {
         updated_at: new Date().toISOString()
       });
 
-      // Create a new history entry
-      const newHistoryEntry: StatusHistory = {
-        id: Date.now().toString(),
-        status: selectedStatus,
-        created_at: new Date().toISOString(),
-        created_by: 'Admin',
-        notes: statusNote || 'Status updated'
-      };
-      
-      setStatusHistory([newHistoryEntry, ...statusHistory]);
-      
       // Reset state
       setEditingStatus(false);
       setStatusNote('');
@@ -500,6 +449,19 @@ const ShipmentManagementTab = () => {
     }
     
     return 'No Address Provided';
+  };
+
+  // Function to get collection information from metadata
+  const getCollectionInfo = (shipment: Shipment) => {
+    const metadata = shipment.metadata || {};
+    
+    return {
+      route: metadata.collection?.route || 'Not specified',
+      date: metadata.collection?.date || 'Not specified',
+      scheduled: metadata.collection?.scheduled || false,
+      completed: metadata.collection?.completed || false,
+      notes: metadata.collection?.notes || 'No notes available'
+    };
   };
   
   // Filter shipments based on search and status filter
@@ -928,28 +890,40 @@ const ShipmentManagementTab = () => {
                 )}
               </div>
 
-              {/* Status History */}
+              {/* Collection Information */}
               <div className="space-y-2">
-                <h3 className="text-lg font-medium">Status History</h3>
-                {loadingHistory ? (
-                  <div className="flex justify-center py-4">
-                    <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary"></div>
-                  </div>
-                ) : statusHistory.length === 0 ? (
-                  <div className="text-center py-4">
-                    <AlertTriangle className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
-                    <h4 className="text-sm font-medium">No status history found</h4>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {statusHistory.map((history, index) => (
-                      <div key={history.id} className="flex items-center justify-between">
-                        <Badge variant="outline">{history.status}</Badge>
-                        <p>{format(new Date(history.created_at), 'dd MMM yyyy HH:mm')}</p>
+                <h3 className="text-lg font-medium">Collection Information</h3>
+                {(() => {
+                  const collectionInfo = getCollectionInfo(viewingShipment);
+                  return (
+                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-md">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-medium text-muted-foreground">Collection Route</h4>
+                          <p>{collectionInfo.route}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-medium text-muted-foreground">Collection Date</h4>
+                          <p>{collectionInfo.date}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-medium text-muted-foreground">Scheduled</h4>
+                          <p>{collectionInfo.scheduled ? 'Yes' : 'No'}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-medium text-muted-foreground">Completed</h4>
+                          <p>{collectionInfo.completed ? 'Yes' : 'No'}</p>
+                        </div>
+                        {collectionInfo.notes && (
+                          <div className="space-y-1 col-span-2">
+                            <h4 className="text-sm font-medium text-muted-foreground">Notes</h4>
+                            <p>{collectionInfo.notes}</p>
+                          </div>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}

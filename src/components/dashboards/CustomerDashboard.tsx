@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,11 +22,30 @@ import {
   MapPin,
   User,
   Phone,
-  Mail
+  Mail,
+  FileText,
+  CreditCard
 } from 'lucide-react';
+
+interface CustomQuote {
+  id: string;
+  phone_number: string;
+  description: string;
+  category?: string;
+  specific_item?: string;
+  status: string;
+  quoted_amount?: number;
+  admin_notes?: string;
+  created_at: string;
+  updated_at: string;
+  user_id?: string;
+  name?: string;
+  email?: string;
+}
 
 const CustomerDashboard: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('shipments');
 
   // Fetch user's shipments
@@ -82,25 +100,28 @@ const CustomerDashboard: React.FC = () => {
     }
   };
 
-  // Fetch user's saved addresses
-  const fetchAddresses = async () => {
+  // Fetch user's custom quotes
+  const fetchCustomQuotes = async () => {
     if (!user) return [];
     
     try {
+      console.log('Fetching custom quotes for user ID:', user.id);
+      
       const { data, error } = await supabase
-        .from('addresses')
+        .from('custom_quotes')
         .select('*')
         .eq('user_id', user.id)
-        .order('is_default', { ascending: false });
+        .order('created_at', { ascending: false });
         
       if (error) {
-        console.error('Error fetching addresses:', error);
+        console.error('Error fetching custom quotes:', error);
         throw error;
       }
       
-      return data || [];
+      console.log('Fetched custom quotes:', data);
+      return data as CustomQuote[] || [];
     } catch (error) {
-      console.error('Error in fetchAddresses:', error);
+      console.error('Error in fetchCustomQuotes:', error);
       return [];
     }
   };
@@ -117,9 +138,9 @@ const CustomerDashboard: React.FC = () => {
     enabled: !!user?.id
   });
 
-  const { data: addresses, isLoading: isLoadingAddresses } = useQuery({
-    queryKey: ['customerAddresses', user?.id],
-    queryFn: fetchAddresses,
+  const { data: customQuotes, isLoading: isLoadingCustomQuotes } = useQuery({
+    queryKey: ['customerCustomQuotes', user?.id],
+    queryFn: fetchCustomQuotes,
     enabled: !!user?.id
   });
 
@@ -258,6 +279,42 @@ const CustomerDashboard: React.FC = () => {
     }
   };
 
+  // Helper function to get custom quote status badge
+  const getCustomQuoteStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="outline">Pending</Badge>;
+      case 'quoted':
+        return <Badge className="bg-blue-100 text-blue-800">Quoted</Badge>;
+      case 'accepted':
+        return <Badge className="bg-green-100 text-green-800">Accepted</Badge>;
+      case 'declined':
+        return <Badge variant="destructive">Declined</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  // Handle Pay button click for custom quotes
+  const handlePayQuote = (quote: CustomQuote) => {
+    if (!quote.quoted_amount) {
+      return;
+    }
+
+    // Navigate to BookingFormNew with pre-filled data
+    const quoteData = {
+      quotedAmount: quote.quoted_amount,
+      quoteId: quote.id,
+      description: quote.description,
+      category: quote.category,
+      specificItem: quote.specific_item
+    };
+    
+    navigate('/book-shipment', { 
+      state: { customQuote: quoteData }
+    });
+  };
+
   return (
     <div className="space-y-6">
       <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
@@ -275,9 +332,9 @@ const CustomerDashboard: React.FC = () => {
             <ReceiptIcon className="h-4 w-4" />
             <span>My Receipts</span>
           </TabsTrigger>
-          <TabsTrigger value="addresses" className="flex items-center gap-2">
-            <MapPin className="h-4 w-4" />
-            <span>Saved Addresses</span>
+          <TabsTrigger value="customQuotes" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            <span>Custom Quotes</span>
           </TabsTrigger>
         </TabsList>
 
@@ -411,66 +468,82 @@ const CustomerDashboard: React.FC = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="addresses" className="space-y-4">
+        <TabsContent value="customQuotes" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Saved Addresses</CardTitle>
-              <CardDescription>Manage your saved addresses for faster checkout</CardDescription>
+              <CardTitle>Custom Quotes</CardTitle>
+              <CardDescription>View your custom quote requests and responses</CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoadingAddresses ? (
+              {isLoadingCustomQuotes ? (
                 <div className="min-h-[200px] flex items-center justify-center">
                   <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
                 </div>
-              ) : addresses && addresses.length > 0 ? (
+              ) : customQuotes && customQuotes.length > 0 ? (
                 <div className="space-y-4">
-                  {addresses.map((address: any) => (
-                    <div key={address.id} className="bg-white p-4 rounded-lg shadow">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium">{address.address_name}</h4>
-                        {address.is_default && (
-                          <Badge variant="outline">Default</Badge>
+                  {customQuotes.map((quote) => (
+                    <div key={quote.id} className="bg-white p-4 rounded-lg shadow">
+                      <div className="flex justify-between items-center mb-3">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-5 w-5 text-zim-green" />
+                          <h4 className="text-lg font-medium">Quote Request</h4>
+                          {getCustomQuoteStatusBadge(quote.status)}
+                          {quote.quoted_amount && (
+                            <Badge variant="secondary">£{quote.quoted_amount}</Badge>
+                          )}
+                        </div>
+                        {quote.status === 'quoted' && quote.quoted_amount && (
+                          <Button 
+                            onClick={() => handlePayQuote(quote)}
+                            className="flex items-center gap-2"
+                            size="sm"
+                          >
+                            <CreditCard className="h-4 w-4" />
+                            Pay £{quote.quoted_amount}
+                          </Button>
                         )}
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1">
-                            <User className="h-4 w-4 text-gray-500" />
-                            <p className="text-sm">{address.recipient_name}</p>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Phone className="h-4 w-4 text-gray-500" />
-                            <p className="text-sm">{address.phone_number || 'No phone provided'}</p>
-                          </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Description</p>
+                          <p className="text-sm">{quote.description}</p>
                         </div>
-                        <div className="space-y-1">
-                          <div className="flex items-start gap-1">
-                            <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
-                            <p className="text-sm">
-                              {address.street_address}, {address.city}
-                              {address.state && `, ${address.state}`}
-                              {address.postal_code && ` ${address.postal_code}`}, 
-                              {address.country}
-                            </p>
-                          </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Date Requested</p>
+                          <p className="text-sm">{formatDate(quote.created_at)}</p>
                         </div>
+                        {quote.category && (
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Category</p>
+                            <p className="text-sm">{quote.category}</p>
+                          </div>
+                        )}
+                        {quote.specific_item && (
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Specific Item</p>
+                            <p className="text-sm">{quote.specific_item}</p>
+                          </div>
+                        )}
                       </div>
-                      <div className="mt-3 flex justify-end space-x-2">
-                        <Link to={`/address-book?edit=${address.id}`}>
-                          <Button variant="outline" size="sm">Edit</Button>
-                        </Link>
-                      </div>
+
+                      {quote.admin_notes && (
+                        <div className="mt-3 p-3 bg-blue-50 rounded-md">
+                          <p className="text-sm font-medium text-blue-800 mb-1">Admin Response</p>
+                          <p className="text-sm text-blue-700">{quote.admin_notes}</p>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               ) : (
                 <EmptyState 
-                  icon={<MapPin className="h-12 w-12 text-gray-400" />}
-                  title="No Saved Addresses"
-                  description="Add addresses to your address book for faster checkout"
+                  icon={<FileText className="h-12 w-12 text-gray-400" />}
+                  title="No Custom Quotes"
+                  description="Request a custom quote for specialized shipping needs"
                   action={
-                    <Link to="/address-book">
-                      <Button>Add Address</Button>
+                    <Link to="/book-shipment">
+                      <Button>Request Custom Quote</Button>
                     </Link>
                   }
                 />
