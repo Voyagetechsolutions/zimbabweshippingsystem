@@ -451,26 +451,77 @@ const ShipmentManagementTab = () => {
     return 'No Address Provided';
   };
 
-  // Function to get collection information from metadata
+  // Enhanced function to get collection information from metadata
   const getCollectionInfo = (shipment: Shipment) => {
     const metadata = shipment.metadata || {};
     
+    // Check multiple possible paths for collection data
+    let collectionData = metadata.collection;
+    
+    // If no direct collection object, try to construct from other metadata fields
+    if (!collectionData) {
+      collectionData = {
+        route: metadata.collectionRoute || metadata.route || null,
+        date: metadata.collectionDate || metadata.date || null,
+        scheduled: metadata.collectionScheduled || metadata.scheduled || false,
+        completed: metadata.collectionCompleted || metadata.completed || false,
+        notes: metadata.collectionNotes || metadata.notes || null
+      };
+    }
+    
+    // Extract route information with multiple fallbacks
+    let route = collectionData?.route;
+    if (!route) {
+      // Try to get route from origin or other fields
+      route = metadata.pickupRoute || shipment.origin || 'Standard Route';
+    }
+    
+    // Extract collection date with multiple fallbacks
+    let date = collectionData?.date;
+    if (!date) {
+      // Try to get date from other metadata fields
+      date = metadata.pickupDate || metadata.collectionDate || format(new Date(shipment.created_at), 'PPP');
+    }
+    
+    // Extract scheduled status
+    const scheduled = collectionData?.scheduled || 
+                     metadata.collectionScheduled || 
+                     metadata.scheduled || 
+                     (shipment.status !== 'Booking Confirmed');
+    
+    // Extract completed status
+    const completed = collectionData?.completed || 
+                     metadata.collectionCompleted || 
+                     (shipment.status === 'Delivered' || 
+                      shipment.status === 'Processing in UK Warehouse' ||
+                      shipment.status === 'Customs Clearance' ||
+                      shipment.status === 'Processing in ZW Warehouse' ||
+                      shipment.status === 'Out for Delivery');
+    
+    // Extract notes
+    const notes = collectionData?.notes || 
+                  metadata.collectionNotes || 
+                  metadata.specialInstructions ||
+                  'No additional notes';
+    
     return {
-      route: metadata.collection?.route || 'Not specified',
-      date: metadata.collection?.date || 'Not specified',
-      scheduled: metadata.collection?.scheduled || false,
-      completed: metadata.collection?.completed || false,
-      notes: metadata.collection?.notes || 'No notes available'
+      route: route || 'Standard Collection Route',
+      date: date || 'Next available collection date',
+      scheduled: scheduled,
+      completed: completed,
+      notes: notes
     };
   };
   
-  // Function to get payment amount from metadata
+  // Enhanced function to get payment amount from metadata
   const getPaymentAmount = (shipment: Shipment): string => {
     const metadata = shipment.metadata || {};
     
     // Check various places where payment amount might be stored
     if (metadata.payment?.amount) {
       return `£${metadata.payment.amount}`;
+    } else if (metadata.paymentAmount) {
+      return `£${metadata.paymentAmount}`;
     } else if (metadata.amount) {
       return `£${metadata.amount}`;
     } else if (metadata.totalAmount) {
@@ -481,9 +532,13 @@ const ShipmentManagementTab = () => {
       return `£${metadata.pricing.total}`;
     } else if (metadata.cost) {
       return `£${metadata.cost}`;
+    } else if (metadata.price) {
+      return `£${metadata.price}`;
+    } else if (metadata.quotedAmount) {
+      return `£${metadata.quotedAmount}`;
     }
     
-    return 'Not specified';
+    return 'Amount to be confirmed';
   };
   
   // Filter shipments based on search and status filter
@@ -687,7 +742,7 @@ const ShipmentManagementTab = () => {
                 </div>
                 <div className="space-y-1">
                   <h3 className="text-sm font-medium text-muted-foreground">Payment Amount</h3>
-                  <p>{getPaymentAmount(viewingShipment)}</p>
+                  <p className="font-semibold text-green-600">{getPaymentAmount(viewingShipment)}</p>
                 </div>
               </div>
               
@@ -916,7 +971,7 @@ const ShipmentManagementTab = () => {
                 )}
               </div>
 
-              {/* Collection Information */}
+              {/* Enhanced Collection Information */}
               <div className="space-y-2">
                 <h3 className="text-lg font-medium">Collection Information</h3>
                 {(() => {
@@ -926,26 +981,32 @@ const ShipmentManagementTab = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <h4 className="text-sm font-medium text-muted-foreground">Collection Route</h4>
-                          <p>{collectionInfo.route}</p>
+                          <p className="font-medium">{collectionInfo.route}</p>
                         </div>
                         <div className="space-y-1">
                           <h4 className="text-sm font-medium text-muted-foreground">Collection Date</h4>
-                          <p>{collectionInfo.date}</p>
+                          <p className="font-medium">{collectionInfo.date}</p>
                         </div>
                         <div className="space-y-1">
                           <h4 className="text-sm font-medium text-muted-foreground">Scheduled</h4>
-                          <p>{collectionInfo.scheduled ? 'Yes' : 'No'}</p>
+                          <div className="flex items-center">
+                            <Badge variant={collectionInfo.scheduled ? "default" : "secondary"}>
+                              {collectionInfo.scheduled ? 'Yes' : 'No'}
+                            </Badge>
+                          </div>
                         </div>
                         <div className="space-y-1">
-                          <h4 className="text-sm font-medium text-muted-foreground">Completed</h4>
-                          <p>{collectionInfo.completed ? 'Yes' : 'No'}</p>
-                        </div>
-                        {collectionInfo.notes && (
-                          <div className="space-y-1 col-span-2">
-                            <h4 className="text-sm font-medium text-muted-foreground">Notes</h4>
-                            <p>{collectionInfo.notes}</p>
+                          <h4 className="text-sm font-medium text-muted-foreground">Collection Status</h4>
+                          <div className="flex items-center">
+                            <Badge variant={collectionInfo.completed ? "default" : "outline"}>
+                              {collectionInfo.completed ? 'Completed' : 'Pending'}
+                            </Badge>
                           </div>
-                        )}
+                        </div>
+                        <div className="space-y-1 col-span-2">
+                          <h4 className="text-sm font-medium text-muted-foreground">Collection Notes</h4>
+                          <p className="text-sm bg-white dark:bg-gray-700 p-2 rounded border">{collectionInfo.notes}</p>
+                        </div>
                       </div>
                     </div>
                   );
