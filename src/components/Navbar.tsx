@@ -11,12 +11,10 @@ import {
 import { Button } from "@/components/ui/button"
 import { Menu } from "lucide-react"
 import Logo from '@/components/Logo';
-import { useAuth } from '@/contexts/AuthContext';
 
 const Navbar = () => {
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { isLoggedIn, logout } = useAuth();
 
   return (
     <nav className="bg-white shadow-md sticky top-0 z-50">
@@ -88,18 +86,12 @@ const Navbar = () => {
           </div>
 
           <div className="flex items-center space-x-4">
-            {isLoggedIn ? (
-              <Button variant="outline" size="sm" onClick={logout}>Logout</Button>
-            ) : (
-              <>
-                <Link to="/login">
-                  <Button variant="outline" size="sm">Login</Button>
-                </Link>
-                <Link to="/signup">
-                  <Button size="sm">Sign Up</Button>
-                </Link>
-              </>
-            )}
+            <Link to="/auth">
+              <Button variant="outline" size="sm">Login</Button>
+            </Link>
+            <Link to="/auth">
+              <Button size="sm">Sign Up</Button>
+            </Link>
             <Sheet>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon">
@@ -185,18 +177,12 @@ const Navbar = () => {
                   >
                     Contact
                   </Link>
-                  {isLoggedIn ? (
-                    <Button variant="outline" size="sm" onClick={logout}>Logout</Button>
-                  ) : (
-                    <>
-                      <Link to="/login">
-                        <Button variant="outline" size="sm">Login</Button>
-                      </Link>
-                      <Link to="/signup">
-                        <Button size="sm">Sign Up</Button>
-                      </Link>
-                    </>
-                  )}
+                  <Link to="/auth">
+                    <Button variant="outline" size="sm">Login</Button>
+                  </Link>
+                  <Link to="/auth">
+                    <Button size="sm">Sign Up</Button>
+                  </Link>
                 </div>
               </SheetContent>
             </Sheet>
@@ -286,18 +272,12 @@ const Navbar = () => {
               Contact
             </Link>
             
-            {isLoggedIn ? (
-              <Button variant="outline" size="sm" onClick={logout}>Logout</Button>
-            ) : (
-              <>
-                <Link to="/login">
-                  <Button variant="outline" size="sm">Login</Button>
-                </Link>
-                <Link to="/signup">
-                  <Button size="sm">Sign Up</Button>
-                </Link>
-              </>
-            )}
+            <Link to="/auth">
+              <Button variant="outline" size="sm">Login</Button>
+            </Link>
+            <Link to="/auth">
+              <Button size="sm">Sign Up</Button>
+            </Link>
           </div>
         </div>
       )}
