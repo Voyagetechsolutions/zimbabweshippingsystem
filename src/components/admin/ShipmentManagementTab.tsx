@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -49,7 +48,7 @@ import {
 } from 'lucide-react';
 import { Shipment, ShipmentMetadata } from '@/types/shipment';
 import { postalCodeToRouteMap } from '@/utils/postalCodeUtils';
-import { getDateByRoute } from '@/data/collectionSchedule';
+import { getDateByRoute, collectionSchedules } from '@/data/collectionSchedule';
 
 // Define extended shipment type with profiles
 interface ShipmentWithProfiles extends Shipment {
@@ -64,56 +63,130 @@ function isValidMetadata(metadata: any): metadata is ShipmentMetadata {
   return typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata);
 }
 
-// Function to extract postal code from shipment data
+// Enhanced function to extract postal code from shipment data
 function extractPostalCode(shipment: ShipmentWithProfiles): string | null {
+  console.log('Extracting postal code from shipment:', shipment.id);
+  
   // Try to get postal code from metadata
   if (isValidMetadata(shipment.metadata)) {
+    // Check sender details first
     if (shipment.metadata.senderDetails?.address) {
-      // Extract postal code from address string - look for UK postal code pattern
       const address = shipment.metadata.senderDetails.address;
+      console.log('Checking senderDetails address:', address);
+      
+      // Extract UK postal code pattern (e.g., "NN1 1AA" or "NN11AA")
       const ukPostalCodeMatch = address.match(/\b([A-Z]{1,2}\d{1,2}[A-Z]?)\s*\d[A-Z]{2}\b/i);
       if (ukPostalCodeMatch) {
-        return ukPostalCodeMatch[1].toUpperCase();
+        const postalCode = ukPostalCodeMatch[1].toUpperCase();
+        console.log('Found postal code from senderDetails:', postalCode);
+        return postalCode;
       }
       
-      // Fallback: try to extract just the prefix
-      const prefixMatch = address.match(/\b([A-Z]{1,2}\d{1,2}[A-Z]?)\b/i);
+      // Fallback: try to extract just the prefix (e.g., "NN")
+      const prefixMatch = address.match(/\b([A-Z]{1,2})\d/i);
       if (prefixMatch) {
-        return prefixMatch[1].toUpperCase();
+        const prefix = prefixMatch[1].toUpperCase();
+        console.log('Found postal code prefix from senderDetails:', prefix);
+        return prefix;
       }
+    }
+    
+    // Check sender object
+    if (shipment.metadata.sender?.address) {
+      const address = shipment.metadata.sender.address;
+      console.log('Checking sender address:', address);
+      
+      const ukPostalCodeMatch = address.match(/\b([A-Z]{1,2}\d{1,2}[A-Z]?)\s*\d[A-Z]{2}\b/i);
+      if (ukPostalCodeMatch) {
+        const postalCode = ukPostalCodeMatch[1].toUpperCase();
+        console.log('Found postal code from sender:', postalCode);
+        return postalCode;
+      }
+      
+      const prefixMatch = address.match(/\b([A-Z]{1,2})\d/i);
+      if (prefixMatch) {
+        const prefix = prefixMatch[1].toUpperCase();
+        console.log('Found postal code prefix from sender:', prefix);
+        return prefix;
+      }
+    }
+    
+    // Check if there's a direct postal code field
+    if (shipment.metadata.postalCode) {
+      const postalCode = shipment.metadata.postalCode.toString().toUpperCase();
+      console.log('Found direct postal code:', postalCode);
+      return postalCode;
     }
   }
   
   // Try to extract from origin field as fallback
   if (shipment.origin) {
+    console.log('Checking origin field:', shipment.origin);
     const ukPostalCodeMatch = shipment.origin.match(/\b([A-Z]{1,2}\d{1,2}[A-Z]?)\s*\d[A-Z]{2}\b/i);
     if (ukPostalCodeMatch) {
-      return ukPostalCodeMatch[1].toUpperCase();
+      const postalCode = ukPostalCodeMatch[1].toUpperCase();
+      console.log('Found postal code from origin:', postalCode);
+      return postalCode;
+    }
+    
+    const prefixMatch = shipment.origin.match(/\b([A-Z]{1,2})\d/i);
+    if (prefixMatch) {
+      const prefix = prefixMatch[1].toUpperCase();
+      console.log('Found postal code prefix from origin:', prefix);
+      return prefix;
     }
   }
   
+  console.log('No postal code found for shipment:', shipment.id);
   return null;
 }
 
-// Function to get collection route from postal code
+// Enhanced function to get collection route from postal code
 function getCollectionRoute(postalCode: string | null): string {
-  if (!postalCode) return 'Standard Collection Route';
+  if (!postalCode) {
+    console.log('No postal code provided, returning default route');
+    return 'Standard Collection Route';
+  }
   
-  // Extract the alphabetic prefix from postal code
+  console.log('Getting route for postal code:', postalCode);
+  
+  // Extract the alphabetic prefix from postal code (e.g., "NN" from "NN1")
   const prefix = postalCode.match(/^[A-Z]+/);
-  if (!prefix) return 'Standard Collection Route';
+  if (!prefix) {
+    console.log('Could not extract prefix from postal code:', postalCode);
+    return 'Standard Collection Route';
+  }
   
-  const route = postalCodeToRouteMap[prefix[0]];
+  const prefixCode = prefix[0];
+  console.log('Extracted prefix:', prefixCode);
+  
+  // Use the postal code to route mapping
+  const route = postalCodeToRouteMap[prefixCode];
+  console.log('Mapped route:', route);
+  
   return route || 'Standard Collection Route';
 }
 
-// Function to get collection date from route
+// Enhanced function to get collection date from route
 function getCollectionDate(route: string): string {
   if (route === 'Standard Collection Route') {
+    console.log('Using default route, returning default date');
     return 'Next available collection date';
   }
   
+  console.log('Getting date for route:', route);
+  
+  // Find the route in collection schedules
+  const schedule = collectionSchedules.find(s => s.route === route);
+  if (schedule) {
+    console.log('Found schedule for route:', route, 'Date:', schedule.date);
+    return schedule.date;
+  }
+  
+  // Fallback to the getDateByRoute function
   const date = getDateByRoute(route);
+  console.log('Fallback date from getDateByRoute:', date);
+  
   return date === 'No date available' ? 'Next available collection date' : date;
 }
 
@@ -493,6 +566,12 @@ const ShipmentManagementTab = () => {
                     const postalCode = extractPostalCode(shipment);
                     const collectionRoute = getCollectionRoute(postalCode);
                     const collectionDate = getCollectionDate(collectionRoute);
+                    
+                    console.log(`Shipment ${shipment.tracking_number}:`, {
+                      postalCode,
+                      collectionRoute,
+                      collectionDate
+                    });
                     
                     return (
                       <TableRow key={shipment.id}>
