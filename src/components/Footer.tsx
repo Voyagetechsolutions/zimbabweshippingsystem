@@ -27,7 +27,7 @@ const Footer = () => {
               Your trusted shipping partner from the UK to Zimbabwe. Fast, secure, and reliable shipping services.
             </p>
             <div className="flex space-x-4">
-              <a href="#" className="text-gray-300 hover:text-zim-yellow transition-colors">
+              <a href="https://www.facebook.com/profile.php?id=61565306426707" className="text-gray-300 hover:text-zim-yellow transition-colors">
                 <Facebook className="h-6 w-6" />
               </a>
               <a href="https://www.instagram.com/zimbabwe__shipping/" className="text-gray-300 hover:text-zim-yellow transition-colors">
