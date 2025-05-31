@@ -67,11 +67,27 @@ const Home = () => {
     <div className="bg-white">
       <Helmet>
         <title>Zimbabwe Shipping | UK to Zimbabwe Delivery Services</title>
-        <meta
-          name="description"
-          content="Reliable and affordable Zimbabwe shipping services from the UK. Door-to-door delivery, parcel tracking & more. Book online today!"
-        />
-      </Helmet>
+          <meta
+            name="description"
+            content="Reliable and affordable Zimbabwe shipping services from the UK. Door-to-door delivery, parcel tracking & more. Book online today!"
+          />
+          <meta name="keywords" content="Zimbabwe shipping, UK to Zimbabwe delivery, shipping to Zimbabwe, parcel delivery Zimbabwe" />
+          <meta name="author" content="Zimbabwe shipping" />
+
+            {/* Open Graph for Facebook & others */}
+          <meta property="og:title" content="Zimbabwe Shipping | UK to Zimbabwe Delivery Services" />
+          <meta property="og:description" content="Affordable UK to Zimbabwe shipping. Secure, fast, and reliable door-to-door delivery service." />
+          <meta property="og:image" content="https://zimbabweshipping.com/og-image.jpg" />
+          <meta property="og:url" content="https://zimbabweshipping.com" />
+          <meta property="og:type" content="website" />
+
+          {/* Twitter Card */}
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:title" content="Zimbabwe Shipping | UK to Zimbabwe Delivery Services" />
+          <meta name="twitter:description" content="Affordable UK to Zimbabwe shipping. Secure, fast, and reliable door-to-door delivery service." />
+          <meta name="twitter:image" content="https://zimbabweshipping.com/og-image.jpg" />
+        </Helmet>
+
 
       {/* Hero Section */}
       <section className="relative px-4 py-16 sm:px-6 sm:py-24 lg:py-32 flex items-center justify-center">
