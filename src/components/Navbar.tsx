@@ -1,384 +1,307 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, ChevronDown, User, ShoppingBag, LogOut, Shield, Settings } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import {
-  NavigationMenu,
-  NavigationMenuContent,
-  NavigationMenuItem,
-  NavigationMenuLink,
-  NavigationMenuList,
-  NavigationMenuTrigger,
-  navigationMenuTriggerStyle,
-} from "@/components/ui/navigation-menu";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import { Button } from "@/components/ui/button"
+import { Menu } from "lucide-react"
 import Logo from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
-import { useRole } from '@/contexts/RoleContext';
-import ThemeToggle from '@/components/ThemeToggle';
-import { useTheme } from '@/contexts/ThemeContext';
 
 const Navbar = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
-  const { user, signOut } = useAuth();
   const location = useLocation();
-  const { hasPermission } = useRole();
-  const { resolvedTheme } = useTheme();
-  
-  const isAdmin = hasPermission('admin');
-
-  const handleReviewsClick = (e: React.MouseEvent) => {
-    if (location.pathname === '/') {
-      e.preventDefault();
-      
-      const reviewsSection = document.querySelector('.reviews-section');
-      if (reviewsSection) {
-        reviewsSection.scrollIntoView({ behavior: 'smooth' });
-      }
-    }
-  };
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollPosition = window.scrollY;
-      setIsScrolled(scrollPosition > 10);
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  const toggleMenu = () => {
-    setIsOpen(!isOpen);
-  };
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { isLoggedIn, logout } = useAuth();
 
   return (
-    <header
-      className={cn(
-        "sticky top-0 z-50 w-full transition-all duration-200",
-        isScrolled 
-          ? resolvedTheme === 'dark' 
-            ? "bg-gray-900 shadow-lg shadow-black/20" 
-            : "bg-white shadow-md" 
-          : resolvedTheme === 'dark' 
-            ? "bg-gray-900/80 backdrop-blur-sm" 
-            : "bg-white/80 backdrop-blur-sm"
-      )}
-    >
+    <nav className="bg-white shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo section */}
-          <div className="flex-shrink-0">
+        <div className="flex justify-between items-center h-16">
+          <div className="flex items-center space-x-8">
             <Link to="/" className="flex items-center">
-              <Logo className="h-8 w-auto" />
+              <Logo />
             </Link>
-          </div>
-
-          {/* Desktop navigation */}
-          <div className="hidden md:block">
-            <NavigationMenu>
-              <NavigationMenuList>
-                <NavigationMenuItem>
-                  <Link to="/services">
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                      Services
-                    </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>
-                
-                <NavigationMenuItem>
-                  <NavigationMenuTrigger>Shipping</NavigationMenuTrigger>
-                  <NavigationMenuContent>
-                    <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
-                      <li>
-                        <Link to="/pricing">
-                          <NavigationMenuLink
-                            className={cn(
-                              "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                            )}
-                          >
-                            <div className="text-sm font-medium leading-none">Pricing</div>
-                            <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                              View our transparent pricing structure for shipping from UK to Zimbabwe
-                            </p>
-                          </NavigationMenuLink>
-                        </Link>
-                      </li>
-                      <li>
-                        <Link to="/collection-schedule">
-                          <NavigationMenuLink
-                            className={cn(
-                              "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                            )}
-                          >
-                            <div className="text-sm font-medium leading-none">Collection Schedule</div>
-                            <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                              Check when we're collecting in your area
-                            </p>
-                          </NavigationMenuLink>
-                        </Link>
-                      </li>
-                      <li>
-                        <Link to="/track">
-                          <NavigationMenuLink
-                            className={cn(
-                              "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                            )}
-                          >
-                            <div className="text-sm font-medium leading-none">Track Shipment</div>
-                            <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                              Track the status of your shipment in real-time
-                            </p>
-                          </NavigationMenuLink>
-                        </Link>
-                      </li>
-                      <li>
-                        <Link to="/book-shipment">
-                          <NavigationMenuLink
-                            className={cn(
-                              "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                            )}
-                          >
-                            <div className="text-sm font-medium leading-none">Book a Shipment</div>
-                            <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                              Schedule a new shipment to Zimbabwe
-                            </p>
-                          </NavigationMenuLink>
-                        </Link>
-                      </li>
-                    </ul>
-                  </NavigationMenuContent>
-                </NavigationMenuItem>
-                
-                {/*<NavigationMenuItem>  //First update the gallery features
-                  <Link to="/gallery">
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                      Gallery
-                    </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>*/}
-                
-                <NavigationMenuItem>
-                  <Link to="/" onClick={handleReviewsClick}>
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                      Reviews
-                    </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>
-                
-                <NavigationMenuItem>
-                  <Link to="/contact">
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                      Contact
-                    </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>
-                
-                <NavigationMenuItem>
-                  <Link to="/about-us">
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
-                      About Us
-                    </NavigationMenuLink>
-                  </Link>
-                </NavigationMenuItem>
-                
-                <NavigationMenuItem>
-                  <Link to="/book-shipment">
-                    <Button className="bg-zim-red hover:bg-zim-red/90 text-white">
-                      Book Shipment
-                    </Button>
-                  </Link>
-                </NavigationMenuItem>
-              </NavigationMenuList>
-            </NavigationMenu>
-          </div>
-
-          {/* Desktop account section */}
-          <div className="hidden md:flex items-center">
-            {/* ThemeToggle component */}
-            <ThemeToggle />
             
-            {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative ml-4 flex items-center">
-                    <User className="h-5 w-5 mr-2" />
-                    <span className="max-w-[100px] truncate">
-                      {user.user_metadata?.full_name || user.email?.split('@')[0]}
-                    </span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <Link to="/dashboard">
-                    <DropdownMenuItem className="cursor-pointer">
-                      <User className="mr-2 h-4 w-4" />
-                      <span>Dashboard</span>
-                    </DropdownMenuItem>
-                  </Link>
-                  <Link to="/account">
-                    <DropdownMenuItem className="cursor-pointer">
-                      <User className="mr-2 h-4 w-4" />
-                      <span>Profile</span>
-                    </DropdownMenuItem>
-                  </Link>
-                  <Link to="/shipments">
-                    <DropdownMenuItem className="cursor-pointer">
-                      <ShoppingBag className="mr-2 h-4 w-4" />
-                      <span>My Shipments</span>
-                    </DropdownMenuItem>
-                  </Link>
-                  
-                  {/* Add Switch to Admin option */}
-                  <Link to="/admin">
-                    <DropdownMenuItem className="cursor-pointer">
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>Switch to Admin</span>
-                    </DropdownMenuItem>
-                  </Link>
-                  
-                  {isAdmin && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <Link to="/admin">
-                        <DropdownMenuItem className="cursor-pointer">
-                          <Shield className="mr-2 h-4 w-4" />
-                          <span>Admin Panel</span>
-                        </DropdownMenuItem>
-                      </Link>
-                    </>
-                  )}
-                  
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+            <div className="hidden md:flex space-x-6">
+              <Link 
+                to="/" 
+                className={`text-gray-700 hover:text-zim-green transition-colors ${
+                  location.pathname === '/' ? 'text-zim-green font-medium' : ''
+                }`}
+              >
+                Home
+              </Link>
+              <Link 
+                to="/services" 
+                className={`text-gray-700 hover:text-zim-green transition-colors ${
+                  location.pathname === '/services' ? 'text-zim-green font-medium' : ''
+                }`}
+              >
+                Services
+              </Link>
+              <Link 
+                to="/pricing" 
+                className={`text-gray-700 hover:text-zim-green transition-colors ${
+                  location.pathname === '/pricing' ? 'text-zim-green font-medium' : ''
+                }`}
+              >
+                Pricing
+              </Link>
+              <Link 
+                to="/track" 
+                className={`text-gray-700 hover:text-zim-green transition-colors ${
+                  location.pathname === '/track' ? 'text-zim-green font-medium' : ''
+                }`}
+              >
+                Track
+              </Link>
+              <Link 
+                to="/gallery" 
+                className={`text-gray-700 hover:text-zim-green transition-colors ${
+                  location.pathname === '/gallery' ? 'text-zim-green font-medium' : ''
+                }`}
+              >
+                Gallery
+              </Link>
+              <Link 
+                to="/blog" 
+                className={`text-gray-700 hover:text-zim-green transition-colors ${
+                  location.pathname === '/blog' ? 'text-zim-green font-medium' : ''
+                }`}
+              >
+                Blog
+              </Link>
+              <Link 
+                to="/contact" 
+                className={`text-gray-700 hover:text-zim-green transition-colors ${
+                  location.pathname === '/contact' ? 'text-zim-green font-medium' : ''
+                }`}
+              >
+                Contact
+              </Link>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-4">
+            {isLoggedIn ? (
+              <Button variant="outline" size="sm" onClick={logout}>Logout</Button>
             ) : (
               <>
-                <Link to="/auth">
-                  <Button variant="outline" className="mr-2">Log in</Button>
+                <Link to="/login">
+                  <Button variant="outline" size="sm">Login</Button>
                 </Link>
-                <Link to="/auth?signup=true">
-                  <Button>Sign up</Button>
+                <Link to="/signup">
+                  <Button size="sm">Sign Up</Button>
                 </Link>
               </>
             )}
-          </div>
-
-          {/* Mobile menu button */}
-          <div className="md:hidden flex items-center">
-            {/* ThemeToggle for mobile */}
-            <ThemeToggle />
-            <button
-              onClick={toggleMenu}
-              className="inline-flex items-center justify-center p-2 ml-2 rounded-md text-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-inset focus:ring-zim-green"
-            >
-              <span className="sr-only">Open main menu</span>
-              {isOpen ? (
-                <X className="block h-6 w-6" aria-hidden="true" />
-              ) : (
-                <Menu className="block h-6 w-6" aria-hidden="true" />
-              )}
-            </button>
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className='md:hidden' />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="sm:max-w-xs">
+                <SheetHeader>
+                  <SheetTitle>Menu</SheetTitle>
+                  <SheetDescription>
+                    See all available options
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="px-2 pt-2 pb-3 space-y-1">
+                  <Link
+                    to="/"
+                    className={`block px-3 py-2 rounded-md text-base font-medium ${location.pathname === '/'
+                      ? 'text-zim-green bg-gray-100'
+                      : 'text-gray-700 hover:text-zim-green hover:bg-gray-50'
+                      }`}
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Home
+                  </Link>
+                  <Link
+                    to="/services"
+                    className={`block px-3 py-2 rounded-md text-base font-medium ${location.pathname === '/services'
+                      ? 'text-zim-green bg-gray-100'
+                      : 'text-gray-700 hover:text-zim-green hover:bg-gray-50'
+                      }`}
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Services
+                  </Link>
+                  <Link
+                    to="/pricing"
+                    className={`block px-3 py-2 rounded-md text-base font-medium ${location.pathname === '/pricing'
+                      ? 'text-zim-green bg-gray-100'
+                      : 'text-gray-700 hover:text-zim-green hover:bg-gray-50'
+                      }`}
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Pricing
+                  </Link>
+                  <Link
+                    to="/track"
+                    className={`block px-3 py-2 rounded-md text-base font-medium ${location.pathname === '/track'
+                      ? 'text-zim-green bg-gray-100'
+                      : 'text-gray-700 hover:text-zim-green hover:bg-gray-50'
+                      }`}
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Track
+                  </Link>
+                  <Link
+                    to="/gallery"
+                    className={`block px-3 py-2 rounded-md text-base font-medium ${location.pathname === '/gallery'
+                      ? 'text-zim-green bg-gray-100'
+                      : 'text-gray-700 hover:text-zim-green hover:bg-gray-50'
+                      }`}
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Gallery
+                  </Link>
+                  <Link 
+                    to="/blog" 
+                    className={`block px-3 py-2 rounded-md text-base font-medium ${
+                      location.pathname === '/blog' 
+                        ? 'text-zim-green bg-gray-100' 
+                        : 'text-gray-700 hover:text-zim-green hover:bg-gray-50'
+                    }`}
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Blog
+                  </Link>
+                  <Link
+                    to="/contact"
+                    className={`block px-3 py-2 rounded-md text-base font-medium ${location.pathname === '/contact'
+                      ? 'text-zim-green bg-gray-100'
+                      : 'text-gray-700 hover:text-zim-green hover:bg-gray-50'
+                      }`}
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Contact
+                  </Link>
+                  {isLoggedIn ? (
+                    <Button variant="outline" size="sm" onClick={logout}>Logout</Button>
+                  ) : (
+                    <>
+                      <Link to="/login">
+                        <Button variant="outline" size="sm">Login</Button>
+                      </Link>
+                      <Link to="/signup">
+                        <Button size="sm">Sign Up</Button>
+                      </Link>
+                    </>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </div>
 
       {/* Mobile menu */}
-      <div className={`md:hidden ${isOpen ? 'block' : 'hidden'}`}>
-        <div className="px-2 pt-2 pb-3 space-y-1 bg-background text-foreground">
-          <Link to="/services" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
-            Services
-          </Link>
-          <Link to="/pricing" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
-            Pricing
-          </Link>
-          <Link to="/track" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
-            Track Shipment
-          </Link>
-          <Link to="/book-shipment" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
-            Book Shipment
-          </Link>
-          <Link to="/collection-schedule" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
-            Collection Schedule
-          </Link>
-          <Link to="/" onClick={(e) => { handleReviewsClick(e); setIsOpen(false); }} className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent">
-            Reviews
-          </Link>
-          <Link to="/contact" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
-            Contact
-          </Link>
-          <Link to="/about-us" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
-            About Us
-          </Link>
-          
-          {user ? (
-            <>
-              <Link to="/dashboard" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
-                Dashboard
-              </Link>
-              <Link to="/account" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
-                Profile
-              </Link>
-              <Link to="/shipments" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
-                My Shipments
-              </Link>
-              
-              {/* Add Switch to Admin option in mobile menu */}
-              <Link to="/admin" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
-                Switch to Admin
-              </Link>
-              
-              {isAdmin && (
-                <Link to="/admin" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
-                  Admin Panel
+      {isMenuOpen && (
+        <div className="md:hidden bg-white border-t border-gray-200">
+          <div className="px-2 pt-2 pb-3 space-y-1">
+            <Link 
+              to="/" 
+              className={`block px-3 py-2 rounded-md text-base font-medium ${
+                location.pathname === '/' 
+                  ? 'text-zim-green bg-gray-100' 
+                  : 'text-gray-700 hover:text-zim-green hover:bg-gray-50'
+              }`}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Home
+            </Link>
+            <Link 
+              to="/services" 
+              className={`block px-3 py-2 rounded-md text-base font-medium ${
+                location.pathname === '/services' 
+                  ? 'text-zim-green bg-gray-100' 
+                  : 'text-gray-700 hover:text-zim-green hover:bg-gray-50'
+              }`}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Services
+            </Link>
+            <Link 
+              to="/pricing" 
+              className={`block px-3 py-2 rounded-md text-base font-medium ${
+                location.pathname === '/pricing' 
+                  ? 'text-zim-green bg-gray-100' 
+                  : 'text-gray-700 hover:text-zim-green hover:bg-gray-50'
+              }`}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Pricing
+            </Link>
+            <Link 
+              to="/track" 
+              className={`block px-3 py-2 rounded-md text-base font-medium ${
+                location.pathname === '/track' 
+                  ? 'text-zim-green bg-gray-100' 
+                  : 'text-gray-700 hover:text-zim-green hover:bg-gray-50'
+              }`}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Track
+            </Link>
+            <Link 
+              to="/gallery" 
+              className={`block px-3 py-2 rounded-md text-base font-medium ${
+                location.pathname === '/gallery' 
+                  ? 'text-zim-green bg-gray-100' 
+                  : 'text-gray-700 hover:text-zim-green hover:bg-gray-50'
+              }`}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Gallery
+            </Link>
+            <Link 
+              to="/blog" 
+              className={`block px-3 py-2 rounded-md text-base font-medium ${
+                location.pathname === '/blog' 
+                  ? 'text-zim-green bg-gray-100' 
+                  : 'text-gray-700 hover:text-zim-green hover:bg-gray-50'
+              }`}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Blog
+            </Link>
+            <Link 
+              to="/contact" 
+              className={`block px-3 py-2 rounded-md text-base font-medium ${
+                location.pathname === '/contact' 
+                  ? 'text-zim-green bg-gray-100' 
+                  : 'text-gray-700 hover:text-zim-green hover:bg-gray-50'
+              }`}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Contact
+            </Link>
+            
+            {isLoggedIn ? (
+              <Button variant="outline" size="sm" onClick={logout}>Logout</Button>
+            ) : (
+              <>
+                <Link to="/login">
+                  <Button variant="outline" size="sm">Login</Button>
                 </Link>
-              )}
-              
-              <button
-                onClick={() => { signOut(); setIsOpen(false); }}
-                className="block w-full text-left px-3 py-2 rounded-md text-base font-medium hover:bg-accent"
-              >
-                Log out
-              </button>
-            </>
-          ) : (
-            <div className="pt-4 pb-3 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex items-center px-5">
-                <Link to="/auth" className="block w-full text-center px-4 py-2 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-zim-green hover:bg-zim-green-dark" onClick={() => setIsOpen(false)}>
-                  Log in
+                <Link to="/signup">
+                  <Button size="sm">Sign Up</Button>
                 </Link>
-              </div>
-              <div className="mt-3 flex items-center px-5">
-                <Link to="/auth?signup=true" className="block w-full text-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-base font-medium text-foreground bg-background hover:bg-accent" onClick={() => setIsOpen(false)}>
-                  Sign up
-                </Link>
-              </div>
-            </div>
-          )}
+              </>
+            )}
+          </div>
         </div>
-      </div>
-      
-      <div className="w-full flex h-1">
-        <div className="w-1/3 bg-zim-green"></div>
-        <div className="w-1/3 bg-zim-yellow"></div>
-        <div className="w-1/3 bg-zim-red"></div>
-      </div>
-    </header>
+      )}
+    </nav>
   );
 };
 
