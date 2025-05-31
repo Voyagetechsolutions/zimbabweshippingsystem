@@ -1,0 +1,562 @@
+
+import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle, 
+  CardDescription 
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { 
+  Tabs, 
+  TabsContent, 
+  TabsList, 
+  TabsTrigger 
+} from '@/components/ui/tabs';
+import {
+  Package,
+  Truck,
+  Users,
+  AlertCircle,
+  Search,
+  Filter,
+  Clock,
+  RefreshCw,
+  Calendar,
+  MapPin
+} from 'lucide-react';
+import { Shipment, ShipmentMetadata } from '@/types/shipment';
+import { postalCodeToRouteMap } from '@/utils/postalCodeUtils';
+import { getDateByRoute } from '@/data/collectionSchedule';
+
+// Define extended shipment type with profiles
+interface ShipmentWithProfiles extends Shipment {
+  profiles?: {
+    email?: string;
+    full_name?: string;
+  };
+}
+
+// Type guard to check if a value is a valid ShipmentMetadata
+function isValidMetadata(metadata: any): metadata is ShipmentMetadata {
+  return typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata);
+}
+
+// Function to extract postal code from shipment data
+function extractPostalCode(shipment: ShipmentWithProfiles): string | null {
+  // Try to get postal code from metadata
+  if (isValidMetadata(shipment.metadata)) {
+    if (shipment.metadata.senderDetails?.address) {
+      // Extract postal code from address string - look for UK postal code pattern
+      const address = shipment.metadata.senderDetails.address;
+      const ukPostalCodeMatch = address.match(/\b([A-Z]{1,2}\d{1,2}[A-Z]?)\s*\d[A-Z]{2}\b/i);
+      if (ukPostalCodeMatch) {
+        return ukPostalCodeMatch[1].toUpperCase();
+      }
+      
+      // Fallback: try to extract just the prefix
+      const prefixMatch = address.match(/\b([A-Z]{1,2}\d{1,2}[A-Z]?)\b/i);
+      if (prefixMatch) {
+        return prefixMatch[1].toUpperCase();
+      }
+    }
+  }
+  
+  // Try to extract from origin field as fallback
+  if (shipment.origin) {
+    const ukPostalCodeMatch = shipment.origin.match(/\b([A-Z]{1,2}\d{1,2}[A-Z]?)\s*\d[A-Z]{2}\b/i);
+    if (ukPostalCodeMatch) {
+      return ukPostalCodeMatch[1].toUpperCase();
+    }
+  }
+  
+  return null;
+}
+
+// Function to get collection route from postal code
+function getCollectionRoute(postalCode: string | null): string {
+  if (!postalCode) return 'Standard Collection Route';
+  
+  // Extract the alphabetic prefix from postal code
+  const prefix = postalCode.match(/^[A-Z]+/);
+  if (!prefix) return 'Standard Collection Route';
+  
+  const route = postalCodeToRouteMap[prefix[0]];
+  return route || 'Standard Collection Route';
+}
+
+// Function to get collection date from route
+function getCollectionDate(route: string): string {
+  if (route === 'Standard Collection Route') {
+    return 'Next available collection date';
+  }
+  
+  const date = getDateByRoute(route);
+  return date === 'No date available' ? 'Next available collection date' : date;
+}
+
+const ShipmentManagementTab = () => {
+  const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Fetch all shipments with user profiles
+  const { data: shipments, isLoading, refetch } = useQuery({
+    queryKey: ['admin-shipments'],
+    queryFn: async () => {
+      try {
+        console.log('Fetching all shipments for admin dashboard');
+        
+        const { data: shipmentsData, error: shipmentsError } = await supabase
+          .from('shipments')
+          .select('*')
+          .order('created_at', { ascending: false });
+          
+        if (shipmentsError) {
+          console.error('Error fetching shipments:', shipmentsError);
+          throw shipmentsError;
+        }
+        
+        if (shipmentsData && shipmentsData.length > 0) {
+          const enrichedShipments = [];
+          
+          for (const shipment of shipmentsData) {
+            const enrichedShipment: ShipmentWithProfiles = {
+              id: shipment.id,
+              tracking_number: shipment.tracking_number,
+              status: shipment.status,
+              origin: shipment.origin,
+              destination: shipment.destination,
+              user_id: shipment.user_id,
+              created_at: shipment.created_at,
+              updated_at: shipment.updated_at,
+              metadata: isValidMetadata(shipment.metadata) ? shipment.metadata : {},
+              can_cancel: shipment.can_cancel,
+              can_modify: shipment.can_modify,
+              profiles: undefined
+            };
+            
+            if (shipment.user_id) {
+              const { data: userData, error: userError } = await supabase
+                .from('profiles')
+                .select('email, full_name')
+                .eq('id', shipment.user_id)
+                .single();
+                
+              if (!userError && userData) {
+                enrichedShipment.profiles = userData;
+              }
+            }
+            
+            enrichedShipments.push(enrichedShipment);
+          }
+          
+          console.log('Fetched shipments with profiles:', enrichedShipments.length);
+          return enrichedShipments as ShipmentWithProfiles[];
+        }
+        
+        return [] as ShipmentWithProfiles[];
+      } catch (error: any) {
+        console.error('Error in query function:', error);
+        toast({
+          title: 'Error fetching shipments',
+          description: error.message,
+          variant: 'destructive'
+        });
+        return [];
+      }
+    },
+    refetchInterval: 30000,
+  });
+
+  // Manual refresh function
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+      toast({
+        title: 'Data refreshed',
+        description: 'Shipment data has been updated',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Refresh failed',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Filter shipments by status, date and search query
+  const getFilteredShipments = () => {
+    if (!shipments) return [];
+
+    return shipments.filter(shipment => {
+      if (statusFilter !== 'all' && shipment.status !== statusFilter) {
+        return false;
+      }
+      
+      if (dateFilter !== 'all') {
+        const shipmentDate = new Date(shipment.created_at);
+        const now = new Date();
+        
+        if (dateFilter === 'today') {
+          return shipmentDate.toDateString() === now.toDateString();
+        } else if (dateFilter === 'week') {
+          const weekAgo = new Date();
+          weekAgo.setDate(now.getDate() - 7);
+          return shipmentDate >= weekAgo;
+        } else if (dateFilter === 'month') {
+          const monthAgo = new Date();
+          monthAgo.setDate(now.getDate() - 30);
+          return shipmentDate >= monthAgo;
+        }
+      }
+      
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        return (
+          shipment.tracking_number.toLowerCase().includes(query) ||
+          shipment.origin.toLowerCase().includes(query) ||
+          shipment.destination.toLowerCase().includes(query) ||
+          shipment.status.toLowerCase().includes(query) ||
+          (shipment.profiles?.full_name || '').toLowerCase().includes(query) ||
+          (shipment.profiles?.email || '').toLowerCase().includes(query)
+        );
+      }
+      
+      return true;
+    });
+  };
+
+  // Update shipment status
+  const updateShipmentStatus = async (id: string, newStatus: string) => {
+    try {
+      console.log(`Updating shipment ${id} to status ${newStatus}`);
+      
+      const { error } = await supabase
+        .from('shipments')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+        
+      if (error) {
+        console.error('Error updating shipment status:', error);
+        throw error;
+      }
+      
+      toast({
+        title: 'Status Updated',
+        description: `Shipment status updated to ${newStatus}`,
+      });
+      
+      refetch();
+      
+    } catch (error: any) {
+      console.error('Error updating status:', error.message);
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+  };
+
+  // Get status badge style based on status
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Booking Confirmed':
+        return <Badge className="bg-blue-100 text-blue-800 border-blue-300">{status}</Badge>;
+      case 'Ready for Pickup':
+        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">{status}</Badge>;
+      case 'Processing in Warehouse (UK)':
+      case 'Processing in Warehouse (ZW)':
+        return <Badge className="bg-orange-100 text-orange-800 border-orange-300">{status}</Badge>;
+      case 'Customs Clearance':
+        return <Badge className="bg-purple-100 text-purple-800 border-purple-300">{status}</Badge>;
+      case 'In Transit':
+        return <Badge className="bg-indigo-100 text-indigo-800 border-indigo-300">{status}</Badge>;
+      case 'Out for Delivery':
+        return <Badge className="bg-teal-100 text-teal-800 border-teal-300">{status}</Badge>;
+      case 'Delivered':
+        return <Badge className="bg-green-100 text-green-800 border-green-300">{status}</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  // Get next status options based on current status
+  const getNextStatusOptions = (currentStatus: string) => {
+    const statusFlow: Record<string, string[]> = {
+      'Booking Confirmed': ['Ready for Pickup', 'Processing in Warehouse (UK)'],
+      'Ready for Pickup': ['Processing in Warehouse (UK)'],
+      'Processing in Warehouse (UK)': ['In Transit', 'Customs Clearance'],
+      'In Transit': ['Customs Clearance', 'Processing in Warehouse (ZW)'],
+      'Customs Clearance': ['Processing in Warehouse (ZW)'],
+      'Processing in Warehouse (ZW)': ['Out for Delivery'],
+      'Out for Delivery': ['Delivered'],
+      'Delivered': [],
+    };
+    
+    return statusFlow[currentStatus] || [];
+  };
+
+  const filteredShipments = getFilteredShipments();
+
+  return (
+    <div className="space-y-6">
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500">Total Shipments</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <Package className="h-8 w-8 text-blue-500 mr-3" />
+              <div className="text-2xl font-bold">{filteredShipments.length}</div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500">In Transit</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <Truck className="h-8 w-8 text-orange-500 mr-3" />
+              <div className="text-2xl font-bold">
+                {filteredShipments.filter(s => s.status === 'In Transit').length}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500">Delivered</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <Package className="h-8 w-8 text-green-500 mr-3" />
+              <div className="text-2xl font-bold">
+                {filteredShipments.filter(s => s.status === 'Delivered').length}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500">Total Customers</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <Users className="h-8 w-8 text-purple-500 mr-3" />
+              <div className="text-2xl font-bold">
+                {new Set(filteredShipments.map(s => s.user_id).filter(Boolean)).size}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Shipments Management */}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div>
+              <CardTitle>Shipment Management</CardTitle>
+              <CardDescription>View and manage all shipments in the system</CardDescription>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleRefresh} 
+              disabled={isRefreshing}
+              className="w-full sm:w-auto"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh Data
+            </Button>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row gap-4 mt-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search by tracking #, customer, or destination"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            
+            <div className="flex gap-2 flex-col sm:flex-row">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="Booking Confirmed">Booking Confirmed</SelectItem>
+                  <SelectItem value="Ready for Pickup">Ready for Pickup</SelectItem>
+                  <SelectItem value="Processing in Warehouse (UK)">UK Warehouse</SelectItem>
+                  <SelectItem value="In Transit">In Transit</SelectItem>
+                  <SelectItem value="Customs Clearance">Customs Clearance</SelectItem>
+                  <SelectItem value="Processing in Warehouse (ZW)">ZW Warehouse</SelectItem>
+                  <SelectItem value="Out for Delivery">Out for Delivery</SelectItem>
+                  <SelectItem value="Delivered">Delivered</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={dateFilter} onValueChange={setDateFilter}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <Clock className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Time Period" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Time</SelectItem>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="week">Last 7 Days</SelectItem>
+                  <SelectItem value="month">Last 30 Days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardHeader>
+        
+        <CardContent>
+          {isLoading ? (
+            <div className="animate-pulse space-y-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="h-12 bg-gray-100 rounded"></div>
+              ))}
+            </div>
+          ) : filteredShipments.length === 0 ? (
+            <div className="text-center py-8">
+              <AlertCircle className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium">No shipments found</h3>
+              <p className="text-gray-500 mt-1">
+                {searchQuery || statusFilter !== 'all' || dateFilter !== 'all' 
+                  ? "Try adjusting your filters" 
+                  : "There are no shipments to display"}
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tracking #</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Collection Info</TableHead>
+                    <TableHead>From</TableHead>
+                    <TableHead>To</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredShipments.map((shipment) => {
+                    const postalCode = extractPostalCode(shipment);
+                    const collectionRoute = getCollectionRoute(postalCode);
+                    const collectionDate = getCollectionDate(collectionRoute);
+                    
+                    return (
+                      <TableRow key={shipment.id}>
+                        <TableCell className="font-medium">{shipment.tracking_number}</TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div>{shipment.profiles?.full_name || 'Unknown'}</div>
+                            <div className="text-gray-500">{shipment.profiles?.email || 'No email'}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm space-y-1">
+                            <div className="flex items-center">
+                              <MapPin className="h-3 w-3 mr-1 text-gray-400" />
+                              <span className="font-medium">{collectionRoute}</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Calendar className="h-3 w-3 mr-1 text-gray-400" />
+                              <span className="text-gray-600">{collectionDate}</span>
+                            </div>
+                            {postalCode && (
+                              <div className="text-xs text-gray-500">Postal: {postalCode}</div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-[180px] truncate">{shipment.origin}</TableCell>
+                        <TableCell className="max-w-[180px] truncate">{shipment.destination}</TableCell>
+                        <TableCell>{getStatusBadge(shipment.status)}</TableCell>
+                        <TableCell className="text-sm text-gray-500">
+                          {format(new Date(shipment.created_at), 'MMM d, yyyy')}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {getNextStatusOptions(shipment.status).length > 0 ? (
+                            <Select 
+                              onValueChange={(value) => updateShipmentStatus(shipment.id, value)}
+                            >
+                              <SelectTrigger className="w-[160px]">
+                                <SelectValue placeholder="Update Status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {getNextStatusOptions(shipment.status).map((status) => (
+                                  <SelectItem key={status} value={status}>
+                                    {status}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Badge variant="outline" className="ml-auto">
+                              {shipment.status === 'Delivered' ? 'Completed' : 'No Actions'}
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default ShipmentManagementTab;
