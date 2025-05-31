@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { Shipment } from '@/types/shipment';
+
+// UI Components
 import { 
   Card, 
   CardContent, 
   CardHeader, 
   CardTitle, 
-  CardDescription 
+  CardDescription,
+  CardFooter 
 } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { 
   Select, 
   SelectContent, 
@@ -20,55 +22,88 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from '@/components/ui/tabs';
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle 
+} from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+
+// Icons
+import { 
+  Search, 
+  RefreshCcw,
+  Filter,
+  ArrowUpDown,
+  Eye,
+  Edit,
+  Trash,
+  AlertTriangle,
+  FileSpreadsheet,
   Package,
   Truck,
-  Users,
-  AlertCircle,
-  Search,
-  Filter,
-  Clock,
-  RefreshCw,
-  Calendar,
-  MapPin
+  ChevronRight,
+  Mail,
+  Phone,
+  MapPin,
+  User,
+  Calendar
 } from 'lucide-react';
-import { Shipment, ShipmentMetadata } from '@/types/shipment';
+
+// Import postal code utilities and collection schedule data
 import { postalCodeToRouteMap } from '@/utils/postalCodeUtils';
 import { getDateByRoute, collectionSchedules } from '@/data/collectionSchedule';
 
-// Define extended shipment type with profiles
-interface ShipmentWithProfiles extends Shipment {
-  profiles?: {
-    email?: string;
-    full_name?: string;
-  };
+// Define the Json type to match Supabase's Json type
+type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
+
+// Define the status history type
+interface StatusHistory {
+  id: string;
+  status: string;
+  created_at: string;
+  created_by: string;
+  notes: string;
 }
 
-// Type guard to check if a value is a valid ShipmentMetadata
-function isValidMetadata(metadata: any): metadata is ShipmentMetadata {
-  return typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata);
-}
+const STATUS_OPTIONS = [
+  'Booking Confirmed',
+  'Ready for Pickup',
+  'Processing in UK Warehouse',
+  'Customs Clearance',
+  'Processing in ZW Warehouse',
+  'Out for Delivery',
+  'Delivered',
+  'Cancelled',
+];
 
 // Enhanced function to extract postal code from shipment data
-function extractPostalCode(shipment: ShipmentWithProfiles): string | null {
+function extractPostalCode(shipment: Shipment): string | null {
   console.log('Extracting postal code from shipment:', shipment.id);
   
   // Try to get postal code from metadata
-  if (isValidMetadata(shipment.metadata)) {
+  if (shipment.metadata && typeof shipment.metadata === 'object') {
     // Check sender details first
     if (shipment.metadata.senderDetails?.address) {
       const address = shipment.metadata.senderDetails.address;
@@ -192,449 +227,794 @@ function getCollectionDate(route: string): string {
 
 const ShipmentManagementTab = () => {
   const { toast } = useToast();
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState('all');
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [viewingShipment, setViewingShipment] = useState<Shipment | null>(null);
+  const [editingStatus, setEditingStatus] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [statusNote, setStatusNote] = useState('');
+  const [activeTab, setActiveTab] = useState('allShipments');
+  const [customQuotes, setCustomQuotes] = useState<any[]>([]);
+  const [sortField, setSortField] = useState('created_at');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-  // Fetch all shipments with user profiles
-  const { data: shipments, isLoading, refetch } = useQuery({
-    queryKey: ['admin-shipments'],
-    queryFn: async () => {
-      try {
-        console.log('Fetching all shipments for admin dashboard');
-        
-        const { data: shipmentsData, error: shipmentsError } = await supabase
-          .from('shipments')
-          .select('*')
-          .order('created_at', { ascending: false });
-          
-        if (shipmentsError) {
-          console.error('Error fetching shipments:', shipmentsError);
-          throw shipmentsError;
-        }
-        
-        if (shipmentsData && shipmentsData.length > 0) {
-          const enrichedShipments = [];
-          
-          for (const shipment of shipmentsData) {
-            const enrichedShipment: ShipmentWithProfiles = {
-              id: shipment.id,
-              tracking_number: shipment.tracking_number,
-              status: shipment.status,
-              origin: shipment.origin,
-              destination: shipment.destination,
-              user_id: shipment.user_id,
-              created_at: shipment.created_at,
-              updated_at: shipment.updated_at,
-              metadata: isValidMetadata(shipment.metadata) ? shipment.metadata : {},
-              can_cancel: shipment.can_cancel,
-              can_modify: shipment.can_modify,
-              profiles: undefined
-            };
-            
-            if (shipment.user_id) {
-              const { data: userData, error: userError } = await supabase
-                .from('profiles')
-                .select('email, full_name')
-                .eq('id', shipment.user_id)
-                .single();
-                
-              if (!userError && userData) {
-                enrichedShipment.profiles = userData;
-              }
-            }
-            
-            enrichedShipments.push(enrichedShipment);
-          }
-          
-          console.log('Fetched shipments with profiles:', enrichedShipments.length);
-          return enrichedShipments as ShipmentWithProfiles[];
-        }
-        
-        return [] as ShipmentWithProfiles[];
-      } catch (error: any) {
-        console.error('Error in query function:', error);
-        toast({
-          title: 'Error fetching shipments',
-          description: error.message,
-          variant: 'destructive'
-        });
-        return [];
-      }
-    },
-    refetchInterval: 30000,
-  });
+  useEffect(() => {
+    fetchShipments();
+    fetchCustomQuotes();
+  }, [sortField, sortDirection]);
 
-  // Manual refresh function
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
+  const fetchShipments = async () => {
+    setLoading(true);
     try {
-      await refetch();
-      toast({
-        title: 'Data refreshed',
-        description: 'Shipment data has been updated',
-      });
-    } catch (error: any) {
-      toast({
-        title: 'Refresh failed',
-        description: error.message,
-        variant: 'destructive'
-      });
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
-  // Filter shipments by status, date and search query
-  const getFilteredShipments = () => {
-    if (!shipments) return [];
-
-    return shipments.filter(shipment => {
-      if (statusFilter !== 'all' && shipment.status !== statusFilter) {
-        return false;
-      }
-      
-      if (dateFilter !== 'all') {
-        const shipmentDate = new Date(shipment.created_at);
-        const now = new Date();
-        
-        if (dateFilter === 'today') {
-          return shipmentDate.toDateString() === now.toDateString();
-        } else if (dateFilter === 'week') {
-          const weekAgo = new Date();
-          weekAgo.setDate(now.getDate() - 7);
-          return shipmentDate >= weekAgo;
-        } else if (dateFilter === 'month') {
-          const monthAgo = new Date();
-          monthAgo.setDate(now.getDate() - 30);
-          return shipmentDate >= monthAgo;
-        }
-      }
-      
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        return (
-          shipment.tracking_number.toLowerCase().includes(query) ||
-          shipment.origin.toLowerCase().includes(query) ||
-          shipment.destination.toLowerCase().includes(query) ||
-          shipment.status.toLowerCase().includes(query) ||
-          (shipment.profiles?.full_name || '').toLowerCase().includes(query) ||
-          (shipment.profiles?.email || '').toLowerCase().includes(query)
-        );
-      }
-      
-      return true;
-    });
-  };
-
-  // Update shipment status
-  const updateShipmentStatus = async (id: string, newStatus: string) => {
-    try {
-      console.log(`Updating shipment ${id} to status ${newStatus}`);
-      
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('shipments')
-        .update({ 
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id);
-        
-      if (error) {
-        console.error('Error updating shipment status:', error);
-        throw error;
-      }
+        .select('*')
+        .order(sortField, { ascending: sortDirection === 'asc' });
+
+      if (error) throw error;
+
+      console.log('Shipments fetched:', data);
+      // Cast the data to ensure type compatibility
+      const typedData = data?.map(item => {
+        // Ensure metadata is in the correct shape for Shipment type
+        return {
+          ...item,
+          metadata: item.metadata || {},
+          // Add required fields from the Shipment type that might be missing
+          can_cancel: item.can_cancel !== undefined ? item.can_cancel : true,
+          can_modify: item.can_modify !== undefined ? item.can_modify : true
+        } as Shipment;
+      }) || [];
       
-      toast({
-        title: 'Status Updated',
-        description: `Shipment status updated to ${newStatus}`,
-      });
-      
-      refetch();
-      
+      setShipments(typedData);
     } catch (error: any) {
-      console.error('Error updating status:', error.message);
+      console.error('Error fetching shipments:', error);
       toast({
         title: 'Error',
-        description: error.message,
-        variant: 'destructive'
+        description: 'Failed to load shipments: ' + error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCustomQuotes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('custom_quotes')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      setCustomQuotes(data || []);
+    } catch (error: any) {
+      console.error('Error fetching custom quotes:', error);
+    }
+  };
+
+  const handleViewShipment = (shipment: Shipment) => {
+    setViewingShipment(shipment);
+    setSelectedStatus(shipment.status);
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!viewingShipment || !selectedStatus) return;
+    
+    try {
+      console.log(`Updating shipment status for ID: ${viewingShipment.id} to "${selectedStatus}"`);
+      
+      // Update the shipment status
+      const { error } = await supabase
+        .from('shipments')
+        .update({
+          status: selectedStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', viewingShipment.id);
+
+      if (error) {
+        console.error('Error in Supabase update:', error);
+        throw error;
+      }
+
+      toast({
+        title: 'Status Updated',
+        description: `Shipment ${viewingShipment.tracking_number} status updated to ${selectedStatus}`,
+      });
+
+      // Update the local state to reflect the change
+      setShipments(shipments.map(s => 
+        s.id === viewingShipment.id 
+          ? {...s, status: selectedStatus, updated_at: new Date().toISOString()} 
+          : s
+      ));
+      
+      // Update the viewing shipment with the new status
+      setViewingShipment({
+        ...viewingShipment,
+        status: selectedStatus,
+        updated_at: new Date().toISOString()
+      });
+
+      // Reset state
+      setEditingStatus(false);
+      setStatusNote('');
+    } catch (error: any) {
+      console.error('Error updating status:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to update status: ${error.message}`,
+        variant: 'destructive',
       });
     }
   };
 
-  // Get status badge style based on status
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'Booking Confirmed':
-        return <Badge className="bg-blue-100 text-blue-800 border-blue-300">{status}</Badge>;
-      case 'Ready for Pickup':
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">{status}</Badge>;
-      case 'Processing in Warehouse (UK)':
-      case 'Processing in Warehouse (ZW)':
-        return <Badge className="bg-orange-100 text-orange-800 border-orange-300">{status}</Badge>;
-      case 'Customs Clearance':
-        return <Badge className="bg-purple-100 text-purple-800 border-purple-300">{status}</Badge>;
-      case 'In Transit':
-        return <Badge className="bg-indigo-100 text-indigo-800 border-indigo-300">{status}</Badge>;
-      case 'Out for Delivery':
-        return <Badge className="bg-teal-100 text-teal-800 border-teal-300">{status}</Badge>;
-      case 'Delivered':
-        return <Badge className="bg-green-100 text-green-800 border-green-300">{status}</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
+  // Function to handle sorting
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
     }
   };
-
-  // Get next status options based on current status
-  const getNextStatusOptions = (currentStatus: string) => {
-    const statusFlow: Record<string, string[]> = {
-      'Booking Confirmed': ['Ready for Pickup', 'Processing in Warehouse (UK)'],
-      'Ready for Pickup': ['Processing in Warehouse (UK)'],
-      'Processing in Warehouse (UK)': ['In Transit', 'Customs Clearance'],
-      'In Transit': ['Customs Clearance', 'Processing in Warehouse (ZW)'],
-      'Customs Clearance': ['Processing in Warehouse (ZW)'],
-      'Processing in Warehouse (ZW)': ['Out for Delivery'],
-      'Out for Delivery': ['Delivered'],
-      'Delivered': [],
-    };
+  
+  // Enhanced function to extract sender's name from metadata with improved fallbacks
+  const getSenderName = (shipment: Shipment): string => {
+    if (!shipment || !shipment.metadata) {
+      return 'No Name Provided';
+    }
     
-    return statusFlow[currentStatus] || [];
+    const metadata = shipment.metadata;
+    
+    // First check sender which is our primary path after refactoring
+    if (metadata.sender) {
+      if (metadata.sender.name) {
+        return metadata.sender.name;
+      }
+      if (metadata.sender.firstName && metadata.sender.lastName) {
+        return `${metadata.sender.firstName} ${metadata.sender.lastName}`;
+      }
+    }
+    
+    // Check senderDetails which is our secondary path
+    if (metadata.senderDetails) {
+      if (metadata.senderDetails.firstName && metadata.senderDetails.lastName) {
+        return `${metadata.senderDetails.firstName} ${metadata.senderDetails.lastName}`;
+      }
+      if (metadata.senderDetails.name) {
+        return metadata.senderDetails.name;
+      }
+    }
+    
+    // Check for directly nested properties
+    if (metadata.firstName && metadata.lastName) {
+      return `${metadata.firstName} ${metadata.lastName}`;
+    }
+    
+    // Check other possible paths
+    if (metadata.sender_name) {
+      return metadata.sender_name;
+    }
+    
+    if (metadata.sender_details?.name) {
+      return metadata.sender_details.name;
+    }
+    
+    return 'No Name Provided';
+  };
+  
+  // Enhanced function to extract sender's email from metadata
+  const getSenderEmail = (shipment: Shipment): string => {
+    if (!shipment || !shipment.metadata) {
+      return 'No Email Provided';
+    }
+    
+    const metadata = shipment.metadata;
+    
+    if (metadata.sender?.email) {
+      return metadata.sender.email;
+    }
+    
+    if (metadata.senderDetails?.email) {
+      return metadata.senderDetails.email;
+    }
+    
+    if (metadata.email) {
+      return metadata.email;
+    }
+    
+    if (metadata.sender_email) {
+      return metadata.sender_email;
+    }
+    
+    return 'No Email Provided';
+  };
+  
+  // Enhanced function to extract sender's phone from metadata
+  const getSenderPhone = (shipment: Shipment): string => {
+    if (!shipment || !shipment.metadata) {
+      return 'No Phone Provided';
+    }
+    
+    const metadata = shipment.metadata;
+    
+    if (metadata.sender?.phone) {
+      return metadata.sender.phone;
+    }
+    
+    if (metadata.senderDetails?.phone) {
+      return metadata.senderDetails.phone;
+    }
+    
+    if (metadata.phone) {
+      return metadata.phone;
+    }
+    
+    if (metadata.sender_phone) {
+      return metadata.sender_phone;
+    }
+    
+    if (metadata.sender_details?.phone) {
+      return metadata.sender_details.phone;
+    }
+    
+    if (metadata.sender?.additionalPhone) {
+      return metadata.sender.additionalPhone;
+    }
+    
+    if (metadata.additionalPhone) {
+      return metadata.additionalPhone;
+    }
+    
+    return 'No Phone Provided';
+  };
+  
+  // Enhanced function to extract receiver's name from metadata
+  const getReceiverName = (shipment: Shipment): string => {
+    if (!shipment || !shipment.metadata) {
+      return 'No Name Provided';
+    }
+    
+    const metadata = shipment.metadata;
+    
+    if (metadata.recipient?.name) {
+      return metadata.recipient.name;
+    }
+    
+    if (metadata.recipientDetails?.name) {
+      return metadata.recipientDetails.name;
+    }
+    
+    if (metadata.recipientName) {
+      return metadata.recipientName;
+    }
+    
+    if (metadata.receiver_name) {
+      return metadata.receiver_name;
+    }
+    
+    if (metadata.recipient_details?.name) {
+      return metadata.recipient_details.name;
+    }
+    
+    return 'No Name Provided';
+  };
+  
+  // Enhanced function to extract receiver's phone from metadata
+  const getReceiverPhone = (shipment: Shipment): string => {
+    if (!shipment || !shipment.metadata) {
+      return 'No Phone Provided';
+    }
+    
+    const metadata = shipment.metadata;
+    
+    if (metadata.recipient?.phone) {
+      return metadata.recipient.phone;
+    }
+    
+    if (metadata.recipientDetails?.phone) {
+      return metadata.recipientDetails.phone;
+    }
+    
+    if (metadata.recipientPhone) {
+      return metadata.recipientPhone;
+    }
+    
+    if (metadata.receiver_phone) {
+      return metadata.receiver_phone;
+    }
+    
+    if (metadata.recipient_details?.phone) {
+      return metadata.recipient_details.phone;
+    }
+    
+    if (metadata.additionalRecipientPhone) {
+      return metadata.additionalRecipientPhone;
+    }
+    
+    if (metadata.recipient?.additionalPhone) {
+      return metadata.recipient.additionalPhone;
+    }
+    
+    return 'No Phone Provided';
+  };
+  
+  // Function to get delivery address
+  const getDeliveryAddress = (shipment: Shipment): string => {
+    const metadata = shipment.metadata || {};
+    
+    if (metadata.recipientDetails?.address) {
+      return metadata.recipientDetails.address;
+    } else if (metadata.recipient?.address) {
+      return metadata.recipient.address;
+    } else if (metadata.deliveryAddress) {
+      return metadata.deliveryAddress;
+    } else if (shipment.destination) {
+      return shipment.destination;
+    }
+    
+    return 'No Address Provided';
+  };
+  
+  // Function to get pickup address
+  const getPickupAddress = (shipment: Shipment): string => {
+    const metadata = shipment.metadata || {};
+    
+    if (metadata.senderDetails?.address) {
+      return metadata.senderDetails.address;
+    } else if (metadata.sender?.address) {
+      return metadata.sender.address;
+    } else if (metadata.pickupAddress) {
+      const address = metadata.pickupAddress;
+      const city = metadata.pickupCity || '';
+      const postcode = metadata.pickupPostcode || '';
+      const country = metadata.pickupCountry || '';
+      
+      return [address, city, postcode, country].filter(Boolean).join(', ');
+    } else if (shipment.origin) {
+      return shipment.origin;
+    }
+    
+    return 'No Address Provided';
   };
 
-  const filteredShipments = getFilteredShipments();
+  // Fixed function to get collection information from postal code
+  const getCollectionInfo = (shipment: Shipment) => {
+    // Extract postal code from the shipment
+    const postalCode = extractPostalCode(shipment);
+    console.log('Postal code extracted for collection info:', postalCode);
+    
+    // Get the collection route based on postal code
+    const route = getCollectionRoute(postalCode);
+    console.log('Collection route determined:', route);
+    
+    // Get the collection date based on the route
+    const date = getCollectionDate(route);
+    console.log('Collection date determined:', date);
+    
+    // Determine if it's scheduled (not just booking confirmed)
+    const scheduled = shipment.status !== 'Booking Confirmed';
+    
+    // Determine if collection is completed (advanced statuses)
+    const completed = ['Processing in UK Warehouse', 'Customs Clearance', 'Processing in ZW Warehouse', 'Out for Delivery', 'Delivered'].includes(shipment.status);
+    
+    // Get notes from metadata or provide default
+    const metadata = shipment.metadata || {};
+    const notes = metadata.collectionNotes || 
+                  metadata.specialInstructions ||
+                  metadata.notes ||
+                  'Standard collection procedure';
+    
+    return {
+      route: route,
+      date: date,
+      scheduled: scheduled,
+      completed: completed,
+      notes: notes,
+      postalCode: postalCode
+    };
+  };
+  
+  // Enhanced function to get payment amount from metadata
+  const getPaymentAmount = (shipment: Shipment): string => {
+    const metadata = shipment.metadata || {};
+    
+    // Check various places where payment amount might be stored
+    if (metadata.payment?.amount) {
+      return `£${metadata.payment.amount}`;
+    } else if (metadata.paymentAmount) {
+      return `£${metadata.paymentAmount}`;
+    } else if (metadata.amount) {
+      return `£${metadata.amount}`;
+    } else if (metadata.totalAmount) {
+      return `£${metadata.totalAmount}`;
+    } else if (metadata.total) {
+      return `£${metadata.total}`;
+    } else if (metadata.pricing?.total) {
+      return `£${metadata.pricing.total}`;
+    } else if (metadata.cost) {
+      return `£${metadata.cost}`;
+    } else if (metadata.price) {
+      return `£${metadata.price}`;
+    } else if (metadata.quotedAmount) {
+      return `£${metadata.quotedAmount}`;
+    }
+    
+    return 'Amount to be confirmed';
+  };
+  
+  // Filter shipments based on search and status filter
+  const filteredShipments = shipments.filter(shipment => {
+    const metadata = shipment.metadata || {};
+    const senderName = getSenderName(shipment);
+    const receiverName = getReceiverName(shipment);
+    const senderPhone = getSenderPhone(shipment);
+    const receiverPhone = getReceiverPhone(shipment);
+    const senderEmail = getSenderEmail(shipment);
+    
+    const matchesSearch = 
+      searchQuery === '' ||
+      shipment.tracking_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      senderName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      receiverName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      senderPhone.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      senderEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      shipment.origin?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      shipment.destination?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesStatus = 
+      statusFilter === 'all' ||
+      shipment.status?.toLowerCase() === statusFilter.toLowerCase();
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  // Helper function to render status badge
+  const renderStatusBadge = (status: string) => {
+    const statusLower = status?.toLowerCase() || '';
+    let variant: "default" | "destructive" | "outline" | "secondary" = "default";
+    
+    if (statusLower.includes('cancelled')) {
+      variant = "destructive";
+    } else if (statusLower.includes('delivered')) {
+      variant = "secondary";
+    } else if (statusLower.includes('processing') || statusLower.includes('pickup') || statusLower.includes('transit')) {
+      variant = "outline";
+    }
+    
+    return <Badge variant={variant}>{status}</Badge>;
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Total Shipments</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center">
-              <Package className="h-8 w-8 text-blue-500 mr-3" />
-              <div className="text-2xl font-bold">{filteredShipments.length}</div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">In Transit</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center">
-              <Truck className="h-8 w-8 text-orange-500 mr-3" />
-              <div className="text-2xl font-bold">
-                {filteredShipments.filter(s => s.status === 'In Transit').length}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Delivered</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center">
-              <Package className="h-8 w-8 text-green-500 mr-3" />
-              <div className="text-2xl font-bold">
-                {filteredShipments.filter(s => s.status === 'Delivered').length}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Total Customers</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center">
-              <Users className="h-8 w-8 text-purple-500 mr-3" />
-              <div className="text-2xl font-bold">
-                {new Set(filteredShipments.map(s => s.user_id).filter(Boolean)).size}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      
-      {/* Shipments Management */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <div>
-              <CardTitle>Shipment Management</CardTitle>
-              <CardDescription>View and manage all shipments in the system</CardDescription>
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleRefresh} 
-              disabled={isRefreshing}
-              className="w-full sm:w-auto"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Refresh Data
-            </Button>
+    <Card>
+      <CardHeader>
+        <CardTitle>Shipment Management</CardTitle>
+        <CardDescription>
+          View and manage all shipments
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Search and Filter Controls */}
+        <div className="flex flex-col md:flex-row gap-4 items-end">
+          <div className="relative flex-grow">
+            <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+            <Input
+              placeholder="Search by tracking #, sender, receiver, origin, destination..."
+              className="pl-10"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-4 mt-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search by tracking #, customer, or destination"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+          <div className="flex gap-2">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="h-4 w-4 mr-2" />
+                <span>Status</span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                {STATUS_OPTIONS.map((status) => (
+                  <SelectItem key={status.toLowerCase()} value={status.toLowerCase()}>
+                    {status}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             
-            <div className="flex gap-2 flex-col sm:flex-row">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="Booking Confirmed">Booking Confirmed</SelectItem>
-                  <SelectItem value="Ready for Pickup">Ready for Pickup</SelectItem>
-                  <SelectItem value="Processing in Warehouse (UK)">UK Warehouse</SelectItem>
-                  <SelectItem value="In Transit">In Transit</SelectItem>
-                  <SelectItem value="Customs Clearance">Customs Clearance</SelectItem>
-                  <SelectItem value="Processing in Warehouse (ZW)">ZW Warehouse</SelectItem>
-                  <SelectItem value="Out for Delivery">Out for Delivery</SelectItem>
-                  <SelectItem value="Delivered">Delivered</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Select value={dateFilter} onValueChange={setDateFilter}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <Clock className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Time Period" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Time</SelectItem>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="week">Last 7 Days</SelectItem>
-                  <SelectItem value="month">Last 30 Days</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Button variant="outline" onClick={fetchShipments}>
+              <RefreshCcw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
           </div>
-        </CardHeader>
-        
-        <CardContent>
-          {isLoading ? (
-            <div className="animate-pulse space-y-4">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="h-12 bg-gray-100 rounded"></div>
-              ))}
-            </div>
-          ) : filteredShipments.length === 0 ? (
-            <div className="text-center py-8">
-              <AlertCircle className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium">No shipments found</h3>
-              <p className="text-gray-500 mt-1">
-                {searchQuery || statusFilter !== 'all' || dateFilter !== 'all' 
-                  ? "Try adjusting your filters" 
-                  : "There are no shipments to display"}
-              </p>
-            </div>
-          ) : (
+        </div>
+
+        {/* Shipments Table */}
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          </div>
+        ) : filteredShipments.length === 0 ? (
+          <div className="text-center py-8">
+            <Package className="h-16 w-16 mx-auto text-muted-foreground mb-2" />
+            <h3 className="text-lg font-medium">No shipments found</h3>
+            <p className="text-muted-foreground">Try adjusting your filters</p>
+          </div>
+        ) : (
+          <div className="border rounded-md overflow-hidden">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Tracking #</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Collection Info</TableHead>
-                    <TableHead>From</TableHead>
-                    <TableHead>To</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort('tracking_number')}>
+                      Tracking #
+                      {sortField === 'tracking_number' && (
+                        <ArrowUpDown className="inline-block ml-1 h-4 w-4" />
+                      )}
+                    </TableHead>
+                    <TableHead>Sender Name</TableHead>
+                    <TableHead>Receiver Name</TableHead>
+                    <TableHead>Sender number</TableHead>
+                    <TableHead>Receiver Number</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort('origin')}>
+                      Origin
+                      {sortField === 'origin' && (
+                        <ArrowUpDown className="inline-block ml-1 h-4 w-4" />
+                      )}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort('destination')}>
+                      Destination
+                      {sortField === 'destination' && (
+                        <ArrowUpDown className="inline-block ml-1 h-4 w-4" />
+                      )}
+                    </TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort('created_at')}>
+                      Created
+                      {sortField === 'created_at' && (
+                        <ArrowUpDown className="inline-block ml-1 h-4 w-4" />
+                      )}
+                    </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredShipments.map((shipment) => {
-                    const postalCode = extractPostalCode(shipment);
-                    const collectionRoute = getCollectionRoute(postalCode);
-                    const collectionDate = getCollectionDate(collectionRoute);
-                    
-                    console.log(`Shipment ${shipment.tracking_number}:`, {
-                      postalCode,
-                      collectionRoute,
-                      collectionDate
-                    });
-                    
-                    return (
-                      <TableRow key={shipment.id}>
-                        <TableCell className="font-medium">{shipment.tracking_number}</TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            <div>{shipment.profiles?.full_name || 'Unknown'}</div>
-                            <div className="text-gray-500">{shipment.profiles?.email || 'No email'}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm space-y-1">
-                            <div className="flex items-center">
-                              <MapPin className="h-3 w-3 mr-1 text-gray-400" />
-                              <span className="font-medium">{collectionRoute}</span>
-                            </div>
-                            <div className="flex items-center">
-                              <Calendar className="h-3 w-3 mr-1 text-gray-400" />
-                              <span className="text-gray-600">{collectionDate}</span>
-                            </div>
-                            {postalCode && (
-                              <div className="text-xs text-gray-500">Postal: {postalCode}</div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="max-w-[180px] truncate">{shipment.origin}</TableCell>
-                        <TableCell className="max-w-[180px] truncate">{shipment.destination}</TableCell>
-                        <TableCell>{getStatusBadge(shipment.status)}</TableCell>
-                        <TableCell className="text-sm text-gray-500">
-                          {format(new Date(shipment.created_at), 'MMM d, yyyy')}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {getNextStatusOptions(shipment.status).length > 0 ? (
-                            <Select 
-                              onValueChange={(value) => updateShipmentStatus(shipment.id, value)}
-                            >
-                              <SelectTrigger className="w-[160px]">
-                                <SelectValue placeholder="Update Status" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {getNextStatusOptions(shipment.status).map((status) => (
-                                  <SelectItem key={status} value={status}>
-                                    {status}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <Badge variant="outline" className="ml-auto">
-                              {shipment.status === 'Delivered' ? 'Completed' : 'No Actions'}
-                            </Badge>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                  {filteredShipments.map(shipment => (
+                    <TableRow key={shipment.id}>
+                      <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
+                      <TableCell className="max-w-[150px] truncate">{getSenderName(shipment)}</TableCell>
+                      <TableCell className="max-w-[150px] truncate">{getReceiverName(shipment)}</TableCell>
+                      <TableCell className="max-w-[150px] truncate">{getSenderPhone(shipment)}</TableCell>
+                      <TableCell className="max-w-[150px] truncate">{getReceiverPhone(shipment)}</TableCell>
+                      <TableCell className="max-w-[150px] truncate">{shipment.origin}</TableCell>
+                      <TableCell className="max-w-[150px] truncate">{shipment.destination}</TableCell>
+                      <TableCell>{renderStatusBadge(shipment.status)}</TableCell>
+                      <TableCell>{format(new Date(shipment.created_at), 'dd MMM yyyy')}</TableCell>
+                      <TableCell className="text-right">
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleViewShipment(shipment)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </div>
+          </div>
+        )}
+        
+        <div className="text-sm text-muted-foreground mt-2">
+          Showing {filteredShipments.length} of {shipments.length} shipments
+        </div>
+      </CardContent>
+
+      {/* View Shipment Details Dialog */}
+      <Dialog open={!!viewingShipment} onOpenChange={(open) => !open && setViewingShipment(null)}>
+        <DialogContent className="max-w-[900px]">
+          <DialogHeader>
+            <DialogTitle>Shipment Details</DialogTitle>
+            <DialogDescription>
+              Tracking Number: {viewingShipment?.tracking_number}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {viewingShipment && (
+            <div className="space-y-6 py-4">
+              {/* Shipment Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-medium text-muted-foreground">Origin</h3>
+                  <p>{viewingShipment.origin || 'Not specified'}</p>
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-medium text-muted-foreground">Destination</h3>
+                  <p>{viewingShipment.destination || 'Not specified'}</p>
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-medium text-muted-foreground">Created At</h3>
+                  <p>{format(new Date(viewingShipment.created_at), 'dd MMM yyyy HH:mm')}</p>
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-medium text-muted-foreground">Updated At</h3>
+                  <p>{format(new Date(viewingShipment.updated_at), 'dd MMM yyyy HH:mm')}</p>
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-medium text-muted-foreground">Payment Amount</h3>
+                  <p className="font-semibold text-green-600">{getPaymentAmount(viewingShipment)}</p>
+                </div>
+              </div>
+              
+              {/* Sender and Recipient Details */}
+              <div>
+                <h3 className="text-lg font-medium mb-3">Contact Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 dark:bg-gray-800 p-4 rounded-md">
+                  <div>
+                    <h4 className="font-medium">Sender</h4>
+                    <div className="mt-2 space-y-2">
+                      <div className="flex items-start">
+                        <User className="h-4 w-4 mt-1 mr-2 text-gray-500" />
+                        <div>
+                          <p className="font-medium">{getSenderName(viewingShipment)}</p>
+                          <p className="text-sm text-gray-500">{getSenderEmail(viewingShipment)}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start">
+                        <Phone className="h-4 w-4 mt-1 mr-2 text-gray-500" />
+                        <div>
+                          <p>{getSenderPhone(viewingShipment)}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start">
+                        <MapPin className="h-4 w-4 mt-1 mr-2 text-gray-500" />
+                        <div>
+                          <p className="text-sm">
+                            {getPickupAddress(viewingShipment)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="font-medium">Receiver</h4>
+                    <div className="mt-2 space-y-2">
+                      <div className="flex items-start">
+                        <User className="h-4 w-4 mt-1 mr-2 text-gray-500" />
+                        <p className="font-medium">{getReceiverName(viewingShipment)}</p>
+                      </div>
+                      <div className="flex items-start">
+                        <Phone className="h-4 w-4 mt-1 mr-2 text-gray-500" />
+                        <div>
+                          <p>{getReceiverPhone(viewingShipment)}</p>
+                          {viewingShipment.metadata?.additionalRecipientPhone && (
+                            <p className="text-sm text-gray-500">Additional: {viewingShipment.metadata.additionalRecipientPhone}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-start">
+                        <MapPin className="h-4 w-4 mt-1 mr-2 text-gray-500" />
+                        <div>
+                          <p className="text-sm">
+                            {getDeliveryAddress(viewingShipment)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* ... keep existing code (Shipment Details Section) the same ... */}
+              
+              {/* Status Section */}
+              <div className="space-y-2">
+                <h3 className="text-lg font-medium">Status</h3>
+                <div className="flex items-center justify-between">
+                  <Badge variant="outline">{viewingShipment.status}</Badge>
+                  {!editingStatus ? (
+                    <Button variant="ghost" size="sm" onClick={() => setEditingStatus(true)}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Status
+                    </Button>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Select Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STATUS_OPTIONS.map((status) => (
+                            <SelectItem key={status} value={status}>
+                              {status}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <div className="flex gap-2 mt-2 md:mt-0">
+                        <Button variant="outline" size="sm" onClick={handleUpdateStatus}>
+                          Update
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setEditingStatus(false)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {editingStatus && (
+                  <div className="mt-2">
+                    <Label htmlFor="statusNote">Add a note (optional)</Label>
+                    <Textarea 
+                      id="statusNote"
+                      value={statusNote} 
+                      onChange={(e) => setStatusNote(e.target.value)}
+                      placeholder="Add a note about this status change"
+                      className="mt-1"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Enhanced Collection Information */}
+              <div className="space-y-2">
+                <h3 className="text-lg font-medium">Collection Information</h3>
+                {(() => {
+                  const collectionInfo = getCollectionInfo(viewingShipment);
+                  return (
+                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-md">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-medium text-muted-foreground">Collection Route</h4>
+                          <p className="font-medium">{collectionInfo.route}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-medium text-muted-foreground">Collection Date</h4>
+                          <p className="font-medium">{collectionInfo.date}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-medium text-muted-foreground">Scheduled</h4>
+                          <div className="flex items-center">
+                            <Badge variant={collectionInfo.scheduled ? "default" : "secondary"}>
+                              {collectionInfo.scheduled ? 'Yes' : 'No'}
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-medium text-muted-foreground">Collection Status</h4>
+                          <div className="flex items-center">
+                            <Badge variant={collectionInfo.completed ? "default" : "outline"}>
+                              {collectionInfo.completed ? 'Completed' : 'Pending'}
+                            </Badge>
+                          </div>
+                        </div>
+                        {collectionInfo.postalCode && (
+                          <div className="space-y-1">
+                            <h4 className="text-sm font-medium text-muted-foreground">Postal Code</h4>
+                            <p className="text-sm bg-white dark:bg-gray-700 p-2 rounded border">{collectionInfo.postalCode}</p>
+                          </div>
+                        )}
+                        <div className="space-y-1 col-span-2">
+                          <h4 className="text-sm font-medium text-muted-foreground">Collection Notes</h4>
+                          <p className="text-sm bg-white dark:bg-gray-700 p-2 rounded border">{collectionInfo.notes}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 };
 
