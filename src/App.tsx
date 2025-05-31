@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -31,7 +32,6 @@ import QuoteSubmitted from '@/pages/QuoteSubmitted';
 import TermsAndConditions from './pages/TermsAndConditions';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import ConfirmBooking from './pages/ConfirmBooking';
-import Blog from '@/pages/Blog';
 
 // Components
 import { RequireAuth, RequireAdmin, RedirectIfAuthenticated, RequireRole } from './components/RouteGuard';
@@ -84,7 +84,6 @@ function App() {
                     <Route path="/faq" element={<FAQ />} />
                     <Route path="/terms" element={<TermsAndConditions />} />
                     <Route path="/privacy" element={<PrivacyPolicy />} />
-                    <Route path="/blog" element={<Blog />} />
 
                     {/* Protected routes - any authenticated user */}
                     <Route

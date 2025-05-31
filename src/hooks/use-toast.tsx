@@ -1,5 +1,6 @@
 
-import React from "react"
+// This file is the source of truth for toast functionality
+import * as React from "react"
 import { type ToastActionElement, type ToastProps } from "@/components/ui/toast"
 
 const TOAST_LIMIT = 5
@@ -87,6 +88,8 @@ export const reducer = (state: State, action: Action): State => {
     case "DISMISS_TOAST": {
       const { toastId } = action
 
+      // ! Side effects ! - This could be extracted into a dismissToast() action,
+      // but I'll keep it here for simplicity
       if (toastId) {
         addToRemoveQueue(toastId)
       } else {
@@ -183,6 +186,7 @@ function useToast() {
   }
 }
 
+// Export the ToastAPI type
 export type ToastAPI = ReturnType<typeof useToast>;
 export type ToastMethod = typeof toast;
 

@@ -1,3 +1,5 @@
 
 // Re-export from the hooks directory
-export { useToast, toast, type ToastAPI, type ToastMethod } from "@/hooks/use-toast";
+import { useToast, toast, type ToastAPI, type ToastMethod } from "@/hooks/use-toast";
+
+export { useToast, toast, type ToastAPI, type ToastMethod };
