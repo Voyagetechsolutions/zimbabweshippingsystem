@@ -71,12 +71,6 @@ export const collectionSchedules: RouteSchedule[] = [
     country: "England"
   },
   {
-    route: "SCOTLAND ROUTE",
-    date: "Please contact support to place booking",
-    areas: ["GLASSGOW", "EDINBURGH", "NECASTLE", "MIDDLESBROUGH", "PRESTON", "CARLLSLE"],
-    country: "England"
-  },
-  {
     route: "LONDON DERRY ROUTE",
     date: "18th of April",
     areas: ["LARNE", "BALLYCLARE", "BALLYMENA", "BALLYMONEY", "KILERA", "COLERAINE", "LONDONDERRY", "LIFFORD", "OMAGH", "COOKSTOWN", "CARRICKFERGUS"],
