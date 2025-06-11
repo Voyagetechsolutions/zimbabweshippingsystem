@@ -144,7 +144,7 @@ const CollectionSchedule = () => {
       schedule.areas.some(area => area === filterArea);
     
     const matchesDate = !filterDate || 
-      schedule.pickup_date.toLowerCase().includes(format(filterDate, 'do of MMMM').toLowerCase());
+      schedule.pickup_date.toLowerCase().includes(format(filterDate, "do 'of' MMMM").toLowerCase());
     
     return matchesSearch && matchesRoute && matchesArea && matchesDate;
   });
