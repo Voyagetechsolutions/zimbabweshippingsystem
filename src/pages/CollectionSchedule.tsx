@@ -46,6 +46,18 @@ const CollectionSchedule = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
+        // First, remove SCOTLAND ROUTE from database if it exists
+        const { error: deleteError } = await supabase
+          .from('collection_schedules')
+          .delete()
+          .eq('route', 'SCOTLAND ROUTE');
+        
+        if (deleteError) {
+          console.error('Error removing SCOTLAND ROUTE:', deleteError);
+        } else {
+          console.log('SCOTLAND ROUTE removed from database');
+        }
+        
         // Fetch collection schedules
         const { data: schedulesData, error: schedulesError } = await supabase
           .from('collection_schedules')
@@ -54,50 +66,57 @@ const CollectionSchedule = () => {
         if (schedulesError) throw schedulesError;
         
         if (schedulesData && schedulesData.length > 0) {
-          setSchedules(schedulesData);
+          // Filter out any SCOTLAND ROUTE that might still exist
+          const filteredData = schedulesData.filter(schedule => schedule.route !== 'SCOTLAND ROUTE');
+          setSchedules(filteredData);
           
-          // Extract unique routes and areas
-          const routes = [...new Set(schedulesData.map(schedule => schedule.route))];
+          // Extract unique routes and areas (excluding SCOTLAND ROUTE)
+          const routes = [...new Set(filteredData.map(schedule => schedule.route))];
           setAllRoutes(routes);
           
-          const areas = [...new Set(schedulesData.flatMap(schedule => schedule.areas))];
+          const areas = [...new Set(filteredData.flatMap(schedule => schedule.areas))];
           setAllAreas(areas);
         } else {
           // If no data in database, use the default data from collectionSchedule.ts
-          const defaultSchedules = collectionSchedules.map((schedule, index) => ({
-            id: index.toString(),
-            route: schedule.route,
-            pickup_date: schedule.date,
-            areas: schedule.areas
-          }));
+          // and filter out SCOTLAND ROUTE
+          const filteredSchedules = collectionSchedules
+            .filter(schedule => schedule.route !== 'SCOTLAND ROUTE')
+            .map((schedule, index) => ({
+              id: index.toString(),
+              route: schedule.route,
+              pickup_date: schedule.date,
+              areas: schedule.areas
+            }));
           
-          setSchedules(defaultSchedules);
+          setSchedules(filteredSchedules);
           
-          // Extract unique routes and areas from default data
-          const routes = [...new Set(defaultSchedules.map(schedule => schedule.route))];
+          // Extract unique routes and areas from filtered default data
+          const routes = [...new Set(filteredSchedules.map(schedule => schedule.route))];
           setAllRoutes(routes);
           
-          const areas = [...new Set(defaultSchedules.flatMap(schedule => schedule.areas))];
+          const areas = [...new Set(filteredSchedules.flatMap(schedule => schedule.areas))];
           setAllAreas(areas);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
         
-        // Fallback to static data if API fails
-        const defaultSchedules = collectionSchedules.map((schedule, index) => ({
-          id: index.toString(),
-          route: schedule.route,
-          pickup_date: schedule.date,
-          areas: schedule.areas
-        }));
+        // Fallback to static data if API fails, but filter out SCOTLAND ROUTE
+        const filteredSchedules = collectionSchedules
+          .filter(schedule => schedule.route !== 'SCOTLAND ROUTE')
+          .map((schedule, index) => ({
+            id: index.toString(),
+            route: schedule.route,
+            pickup_date: schedule.date,
+            areas: schedule.areas
+          }));
         
-        setSchedules(defaultSchedules);
+        setSchedules(filteredSchedules);
         
-        // Extract unique routes and areas from default data
-        const routes = [...new Set(defaultSchedules.map(schedule => schedule.route))];
+        // Extract unique routes and areas from filtered default data
+        const routes = [...new Set(filteredSchedules.map(schedule => schedule.route))];
         setAllRoutes(routes);
         
-        const areas = [...new Set(defaultSchedules.flatMap(schedule => schedule.areas))];
+        const areas = [...new Set(filteredSchedules.flatMap(schedule => schedule.areas))];
         setAllAreas(areas);
         
         toast({
