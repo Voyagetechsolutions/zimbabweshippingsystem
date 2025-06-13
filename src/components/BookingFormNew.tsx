@@ -39,7 +39,7 @@ const formSchema = z.object({
   }),
   hasAdditionalPhone: z.boolean().default(false),
   additionalPhone: z.string().optional(),
-  pickupCountry: z.enum(['England', 'Ireland']),
+  pickupCountry: z.enum(['England']),
   pickupAddress: z.string().min(1, 'Pickup address is required'),
   pickupPostcode: z.string()
     .min(1, 'Postcode is required')
@@ -530,7 +530,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="England">England</SelectItem>
-                          <SelectItem value="Ireland">Ireland</SelectItem>
+                         
                         </SelectContent>
                       </Select>
                       <FormMessage />
