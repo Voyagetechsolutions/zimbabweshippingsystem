@@ -183,7 +183,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
         }
       }
     } else if (watchCountry === 'Ireland' && watchPickupCity) {
-      setIsRestrictedPostcode(false);
+      print("Currently under available contact soon for more details")
       
       const route = getIrelandRouteForCity(watchPickupCity);
       setDetectedRoute(route);
