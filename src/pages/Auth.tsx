@@ -66,14 +66,14 @@ const Auth = () => {
       return;
     }
 
-    if (password.length < 8) {
+    /*if (password.length < 8) {
       toast({
         title: 'Weak Password',
         description: 'Password must be at least 8 characters long.',
         variant: 'destructive',
       });
       return;
-    }
+    }*/
 
     try {
       setLoading(true);
