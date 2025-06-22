@@ -182,20 +182,6 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
           form.setValue('collectionDate', matchingRoute.pickupDate);
         }
       }
-    } else if (watchCountry === 'Ireland' && watchPickupCity) {
-      print("Currently under available contact soon for more details")
-      
-      const route = getIrelandRouteForCity(watchPickupCity);
-      setDetectedRoute(route);
-      
-      if (route) {
-        const matchingRoute = availableRoutes.find(item => item.route === route);
-        if (matchingRoute) {
-          setCollectionDate(matchingRoute.pickupDate);
-          form.setValue('collectionRoute', route);
-          form.setValue('collectionDate', matchingRoute.pickupDate);
-        }
-      }
     }
   }, [watchPostcode, watchCountry, watchPickupCity, availableRoutes, form, toast]);
   
