@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -49,6 +50,17 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 // Icons
 import { 
@@ -239,6 +251,7 @@ const ShipmentManagementTab = () => {
   const [customQuotes, setCustomQuotes] = useState<any[]>([]);
   const [sortField, setSortField] = useState('created_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [deletingShipment, setDeletingShipment] = useState<Shipment | null>(null);
 
   useEffect(() => {
     fetchShipments();
@@ -348,6 +361,38 @@ const ShipmentManagementTab = () => {
       toast({
         title: 'Error',
         description: `Failed to update status: ${error.message}`,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteShipment = async () => {
+    if (!deletingShipment) return;
+    
+    try {
+      const { error } = await supabase
+        .from('shipments')
+        .delete()
+        .eq('id', deletingShipment.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Shipment Deleted',
+        description: `Shipment ${deletingShipment.tracking_number} has been deleted successfully`,
+      });
+
+      // Remove from local state
+      setShipments(shipments.filter(s => s.id !== deletingShipment.id));
+      
+      // Close dialogs
+      setDeletingShipment(null);
+      setViewingShipment(null);
+    } catch (error: any) {
+      console.error('Error deleting shipment:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to delete shipment: ${error.message}`,
         variant: 'destructive',
       });
     }
@@ -817,201 +862,247 @@ const ShipmentManagementTab = () => {
         </div>
       </CardContent>
 
-      {/* View Shipment Details Dialog */}
+      {/* Enhanced View Shipment Details Dialog for Mobile */}
       <Dialog open={!!viewingShipment} onOpenChange={(open) => !open && setViewingShipment(null)}>
-        <DialogContent className="max-w-[900px]">
-          <DialogHeader>
-            <DialogTitle>Shipment Details</DialogTitle>
-            <DialogDescription>
-              Tracking Number: {viewingShipment?.tracking_number}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {viewingShipment && (
-            <div className="space-y-6 py-4">
-              {/* Shipment Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">Origin</h3>
-                  <p>{viewingShipment.origin || 'Not specified'}</p>
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">Destination</h3>
-                  <p>{viewingShipment.destination || 'Not specified'}</p>
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">Created At</h3>
-                  <p>{format(new Date(viewingShipment.created_at), 'dd MMM yyyy HH:mm')}</p>
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">Updated At</h3>
-                  <p>{format(new Date(viewingShipment.updated_at), 'dd MMM yyyy HH:mm')}</p>
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-muted-foreground">Payment Amount</h3>
-                  <p className="font-semibold text-green-600">{getPaymentAmount(viewingShipment)}</p>
-                </div>
-              </div>
-              
-              {/* Sender and Recipient Details */}
-              <div>
-                <h3 className="text-lg font-medium mb-3">Contact Details</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 dark:bg-gray-800 p-4 rounded-md">
+        <DialogContent className="w-full h-full max-w-none max-h-none m-0 rounded-none sm:max-w-[900px] sm:h-auto sm:max-h-[90vh] sm:m-6 sm:rounded-lg">
+          <div className="flex flex-col h-full">
+            <DialogHeader className="flex-shrink-0 p-4 sm:p-6 border-b">
+              <DialogTitle className="text-lg sm:text-xl">Shipment Details</DialogTitle>
+              <DialogDescription className="break-all">
+                Tracking Number: {viewingShipment?.tracking_number}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+              {viewingShipment && (
+                <div className="space-y-4 sm:space-y-6">
+                  {/* Shipment Information */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-medium text-muted-foreground">Origin</h3>
+                      <p className="break-words">{viewingShipment.origin || 'Not specified'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-medium text-muted-foreground">Destination</h3>
+                      <p className="break-words">{viewingShipment.destination || 'Not specified'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-medium text-muted-foreground">Created At</h3>
+                      <p>{format(new Date(viewingShipment.created_at), 'dd MMM yyyy HH:mm')}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-medium text-muted-foreground">Updated At</h3>
+                      <p>{format(new Date(viewingShipment.updated_at), 'dd MMM yyyy HH:mm')}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-medium text-muted-foreground">Payment Amount</h3>
+                      <p className="font-semibold text-green-600">{getPaymentAmount(viewingShipment)}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Contact Details */}
                   <div>
-                    <h4 className="font-medium">Sender</h4>
-                    <div className="mt-2 space-y-2">
-                      <div className="flex items-start">
-                        <User className="h-4 w-4 mt-1 mr-2 text-gray-500" />
-                        <div>
-                          <p className="font-medium">{getSenderName(viewingShipment)}</p>
-                          <p className="text-sm text-gray-500">{getSenderEmail(viewingShipment)}</p>
+                    <h3 className="text-base sm:text-lg font-medium mb-3">Contact Details</h3>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 bg-gray-50 dark:bg-gray-800 p-3 sm:p-4 rounded-md">
+                      <div className="space-y-3">
+                        <h4 className="font-medium">Sender</h4>
+                        <div className="space-y-2">
+                          <div className="flex items-start">
+                            <User className="h-4 w-4 mt-1 mr-2 text-gray-500 flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium break-words">{getSenderName(viewingShipment)}</p>
+                              <p className="text-sm text-gray-500 break-words">{getSenderEmail(viewingShipment)}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-start">
+                            <Phone className="h-4 w-4 mt-1 mr-2 text-gray-500 flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="break-words">{getSenderPhone(viewingShipment)}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-start">
+                            <MapPin className="h-4 w-4 mt-1 mr-2 text-gray-500 flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm break-words">
+                                {getPickupAddress(viewingShipment)}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-start">
-                        <Phone className="h-4 w-4 mt-1 mr-2 text-gray-500" />
-                        <div>
-                          <p>{getSenderPhone(viewingShipment)}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start">
-                        <MapPin className="h-4 w-4 mt-1 mr-2 text-gray-500" />
-                        <div>
-                          <p className="text-sm">
-                            {getPickupAddress(viewingShipment)}
-                          </p>
+                      <div className="space-y-3">
+                        <h4 className="font-medium">Receiver</h4>
+                        <div className="space-y-2">
+                          <div className="flex items-start">
+                            <User className="h-4 w-4 mt-1 mr-2 text-gray-500 flex-shrink-0" />
+                            <p className="font-medium break-words">{getReceiverName(viewingShipment)}</p>
+                          </div>
+                          <div className="flex items-start">
+                            <Phone className="h-4 w-4 mt-1 mr-2 text-gray-500 flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="break-words">{getReceiverPhone(viewingShipment)}</p>
+                              {viewingShipment.metadata?.additionalRecipientPhone && (
+                                <p className="text-sm text-gray-500 break-words">Additional: {viewingShipment.metadata.additionalRecipientPhone}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-start">
+                            <MapPin className="h-4 w-4 mt-1 mr-2 text-gray-500 flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm break-words">
+                                {getDeliveryAddress(viewingShipment)}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                  <div>
-                    <h4 className="font-medium">Receiver</h4>
-                    <div className="mt-2 space-y-2">
-                      <div className="flex items-start">
-                        <User className="h-4 w-4 mt-1 mr-2 text-gray-500" />
-                        <p className="font-medium">{getReceiverName(viewingShipment)}</p>
-                      </div>
-                      <div className="flex items-start">
-                        <Phone className="h-4 w-4 mt-1 mr-2 text-gray-500" />
-                        <div>
-                          <p>{getReceiverPhone(viewingShipment)}</p>
-                          {viewingShipment.metadata?.additionalRecipientPhone && (
-                            <p className="text-sm text-gray-500">Additional: {viewingShipment.metadata.additionalRecipientPhone}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-start">
-                        <MapPin className="h-4 w-4 mt-1 mr-2 text-gray-500" />
-                        <div>
-                          <p className="text-sm">
-                            {getDeliveryAddress(viewingShipment)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* ... keep existing code (Shipment Details Section) the same ... */}
-              
-              {/* Status Section */}
-              <div className="space-y-2">
-                <h3 className="text-lg font-medium">Status</h3>
-                <div className="flex items-center justify-between">
-                  <Badge variant="outline">{viewingShipment.status}</Badge>
-                  {!editingStatus ? (
-                    <Button variant="ghost" size="sm" onClick={() => setEditingStatus(true)}>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit Status
-                    </Button>
-                  ) : (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                        <SelectTrigger className="w-[180px]">
-                          <SelectValue placeholder="Select Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STATUS_OPTIONS.map((status) => (
-                            <SelectItem key={status} value={status}>
-                              {status}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <div className="flex gap-2 mt-2 md:mt-0">
-                        <Button variant="outline" size="sm" onClick={handleUpdateStatus}>
-                          Update
+                  
+                  {/* Status Section */}
+                  <div className="space-y-2">
+                    <h3 className="text-base sm:text-lg font-medium">Status</h3>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <Badge variant="outline">{viewingShipment.status}</Badge>
+                      {!editingStatus ? (
+                        <Button variant="ghost" size="sm" onClick={() => setEditingStatus(true)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit Status
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setEditingStatus(false)}>
-                          Cancel
-                        </Button>
-                      </div>
+                      ) : (
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                          <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                            <SelectTrigger className="w-full sm:w-[180px]">
+                              <SelectValue placeholder="Select Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {STATUS_OPTIONS.map((status) => (
+                                <SelectItem key={status} value={status}>
+                                  {status}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={handleUpdateStatus}>
+                              Update
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => setEditingStatus(false)}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-                {editingStatus && (
-                  <div className="mt-2">
-                    <Label htmlFor="statusNote">Add a note (optional)</Label>
-                    <Textarea 
-                      id="statusNote"
-                      value={statusNote} 
-                      onChange={(e) => setStatusNote(e.target.value)}
-                      placeholder="Add a note about this status change"
-                      className="mt-1"
-                    />
+                    {editingStatus && (
+                      <div className="mt-2">
+                        <Label htmlFor="statusNote">Add a note (optional)</Label>
+                        <Textarea 
+                          id="statusNote"
+                          value={statusNote} 
+                          onChange={(e) => setStatusNote(e.target.value)}
+                          placeholder="Add a note about this status change"
+                          className="mt-1"
+                        />
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
-              {/* Enhanced Collection Information */}
-              <div className="space-y-2">
-                <h3 className="text-lg font-medium">Collection Information</h3>
-                {(() => {
-                  const collectionInfo = getCollectionInfo(viewingShipment);
-                  return (
-                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-md">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <h4 className="text-sm font-medium text-muted-foreground">Collection Route</h4>
-                          <p className="font-medium">{collectionInfo.route}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <h4 className="text-sm font-medium text-muted-foreground">Collection Date</h4>
-                          <p className="font-medium">{collectionInfo.date}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <h4 className="text-sm font-medium text-muted-foreground">Scheduled</h4>
-                          <div className="flex items-center">
-                            <Badge variant={collectionInfo.scheduled ? "default" : "secondary"}>
-                              {collectionInfo.scheduled ? 'Yes' : 'No'}
-                            </Badge>
+                  {/* Collection Information */}
+                  <div className="space-y-2">
+                    <h3 className="text-base sm:text-lg font-medium">Collection Information</h3>
+                    {(() => {
+                      const collectionInfo = getCollectionInfo(viewingShipment);
+                      return (
+                        <div className="bg-gray-50 dark:bg-gray-800 p-3 sm:p-4 rounded-md">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                            <div className="space-y-1">
+                              <h4 className="text-sm font-medium text-muted-foreground">Collection Route</h4>
+                              <p className="font-medium break-words">{collectionInfo.route}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <h4 className="text-sm font-medium text-muted-foreground">Collection Date</h4>
+                              <p className="font-medium break-words">{collectionInfo.date}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <h4 className="text-sm font-medium text-muted-foreground">Scheduled</h4>
+                              <div className="flex items-center">
+                                <Badge variant={collectionInfo.scheduled ? "default" : "secondary"}>
+                                  {collectionInfo.scheduled ? 'Yes' : 'No'}
+                                </Badge>
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <h4 className="text-sm font-medium text-muted-foreground">Collection Status</h4>
+                              <div className="flex items-center">
+                                <Badge variant={collectionInfo.completed ? "default" : "outline"}>
+                                  {collectionInfo.completed ? 'Completed' : 'Pending'}
+                                </Badge>
+                              </div>
+                            </div>
+                            {collectionInfo.postalCode && (
+                              <div className="space-y-1">
+                                <h4 className="text-sm font-medium text-muted-foreground">Postal Code</h4>
+                                <p className="text-sm bg-white dark:bg-gray-700 p-2 rounded border break-words">{collectionInfo.postalCode}</p>
+                              </div>
+                            )}
+                            <div className="space-y-1 sm:col-span-2">
+                              <h4 className="text-sm font-medium text-muted-foreground">Collection Notes</h4>
+                              <p className="text-sm bg-white dark:bg-gray-700 p-2 rounded border break-words">{collectionInfo.notes}</p>
+                            </div>
                           </div>
                         </div>
-                        <div className="space-y-1">
-                          <h4 className="text-sm font-medium text-muted-foreground">Collection Status</h4>
-                          <div className="flex items-center">
-                            <Badge variant={collectionInfo.completed ? "default" : "outline"}>
-                              {collectionInfo.completed ? 'Completed' : 'Pending'}
-                            </Badge>
-                          </div>
-                        </div>
-                        {collectionInfo.postalCode && (
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-medium text-muted-foreground">Postal Code</h4>
-                            <p className="text-sm bg-white dark:bg-gray-700 p-2 rounded border">{collectionInfo.postalCode}</p>
-                          </div>
-                        )}
-                        <div className="space-y-1 col-span-2">
-                          <h4 className="text-sm font-medium text-muted-foreground">Collection Notes</h4>
-                          <p className="text-sm bg-white dark:bg-gray-700 p-2 rounded border">{collectionInfo.notes}</p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+
+            <DialogFooter className="flex-shrink-0 p-4 sm:p-6 border-t">
+              <div className="flex flex-col sm:flex-row gap-2 w-full">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setViewingShipment(null)}
+                  className="w-full sm:w-auto"
+                >
+                  Close
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="destructive" 
+                      className="w-full sm:w-auto"
+                      onClick={() => setDeletingShipment(viewingShipment)}
+                    >
+                      <Trash className="h-4 w-4 mr-2" />
+                      Delete Shipment
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Shipment</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to delete shipment {viewingShipment?.tracking_number}? 
+                        This action cannot be undone and will permanently remove all shipment data.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel onClick={() => setDeletingShipment(null)}>
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={handleDeleteShipment}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </Card>
