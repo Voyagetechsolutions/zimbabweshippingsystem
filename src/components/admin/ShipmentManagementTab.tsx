@@ -251,6 +251,7 @@ const ShipmentManagementTab = () => {
   const [sortField, setSortField] = useState('created_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [deletingShipment, setDeletingShipment] = useState<Shipment | null>(null);
+  const [selectedShipments, setSelectedShipments] = useState<string[]>([]);
 
   useEffect(() => {
     fetchShipments();
@@ -394,6 +395,52 @@ const ShipmentManagementTab = () => {
         description: `Failed to delete shipment: ${error.message}`,
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleDeleteSelectedShipments = async () => {
+    if (selectedShipments.length === 0) return;
+    
+    try {
+      const { error } = await supabase
+        .from('shipments')
+        .delete()
+        .in('id', selectedShipments);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Shipments Deleted',
+        description: `${selectedShipments.length} shipment(s) have been deleted successfully`,
+      });
+
+      // Remove from local state
+      setShipments(shipments.filter(s => !selectedShipments.includes(s.id)));
+      setSelectedShipments([]);
+      
+    } catch (error: any) {
+      console.error('Error deleting shipments:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to delete shipments: ${error.message}`,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleSelectShipment = (shipmentId: string) => {
+    setSelectedShipments(prev => 
+      prev.includes(shipmentId) 
+        ? prev.filter(id => id !== shipmentId)
+        : [...prev, shipmentId]
+    );
+  };
+
+  const handleSelectAllShipments = () => {
+    if (selectedShipments.length === filteredShipments.length) {
+      setSelectedShipments([]);
+    } else {
+      setSelectedShipments(filteredShipments.map(s => s.id));
     }
   };
 
@@ -775,6 +822,36 @@ const ShipmentManagementTab = () => {
               <RefreshCcw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="destructive" 
+                  disabled={selectedShipments.length === 0}
+                >
+                  <Trash className="h-4 w-4 mr-2" />
+                  Delete ({selectedShipments.length})
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Shipments</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete {selectedShipments.length} selected shipment(s)? 
+                    This action cannot be undone and will permanently remove all shipment data.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction 
+                    onClick={handleDeleteSelectedShipments}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
 
@@ -795,6 +872,14 @@ const ShipmentManagementTab = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <input
+                        type="checkbox"
+                        checked={selectedShipments.length === filteredShipments.length && filteredShipments.length > 0}
+                        onChange={handleSelectAllShipments}
+                        className="rounded"
+                      />
+                    </TableHead>
                     <TableHead className="cursor-pointer" onClick={() => handleSort('tracking_number')}>
                       Tracking #
                       {sortField === 'tracking_number' && (
@@ -830,6 +915,14 @@ const ShipmentManagementTab = () => {
                 <TableBody>
                   {filteredShipments.map(shipment => (
                     <TableRow key={shipment.id}>
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          checked={selectedShipments.includes(shipment.id)}
+                          onChange={() => handleSelectShipment(shipment.id)}
+                          className="rounded"
+                        />
+                      </TableCell>
                       <TableCell className="font-mono">{shipment.tracking_number}</TableCell>
                       <TableCell className="max-w-[150px] truncate">{getSenderName(shipment)}</TableCell>
                       <TableCell className="max-w-[150px] truncate">{getReceiverName(shipment)}</TableCell>
@@ -858,6 +951,11 @@ const ShipmentManagementTab = () => {
         
         <div className="text-sm text-muted-foreground mt-2">
           Showing {filteredShipments.length} of {shipments.length} shipments
+          {selectedShipments.length > 0 && (
+            <span className="ml-2 font-medium">
+              • {selectedShipments.length} selected
+            </span>
+          )}
         </div>
       </CardContent>
 
