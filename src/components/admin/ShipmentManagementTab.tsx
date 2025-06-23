@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -862,7 +861,7 @@ const ShipmentManagementTab = () => {
         </div>
       </CardContent>
 
-      {/* Enhanced View Shipment Details Dialog for Mobile */}
+      {/* Enhanced View Shipment Details Dialog */}
       <Dialog open={!!viewingShipment} onOpenChange={(open) => !open && setViewingShipment(null)}>
         <DialogContent className="w-full h-full max-w-none max-h-none m-0 rounded-none sm:max-w-[900px] sm:h-auto sm:max-h-[90vh] sm:m-6 sm:rounded-lg">
           <div className="flex flex-col h-full">
