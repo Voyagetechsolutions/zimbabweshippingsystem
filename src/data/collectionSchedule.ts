@@ -12,61 +12,61 @@ export interface RouteSchedule {
 export const collectionSchedules: RouteSchedule[] = [
   {
     route: "CARDIFF ROUTE",
-    date: "30th of June",
+    date: "28th of July",
     areas: ["CARDIFF", "GLOUCESTER", "BRISTOL", "SWINDON", "BATH", "SALISBURY"],
     country: "England"
   },
   {
     route: "BOURNEMOUTH ROUTE",
-    date: "01st of July",
+    date: "29th of July",
     areas: ["SOUTHAMPTON", "OXFORD", "HAMPHIRE", "READING", "GUILFORD", "PORTSMOUTH"],
     country: "England"
   },
   {
     route: "BIRMINGHAM ROUTE",
-    date: "26th of June",
+    date: "31st of July",
     areas: ["WOLVEHAMPTON", "COVENTRY", "WARWICK", "DUDLEY", "WALSALL", "RUGBY"],
     country: "England"
   },
   {
     route: "LONDON ROUTE",
-    date: "28th of June",
+    date: "26th of July",
     areas: ["CENTRAL LONDON", "HEATHROW", "EAST LONDON", "ROMFORD", "ALL AREAS INSIDE M25"],
     country: "England"
   },
   {
     route: "LEEDS ROUTE",
-    date: "24th of June",
+    date: "22nd of July",
     areas: ["WAKEFIELD", "HALIFAX", "DONCASTER", "SHEFFIELD", "HUDDERSFIELD", "YORK"],
     country: "England"
   },
   {
     route: "NOTTINGHAM ROUTE",
-    date: "27th of June",
+    date: "23rd of July",
     areas: ["LIECESTER", "DERBY", "PETERSBOROUGH", "CORBY", "MARKET HARB"],
     country: "England"
   },
   {
     route: "MANCHESTER ROUTE",
-    date: "05th of July",
+    date: "2nd of August",
     areas: ["LIVERPOOL", "STOKE ON TRENT", "BOLTON", "WARRINGTON", "OLDHAM", "SHREWBURY"],
     country: "England"
   },
   {
     route: "BRIGHTON ROUTE",
-    date: "03rd of July",
+    date: "4th of August",
     areas: ["HIGH COMBE", "SLOUGH", "VRAWLEY", "LANCING", "EASTBOURNE", "CANTEBURY"],
     country: "England"
   },
   {
     route: "SOUTHEND ROUTE",
-    date: "07th of July",
+    date: "1st of August",
     areas: ["NORWICH", "IPSWICH", "COLCHESTER", "BRAINTREE", "CAMBRIDGE", "BASILDON"],
     country: "England"
   },
   {
     route: "NORTHAMPTON ROUTE",
-    date: "23rd of June",
+    date: "21st of July",
     areas: ["KETTERING", "BEDFORD", "MILTON KEYNES", "BANBURY", "AYLESBURY", "LUTON"],
     country: "England"
   },
