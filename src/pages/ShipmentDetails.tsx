@@ -205,8 +205,10 @@ const ShipmentDetails = () => {
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
+
       <Navbar />
-      <main className="flex-grow w-full overflow-y-auto">
+      <main className="flex-grow w-full overflow-y-auto max-h-screen">
+
         <div className="container mx-auto px-4 py-4 md:py-8 max-w-4xl">
           <div className="space-y-4 md:space-y-6">
             <div className="flex flex-col space-y-4">
