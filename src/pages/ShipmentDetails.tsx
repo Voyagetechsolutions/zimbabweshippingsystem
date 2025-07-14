@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
 import { ArrowLeft, Package, MapPin, Calendar, Truck, Clock, Package2 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
@@ -32,7 +31,7 @@ interface Shipment {
 
 const getStatusColor = (status: string): string => {
   const statusLower = status.toLowerCase();
-  
+
   switch (true) {
     case statusLower.includes('booking confirmed'):
       return 'bg-blue-100 text-blue-800 border-blue-300';
@@ -48,9 +47,7 @@ const getStatusColor = (status: string): string => {
       return 'bg-indigo-100 text-indigo-800 border-indigo-300';
     case statusLower.includes('delivered'):
       return 'bg-green-100 text-green-800 border-green-300';
-    case statusLower.includes('cancelled'):
-      return 'bg-red-100 text-red-800 border-red-300';
-    case statusLower.includes('delayed'):
+    case statusLower.includes('cancelled') || statusLower.includes('delayed'):
       return 'bg-red-100 text-red-800 border-red-300';
     default:
       return 'bg-gray-100 text-gray-800 border-gray-300';
@@ -59,24 +56,19 @@ const getStatusColor = (status: string): string => {
 
 const getStatusIcon = (status: string) => {
   const statusLower = status.toLowerCase();
-  
+
   switch (true) {
     case statusLower.includes('booking confirmed'):
-      return <Package className="h-5 w-5" />;
     case statusLower.includes('ready for pickup'):
-      return <Package className="h-5 w-5" />;
     case statusLower.includes('processing'):
-      return <Package className="h-5 w-5" />;
     case statusLower.includes('customs'):
       return <Package className="h-5 w-5" />;
     case statusLower.includes('transit'):
-      return <Truck className="h-5 w-5" />;
     case statusLower.includes('out for delivery'):
       return <Truck className="h-5 w-5" />;
     case statusLower.includes('delivered'):
       return <Package2 className="h-5 w-5" />;
     case statusLower.includes('cancelled'):
-      return <Clock className="h-5 w-5" />;
     case statusLower.includes('delayed'):
       return <Clock className="h-5 w-5" />;
     default:
@@ -95,40 +87,25 @@ const ShipmentDetails = () => {
 
   useEffect(() => {
     const fetchShipmentDetails = async () => {
-      try {
-        if (!id) return;
+      if (!id) return;
 
-        const { data, error } = await supabase
-          .from('shipments')
-          .select('*')
-          .eq('id', id)
-          .single();
+      const { data, error } = await supabase
+        .from('shipments')
+        .select('*')
+        .eq('id', id)
+        .single();
 
-        if (error) {
-          console.error('Error fetching shipment:', error);
-          toast({
-            title: 'Error',
-            description: 'Failed to load shipment details.',
-            variant: 'destructive',
-          });
-          setLoading(false);
-          return;
-        }
-
-        if (data) {
-          // Cast the database object to our Shipment type
-          setShipment(data as unknown as Shipment);
-        }
-      } catch (error) {
-        console.error('Unexpected error:', error);
+      if (error) {
         toast({
           title: 'Error',
-          description: 'An unexpected error occurred.',
+          description: 'Failed to load shipment details.',
           variant: 'destructive',
         });
-      } finally {
-        setLoading(false);
+      } else {
+        setShipment(data as Shipment);
       }
+
+      setLoading(false);
     };
 
     fetchShipmentDetails();
@@ -139,34 +116,28 @@ const ShipmentDetails = () => {
   };
 
   const getTimelineSteps = (status: string) => {
-    const allSteps = [
-      { name: 'Booking Confirmed', completed: false },
-      { name: 'Ready for Pickup', completed: false },
-      { name: 'Processing in Warehouse (UK)', completed: false },
-      { name: 'Customs Clearance', completed: false },
-      { name: 'Processing in Warehouse (ZW)', completed: false },
-      { name: 'Out for Delivery', completed: false },
-      { name: 'Delivered', completed: false },
+    const steps = [
+      'Booking Confirmed',
+      'Ready for Pickup',
+      'Processing in Warehouse (UK)',
+      'Customs Clearance',
+      'Processing in Warehouse (ZW)',
+      'Out for Delivery',
+      'Delivered',
     ];
-    
+
     const statusLower = status.toLowerCase();
-    const statusIndex = allSteps.findIndex(step => 
-      statusLower.includes(step.name.toLowerCase())
-    );
-    
-    if (statusIndex !== -1) {
-      for (let i = 0; i <= statusIndex; i++) {
-        allSteps[i].completed = true;
-      }
-    } else if (statusLower.includes('cancelled')) {
-    }
-    
-    return allSteps;
+    const index = steps.findIndex(step => statusLower.includes(step.toLowerCase()));
+
+    return steps.map((step, i) => ({
+      name: step,
+      completed: i <= index,
+    }));
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
       </div>
     );
@@ -174,27 +145,29 @@ const ShipmentDetails = () => {
 
   if (!shipment) {
     return (
-      <div className="min-h-screen flex flex-col">
+      <div className="h-screen flex flex-col overflow-hidden">
         <Navbar />
-        <main className="flex-grow container mx-auto px-4 py-8">
-          <Card className="max-w-3xl mx-auto">
-            <CardContent className="pt-6 text-center">
-              <div className="mb-6">
-                <Package className="h-16 w-16 mx-auto text-gray-400" />
-              </div>
-              <h1 className="text-2xl font-bold mb-4">Shipment Not Found</h1>
-              <p className="text-gray-500 mb-6">
-                The shipment you're looking for does not exist or you don't have permission to view it.
-              </p>
-              <Button onClick={() => navigate(-1)} variant="outline" className="mr-4">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Go Back
-              </Button>
-              <Button onClick={() => navigate('/dashboard')} className="bg-zim-green hover:bg-zim-green/90">
-                Dashboard
-              </Button>
-            </CardContent>
-          </Card>
+        <main className="flex-grow overflow-y-auto">
+          <div className="container mx-auto px-4 py-8">
+            <Card className="max-w-3xl mx-auto">
+              <CardContent className="pt-6 text-center">
+                <Package className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+                <h1 className="text-2xl font-bold mb-2">Shipment Not Found</h1>
+                <p className="text-gray-500 mb-6">
+                  The shipment you're looking for does not exist or you don't have permission to view it.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                  <Button onClick={() => navigate(-1)} variant="outline">
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Go Back
+                  </Button>
+                  <Button onClick={() => navigate('/dashboard')} className="bg-zim-green hover:bg-zim-green/90">
+                    Dashboard
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </main>
         <Footer />
       </div>
@@ -204,185 +177,126 @@ const ShipmentDetails = () => {
   const timelineSteps = getTimelineSteps(shipment.status);
 
   return (
-    <div className="h-screen flex flex-col overflow-x-hidden">
-
+    <div className="h-screen flex flex-col overflow-hidden">
       <Navbar />
       <main className="flex-grow overflow-y-auto">
-        <div className="container mx-auto px-4 py-4 md:py-8 max-w-4xl">
-          <div className="space-y-4 md:space-y-6">
-            <div className="flex flex-col space-y-4">
-              <Button 
-                variant="outline" 
-                onClick={() => navigate(-1)}
-                className="w-fit"
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
-              
-              <div className="flex flex-col space-y-2">
-                <h1 className="text-xl md:text-2xl lg:text-3xl font-bold break-words">Shipment Details</h1>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                  <p className="text-gray-500 flex items-start sm:items-center break-all">
-                    <Package className="mr-2 h-4 w-4 mt-0.5 sm:mt-0 flex-shrink-0" />
-                    <span className="break-all">
-                      Tracking #: <span className="font-mono ml-1">{shipment.tracking_number}</span>
-                    </span>
-                  </p>
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                    <Badge 
-                      className={`py-1 px-3 w-fit ${getStatusColor(shipment.status)}`}
-                    >
-                      <span className="flex items-center">
-                        {getStatusIcon(shipment.status)}
-                        <span className="ml-1 break-words">{shipment.status}</span>
-                      </span>
-                    </Badge>
-                    
-                    {(shipment.status.toLowerCase() !== 'delivered' && 
-                      shipment.status.toLowerCase() !== 'cancelled') && 
-                      (shipment.can_modify || shipment.can_cancel) && (
-                      <ShipmentActions 
-                        shipmentId={shipment.id}
-                        canModify={shipment.can_modify}
-                        canCancel={shipment.can_cancel}
-                        onActionComplete={handleRefresh}
-                      />
-                    )}
-                  </div>
-                </div>
+        <div className="container mx-auto px-4 py-4 md:py-8 max-w-4xl space-y-6">
+          <div>
+            <Button variant="outline" onClick={() => navigate(-1)} className="mb-4">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+
+            <h1 className="text-2xl font-bold mb-2">Shipment Details</h1>
+            <div className="flex flex-col sm:flex-row sm:justify-between gap-2">
+              <p className="text-gray-500 break-all">
+                <Package className="inline h-4 w-4 mr-1" />
+                Tracking #: <span className="font-mono">{shipment.tracking_number}</span>
+              </p>
+              <div className="flex gap-2 flex-wrap">
+                <Badge className={`py-1 px-3 ${getStatusColor(shipment.status)}`}>
+                  {getStatusIcon(shipment.status)}
+                  <span className="ml-1">{shipment.status}</span>
+                </Badge>
+
+                {(shipment.can_modify || shipment.can_cancel) && (
+                  <ShipmentActions
+                    shipmentId={shipment.id}
+                    canModify={shipment.can_modify}
+                    canCancel={shipment.can_cancel}
+                    onActionComplete={handleRefresh}
+                  />
+                )}
               </div>
             </div>
+          </div>
 
-            <Card className="w-full overflow-hidden">
-              <CardHeader className="pb-4">
-                <h2 className="text-lg md:text-xl font-bold flex items-center">
-                  <Clock className="mr-2 h-5 w-5 flex-shrink-0" />
-                  Shipment Progress
-                </h2>
-              </CardHeader>
-              <CardContent className="overflow-x-auto">
-                <div className="relative min-w-0">
-                  <div className="absolute left-5 top-0 h-full w-0.5 bg-gray-200"></div>
-                  {timelineSteps.map((step, index) => (
-                    <div key={step.name} className="relative mb-6 last:mb-0 flex items-start min-w-0">
-                      <div className={`
-                        absolute left-5 -ml-3 h-6 w-6 rounded-full border-2 z-10
-                        flex items-center justify-center flex-shrink-0
-                        ${step.completed 
-                          ? 'bg-zim-green border-zim-green' 
-                          : 'bg-white border-gray-300'}
-                      `}>
-                        {step.completed && (
-                          <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                      <div className="ml-10 min-w-0 flex-1">
-                        <h3 className={`font-medium break-words ${step.completed ? 'text-zim-black' : 'text-gray-500'}`}>
-                          {step.name}
-                        </h3>
-                        {step.completed && index === timelineSteps.findIndex(s => s.completed) && (
-                          <p className="text-sm text-gray-500 break-words">
-                            {format(new Date(shipment.created_at), 'PPP')}
-                          </p>
-                        )}
-                      </div>
+          {/* Timeline */}
+          <Card>
+            <CardHeader>
+              <h2 className="text-lg font-bold flex items-center">
+                <Clock className="mr-2 h-5 w-5" /> Shipment Progress
+              </h2>
+            </CardHeader>
+            <CardContent>
+              <div className="relative pl-8">
+                <div className="absolute left-4 top-0 h-full w-0.5 bg-gray-200" />
+                {timelineSteps.map((step, idx) => (
+                  <div key={idx} className="mb-6 last:mb-0 relative">
+                    <div
+                      className={`absolute left-0 h-6 w-6 rounded-full border-2 z-10 flex items-center justify-center ${
+                        step.completed ? 'bg-zim-green border-zim-green' : 'bg-white border-gray-300'
+                      }`}
+                    >
+                      {step.completed && (
+                        <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="w-full overflow-hidden">
-              <CardHeader className="pb-4">
-                <h2 className="text-lg md:text-xl font-bold flex items-center">
-                  <Package className="mr-2 h-5 w-5 flex-shrink-0" />
-                  Shipment Information
-                </h2>
-              </CardHeader>
-              <CardContent className="overflow-x-auto">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-                  <div className="min-w-0">
-                    <h3 className="font-medium text-gray-500 mb-2">Origin</h3>
-                    <div className="flex items-start">
-                      <MapPin className="mr-2 h-5 w-5 text-zim-black mt-0.5 flex-shrink-0" />
-                      <p className="font-medium break-words">{shipment.origin}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="min-w-0">
-                    <h3 className="font-medium text-gray-500 mb-2">Destination</h3>
-                    <div className="flex items-start">
-                      <MapPin className="mr-2 h-5 w-5 text-zim-green mt-0.5 flex-shrink-0" />
-                      <p className="font-medium break-words">{shipment.destination}</p>
-                    </div>
-                  </div>
-
-                  <div className="min-w-0">
-                    <h3 className="font-medium text-gray-500 mb-2">Carrier</h3>
-                    <div className="flex items-center">
-                      <Truck className="mr-2 h-5 w-5 flex-shrink-0" />
-                      <p className="font-medium break-words">{shipment.carrier || 'Not specified'}</p>
-                    </div>
-                  </div>
-
-                  <div className="min-w-0">
-                    <h3 className="font-medium text-gray-500 mb-2">Estimated Delivery</h3>
-                    <div className="flex items-center">
-                      <Calendar className="mr-2 h-5 w-5 flex-shrink-0" />
-                      <p className="font-medium break-words">
-                        {shipment.estimated_delivery 
-                          ? format(new Date(shipment.estimated_delivery), 'PPP') 
-                          : 'Not specified'}
+                    <div className="ml-10">
+                      <p className={`font-medium ${step.completed ? 'text-zim-black' : 'text-gray-500'}`}>
+                        {step.name}
                       </p>
                     </div>
                   </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
-                  <div className="min-w-0 lg:col-span-2">
-                    <h3 className="font-medium text-gray-500 mb-2">Volume</h3>
-                    <div className="flex items-center">
-                      <Package2 className="mr-2 h-5 w-5 flex-shrink-0" />
-                      <p className="font-medium break-words">{shipment.dimensions || 'Not specified'}</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Info Card */}
+          <Card>
+            <CardHeader>
+              <h2 className="text-lg font-bold flex items-center">
+                <Package className="mr-2 h-5 w-5" /> Shipment Information
+              </h2>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Info label="Origin" icon={<MapPin />} value={shipment.origin} />
+                <Info label="Destination" icon={<MapPin />} value={shipment.destination} />
+                <Info label="Carrier" icon={<Truck />} value={shipment.carrier || 'Not specified'} />
+                <Info
+                  label="Estimated Delivery"
+                  icon={<Calendar />}
+                  value={
+                    shipment.estimated_delivery
+                      ? format(new Date(shipment.estimated_delivery), 'PPP')
+                      : 'Not specified'
+                  }
+                />
+                <Info label="Dimensions" icon={<Package2 />} value={shipment.dimensions || 'Not specified'} />
+              </div>
+            </CardContent>
+          </Card>
 
-            <Card className="w-full overflow-hidden">
-              <CardContent className="pt-6 overflow-x-auto">
-                <div className="flex flex-col md:flex-row justify-between text-sm text-gray-500 mb-4 gap-2">
-                  <div className="break-words">Created: {format(new Date(shipment.created_at), 'PPP pp')}</div>
-                  <div className="break-words">Last Updated: {format(new Date(shipment.updated_at), 'PPP pp')}</div>
-                </div>
-              </CardContent>
-              <CardFooter className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-4">
-                {user && (
-                  <Button 
-                    onClick={() => navigate('/dashboard')} 
-                    variant="outline"
-                    className="w-full sm:w-auto"
-                  >
-                    Back to Dashboard
-                  </Button>
-                )}
-                <Button 
-                  onClick={() => {
-                    navigator.clipboard.writeText(shipment.tracking_number);
-                    toast({
-                      title: "Tracking Number Copied",
-                      description: `${shipment.tracking_number} has been copied to clipboard.`,
-                    });
-                  }}
-                  className="bg-zim-green hover:bg-zim-green/90 w-full sm:w-auto"
-                >
-                  Copy Tracking #
+          {/* Footer Info */}
+          <Card>
+            <CardContent className="text-sm text-gray-500">
+              <p>Created: {format(new Date(shipment.created_at), 'PPP pp')}</p>
+              <p>Last Updated: {format(new Date(shipment.updated_at), 'PPP pp')}</p>
+            </CardContent>
+            <CardFooter className="flex flex-col sm:flex-row justify-end gap-2">
+              {user && (
+                <Button onClick={() => navigate('/dashboard')} variant="outline">
+                  Back to Dashboard
                 </Button>
-              </CardFooter>
-            </Card>
-          </div>
+              )}
+              <Button
+                onClick={() => {
+                  navigator.clipboard.writeText(shipment.tracking_number);
+                  toast({
+                    title: 'Copied!',
+                    description: `Tracking # ${shipment.tracking_number} copied to clipboard.`,
+                  });
+                }}
+                className="bg-zim-green hover:bg-zim-green/90"
+              >
+                Copy Tracking #
+              </Button>
+            </CardFooter>
+          </Card>
         </div>
       </main>
       <Footer />
@@ -390,5 +304,23 @@ const ShipmentDetails = () => {
     </div>
   );
 };
+
+const Info = ({
+  label,
+  icon,
+  value,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  value: string;
+}) => (
+  <div>
+    <h3 className="text-gray-500 text-sm mb-1">{label}</h3>
+    <div className="flex items-center text-sm font-medium">
+      {icon && <span className="mr-2 text-zim-black">{icon}</span>}
+      {value}
+    </div>
+  </div>
+);
 
 export default ShipmentDetails;
