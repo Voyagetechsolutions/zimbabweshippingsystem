@@ -86,76 +86,16 @@ const ShipmentDetails = () => {
   const completed = getCompletedSteps(shipment.status);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="flex-grow container mx-auto px-4 py-6 space-y-6">
-        <Button variant="outline" onClick={() => navigate(-1)}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back
-        </Button>
-
-        <Card>
-          <CardHeader>
-            <h1 className="text-lg md:text-xl font-bold flex items-center">
-              <Package className="mr-2" /> Tracking #: {shipment.tracking_number}
-            </h1>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-            <Detail label="Origin" value={shipment.origin} icon={<MapPin className="mr-1" />} />
-            <Detail label="Destination" value={shipment.destination} icon={<MapPin className="mr-1" />} />
-            <Detail label="Carrier" value={shipment.carrier || 'Not specified'} icon={<Truck className="mr-1" />} />
-            <Detail
-              label="Estimated Delivery"
-              value={
-                shipment.estimated_delivery
-                  ? format(new Date(shipment.estimated_delivery), 'PPP')
-                  : 'Not available'
-              }
-              icon={<Calendar className="mr-1" />}
-            />
-            <Detail label="Dimensions" value={shipment.dimensions || 'Not specified'} icon={<Package2 className="mr-1" />} />
-            <Detail
-              label="Created"
-              value={format(new Date(shipment.created_at), 'PPP')}
-              icon={<Calendar className="mr-1" />}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader
-            className="flex justify-between items-center cursor-pointer"
-            onClick={() => setShowTimeline(prev => !prev)}
-          >
-            <h2 className="text-md font-semibold flex items-center">
-              <Truck className="mr-2" /> Shipment Progress
-            </h2>
-            {showTimeline ? <ChevronUp /> : <ChevronDown />}
-          </CardHeader>
-          {showTimeline && (
-            <CardContent>
-              <ul className="space-y-2">
-                {timelineSteps.map((step, i) => (
-                  <li
-                    key={step}
-                    className={`flex items-center gap-2 ${
-                      i < completed ? 'text-zim-green font-semibold' : 'text-gray-400'
-                    }`}
-                  >
-                    {i < completed ? (
-                      <CheckCircle className="w-4 h-4 text-zim-green" />
-                    ) : (
-                      <div className="w-4 h-4 rounded-full border border-gray-300"></div>
-                    )}
-                    {step}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          )}
-        </Card>
-
-        <div className="flex flex-col sm:flex-row justify-end gap-4">
+      <main className="container mx-auto p-4 max-w-4xl">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <Button variant="outline" onClick={() => navigate(-1)} className="flex items-center gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
           <Button
             onClick={() => {
               navigator.clipboard.writeText(shipment.tracking_number);
@@ -164,10 +104,137 @@ const ShipmentDetails = () => {
                 description: 'Tracking number copied to clipboard.',
               });
             }}
-            className="bg-zim-green hover:bg-zim-green/90"
+            className="flex items-center gap-2"
           >
-            Copy Tracking Number
+            <Package className="h-4 w-4" />
+            Copy Tracking #
           </Button>
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* Left Column - Main Details */}
+          <div className="lg:col-span-2 space-y-6">
+            
+            {/* Tracking Info Card */}
+            <Card className="border-l-4 border-l-primary">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <Package className="h-5 w-5 text-primary" />
+                  <h1 className="text-xl font-bold">Tracking #{shipment.tracking_number}</h1>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Status: <span className="font-medium text-foreground">{shipment.status}</span>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <div className="text-xs text-muted-foreground uppercase tracking-wide">Origin</div>
+                    <div className="flex items-center gap-2 font-medium">
+                      <MapPin className="h-4 w-4 text-primary" />
+                      {shipment.origin}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-xs text-muted-foreground uppercase tracking-wide">Destination</div>
+                    <div className="flex items-center gap-2 font-medium">
+                      <MapPin className="h-4 w-4 text-primary" />
+                      {shipment.destination}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Shipment Progress */}
+            <Card>
+              <CardHeader className="cursor-pointer" onClick={() => setShowTimeline(prev => !prev)}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Truck className="h-5 w-5 text-primary" />
+                    <h2 className="text-lg font-semibold">Shipment Progress</h2>
+                  </div>
+                  {showTimeline ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </div>
+              </CardHeader>
+              {showTimeline && (
+                <CardContent className="pt-0">
+                  <div className="space-y-4">
+                    {timelineSteps.map((step, i) => (
+                      <div
+                        key={step}
+                        className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                          i < completed 
+                            ? 'bg-primary/10 text-primary' 
+                            : 'bg-muted/50 text-muted-foreground'
+                        }`}
+                      >
+                        {i < completed ? (
+                          <CheckCircle className="w-5 h-5 text-primary flex-shrink-0" />
+                        ) : (
+                          <div className="w-5 h-5 rounded-full border-2 border-muted-foreground/30 flex-shrink-0"></div>
+                        )}
+                        <span className={i < completed ? 'font-medium' : ''}>{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          </div>
+
+          {/* Right Column - Additional Details */}
+          <div className="space-y-6">
+            
+            {/* Shipment Details */}
+            <Card>
+              <CardHeader className="pb-3">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Package2 className="h-4 w-4" />
+                  Details
+                </h3>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-4">
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide">Carrier</div>
+                  <div className="flex items-center gap-2">
+                    <Truck className="h-4 w-4 text-muted-foreground" />
+                    <span>{shipment.carrier || 'Not specified'}</span>
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide">Dimensions</div>
+                  <div className="flex items-center gap-2">
+                    <Package2 className="h-4 w-4 text-muted-foreground" />
+                    <span>{shipment.dimensions || 'Not specified'}</span>
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide">Estimated Delivery</div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span>
+                      {shipment.estimated_delivery
+                        ? format(new Date(shipment.estimated_delivery), 'PPP')
+                        : 'Not available'}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide">Created</div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span>{format(new Date(shipment.created_at), 'PPP')}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </main>
 
