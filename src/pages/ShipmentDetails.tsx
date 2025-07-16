@@ -63,13 +63,12 @@ const ShipmentDetails = () => {
   }, [id, toast]);
 
   const timelineSteps = [
-    'Booking Confirmed',
-    'Ready for Pickup',
-    'Processing in Warehouse (UK)',
-    'Customs Clearance',
-    'Processing in Warehouse (ZW)',
-    'Out for Delivery',
-    'Delivered',
+  'Booking Confirmed',
+  'Ready for Pickup',
+  'InTransit to Zimbabwe',
+  'Goods Arrived in Zimbabwe',
+  'Processing in ZW Warehouse',
+  'Delivered'
   ];
 
   const getCompletedSteps = (status) => {
