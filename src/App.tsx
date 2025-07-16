@@ -36,6 +36,7 @@ import ConfirmBooking from './pages/ConfirmBooking';
 // Components
 import { RequireAuth, RequireAdmin, RedirectIfAuthenticated, RequireRole } from './components/RouteGuard';
 import { Toaster } from './components/ui/toaster';
+import { TooltipProvider } from './components/ui/tooltip';
 import WhatsAppButton from './components/WhatsAppButton';
 
 // Contexts
@@ -62,124 +63,126 @@ function App() {
           <RoleProvider>
             <ThemeProvider>
               <ShippingProvider>
-                <Router>
-                  <Routes>
-                    {/* Public routes */}
-                    <Route path="/" element={<Index />} />
-                    <Route path="/auth" element={<RedirectIfAuthenticated><Auth /></RedirectIfAuthenticated>} />
-                    <Route path="/auth/callback" element={<AuthCallback />} />
-                    <Route path="/services" element={<Services />} />
-                    <Route path="/gallery" element={<Gallery />} />
-                    <Route path="/contact" element={<Contact />} />
-                    <Route path="/track" element={<Track />} />
-                    <Route path="/book-shipment" element={<BookShipment />} />
-                    <Route path="/payment-success" element={<PaymentSuccess />} />
-                    <Route path="/quote-submitted" element={<QuoteSubmitted />} />
-                    <Route path="/confirm-booking" element={<ConfirmBooking />} />
-                    <Route path="/reviews" element={<Reviews />} />
-                    <Route path="/support" element={<Support />} />
-                    <Route path="/pricing" element={<Pricing />} />
-                    <Route path="/about-us" element={<AboutUs />} />
-                    <Route path="/collection-schedule" element={<CollectionSchedule />} />
-                    <Route path="/faq" element={<FAQ />} />
-                    <Route path="/terms" element={<TermsAndConditions />} />
-                    <Route path="/privacy" element={<PrivacyPolicy />} />
+                <TooltipProvider>
+                  <Router>
+                    <Routes>
+                      {/* Public routes */}
+                      <Route path="/" element={<Index />} />
+                      <Route path="/auth" element={<RedirectIfAuthenticated><Auth /></RedirectIfAuthenticated>} />
+                      <Route path="/auth/callback" element={<AuthCallback />} />
+                      <Route path="/services" element={<Services />} />
+                      <Route path="/gallery" element={<Gallery />} />
+                      <Route path="/contact" element={<Contact />} />
+                      <Route path="/track" element={<Track />} />
+                      <Route path="/book-shipment" element={<BookShipment />} />
+                      <Route path="/payment-success" element={<PaymentSuccess />} />
+                      <Route path="/quote-submitted" element={<QuoteSubmitted />} />
+                      <Route path="/confirm-booking" element={<ConfirmBooking />} />
+                      <Route path="/reviews" element={<Reviews />} />
+                      <Route path="/support" element={<Support />} />
+                      <Route path="/pricing" element={<Pricing />} />
+                      <Route path="/about-us" element={<AboutUs />} />
+                      <Route path="/collection-schedule" element={<CollectionSchedule />} />
+                      <Route path="/faq" element={<FAQ />} />
+                      <Route path="/terms" element={<TermsAndConditions />} />
+                      <Route path="/privacy" element={<PrivacyPolicy />} />
 
-                    {/* Protected routes - any authenticated user */}
-                    <Route
-                      path="/dashboard"
-                      element={
-                        <RequireAuth>
-                          <Dashboard />
-                        </RequireAuth>
-                      }
-                    />
-                    <Route
-                      path="/shipment/:id"
-                      element={
-                        <RequireAuth>
-                          <ShipmentDetails />
-                        </RequireAuth>
-                      }
-                    />
-                    <Route
-                      path="/account"
-                      element={
-                        <RequireAuth>
-                          <Account />
-                        </RequireAuth>
-                      }
-                    />
-                    <Route
-                      path="/address-book"
-                      element={
-                        <RequireAuth>
-                          <AddressBook />
-                        </RequireAuth>
-                      }
-                    />
-                    <Route
-                      path="/notifications"
-                      element={
-                        <RequireAuth>
-                          <Notifications />
-                        </RequireAuth>
-                      }
-                    />
+                      {/* Protected routes - any authenticated user */}
+                      <Route
+                        path="/dashboard"
+                        element={
+                          <RequireAuth>
+                            <Dashboard />
+                          </RequireAuth>
+                        }
+                      />
+                      <Route
+                        path="/shipment/:id"
+                        element={
+                          <RequireAuth>
+                            <ShipmentDetails />
+                          </RequireAuth>
+                        }
+                      />
+                      <Route
+                        path="/account"
+                        element={
+                          <RequireAuth>
+                            <Account />
+                          </RequireAuth>
+                        }
+                      />
+                      <Route
+                        path="/address-book"
+                        element={
+                          <RequireAuth>
+                            <AddressBook />
+                          </RequireAuth>
+                        }
+                      />
+                      <Route
+                        path="/notifications"
+                        element={
+                          <RequireAuth>
+                            <Notifications />
+                          </RequireAuth>
+                        }
+                      />
+                      
+                      {/* Role-specific routes */}
+                      <Route
+                        path="/admin/logistics"
+                        element={
+                          <RequireRole requiredRole="logistics">
+                            <Dashboard />
+                          </RequireRole>
+                        }
+                      />
+
+                      <Route
+                        path="/driver"
+                        element={
+                          <RequireRole requiredRole="driver">
+                            <Dashboard />
+                          </RequireRole>
+                        }
+                      />
+
+                      <Route
+                        path="/support"
+                        element={
+                          <RequireRole requiredRole="support">
+                            <Dashboard />
+                          </RequireRole>
+                        }
+                      />
+
+                      {/* Admin routes */}
+                      <Route
+                        path="/admin"
+                        element={
+                          <RequireAdmin>
+                            <AdminDashboard />
+                          </RequireAdmin>
+                        }
+                      />
+                      <Route
+                        path="/admin/gallery"
+                        element={
+                          <RequireAdmin>
+                            <GalleryAdmin />
+                          </RequireAdmin>
+                        }
+                      />
+
+                      {/* Catch-all route */}
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
                     
-                    {/* Role-specific routes */}
-                    <Route
-                      path="/admin/logistics"
-                      element={
-                        <RequireRole requiredRole="logistics">
-                          <Dashboard />
-                        </RequireRole>
-                      }
-                    />
-
-                    <Route
-                      path="/driver"
-                      element={
-                        <RequireRole requiredRole="driver">
-                          <Dashboard />
-                        </RequireRole>
-                      }
-                    />
-
-                    <Route
-                      path="/support"
-                      element={
-                        <RequireRole requiredRole="support">
-                          <Dashboard />
-                        </RequireRole>
-                      }
-                    />
-
-                    {/* Admin routes */}
-                    <Route
-                      path="/admin"
-                      element={
-                        <RequireAdmin>
-                          <AdminDashboard />
-                        </RequireAdmin>
-                      }
-                    />
-                    <Route
-                      path="/admin/gallery"
-                      element={
-                        <RequireAdmin>
-                          <GalleryAdmin />
-                        </RequireAdmin>
-                      }
-                    />
-
-                    {/* Catch-all route */}
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                  
-                  <WhatsAppButton />
-                  <Toaster />
-                </Router>
+                    <WhatsAppButton />
+                    <Toaster />
+                  </Router>
+                </TooltipProvider>
               </ShippingProvider>
             </ThemeProvider>
           </RoleProvider>
