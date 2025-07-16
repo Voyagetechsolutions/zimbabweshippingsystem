@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -66,28 +67,27 @@ const Home = () => {
   return (
     <div className="bg-white">
       <Helmet>
-        <title>Zimbabwe Shipping | UK to Zimbabwe Delivery Services</title>
-          <meta
-            name="description"
-            content="Reliable and affordable Zimbabwe shipping services from the UK. Door-to-door delivery, parcel tracking & more. Book online today!"
-          />
-          <meta name="keywords" content="Zimbabwe shipping, UK to Zimbabwe delivery, shipping to Zimbabwe, parcel delivery Zimbabwe" />
-          <meta name="author" content="Zimbabwe shipping" />
+        <title>Zimbabwe Shipping Services - Fast UK to Zimbabwe Delivery | Family-Run Business Since 2011</title>
+        <meta
+          name="description"
+          content="Expert Zimbabwe shipping services from UK. Family-run business since 2011 offering door-to-door delivery, secure handling, and competitive rates. Free UK collection with 30-day payment terms."
+        />
+        <meta name="keywords" content="Zimbabwe shipping, UK to Zimbabwe delivery, shipping to Zimbabwe, parcel delivery Zimbabwe, family shipping business" />
+        <meta name="author" content="Zimbabwe Shipping Services" />
 
-            {/* Open Graph for Facebook & others */}
-          <meta property="og:title" content="Zimbabwe Shipping | UK to Zimbabwe Delivery Services" />
-          <meta property="og:description" content="Affordable UK to Zimbabwe shipping. Secure, fast, and reliable door-to-door delivery service." />
-          <meta property="og:image" content="https://zimbabweshipping.com/og-image.jpg" />
-          <meta property="og:url" content="https://zimbabweshipping.com" />
-          <meta property="og:type" content="website" />
+        {/* Open Graph for Facebook & others */}
+        <meta property="og:title" content="Zimbabwe Shipping Services - Fast UK to Zimbabwe Delivery" />
+        <meta property="og:description" content="Expert Zimbabwe shipping from UK. Family-run business since 2011 with door-to-door delivery, secure handling, and competitive rates." />
+        <meta property="og:image" content="https://zimbabweshipping.com/og-image.jpg" />
+        <meta property="og:url" content="https://zimbabweshipping.com" />
+        <meta property="og:type" content="website" />
 
-          {/* Twitter Card */}
-          <meta name="twitter:card" content="summary_large_image" />
-          <meta name="twitter:title" content="Zimbabwe Shipping | UK to Zimbabwe Delivery Services" />
-          <meta name="twitter:description" content="Affordable UK to Zimbabwe shipping. Secure, fast, and reliable door-to-door delivery service." />
-          <meta name="twitter:image" content="https://zimbabweshipping.com/og-image.jpg" />
-        </Helmet>
-
+        {/* Twitter Card */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Zimbabwe Shipping Services - Fast UK to Zimbabwe Delivery" />
+        <meta name="twitter:description" content="Expert Zimbabwe shipping from UK. Family-run business since 2011 with door-to-door delivery and secure handling." />
+        <meta name="twitter:image" content="https://zimbabweshipping.com/og-image.jpg" />
+      </Helmet>
 
       {/* Hero Section */}
       <section className="relative px-4 py-16 sm:px-6 sm:py-24 lg:py-32 flex items-center justify-center">
@@ -102,7 +102,7 @@ const Home = () => {
             Reliable Zimbabwe Shipping from UK – Fast & Affordable
           </h1>
           <p className={`text-lg md:text-xl text-white/90 mb-10 transition-all duration-700 delay-100 ${animationClass}`}>
-            We specialize in Zimbabwe shipping with secure, affordable, and fast door-to-door delivery.
+            We specialize in Zimbabwe shipping with secure, affordable, and fast door-to-door delivery. Our family-run business has been serving the Zimbabwe community since 2011, providing trusted shipping solutions with exceptional customer service.
           </p>
           <div className={`flex flex-col sm:flex-row justify-center gap-4 transition-all duration-700 delay-200 ${animationClass}`}>
             <Button asChild size="lg" className="bg-zim-green hover:bg-zim-green/90">
@@ -125,33 +125,64 @@ const Home = () => {
         <AnnouncementsFeed />
       </section>
 
-      {/* Shipping Gallery Slideshow */}
-      <ShippingGallerySlideshow />
-
-      {/* Quick Calculator and Services Section */}
-      <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto bg-gray-50">
-        <div className="grid md:grid-cols-3 gap-8 mb-12">
-          <div className="md:col-span-2">
-            <div className="text-left mb-8">
-              <h2 className={`text-3xl font-bold text-gray-900 mb-4 transition-all duration-700 delay-300 ${animationClass}`}>
-                Our Zimbabwe Shipping Services
-              </h2>
-              <p className={`text-lg text-gray-600 max-w-2xl transition-all duration-700 delay-400 ${animationClass}`}>
-                We offer comprehensive Zimbabwe shipping solutions from the UK, focusing on reliability, transparency, and customer satisfaction.
-              </p>
+      {/* Why Choose Zimbabwe Shipping Services Section */}
+      <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto bg-gray-50">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold text-gray-900 mb-6">Why Choose Zimbabwe Shipping Services?</h2>
+          <p className="text-lg text-gray-600 max-w-3xl mx-auto mb-8">
+            As a family-run business established in 2011, we understand the importance of connecting families and businesses between the UK and Zimbabwe. Our director's experience as a former FedEx driver and successful establishment of Telk Removals has shaped our commitment to safe, reliable, and trustworthy shipping services.
+          </p>
+          <p className="text-base text-gray-600 max-w-3xl mx-auto">
+            We treat every shipment as if it were our own, ensuring your goods are handled with the utmost care throughout their journey. From personal items and gifts to commercial cargo, we provide comprehensive shipping solutions that you can depend on. Our expansion from Bulawayo Shipping Services to Zimbabwe Shipping Services reflects our growth and commitment to serving all cities across Zimbabwe.
+          </p>
+        </div>
+        
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+          {services.map((service, index) => (
+            <div
+              key={index}
+              className={`bg-white p-6 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-300 ${animationClass}`}
+              style={{ transitionDelay: `${300 + index * 100}ms` }}
+            >
+              <div className="mb-4 flex justify-center">{service.icon}</div>
+              <h3 className="text-xl font-semibold mb-3 text-center">{service.title}</h3>
+              <p className="text-gray-600 text-center leading-relaxed">{service.description}</p>
             </div>
-            <div className="grid sm:grid-cols-2 gap-6">
-              {services.slice(0, 4).map((service, index) => (
-                <div
-                  key={index}
-                  className={`bg-white p-5 rounded-lg shadow-sm border border-gray-100 flex flex-col items-center text-center transition-all duration-700 ${animationClass}`}
-                  style={{ transitionDelay: `${500 + index * 100}ms` }}
-                >
-                  <div className="mb-3">{service.icon}</div>
-                  <h3 className="text-lg font-semibold mb-2">{service.title}</h3>
-                  <p className="text-gray-600 text-sm">{service.description}</p>
-                </div>
-              ))}
+          ))}
+        </div>
+      </section>
+
+      {/* Our Experience and Commitment Section */}
+      <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-12 items-center">
+          <div>
+            <h2 className="text-3xl font-bold text-gray-900 mb-6">14+ Years of Shipping Excellence</h2>
+            <p className="text-gray-600 mb-4 leading-relaxed">
+              Since 2011, Zimbabwe Shipping Services has been the trusted choice for UK to Zimbabwe shipping. Our journey began with a passion for safe and reliable transportation, strongly influenced by our director's experience as a FedEx driver where diligent goods handling and trustworthiness became our core values.
+            </p>
+            <p className="text-gray-600 mb-4 leading-relaxed">
+              Before venturing into international shipping, we successfully established Telk Removals, a well-regarded home removals company in the UK. This experience sharpened our skills in handling diverse goods and deepened our understanding of customer needs: care, reliability, and trust.
+            </p>
+            <p className="text-gray-600 mb-6 leading-relaxed">
+              In 2013, we expanded into trucking logistics in Zimbabwe, complementing our shipping business and ensuring progressive goods movement throughout the country. Today, we serve all major cities in Zimbabwe and have recently opened a new branch in Ireland to better serve our growing customer base.
+            </p>
+            <div className="space-y-3">
+              <div className="flex items-center">
+                <CheckCircle className="h-5 w-5 text-zim-green mr-3" />
+                <span className="font-medium">Free collection from anywhere in the UK</span>
+              </div>
+              <div className="flex items-center">
+                <CheckCircle className="h-5 w-5 text-zim-green mr-3" />
+                <span className="font-medium">30-day payment terms from collection</span>
+              </div>
+              <div className="flex items-center">
+                <CheckCircle className="h-5 w-5 text-zim-green mr-3" />
+                <span className="font-medium">Competitive and transparent pricing</span>
+              </div>
+              <div className="flex items-center">
+                <CheckCircle className="h-5 w-5 text-zim-green mr-3" />
+                <span className="font-medium">Customs clearance assistance</span>
+              </div>
             </div>
           </div>
           <div>
@@ -160,14 +191,17 @@ const Home = () => {
         </div>
       </section>
 
+      {/* Shipping Gallery Slideshow */}
+      <ShippingGallerySlideshow />
+
       {/* Testimonials Section */}
       <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <div className="text-center mb-10">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            What Our Customers Say
+            What Our Customers Say About Our Zimbabwe Shipping Services
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Read testimonials from customers in your area who have used our Zimbabwe shipping services.
+            Read testimonials from satisfied customers who have trusted us with their Zimbabwe shipping needs. Our commitment to excellence has earned us a reputation for reliability and outstanding customer service across the UK and beyond.
           </p>
         </div>
         <PersonalizedTestimonials />
@@ -177,13 +211,13 @@ const Home = () => {
       <section className="py-16 px-4 sm:px-6 lg:px-8 bg-zim-green text-white">
         <div className="max-w-7xl mx-auto text-center">
           <h2 className={`text-3xl font-bold mb-6 transition-all duration-700 ${animationClass}`}>
-            Ready to get started?
+            Ready to Ship to Zimbabwe? Join Thousands of Satisfied Customers
           </h2>
           <p className={`text-lg mb-8 max-w-2xl mx-auto transition-all duration-700 delay-100 ${animationClass}`}>
-            Join thousands of satisfied customers who trust us with their Zimbabwe shipping needs. Book your shipment today!
+            Experience the difference of working with a family-run shipping company that treats your goods like our own. With over 14 years of experience, competitive pricing, and exceptional customer service, we're your trusted partner for all Zimbabwe shipping needs. Contact us today for a quote or to discuss your specific requirements.
           </p>
           <Button asChild size="lg" variant="outline" className={`bg-white text-zim-green hover:bg-gray-100 transition-all duration-700 delay-200 ${animationClass}`}>
-            <Link to="/signup">Sign Up Now</Link>
+            <Link to="/signup">Get Started Today</Link>
           </Button>
         </div>
       </section>
