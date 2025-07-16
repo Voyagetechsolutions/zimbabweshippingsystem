@@ -80,7 +80,7 @@ const STATUS_OPTIONS = [
   'InTransit to Zimbabwe',
   'Goods Arrived in Zimbabwe',
   'Processing in ZW Warehouse',
-  'Delivered'
+  'Delivered',
   'Cancelled',
 ];
 
@@ -365,7 +365,7 @@ const ShipmentManagementTab = () => {
           {status}
         </Badge>
       );
-    } else if (statusLower.includes('processing') || statusLower.includes('pickup') || statusLower.includes('transit')) {
+    } else if (statusLower.includes('processing') || statusLower.includes('pickup') || statusLower.includes('transit') || statusLower.includes('arrived')) {
       return (
         <Badge variant="outline" className="flex items-center gap-1">
           <Loader2 className="h-3 w-3 animate-spin" />
@@ -444,7 +444,7 @@ const ShipmentManagementTab = () => {
               </div>
               <CardTitle className="text-2xl">
                 {shipments.filter(s => 
-                  ['Processing in UK Warehouse', 'Customs Clearance', 'Processing in ZW Warehouse', 'Out for Delivery']
+                  ['InTransit to Zimbabwe', 'Goods Arrived in Zimbabwe', 'Processing in ZW Warehouse']
                   .includes(s.status)).length}
               </CardTitle>
             </CardHeader>
