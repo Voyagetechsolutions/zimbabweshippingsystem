@@ -9,6 +9,7 @@ import {
   MapPinIcon,
   CalculatorIcon,
   HeartIcon,
+  CheckCircle,
 } from 'lucide-react';
 import { Helmet } from 'react-helmet';
 import HeroImage from '@/assets/hero.webp';
