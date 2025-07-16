@@ -21,7 +21,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
-const getStatusColorClass = (status: string) => {
+const getStatusColorClass = (status) => {
   const s = status.toLowerCase();
   if (s.includes('delivered')) return 'bg-green-100 text-green-800 border-green-300';
   if (s.includes('cancelled') || s.includes('delayed')) return 'bg-red-100 text-red-800 border-red-300';
@@ -34,13 +34,13 @@ const getStatusColorClass = (status: string) => {
 };
 
 const ShipmentDetails = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [shipment, setShipment] = useState<any>(null);
+  const [shipment, setShipment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showTimeline, setShowTimeline] = useState(false);
-  const timelineRef = useRef<HTMLDivElement>(null);
+  const timelineRef = useRef(null);
 
   useEffect(() => {
     const fetchShipment = async () => {
@@ -72,7 +72,7 @@ const ShipmentDetails = () => {
     'Delivered',
   ];
 
-  const getCompletedSteps = (status: string) => {
+  const getCompletedSteps = (status) => {
     const index = timelineSteps.findIndex(step =>
       status.toLowerCase().includes(step.toLowerCase())
     );
@@ -81,28 +81,24 @@ const ShipmentDetails = () => {
 
   const completed = shipment ? getCompletedSteps(shipment.status) : 0;
 
-  const printPage = () => {
-    window.print();
-  };
+  const printPage = () => window.print();
 
   const exportJSON = () => {
     if (!shipment) return;
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(shipment, null, 2));
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(shipment, null, 2));
     const dlAnchorElem = document.createElement('a');
-    dlAnchorElem.setAttribute("href", dataStr);
-    dlAnchorElem.setAttribute("download", `shipment_${shipment.tracking_number || 'data'}.json`);
+    dlAnchorElem.setAttribute('href', dataStr);
+    dlAnchorElem.setAttribute('download', `shipment_${shipment.tracking_number || 'data'}.json`);
     dlAnchorElem.click();
   };
 
-  if (loading) {
-    return <div className="flex justify-center items-center h-screen">Loading...</div>;
-  }
+  if (loading) return <div className="flex justify-center items-center h-screen">Loading...</div>;
 
   if (!shipment) {
     return (
       <div className="min-h-screen flex flex-col">
         <Navbar />
-        <main className="flex-grow p-6 text-center">
+        <main className="flex-grow p-6 text-center overflow-auto">
           <h2 className="text-xl font-bold">Shipment not found</h2>
           <Button onClick={() => navigate(-1)} className="mt-4">
             <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
@@ -116,19 +112,12 @@ const ShipmentDetails = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-
-      <main className="flex-grow container mx-auto px-4 py-6 space-y-6 max-w-4xl">
+      <main className="flex-grow container mx-auto px-4 py-6 space-y-6 max-w-4xl overflow-auto">
         <Button variant="outline" onClick={() => navigate(-1)}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Back
         </Button>
 
-        {/* Status Badge */}
-        <div
-          className={`inline-block px-4 py-1 rounded-full font-semibold border ${getStatusColorClass(
-            shipment.status
-          )}`}
-          aria-label="Shipment Status"
-        >
+        <div className={`inline-block px-4 py-1 rounded-full font-semibold border ${getStatusColorClass(shipment.status)}`}>
           {shipment.status}
         </div>
 
@@ -142,38 +131,21 @@ const ShipmentDetails = () => {
             <Detail label="Origin" value={shipment.origin} icon={<MapPin className="mr-1" />} />
             <Detail label="Destination" value={shipment.destination} icon={<MapPin className="mr-1" />} />
             <Detail label="Carrier" value={shipment.carrier || 'Not specified'} icon={<Truck className="mr-1" />} />
-            <Detail
-              label="Estimated Delivery"
-              value={
-                shipment.estimated_delivery
-                  ? format(new Date(shipment.estimated_delivery), 'PPP')
-                  : 'Not available'
-              }
-              icon={<Calendar className="mr-1" />}
-            />
+            <Detail label="Estimated Delivery" value={shipment.estimated_delivery ? format(new Date(shipment.estimated_delivery), 'PPP') : 'Not available'} icon={<Calendar className="mr-1" />} />
             <Detail label="Dimensions" value={shipment.dimensions || 'Not specified'} icon={<Package2 className="mr-1" />} />
-            <Detail
-              label="Created"
-              value={format(new Date(shipment.created_at), 'PPP')}
-              icon={<Calendar className="mr-1" />}
-            />
+            <Detail label="Created" value={format(new Date(shipment.created_at), 'PPP')} icon={<Calendar className="mr-1" />} />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader
-            className="flex justify-between items-center cursor-pointer select-none"
+            className="flex justify-between items-center cursor-pointer"
             onClick={() => setShowTimeline(prev => !prev)}
             aria-expanded={showTimeline}
             aria-controls="shipment-timeline"
             role="button"
             tabIndex={0}
-            onKeyDown={e => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                setShowTimeline(prev => !prev);
-              }
-            }}
+            onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setShowTimeline(prev => !prev)}
           >
             <h2 className="text-md font-semibold flex items-center">
               <Truck className="mr-2" /> Shipment Progress
@@ -183,23 +155,15 @@ const ShipmentDetails = () => {
           <CardContent
             id="shipment-timeline"
             ref={timelineRef}
-            className={`overflow-hidden transition-all duration-300 ease-in-out ${
-              showTimeline ? 'max-h-[500px]' : 'max-h-0'
-            }`}
+            className={`overflow-hidden transition-all duration-300 ease-in-out ${showTimeline ? 'max-h-[500px]' : 'max-h-0'}`}
           >
             <ul className="space-y-2">
               {timelineSteps.map((step, i) => (
                 <li
                   key={step}
-                  className={`flex items-center gap-2 ${
-                    i < completed ? 'text-zim-green font-semibold' : 'text-gray-400'
-                  }`}
+                  className={`flex items-center gap-2 ${i < completed ? 'text-zim-green font-semibold' : 'text-gray-400'}`}
                 >
-                  {i < completed ? (
-                    <CheckCircle className="w-4 h-4 text-zim-green" />
-                  ) : (
-                    <div className="w-4 h-4 rounded-full border border-gray-300"></div>
-                  )}
+                  {i < completed ? <CheckCircle className="w-4 h-4 text-zim-green" /> : <div className="w-4 h-4 rounded-full border border-gray-300"></div>}
                   {step}
                 </li>
               ))}
@@ -211,52 +175,32 @@ const ShipmentDetails = () => {
           <Button
             onClick={() => {
               navigator.clipboard.writeText(shipment.tracking_number);
-              toast({
-                title: 'Copied',
-                description: 'Tracking number copied to clipboard.',
-              });
+              toast({ title: 'Copied', description: 'Tracking number copied to clipboard.' });
             }}
             className="bg-zim-green hover:bg-zim-green/90"
           >
             Copy Tracking Number
           </Button>
 
-          <Button
-            variant="outline"
-            onClick={printPage}
-            className="flex items-center gap-2"
-          >
+          <Button variant="outline" onClick={printPage} className="flex items-center gap-2">
             <Printer className="w-4 h-4" /> Print
           </Button>
 
-          <Button
-            variant="outline"
-            onClick={exportJSON}
-            className="flex items-center gap-2"
-          >
+          <Button variant="outline" onClick={exportJSON} className="flex items-center gap-2">
             <Download className="w-4 h-4" /> Export JSON
           </Button>
         </div>
       </main>
-
       <Footer />
     </div>
   );
 };
 
-const Detail = ({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: string;
-  icon: React.ReactNode;
-}) => (
+const Detail = ({ label, value, icon }) => (
   <div>
     <div className="text-gray-500 text-xs mb-1">{label}</div>
-    <div className="flex items-center text-base font-medium">
-      {icon} {value}
+    <div className="flex items-start gap-1 text-base font-medium break-words whitespace-pre-wrap">
+      {icon} <span>{value}</span>
     </div>
   </div>
 );
