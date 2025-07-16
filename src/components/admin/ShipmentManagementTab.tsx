@@ -77,21 +77,19 @@ import {
 const STATUS_OPTIONS = [
   'Booking Confirmed',
   'Ready for Pickup',
-  'Processing in UK Warehouse',
-  'Customs Clearance',
+  'InTransit to Zimbabwe',
+  'Goods Arrived in Zimbabwe',
   'Processing in ZW Warehouse',
-  'Out for Delivery',
-  'Delivered',
+  'Delivered'
   'Cancelled',
 ];
 
 const STATUS_STEPS = [
   'Booking Confirmed',
   'Ready for Pickup',
-  'Processing in UK Warehouse',
-  'Customs Clearance',
+  'InTransit to Zimbabwe',
+  'Goods Arrived in Zimbabwe',
   'Processing in ZW Warehouse',
-  'Out for Delivery',
   'Delivered'
 ];
 
