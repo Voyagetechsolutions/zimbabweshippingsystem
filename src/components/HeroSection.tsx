@@ -6,16 +6,23 @@ import { supabase } from '@/integrations/supabase/client';
 import Logo from './Logo';
 
 const HeroSection: React.FC = () => {
-  const [session, setSession] = useState(supabase.auth.getSession()?.data.session ?? null);
+  const [session, setSession] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Listen for auth state changes and update session
+    const fetchSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      setSession(data.session);
+    };
+    fetchSession();
+
+    // Optional: listen for auth changes to keep session updated
     const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
     });
+
     return () => {
-      listener?.unsubscribe();
+      listener.subscription.unsubscribe();
     };
   }, []);
 
