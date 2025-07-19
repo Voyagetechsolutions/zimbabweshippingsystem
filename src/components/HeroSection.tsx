@@ -32,45 +32,47 @@ const HeroSection: React.FC = () => {
                 </Link>
               </div>
               <div className="mt-8 grid grid-cols-2 gap-4">
-                <div className="flex items-center bg-white p-3 rounded-md shadow-sm border">
-                  <div className="bg-zim-green/10 p-2 rounded-full mr-3">
-                    <Truck className="h-5 w-5 text-zim-green" />
-                  </div>
-                  <div className="text-sm">
-                    <p className="font-medium">Delivery Time</p>
-                    <p className="text-gray-500 text-xs">4-6 weeks transit time</p>
-                  </div>
-                </div>
-                <div className="flex items-center bg-white p-3 rounded-md shadow-sm border">
-                  <div className="bg-zim-yellow/10 p-2 rounded-full mr-3">
-                    <Package className="h-5 w-5 text-zim-yellow" />
-                  </div>
-                  <div className="text-sm">
-                    <p className="font-medium">Secure Packaging</p>
-                    <p className="text-gray-500 text-xs">Safe handling guaranteed</p>
-                  </div>
-                </div>
-                <div className="flex items-center bg-white p-3 rounded-md shadow-sm border">
-                  <div className="bg-zim-red/10 p-2 rounded-full mr-3">
-                    <MapPin className="h-5 w-5 text-zim-red" />
-                  </div>
-                  <div className="text-sm">
-                    <p className="font-medium">Best Prices</p>
-                    <p className="text-gray-500 text-xs">Starting from £150</p>
-                  </div>
-                </div>
-                <div className="flex items-center bg-white p-3 rounded-md shadow-sm border">
-                  <div className="bg-zim-black/10 p-2 rounded-full mr-3">
-                    <Truck className="h-5 w-5 text-zim-black" />
-                  </div>
-                  <div className="text-sm">
-                    <p className="font-medium">Volume Based</p>
-                    <p className="text-gray-500 text-xs">Pricing by volume</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+  <button className="flex items-center bg-white p-3 rounded-md shadow-sm border w-full text-left">
+    <div className="bg-zim-green/10 p-2 rounded-full mr-3">
+      <Truck className="h-5 w-5 text-zim-green" />
+    </div>
+    <div className="text-sm">
+      <p className="font-medium">Delivery Time</p>
+      <p className="text-gray-500 text-xs">4-6 weeks transit time</p>
+    </div>
+  </button>
+
+  <button className="flex items-center bg-white p-3 rounded-md shadow-sm border w-full text-left">
+    <div className="bg-zim-yellow/10 p-2 rounded-full mr-3">
+      <Package className="h-5 w-5 text-zim-yellow" />
+    </div>
+    <div className="text-sm">
+      <p className="font-medium">Secure Packaging</p>
+      <p className="text-gray-500 text-xs">Safe handling guaranteed</p>
+    </div>
+  </button>
+
+  <button className="flex items-center bg-white p-3 rounded-md shadow-sm border w-full text-left">
+    <div className="bg-zim-red/10 p-2 rounded-full mr-3">
+      <MapPin className="h-5 w-5 text-zim-red" />
+    </div>
+    <div className="text-sm">
+      <p className="font-medium">Best Prices</p>
+      <p className="text-gray-500 text-xs">Starting from £150</p>
+    </div>
+  </button>
+
+  <button className="flex items-center bg-white p-3 rounded-md shadow-sm border w-full text-left">
+    <div className="bg-zim-black/10 p-2 rounded-full mr-3">
+      <Truck className="h-5 w-5 text-zim-black" />
+    </div>
+    <div className="text-sm">
+      <p className="font-medium">Volume Based</p>
+      <p className="text-gray-500 text-xs">Pricing by volume</p>
+    </div>
+  </button>
+</div>
+
           <div className="order-1 lg:order-2 flex justify-center">
             <div className="relative">
               {/* Multi-layered glow effect around the logo */}
