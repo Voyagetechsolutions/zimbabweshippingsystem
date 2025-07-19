@@ -34,8 +34,6 @@ import ConfirmBooking from './pages/ConfirmBooking';
 import ShippingGuidelines from './pages/ShippingGuidelines';
 import ProtectedRoute from './components/ProtectedRoute';
 import BookShipment from './pages/BookShipment';
-import Login from './pages/Login';
-import Home from './pages/Home';
 import CustomerPage from './pages/CustomerPage';
 
 // Components
@@ -92,8 +90,6 @@ function App() {
                       <Route path="/terms" element={<TermsAndConditions />} />
                       <Route path="/privacy" element={<PrivacyPolicy />} />
                       <Route path="/shipping-guidelines" element={<ShippingGuidelines />} />
-                       <Route path="/" element={<Home />} />
-                      <Route path="/login" element={<Login />} />
                       <Route path="/customer" element={<CustomerPage />} />
 
                         <Route
