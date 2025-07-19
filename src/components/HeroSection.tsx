@@ -1,13 +1,23 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Truck, Package, MapPin, Calendar, DollarSign, FileText } from 'lucide-react';
+import { ArrowRight, Calendar, DollarSign, FileText } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useSession } from '@supabase/auth-helpers-react';
+import { supabase } from '@/integrations/supabase/client';
 import Logo from './Logo';
 
 const HeroSection: React.FC = () => {
-  const session = useSession();
+  const [session, setSession] = useState(supabase.auth.getSession()?.data.session ?? null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Listen for auth state changes and update session
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+    });
+    return () => {
+      listener?.unsubscribe();
+    };
+  }, []);
 
   const handleBookClick = () => {
     if (!session) {
