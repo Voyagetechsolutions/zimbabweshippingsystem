@@ -31,7 +31,7 @@ const HeroSection: React.FC = () => {
                   </Button>
                 </Link>
               </div>
-              <div className="mt-8 grid grid-cols-2 gap-4">
+             <div className="mt-8 grid grid-cols-2 gap-4">
   <button className="flex items-center bg-white p-3 rounded-md shadow-sm border w-full text-left">
     <div className="bg-zim-green/10 p-2 rounded-full mr-3">
       <Truck className="h-5 w-5 text-zim-green" />
@@ -72,6 +72,7 @@ const HeroSection: React.FC = () => {
     </div>
   </button>
 </div>
+
 
           <div className="order-1 lg:order-2 flex justify-center">
             <div className="relative">
