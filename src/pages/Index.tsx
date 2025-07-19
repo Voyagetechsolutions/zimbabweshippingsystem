@@ -10,9 +10,6 @@ import CallToAction from '@/components/CallToAction';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import ReviewsSection from '@/components/reviews/ReviewsSection';
 import ShippingGallerySlideshow from '@/components/ShippingGallerySlideshow';
-import { Button } from "@/components/ui/button";
-import { Link } from 'react-router-dom';
-import { Clock, Shield, MapPin, Package } from 'lucide-react';
 import { Helmet } from 'react-helmet';
 
 const Index = () => {
@@ -42,84 +39,6 @@ const Index = () => {
       <main className="flex-grow">
         <HeroSection />
         
-        {/* Enhanced Services Overview Section */}
-        <section className="py-16 bg-white">
-          <div className="container mx-auto px-4">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold mb-4">Comprehensive Zimbabwe Shipping Solutions</h2>
-              <p className="text-lg text-gray-600 max-w-3xl mx-auto mb-8">
-                We provide end-to-end shipping solutions from the UK to Zimbabwe, combining years of experience with modern logistics technology. Our comprehensive service portfolio includes personal shipments, commercial freight, and specialized cargo handling to meet diverse customer needs across all Zimbabwe cities.
-              </p>
-            </div>
-            
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-              <Button
-                asChild
-                variant="outline"
-                className="bg-gray-50 rounded-lg p-6 text-center hover:shadow-md transition-shadow h-auto flex-col space-y-4 border-gray-200"
-              >
-                <Link to="/pricing">
-                  <div className="w-16 h-16 rounded-full bg-zim-green/10 flex items-center justify-center mx-auto">
-                    <Clock className="h-8 w-8 text-zim-green" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-2">Delivery Time</h3>
-                    <p className="text-sm text-gray-600">4-6 weeks transit time</p>
-                  </div>
-                </Link>
-              </Button>
-              
-              <Button
-                asChild
-                variant="outline"
-                className="bg-gray-50 rounded-lg p-6 text-center hover:shadow-md transition-shadow h-auto flex-col space-y-4 border-gray-200"
-              >
-                <Link to="/services">
-                  <div className="w-16 h-16 rounded-full bg-zim-yellow/10 flex items-center justify-center mx-auto">
-                    <Shield className="h-8 w-8 text-zim-yellow" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-2">Secure Packaging</h3>
-                    <p className="text-sm text-gray-600">Safe handling guaranteed</p>
-                  </div>
-                </Link>
-              </Button>
-              
-              <Button
-                asChild
-                variant="outline"
-                className="bg-gray-50 rounded-lg p-6 text-center hover:shadow-md transition-shadow h-auto flex-col space-y-4 border-gray-200"
-              >
-                <Link to="/pricing">
-                  <div className="w-16 h-16 rounded-full bg-zim-red/10 flex items-center justify-center mx-auto">
-                    <MapPin className="h-8 w-8 text-zim-red" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-2">Best Prices</h3>
-                    <p className="text-sm text-gray-600">Starting from £150</p>
-                  </div>
-                </Link>
-              </Button>
-              
-              <Button
-                asChild
-                variant="outline"
-                className="bg-gray-50 rounded-lg p-6 text-center hover:shadow-md transition-shadow h-auto flex-col space-y-4 border-gray-200"
-              >
-                <Link to="/pricing">
-                  <div className="w-16 h-16 rounded-full bg-zim-black/10 flex items-center justify-center mx-auto">
-                    <Package className="h-8 w-8 text-zim-black" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-2">Volume Based</h3>
-                    <p className="text-sm text-gray-600">Pricing by volume</p>
-                  </div>
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </section>
-
         <ServicesSection />
         <TrackingSection />
         <PricingSection />
