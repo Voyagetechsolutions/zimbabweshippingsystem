@@ -1,11 +1,22 @@
-
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Truck, Package, MapPin, Calendar, DollarSign, FileText } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { useSession } from '@supabase/auth-helpers-react';
 import Logo from './Logo';
 
 const HeroSection: React.FC = () => {
+  const session = useSession();
+  const navigate = useNavigate();
+
+  const handleBookClick = () => {
+    if (!session) {
+      navigate('/login');
+    } else {
+      navigate('/book-shipment');
+    }
+  };
+
   return (
     <div className="relative overflow-hidden bg-white dark:bg-gray-900 hero-pattern">
       <div className="absolute inset-0 bg-gradient-to-r from-zim-green/10 to-zim-red/10"></div>
@@ -20,17 +31,20 @@ const HeroSection: React.FC = () => {
                 Fast, reliable, and affordable shipping services for all your packages. From personal items to commercial cargo.
               </p>
               <div className="space-y-4 md:space-y-0 md:space-x-4 md:flex">
-                <Link to="/book-shipment">
-                  <Button className="w-full md:w-auto bg-zim-red hover:bg-zim-red/90 text-white flex items-center justify-center text-lg py-3 px-8">
-                    Book Your Shipment <ArrowRight className="ml-2" />
-                  </Button>
-                </Link>
+                <Button
+                  onClick={handleBookClick}
+                  className="w-full md:w-auto bg-zim-red hover:bg-zim-red/90 text-white flex items-center justify-center text-lg py-3 px-8"
+                >
+                  Book Your Shipment <ArrowRight className="ml-2" />
+                </Button>
+
                 <Link to="/track">
                   <Button variant="outline" className="w-full md:w-auto border-zim-black text-zim-black hover:bg-zim-black hover:text-white flex items-center justify-center text-lg py-3 px-8">
                     Track Shipment
                   </Button>
                 </Link>
               </div>
+
               <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Button
                   asChild
@@ -85,12 +99,10 @@ const HeroSection: React.FC = () => {
 
           <div className="order-1 lg:order-2 flex justify-center">
             <div className="relative">
-              {/* Multi-layered glow effect around the logo */}
               <div className="absolute -inset-4 rounded-full bg-gradient-to-tr from-zim-green via-zim-yellow to-zim-red opacity-50 blur-xl animate-pulse"></div>
               <div className="absolute -inset-6 rounded-full bg-zim-yellow/30 opacity-40 blur-2xl animate-pulse animate-delay-200"></div>
               <div className="absolute -inset-8 rounded-full bg-zim-green/20 opacity-30 blur-3xl animate-pulse animate-delay-500"></div>
-              
-              {/* Logo with subtle hover animation */}
+
               <div className="relative z-10 transform transition-all duration-500 hover:scale-105">
                 <img 
                   src="/lovable-uploads/9916a41e-7a43-42af-b9b0-e92e37521652.png" 
