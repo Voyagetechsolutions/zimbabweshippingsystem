@@ -53,37 +53,69 @@ const Index = () => {
             </div>
             
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-              <div className="bg-gray-50 rounded-lg p-6 text-center hover:shadow-md transition-shadow">
-                <div className="w-16 h-16 rounded-full bg-zim-green/10 flex items-center justify-center mx-auto mb-4">
-                  <Clock className="h-8 w-8 text-zim-green" />
-                </div>
-                <h3 className="font-semibold mb-2">4-6 weeks transit time</h3>
-                <p className="text-sm text-gray-600">Reliable delivery timeframes for your shipments</p>
-              </div>
+              <Button
+                asChild
+                variant="outline"
+                className="bg-gray-50 rounded-lg p-6 text-center hover:shadow-md transition-shadow h-auto flex-col space-y-4 border-gray-200"
+              >
+                <Link to="/pricing">
+                  <div className="w-16 h-16 rounded-full bg-zim-green/10 flex items-center justify-center mx-auto">
+                    <Clock className="h-8 w-8 text-zim-green" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-2">Delivery Time</h3>
+                    <p className="text-sm text-gray-600">4-6 weeks transit time</p>
+                  </div>
+                </Link>
+              </Button>
               
-              <div className="bg-gray-50 rounded-lg p-6 text-center hover:shadow-md transition-shadow">
-                <div className="w-16 h-16 rounded-full bg-zim-yellow/10 flex items-center justify-center mx-auto mb-4">
-                  <Shield className="h-8 w-8 text-zim-yellow" />
-                </div>
-                <h3 className="font-semibold mb-2">Safe handling guaranteed</h3>
-                <p className="text-sm text-gray-600">Secure packaging and careful handling throughout</p>
-              </div>
+              <Button
+                asChild
+                variant="outline"
+                className="bg-gray-50 rounded-lg p-6 text-center hover:shadow-md transition-shadow h-auto flex-col space-y-4 border-gray-200"
+              >
+                <Link to="/services">
+                  <div className="w-16 h-16 rounded-full bg-zim-yellow/10 flex items-center justify-center mx-auto">
+                    <Shield className="h-8 w-8 text-zim-yellow" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-2">Secure Packaging</h3>
+                    <p className="text-sm text-gray-600">Safe handling guaranteed</p>
+                  </div>
+                </Link>
+              </Button>
               
-              <div className="bg-gray-50 rounded-lg p-6 text-center hover:shadow-md transition-shadow">
-                <div className="w-16 h-16 rounded-full bg-zim-red/10 flex items-center justify-center mx-auto mb-4">
-                  <MapPin className="h-8 w-8 text-zim-red" />
-                </div>
-                <h3 className="font-semibold mb-2">Starting from £150</h3>
-                <p className="text-sm text-gray-600">Competitive pricing for all your shipping needs</p>
-              </div>
+              <Button
+                asChild
+                variant="outline"
+                className="bg-gray-50 rounded-lg p-6 text-center hover:shadow-md transition-shadow h-auto flex-col space-y-4 border-gray-200"
+              >
+                <Link to="/pricing">
+                  <div className="w-16 h-16 rounded-full bg-zim-red/10 flex items-center justify-center mx-auto">
+                    <MapPin className="h-8 w-8 text-zim-red" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-2">Best Prices</h3>
+                    <p className="text-sm text-gray-600">Starting from £150</p>
+                  </div>
+                </Link>
+              </Button>
               
-              <div className="bg-gray-50 rounded-lg p-6 text-center hover:shadow-md transition-shadow">
-                <div className="w-16 h-16 rounded-full bg-zim-black/10 flex items-center justify-center mx-auto mb-4">
-                  <Package className="h-8 w-8 text-zim-black" />
-                </div>
-                <h3 className="font-semibold mb-2">Pricing by volume</h3>
-                <p className="text-sm text-gray-600">Volume-based pricing with transparent costs</p>
-              </div>
+              <Button
+                asChild
+                variant="outline"
+                className="bg-gray-50 rounded-lg p-6 text-center hover:shadow-md transition-shadow h-auto flex-col space-y-4 border-gray-200"
+              >
+                <Link to="/pricing">
+                  <div className="w-16 h-16 rounded-full bg-zim-black/10 flex items-center justify-center mx-auto">
+                    <Package className="h-8 w-8 text-zim-black" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-2">Volume Based</h3>
+                    <p className="text-sm text-gray-600">Pricing by volume</p>
+                  </div>
+                </Link>
+              </Button>
             </div>
           </div>
         </section>
