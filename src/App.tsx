@@ -32,6 +32,11 @@ import TermsAndConditions from './pages/TermsAndConditions';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import ConfirmBooking from './pages/ConfirmBooking';
 import ShippingGuidelines from './pages/ShippingGuidelines';
+import ProtectedRoute from './components/ProtectedRoute';
+import BookShipment from './pages/BookShipment';
+import Login from './pages/Login';
+import Home from './pages/Home';
+import CustomerPage from './pages/CustomerPage';
 
 // Components
 import { RequireAuth, RequireAdmin, RedirectIfAuthenticated, RequireRole } from './components/RouteGuard';
@@ -87,6 +92,18 @@ function App() {
                       <Route path="/terms" element={<TermsAndConditions />} />
                       <Route path="/privacy" element={<PrivacyPolicy />} />
                       <Route path="/shipping-guidelines" element={<ShippingGuidelines />} />
+                       <Route path="/" element={<Home />} />
+                      <Route path="/login" element={<Login />} />
+                      <Route path="/customer" element={<CustomerPage />} />
+
+                        <Route
+                          path="/book-shipment"
+                          element={
+                            <ProtectedRoute>
+                              <BookShipment />
+                            </ProtectedRoute>
+                          }
+                        />
 
                       {/* Protected routes - any authenticated user */}
                       <Route
