@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Truck, Package, MapPin } from 'lucide-react';
+import { ArrowRight, Truck, Package, MapPin, Calendar, DollarSign, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Logo from './Logo';
 
@@ -31,48 +31,57 @@ const HeroSection: React.FC = () => {
                   </Button>
                 </Link>
               </div>
-             <div className="mt-8 grid grid-cols-2 gap-4">
-  <button className="flex items-center bg-white p-3 rounded-md shadow-sm border w-full text-left">
-    <div className="bg-zim-green/10 p-2 rounded-full mr-3">
-      <Truck className="h-5 w-5 text-zim-green" />
-    </div>
-    <div className="text-sm">
-      <p className="font-medium">Delivery Time</p>
-      <p className="text-gray-500 text-xs">4-6 weeks transit time</p>
-    </div>
-  </button>
+              <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Button
+                  asChild
+                  variant="outline"
+                  className="flex items-center bg-white p-3 rounded-md shadow-sm border w-full text-left h-auto flex-col space-y-2"
+                >
+                  <Link to="/collection-schedule">
+                    <div className="bg-zim-green/10 p-2 rounded-full">
+                      <Calendar className="h-5 w-5 text-zim-green" />
+                    </div>
+                    <div className="text-sm text-center">
+                      <p className="font-medium">Our Collection Schedule</p>
+                      <p className="text-gray-500 text-xs">View pickup dates</p>
+                    </div>
+                  </Link>
+                </Button>
 
-  <button className="flex items-center bg-white p-3 rounded-md shadow-sm border w-full text-left">
-    <div className="bg-zim-yellow/10 p-2 rounded-full mr-3">
-      <Package className="h-5 w-5 text-zim-yellow" />
-    </div>
-    <div className="text-sm">
-      <p className="font-medium">Secure Packaging</p>
-      <p className="text-gray-500 text-xs">Safe handling guaranteed</p>
-    </div>
-  </button>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="flex items-center bg-white p-3 rounded-md shadow-sm border w-full text-left h-auto flex-col space-y-2"
+                >
+                  <Link to="/pricing">
+                    <div className="bg-zim-yellow/10 p-2 rounded-full">
+                      <DollarSign className="h-5 w-5 text-zim-yellow" />
+                    </div>
+                    <div className="text-sm text-center">
+                      <p className="font-medium">Our Pricing</p>
+                      <p className="text-gray-500 text-xs">View shipping rates</p>
+                    </div>
+                  </Link>
+                </Button>
 
-  <button className="flex items-center bg-white p-3 rounded-md shadow-sm border w-full text-left">
-    <div className="bg-zim-red/10 p-2 rounded-full mr-3">
-      <MapPin className="h-5 w-5 text-zim-red" />
-    </div>
-    <div className="text-sm">
-      <p className="font-medium">Best Prices</p>
-      <p className="text-gray-500 text-xs">Starting from £150</p>
-    </div>
-  </button>
-
-  <button className="flex items-center bg-white p-3 rounded-md shadow-sm border w-full text-left">
-    <div className="bg-zim-black/10 p-2 rounded-full mr-3">
-      <Truck className="h-5 w-5 text-zim-black" />
-    </div>
-    <div className="text-sm">
-      <p className="font-medium">Volume Based</p>
-      <p className="text-gray-500 text-xs">Pricing by volume</p>
-    </div>
-  </button>
-</div>
-
+                <Button
+                  asChild
+                  variant="outline"
+                  className="flex items-center bg-white p-3 rounded-md shadow-sm border w-full text-left h-auto flex-col space-y-2"
+                >
+                  <Link to="/shipping-guidelines">
+                    <div className="bg-zim-red/10 p-2 rounded-full">
+                      <FileText className="h-5 w-5 text-zim-red" />
+                    </div>
+                    <div className="text-sm text-center">
+                      <p className="font-medium">Shipping Guidelines</p>
+                      <p className="text-gray-500 text-xs">What you can ship</p>
+                    </div>
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </div>
 
           <div className="order-1 lg:order-2 flex justify-center">
             <div className="relative">
