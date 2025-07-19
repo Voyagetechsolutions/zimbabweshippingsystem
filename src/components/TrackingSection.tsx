@@ -81,29 +81,22 @@ const TrackingSection: React.FC = () => {
                     <div className="flex items-start space-x-2">
                       <div className="w-3 h-3 rounded-full bg-orange-500 mt-1"></div>
                       <div>
-                        <span className="font-medium dark:text-white">Processing</span>
-                        <p className="text-gray-600 dark:text-gray-400">In warehouse processing</p>
+                        <span className="font-medium dark:text-white">InTransit to Zimbabwe</span>
+                        <p className="text-gray-600 dark:text-gray-400">Shipment on the way to Zimbabwe</p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-2">
                       <div className="w-3 h-3 rounded-full bg-purple-500 mt-1"></div>
                       <div>
-                        <span className="font-medium dark:text-white">Customs Clearance</span>
-                        <p className="text-gray-600 dark:text-gray-400">Clearing customs</p>
+                        <span className="font-medium dark:text-white">Goods Arrived in Zimbabwe</span>
+                        <p className="text-gray-600 dark:text-gray-400">Goods have arrived in Zimbabwe</p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-2">
                       <div className="w-3 h-3 rounded-full bg-blue-600 mt-1"></div>
                       <div>
-                        <span className="font-medium dark:text-white">In Transit</span>
-                        <p className="text-gray-600 dark:text-gray-400">Shipment on the way</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start space-x-2">
-                      <div className="w-3 h-3 rounded-full bg-indigo-500 mt-1"></div>
-                      <div>
-                        <span className="font-medium dark:text-white">Out for Delivery</span>
-                        <p className="text-gray-600 dark:text-gray-400">On the way to destination</p>
+                        <span className="font-medium dark:text-white">Processing in ZW Warehouse</span>
+                        <p className="text-gray-600 dark:text-gray-400">Processing in Zimbabwe warehouse</p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-2">
@@ -111,13 +104,6 @@ const TrackingSection: React.FC = () => {
                       <div>
                         <span className="font-medium dark:text-white">Delivered</span>
                         <p className="text-gray-600 dark:text-gray-400">Shipment delivered</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start space-x-2">
-                      <div className="w-3 h-3 rounded-full bg-red-500 mt-1"></div>
-                      <div>
-                        <span className="font-medium dark:text-white">Cancelled</span>
-                        <p className="text-gray-600 dark:text-gray-400">Shipment cancelled</p>
                       </div>
                     </div>
                   </div>
