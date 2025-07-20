@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -9,6 +8,7 @@ import { PaymentMethodSection } from '@/components/PaymentMethodSection';
 import { ArrowLeft } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 enum BookingStep {
   FORM,
@@ -22,10 +22,46 @@ const BookShipment = () => {
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, loading } = useAuth();
+
+  // Check authentication on component mount
+  useEffect(() => {
+    if (!loading && !user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to access the booking form.",
+        variant: "destructive",
+      });
+      navigate('/auth');
+      return;
+    }
+  }, [user, loading, navigate, toast]);
 
   useEffect(() => {
     document.title = 'Book a Shipment | UK Shipping Service';
   }, []);
+
+  // Show loading while checking authentication
+  if (loading) {
+    return (
+      <>
+        <Navbar />
+        <main className="min-h-screen bg-gray-50 py-12 px-4">
+          <div className="container mx-auto max-w-4xl">
+            <div className="flex justify-center items-center h-64">
+              <div className="text-lg">Loading...</div>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
+  // Don't render the form if user is not authenticated
+  if (!user) {
+    return null;
+  }
 
   const handleFormSubmit = async (data: any, shipmentId: string, amount: number) => {
     console.log("Form submitted with data:", { data, shipmentId, amount });

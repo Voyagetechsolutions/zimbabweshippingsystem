@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -32,8 +33,6 @@ import TermsAndConditions from './pages/TermsAndConditions';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import ConfirmBooking from './pages/ConfirmBooking';
 import ShippingGuidelines from './pages/ShippingGuidelines';
-import ProtectedRoute from './components/ProtectedRoute';
-import BookShipment from './pages/BookShipment';
 import CustomerPage from './pages/CustomerPage';
 
 // Components
@@ -77,7 +76,6 @@ function App() {
                       <Route path="/gallery" element={<Gallery />} />
                       <Route path="/contact" element={<Contact />} />
                       <Route path="/track" element={<Track />} />
-                      <Route path="/book-shipment" element={<BookShipment />} />
                       <Route path="/payment-success" element={<PaymentSuccess />} />
                       <Route path="/quote-submitted" element={<QuoteSubmitted />} />
                       <Route path="/confirm-booking" element={<ConfirmBooking />} />
@@ -92,14 +90,15 @@ function App() {
                       <Route path="/shipping-guidelines" element={<ShippingGuidelines />} />
                       <Route path="/customer" element={<CustomerPage />} />
 
-                        <Route
-                          path="/book-shipment"
-                          element={
-                            <ProtectedRoute>
-                              <BookShipment />
-                            </ProtectedRoute>
-                          }
-                        />
+                      {/* Protected booking route - requires authentication */}
+                      <Route
+                        path="/book-shipment"
+                        element={
+                          <RequireAuth>
+                            <BookShipment />
+                          </RequireAuth>
+                        }
+                      />
 
                       {/* Protected routes - any authenticated user */}
                       <Route
