@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Calendar, DollarSign, FileText } from 'lucide-react';
@@ -28,7 +29,7 @@ const HeroSection: React.FC = () => {
 
   const handleBookClick = () => {
     if (!session) {
-      navigate('/login');
+      navigate('/auth');
     } else {
       navigate('/book-shipment');
     }
@@ -66,11 +67,11 @@ const HeroSection: React.FC = () => {
                 <Button
                   asChild
                   variant="outline"
-                  className="flex items-center bg-white p-3 rounded-md shadow-sm border w-full text-left h-auto flex-col space-y-2"
+                  className="flex items-center bg-white p-4 rounded-md shadow-sm border w-full text-left h-auto flex-col space-y-3 hover:shadow-md transition-shadow"
                 >
                   <Link to="/collection-schedule">
-                    <div className="bg-zim-green/10 p-2 rounded-full">
-                      <Calendar className="h-5 w-5 text-zim-green" />
+                    <div className="bg-zim-green/10 p-3 rounded-full">
+                      <Calendar className="h-8 w-8 text-zim-green" />
                     </div>
                     <div className="text-sm text-center">
                       <p className="font-medium">Our Collection Schedule</p>
@@ -82,11 +83,11 @@ const HeroSection: React.FC = () => {
                 <Button
                   asChild
                   variant="outline"
-                  className="flex items-center bg-white p-3 rounded-md shadow-sm border w-full text-left h-auto flex-col space-y-2"
+                  className="flex items-center bg-white p-4 rounded-md shadow-sm border w-full text-left h-auto flex-col space-y-3 hover:shadow-md transition-shadow"
                 >
                   <Link to="/pricing">
-                    <div className="bg-zim-yellow/10 p-2 rounded-full">
-                      <DollarSign className="h-5 w-5 text-zim-yellow" />
+                    <div className="bg-zim-yellow/10 p-3 rounded-full">
+                      <DollarSign className="h-8 w-8 text-zim-yellow" />
                     </div>
                     <div className="text-sm text-center">
                       <p className="font-medium">Our Pricing</p>
@@ -98,11 +99,11 @@ const HeroSection: React.FC = () => {
                 <Button
                   asChild
                   variant="outline"
-                  className="flex items-center bg-white p-3 rounded-md shadow-sm border w-full text-left h-auto flex-col space-y-2"
+                  className="flex items-center bg-white p-4 rounded-md shadow-sm border w-full text-left h-auto flex-col space-y-3 hover:shadow-md transition-shadow"
                 >
                   <Link to="/shipping-guidelines">
-                    <div className="bg-zim-red/10 p-2 rounded-full">
-                      <FileText className="h-5 w-5 text-zim-red" />
+                    <div className="bg-zim-red/10 p-3 rounded-full">
+                      <FileText className="h-8 w-8 text-zim-red" />
                     </div>
                     <div className="text-sm text-center">
                       <p className="font-medium">Shipping Guidelines</p>
