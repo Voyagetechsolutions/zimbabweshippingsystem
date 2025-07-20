@@ -71,7 +71,7 @@ const HeroSection: React.FC = () => {
                 >
                   <Link to="/collection-schedule">
                     <div className="bg-zim-green/10 p-3 rounded-full">
-                      <Calendar className="h-18 w-18 text-zim-green" />
+                      <Calendar className="h-30 w-30 text-zim-green" />
                     </div>
                     <div className="text-sm text-center">
                       <p className="font-medium">Our Collection Schedule</p>
@@ -87,7 +87,7 @@ const HeroSection: React.FC = () => {
                 >
                   <Link to="/pricing">
                     <div className="bg-zim-yellow/10 p-3 rounded-full">
-                      <DollarSign className="h-18 w-18 text-zim-yellow" />
+                      <DollarSign className="h-30 w-30 text-zim-yellow" />
                     </div>
                     <div className="text-sm text-center">
                       <p className="font-medium">Our Pricing</p>
@@ -103,7 +103,7 @@ const HeroSection: React.FC = () => {
                 >
                   <Link to="/shipping-guidelines">
                     <div className="bg-zim-red/10 p-3 rounded-full">
-                      <FileText className="h-18 w-18 text-zim-red" />
+                      <FileText className="h-30 w-30 text-zim-red" />
                     </div>
                     <div className="text-sm text-center">
                       <p className="font-medium">Shipping Guidelines</p>
