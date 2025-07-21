@@ -7,7 +7,7 @@ import { RoleProvider } from '@/contexts/RoleContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ShippingProvider } from '@/contexts/ShippingContext';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { RouteGuard } from '@/components/RouteGuard';
+import { RequireAuth, RequireAdmin, RedirectIfAuthenticated } from '@/components/RouteGuard';
 
 // Import pages
 import Index from '@/pages/Index';
@@ -56,7 +56,11 @@ function App() {
                   <Router>
                     <Routes>
                       <Route path="/" element={<Index />} />
-                      <Route path="/auth" element={<Auth />} />
+                      <Route path="/auth" element={
+                        <RedirectIfAuthenticated>
+                          <Auth />
+                        </RedirectIfAuthenticated>
+                      } />
                       <Route path="/auth/callback" element={<AuthCallback />} />
                       <Route path="/track" element={<Track />} />
                       <Route path="/pricing" element={<Pricing />} />
@@ -77,59 +81,59 @@ function App() {
                       
                       {/* Protected routes */}
                       <Route path="/book-shipment" element={
-                        <RouteGuard>
+                        <RequireAuth>
                           <BookShipment />
-                        </RouteGuard>
+                        </RequireAuth>
                       } />
                       <Route path="/dashboard" element={
-                        <RouteGuard>
+                        <RequireAuth>
                           <Dashboard />
-                        </RouteGuard>
+                        </RequireAuth>
                       } />
                       <Route path="/admin" element={
-                        <RouteGuard>
+                        <RequireAdmin>
                           <AdminDashboard />
-                        </RouteGuard>
+                        </RequireAdmin>
                       } />
                       <Route path="/account" element={
-                        <RouteGuard>
+                        <RequireAuth>
                           <Account />
-                        </RouteGuard>
+                        </RequireAuth>
                       } />
                       <Route path="/shipment/:id" element={
-                        <RouteGuard>
+                        <RequireAuth>
                           <ShipmentDetails />
-                        </RouteGuard>
+                        </RequireAuth>
                       } />
                       <Route path="/admin/gallery" element={
-                        <RouteGuard>
+                        <RequireAdmin>
                           <GalleryAdmin />
-                        </RouteGuard>
+                        </RequireAdmin>
                       } />
                       <Route path="/address-book" element={
-                        <RouteGuard>
+                        <RequireAuth>
                           <AddressBook />
-                        </RouteGuard>
+                        </RequireAuth>
                       } />
                       <Route path="/confirm-booking" element={
-                        <RouteGuard>
+                        <RequireAuth>
                           <ConfirmBooking />
-                        </RouteGuard>
+                        </RequireAuth>
                       } />
                       <Route path="/receipt" element={
-                        <RouteGuard>
+                        <RequireAuth>
                           <Receipt />
-                        </RouteGuard>
+                        </RequireAuth>
                       } />
                       <Route path="/notifications" element={
-                        <RouteGuard>
+                        <RequireAuth>
                           <Notifications />
-                        </RouteGuard>
+                        </RequireAuth>
                       } />
                       <Route path="/tasks" element={
-                        <RouteGuard>
+                        <RequireAuth>
                           <TaskManagement />
-                        </RouteGuard>
+                        </RequireAuth>
                       } />
                       
                       {/* Catch all route */}
