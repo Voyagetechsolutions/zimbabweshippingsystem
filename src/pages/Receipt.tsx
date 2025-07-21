@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -161,11 +160,11 @@ const Receipt = () => {
       case 'payOnArrival':
         return 'Pay on Arrival (20% Premium)';
       case 'cashOnCollection':
-        return 'Cash on Collection';
+        return 'Pay Full on Collection';
       case 'bankTransfer':
         return 'Bank Transfer';
-      case 'payLater':
-        return '30-Day Payment Terms';
+      case 'standard':
+        return paymentInfo?.payLaterMethod === 'payLater' ? 'Pay within 30 days' : 'Standard Payment';
       default:
         return method?.charAt(0).toUpperCase() + method?.slice(1).replace(/_/g, ' ');
     }
@@ -340,6 +339,25 @@ const Receipt = () => {
                       <p className="text-sm">{formatDate(paymentInfo?.date || receipt?.created_at || new Date().toISOString())}</p>
                     </div>
                   </div>
+                  
+                  {/* Payment Schedule Display */}
+                  {paymentInfo?.paymentSchedule && paymentInfo.paymentSchedule.length > 0 && (
+                    <div className="mt-4 border-t pt-4">
+                      <h4 className="text-sm font-semibold mb-3">Payment Plan:</h4>
+                      <div className="space-y-2">
+                        {paymentInfo.paymentSchedule.map((payment: any, index: number) => (
+                          <div key={index} className="flex justify-between items-center bg-white p-2 rounded border">
+                            <span className="text-sm">
+                              {formatDate(payment.date)}
+                            </span>
+                            <span className="text-sm font-medium">
+                              {formatCurrency(payment.amount, paymentInfo.currency || 'GBP')}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               

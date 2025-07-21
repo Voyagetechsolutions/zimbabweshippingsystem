@@ -50,7 +50,8 @@ import {
   MessageSquare, 
   Megaphone,
   FileSpreadsheet,
-  Menu
+  Menu,
+  DollarSign
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { SetupAdmin } from '@/components/SetupAdmin';
@@ -61,6 +62,7 @@ import ContentManagement from '@/components/admin/ContentManagement';
 import CollectionScheduleManagement from '@/components/admin/CollectionScheduleManagement';
 import SupportTickets from '@/components/admin/SupportTickets';
 import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
+import PaymentScheduleManagement from '@/components/admin/PaymentScheduleManagement';
 
 const STATUS_OPTIONS = [
   'Booking Confirmed',
@@ -141,9 +143,9 @@ const AdminDashboard = () => {
     inTransit: 0,
     delivered: 0,
     quotes: 0,
+    paymentSchedules: 0,
   });
 
-  // Clean up useEffect to prevent memory leaks
   useEffect(() => {
     return () => {
       isMounted.current = false;
@@ -204,11 +206,28 @@ const AdminDashboard = () => {
         .select('id', { count: 'exact' });
       
       if (quotesError) throw quotesError;
+
+      // Fetch payment schedules count
+      const { data: receiptsData, error: receiptsError } = await supabase
+        .from('receipts')
+        .select('payment_info')
+        .eq('payment_method', 'standard')
+        .not('payment_info->paymentSchedule', 'is', null);
+
+      if (receiptsError) throw receiptsError;
+
+      const paymentSchedulesCount = receiptsData?.filter(receipt => {
+        const paymentInfo = receipt.payment_info as any;
+        return paymentInfo?.payLaterMethod === 'payLater' && 
+               paymentInfo?.paymentSchedule && 
+               Array.isArray(paymentInfo.paymentSchedule);
+      }).length || 0;
       
       if (isMounted.current) {
         setStats(prev => ({
           ...prev,
-          quotes: quotesData ? quotesData.length : 0
+          quotes: quotesData ? quotesData.length : 0,
+          paymentSchedules: paymentSchedulesCount
         }));
       }
     } catch (error) {
@@ -358,13 +377,19 @@ const AdminDashboard = () => {
                 <SelectItem value="shipments">
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4" />
-                    <span>Shipments m</span>
+                    <span>Shipments</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="quotes">
                   <div className="flex items-center gap-2">
                     <FileSpreadsheet className="h-4 w-4" />
                     <span>Custom Quotes</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="payments">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    <span>30-Day Payments</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="users">
@@ -401,7 +426,7 @@ const AdminDashboard = () => {
             </Select>
           </TabsList>
         ) : (
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-8 gap-2 mb-4">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-9 gap-2 mb-4">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
               <span className={isMobile ? "" : "hidden sm:inline"}>Overview</span>
@@ -413,6 +438,10 @@ const AdminDashboard = () => {
             <TabsTrigger value="quotes" className="flex items-center gap-2">
               <FileSpreadsheet className="h-4 w-4" />
               <span className={isMobile ? "" : "hidden sm:inline"}>Custom Quotes</span>
+            </TabsTrigger>
+            <TabsTrigger value="payments" className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4" />
+              <span className={isMobile ? "" : "hidden sm:inline"}>30-Day Payments</span>
             </TabsTrigger>
             <TabsTrigger value="users" className="flex items-center gap-2">
               <User className="h-4 w-4" />
@@ -439,7 +468,7 @@ const AdminDashboard = () => {
         
         {/* Tab Content */}
         <TabsContent value="overview">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-500">Total Shipments</CardTitle>
@@ -496,6 +525,18 @@ const AdminDashboard = () => {
                 <div className="flex items-center">
                   <FileSpreadsheet className="h-8 w-8 text-purple-500 mr-3" />
                   <div className="text-2xl font-bold">{stats.quotes}</div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-500">30-Day Payments</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center">
+                  <DollarSign className="h-8 w-8 text-orange-500 mr-3" />
+                  <div className="text-2xl font-bold">{stats.paymentSchedules}</div>
                 </div>
               </CardContent>
             </Card>
@@ -556,8 +597,8 @@ const AdminDashboard = () => {
               <Button variant="outline" onClick={() => setActiveTab('shipments')}>
                 View All Shipments
               </Button>
-              <Button variant="outline" onClick={() => setActiveTab('quotes')}>
-                View Custom Quotes
+              <Button variant="outline" onClick={() => setActiveTab('payments')}>
+                View Payment Schedules
               </Button>
             </CardContent>
           </Card>
@@ -697,6 +738,10 @@ const AdminDashboard = () => {
         
         <TabsContent value="quotes">
           <CustomQuoteManagement />
+        </TabsContent>
+
+        <TabsContent value="payments">
+          <PaymentScheduleManagement />
         </TabsContent>
         
         <TabsContent value="users">
