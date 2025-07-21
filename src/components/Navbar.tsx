@@ -240,13 +240,13 @@ const Navbar = () => {
                     </DropdownMenuItem>
                   </Link>
                   
-                  {/* Add Switch to Admin option */}
-                  <Link to="/admin">
+                  {/* Add Switch to Admin option */
+                  /*<Link to="/admin">
                     <DropdownMenuItem className="cursor-pointer">
                       <Settings className="mr-2 h-4 w-4" />
                       <span>Switch to Admin</span>
                     </DropdownMenuItem>
-                  </Link>
+                  </Link>*/}
                   
                   {isAdmin && (
                     <>
