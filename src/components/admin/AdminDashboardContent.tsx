@@ -34,6 +34,7 @@ import SystemSettingsTab from '@/components/admin/tabs/SystemSettingsTab';
 import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
 import SupportTickets from '@/components/admin/SupportTickets';
 import ContentManagement from '@/components/admin/ContentManagement';
+import PaymentScheduleManagement from '@/components/admin/PaymentScheduleManagement';
 
 // Icons
 import {
@@ -55,7 +56,8 @@ import {
   Quote,
   LayoutDashboard, // Added for dashboard overview
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  CalendarDays
 } from 'lucide-react';
 
 const AdminDashboardContent = () => {
@@ -180,13 +182,14 @@ const AdminDashboardContent = () => {
     { value: 'pickupZones', label: 'Pickup Zones', icon: MapPin },
     { value: 'delivery', label: 'Delivery', icon: Truck },
     { value: 'payments', label: 'Payments', icon: CreditCard },
+    { value: 'paymentSchedule', label: '30-Day Payments', icon: CalendarDays },
     { value: 'reports', label: 'Reports', icon: BarChart3 },
     { value: 'notifications', label: 'Notifications', icon: Bell },
     { value: 'schedule', label: 'Schedule', icon: Calendar },
     { value: 'routes', label: 'Routes', icon: Route },
     { value: 'users', label: 'Users', icon: Users },
-    { value: 'supportTickets', label: 'Support Tickets', icon: MessageSquare }, // Moved from "More"
-    { value: 'contentManagement', label: 'Content Management', icon: ImageIcon }, // Moved from "More"
+    { value: 'supportTickets', label: 'Support Tickets', icon: MessageSquare },
+    { value: 'contentManagement', label: 'Content Management', icon: ImageIcon },
     { value: 'settings', label: 'System Settings', icon: Settings },
   ];
 
@@ -283,6 +286,8 @@ const AdminDashboardContent = () => {
         return <DeliveryManagementTab />;
       case 'payments':
         return <PaymentsInvoicingTab />;
+      case 'paymentSchedule':
+        return <PaymentScheduleManagement />;
       case 'reports':
         return <ReportsAnalyticsTab />;
       case 'notifications':
