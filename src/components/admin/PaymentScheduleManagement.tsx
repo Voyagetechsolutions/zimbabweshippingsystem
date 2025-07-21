@@ -56,90 +56,135 @@ const PaymentScheduleManagement = () => {
     try {
       setLoading(true);
       
-      // Fetch receipts where payment method is 'standard' and payLaterMethod is 'payLater'
-      const { data: receipts, error } = await supabase
+      // First, fetch receipts with payment schedules
+      const { data: receipts, error: receiptsError } = await supabase
         .from('receipts')
-        .select(`
-          *,
-          shipments (
-            id,
-            tracking_number,
-            metadata,
-            profiles (
-              full_name,
-              email
-            )
-          )
-        `)
+        .select('*')
         .eq('payment_method', 'standard')
         .not('payment_info->paymentSchedule', 'is', null)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (receiptsError) {
+        console.error('Error fetching receipts:', receiptsError);
+        throw receiptsError;
+      }
 
-      const scheduleRecords: PaymentScheduleRecord[] = receipts
-        .filter(receipt => {
-          const paymentInfo = receipt.payment_info as any;
-          return paymentInfo?.payLaterMethod === 'payLater' && 
-                 paymentInfo?.paymentSchedule && 
-                 Array.isArray(paymentInfo.paymentSchedule);
-        })
-        .map(receipt => {
-          const senderDetails = receipt.sender_details as any;
-          const paymentInfo = receipt.payment_info as any;
-          const shipment = receipt.shipments as any;
-          
-          // Get name from multiple sources
-          let senderName = 'N/A';
-          
-          // Priority 1: From receipt sender_details
-          if (senderDetails?.name) {
-            senderName = senderDetails.name;
-          } else if (senderDetails?.firstName && senderDetails?.lastName) {
-            senderName = `${senderDetails.firstName} ${senderDetails.lastName}`;
-          }
-          // Priority 2: From shipment metadata
-          else if (shipment?.metadata?.sender?.name) {
-            senderName = shipment.metadata.sender.name;
-          } else if (shipment?.metadata?.sender?.firstName && shipment?.metadata?.sender?.lastName) {
-            senderName = `${shipment.metadata.sender.firstName} ${shipment.metadata.sender.lastName}`;
-          } else if (shipment?.metadata?.senderDetails?.name) {
-            senderName = shipment.metadata.senderDetails.name;
-          } else if (shipment?.metadata?.senderDetails?.firstName && shipment?.metadata?.senderDetails?.lastName) {
-            senderName = `${shipment.metadata.senderDetails.firstName} ${shipment.metadata.senderDetails.lastName}`;
-          }
-          // Priority 3: From profiles table
-          else if (shipment?.profiles?.full_name) {
-            senderName = shipment.profiles.full_name;
-          }
-          
-          // Get email from multiple sources
-          let senderEmail = 'N/A';
-          if (senderDetails?.email) {
-            senderEmail = senderDetails.email;
-          } else if (shipment?.metadata?.sender?.email) {
-            senderEmail = shipment.metadata.sender.email;
-          } else if (shipment?.metadata?.senderDetails?.email) {
-            senderEmail = shipment.metadata.senderDetails.email;
-          } else if (shipment?.profiles?.email) {
-            senderEmail = shipment.profiles.email;
-          }
-          
-          return {
-            id: receipt.id,
-            receipt_number: receipt.receipt_number || 'N/A',
-            sender_name: senderName,
-            sender_email: senderEmail,
-            sender_phone: senderDetails?.phone || shipment?.metadata?.sender?.phone || shipment?.metadata?.senderDetails?.phone || 'N/A',
-            payment_schedule: paymentInfo.paymentSchedule || [],
-            total_amount: paymentInfo.finalAmount || receipt.amount || 0,
-            currency: paymentInfo.currency || receipt.currency || 'GBP',
-            created_at: receipt.created_at,
-            status: receipt.status || 'pending',
-            shipment_id: receipt.shipment_id,
-            tracking_number: shipment?.tracking_number || 'N/A'
-          };
-        });
+      if (!receipts || receipts.length === 0) {
+        setRecords([]);
+        return;
+      }
+
+      // Filter receipts that have payment schedules
+      const filteredReceipts = receipts.filter(receipt => {
+        const paymentInfo = receipt.payment_info as any;
+        return paymentInfo?.payLaterMethod === 'payLater' && 
+               paymentInfo?.paymentSchedule && 
+               Array.isArray(paymentInfo.paymentSchedule);
+      });
+
+      // Get shipment IDs to fetch tracking numbers
+      const shipmentIds = filteredReceipts
+        .map(receipt => receipt.shipment_id)
+        .filter(id => id !== null);
+
+      // Fetch shipments data
+      let shipmentsData: any[] = [];
+      if (shipmentIds.length > 0) {
+        const { data: shipments, error: shipmentsError } = await supabase
+          .from('shipments')
+          .select('id, tracking_number, metadata, user_id')
+          .in('id', shipmentIds);
+
+        if (shipmentsError) {
+          console.error('Error fetching shipments:', shipmentsError);
+        } else {
+          shipmentsData = shipments || [];
+        }
+      }
+
+      // Get user IDs to fetch profiles
+      const userIds = [
+        ...filteredReceipts.map(receipt => receipt.user_id),
+        ...shipmentsData.map(shipment => shipment.user_id)
+      ].filter(id => id !== null);
+
+      // Fetch profiles data
+      let profilesData: any[] = [];
+      if (userIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', userIds);
+
+        if (profilesError) {
+          console.error('Error fetching profiles:', profilesError);
+        } else {
+          profilesData = profiles || [];
+        }
+      }
+
+      // Process the data
+      const scheduleRecords: PaymentScheduleRecord[] = filteredReceipts.map(receipt => {
+        const senderDetails = receipt.sender_details as any;
+        const paymentInfo = receipt.payment_info as any;
+        
+        // Find related shipment
+        const shipment = shipmentsData.find(s => s.id === receipt.shipment_id);
+        
+        // Find related profile
+        const profile = profilesData.find(p => p.id === receipt.user_id || p.id === shipment?.user_id);
+        
+        // Get sender name from multiple sources
+        let senderName = 'N/A';
+        
+        // Priority 1: From receipt sender_details
+        if (senderDetails?.name) {
+          senderName = senderDetails.name;
+        } else if (senderDetails?.firstName && senderDetails?.lastName) {
+          senderName = `${senderDetails.firstName} ${senderDetails.lastName}`;
+        }
+        // Priority 2: From shipment metadata
+        else if (shipment?.metadata?.sender?.name) {
+          senderName = shipment.metadata.sender.name;
+        } else if (shipment?.metadata?.sender?.firstName && shipment?.metadata?.sender?.lastName) {
+          senderName = `${shipment.metadata.sender.firstName} ${shipment.metadata.sender.lastName}`;
+        } else if (shipment?.metadata?.senderDetails?.name) {
+          senderName = shipment.metadata.senderDetails.name;
+        } else if (shipment?.metadata?.senderDetails?.firstName && shipment?.metadata?.senderDetails?.lastName) {
+          senderName = `${shipment.metadata.senderDetails.firstName} ${shipment.metadata.senderDetails.lastName}`;
+        }
+        // Priority 3: From profiles table
+        else if (profile?.full_name) {
+          senderName = profile.full_name;
+        }
+        
+        // Get email from multiple sources
+        let senderEmail = 'N/A';
+        if (senderDetails?.email) {
+          senderEmail = senderDetails.email;
+        } else if (shipment?.metadata?.sender?.email) {
+          senderEmail = shipment.metadata.sender.email;
+        } else if (shipment?.metadata?.senderDetails?.email) {
+          senderEmail = shipment.metadata.senderDetails.email;
+        } else if (profile?.email) {
+          senderEmail = profile.email;
+        }
+        
+        return {
+          id: receipt.id,
+          receipt_number: receipt.receipt_number || 'N/A',
+          sender_name: senderName,
+          sender_email: senderEmail,
+          sender_phone: senderDetails?.phone || shipment?.metadata?.sender?.phone || shipment?.metadata?.senderDetails?.phone || 'N/A',
+          payment_schedule: paymentInfo.paymentSchedule || [],
+          total_amount: paymentInfo.finalAmount || receipt.amount || 0,
+          currency: paymentInfo.currency || receipt.currency || 'GBP',
+          created_at: receipt.created_at,
+          status: receipt.status || 'pending',
+          shipment_id: receipt.shipment_id,
+          tracking_number: shipment?.tracking_number || 'N/A'
+        };
+      });
 
       setRecords(scheduleRecords);
     } catch (error: any) {
