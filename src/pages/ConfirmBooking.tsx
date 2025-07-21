@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -10,6 +11,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { useShipping } from '@/contexts/ShippingContext';
 import { supabase } from '@/integrations/supabase/client';
 import { exportElementToPdf } from '@/utils/exportUtils';
+import { formatDate } from '@/utils/formatters';
 
 const ConfirmBooking = () => {
   const location = useLocation();
@@ -126,13 +128,18 @@ const ConfirmBooking = () => {
       };
     } else if (paymentMethod === 'cash-on-collection') {
       return {
-        displayName: 'Cash on Collection',
+        displayName: 'Pay Full on Collection',
         instructions: "Please make payment via bank transfer or have cash on the collection date."
       };
     } else if (paymentMethod === 'pay-on-arrival') {
       return {
         displayName: 'Pay on Arrival (20% Premium)',
         instructions: "Payment will be required when goods arrive in Zimbabwe."
+      };
+    } else if (paymentMethod === 'standard' && paymentData?.payLaterMethod === 'payLater') {
+      return {
+        displayName: 'Pay within 30 days',
+        instructions: "Payment schedule has been set up. Please see payment plan below."
       };
     }
     
@@ -368,16 +375,9 @@ const ConfirmBooking = () => {
                 <div>
                   <h3 className="text-lg font-semibold mb-3">Additional Services</h3>
                   <ul className="space-y-2 text-sm">
-                    {bookingData.doorToDoor && (
-                      <li className="flex justify-between">
-                        <span>Door-to-Door Delivery{bookingData.additionalDeliveryAddresses?.length > 0 ? 
-                          ` (${1 + (bookingData.additionalDeliveryAddresses?.length || 0)} addresses)` : ''}
-                        </span>
-                        <span className="font-medium">
-                          {formatPrice(25 * (1 + (bookingData.additionalDeliveryAddresses?.length || 0)))}
-                        </span>
-                      </li>
-                    )}
+                    <li className="text-blue-600 font-medium">
+                      If you wish to have your goods delivered to different drop-off addresses, please kindly communicate with the driver at the collection point.
+                    </li>
                     
                     {bookingData.wantMetalSeal && bookingData.includeDrums && (
                       <li className="flex justify-between">
@@ -386,7 +386,7 @@ const ConfirmBooking = () => {
                       </li>
                     )}
                     
-                    {(!bookingData.doorToDoor && !bookingData.wantMetalSeal) && (
+                    {!bookingData.wantMetalSeal && (
                       <li className="text-gray-500">No additional services selected</li>
                     )}
                   </ul>
@@ -410,6 +410,31 @@ const ConfirmBooking = () => {
                   <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm">
                     <p className="text-amber-800">{paymentInfo.instructions}</p>
                   </div>
+
+                  {/* Payment Schedule Display - Only show if payment method is 'Pay within 30 days' */}
+                  {paymentData?.payLaterMethod === 'payLater' && paymentData?.paymentSchedule && paymentData.paymentSchedule.length > 0 && (
+                    <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
+                      <h4 className="text-sm font-semibold mb-3 text-blue-800">Payment Plan:</h4>
+                      <div className="space-y-2">
+                        {paymentData.paymentSchedule.map((payment, index) => (
+                          <div key={index} className="flex justify-between items-center bg-white p-2 rounded border">
+                            <span className="text-sm font-medium">
+                              {formatDate(payment.date)}
+                            </span>
+                            <span className="text-sm font-semibold text-blue-600">
+                              {formatPrice(payment.amount)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3 pt-2 border-t border-blue-200 flex justify-between items-center">
+                        <span className="text-sm font-medium text-blue-800">Total:</span>
+                        <span className="text-sm font-bold text-blue-800">
+                          {formatPrice(paymentData.finalAmount || totalAmount)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 
                 <Separator />
