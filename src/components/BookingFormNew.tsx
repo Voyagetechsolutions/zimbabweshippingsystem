@@ -75,9 +75,7 @@ const formSchema = z.object({
   otherItemDescription: z.string().optional(),
   
   // Additional Services
-  doorToDoor: z.boolean().default(false),
   wantMetalSeal: z.boolean().default(false),
-  additionalDeliveryAddresses: z.array(z.string()).optional(),
   
   // Payment Options
   paymentOption: z.enum(['standard', 'payLater']).default('standard'),
@@ -97,7 +95,6 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
   const [availableRoutes, setAvailableRoutes] = useState<{ route: string; pickupDate: string }[]>([]);
   const [detectedRoute, setDetectedRoute] = useState<string | null>(null);
   const [collectionDate, setCollectionDate] = useState<string | null>(null);
-  const [additionalAddresses, setAdditionalAddresses] = useState<string[]>(['']);
   const [isRestrictedPostcode, setIsRestrictedPostcode] = useState(false);
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -110,11 +107,9 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
       includeOtherItems: false,
       shipmentType: 'drum',
       drumQuantity: '1',
-      doorToDoor: false,
       wantMetalSeal: false,
       hasAdditionalPhone: false,
       hasAdditionalRecipientPhone: false,
-      additionalDeliveryAddresses: [],
       paymentOption: 'standard',
       paymentMethod: 'card',
     },
@@ -184,24 +179,6 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
       }
     }
   }, [watchPostcode, watchCountry, watchPickupCity, availableRoutes, form, toast]);
-  
-  // Handle adding/removing additional delivery addresses
-  const addDeliveryAddress = () => {
-    setAdditionalAddresses([...additionalAddresses, '']);
-  };
-  
-  const removeDeliveryAddress = (index: number) => {
-    const newAddresses = [...additionalAddresses];
-    newAddresses.splice(index, 1);
-    setAdditionalAddresses(newAddresses);
-  };
-  
-  const updateDeliveryAddress = (index: number, value: string) => {
-    const newAddresses = [...additionalAddresses];
-    newAddresses[index] = value;
-    setAdditionalAddresses(newAddresses);
-    form.setValue('additionalDeliveryAddresses', newAddresses.filter(addr => addr.trim() !== ''));
-  };
 
   // Handle form submission
   const onSubmit = async (values: FormValues) => {
@@ -287,9 +264,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
             description: values.includeOtherItems ? values.otherItemDescription : null,
           },
           services: {
-            doorToDoor: values.doorToDoor,
             metalSeal: values.wantMetalSeal,
-            additionalAddresses: values.additionalDeliveryAddresses?.filter(addr => addr.trim() !== '') || [],
           },
           collection: {
             route: values.collectionRoute,
@@ -364,12 +339,6 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
       if (values.wantMetalSeal) {
         total += 5 * qty;
       }
-    }
-    
-    // Add door-to-door delivery cost
-    if (values.doorToDoor) {
-      const addressCount = (additionalAddresses.filter(addr => addr.trim() !== '').length || 1);
-      total += 25 * addressCount;
     }
     
     return total;
@@ -822,64 +791,6 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
                         </FormItem>
                       )}
                     />
-                    
-                    <FormField
-                      control={form.control}
-                      name="doorToDoor"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 mt-4">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel className="font-normal">
-                              Door-to-Door Delivery (£25 per delivery address)
-                            </FormLabel>
-                            <FormDescription>
-                              We'll pick up from your address and deliver directly to the recipient
-                            </FormDescription>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-                    
-                    {form.watch('doorToDoor') && (
-                      <div className="mt-4 space-y-4 border-t pt-4">
-                        <div className="font-medium">Delivery Addresses</div>
-                        {additionalAddresses.map((address, index) => (
-                          <div key={index} className="flex items-start gap-2">
-                            <Textarea 
-                              value={address}
-                              onChange={(e) => updateDeliveryAddress(index, e.target.value)}
-                              placeholder={`Delivery address ${index + 1}`}
-                              className="flex-grow"
-                            />
-                            {index > 0 && (
-                              <Button 
-                                type="button" 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => removeDeliveryAddress(index)}
-                              >
-                                Remove
-                              </Button>
-                            )}
-                          </div>
-                        ))}
-                        
-                        <Button 
-                          type="button"
-                          variant="outline"
-                          onClick={addDeliveryAddress}
-                          className="mt-2"
-                        >
-                          Add Another Address
-                        </Button>
-                      </div>
-                    )}
                   </div>
                 )}
                 
@@ -889,64 +800,6 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
                     <div className="font-medium mb-4">Other Items Details</div>
                     
                     <div className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="doorToDoor"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel className="font-normal">
-                                Door-to-Door Delivery (£25 per delivery address)
-                              </FormLabel>
-                              <FormDescription>
-                                We'll pick up from your address and deliver directly to the recipient
-                              </FormDescription>
-                            </div>
-                          </FormItem>
-                        )}
-                      />
-                      
-                      {form.watch('doorToDoor') && (
-                        <div className="mt-4 space-y-4 border-t pt-4">
-                          <div className="font-medium">Delivery Addresses</div>
-                          {additionalAddresses.map((address, index) => (
-                            <div key={index} className="flex items-start gap-2">
-                              <Textarea 
-                                value={address}
-                                onChange={(e) => updateDeliveryAddress(index, e.target.value)}
-                                placeholder={`Delivery address ${index + 1}`}
-                                className="flex-grow"
-                              />
-                              {index > 0 && (
-                                <Button 
-                                  type="button" 
-                                  variant="outline" 
-                                  size="sm"
-                                  onClick={() => removeDeliveryAddress(index)}
-                                >
-                                  Remove
-                                </Button>
-                              )}
-                            </div>
-                          ))}
-                          
-                          <Button 
-                            type="button"
-                            variant="outline"
-                            onClick={addDeliveryAddress}
-                            className="mt-2"
-                          >
-                            Add Another Address
-                          </Button>
-                        </div>
-                      )}
-                      
                       <div className="flex flex-col space-y-4">
                         <Button 
                           className="w-full" 
@@ -973,6 +826,21 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
                     </div>
                   </div>
                 )}
+                
+                {/* Delivery Information */}
+                <div className="border rounded-md p-4 bg-blue-50 dark:bg-blue-900/20">
+                  <div className="flex items-start">
+                    <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-blue-800 dark:text-blue-200 mb-1">
+                        Delivery Information
+                      </p>
+                      <p className="text-blue-700 dark:text-blue-300 text-sm">
+                        If you wish to have your goods delivered to different drop-off addresses, please kindly communicate with the driver at the collection point.
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 
                 <div className="flex justify-between">
                   <Button 
@@ -1023,13 +891,6 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
                           <span>£{parseInt(form.watch('drumQuantity') || '1') * 5}</span>
                         </div>
                       )}
-                    </div>
-                  )}
-                  
-                  {form.watch('doorToDoor') && (
-                    <div className="flex justify-between mt-2">
-                      <span>Door-to-Door Delivery ({additionalAddresses.filter(a => a.trim() !== '').length || 1} address{additionalAddresses.filter(a => a.trim() !== '').length > 1 ? 'es' : ''})</span>
-                      <span>£{(additionalAddresses.filter(a => a.trim() !== '').length || 1) * 25}</span>
                     </div>
                   )}
                   

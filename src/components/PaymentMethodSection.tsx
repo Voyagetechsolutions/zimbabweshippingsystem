@@ -4,15 +4,26 @@ import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { CheckCircle2, AlertCircle, CreditCard, Wallet, CalendarClock, Loader2 } from 'lucide-react';
+import { CheckCircle2, AlertCircle, CreditCard, Wallet, CalendarClock, Loader2, Calendar } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { generateUniqueId } from '@/utils/utils';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface PaymentMethodSectionProps {
   bookingData: any;
   totalAmount: number;
   onCancel: () => void;
   onComplete: (paymentData: any) => void;
+}
+
+interface PaymentSchedule {
+  date: Date;
+  amount: number;
 }
 
 export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
@@ -22,8 +33,12 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
   onComplete
 }) => {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'standard' | 'cashOnCollection' | 'payOnArrival'>('standard');
-  const [payLaterMethod, setPayLaterMethod] = useState<'bankTransfer' | 'payLater'>('bankTransfer');
+  const [payLaterMethod, setPayLaterMethod] = useState<'payLater'>('payLater');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentSchedule, setPaymentSchedule] = useState<PaymentSchedule[]>([]);
+  const [tempDate, setTempDate] = useState<Date | undefined>(undefined);
+  const [tempAmount, setTempAmount] = useState<string>('');
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -38,8 +53,65 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
   const finalAmount = isSpecialDeal ? (totalAmount - specialDealDiscount) : 
                       isPayOnArrival ? (totalAmount + payOnArrivalPremium) : 
                       totalAmount;
-  
+
+  const getRemainingAmount = () => {
+    const scheduledTotal = paymentSchedule.reduce((sum, payment) => sum + payment.amount, 0);
+    return finalAmount - scheduledTotal;
+  };
+
+  const isPaymentScheduleComplete = () => {
+    return getRemainingAmount() === 0;
+  };
+
+  const addPaymentSchedule = () => {
+    if (!tempDate || !tempAmount || parseFloat(tempAmount) <= 0) {
+      toast({
+        title: "Invalid Input",
+        description: "Please select a date and enter a valid amount.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const amount = parseFloat(tempAmount);
+    const remaining = getRemainingAmount();
+
+    if (amount > remaining) {
+      toast({
+        title: "Amount Too High",
+        description: `Amount cannot exceed the remaining balance of £${remaining.toFixed(2)}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newSchedule: PaymentSchedule = {
+      date: tempDate,
+      amount: amount
+    };
+
+    setPaymentSchedule([...paymentSchedule, newSchedule]);
+    setTempDate(undefined);
+    setTempAmount('');
+    setIsDatePickerOpen(false);
+  };
+
+  const removePaymentSchedule = (index: number) => {
+    const newSchedule = [...paymentSchedule];
+    newSchedule.splice(index, 1);
+    setPaymentSchedule(newSchedule);
+  };
+
   const handleConfirm = async () => {
+    if (selectedPaymentMethod === 'standard' && payLaterMethod === 'payLater' && !isPaymentScheduleComplete()) {
+      toast({
+        title: "Incomplete Payment Schedule",
+        description: "Please schedule payments for the full amount or enter the remaining balance.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsProcessing(true);
     try {
       // Generate a receipt number
@@ -62,7 +134,8 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
         premium: isPayOnArrival ? payOnArrivalPremium : 0,
         status: 'pending',
         date: new Date().toISOString(),
-        receipt_number: receiptNumber
+        receipt_number: receiptNumber,
+        paymentSchedule: selectedPaymentMethod === 'standard' && payLaterMethod === 'payLater' ? paymentSchedule : null
       };
 
       // Ensure the shipment details have all required information including tracking number
@@ -77,10 +150,6 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
           ...(bookingData?.wantMetalSeal ? [{
             name: `Metal Seal${parseInt(bookingData?.drumQuantity || '1') > 1 ? 's' : ''} (${parseInt(bookingData?.drumQuantity || '1')} x £5)`,
             price: 5 * parseInt(bookingData?.drumQuantity || '1')
-          }] : []),
-          ...(bookingData?.doorToDoor ? [{
-            name: 'Door to Door Delivery',
-            price: 25
           }] : [])
         ]
       };
@@ -164,25 +233,107 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
                 </span>
                 <span className="text-zim-green dark:text-green-400 font-semibold">£{totalAmount.toFixed(2)}</span>
               </label>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 mb-3">Pay by card or bank transfer before collection</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 mb-3">Pay by card or within 30 days</p>
               
               {selectedPaymentMethod === 'standard' && (
                 <div className="border-t dark:border-gray-600 pt-3 mt-2">
-                  <RadioGroup 
-                    value={payLaterMethod} 
-                    onValueChange={(value) => setPayLaterMethod(value as 'bankTransfer' | 'payLater')}
-                    className="space-y-3"
-                  >
-                    <div className="flex items-center">
-                      <RadioGroupItem value="bankTransfer" id="bankTransfer" />
-                      <label htmlFor="bankTransfer" className="ml-2 text-sm font-medium">Bank Transfer</label>
+                  <div className="flex items-center">
+                    <RadioGroupItem value="payLater" id="payLater" />
+                    <label htmlFor="payLater" className="ml-2 text-sm font-medium">Pay within 30 days</label>
+                  </div>
+                  
+                  {payLaterMethod === 'payLater' && (
+                    <div className="mt-4 space-y-4">
+                      <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-md">
+                        <h4 className="font-medium mb-3">Payment Schedule</h4>
+                        
+                        <div className="space-y-3">
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <div className="flex-1">
+                              <Label htmlFor="payment-date" className="text-sm">Payment Date</Label>
+                              <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    className={cn(
+                                      "w-full justify-start text-left font-normal",
+                                      !tempDate && "text-muted-foreground"
+                                    )}
+                                  >
+                                    <Calendar className="mr-2 h-4 w-4" />
+                                    {tempDate ? format(tempDate, "PPP") : <span>Pick a date</span>}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                  <CalendarComponent
+                                    mode="single"
+                                    selected={tempDate}
+                                    onSelect={(date) => {
+                                      setTempDate(date);
+                                      setIsDatePickerOpen(false);
+                                    }}
+                                    disabled={(date) => date < new Date()}
+                                    initialFocus
+                                    className="p-3 pointer-events-auto"
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                            
+                            <div className="flex-1">
+                              <Label htmlFor="payment-amount" className="text-sm">Amount (£)</Label>
+                              <Input
+                                id="payment-amount"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                max={getRemainingAmount()}
+                                value={tempAmount}
+                                onChange={(e) => setTempAmount(e.target.value)}
+                                placeholder="Enter amount"
+                              />
+                            </div>
+                            
+                            <div className="flex items-end">
+                              <Button 
+                                type="button" 
+                                onClick={addPaymentSchedule}
+                                disabled={!tempDate || !tempAmount}
+                                className="w-full sm:w-auto"
+                              >
+                                Add
+                              </Button>
+                            </div>
+                          </div>
+                          
+                          {paymentSchedule.length > 0 && (
+                            <div className="space-y-2">
+                              <h5 className="font-medium text-sm">Scheduled Payments:</h5>
+                              {paymentSchedule.map((payment, index) => (
+                                <div key={index} className="flex justify-between items-center bg-white dark:bg-gray-800 p-2 rounded border">
+                                  <span className="text-sm">
+                                    {format(payment.date, "PPP")} - £{payment.amount.toFixed(2)}
+                                  </span>
+                                  <Button 
+                                    type="button" 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => removePaymentSchedule(index)}
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              ))}
+                              
+                              <div className="text-sm text-gray-600 dark:text-gray-400">
+                                Remaining: £{getRemainingAmount().toFixed(2)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    
-                    <div className="flex items-center">
-                      <RadioGroupItem value="payLater" id="payLater" />
-                      <label htmlFor="payLater" className="ml-2 text-sm font-medium">30-Day Payment Terms (For Business Clients)</label>
-                    </div>
-                  </RadioGroup>
+                  )}
                 </div>
               )}
             </div>
@@ -196,7 +347,7 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
               <label htmlFor="cashOnCollection" className="font-medium flex items-center justify-between">
                 <span className="flex items-center">
                   <Wallet className="mr-2 h-4 w-4" />
-                  Cash on Collection
+                  Pay Full on Collection
                 </span>
                 {isSpecialDeal && drumQuantity > 0 ? (
                   <div className="text-right">
