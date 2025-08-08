@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { PhoneIcon } from 'lucide-react';
 import { getRouteForPostalCode, getIrelandRouteForCity, restrictedPostalCodes } from '@/utils/postalCodeUtils';
-import { getDateByRoute, getDateForIrelandCity } from '@/data/collectionSchedule';
+import { supabase } from '@/integrations/supabase/client';
 import { generateUniqueId } from '@/utils/utils';
 
 interface CollectionInfoProps {
@@ -24,9 +24,88 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
   const [route, setRoute] = useState<string | null>(null);
   const [collectionDate, setCollectionDate] = useState<string | null>(null);
   const [isRestricted, setIsRestricted] = useState(false);
+  const [scheduleData, setScheduleData] = useState<any[]>([]);
+  
+  // Fetch updated schedule data from database
+  useEffect(() => {
+    const fetchScheduleData = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('collection_schedules')
+          .select('*');
+        
+        if (error) {
+          console.error('Error fetching schedule data:', error);
+          // Use fallback data with updated dates
+          setScheduleData([
+            { route: "NORTHAMPTON ROUTE", pickup_date: "29th of August" },
+            { route: "LEEDS ROUTE", pickup_date: "30th of August" },
+            { route: "NOTTINGHAM ROUTE", pickup_date: "2nd of September" },
+            { route: "BIRMINGHAM ROUTE", pickup_date: "4th of September" },
+            { route: "LONDON ROUTE", pickup_date: "6th of September" },
+            { route: "CARDIFF ROUTE", pickup_date: "8th of September" },
+            { route: "BOURNEMOUTH ROUTE", pickup_date: "9th of September" },
+            { route: "BRIGHTON ROUTE", pickup_date: "10th of September" },
+            { route: "SOUTHEND ROUTE", pickup_date: "12th of September" }
+          ]);
+        } else {
+          setScheduleData(data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching schedules:', error);
+        // Use fallback data
+        setScheduleData([
+          { route: "NORTHAMPTON ROUTE", pickup_date: "29th of August" },
+          { route: "LEEDS ROUTE", pickup_date: "30th of August" },
+          { route: "NOTTINGHAM ROUTE", pickup_date: "2nd of September" },
+          { route: "BIRMINGHAM ROUTE", pickup_date: "4th of September" },
+          { route: "LONDON ROUTE", pickup_date: "6th of September" },
+          { route: "CARDIFF ROUTE", pickup_date: "8th of September" },
+          { route: "BOURNEMOUTH ROUTE", pickup_date: "9th of September" },
+          { route: "BRIGHTON ROUTE", pickup_date: "10th of September" },
+          { route: "SOUTHEND ROUTE", pickup_date: "12th of September" }
+        ]);
+      }
+    };
+    
+    fetchScheduleData();
+  }, []);
+
+  // Helper function to get date by route from fetched data
+  const getDateByRouteFromData = (routeName: string): string => {
+    const schedule = scheduleData.find(s => s.route === routeName);
+    return schedule?.pickup_date || "Next available collection date";
+  };
+
+  // Helper function to get Ireland route date
+  const getDateForIrelandCityFromData = (city: string): string | null => {
+    // Ireland routes mapping
+    const irelandRoutes = {
+      'LONDON DERRY ROUTE': '18th of April',
+      'BELFAST ROUTE': '19th of April',
+      'CAVAN ROUTE': '21st of April',
+      'ATHLONE ROUTE': '23rd of April',
+      'LIMERICK ROUTE': '24th of April',
+      'DUBLIN CITY ROUTE': '26th of April',
+      'CORK ROUTE': '28th of April'
+    };
+    
+    // Get route for the city (you can expand this mapping as needed)
+    const cityToRoute: Record<string, string> = {
+      'BELFAST': 'BELFAST ROUTE',
+      'DUBLIN': 'DUBLIN CITY ROUTE',
+      'CORK': 'CORK ROUTE',
+      // Add more mappings as needed
+    };
+    
+    const routeName = cityToRoute[city.toUpperCase()];
+    return routeName ? irelandRoutes[routeName as keyof typeof irelandRoutes] || null : null;
+  };
   
   // Process the collection information when props change
   useEffect(() => {
+    if (scheduleData.length === 0) return; // Wait for schedule data to load
+    
     // Print debug information
     console.log("CollectionInfo useEffect running with:", { country, postalCode, city });
     
@@ -48,7 +127,7 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
         // Normal route determination for non-restricted areas
         newRoute = getRouteForPostalCode(postalCode);
         if (newRoute) {
-          newCollectionDate = getDateByRoute(newRoute);
+          newCollectionDate = getDateByRouteFromData(newRoute);
           console.log("Retrieved England route and date:", { newRoute, newCollectionDate });
         }
       }
@@ -56,7 +135,7 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
       const normalizedCity = city.trim().toUpperCase();
       newRoute = getIrelandRouteForCity(normalizedCity);
       if (newRoute) {
-        newCollectionDate = getDateForIrelandCity(normalizedCity) || getDateByRoute(newRoute);
+        newCollectionDate = getDateForIrelandCityFromData(normalizedCity) || getDateByRouteFromData(newRoute);
         console.log("Retrieved Ireland route and date:", { newRoute, newCollectionDate });
       }
     }
@@ -99,7 +178,7 @@ const CollectionInfo: React.FC<CollectionInfoProps> = ({
     } else {
       console.warn("onCollectionInfoReady callback is not provided to CollectionInfo component");
     }
-  }, [country, postalCode, city, onCollectionInfoReady]);
+  }, [country, postalCode, city, onCollectionInfoReady, scheduleData]);
 
   // Don't render anything if data isn't ready yet
   if (!isDataReady) {
