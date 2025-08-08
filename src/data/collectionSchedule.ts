@@ -8,41 +8,41 @@ export interface RouteSchedule {
   country?: string;
 }
 
-// Initial data that will be used until we load from the database
+// Updated collection schedules with new dates
 export const collectionSchedules: RouteSchedule[] = [
   {
     route: "CARDIFF ROUTE",
-    date: "28th of July",
+    date: "8th of September",
     areas: ["CARDIFF", "GLOUCESTER", "BRISTOL", "SWINDON", "BATH", "SALISBURY"],
     country: "England"
   },
   {
-    route: "BOURNEMOUTH ROUTE",
-    date: "29th of July",
+    route: "BOURNEMOUTH ROUTE", 
+    date: "9th of September",
     areas: ["SOUTHAMPTON", "OXFORD", "HAMPHIRE", "READING", "GUILFORD", "PORTSMOUTH"],
     country: "England"
   },
   {
     route: "BIRMINGHAM ROUTE",
-    date: "31st of July",
+    date: "4th of September", 
     areas: ["WOLVEHAMPTON", "COVENTRY", "WARWICK", "DUDLEY", "WALSALL", "RUGBY"],
     country: "England"
   },
   {
     route: "LONDON ROUTE",
-    date: "26th of July",
+    date: "6th of September",
     areas: ["CENTRAL LONDON", "HEATHROW", "EAST LONDON", "ROMFORD", "ALL AREAS INSIDE M25"],
     country: "England"
   },
   {
     route: "LEEDS ROUTE",
-    date: "22nd of July",
+    date: "30th of August",
     areas: ["WAKEFIELD", "HALIFAX", "DONCASTER", "SHEFFIELD", "HUDDERSFIELD", "YORK"],
     country: "England"
   },
   {
     route: "NOTTINGHAM ROUTE",
-    date: "23rd of July",
+    date: "2nd of September",
     areas: ["LIECESTER", "DERBY", "PETERSBOROUGH", "CORBY", "MARKET HARB"],
     country: "England"
   },
@@ -54,19 +54,19 @@ export const collectionSchedules: RouteSchedule[] = [
   },
   {
     route: "BRIGHTON ROUTE",
-    date: "4th of August",
+    date: "10th of September",
     areas: ["HIGH COMBE", "SLOUGH", "VRAWLEY", "LANCING", "EASTBOURNE", "CANTEBURY"],
     country: "England"
   },
   {
     route: "SOUTHEND ROUTE",
-    date: "1st of August",
+    date: "12th of September",
     areas: ["NORWICH", "IPSWICH", "COLCHESTER", "BRAINTREE", "CAMBRIDGE", "BASILDON"],
     country: "England"
   },
   {
     route: "NORTHAMPTON ROUTE",
-    date: "21st of July",
+    date: "29th of August",
     areas: ["KETTERING", "BEDFORD", "MILTON KEYNES", "BANBURY", "AYLESBURY", "LUTON"],
     country: "England"
   },
