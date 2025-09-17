@@ -744,6 +744,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json[]
       }
+      get_shipment_tracking_info: {
+        Args: { tracking_num: string }
+        Returns: Json
+      }
       insert_gallery_image: {
         Args: {
           p_alt: string
@@ -760,6 +764,10 @@ export type Database = {
       is_user_admin: {
         Args: { user_id: string }
         Returns: boolean
+      }
+      log_tracking_access: {
+        Args: { tracking_num: string }
+        Returns: undefined
       }
       make_admin: {
         Args: { user_email: string }

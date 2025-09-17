@@ -37,58 +37,57 @@ const Track = () => {
     setIsTracking(true);
     
     try {
+      // Use the secure tracking function that only returns non-sensitive data
       const { data, error: queryError } = await supabase
-        .from('shipments')
-        .select('*')
-        .eq('tracking_number', trackingNumber)
-        .single();
+        .rpc('get_shipment_tracking_info', { 
+          tracking_num: trackingNumber 
+        });
+      
+      // Also log the tracking access for security monitoring
+      await supabase.rpc('log_tracking_access', { 
+        tracking_num: trackingNumber 
+      });
       
       setIsTracking(false);
       
       if (queryError) {
+        setError('An error occurred while tracking your shipment');
+        console.error(queryError);
+        return;
+      }
+      
+      if (!data) {
         setError('No shipment found with this tracking number');
         return;
       }
       
-      if (data) {
-        const shipment = data;
-        
-        // Safely extract estimated_delivery from metadata, with improved type checks
-        let estimatedDelivery = 'Not available';
-        if (shipment.metadata && typeof shipment.metadata === 'object' && shipment.metadata !== null && !Array.isArray(shipment.metadata)) {
-          const metadata = shipment.metadata as Record<string, any>;
-          if (metadata.estimated_delivery) {
-            estimatedDelivery = metadata.estimated_delivery as string;
-          }
-        }
-        
-        // Safely extract carrier from metadata, with improved type checks
-        let carrier = 'Zimbabwe Shipping';
-        if (shipment.metadata && typeof shipment.metadata === 'object' && shipment.metadata !== null && !Array.isArray(shipment.metadata)) {
-          const metadata = shipment.metadata as Record<string, any>;
-          if (metadata.carrier) {
-            carrier = metadata.carrier as string;
-          }
-        }
-        
-        const result: TrackingResult = {
-          status: shipment.status,
-          origin: shipment.origin,
-          destination: shipment.destination,
-          lastUpdate: new Date(shipment.updated_at).toLocaleString(),
-          estimatedDelivery,
-          carrier,
-          tracking_number: shipment.tracking_number
-        };
-        
-        setTrackingResult(result);
-        toast({
-          title: "Tracking Information Found",
-          description: `Latest status: ${shipment.status}`,
-        });
-      } else {
-        setError('No shipment found with this tracking number');
-      }
+      // Type the secure tracking data properly
+      const trackingData = data as {
+        status: string;
+        origin: string;
+        destination: string;
+        last_updated: string;
+        estimated_delivery: string;
+        carrier: string;
+        tracking_number: string;
+      };
+      
+      // Parse the secure tracking data
+      const result: TrackingResult = {
+        status: trackingData.status,
+        origin: trackingData.origin,
+        destination: trackingData.destination,
+        lastUpdate: new Date(trackingData.last_updated).toLocaleString(),
+        estimatedDelivery: trackingData.estimated_delivery === '"Not available"' ? 'Not available' : trackingData.estimated_delivery,
+        carrier: trackingData.carrier === '"Zimbabwe Shipping"' ? 'Zimbabwe Shipping' : trackingData.carrier,
+        tracking_number: trackingData.tracking_number
+      };
+      
+      setTrackingResult(result);
+      toast({
+        title: "Tracking Information Found",
+        description: `Latest status: ${trackingData.status}`,
+      });
     } catch (err) {
       setIsTracking(false);
       setError('An error occurred while tracking your shipment');
