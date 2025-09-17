@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -59,6 +59,36 @@ export type Database = {
           street_address?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: Json | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: Json | null
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -669,20 +699,20 @@ export type Database = {
       create_announcement: {
         Args:
           | {
-              p_title: string
-              p_content: string
               p_category: string
-              p_is_active: boolean
+              p_content: string
               p_created_by: string
               p_expiry_date: string
+              p_is_active: boolean
+              p_title: string
             }
           | {
-              p_title: string
-              p_content: string
               p_category: string
-              p_is_active: boolean
+              p_content: string
               p_created_by: string
               p_expiry_date: string
+              p_is_active: boolean
+              p_title: string
             }
         Returns: Json
       }
@@ -716,10 +746,10 @@ export type Database = {
       }
       insert_gallery_image: {
         Args: {
-          p_src: string
           p_alt: string
           p_caption: string
           p_category: string
+          p_src: string
         }
         Returns: Json
       }
@@ -744,7 +774,7 @@ export type Database = {
         Returns: Json
       }
       verify_mfa_login: {
-        Args: { user_id: string; token: string }
+        Args: { token: string; user_id: string }
         Returns: boolean
       }
     }
