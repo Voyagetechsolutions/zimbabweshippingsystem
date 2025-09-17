@@ -26,74 +26,107 @@ serve(async (req) => {
     const updatedSchedules = [
       {
         route: "NORTHAMPTON ROUTE",
-        pickup_date: "29th of August",
+        pickup_date: "26th of September",
         areas: ["KETTERING", "BEDFORD", "MILTON KEYNES", "BANBURY", "AYLESBURY", "LUTON"],
         country: "England"
       },
       {
         route: "LEEDS ROUTE",
-        pickup_date: "30th of August",
+        pickup_date: "27th of September",
         areas: ["WAKEFIELD", "HALIFAX", "DONCASTER", "SHEFFIELD", "HUDDERSFIELD", "YORK"],
         country: "England"
       },
       {
-        route: "NOTTINGHAM ROUTE",
-        pickup_date: "2nd of September",
-        areas: ["LIECESTER", "DERBY", "PETERSBOROUGH", "CORBY", "MARKET HARB"],
-        country: "England"
-      },
-      {
-        route: "BIRMINGHAM ROUTE",
-        pickup_date: "4th of September",
-        areas: ["WOLVEHAMPTON", "COVENTRY", "WARWICK", "DUDLEY", "WALSALL", "RUGBY"],
-        country: "England"
-      },
-      {
-        route: "LONDON ROUTE",
-        pickup_date: "6th of September",
-        areas: ["CENTRAL LONDON", "HEATHROW", "EAST LONDON", "ROMFORD", "ALL AREAS INSIDE M25"],
-        country: "England"
-      },
-      {
         route: "CARDIFF ROUTE",
-        pickup_date: "8th of September",
+        pickup_date: "29th of September",
         areas: ["CARDIFF", "GLOUCESTER", "BRISTOL", "SWINDON", "BATH", "SALISBURY"],
         country: "England"
       },
       {
         route: "BOURNEMOUTH ROUTE",
-        pickup_date: "9th of September",
+        pickup_date: "30th of September",
         areas: ["SOUTHAMPTON", "OXFORD", "HAMPHIRE", "READING", "GUILFORD", "PORTSMOUTH"],
         country: "England"
       },
       {
         route: "BRIGHTON ROUTE",
-        pickup_date: "10th of September",
+        pickup_date: "2nd of October",
         areas: ["HIGH COMBE", "SLOUGH", "VRAWLEY", "LANCING", "EASTBOURNE", "CANTEBURY"],
         country: "England"
       },
       {
+        route: "LONDON ROUTE",
+        pickup_date: "4th of October",
+        areas: ["CENTRAL LONDON", "HEATHROW", "EAST LONDON", "ROMFORD", "ALL AREAS INSIDE M25"],
+        country: "England"
+      },
+      {
+        route: "BIRMINGHAM ROUTE",
+        pickup_date: "6th of October",
+        areas: ["WOLVEHAMPTON", "COVENTRY", "WARWICK", "DUDLEY", "WALSALL", "RUGBY"],
+        country: "England"
+      },
+      {
+        route: "NOTTINGHAM ROUTE",
+        pickup_date: "8th of October",
+        areas: ["LIECESTER", "DERBY", "PETERSBOROUGH", "CORBY", "MARKET HARB"],
+        country: "England"
+      },
+      {
+        route: "MANCHESTER ROUTE",
+        pickup_date: "11th of October",
+        areas: ["MANCHESTER", "STOCKPORT", "OLDHAM", "BOLTON", "BURY", "SALFORD"],
+        country: "England"
+      },
+      {
         route: "SOUTHEND ROUTE",
-        pickup_date: "12th of September",
+        pickup_date: "13th of October",
         areas: ["NORWICH", "IPSWICH", "COLCHESTER", "BRAINTREE", "CAMBRIDGE", "BASILDON"],
         country: "England"
       }
     ];
 
-    // Update existing routes with new dates
+    // Update existing routes with new dates and insert new ones if they don't exist
     for (const schedule of updatedSchedules) {
-      const { error } = await supabaseClient
+      // Try to update first
+      const { data: existingRoute, error: selectError } = await supabaseClient
         .from('collection_schedules')
-        .update({
-          pickup_date: schedule.pickup_date,
-          updated_at: new Date().toISOString()
-        })
-        .eq('route', schedule.route);
-      
-      if (error) {
-        console.error(`Error updating ${schedule.route}:`, error);
+        .select('id')
+        .eq('route', schedule.route)
+        .single();
+
+      if (existingRoute) {
+        // Route exists, update it
+        const { error } = await supabaseClient
+          .from('collection_schedules')
+          .update({
+            pickup_date: schedule.pickup_date,
+            updated_at: new Date().toISOString()
+          })
+          .eq('route', schedule.route);
+        
+        if (error) {
+          console.error(`Error updating ${schedule.route}:`, error);
+        } else {
+          console.log(`Successfully updated ${schedule.route} to ${schedule.pickup_date}`);
+        }
       } else {
-        console.log(`Successfully updated ${schedule.route} to ${schedule.pickup_date}`);
+        // Route doesn't exist, insert it
+        const { error } = await supabaseClient
+          .from('collection_schedules')
+          .insert({
+            route: schedule.route,
+            pickup_date: schedule.pickup_date,
+            areas: schedule.areas,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        
+        if (error) {
+          console.error(`Error inserting ${schedule.route}:`, error);
+        } else {
+          console.log(`Successfully inserted new route ${schedule.route} with date ${schedule.pickup_date}`);
+        }
       }
     }
     
