@@ -12,6 +12,7 @@ import { RequireAuth, RequireAdmin, RedirectIfAuthenticated } from '@/components
 // Import pages
 import Index from '@/pages/Index';
 import BookShipment from '@/pages/BookShipment';
+import SimpleBooking from '@/pages/SimpleBooking';
 import Track from '@/pages/Track';
 import Pricing from '@/pages/Pricing';
 import Services from '@/pages/Services';
@@ -78,6 +79,7 @@ function App() {
                       <Route path="/quote-submitted" element={<QuoteSubmitted />} />
                       <Route path="/payment-success" element={<PaymentSuccess />} />
                       <Route path="/custom-quote-request" element={<CustomQuoteRequest />} />
+                      <Route path="/book" element={<SimpleBooking />} />
                       
                       {/* Protected routes */}
                       <Route path="/book-shipment" element={

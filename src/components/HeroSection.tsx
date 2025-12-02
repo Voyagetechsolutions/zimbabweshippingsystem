@@ -28,11 +28,8 @@ const HeroSection: React.FC = () => {
   }, []);
 
   const handleBookClick = () => {
-    if (!session) {
-      navigate('/auth');
-    } else {
-      navigate('/book-shipment');
-    }
+    // Simple booking flow - no login required
+    navigate('/book');
   };
 
   return (
