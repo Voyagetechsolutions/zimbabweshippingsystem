@@ -696,9 +696,9 @@ export type Database = {
         Args: { ip_address: string }
         Returns: boolean
       }
-      create_announcement: {
-        Args:
-          | {
+      create_announcement:
+        | {
+            Args: {
               p_category: string
               p_content: string
               p_created_by: string
@@ -706,7 +706,10 @@ export type Database = {
               p_is_active: boolean
               p_title: string
             }
-          | {
+            Returns: Json
+          }
+        | {
+            Args: {
               p_category: string
               p_content: string
               p_created_by: string
@@ -714,36 +717,18 @@ export type Database = {
               p_is_active: boolean
               p_title: string
             }
-        Returns: Json
-      }
-      delete_announcement: {
-        Args: { p_id: string }
-        Returns: boolean
-      }
-      delete_gallery_image: {
-        Args: { p_id: string }
-        Returns: boolean
-      }
-      elevate_to_admin: {
-        Args: { admin_password: string }
-        Returns: boolean
-      }
-      get_active_announcements: {
-        Args: Record<PropertyKey, never>
-        Returns: Json[]
-      }
-      get_announcements: {
-        Args: Record<PropertyKey, never>
-        Returns: Json[]
-      }
+            Returns: Json
+          }
+      delete_announcement: { Args: { p_id: string }; Returns: boolean }
+      delete_gallery_image: { Args: { p_id: string }; Returns: boolean }
+      elevate_to_admin: { Args: { admin_password: string }; Returns: boolean }
+      get_active_announcements: { Args: never; Returns: Json[] }
+      get_announcements: { Args: never; Returns: Json[] }
       get_driver_performance: {
         Args: { driver_id_param: string }
         Returns: Json
       }
-      get_gallery_images: {
-        Args: Record<PropertyKey, never>
-        Returns: Json[]
-      }
+      get_gallery_images: { Args: never; Returns: Json[] }
       get_shipment_tracking_info: {
         Args: { tracking_num: string }
         Returns: Json
@@ -757,22 +742,13 @@ export type Database = {
         }
         Returns: Json
       }
-      is_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_user_admin: {
-        Args: { user_id: string }
-        Returns: boolean
-      }
+      is_admin: { Args: never; Returns: boolean }
+      is_user_admin: { Args: { user_id: string }; Returns: boolean }
       log_tracking_access: {
         Args: { tracking_num: string }
         Returns: undefined
       }
-      make_admin: {
-        Args: { user_email: string }
-        Returns: boolean
-      }
+      make_admin: { Args: { user_email: string }; Returns: boolean }
       update_admin_password: {
         Args: { current_password: string; new_password: string }
         Returns: boolean
