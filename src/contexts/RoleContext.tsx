@@ -9,6 +9,7 @@ import React, {
 import { useAuth } from '@/contexts/AuthContext';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/utils/logger';
 
 export type UserRoleType = 'admin' | 'driver' | 'logistics' | 'customer' | 'anonymous';
 
@@ -56,13 +57,13 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
           .single();
 
         if (error) {
-          console.error('Error fetching user role:', error);
+          logger.error('Error fetching user role:', error);
           setUserRole('anonymous');
         } else {
           setUserRole(data?.role || 'anonymous');
         }
       } catch (error) {
-        console.error('Unexpected error fetching user role:', error);
+        logger.error('Unexpected error fetching user role:', error);
         setUserRole('anonymous');
       } finally {
         setIsLoading(false);
@@ -75,13 +76,13 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
   // This is a simplified implementation that just logs the request
   const requestRoleElevation = async (role: string) => {
     if (!user) {
-      console.error('User not authenticated.');
+      logger.error('User not authenticated.');
       return;
     }
 
     try {
-      // Just log to console instead since audit_logs table was deleted
-      console.log('Role elevation request:', {
+      // Just log instead since audit_logs table was deleted
+      logger.info('Role elevation request:', {
         user_id: user.id,
         action: 'ROLE_ELEVATION_REQUEST',
         entity_type: 'USER',
@@ -95,9 +96,9 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
       setUserRole('pending');
 
       // Notify success (even though we're only logging)
-      console.log('Role elevation request submitted successfully.');
+      logger.info('Role elevation request submitted successfully.');
     } catch (error) {
-      console.error('Error requesting role elevation:', error);
+      logger.error('Error requesting role elevation:', error);
     }
   };
 
@@ -119,20 +120,42 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
     return false;
   };
 
-  // New function to elevate to admin
+  // Function to elevate to admin - requires server-side validation
   const elevateToAdmin = async (password: string): Promise<boolean> => {
+    if (!user) {
+      logger.error('User must be authenticated to elevate privileges');
+      return false;
+    }
+
     try {
-      // This would normally call a Supabase function, but we'll mock the behavior
-      console.log('Admin elevation with password', password);
-      
-      if (password === 'admin123') { // Demo password for testing
-        setUserRole('admin');
-        return true;
+      // Call Supabase Edge Function for secure server-side password verification
+      // This prevents password exposure in client-side code
+      const { data, error } = await supabase.functions.invoke('elevate-to-admin', {
+        body: { password }
+      });
+
+      if (error) {
+        logger.error('Error during admin elevation:', error.message);
+        return false;
+      }
+
+      if (data?.success) {
+        // Refresh user role from database
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        if (!profileError && profile) {
+          setUserRole(profile.role);
+          return true;
+        }
       }
       
       return false;
     } catch (error) {
-      console.error('Error during admin elevation:', error);
+      logger.error('Error during admin elevation:', error);
       return false;
     }
   };
@@ -141,7 +164,7 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
   const setRoleForUser = async (userId: string, role: string): Promise<boolean> => {
     try {
       if (!hasPermission('admin')) {
-        console.error('Only admins can set user roles');
+        logger.error('Only admins can set user roles');
         return false;
       }
 
@@ -152,13 +175,13 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
         .eq('id', userId);
 
       if (error) {
-        console.error('Error updating user role:', error);
+        logger.error('Error updating user role:', error);
         return false;
       }
 
       return true;
     } catch (error) {
-      console.error('Error setting user role:', error);
+      logger.error('Error setting user role:', error);
       return false;
     }
   };

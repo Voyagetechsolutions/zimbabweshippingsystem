@@ -2,7 +2,7 @@ export interface Role {
   id: string;
   name: string;
   description: string | null;
-  permissions: Record<string, any>;
+  permissions: Permissions;
   created_at: string;
   updated_at: string;
 }
@@ -14,7 +14,7 @@ export interface AuditLog {
   action: string;
   entity_type: string;
   entity_id?: string;
-  details?: any;
+  details?: Record<string, unknown>;
   ip_address?: string;
   created_at: string;
   user_email?: string;
@@ -25,7 +25,7 @@ export interface AuditLog {
 export interface SystemSetting {
   id: string;
   key: string;
-  value: any;
+  value: string | number | boolean | Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
@@ -43,7 +43,7 @@ export interface Ticket {
   updated_at: string;
   user_email?: string;
   user_name?: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
   is_contact_form?: boolean;
 }
 
@@ -81,7 +81,7 @@ export interface Announcement {
 }
 
 // Helper function for typescript casting
-export function castTo<T>(data: any): T {
+export function castTo<T>(data: unknown): T {
   return data as T;
 }
 

@@ -3,6 +3,7 @@ import React, { createContext, useState, useEffect, useContext } from 'react';
 import { Session, User, AuthResponse } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/utils/logger';
 
 interface AuthContextType {
   session: Session | null;
@@ -46,7 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           checkAdminStatus(initialSession.user.id);
         }
       } catch (error) {
-        console.error("Error getting initial session:", error);
+        logger.error("Error getting initial session:", error);
         toast({
           title: "Authentication Error",
           description: "Failed to retrieve your session. Please try logging in again.",
@@ -62,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set up auth state change listener
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
-        console.log("Auth state changed:", event, newSession ? "Session exists" : "No session");
+        logger.debug("Auth state changed:", event, newSession ? "Session exists" : "No session");
         setSession(newSession);
         setUser(newSession?.user || null);
         setLoading(false);
@@ -85,14 +86,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await supabase.rpc('is_user_admin', { user_id: userId });
       
       if (error) {
-        console.error('Error checking admin status:', error);
+        logger.error('Error checking admin status:', error);
         setIsAdmin(false);
         return;
       }
       
       setIsAdmin(data === true);
     } catch (error) {
-      console.error('Error checking admin status:', error);
+      logger.error('Error checking admin status:', error);
       setIsAdmin(false);
     }
   };

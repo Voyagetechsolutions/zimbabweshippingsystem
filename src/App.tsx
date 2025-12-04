@@ -1,4 +1,5 @@
 
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
@@ -8,54 +9,61 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ShippingProvider } from '@/contexts/ShippingContext';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { RequireAuth, RequireAdmin, RedirectIfAuthenticated } from '@/components/RouteGuard';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
-// Import pages
-import Index from '@/pages/Index';
-import BookShipment from '@/pages/BookShipment';
-import SimpleBooking from '@/pages/SimpleBooking';
-import Track from '@/pages/Track';
-import Pricing from '@/pages/Pricing';
-import Services from '@/pages/Services';
-import Contact from '@/pages/Contact';
-import Auth from '@/pages/Auth';
-import Dashboard from '@/pages/Dashboard';
-import AdminDashboard from '@/pages/AdminDashboard';
-import Account from '@/pages/Account';
-import AuthCallback from '@/pages/AuthCallback';
-import AboutUs from '@/pages/AboutUs';
-import FAQ from '@/pages/FAQ';
-import Support from '@/pages/Support';
-import Reviews from '@/pages/Reviews';
-import Gallery from '@/pages/Gallery';
-import NotFound from '@/pages/NotFound';
-import CollectionSchedule from '@/pages/CollectionSchedule';
-import ShippingGuidelines from '@/pages/ShippingGuidelines';
-import PrivacyPolicy from '@/pages/PrivacyPolicy';
-import TermsAndConditions from '@/pages/TermsAndConditions';
-import ShipmentDetails from '@/pages/ShipmentDetails';
-import GalleryAdmin from '@/pages/GalleryAdmin';
-import AddressBook from '@/pages/AddressBook';
-import ConfirmBooking from '@/pages/ConfirmBooking';
-import Receipt from '@/pages/Receipt';
-import QuoteSubmitted from '@/pages/QuoteSubmitted';
-import PaymentSuccess from '@/pages/PaymentSuccess';
-import Notifications from '@/pages/Notifications';
-import TaskManagement from '@/pages/TaskManagement';
-import CustomQuoteRequest from '@/pages/CustomQuoteRequest';
+// Lazy load pages for code splitting and better performance
+const Index = lazy(() => import('@/pages/Index'));
+const BookShipment = lazy(() => import('@/pages/BookShipment'));
+const SimpleBooking = lazy(() => import('@/pages/SimpleBooking'));
+const Track = lazy(() => import('@/pages/Track'));
+const Pricing = lazy(() => import('@/pages/Pricing'));
+const Services = lazy(() => import('@/pages/Services'));
+const Contact = lazy(() => import('@/pages/Contact'));
+const Auth = lazy(() => import('@/pages/Auth'));
+const Dashboard = lazy(() => import('@/pages/Dashboard'));
+const AdminDashboard = lazy(() => import('@/pages/AdminDashboard'));
+const Account = lazy(() => import('@/pages/Account'));
+const AuthCallback = lazy(() => import('@/pages/AuthCallback'));
+const AboutUs = lazy(() => import('@/pages/AboutUs'));
+const FAQ = lazy(() => import('@/pages/FAQ'));
+const Support = lazy(() => import('@/pages/Support'));
+const Reviews = lazy(() => import('@/pages/Reviews'));
+const Gallery = lazy(() => import('@/pages/Gallery'));
+const NotFound = lazy(() => import('@/pages/NotFound'));
+const CollectionSchedule = lazy(() => import('@/pages/CollectionSchedule'));
+const ShippingGuidelines = lazy(() => import('@/pages/ShippingGuidelines'));
+const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));
+const TermsAndConditions = lazy(() => import('@/pages/TermsAndConditions'));
+const ShipmentDetails = lazy(() => import('@/pages/ShipmentDetails'));
+const GalleryAdmin = lazy(() => import('@/pages/GalleryAdmin'));
+const AddressBook = lazy(() => import('@/pages/AddressBook'));
+const ConfirmBooking = lazy(() => import('@/pages/ConfirmBooking'));
+const Receipt = lazy(() => import('@/pages/Receipt'));
+const QuoteSubmitted = lazy(() => import('@/pages/QuoteSubmitted'));
+const PaymentSuccess = lazy(() => import('@/pages/PaymentSuccess'));
+const Notifications = lazy(() => import('@/pages/Notifications'));
+const TaskManagement = lazy(() => import('@/pages/TaskManagement'));
+const CustomQuoteRequest = lazy(() => import('@/pages/CustomQuoteRequest'));
 
 const queryClient = new QueryClient();
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen bg-background">
-        <AuthProvider>
-          <RoleProvider>
-            <ThemeProvider>
-              <ShippingProvider>
-                <TooltipProvider>
-                  <Router>
-                    <Routes>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <div className="min-h-screen bg-background">
+          <AuthProvider>
+            <RoleProvider>
+              <ThemeProvider>
+                <ShippingProvider>
+                  <TooltipProvider>
+                    <Router>
+                      <Suspense fallback={
+                        <div className="min-h-screen flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                        </div>
+                      }>
+                        <Routes>
                       <Route path="/" element={<Index />} />
                       <Route path="/auth" element={
                         <RedirectIfAuthenticated>
@@ -138,18 +146,20 @@ function App() {
                         </RequireAuth>
                       } />
                       
-                      {/* Catch all route */}
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
-                  </Router>
-                </TooltipProvider>
-              </ShippingProvider>
-            </ThemeProvider>
-          </RoleProvider>
-        </AuthProvider>
-        <Toaster />
-      </div>
-    </QueryClientProvider>
+                        {/* Catch all route */}
+                        <Route path="*" element={<NotFound />} />
+                        </Routes>
+                      </Suspense>
+                    </Router>
+                  </TooltipProvider>
+                </ShippingProvider>
+              </ThemeProvider>
+            </RoleProvider>
+          </AuthProvider>
+          <Toaster />
+        </div>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
