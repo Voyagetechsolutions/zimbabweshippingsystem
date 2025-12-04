@@ -1,45 +1,39 @@
 
 import React, { useEffect } from 'react';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
-import AdminDashboardContent from '@/components/admin/AdminDashboardContent';
+import { ModernAdminDashboard } from '@/components/admin/ModernAdminDashboard';
 import { useAuth } from '@/contexts/AuthContext'; 
 import { SetupAdmin } from '@/components/SetupAdmin';
+import { RefreshCw } from 'lucide-react';
 
 const AdminDashboard = () => {
-  const { isAdmin, loading } = useAuth(); // Use isAdmin directly from AuthContext
+  const { isAdmin, loading } = useAuth();
   
-  // Use effect to ensure permissions are properly loaded
   useEffect(() => {
-    document.title = 'Admin Dashboard | UK to Zimbabwe Shipping';
+    document.title = 'Admin Dashboard | Zimbabwe Shipping';
   }, []);
   
-  // Show loading indicator while checking admin status
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50">
+        <div className="text-center">
+          <RefreshCw className="h-16 w-16 animate-spin text-purple-600 mx-auto mb-4" />
+          <p className="text-gray-600 text-lg">Loading admin dashboard...</p>
+        </div>
       </div>
     );
   }
   
-  return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar />
-      <main className="flex-grow py-8 bg-gray-50 dark:bg-gray-900">
-        <div className="container mx-auto px-4">
-          {isAdmin ? (
-            <AdminDashboardContent />
-          ) : (
-            <div className="max-w-md mx-auto">
-              <SetupAdmin />
-            </div>
-          )}
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4">
+        <div className="max-w-md mx-auto">
+          <SetupAdmin />
         </div>
-      </main>
-      <Footer />
-    </div>
-  );
+      </div>
+    );
+  }
+  
+  return <ModernAdminDashboard />;
 };
 
 export default AdminDashboard;

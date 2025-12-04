@@ -40,10 +40,25 @@ export const getSecurityHeaders = () => {
 // Function to add security headers to Vite config
 export const configureSecurityHeaders = () => {
   if (typeof document !== 'undefined') {
-    // We're in the browser, let's apply CSP via meta tag as a fallback
+    // Apply CSP via meta tag (excluding frame-ancestors which requires HTTP headers)
+    const cspDirectives = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' https://storage.googleapis.com",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: https://api.ipify.org https://*.supabase.co https://oncsaunsqtekwwbzvvyh.supabase.co",
+      "font-src 'self'",
+      "connect-src 'self' https://api.ipify.org https://*.supabase.co https://oncsaunsqtekwwbzvvyh.supabase.co",
+      "frame-src 'self'",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      // Note: frame-ancestors is excluded as it cannot be set via meta tag
+      "upgrade-insecure-requests"
+    ].join('; ');
+    
     const meta = document.createElement('meta');
     meta.httpEquiv = 'Content-Security-Policy';
-    meta.content = getContentSecurityPolicy()['Content-Security-Policy'];
+    meta.content = cspDirectives;
     document.head.appendChild(meta);
   }
 };

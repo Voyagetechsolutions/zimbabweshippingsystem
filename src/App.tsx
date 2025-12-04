@@ -89,12 +89,10 @@ function App() {
                       <Route path="/custom-quote-request" element={<CustomQuoteRequest />} />
                       <Route path="/book" element={<SimpleBooking />} />
                       
+                      {/* Public booking route */}
+                      <Route path="/book-shipment" element={<BookShipment />} />
+                      
                       {/* Protected routes */}
-                      <Route path="/book-shipment" element={
-                        <RequireAuth>
-                          <BookShipment />
-                        </RequireAuth>
-                      } />
                       <Route path="/dashboard" element={
                         <RequireAuth>
                           <Dashboard />
@@ -110,31 +108,15 @@ function App() {
                           <Account />
                         </RequireAuth>
                       } />
-                      <Route path="/shipment/:id" element={
-                        <RequireAuth>
-                          <ShipmentDetails />
-                        </RequireAuth>
-                      } />
+                      <Route path="/shipment/:id" element={<ShipmentDetails />} />
                       <Route path="/admin/gallery" element={
                         <RequireAdmin>
                           <GalleryAdmin />
                         </RequireAdmin>
                       } />
-                      <Route path="/address-book" element={
-                        <RequireAuth>
-                          <AddressBook />
-                        </RequireAuth>
-                      } />
-                      <Route path="/confirm-booking" element={
-                        <RequireAuth>
-                          <ConfirmBooking />
-                        </RequireAuth>
-                      } />
-                      <Route path="/receipt" element={
-                        <RequireAuth>
-                          <Receipt />
-                        </RequireAuth>
-                      } />
+                      <Route path="/address-book" element={<AddressBook />} />
+                      <Route path="/confirm-booking" element={<ConfirmBooking />} />
+                      <Route path="/receipt" element={<Receipt />} />
                       <Route path="/notifications" element={
                         <RequireAuth>
                           <Notifications />
