@@ -89,11 +89,11 @@ const Navbar = () => {
             <NavigationMenu>
               <NavigationMenuList>
                 <NavigationMenuItem>
-                  <Link to="/services">
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                  <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
+                    <Link to="/services">
                       Services
-                    </NavigationMenuLink>
-                  </Link>
+                    </Link>
+                  </NavigationMenuLink>
                 </NavigationMenuItem>
                 
                 <NavigationMenuItem>
@@ -101,8 +101,8 @@ const Navbar = () => {
                   <NavigationMenuContent>
                     <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
                       <li>
-                        <Link to="/pricing">
-                          <NavigationMenuLink
+                        <NavigationMenuLink asChild>
+                          <Link to="/pricing"
                             className={cn(
                               "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
                             )}
@@ -111,12 +111,12 @@ const Navbar = () => {
                             <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
                               View our transparent pricing structure for shipping from UK to Zimbabwe
                             </p>
-                          </NavigationMenuLink>
-                        </Link>
+                          </Link>
+                        </NavigationMenuLink>
                       </li>
                       <li>
-                        <Link to="/collection-schedule">
-                          <NavigationMenuLink
+                        <NavigationMenuLink asChild>
+                          <Link to="/collection-schedule"
                             className={cn(
                               "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
                             )}
@@ -125,12 +125,12 @@ const Navbar = () => {
                             <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
                               Check when we're collecting in your area
                             </p>
-                          </NavigationMenuLink>
-                        </Link>
+                          </Link>
+                        </NavigationMenuLink>
                       </li>
                       <li>
-                        <Link to="/track">
-                          <NavigationMenuLink
+                        <NavigationMenuLink asChild>
+                          <Link to="/track"
                             className={cn(
                               "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
                             )}
@@ -139,12 +139,12 @@ const Navbar = () => {
                             <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
                               Track the status of your shipment in real-time
                             </p>
-                          </NavigationMenuLink>
-                        </Link>
+                          </Link>
+                        </NavigationMenuLink>
                       </li>
                       <li>
-                        <Link to="/book-shipment">
-                          <NavigationMenuLink
+                        <NavigationMenuLink asChild>
+                          <Link to="/book-shipment"
                             className={cn(
                               "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
                             )}
@@ -153,8 +153,8 @@ const Navbar = () => {
                             <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
                               Schedule a new shipment to Zimbabwe
                             </p>
-                          </NavigationMenuLink>
-                        </Link>
+                          </Link>
+                        </NavigationMenuLink>
                       </li>
                     </ul>
                   </NavigationMenuContent>
@@ -169,27 +169,27 @@ const Navbar = () => {
                 </NavigationMenuItem>*/}
                 
                 <NavigationMenuItem>
-                  <Link to="/" onClick={handleReviewsClick}>
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                  <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
+                    <Link to="/" onClick={handleReviewsClick}>
                       Reviews
-                    </NavigationMenuLink>
-                  </Link>
+                    </Link>
+                  </NavigationMenuLink>
                 </NavigationMenuItem>
                 
                 <NavigationMenuItem>
-                  <Link to="/contact">
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                  <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
+                    <Link to="/contact">
                       Contact
-                    </NavigationMenuLink>
-                  </Link>
+                    </Link>
+                  </NavigationMenuLink>
                 </NavigationMenuItem>
                 
                 <NavigationMenuItem>
-                  <Link to="/about-us">
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                  <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
+                    <Link to="/about-us">
                       About Us
-                    </NavigationMenuLink>
-                  </Link>
+                    </Link>
+                  </NavigationMenuLink>
                 </NavigationMenuItem>
                 
                 <NavigationMenuItem>
