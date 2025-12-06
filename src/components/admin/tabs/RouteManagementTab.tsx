@@ -316,26 +316,41 @@ const RouteManagementTab = () => {
   });
 
   // Helper function to safely format dates
-  const safeFormatDate = (dateStr: string | Date, formatStr: string = 'MMMM d, yyyy'): string => {
+  const safeFormatDate = (dateStr: string | Date | null | undefined, formatStr: string = 'MMMM d, yyyy'): string => {
     try {
-      if (!dateStr) return 'No date';
+      if (!dateStr) return 'Not set';
       
+      // Handle string dates
       const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
       
-      if (!isValid(date)) {
+      // Check if date is valid
+      if (!date || !isValid(date) || isNaN(date.getTime())) {
         console.warn(`Invalid date value: ${dateStr}`);
-        return 'Invalid date';
+        return 'Not set';
       }
       
       return format(date, formatStr);
     } catch (error) {
       console.error(`Error formatting date: ${dateStr}`, error);
-      return 'Invalid date';
+      return 'Not set';
     }
   };
 
   return (
     <div className="space-y-6">
+      {/* Info Banner */}
+      <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-lg p-4">
+        <div className="flex items-start gap-3">
+          <Route className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+          <div>
+            <h3 className="font-semibold text-green-900 dark:text-green-300 mb-1">Central Route & Schedule Management</h3>
+            <p className="text-sm text-green-800 dark:text-green-400">
+              This is your <strong>one-stop location</strong> to manage both routes and collection dates. When you create or edit a route, the collection date is automatically available in bookings and the Collection Schedule overview page.
+            </p>
+          </div>
+        </div>
+      </div>
+      
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <div>

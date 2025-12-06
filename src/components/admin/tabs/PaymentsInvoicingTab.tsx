@@ -60,6 +60,8 @@ interface Payment {
   created_at: string;
   user_email?: string;
   user_name?: string;
+  customer_phone?: string;
+  tracking_number?: string;
 }
 
 const PaymentsInvoicingTab = () => {
@@ -77,7 +79,7 @@ const PaymentsInvoicingTab = () => {
   const fetchPayments = async () => {
     setLoading(true);
     try {
-      // Get all payments
+      // Get all pending/unpaid payments
       const { data: paymentsData, error: paymentsError } = await supabase
         .from('payments')
         .select('*')
@@ -85,9 +87,12 @@ const PaymentsInvoicingTab = () => {
       
       if (paymentsError) throw paymentsError;
       
-      // For each payment with a user_id, fetch the user profile data
+      // For each payment, fetch customer data from profile or shipment metadata
       const enhancedPayments = await Promise.all(
         paymentsData.map(async (payment) => {
+          let customerInfo: any = {};
+          
+          // First try to get data from user profile
           if (payment.user_id) {
             const { data: profileData, error: profileError } = await supabase
               .from('profiles')
@@ -96,14 +101,34 @@ const PaymentsInvoicingTab = () => {
               .single();
             
             if (!profileError && profileData) {
-              return {
-                ...payment,
-                user_email: profileData.email,
-                user_name: profileData.full_name
-              };
+              customerInfo.user_email = profileData.email;
+              customerInfo.user_name = profileData.full_name;
             }
           }
-          return payment;
+          
+          // If no user_id (guest booking), fetch from shipment metadata
+          if (payment.shipment_id && !payment.user_id) {
+            const { data: shipmentData, error: shipmentError } = await supabase
+              .from('shipments')
+              .select('tracking_number, metadata')
+              .eq('id', payment.shipment_id)
+              .single();
+            
+            if (!shipmentError && shipmentData) {
+              const metadata = shipmentData.metadata || {};
+              const sender = metadata.sender || {};
+              
+              customerInfo.user_name = `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || 'Guest Customer';
+              customerInfo.user_email = sender.email || 'N/A';
+              customerInfo.customer_phone = sender.phone || 'N/A';
+              customerInfo.tracking_number = shipmentData.tracking_number;
+            }
+          }
+          
+          return {
+            ...payment,
+            ...customerInfo
+          };
         })
       );
       
@@ -141,17 +166,45 @@ const PaymentsInvoicingTab = () => {
     return matchesStatus && matchesSearch;
   });
 
+  const handleMarkAsPaid = async (paymentId: string) => {
+    try {
+      const { error } = await supabase
+        .from('payments')
+        .update({ 
+          payment_status: 'succeeded',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', paymentId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Payment Updated',
+        description: 'Payment has been marked as completed successfully.',
+      });
+
+      await fetchPayments();
+    } catch (error: any) {
+      console.error('Error updating payment:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update payment status',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status.toLowerCase()) {
       case 'succeeded':
       case 'completed':
-        return <Badge className="bg-green-100 text-green-800 border border-green-300">Completed</Badge>;
+        return <Badge className="bg-green-100 text-green-800 border border-green-300 hover:bg-green-200">✓ Completed</Badge>;
       case 'pending':
-        return <Badge className="bg-yellow-100 text-yellow-800 border border-yellow-300">Pending</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-800 border border-yellow-300 hover:bg-yellow-200">⏱ Pending</Badge>;
       case 'failed':
-        return <Badge className="bg-red-100 text-red-800 border border-red-300">Failed</Badge>;
+        return <Badge className="bg-red-100 text-red-800 border border-red-300 hover:bg-red-200">✕ Failed</Badge>;
       case 'refunded':
-        return <Badge className="bg-blue-100 text-blue-800 border border-blue-300">Refunded</Badge>;
+        return <Badge className="bg-blue-100 text-blue-800 border border-blue-300 hover:bg-blue-200">↩ Refunded</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -220,10 +273,11 @@ const PaymentsInvoicingTab = () => {
                         <TableRow>
                           <TableHead>Date</TableHead>
                           <TableHead>Customer</TableHead>
+                          <TableHead>Phone</TableHead>
+                          <TableHead>Tracking #</TableHead>
                           <TableHead>Amount</TableHead>
                           <TableHead>Method</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead>Transaction ID</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -238,6 +292,12 @@ const PaymentsInvoicingTab = () => {
                                 <div className="font-medium">{payment.user_name || 'Unknown User'}</div>
                                 <div className="text-sm text-gray-500">{payment.user_email || 'No email'}</div>
                               </div>
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              {payment.customer_phone || 'N/A'}
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">
+                              {payment.tracking_number || 'N/A'}
                             </TableCell>
                             <TableCell className="whitespace-nowrap">
                               {payment.currency === 'USD' ? '$' : '£'}{payment.amount.toFixed(2)}
@@ -269,7 +329,8 @@ const PaymentsInvoicingTab = () => {
                                 {payment.payment_status.toLowerCase() === 'pending' && (
                                   <AlertDialog>
                                     <AlertDialogTrigger asChild>
-                                      <Button variant="outline" size="sm">
+                                      <Button variant="outline" size="sm" className="hover:bg-green-50 hover:border-green-500">
+                                        <CheckCircle className="h-4 w-4 mr-1" />
                                         Mark Paid
                                       </Button>
                                     </AlertDialogTrigger>
@@ -282,7 +343,10 @@ const PaymentsInvoicingTab = () => {
                                       </AlertDialogHeader>
                                       <AlertDialogFooter>
                                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction className="bg-green-600">
+                                        <AlertDialogAction 
+                                          className="bg-green-600 hover:bg-green-700"
+                                          onClick={() => handleMarkAsPaid(payment.id)}
+                                        >
                                           Mark as Completed
                                         </AlertDialogAction>
                                       </AlertDialogFooter>

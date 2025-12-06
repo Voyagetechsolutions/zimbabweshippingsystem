@@ -17,7 +17,7 @@ const SimpleBooking: React.FC = () => {
             Ship to Zimbabwe
           </h1>
           <p className="text-lg text-gray-600">
-            Quick & easy booking in 4 simple steps. No account needed.
+            Quick & easy booking in 5 simple steps. No account needed.
           </p>
         </div>
         <SimplifiedBookingForm />

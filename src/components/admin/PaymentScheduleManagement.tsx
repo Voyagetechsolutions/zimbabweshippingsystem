@@ -56,12 +56,12 @@ const PaymentScheduleManagement = () => {
     try {
       setLoading(true);
       
-      // First, fetch receipts with payment schedules
+      // Fetch all receipts with 'standard' payment method (Pay within 30 days)
       const { data: receipts, error: receiptsError } = await supabase
         .from('receipts')
         .select('*')
         .eq('payment_method', 'standard')
-        .not('payment_info->paymentSchedule', 'is', null)
+        .eq('status', 'pending') // Only show unpaid
         .order('created_at', { ascending: false });
 
       if (receiptsError) {
@@ -74,13 +74,8 @@ const PaymentScheduleManagement = () => {
         return;
       }
 
-      // Filter receipts that have payment schedules
-      const filteredReceipts = receipts.filter(receipt => {
-        const paymentInfo = receipt.payment_info as any;
-        return paymentInfo?.payLaterMethod === 'payLater' && 
-               paymentInfo?.paymentSchedule && 
-               Array.isArray(paymentInfo.paymentSchedule);
-      });
+      // All 'standard' payment method receipts are 30-day payment customers
+      const filteredReceipts = receipts;
 
       // Get shipment IDs to fetch tracking numbers
       const shipmentIds = filteredReceipts

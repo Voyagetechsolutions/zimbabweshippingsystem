@@ -51,7 +51,7 @@ function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <div className="min-h-screen bg-background">
+        <div className="min-h-screen bg-background flex flex-col">
           <AuthProvider>
             <RoleProvider>
               <ThemeProvider>

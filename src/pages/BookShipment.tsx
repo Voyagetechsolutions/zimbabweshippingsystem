@@ -26,7 +26,7 @@ const BookShipment = () => {
               Ship to Zimbabwe
             </h1>
             <p className="text-gray-600 max-w-2xl">
-              Complete your booking in 4 simple steps. No account needed.
+              Complete your booking in 5 simple steps. No account needed.
             </p>
           </div>
           

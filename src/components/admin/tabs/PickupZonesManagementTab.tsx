@@ -458,8 +458,15 @@ const PickupZonesManagementTab = () => {
     const routeShipments = groupedShipments[route] || [];
     return routeShipments.reduce((total, shipment) => {
       const metadata = shipment.metadata || {};
+      const items = metadata.items || {};
       const shipmentDetails = metadata.shipment || metadata.shipmentDetails || {};
       
+      // Check new items structure first
+      if (items.drums?.quantity) {
+        return total + items.drums.quantity;
+      }
+      
+      // Fallback to old structure
       if (shipmentDetails.type === 'Drums' || shipmentDetails.includeDrums) {
         const quantity = parseInt(String(shipmentDetails.quantity)) || 1;
         return total + quantity;
@@ -756,12 +763,27 @@ const PickupZonesManagementTab = () => {
                         const metadata = shipment.metadata || {};
                         const senderDetails = metadata.sender || metadata.senderDetails || {};
                         const shipmentDetails = metadata.shipment || metadata.shipmentDetails || {};
+                        const items = metadata.items || {};
                         const collectionDetails = metadata.collection || {};
                         
                         // Get sender name from either profiles or metadata
                         const senderName = shipment.profiles?.full_name || 
                           `${senderDetails.firstName || ''} ${senderDetails.lastName || ''}`.trim() || 
                           'N/A';
+                        
+                        // Determine shipment type from new metadata structure
+                        let shipmentType = 'N/A';
+                        if (items.drums) {
+                          shipmentType = 'Drums';
+                          if (items.boxes) shipmentType += ' + Boxes';
+                        } else if (items.boxes) {
+                          shipmentType = 'Boxes';
+                        } else if (shipmentDetails.type) {
+                          shipmentType = shipmentDetails.type;
+                        }
+                        
+                        // Get quantity
+                        const quantity = items.drums?.quantity || shipmentDetails.quantity || 'N/A';
                         
                         return (
                           <TableRow key={shipment.id}>
@@ -781,10 +803,10 @@ const PickupZonesManagementTab = () => {
                               {shipment.origin}
                             </TableCell>
                             <TableCell>
-                              {shipmentDetails.type || 'N/A'}
+                              {shipmentType}
                             </TableCell>
                             <TableCell>
-                              {shipmentDetails.type === 'Drums' && shipmentDetails.quantity ? shipmentDetails.quantity : 'N/A'}
+                              {quantity}
                             </TableCell>
                             <TableCell>
                               <Badge 
