@@ -21,8 +21,17 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, RefreshCcw, Calendar, DollarSign, User } from 'lucide-react';
+import { Search, RefreshCcw, Calendar, DollarSign, User, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '@/utils/formatters';
+
+interface PaymentInstallment {
+  id: string;
+  date: string;
+  amount: number;
+  paid: boolean;
+  paidAmount?: number;
+  paidDate?: string;
+}
 
 interface PaymentScheduleRecord {
   id: string;
@@ -30,16 +39,16 @@ interface PaymentScheduleRecord {
   sender_name: string;
   sender_email: string;
   sender_phone: string;
-  payment_schedule: Array<{
-    date: string;
-    amount: number;
-  }>;
+  payment_schedule: PaymentInstallment[];
   total_amount: number;
+  total_paid: number;
+  remaining_balance: number;
   currency: string;
   created_at: string;
   status: string;
   shipment_id?: string;
   tracking_number?: string;
+  has_schedule: boolean;
 }
 
 const PaymentScheduleManagement = () => {
@@ -165,19 +174,37 @@ const PaymentScheduleManagement = () => {
           senderEmail = profile.email;
         }
         
+        // Calculate payment totals
+        const receiptAny = receipt as any;
+        const schedule = paymentInfo?.paymentSchedule || receiptAny.payment_schedule || [];
+        const hasSchedule = paymentInfo?.usePaymentSchedule === true && schedule.length > 0;
+        const totalAmount = paymentInfo?.finalAmount || receipt.amount || 0;
+        const totalPaid = schedule.reduce((sum: number, inst: any) => sum + (inst.paidAmount || 0), 0);
+        const remainingBalance = totalAmount - totalPaid;
+        
         return {
           id: receipt.id,
           receipt_number: receipt.receipt_number || 'N/A',
           sender_name: senderName,
           sender_email: senderEmail,
           sender_phone: senderDetails?.phone || shipment?.metadata?.sender?.phone || shipment?.metadata?.senderDetails?.phone || 'N/A',
-          payment_schedule: paymentInfo.paymentSchedule || [],
-          total_amount: paymentInfo.finalAmount || receipt.amount || 0,
-          currency: paymentInfo.currency || receipt.currency || 'GBP',
+          payment_schedule: schedule.map((inst: any) => ({
+            id: inst.id || `inst-${Math.random()}`,
+            date: inst.date,
+            amount: inst.amount,
+            paid: inst.paid || false,
+            paidAmount: inst.paidAmount || 0,
+            paidDate: inst.paidDate || null
+          })),
+          total_amount: totalAmount,
+          total_paid: totalPaid,
+          remaining_balance: remainingBalance,
+          currency: paymentInfo?.currency || receipt.currency || 'GBP',
           created_at: receipt.created_at,
-          status: receipt.status || 'pending',
+          status: remainingBalance <= 0 ? 'completed' : (receipt.status || 'pending'),
           shipment_id: receipt.shipment_id,
-          tracking_number: shipment?.tracking_number || 'N/A'
+          tracking_number: shipment?.tracking_number || 'N/A',
+          has_schedule: hasSchedule
         };
       });
 
@@ -279,10 +306,9 @@ const PaymentScheduleManagement = () => {
                     <TableHead>Customer Info</TableHead>
                     <TableHead>Contact Details</TableHead>
                     <TableHead>Payment Schedule</TableHead>
-                    <TableHead>Total Amount</TableHead>
+                    <TableHead>Total / Paid / Remaining</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Tracking #</TableHead>
-                    <TableHead>Receipt #</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -320,20 +346,48 @@ const PaymentScheduleManagement = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="font-semibold text-lg">
-                          {formatCurrency(record.total_amount, record.currency)}
-                        </span>
+                        <div className="space-y-1 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-500">Total:</span>
+                            <span className="font-semibold">{formatCurrency(record.total_amount, record.currency)}</span>
+                          </div>
+                          <div className="flex justify-between text-green-600">
+                            <span>Paid:</span>
+                            <span className="font-medium">{formatCurrency(record.total_paid, record.currency)}</span>
+                          </div>
+                          <div className="flex justify-between text-orange-600 font-medium border-t pt-1">
+                            <span>Remaining:</span>
+                            <span>{formatCurrency(record.remaining_balance, record.currency)}</span>
+                          </div>
+                          {/* Progress bar */}
+                          <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                            <div 
+                              className="bg-green-500 h-2 rounded-full transition-all"
+                              style={{ width: `${Math.min((record.total_paid / record.total_amount) * 100, 100)}%` }}
+                            />
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge className={getStatusBadgeClass(record.status)}>
-                          {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
+                          {record.status === 'completed' ? (
+                            <span className="flex items-center gap-1">
+                              <CheckCircle className="h-3 w-3" />
+                              Paid
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
+                            </span>
+                          )}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <span className="font-mono text-sm">{record.tracking_number}</span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-mono text-sm">{record.receipt_number}</span>
+                        <div className="space-y-1">
+                          <span className="font-mono text-sm block">{record.tracking_number}</span>
+                          <span className="font-mono text-xs text-gray-500 block">{record.receipt_number}</span>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

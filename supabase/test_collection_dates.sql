@@ -22,7 +22,31 @@ SELECT
 FROM collection_schedules
 ORDER BY route;
 
--- 3. TEST UPDATE A COLLECTION DATE (Example: LONDON ROUTE)
+-- 3. CHECK RLS POLICIES ON COLLECTION_SCHEDULES
+SELECT 
+    schemaname,
+    tablename,
+    policyname,
+    permissive,
+    roles,
+    cmd,
+    qual
+FROM pg_policies 
+WHERE tablename = 'collection_schedules';
+
+-- 4. TEMPORARILY DISABLE RLS FOR TESTING (Run as admin)
+-- ALTER TABLE collection_schedules DISABLE ROW LEVEL SECURITY;
+
+-- 5. CREATE PERMISSIVE POLICY FOR AUTHENTICATED USERS
+-- This allows any authenticated user to read/update collection_schedules
+CREATE POLICY IF NOT EXISTS "Allow authenticated users full access to collection_schedules"
+ON collection_schedules
+FOR ALL
+TO authenticated
+USING (true)
+WITH CHECK (true);
+
+-- 6. TEST UPDATE A COLLECTION DATE (Example: LONDON)
 -- Change 'December 15th, 2025' to your desired date
 UPDATE collection_schedules
 SET 

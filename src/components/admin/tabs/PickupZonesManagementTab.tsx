@@ -54,7 +54,13 @@ import {
   Check,
   User,
   Clock,
-  Loader2
+  Loader2,
+  Truck,
+  Eye,
+  CheckCircle,
+  Phone,
+  Mail,
+  ChevronRight
 } from 'lucide-react';
 
 // Define the standard routes used across the app
@@ -93,6 +99,9 @@ const PickupZonesManagementTab = () => {
   const [schedulingRoute, setSchedulingRoute] = useState('');
   const [exporting, setExporting] = useState(false);
   const [fetchingUsers, setFetchingUsers] = useState(false);
+  const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
+  const [shipmentDialogOpen, setShipmentDialogOpen] = useState(false);
+  const [markingCollected, setMarkingCollected] = useState<string | null>(null);
 
   useEffect(() => {
     fetchShipmentsAndSchedules();
@@ -117,11 +126,11 @@ const PickupZonesManagementTab = () => {
       
       setSchedules(schedulesData || []);
       
-      // Then fetch shipments
+      // Then fetch shipments - include Collected to show recently collected ones
       const { data: shipmentsData, error: shipmentsError } = await supabase
         .from('shipments')
         .select('*')
-        .in('status', ['Booking Confirmed', 'Ready for Pickup', 'Pending Collection'])
+        .in('status', ['Booking Confirmed', 'Ready for Pickup', 'Pending Collection', 'Collected'])
         .order('created_at', { ascending: false });
 
       if (shipmentsError) throw shipmentsError;
@@ -511,6 +520,62 @@ const PickupZonesManagementTab = () => {
     }
   };
 
+  // Mark a shipment as collected
+  const markAsCollected = async (shipmentId: string) => {
+    try {
+      setMarkingCollected(shipmentId);
+      
+      const { error } = await supabase
+        .from('shipments')
+        .update({
+          status: 'Collected',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', shipmentId);
+      
+      if (error) throw error;
+      
+      // Close dialog first if open
+      if (shipmentDialogOpen) {
+        setShipmentDialogOpen(false);
+        setSelectedShipment(null);
+      }
+      
+      // Update local state immediately for instant UI feedback
+      setShipments(prevShipments => 
+        prevShipments.map(s => 
+          s.id === shipmentId 
+            ? { ...s, status: 'Collected', updated_at: new Date().toISOString() } 
+            : s
+        )
+      );
+      
+      toast({
+        title: 'Shipment Collected',
+        description: 'Shipment has been marked as collected.',
+      });
+      
+      // Also refresh from server to ensure consistency
+      fetchShipmentsAndSchedules();
+      
+    } catch (error: any) {
+      console.error('Error marking shipment as collected:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update shipment status: ' + error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setMarkingCollected(null);
+    }
+  };
+
+  // View shipment details
+  const viewShipmentDetails = (shipment: Shipment) => {
+    setSelectedShipment(shipment);
+    setShipmentDialogOpen(true);
+  };
+
   const notifyCustomers = async (route: string) => {
     try {
       const routeShipments = groupedShipments[route] || [];
@@ -656,59 +721,94 @@ const PickupZonesManagementTab = () => {
         ) : selectedRoute === 'all' ? (
           // Show all routes summary
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Object.keys(groupedShipments).map(route => {
+            {ROUTES.map(route => {
               const routeShipments = groupedShipments[route] || [];
-              if (routeShipments.length === 0) return null;
               
               const drumCount = countDrums(route);
               const isOverbooked = isRouteOverbooked(route);
               const pickupDate = getPickupDateForRoute(route);
               
+              const hasPickups = routeShipments.length > 0;
+              
               return (
                 <Card 
                   key={route}
-                  className={isOverbooked ? 'border-red-500 dark:border-red-700' : ''}
+                  className={`cursor-pointer transition-all ${
+                    isOverbooked 
+                      ? 'border-red-500 dark:border-red-700 hover:shadow-lg' 
+                      : hasPickups 
+                        ? 'hover:shadow-lg hover:border-green-500' 
+                        : 'opacity-60 hover:opacity-100'
+                  }`}
+                  onClick={() => setSelectedRoute(route)}
                 >
                   <CardHeader className="pb-2">
-                    <div className="flex justify-between items-center">
-                      <CardTitle className="text-lg">{route}</CardTitle>
-                      <Badge 
-                        variant={isOverbooked ? 'destructive' : 'outline'}
-                        className="ml-2"
-                      >
-                        {drumCount} drums
-                      </Badge>
-                    </div>
-                    <CardDescription className="flex flex-col gap-1">
-                      <div>{routeShipments.length} shipments ready for pickup</div>
-                      <div className="flex items-center text-sm mt-1">
-                        <Clock className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
-                        <span>{pickupDate !== 'Not scheduled' ? pickupDate : 'No pickup date'}</span>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className={`text-lg flex items-center gap-2 ${!hasPickups ? 'text-muted-foreground' : ''}`}>
+                          <Truck className={`h-5 w-5 ${hasPickups ? 'text-green-600' : 'text-gray-400'}`} />
+                          {route}
+                        </CardTitle>
+                        <div className="flex items-center text-sm text-muted-foreground mt-1">
+                          <Calendar className="h-3.5 w-3.5 mr-1" />
+                          <span>{pickupDate !== 'Not scheduled' ? safeFormatDate(pickupDate, 'MMM d, yyyy') : 'Not scheduled'}</span>
+                        </div>
                       </div>
-                    </CardDescription>
+                      {/* Pickup Count Badge */}
+                      <div className="text-right">
+                        <div className={`text-3xl font-bold ${hasPickups ? 'text-green-600' : 'text-gray-300'}`}>
+                          {routeShipments.length}
+                        </div>
+                        <div className="text-xs text-muted-foreground">pickups</div>
+                      </div>
+                    </div>
                   </CardHeader>
                   <CardContent className="pb-3">
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-muted-foreground">Capacity</span>
+                      <Badge 
+                        variant={isOverbooked ? 'destructive' : 'outline'}
+                      >
+                        {drumCount}/10 drums
+                      </Badge>
+                    </div>
                     <Progress 
                       value={drumCount > 10 ? 100 : (drumCount / 10) * 100}
                       className={`h-2 ${isOverbooked ? 'bg-red-200 dark:bg-red-900' : ''}`}
                     />
+                    {isOverbooked && (
+                      <div className="flex items-center gap-1 mt-2 text-xs text-red-600">
+                        <AlertCircle className="h-3 w-3" />
+                        <span>Route overbooked</span>
+                      </div>
+                    )}
                   </CardContent>
-                  <CardFooter className="flex justify-between pt-0">
+                  <CardFooter className="flex justify-between pt-0 border-t">
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
-                      onClick={() => setSelectedRoute(route)}
+                      className={hasPickups ? "text-green-600 hover:text-green-700 hover:bg-green-50" : "text-muted-foreground"}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedRoute(route);
+                      }}
                     >
-                      View Details
+                      <Eye className="h-4 w-4 mr-1" />
+                      {hasPickups ? 'View Pickups' : 'View Route'}
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => exportPickupList(route)}
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Export
-                    </Button>
+                    {hasPickups && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          exportPickupList(route);
+                        }}
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        Export
+                      </Button>
+                    )}
                   </CardFooter>
                 </Card>
               );
@@ -717,24 +817,54 @@ const PickupZonesManagementTab = () => {
         ) : (
           // Show selected route details
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <h2 className="text-xl font-bold">{selectedRoute} Route</h2>
-                <div className="flex items-center text-muted-foreground gap-2">
-                  <span>{(groupedShipments[selectedRoute] || []).length} shipments, {countDrums(selectedRoute)} drums</span>
-                  <Badge variant="outline" className="flex items-center ml-2">
-                    <Calendar className="h-3 w-3 mr-1" />
-                    {getPickupDateForRoute(selectedRoute)}
+            {/* Route Header with Back Button */}
+            <div className="flex items-center gap-4 pb-4 border-b">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedRoute('all')}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                ← Back to All Routes
+              </Button>
+            </div>
+            
+            {/* Route Summary Card */}
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800 rounded-lg p-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="h-16 w-16 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
+                    <Truck className="h-8 w-8 text-green-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-green-900 dark:text-green-100">{selectedRoute}</h2>
+                    <div className="flex items-center gap-4 text-sm text-green-700 dark:text-green-300 mt-1">
+                      <span className="flex items-center gap-1">
+                        <Package className="h-4 w-4" />
+                        {(groupedShipments[selectedRoute] || []).length} pickups
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-4 w-4" />
+                        {getPickupDateForRoute(selectedRoute) !== 'Not scheduled' 
+                          ? safeFormatDate(getPickupDateForRoute(selectedRoute), 'EEEE, MMM d, yyyy')
+                          : 'Not scheduled'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  {isRouteOverbooked(selectedRoute) && (
+                    <Badge variant="destructive" className="flex items-center gap-1">
+                      <AlertCircle className="h-4 w-4" />
+                      Overbooked
+                    </Badge>
+                  )}
+                  <Badge variant="outline" className="text-lg px-4 py-2">
+                    {countDrums(selectedRoute)}/10 drums
                   </Badge>
                 </div>
               </div>
-              
-              {isRouteOverbooked(selectedRoute) && (
-                <Badge variant="destructive" className="flex items-center gap-1">
-                  <AlertCircle className="h-4 w-4" />
-                  Overbooked ({countDrums(selectedRoute)} drums)
-                </Badge>
-              )}
             </div>
             
             <div className="border rounded-md overflow-hidden">
@@ -746,9 +876,8 @@ const PickupZonesManagementTab = () => {
                       <TableHead>Sender</TableHead>
                       <TableHead>Pickup Address</TableHead>
                       <TableHead>Shipment Type</TableHead>
-                      <TableHead>Quantity</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Collection Date</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -783,40 +912,78 @@ const PickupZonesManagementTab = () => {
                         }
                         
                         // Get quantity
-                        const quantity = items.drums?.quantity || shipmentDetails.quantity || 'N/A';
+                        const quantity = items.drums?.quantity || shipmentDetails.quantity || 1;
                         
                         return (
-                          <TableRow key={shipment.id}>
-                            <TableCell className="font-mono text-sm">
+                          <TableRow key={shipment.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                            <TableCell className="font-mono text-sm font-medium">
                               {shipment.tracking_number}
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                <User className="h-4 w-4 text-gray-400" />
+                                <div className="h-8 w-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                                  <User className="h-4 w-4 text-green-600" />
+                                </div>
                                 <div>
                                   <div className="text-sm font-medium">{senderName}</div>
-                                  <div className="text-xs text-muted-foreground">{senderDetails.phone || 'N/A'}</div>
+                                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <Phone className="h-3 w-3" />
+                                    {senderDetails.phone || 'N/A'}
+                                  </div>
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell className="max-w-[200px] truncate">
-                              {shipment.origin}
+                            <TableCell className="max-w-[250px]">
+                              <div className="flex items-start gap-1">
+                                <MapPin className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                                <span className="text-sm truncate">{shipment.origin}</span>
+                              </div>
                             </TableCell>
                             <TableCell>
-                              {shipmentType}
-                            </TableCell>
-                            <TableCell>
-                              {quantity}
+                              <div className="flex items-center gap-2">
+                                <Package className="h-4 w-4 text-gray-400" />
+                                <div>
+                                  <div className="text-sm">{shipmentType}</div>
+                                  <div className="text-xs text-muted-foreground">Qty: {quantity}</div>
+                                </div>
+                              </div>
                             </TableCell>
                             <TableCell>
                               <Badge 
                                 variant={shipment.status === 'Ready for Pickup' || shipment.status === 'Pending Collection' ? 'default' : 'outline'}
+                                className={shipment.status === 'Collected' ? 'bg-green-100 text-green-800 border-green-300' : ''}
                               >
                                 {shipment.status}
                               </Badge>
                             </TableCell>
-                            <TableCell>
-                              {collectionDetails.date || getPickupDateForRoute(selectedRoute)}
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => viewShipmentDetails(shipment)}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                {shipment.status !== 'Collected' && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-green-600 hover:text-green-700 hover:bg-green-50 hover:border-green-500"
+                                    onClick={() => markAsCollected(shipment.id)}
+                                    disabled={markingCollected === shipment.id}
+                                  >
+                                    {markingCollected === shipment.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <>
+                                        <CheckCircle className="h-4 w-4 mr-1" />
+                                        Collected
+                                      </>
+                                    )}
+                                  </Button>
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -930,6 +1097,161 @@ const PickupZonesManagementTab = () => {
                   Schedule Pickups
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Shipment Details Dialog */}
+      <Dialog open={shipmentDialogOpen} onOpenChange={setShipmentDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-green-600" />
+              Shipment Details
+            </DialogTitle>
+            <DialogDescription>
+              {selectedShipment?.tracking_number}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedShipment && (() => {
+            const metadata = selectedShipment.metadata || {};
+            const senderDetails = metadata.sender || metadata.senderDetails || {};
+            const shipmentDetails = metadata.shipment || metadata.shipmentDetails || {};
+            const items = metadata.items || {};
+            const collectionDetails = metadata.collection || {};
+            
+            const senderName = selectedShipment.profiles?.full_name || 
+              `${senderDetails.firstName || ''} ${senderDetails.lastName || ''}`.trim() || 
+              'N/A';
+            
+            let shipmentType = 'N/A';
+            if (items.drums) {
+              shipmentType = `${items.drums.quantity || 1} x Drum(s)`;
+              if (items.boxes) shipmentType += ` + Boxes`;
+            } else if (items.boxes) {
+              shipmentType = 'Boxes';
+            } else if (shipmentDetails.type) {
+              shipmentType = shipmentDetails.type;
+            }
+            
+            return (
+              <div className="space-y-6 py-4">
+                {/* Status Banner */}
+                <div className={`p-4 rounded-lg ${
+                  selectedShipment.status === 'Collected' 
+                    ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
+                    : 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {selectedShipment.status === 'Collected' ? (
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <Clock className="h-5 w-5 text-yellow-600" />
+                      )}
+                      <span className={`font-medium ${
+                        selectedShipment.status === 'Collected' ? 'text-green-800 dark:text-green-300' : 'text-yellow-800 dark:text-yellow-300'
+                      }`}>
+                        {selectedShipment.status}
+                      </span>
+                    </div>
+                    {selectedShipment.status !== 'Collected' && (
+                      <Button
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700"
+                        onClick={() => markAsCollected(selectedShipment.id)}
+                        disabled={markingCollected === selectedShipment.id}
+                      >
+                        {markingCollected === selectedShipment.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                        ) : (
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                        )}
+                        Mark as Collected
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Sender Details */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Sender Details</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                          <User className="h-5 w-5 text-green-600" />
+                        </div>
+                        <div>
+                          <div className="font-medium">{senderName}</div>
+                          <div className="text-sm text-muted-foreground">Customer</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Phone className="h-4 w-4 text-gray-400" />
+                        <span>{senderDetails.phone || 'N/A'}</span>
+                      </div>
+                      {senderDetails.email && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Mail className="h-4 w-4 text-gray-400" />
+                          <span>{senderDetails.email}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Pickup Address</h3>
+                    <div className="flex items-start gap-2">
+                      <MapPin className="h-5 w-5 text-gray-400 mt-0.5" />
+                      <div className="text-sm">{selectedShipment.origin}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Shipment Info */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div>
+                    <div className="text-xs text-muted-foreground uppercase">Shipment Type</div>
+                    <div className="font-medium flex items-center gap-2 mt-1">
+                      <Package className="h-4 w-4 text-green-600" />
+                      {shipmentType}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground uppercase">Route</div>
+                    <div className="font-medium flex items-center gap-2 mt-1">
+                      <Truck className="h-4 w-4 text-green-600" />
+                      {collectionDetails.route || selectedRoute || 'N/A'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground uppercase">Collection Date</div>
+                    <div className="font-medium flex items-center gap-2 mt-1">
+                      <Calendar className="h-4 w-4 text-green-600" />
+                      {collectionDetails.date || getPickupDateForRoute(selectedRoute) || 'Not scheduled'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Additional Notes */}
+                {(items.boxes?.description || shipmentDetails.notes) && (
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Notes</h3>
+                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg text-sm">
+                      {items.boxes?.description || shipmentDetails.notes}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShipmentDialogOpen(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

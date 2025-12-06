@@ -324,6 +324,43 @@ const ShipmentManagementTab = () => {
     return amount ? `£${amount}` : 'Amount to be confirmed';
   };
 
+  const getShipmentType = (shipment: Shipment): { type: string; details: string } => {
+    const metadata = shipment.metadata || {};
+    const shipmentDetails = metadata.shipmentDetails || {};
+    
+    const types: string[] = [];
+    const details: string[] = [];
+    
+    if (shipmentDetails.includeDrums) {
+      const qty = shipmentDetails.quantity || 0;
+      types.push('Drums');
+      details.push(`${qty} drum${qty !== 1 ? 's' : ''}`);
+      if (shipmentDetails.wantMetalSeal) {
+        details.push('with metal seals');
+      }
+    }
+    
+    if (shipmentDetails.includeOtherItems || shipmentDetails.includeBoxes) {
+      types.push('Boxes/Items');
+      if (shipmentDetails.category) {
+        details.push(shipmentDetails.category);
+      }
+    }
+    
+    if (types.length === 0) {
+      // Fallback to metadata type
+      if (metadata.shipmentType) {
+        return { type: metadata.shipmentType, details: '' };
+      }
+      return { type: 'Standard Shipment', details: '' };
+    }
+    
+    return { 
+      type: types.join(' + '), 
+      details: details.join(', ')
+    };
+  };
+
   const getStatusProgress = (status: string) => {
     const currentStep = STATUS_STEPS.indexOf(status);
     return currentStep >= 0 ? Math.round((currentStep / (STATUS_STEPS.length - 1)) * 100) : 0;
@@ -578,358 +615,365 @@ const ShipmentManagementTab = () => {
         </div>
       </CardContent>
 
-      {/* Shipment Details Dialog */}
+      {/* Shipment Details Dialog - Modern Youthful Design */}
       <Dialog open={!!viewingShipment} onOpenChange={(open) => !open && setViewingShipment(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-0 gap-0" aria-describedby={undefined}>
+          <DialogHeader className="sr-only">
+            <DialogTitle>Shipment Details</DialogTitle>
+            <DialogDescription>View and manage shipment information</DialogDescription>
+          </DialogHeader>
           {viewingShipment && (
-            <>
-              <DialogHeader>
-                <div className="flex items-center gap-2">
-                  <DialogTitle>Shipment Details</DialogTitle>
-                  {renderStatusBadge(viewingShipment.status)}
+            <div className="flex flex-col">
+              {/* Header with Gradient */}
+              <div className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 p-6 text-white">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                        <Package className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <p className="text-white/80 text-sm font-medium">Tracking Number</p>
+                        <h2 className="text-2xl font-bold tracking-wide">{viewingShipment.tracking_number}</h2>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <Badge className={`text-sm px-4 py-1.5 font-semibold ${
+                      viewingShipment.status === 'Delivered' ? 'bg-green-600' :
+                      viewingShipment.status === 'Cancelled' ? 'bg-red-500' :
+                      viewingShipment.status === 'InTransit to Zimbabwe' ? 'bg-blue-500' :
+                      'bg-white/20 backdrop-blur-sm'
+                    }`}>
+                      {viewingShipment.status}
+                    </Badge>
+                    <p className="text-white/70 text-xs mt-2">
+                      Created {format(new Date(viewingShipment.created_at), 'MMM d, yyyy')}
+                    </p>
+                  </div>
                 </div>
-                <DialogDescription>
-                  Tracking Number: {viewingShipment.tracking_number}
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="space-y-6">
-                {/* Progress Tracker */}
-                <div className="space-y-2">
-                  <h3 className="font-medium">Shipment Progress</h3>
-                  <Progress value={getStatusProgress(viewingShipment.status)} className="h-2" />
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    {STATUS_STEPS.map((step, index) => (
-                      <div 
-                        key={step} 
-                        className={`text-center ${STATUS_STEPS.indexOf(viewingShipment.status) >= index ? 'text-primary' : ''}`}
-                      >
-                        <div className="mx-auto mb-1">
-                          {STATUS_STEPS.indexOf(viewingShipment.status) >= index ? (
-                            <CheckCircle className="h-4 w-4" />
+              </div>
+
+              {/* Progress Timeline - Modern Style */}
+              <div className="px-6 py-5 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950 border-b">
+                <div className="flex items-center justify-between relative">
+                  {/* Progress Line */}
+                  <div className="absolute top-5 left-0 right-0 h-1 bg-gray-200 dark:bg-gray-700 rounded-full">
+                    <div 
+                      className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-500"
+                      style={{ width: `${getStatusProgress(viewingShipment.status)}%` }}
+                    />
+                  </div>
+                  
+                  {STATUS_STEPS.map((step, index) => {
+                    const isCompleted = STATUS_STEPS.indexOf(viewingShipment.status) >= index;
+                    const isCurrent = STATUS_STEPS.indexOf(viewingShipment.status) === index;
+                    return (
+                      <div key={step} className="relative z-10 flex flex-col items-center">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                          isCompleted 
+                            ? 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30' 
+                            : 'bg-gray-200 dark:bg-gray-700 text-gray-400'
+                        } ${isCurrent ? 'ring-4 ring-emerald-500/30 scale-110' : ''}`}>
+                          {isCompleted ? (
+                            <CheckCircle className="h-5 w-5" />
                           ) : (
-                            <div className="h-4 w-4 rounded-full border border-muted-foreground/30" />
+                            <span className="text-sm font-medium">{index + 1}</span>
                           )}
                         </div>
-                        <span className="hidden md:inline">{step}</span>
-                        <span className="md:hidden">{index + 1}</span>
+                        <span className={`text-xs mt-2 text-center max-w-[80px] ${
+                          isCompleted ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-gray-400'
+                        }`}>
+                          {step.replace('InTransit to Zimbabwe', 'In Transit').replace('Processing in ZW Warehouse', 'Processing')}
+                        </span>
                       </div>
-                    ))}
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Main Content */}
+              <div className="p-6 space-y-6">
+                {/* Shipment Type Banner */}
+                <div className="bg-gradient-to-r from-slate-800 to-slate-900 dark:from-slate-700 dark:to-slate-800 rounded-xl p-4 text-white">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-white/10 rounded-lg">
+                        <Package className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-white/70 text-xs font-medium">Shipment Type</p>
+                        <p className="text-lg font-bold">{getShipmentType(viewingShipment).type}</p>
+                        {getShipmentType(viewingShipment).details && (
+                          <p className="text-white/60 text-sm">{getShipmentType(viewingShipment).details}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-white/70 text-xs">Origin → Destination</p>
+                      <p className="font-medium">{viewingShipment.origin || 'UK'} → {viewingShipment.destination || 'Zimbabwe'}</p>
+                    </div>
                   </div>
                 </div>
 
-                {/* Key Information Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Card>
-                    <CardHeader className="p-4 pb-2">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        <span>Dates</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0 space-y-2">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Created</p>
-                        <p>{format(new Date(viewingShipment.created_at), 'PPp')}</p>
+                {/* Quick Stats Row */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50 rounded-xl p-4 border border-blue-100 dark:border-blue-900">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-500 rounded-lg">
+                        <Truck className="h-4 w-4 text-white" />
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">Last Updated</p>
-                        <p>{format(new Date(viewingShipment.updated_at), 'PPp')}</p>
+                        <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">Route</p>
+                        <p className="font-semibold text-blue-900 dark:text-blue-100">{getCollectionInfo(viewingShipment).route || 'N/A'}</p>
                       </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="p-4 pb-2">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <MapPin className="h-4 w-4" />
-                        <span>Route</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0 space-y-2">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Origin</p>
-                        <p>{viewingShipment.origin || 'Not specified'}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/50 dark:to-pink-950/50 rounded-xl p-4 border border-purple-100 dark:border-purple-900">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-purple-500 rounded-lg">
+                        <Calendar className="h-4 w-4 text-white" />
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">Destination</p>
-                        <p>{viewingShipment.destination || 'Not specified'}</p>
+                        <p className="text-xs text-purple-600 dark:text-purple-400 font-medium">Collection</p>
+                        <p className="font-semibold text-purple-900 dark:text-purple-100">{getCollectionInfo(viewingShipment).date || 'TBC'}</p>
                       </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="p-4 pb-2">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <FileSpreadsheet className="h-4 w-4" />
-                        <span>Payment</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0">
-                      <p className="text-2xl font-bold">{getPaymentAmount(viewingShipment)}</p>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Contact Information */}
-                <div className="space-y-4">
-                  <h3 className="font-medium">Contact Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Card>
-                      <CardHeader className="p-4 pb-2">
-                        <CardTitle className="text-sm font-medium flex items-center gap-2">
-                          <User className="h-4 w-4" />
-                          <span>Sender</span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-4 pt-0 space-y-3">
-                        <div className="flex items-start gap-3">
-                          <User className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                          <div>
-                            <p className="font-medium">{getSenderName(viewingShipment)}</p>
-                            <p className="text-sm text-muted-foreground">{getSenderEmail(viewingShipment)}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <Phone className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                          <p>{getSenderPhone(viewingShipment)}</p>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                          <p className="text-sm">
-                            {getPickupAddress(viewingShipment)}
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader className="p-4 pb-2">
-                        <CardTitle className="text-sm font-medium flex items-center gap-2">
-                          <User className="h-4 w-4" />
-                          <span>Receiver</span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-4 pt-0 space-y-3">
-                        <div className="flex items-start gap-3">
-                          <User className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                          <p className="font-medium">{getReceiverName(viewingShipment)}</p>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <Phone className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                          <div>
-                            <p>{getReceiverPhone(viewingShipment)}</p>
-                            {viewingShipment.metadata?.additionalRecipientPhone && (
-                              <p className="text-sm text-muted-foreground">Alt: {viewingShipment.metadata.additionalRecipientPhone}</p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                          <p className="text-sm">
-                            {getDeliveryAddress(viewingShipment)}
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/50 dark:to-orange-950/50 rounded-xl p-4 border border-amber-100 dark:border-amber-900">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-amber-500 rounded-lg">
+                        <FileSpreadsheet className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">Payment</p>
+                        <p className="font-semibold text-amber-900 dark:text-amber-100">{getPaymentAmount(viewingShipment)}</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/50 dark:to-teal-950/50 rounded-xl p-4 border border-emerald-100 dark:border-emerald-900">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-emerald-500 rounded-lg">
+                        <Clock className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Updated</p>
+                        <p className="font-semibold text-emerald-900 dark:text-emerald-100">{format(new Date(viewingShipment.updated_at), 'MMM d')}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Shipment Details */}
-                <div className="space-y-4">
-                  <h3 className="font-medium">Shipment Details</h3>
-                  <Card>
-                    <CardContent className="p-6">
-                      {viewingShipment.metadata?.shipmentDetails ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <h4 className="text-sm font-medium text-muted-foreground mb-2">Type</h4>
-                            <p>{viewingShipment.metadata.shipmentDetails.type || 'Standard'}</p>
-                          </div>
-                          
-                          {viewingShipment.metadata.shipmentDetails.includeDrums && (
-                            <>
-                              <div>
-                                <h4 className="text-sm font-medium text-muted-foreground mb-2">Drum Quantity</h4>
-                                <p>{viewingShipment.metadata.shipmentDetails.quantity || 'Not specified'}</p>
-                              </div>
-                              
-                              {viewingShipment.metadata.shipmentDetails.wantMetalSeal && (
-                                <div>
-                                  <h4 className="text-sm font-medium text-muted-foreground mb-2">Metal Seals</h4>
-                                  <p>Yes</p>
-                                </div>
-                              )}
-                            </>
-                          )}
-                          
-                          {viewingShipment.metadata.shipmentDetails.includeOtherItems && (
-                            <>
-                              <div>
-                                <h4 className="text-sm font-medium text-muted-foreground mb-2">Item Category</h4>
-                                <p>{viewingShipment.metadata.shipmentDetails.category || 'Not specified'}</p>
-                              </div>
-                              
-                              <div>
-                                <h4 className="text-sm font-medium text-muted-foreground mb-2">Description</h4>
-                                <p>{viewingShipment.metadata.shipmentDetails.description || 'Not provided'}</p>
-                              </div>
-                            </>
-                          )}
-                          
-                          {viewingShipment.metadata.shipmentDetails.services?.length > 0 && (
-                            <div className="col-span-2">
-                              <h4 className="text-sm font-medium text-muted-foreground mb-2">Additional Services</h4>
-                              <ul className="space-y-1">
-                                {viewingShipment.metadata.shipmentDetails.services.map((service: any, idx: number) => (
-                                  <li key={idx} className="flex justify-between">
-                                    <span>{service.name}</span>
-                                    <span>£{service.price}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
+                {/* Sender & Receiver Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Sender Card */}
+                  <div className="bg-white dark:bg-gray-900 rounded-xl border shadow-sm overflow-hidden">
+                    <div className="bg-gradient-to-r from-blue-500 to-indigo-500 px-4 py-3">
+                      <h3 className="font-semibold text-white flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Sender Details
+                      </h3>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                          <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="font-semibold">{getSenderName(viewingShipment)}</p>
+                          <p className="text-sm text-muted-foreground">{getSenderEmail(viewingShipment)}</p>
+                        </div>
+                      </div>
+                      <Separator />
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Phone className="h-4 w-4" />
+                          <span>{getSenderPhone(viewingShipment)}</span>
+                        </div>
+                        <div className="flex items-start gap-2 text-muted-foreground">
+                          <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                          <span>{getPickupAddress(viewingShipment)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Receiver Card */}
+                  <div className="bg-white dark:bg-gray-900 rounded-xl border shadow-sm overflow-hidden">
+                    <div className="bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-3">
+                      <h3 className="font-semibold text-white flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Receiver Details
+                      </h3>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center">
+                          <User className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                        </div>
+                        <div>
+                          <p className="font-semibold">{getReceiverName(viewingShipment)}</p>
+                          <p className="text-sm text-muted-foreground">Zimbabwe</p>
+                        </div>
+                      </div>
+                      <Separator />
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Phone className="h-4 w-4" />
+                          <span>{getReceiverPhone(viewingShipment)}</span>
+                          {viewingShipment.metadata?.additionalRecipientPhone && (
+                            <span className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">
+                              Alt: {viewingShipment.metadata.additionalRecipientPhone}
+                            </span>
                           )}
                         </div>
-                      ) : (
-                        <p className="text-muted-foreground">No detailed shipment information available</p>
+                        <div className="flex items-start gap-2 text-muted-foreground">
+                          <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                          <span>{getDeliveryAddress(viewingShipment)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Shipment Items */}
+                {viewingShipment.metadata?.shipmentDetails && (
+                  <div className="bg-white dark:bg-gray-900 rounded-xl border shadow-sm overflow-hidden">
+                    <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-3">
+                      <h3 className="font-semibold text-white flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Shipment Contents
+                      </h3>
+                    </div>
+                    <div className="p-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="text-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <p className="text-2xl font-bold text-amber-600">
+                            {viewingShipment.metadata.shipmentDetails.quantity || '—'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Drums</p>
+                        </div>
+                        <div className="text-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <p className="text-2xl font-bold text-orange-600">
+                            {viewingShipment.metadata.shipmentDetails.wantMetalSeal ? '✓' : '—'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Metal Seal</p>
+                        </div>
+                        <div className="text-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <p className="text-lg font-bold text-purple-600 truncate">
+                            {viewingShipment.metadata.shipmentDetails.category || '—'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Category</p>
+                        </div>
+                        <div className="text-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <p className="text-lg font-bold text-blue-600">
+                            {viewingShipment.metadata.shipmentDetails.services?.length || 0}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Add-ons</p>
+                        </div>
+                      </div>
+                      {viewingShipment.metadata.shipmentDetails.description && (
+                        <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <p className="text-sm text-muted-foreground">
+                            <strong>Description:</strong> {viewingShipment.metadata.shipmentDetails.description}
+                          </p>
+                        </div>
                       )}
-                    </CardContent>
-                  </Card>
-                </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Status Update Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium">Status Management</h3>
-                    {!editingStatus ? (
+                <div className="bg-white dark:bg-gray-900 rounded-xl border shadow-sm overflow-hidden">
+                  <div className="bg-gradient-to-r from-violet-500 to-purple-500 px-4 py-3 flex items-center justify-between">
+                    <h3 className="font-semibold text-white flex items-center gap-2">
+                      <Edit className="h-4 w-4" />
+                      Status Management
+                    </h3>
+                    {!editingStatus && viewingShipment.status !== 'Delivered' && viewingShipment.status !== 'Cancelled' && (
                       <Button 
-                        variant="outline" 
                         size="sm" 
+                        variant="secondary"
                         onClick={() => setEditingStatus(true)}
-                        disabled={viewingShipment.status === 'Delivered' || viewingShipment.status === 'Cancelled'}
+                        className="bg-white/20 hover:bg-white/30 text-white border-0"
                       >
-                        <Edit className="h-4 w-4 mr-2" />
                         Update Status
                       </Button>
+                    )}
+                  </div>
+                  <div className="p-4">
+                    {editingStatus ? (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="status" className="text-sm font-medium">New Status</Label>
+                            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                              <SelectTrigger className="w-full mt-2">
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {STATUS_OPTIONS.map((status) => (
+                                  <SelectItem 
+                                    key={status} 
+                                    value={status}
+                                    disabled={status === viewingShipment.status}
+                                  >
+                                    {status}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label htmlFor="note" className="text-sm font-medium">Note (Optional)</Label>
+                            <Textarea
+                              id="note"
+                              value={statusNote}
+                              onChange={(e) => setStatusNote(e.target.value)}
+                              placeholder="Add notes..."
+                              className="mt-2 h-[42px] min-h-[42px]"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button 
+                            onClick={handleUpdateStatus}
+                            disabled={selectedStatus === viewingShipment.status || isUpdating}
+                            className="bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600"
+                          >
+                            {isUpdating ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Updating...
+                              </>
+                            ) : (
+                              'Confirm Update'
+                            )}
+                          </Button>
+                          <Button variant="outline" onClick={() => setEditingStatus(false)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
                     ) : (
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => setEditingStatus(false)}
-                        >
-                          Cancel
-                        </Button>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Current Status</p>
+                          <p className="font-semibold">{viewingShipment.status}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-muted-foreground">Last Updated</p>
+                          <p className="font-medium">{format(new Date(viewingShipment.updated_at), 'PPpp')}</p>
+                        </div>
                       </div>
                     )}
                   </div>
-
-                  {editingStatus ? (
-                    <Card>
-                      <CardContent className="p-6 space-y-4">
-                        <div>
-                          <Label htmlFor="status">New Status</Label>
-                          <Select 
-                            value={selectedStatus} 
-                            onValueChange={setSelectedStatus}
-                          >
-                            <SelectTrigger className="w-full mt-2">
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {STATUS_OPTIONS.map((status) => (
-                                <SelectItem 
-                                  key={status} 
-                                  value={status}
-                                  disabled={status === viewingShipment.status}
-                                >
-                                  {status}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        
-                        <div>
-                          <Label htmlFor="note">Update Note (Optional)</Label>
-                          <Textarea
-                            id="note"
-                            value={statusNote}
-                            onChange={(e) => setStatusNote(e.target.value)}
-                            placeholder="Add any notes about this status change..."
-                            className="mt-2"
-                          />
-                        </div>
-                        
-                        <Button 
-                          onClick={handleUpdateStatus}
-                          disabled={selectedStatus === viewingShipment.status || isUpdating}
-                        >
-                          {isUpdating ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Updating...
-                            </>
-                          ) : (
-                            'Confirm Update'
-                          )}
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <Card>
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="font-medium">Current Status</h4>
-                            <p className="text-muted-foreground text-sm">
-                              Last updated: {format(new Date(viewingShipment.updated_at), 'PPpp')}
-                            </p>
-                          </div>
-                          <Badge variant="outline">{viewingShipment.status}</Badge>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-
-                {/* Collection Information */}
-                <div className="space-y-4">
-                  <h3 className="font-medium">Collection Information</h3>
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <h4 className="text-sm font-medium text-muted-foreground mb-2">Collection Route</h4>
-                          <p>{getCollectionInfo(viewingShipment).route}</p>
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-medium text-muted-foreground mb-2">Collection Date</h4>
-                          <p>{getCollectionInfo(viewingShipment).date}</p>
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-medium text-muted-foreground mb-2">Scheduled</h4>
-                          <Badge variant={getCollectionInfo(viewingShipment).scheduled ? "default" : "secondary"}>
-                            {getCollectionInfo(viewingShipment).scheduled ? 'Yes' : 'No'}
-                          </Badge>
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-medium text-muted-foreground mb-2">Status</h4>
-                          <Badge variant={getCollectionInfo(viewingShipment).completed ? "default" : "outline"}>
-                            {getCollectionInfo(viewingShipment).completed ? 'Completed' : 'Pending'}
-                          </Badge>
-                        </div>
-                        <div className="col-span-2">
-                          <h4 className="text-sm font-medium text-muted-foreground mb-2">Notes</h4>
-                          <p className="whitespace-pre-line">{getCollectionInfo(viewingShipment).notes}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
                 </div>
               </div>
-            </>
+            </div>
           )}
         </DialogContent>
       </Dialog>

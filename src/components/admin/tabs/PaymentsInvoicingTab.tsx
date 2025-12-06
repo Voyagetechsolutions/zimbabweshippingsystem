@@ -26,8 +26,11 @@ import {
   RefreshCw,
   CheckCircle,
   XCircle,
-  Loader2
+  Loader2,
+  FileText,
+  Send
 } from 'lucide-react';
+import InvoiceGenerator from '../InvoiceGenerator';
 import {
   Select,
   SelectContent,
@@ -62,6 +65,20 @@ interface Payment {
   user_name?: string;
   customer_phone?: string;
   tracking_number?: string;
+  shipment_type?: string;
+}
+
+interface InvoiceData {
+  invoiceNumber: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  trackingNumber: string;
+  shipmentType: string;
+  amount: number;
+  currency: string;
+  paymentMethod: string;
+  paymentDate: string;
 }
 
 const PaymentsInvoicingTab = () => {
@@ -71,6 +88,8 @@ const PaymentsInvoicingTab = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+  const [selectedInvoiceData, setSelectedInvoiceData] = useState<InvoiceData | null>(null);
 
   useEffect(() => {
     fetchPayments();
@@ -106,8 +125,8 @@ const PaymentsInvoicingTab = () => {
             }
           }
           
-          // If no user_id (guest booking), fetch from shipment metadata
-          if (payment.shipment_id && !payment.user_id) {
+          // Fetch from shipment metadata (for both guest and registered users)
+          if (payment.shipment_id) {
             const { data: shipmentData, error: shipmentError } = await supabase
               .from('shipments')
               .select('tracking_number, metadata')
@@ -115,13 +134,20 @@ const PaymentsInvoicingTab = () => {
               .single();
             
             if (!shipmentError && shipmentData) {
-              const metadata = shipmentData.metadata || {};
+              const metadata = (shipmentData.metadata as any) || {};
               const sender = metadata.sender || {};
+              const shipmentDetails = metadata.shipmentDetails || {};
               
-              customerInfo.user_name = `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || 'Guest Customer';
-              customerInfo.user_email = sender.email || 'N/A';
+              // Only override if not already set from profile
+              if (!customerInfo.user_name) {
+                customerInfo.user_name = `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || 'Guest Customer';
+              }
+              if (!customerInfo.user_email) {
+                customerInfo.user_email = sender.email || 'N/A';
+              }
               customerInfo.customer_phone = sender.phone || 'N/A';
               customerInfo.tracking_number = shipmentData.tracking_number;
+              customerInfo.shipment_type = shipmentDetails.type || metadata.shipmentType || 'Shipping Service';
             }
           }
           
@@ -208,6 +234,40 @@ const PaymentsInvoicingTab = () => {
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
+  };
+
+  // Generate invoice number from payment
+  const generateInvoiceNumber = (payment: Payment) => {
+    const date = new Date(payment.created_at);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const shortId = payment.id.slice(-6).toUpperCase();
+    return `INV-${year}${month}-${shortId}`;
+  };
+
+  // Open invoice dialog for a payment
+  const handleGenerateInvoice = (payment: Payment) => {
+    const invoiceData: InvoiceData = {
+      invoiceNumber: generateInvoiceNumber(payment),
+      customerName: payment.user_name || 'Customer',
+      customerEmail: payment.user_email || 'N/A',
+      customerPhone: payment.customer_phone || 'N/A',
+      trackingNumber: payment.tracking_number || 'N/A',
+      shipmentType: payment.shipment_type || 'Shipping Service',
+      amount: payment.amount,
+      currency: payment.currency,
+      paymentMethod: payment.payment_method,
+      paymentDate: payment.created_at,
+    };
+    setSelectedInvoiceData(invoiceData);
+    setInvoiceDialogOpen(true);
+  };
+
+  const handleInvoiceSent = () => {
+    toast({
+      title: 'Invoice Sent Successfully',
+      description: 'The invoice has been emailed to the customer.',
+    });
   };
 
   return (
@@ -316,6 +376,20 @@ const PaymentsInvoicingTab = () => {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end space-x-2">
+                                {/* Send Invoice Button - only for completed payments */}
+                                {(payment.payment_status.toLowerCase() === 'succeeded' || 
+                                  payment.payment_status.toLowerCase() === 'completed') && (
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => handleGenerateInvoice(payment)}
+                                    className="hover:bg-blue-50 hover:border-blue-500"
+                                  >
+                                    <FileText className="h-4 w-4 mr-1" />
+                                    Invoice
+                                  </Button>
+                                )}
+                                
                                 {payment.receipt_url && (
                                   <Button 
                                     variant="ghost" 
@@ -366,6 +440,19 @@ const PaymentsInvoicingTab = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Invoice Generator Dialog */}
+      {selectedInvoiceData && (
+        <InvoiceGenerator
+          isOpen={invoiceDialogOpen}
+          onClose={() => {
+            setInvoiceDialogOpen(false);
+            setSelectedInvoiceData(null);
+          }}
+          invoiceData={selectedInvoiceData}
+          onInvoiceSent={handleInvoiceSent}
+        />
+      )}
     </div>
   );
 };

@@ -44,21 +44,12 @@ const CollectionSchedule = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // First sync schedules to ensure we have updated data
-        console.log('Syncing collection schedules...');
-        const { error: syncError } = await supabase.functions.invoke('sync-collection-schedules');
-        
-        if (syncError) {
-          console.error('Error syncing schedules:', syncError);
-        } else {
-          console.log('Schedules synced successfully');
-        }
-        
-        // Fetch collection schedules from database
+        // Fetch collection schedules directly from database
+        // The sync function is only for initializing missing routes, not for regular page loads
         const { data: schedulesData, error: schedulesError } = await supabase
           .from('collection_schedules')
           .select('*')
-          .order('updated_at', { ascending: false });
+          .order('route', { ascending: true });
           
         if (schedulesError) throw schedulesError;
         
@@ -76,73 +67,11 @@ const CollectionSchedule = () => {
           
           console.log('Loaded schedules from database:', filteredData.length);
         } else {
-          console.log('No schedules found in database, using defaults');
-          // Fallback to updated default schedules
-          const defaultSchedules = [
-            {
-              id: '1',
-              route: "NORTHAMPTON ROUTE",
-              pickup_date: "29th of August",
-              areas: ["KETTERING", "BEDFORD", "MILTON KEYNES", "BANBURY", "AYLESBURY", "LUTON"]
-            },
-            {
-              id: '2',
-              route: "LEEDS ROUTE",
-              pickup_date: "30th of August",
-              areas: ["WAKEFIELD", "HALIFAX", "DONCASTER", "SHEFFIELD", "HUDDERSFIELD", "YORK"]
-            },
-            {
-              id: '3',
-              route: "NOTTINGHAM ROUTE",
-              pickup_date: "2nd of September",
-              areas: ["LIECESTER", "DERBY", "PETERSBOROUGH", "CORBY", "MARKET HARB"]
-            },
-            {
-              id: '4',
-              route: "BIRMINGHAM ROUTE",
-              pickup_date: "4th of September",
-              areas: ["WOLVEHAMPTON", "COVENTRY", "WARWICK", "DUDLEY", "WALSALL", "RUGBY"]
-            },
-            {
-              id: '5',
-              route: "LONDON ROUTE",
-              pickup_date: "6th of September",
-              areas: ["CENTRAL LONDON", "HEATHROW", "EAST LONDON", "ROMFORD", "ALL AREAS INSIDE M25"]
-            },
-            {
-              id: '6',
-              route: "CARDIFF ROUTE",
-              pickup_date: "8th of September",
-              areas: ["CARDIFF", "GLOUCESTER", "BRISTOL", "SWINDON", "BATH", "SALISBURY"]
-            },
-            {
-              id: '7',
-              route: "BOURNEMOUTH ROUTE",
-              pickup_date: "9th of September",
-              areas: ["SOUTHAMPTON", "OXFORD", "HAMPHIRE", "READING", "GUILFORD", "PORTSMOUTH"]
-            },
-            {
-              id: '8',
-              route: "BRIGHTON ROUTE",
-              pickup_date: "10th of September",
-              areas: ["HIGH COMBE", "SLOUGH", "VRAWLEY", "LANCING", "EASTBOURNE", "CANTEBURY"]
-            },
-            {
-              id: '9',
-              route: "SOUTHEND ROUTE",
-              pickup_date: "12th of September",
-              areas: ["NORWICH", "IPSWICH", "COLCHESTER", "BRAINTREE", "CAMBRIDGE", "BASILDON"]
-            }
-          ];
-          
-          setSchedules(defaultSchedules);
-          
-          // Extract unique routes and areas from default data
-          const routes = [...new Set(defaultSchedules.map(schedule => schedule.route))];
-          setAllRoutes(routes);
-          
-          const areas = [...new Set(defaultSchedules.flatMap(schedule => schedule.areas))];
-          setAllAreas(areas);
+          console.log('No schedules found in database');
+          // Show empty state - schedules should be managed in admin dashboard
+          setSchedules([]);
+          setAllRoutes([]);
+          setAllAreas([]);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -287,23 +216,43 @@ const CollectionSchedule = () => {
             <h2 className="text-2xl font-bold mb-4">Upcoming Collections</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredSchedules.map((schedule) => (
-                <Card key={schedule.id} className="h-full">
-                  <CardHeader className="pb-2">
-                    <CardTitle>{schedule.route}</CardTitle>
-                    <CardDescription className="flex items-center gap-1">
-                      <CalendarIcon className="h-4 w-4" />
-                      {schedule.pickup_date}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="mb-4">
-                      <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
-                        <MapPin className="h-4 w-4" />
-                        Collection Areas:
+                <Card key={schedule.id} className="h-full overflow-hidden hover:shadow-lg transition-shadow">
+                  {/* Route Header with Gradient */}
+                  <div className="bg-gradient-to-r from-zim-green to-emerald-600 px-4 py-3">
+                    <div className="flex items-center gap-2 text-white">
+                      <Truck className="h-5 w-5" />
+                      <h3 className="font-bold text-lg">{schedule.route}</h3>
+                    </div>
+                  </div>
+                  
+                  {/* Collection Date - Prominent Display */}
+                  <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 px-4 py-3 border-b">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-amber-500 rounded-lg">
+                        <CalendarIcon className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">Next Collection Date</p>
+                        <p className="font-bold text-lg text-amber-900 dark:text-amber-300">
+                          {schedule.pickup_date || 'To be confirmed'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <CardContent className="pt-4">
+                    <div>
+                      <h4 className="text-sm font-medium mb-3 flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                        <MapPin className="h-4 w-4 text-zim-green" />
+                        Collection Areas
                       </h4>
                       <div className="flex flex-wrap gap-2">
                         {schedule.areas.map((area) => (
-                          <Badge key={area} variant="outline" className="bg-gray-100">
+                          <Badge 
+                            key={area} 
+                            variant="outline" 
+                            className="bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
+                          >
                             {area}
                           </Badge>
                         ))}
@@ -314,8 +263,10 @@ const CollectionSchedule = () => {
               ))}
               
               {filteredSchedules.length === 0 && !loading && (
-                <div className="col-span-3 text-center py-8">
-                  <p className="text-gray-500">No collection schedules found</p>
+                <div className="col-span-3 text-center py-12 bg-white dark:bg-gray-800 rounded-lg border">
+                  <CalendarIcon className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-500 dark:text-gray-400 text-lg">No collection schedules found</p>
+                  <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">Try adjusting your search or filters</p>
                 </div>
               )}
             </div>

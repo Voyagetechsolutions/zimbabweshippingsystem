@@ -102,24 +102,37 @@ const CollectionScheduleTab = () => {
     
     setIsEditing(true);
     try {
-      // Format date as readable string "October 6th, 2025"
+      // Format date as readable string "December 15th, 2025"
       const formattedDate = format(selectedDate, 'MMMM do, yyyy');
       
-      const { data, error } = await supabase
+      console.log('Updating schedule ID:', id, 'with date:', formattedDate);
+      
+      // First, update the record
+      const { error: updateError } = await supabase
         .from('collection_schedules')
         .update({
           pickup_date: formattedDate,
           updated_at: new Date().toISOString()
         })
-        .eq('id', id)
-        .select();
+        .eq('id', id);
       
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
+      if (updateError) {
+        console.error('Supabase update error:', updateError);
+        throw updateError;
       }
       
-      console.log('Update successful:', data);
+      // Verify the update by fetching the record
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('collection_schedules')
+        .select('pickup_date')
+        .eq('id', id)
+        .single();
+      
+      if (verifyError) {
+        console.error('Verification error:', verifyError);
+      } else {
+        console.log('Verified updated date:', verifyData?.pickup_date);
+      }
       
       toast({
         title: 'Date updated successfully',
@@ -181,13 +194,13 @@ const CollectionScheduleTab = () => {
   return (
     <div className="space-y-6">
       {/* Info Banner */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-4">
+      <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-lg p-4">
         <div className="flex items-start gap-3">
-          <CalendarIcon className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+          <CalendarIcon className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
           <div>
-            <h3 className="font-semibold text-blue-900 dark:text-blue-300 mb-1">Quick View Only</h3>
-            <p className="text-sm text-blue-800 dark:text-blue-400">
-              This page shows a quick overview of collection schedules. To add new routes or edit collection dates, please use the <strong>Routes Management</strong> tab which manages both routes and their schedules in one place.
+            <h3 className="font-semibold text-green-900 dark:text-green-300 mb-1">Collection Schedule Management</h3>
+            <p className="text-sm text-green-800 dark:text-green-400">
+              Update collection dates here. These dates will be shown to customers when they book shipments. To <strong>add new routes</strong>, use the <strong>Routes</strong> tab.
             </p>
           </div>
         </div>
@@ -195,9 +208,9 @@ const CollectionScheduleTab = () => {
       
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg font-medium">Collection Schedule Overview</CardTitle>
+          <CardTitle className="text-lg font-medium">Collection Schedules</CardTitle>
           <CardDescription>
-            Quick view of upcoming collection dates for all routes
+            Set and update collection dates for each route
           </CardDescription>
         </CardHeader>
         

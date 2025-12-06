@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ChevronRight, ChevronLeft, Package, Truck, User, MapPin, CreditCard, Wallet, CalendarClock, CheckCircle2, AlertCircle, Info } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Package, Truck, User, MapPin, CreditCard, Wallet, CalendarClock, CheckCircle2, AlertCircle, Info, Plus, Trash2, Calendar } from 'lucide-react';
+import { format, addDays, isAfter, isBefore, startOfDay } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import BookingReceipt from '@/components/BookingReceipt';
@@ -40,12 +41,233 @@ interface FormData {
   
   // Payment (moved to step 5)
   paymentMethod: 'standard' | 'cashOnCollection' | 'payOnArrival';
+  
+  // Payment Schedule (for standard payment)
+  usePaymentSchedule: boolean;
+  paymentSchedule: PaymentInstallment[];
+}
+
+interface PaymentInstallment {
+  id: string;
+  amount: number;
+  date: string; // ISO date string
+  paid: boolean;
 }
 
 const getDrumPrice = (quantity: number): number => {
   if (quantity >= 5) return 260;
   if (quantity >= 2) return 270;
   return 280;
+};
+
+// Payment Schedule Builder Component
+interface PaymentScheduleBuilderProps {
+  totalAmount: number;
+  schedule: PaymentInstallment[];
+  onScheduleChange: (schedule: PaymentInstallment[]) => void;
+}
+
+const PaymentScheduleBuilder: React.FC<PaymentScheduleBuilderProps> = ({
+  totalAmount,
+  schedule,
+  onScheduleChange
+}) => {
+  const today = startOfDay(new Date());
+  const maxDate = addDays(today, 30);
+  
+  const scheduledTotal = schedule.reduce((sum, item) => sum + item.amount, 0);
+  const remainingAmount = totalAmount - scheduledTotal;
+  
+  const addInstallment = () => {
+    const newInstallment: PaymentInstallment = {
+      id: `inst-${Date.now()}`,
+      amount: remainingAmount > 0 ? Math.min(remainingAmount, 100) : 0,
+      date: format(addDays(today, 7), 'yyyy-MM-dd'),
+      paid: false
+    };
+    onScheduleChange([...schedule, newInstallment]);
+  };
+  
+  const updateInstallment = (id: string, field: 'amount' | 'date', value: number | string) => {
+    onScheduleChange(
+      schedule.map(item => 
+        item.id === id ? { ...item, [field]: value } : item
+      )
+    );
+  };
+  
+  const removeInstallment = (id: string) => {
+    onScheduleChange(schedule.filter(item => item.id !== id));
+  };
+  
+  const isValidSchedule = () => {
+    if (schedule.length === 0) return false;
+    if (Math.abs(scheduledTotal - totalAmount) > 0.01) return false;
+    
+    // Check all dates are within 30 days
+    for (const item of schedule) {
+      const itemDate = new Date(item.date);
+      if (isBefore(itemDate, today) || isAfter(itemDate, maxDate)) {
+        return false;
+      }
+    }
+    return true;
+  };
+  
+  return (
+    <div className="space-y-4 bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between">
+        <h4 className="font-medium text-sm flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-blue-600" />
+          Payment Schedule
+        </h4>
+        <div className="text-xs text-gray-500">
+          Must be within 30 days (by {format(maxDate, 'MMM d, yyyy')})
+        </div>
+      </div>
+      
+      {/* Progress Bar */}
+      <div className="space-y-1">
+        <div className="flex justify-between text-xs">
+          <span>Scheduled: £{scheduledTotal.toFixed(2)}</span>
+          <span className={remainingAmount > 0.01 ? 'text-orange-600' : 'text-green-600'}>
+            {remainingAmount > 0.01 ? `Remaining: £${remainingAmount.toFixed(2)}` : '✓ Fully scheduled'}
+          </span>
+        </div>
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+          <div 
+            className={`h-2 rounded-full transition-all ${
+              scheduledTotal >= totalAmount ? 'bg-green-500' : 'bg-blue-500'
+            }`}
+            style={{ width: `${Math.min((scheduledTotal / totalAmount) * 100, 100)}%` }}
+          />
+        </div>
+      </div>
+      
+      {/* Installments List */}
+      <div className="space-y-3">
+        {schedule.map((installment, index) => (
+          <div key={installment.id} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-xs font-medium text-blue-600 dark:text-blue-400">
+              {index + 1}
+            </div>
+            
+            <div className="flex-1 grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Amount (£)</label>
+                <Input
+                  type="number"
+                  min="1"
+                  max={totalAmount}
+                  step="0.01"
+                  value={installment.amount}
+                  onChange={(e) => updateInstallment(installment.id, 'amount', parseFloat(e.target.value) || 0)}
+                  className="h-9 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Payment Date</label>
+                <Input
+                  type="date"
+                  min={format(today, 'yyyy-MM-dd')}
+                  max={format(maxDate, 'yyyy-MM-dd')}
+                  value={installment.date}
+                  onChange={(e) => updateInstallment(installment.id, 'date', e.target.value)}
+                  className="h-9 text-sm"
+                />
+              </div>
+            </div>
+            
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => removeInstallment(installment.id)}
+              className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+      </div>
+      
+      {/* Add Installment Button */}
+      {remainingAmount > 0.01 && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={addInstallment}
+          className="w-full flex items-center justify-center gap-2"
+        >
+          <Plus className="h-4 w-4" />
+          Add Payment Installment
+        </Button>
+      )}
+      
+      {/* Quick Fill Button */}
+      {schedule.length === 0 && (
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              // Split into 2 payments
+              const half = totalAmount / 2;
+              onScheduleChange([
+                { id: 'inst-1', amount: half, date: format(addDays(today, 7), 'yyyy-MM-dd'), paid: false },
+                { id: 'inst-2', amount: half, date: format(addDays(today, 21), 'yyyy-MM-dd'), paid: false }
+              ]);
+            }}
+            className="flex-1 text-xs"
+          >
+            Split in 2
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              // Split into 3 payments
+              const third = Math.floor(totalAmount / 3 * 100) / 100;
+              const remainder = totalAmount - (third * 2);
+              onScheduleChange([
+                { id: 'inst-1', amount: third, date: format(addDays(today, 7), 'yyyy-MM-dd'), paid: false },
+                { id: 'inst-2', amount: third, date: format(addDays(today, 14), 'yyyy-MM-dd'), paid: false },
+                { id: 'inst-3', amount: remainder, date: format(addDays(today, 21), 'yyyy-MM-dd'), paid: false }
+              ]);
+            }}
+            className="flex-1 text-xs"
+          >
+            Split in 3
+          </Button>
+        </div>
+      )}
+      
+      {/* Validation Message */}
+      {schedule.length > 0 && !isValidSchedule() && (
+        <div className="flex items-start gap-2 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg text-sm">
+          <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+          <div className="text-orange-700 dark:text-orange-300">
+            {Math.abs(scheduledTotal - totalAmount) > 0.01 && (
+              <p>Total scheduled (£{scheduledTotal.toFixed(2)}) must equal bill amount (£{totalAmount.toFixed(2)})</p>
+            )}
+          </div>
+        </div>
+      )}
+      
+      {schedule.length > 0 && isValidSchedule() && (
+        <div className="flex items-start gap-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-sm">
+          <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+          <div className="text-green-700 dark:text-green-300">
+            <p className="font-medium">Payment schedule is valid!</p>
+            <p className="text-xs mt-1">You'll receive reminders before each payment date.</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export const SimplifiedBookingForm = () => {
@@ -81,6 +303,8 @@ export const SimplifiedBookingForm = () => {
     boxesDescription: '',
     wantMetalSeal: false,
     paymentMethod: 'standard',
+    usePaymentSchedule: false,
+    paymentSchedule: [],
   });
 
   const updateField = (field: keyof FormData, value: any) => {
@@ -111,22 +335,60 @@ export const SimplifiedBookingForm = () => {
 
       setCollectionRoute(route);
 
-      // Strip " ROUTE" suffix to match database format
-      // Database stores "LONDON" but utils return "LONDON ROUTE"
-      const dbRouteName = route.replace(' ROUTE', '');
+      // Try both formats: with and without " ROUTE" suffix
+      // Database might store as "LONDON" or "LONDON ROUTE"
+      const routeWithSuffix = route.includes(' ROUTE') ? route : `${route} ROUTE`;
+      const routeWithoutSuffix = route.replace(' ROUTE', '');
 
-      // Fetch collection date from database
-      const { data, error } = await supabase
+      console.log('Fetching schedule for route:', route, '| Trying:', routeWithoutSuffix, 'and', routeWithSuffix);
+
+      // Fetch collection date from database - try without suffix first
+      let { data, error } = await supabase
         .from('collection_schedules')
-        .select('pickup_date')
-        .eq('route', dbRouteName)
+        .select('pickup_date, route')
+        .eq('route', routeWithoutSuffix)
         .single();
+
+      // If not found, try with suffix
+      if (error || !data) {
+        const result = await supabase
+          .from('collection_schedules')
+          .select('pickup_date, route')
+          .eq('route', routeWithSuffix)
+          .single();
+        data = result.data;
+        error = result.error;
+      }
+
+      // If still not found, try case-insensitive search
+      if (error || !data) {
+        const result = await supabase
+          .from('collection_schedules')
+          .select('pickup_date, route')
+          .ilike('route', `%${routeWithoutSuffix}%`)
+          .limit(1)
+          .single();
+        data = result.data;
+        error = result.error;
+      }
 
       if (error) {
         console.error('Error fetching collection schedule:', error);
-        setCollectionDate(null);
+        setCollectionDate('To be confirmed');
       } else if (data) {
-        setCollectionDate(data.pickup_date);
+        console.log('Found schedule:', data);
+        // Only set date if it's actually set (not "Not set", "To be confirmed", or empty)
+        const pickupDate = data.pickup_date;
+        if (pickupDate && 
+            pickupDate !== 'Not set' && 
+            pickupDate !== 'To be confirmed' &&
+            pickupDate.trim() !== '') {
+          setCollectionDate(pickupDate);
+        } else {
+          setCollectionDate('To be confirmed');
+        }
+      } else {
+        setCollectionDate('To be confirmed');
       }
     } catch (error) {
       console.error('Error in fetchCollectionSchedule:', error);
@@ -297,6 +559,28 @@ export const SimplifiedBookingForm = () => {
           route: collectionRoute,
           date: collectionDate
         },
+        paymentSchedule: formData.usePaymentSchedule ? {
+          enabled: true,
+          installments: formData.paymentSchedule.map(inst => ({
+            ...inst,
+            paid: false,
+            paidAmount: 0,
+            paidDate: null
+          })),
+          totalScheduled: formData.paymentSchedule.reduce((sum, inst) => sum + inst.amount, 0),
+          totalPaid: 0,
+          remainingBalance: finalAmount
+        } : null,
+        shipmentDetails: {
+          type: formData.includeDrums && formData.includeBoxes ? 'Drums + Boxes' :
+                formData.includeDrums ? 'Drums' :
+                formData.includeBoxes ? 'Boxes/Items' : 'Standard',
+          includeDrums: formData.includeDrums,
+          quantity: formData.drumQuantity,
+          includeOtherItems: formData.includeBoxes,
+          wantMetalSeal: formData.wantMetalSeal,
+          category: formData.boxesDescription
+        },
         notes: notes.length > 0 ? notes.join(' | ') : null
       };
       
@@ -354,14 +638,17 @@ export const SimplifiedBookingForm = () => {
             paymentMethod: formData.paymentMethod,
             baseAmount: calculateBaseTotal(),
             finalAmount: finalAmount,
-            transactionId: paymentData.transaction_id
+            transactionId: paymentData.transaction_id,
+            usePaymentSchedule: formData.usePaymentSchedule,
+            paymentSchedule: formData.usePaymentSchedule ? JSON.parse(JSON.stringify(formData.paymentSchedule)) : null
           },
           collection_info: {
             pickupAddress: `${formData.pickupAddress}, ${formData.pickupCity}, ${formData.pickupPostcode}`,
             deliveryAddress: `${formData.deliveryAddress}, ${formData.deliveryCity}, Zimbabwe`,
             route: collectionRoute,
             collectionDate: collectionDate
-          }
+          },
+          payment_schedule: formData.usePaymentSchedule ? JSON.parse(JSON.stringify(formData.paymentSchedule)) : null
         })
         .select()
         .single();
@@ -547,29 +834,39 @@ export const SimplifiedBookingForm = () => {
 
         {/* Collection Schedule Info */}
         {collectionRoute && (
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border-2 border-emerald-200 dark:border-emerald-800 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+              <Info className="h-5 w-5 text-emerald-600 dark:text-emerald-400 mt-0.5" />
               <div className="flex-1">
-                <p className="font-semibold text-blue-900 dark:text-blue-300 mb-2">Collection Information</p>
-                <div className="space-y-1 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Truck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                    <span className="text-blue-800 dark:text-blue-400">
-                      <strong>Route:</strong> {collectionRoute}
-                    </span>
-                  </div>
-                  {collectionDate && (
-                    <div className="flex items-center gap-2">
-                      <CalendarClock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      <span className="text-blue-800 dark:text-blue-400">
-                        <strong>Next Collection:</strong> {collectionDate}
-                      </span>
+                <p className="font-semibold text-emerald-900 dark:text-emerald-300 mb-3">Collection Information</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Route */}
+                  <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-lg p-2 border border-emerald-100 dark:border-emerald-900">
+                    <div className="p-1.5 bg-emerald-500 rounded">
+                      <Truck className="h-4 w-4 text-white" />
                     </div>
-                  )}
-                  {loadingSchedule && (
-                    <p className="text-xs text-blue-600 dark:text-blue-400 italic">Loading collection schedule...</p>
-                  )}
+                    <div>
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Route</p>
+                      <p className="font-semibold text-emerald-900 dark:text-emerald-100 text-sm">{collectionRoute}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Collection Date */}
+                  <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-lg p-2 border border-emerald-100 dark:border-emerald-900">
+                    <div className="p-1.5 bg-amber-500 rounded">
+                      <CalendarClock className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">Next Collection</p>
+                      {loadingSchedule ? (
+                        <p className="font-semibold text-gray-500 dark:text-gray-400 text-sm italic">Loading...</p>
+                      ) : (
+                        <p className="font-semibold text-amber-900 dark:text-amber-100 text-sm">
+                          {collectionDate || 'To be confirmed'}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -912,9 +1209,40 @@ export const SimplifiedBookingForm = () => {
                     </span>
                     <span className="text-xl font-bold text-zim-green">£{baseTotal.toFixed(2)}</span>
                   </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Pay by card or within 30 days</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Pay by card or schedule payments within 30 days</p>
                 </div>
               </label>
+              
+              {/* Payment Schedule Option - Only show when standard is selected */}
+              {formData.paymentMethod === 'standard' && (
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <input
+                      type="checkbox"
+                      id="usePaymentSchedule"
+                      checked={formData.usePaymentSchedule}
+                      onChange={(e) => {
+                        updateField('usePaymentSchedule', e.target.checked);
+                        if (!e.target.checked) {
+                          updateField('paymentSchedule', []);
+                        }
+                      }}
+                      className="h-4 w-4 rounded border-gray-300 text-zim-green focus:ring-zim-green"
+                    />
+                    <label htmlFor="usePaymentSchedule" className="text-sm font-medium cursor-pointer">
+                      I want to schedule split payments (within 30 days)
+                    </label>
+                  </div>
+                  
+                  {formData.usePaymentSchedule && (
+                    <PaymentScheduleBuilder
+                      totalAmount={baseTotal}
+                      schedule={formData.paymentSchedule}
+                      onScheduleChange={(schedule) => updateField('paymentSchedule', schedule)}
+                    />
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Cash on Collection - With Discount */}
@@ -1037,6 +1365,8 @@ export const SimplifiedBookingForm = () => {
         paymentMethod={receiptData.paymentMethod}
         collectionRoute={receiptData.collectionRoute}
         collectionDate={receiptData.collectionDate}
+        usePaymentSchedule={receiptData.usePaymentSchedule}
+        paymentSchedule={receiptData.paymentSchedule}
         onNewBooking={() => {
           setBookingComplete(false);
           setReceiptData(null);
@@ -1062,6 +1392,8 @@ export const SimplifiedBookingForm = () => {
             boxesDescription: '',
             wantMetalSeal: false,
             paymentMethod: 'standard',
+            usePaymentSchedule: false,
+            paymentSchedule: [],
           });
         }}
       />

@@ -1,7 +1,16 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, Download, Share2, Package, MapPin, User, CreditCard, Calendar, CalendarClock, Truck } from 'lucide-react';
+import { CheckCircle2, Download, Share2, Package, MapPin, User, CreditCard, Calendar, CalendarClock, Truck, Clock, FileText, Loader2 } from 'lucide-react';
+import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+
+interface PaymentInstallment {
+  id: string;
+  amount: number;
+  date: string;
+  paid: boolean;
+}
 
 interface BookingReceiptProps {
   receiptNumber: string;
@@ -25,6 +34,8 @@ interface BookingReceiptProps {
   paymentMethod: string;
   collectionRoute?: string | null;
   collectionDate?: string | null;
+  usePaymentSchedule?: boolean;
+  paymentSchedule?: PaymentInstallment[];
   onNewBooking: () => void;
 }
 
@@ -50,8 +61,14 @@ const BookingReceipt: React.FC<BookingReceiptProps> = ({
   paymentMethod,
   collectionRoute,
   collectionDate,
+  usePaymentSchedule,
+  paymentSchedule,
   onNewBooking
 }) => {
+  const receiptRef = useRef<HTMLDivElement>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const { toast } = useToast();
+  
   const getPaymentMethodLabel = () => {
     switch (paymentMethod) {
       case 'cashOnCollection':
@@ -60,6 +77,74 @@ const BookingReceipt: React.FC<BookingReceiptProps> = ({
         return 'Pay on Arrival';
       default:
         return 'Standard Payment';
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    setIsDownloading(true);
+    
+    try {
+      // Dynamically import libraries
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF } = await import('jspdf');
+      
+      if (!receiptRef.current) {
+        throw new Error('Receipt element not found');
+      }
+      
+      // Hide action buttons temporarily
+      const actionButtons = document.querySelectorAll('.print\\:hidden');
+      actionButtons.forEach(el => (el as HTMLElement).style.display = 'none');
+      
+      // Create canvas from the receipt
+      const canvas = await html2canvas(receiptRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
+      
+      // Show action buttons again
+      actionButtons.forEach(el => (el as HTMLElement).style.display = '');
+      
+      // Create PDF
+      const imgWidth = 210; // A4 width in mm
+      const pageHeight = 297; // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgData = canvas.toDataURL('image/png');
+      
+      // Add image to PDF, handling multiple pages if needed
+      let heightLeft = imgHeight;
+      let position = 0;
+      
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      // Download the PDF
+      pdf.save(`Receipt-${receiptNumber}.pdf`);
+      
+      toast({
+        title: 'Receipt Downloaded',
+        description: `Your receipt has been saved as Receipt-${receiptNumber}.pdf`,
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: 'Download Failed',
+        description: 'Could not generate PDF. Try using Print instead.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -78,13 +163,28 @@ const BookingReceipt: React.FC<BookingReceiptProps> = ({
       } catch (err) {
         console.log('Error sharing:', err);
       }
+    } else {
+      // Fallback: copy to clipboard
+      try {
+        await navigator.clipboard.writeText(
+          `Zimbabwe Shipping Receipt\nReceipt #${receiptNumber}\nTracking: ${trackingNumber}`
+        );
+        toast({
+          title: 'Copied to Clipboard',
+          description: 'Receipt details copied to clipboard',
+        });
+      } catch (err) {
+        console.log('Error copying:', err);
+      }
     }
   };
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 print:space-y-4">
+      {/* Receipt Content - wrapped in ref for PDF generation */}
+      <div ref={receiptRef} className="bg-white dark:bg-gray-900 print:bg-white">
       {/* Success Header */}
-      <div className="text-center space-y-4 print:space-y-2">
+      <div className="text-center space-y-4 print:space-y-2 pt-4">
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 print:bg-green-100">
           <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
         </div>
@@ -235,6 +335,52 @@ const BookingReceipt: React.FC<BookingReceiptProps> = ({
             </div>
           )}
 
+          {/* Payment Schedule */}
+          {usePaymentSchedule && paymentSchedule && paymentSchedule.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Clock className="h-5 w-5 text-zim-green" />
+                <h3 className="font-semibold text-lg">Payment Schedule</h3>
+              </div>
+              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-lg p-4 print:bg-purple-50 print:border">
+                <p className="text-sm text-purple-700 dark:text-purple-300 mb-3 print:text-purple-700">
+                  You've scheduled {paymentSchedule.length} payment{paymentSchedule.length > 1 ? 's' : ''} for this booking:
+                </p>
+                <div className="space-y-2">
+                  {paymentSchedule.map((installment, index) => (
+                    <div 
+                      key={installment.id} 
+                      className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-lg p-3 border border-purple-200 dark:border-purple-800 print:bg-white print:border-purple-200"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center text-xs font-bold text-purple-600 dark:text-purple-400 print:bg-purple-100 print:text-purple-600">
+                          {index + 1}
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900 dark:text-white print:text-black">
+                            £{installment.amount.toFixed(2)}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 print:text-gray-600">
+                            Due: {format(new Date(installment.date), 'MMMM d, yyyy')}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded text-xs font-medium print:bg-yellow-100 print:text-yellow-800">
+                        Pending
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 pt-3 border-t border-purple-200 dark:border-purple-700 flex justify-between items-center">
+                  <span className="text-sm font-medium text-purple-700 dark:text-purple-300 print:text-purple-700">Total Scheduled:</span>
+                  <span className="font-bold text-purple-900 dark:text-purple-100 print:text-purple-900">
+                    £{paymentSchedule.reduce((sum, inst) => sum + inst.amount, 0).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Next Steps */}
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 print:bg-blue-50 print:border-blue-200">
             <div className="flex items-start gap-3">
@@ -252,15 +398,39 @@ const BookingReceipt: React.FC<BookingReceiptProps> = ({
         </CardContent>
       </Card>
 
-      {/* Action Buttons */}
-      <div className="flex gap-4 justify-center print:hidden">
+      {/* Footer Note - inside ref for PDF */}
+      <p className="text-center text-sm text-gray-500 dark:text-gray-400 print:text-gray-600 pb-4">
+        Keep this receipt for your records. Questions? Contact us at support@zimbabweshipping.com
+      </p>
+      </div>
+      {/* End of ref wrapper */}
+
+      {/* Action Buttons - outside ref so they don't appear in PDF */}
+      <div className="flex flex-wrap gap-4 justify-center print:hidden">
+        <Button
+          onClick={handleDownloadPDF}
+          disabled={isDownloading}
+          className="flex items-center gap-2 bg-zim-green hover:bg-zim-green/90"
+        >
+          {isDownloading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Generating PDF...
+            </>
+          ) : (
+            <>
+              <Download className="h-4 w-4" />
+              Download Receipt
+            </>
+          )}
+        </Button>
         <Button
           onClick={handlePrint}
           variant="outline"
           className="flex items-center gap-2"
         >
-          <Download className="h-4 w-4" />
-          Print Receipt
+          <FileText className="h-4 w-4" />
+          Print
         </Button>
         <Button
           onClick={handleShare}
@@ -272,16 +442,12 @@ const BookingReceipt: React.FC<BookingReceiptProps> = ({
         </Button>
         <Button
           onClick={onNewBooking}
-          className="bg-zim-green hover:bg-zim-green/90"
+          variant="outline"
+          className="flex items-center gap-2"
         >
           Book Another Shipment
         </Button>
       </div>
-
-      {/* Footer Note */}
-      <p className="text-center text-sm text-gray-500 dark:text-gray-400 print:text-gray-600">
-        Keep this receipt for your records. Questions? Contact us at support@zimbabweshipping.com
-      </p>
     </div>
   );
 };
