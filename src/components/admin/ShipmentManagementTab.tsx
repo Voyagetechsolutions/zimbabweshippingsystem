@@ -75,6 +75,7 @@ import {
 } from 'lucide-react';
 
 const STATUS_OPTIONS = [
+  'Pending',
   'Booking Confirmed',
   'Ready for Pickup',
   'InTransit to Zimbabwe',
@@ -85,6 +86,7 @@ const STATUS_OPTIONS = [
 ];
 
 const STATUS_STEPS = [
+  'Pending',
   'Booking Confirmed',
   'Ready for Pickup',
   'InTransit to Zimbabwe',

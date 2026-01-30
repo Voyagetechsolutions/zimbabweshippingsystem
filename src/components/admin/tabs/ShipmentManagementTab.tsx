@@ -5,38 +5,38 @@ import { useToast } from '@/hooks/use-toast';
 import { Shipment } from '@/types/shipment';
 
 // UI Components
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
   CardDescription,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@/components/ui/select';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -49,8 +49,8 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 
 // Icons
-import { 
-  Search, 
+import {
+  Search,
   RefreshCw,
   Filter,
   ArrowUpDown,
@@ -74,6 +74,7 @@ import {
 } from 'lucide-react';
 
 const STATUS_OPTIONS = [
+  'Pending',
   'Booking Confirmed',
   'Ready for Pickup',
   'InTransit to Zimbabwe',
@@ -84,6 +85,7 @@ const STATUS_OPTIONS = [
 ];
 
 const STATUS_STEPS = [
+  'Pending',
   'Booking Confirmed',
   'Ready for Pickup',
   'InTransit to Zimbabwe',
@@ -126,7 +128,7 @@ const ShipmentManagementTab = () => {
         can_cancel: item.can_cancel !== undefined ? item.can_cancel : true,
         can_modify: item.can_modify !== undefined ? item.can_modify : true
       } as Shipment)) || [];
-      
+
       setShipments(typedData);
     } catch (error: any) {
       console.error('Error fetching shipments:', error);
@@ -147,7 +149,7 @@ const ShipmentManagementTab = () => {
 
   const handleUpdateStatus = async () => {
     if (!viewingShipment || !selectedStatus) return;
-    
+
     setIsUpdating(true);
     try {
       const { error } = await supabase
@@ -165,12 +167,12 @@ const ShipmentManagementTab = () => {
         description: `Shipment ${viewingShipment.tracking_number} status updated to ${selectedStatus}`,
       });
 
-      setShipments(shipments.map(s => 
-        s.id === viewingShipment.id 
-          ? {...s, status: selectedStatus, updated_at: new Date().toISOString()} 
+      setShipments(shipments.map(s =>
+        s.id === viewingShipment.id
+          ? { ...s, status: selectedStatus, updated_at: new Date().toISOString() }
           : s
       ));
-      
+
       setViewingShipment({
         ...viewingShipment,
         status: selectedStatus,
@@ -199,12 +201,12 @@ const ShipmentManagementTab = () => {
       setSortDirection('asc');
     }
   };
-  
+
   const getSenderName = (shipment: Shipment): string => {
     if (!shipment?.metadata) return 'No Name';
-    
+
     const metadata = shipment.metadata;
-    
+
     if (metadata.sender?.name) return metadata.sender.name;
     if (metadata.sender?.firstName && metadata.sender.lastName) {
       return `${metadata.sender.firstName} ${metadata.sender.lastName}`;
@@ -216,121 +218,121 @@ const ShipmentManagementTab = () => {
     if (metadata.firstName && metadata.lastName) return `${metadata.firstName} ${metadata.lastName}`;
     if (metadata.sender_name) return metadata.sender_name;
     if (metadata.sender_details?.name) return metadata.sender_details.name;
-    
+
     return 'No Name';
   };
-  
+
   const getSenderEmail = (shipment: Shipment): string => {
     if (!shipment?.metadata) return 'No Email';
-    
+
     const metadata = shipment.metadata;
-    return metadata.sender?.email || 
-           metadata.senderDetails?.email || 
-           metadata.email || 
-           metadata.sender_email || 
-           'No Email';
+    return metadata.sender?.email ||
+      metadata.senderDetails?.email ||
+      metadata.email ||
+      metadata.sender_email ||
+      'No Email';
   };
-  
+
   const getSenderPhone = (shipment: Shipment): string => {
     if (!shipment?.metadata) return 'No Phone';
-    
+
     const metadata = shipment.metadata;
-    return metadata.sender?.phone || 
-           metadata.senderDetails?.phone || 
-           metadata.phone || 
-           metadata.sender_phone || 
-           metadata.sender_details?.phone || 
-           metadata.sender?.additionalPhone || 
-           metadata.additionalPhone || 
-           'No Phone';
+    return metadata.sender?.phone ||
+      metadata.senderDetails?.phone ||
+      metadata.phone ||
+      metadata.sender_phone ||
+      metadata.sender_details?.phone ||
+      metadata.sender?.additionalPhone ||
+      metadata.additionalPhone ||
+      'No Phone';
   };
-  
+
   const getReceiverName = (shipment: Shipment): string => {
     if (!shipment?.metadata) return 'No Name';
-    
+
     const metadata = shipment.metadata;
-    return metadata.recipient?.name || 
-           metadata.recipientDetails?.name || 
-           metadata.recipientName || 
-           metadata.receiver_name || 
-           metadata.recipient_details?.name || 
-           'No Name';
+    return metadata.recipient?.name ||
+      metadata.recipientDetails?.name ||
+      metadata.recipientName ||
+      metadata.receiver_name ||
+      metadata.recipient_details?.name ||
+      'No Name';
   };
-  
+
   const getReceiverPhone = (shipment: Shipment): string => {
     if (!shipment?.metadata) return 'No Phone';
-    
+
     const metadata = shipment.metadata;
-    return metadata.recipient?.phone || 
-           metadata.recipientDetails?.phone || 
-           metadata.recipientPhone || 
-           metadata.receiver_phone || 
-           metadata.recipient_details?.phone || 
-           metadata.additionalRecipientPhone || 
-           metadata.recipient?.additionalPhone || 
-           'No Phone';
+    return metadata.recipient?.phone ||
+      metadata.recipientDetails?.phone ||
+      metadata.recipientPhone ||
+      metadata.receiver_phone ||
+      metadata.recipient_details?.phone ||
+      metadata.additionalRecipientPhone ||
+      metadata.recipient?.additionalPhone ||
+      'No Phone';
   };
-  
+
   const getDeliveryAddress = (shipment: Shipment): string => {
     const metadata = shipment.metadata || {};
-    return metadata.recipientDetails?.address || 
-           metadata.recipient?.address || 
-           metadata.deliveryAddress || 
-           shipment.destination || 
-           'No Address';
+    return metadata.recipientDetails?.address ||
+      metadata.recipient?.address ||
+      metadata.deliveryAddress ||
+      shipment.destination ||
+      'No Address';
   };
-  
+
   const getPickupAddress = (shipment: Shipment): string => {
     const metadata = shipment.metadata || {};
-    return metadata.senderDetails?.address || 
-           metadata.sender?.address || 
-           metadata.pickupAddress || 
-           shipment.origin || 
-           'No Address';
+    return metadata.senderDetails?.address ||
+      metadata.sender?.address ||
+      metadata.pickupAddress ||
+      shipment.origin ||
+      'No Address';
   };
 
   const getCollectionInfo = (shipment: Shipment) => {
     const metadata = shipment.metadata || {};
     let collectionData = metadata.collection;
-    
+
     if (!collectionData) {
       collectionData = {
         route: metadata.collectionRoute || metadata.route || 'Standard Route',
         date: metadata.collectionDate || metadata.date || 'Next available date',
         scheduled: metadata.collectionScheduled || metadata.scheduled || false,
-        completed: metadata.collectionCompleted || 
-                 (shipment.status !== 'Booking Confirmed' && shipment.status !== 'Ready for Pickup'),
-        notes: metadata.collectionNotes || 
-              metadata.specialInstructions ||
-              'No additional notes'
+        completed: metadata.collectionCompleted ||
+          (shipment.status !== 'Booking Confirmed' && shipment.status !== 'Ready for Pickup'),
+        notes: metadata.collectionNotes ||
+          metadata.specialInstructions ||
+          'No additional notes'
       };
     }
-    
+
     return collectionData;
   };
-  
+
   const getPaymentAmount = (shipment: Shipment): string => {
     const metadata = shipment.metadata || {};
-    const amount = metadata.payment?.amount || 
-                  metadata.paymentAmount || 
-                  metadata.amount || 
-                  metadata.totalAmount || 
-                  metadata.total || 
-                  metadata.pricing?.total || 
-                  metadata.cost || 
-                  metadata.price || 
-                  metadata.quotedAmount;
-    
+    const amount = metadata.payment?.amount ||
+      metadata.paymentAmount ||
+      metadata.amount ||
+      metadata.totalAmount ||
+      metadata.total ||
+      metadata.pricing?.total ||
+      metadata.cost ||
+      metadata.price ||
+      metadata.quotedAmount;
+
     return amount ? `£${amount}` : 'Amount to be confirmed';
   };
 
   const getShipmentType = (shipment: Shipment): { type: string; details: string } => {
     const metadata = shipment.metadata || {};
     const shipmentDetails = metadata.shipmentDetails || {};
-    
+
     const types: string[] = [];
     const details: string[] = [];
-    
+
     if (shipmentDetails.includeDrums) {
       const qty = shipmentDetails.quantity || 0;
       types.push('Drums');
@@ -339,14 +341,14 @@ const ShipmentManagementTab = () => {
         details.push('with metal seals');
       }
     }
-    
+
     if (shipmentDetails.includeOtherItems || shipmentDetails.includeBoxes) {
       types.push('Boxes/Items');
       if (shipmentDetails.category) {
         details.push(shipmentDetails.category);
       }
     }
-    
+
     if (types.length === 0) {
       // Fallback to metadata type
       if (metadata.shipmentType) {
@@ -354,9 +356,9 @@ const ShipmentManagementTab = () => {
       }
       return { type: 'Standard Shipment', details: '' };
     }
-    
-    return { 
-      type: types.join(' + '), 
+
+    return {
+      type: types.join(' + '),
       details: details.join(', ')
     };
   };
@@ -367,7 +369,7 @@ const ShipmentManagementTab = () => {
   };
 
   const filteredShipments = shipments.filter(shipment => {
-    const matchesSearch = 
+    const matchesSearch =
       searchQuery === '' ||
       shipment.tracking_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       getSenderName(shipment).toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -376,17 +378,17 @@ const ShipmentManagementTab = () => {
       getSenderEmail(shipment).toLowerCase().includes(searchQuery.toLowerCase()) ||
       shipment.origin?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       shipment.destination?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = 
+
+    const matchesStatus =
       statusFilter === 'all' ||
       shipment.status?.toLowerCase() === statusFilter.toLowerCase();
-    
+
     return matchesSearch && matchesStatus;
   });
 
   const renderStatusBadge = (status: string) => {
     const statusLower = status?.toLowerCase() || '';
-    
+
     if (statusLower.includes('cancelled')) {
       return (
         <Badge variant="destructive" className="flex items-center gap-1">
@@ -409,7 +411,7 @@ const ShipmentManagementTab = () => {
         </Badge>
       );
     }
-    
+
     return <Badge>{status}</Badge>;
   };
 
@@ -443,7 +445,7 @@ const ShipmentManagementTab = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          
+
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[180px]">
               <Filter className="h-4 w-4 mr-2" />
@@ -471,7 +473,7 @@ const ShipmentManagementTab = () => {
               <CardTitle className="text-2xl">{shipments.length}</CardTitle>
             </CardHeader>
           </Card>
-          
+
           <Card className="hover:bg-muted/50 transition-colors">
             <CardHeader className="p-4">
               <div className="flex items-center justify-between">
@@ -479,13 +481,13 @@ const ShipmentManagementTab = () => {
                 <Truck className="h-4 w-4 text-muted-foreground" />
               </div>
               <CardTitle className="text-2xl">
-                {shipments.filter(s => 
+                {shipments.filter(s =>
                   ['InTransit to Zimbabwe', 'Goods Arrived in Zimbabwe', 'Processing in ZW Warehouse']
-                  .includes(s.status)).length}
+                    .includes(s.status)).length}
               </CardTitle>
             </CardHeader>
           </Card>
-          
+
           <Card className="hover:bg-muted/50 transition-colors">
             <CardHeader className="p-4">
               <div className="flex items-center justify-between">
@@ -497,7 +499,7 @@ const ShipmentManagementTab = () => {
               </CardTitle>
             </CardHeader>
           </Card>
-          
+
           <Card className="hover:bg-muted/50 transition-colors">
             <CardHeader className="p-4">
               <div className="flex items-center justify-between">
@@ -592,8 +594,8 @@ const ShipmentManagementTab = () => {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button 
-                        variant="ghost" 
+                      <Button
+                        variant="ghost"
                         size="sm"
                         onClick={() => handleViewShipment(shipment)}
                         className="text-primary hover:text-primary"
@@ -608,7 +610,7 @@ const ShipmentManagementTab = () => {
             </Table>
           </div>
         )}
-        
+
         <div className="text-sm text-muted-foreground">
           Showing <span className="font-medium">{filteredShipments.length}</span> of{' '}
           <span className="font-medium">{shipments.length}</span> shipments
@@ -639,12 +641,11 @@ const ShipmentManagementTab = () => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <Badge className={`text-sm px-4 py-1.5 font-semibold ${
-                      viewingShipment.status === 'Delivered' ? 'bg-green-600' :
-                      viewingShipment.status === 'Cancelled' ? 'bg-red-500' :
-                      viewingShipment.status === 'InTransit to Zimbabwe' ? 'bg-blue-500' :
-                      'bg-white/20 backdrop-blur-sm'
-                    }`}>
+                    <Badge className={`text-sm px-4 py-1.5 font-semibold ${viewingShipment.status === 'Delivered' ? 'bg-green-600' :
+                        viewingShipment.status === 'Cancelled' ? 'bg-red-500' :
+                          viewingShipment.status === 'InTransit to Zimbabwe' ? 'bg-blue-500' :
+                            'bg-white/20 backdrop-blur-sm'
+                      }`}>
                       {viewingShipment.status}
                     </Badge>
                     <p className="text-white/70 text-xs mt-2">
@@ -659,31 +660,29 @@ const ShipmentManagementTab = () => {
                 <div className="flex items-center justify-between relative">
                   {/* Progress Line */}
                   <div className="absolute top-5 left-0 right-0 h-1 bg-gray-200 dark:bg-gray-700 rounded-full">
-                    <div 
+                    <div
                       className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-500"
                       style={{ width: `${getStatusProgress(viewingShipment.status)}%` }}
                     />
                   </div>
-                  
+
                   {STATUS_STEPS.map((step, index) => {
                     const isCompleted = STATUS_STEPS.indexOf(viewingShipment.status) >= index;
                     const isCurrent = STATUS_STEPS.indexOf(viewingShipment.status) === index;
                     return (
                       <div key={step} className="relative z-10 flex flex-col items-center">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                          isCompleted 
-                            ? 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30' 
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${isCompleted
+                            ? 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30'
                             : 'bg-gray-200 dark:bg-gray-700 text-gray-400'
-                        } ${isCurrent ? 'ring-4 ring-emerald-500/30 scale-110' : ''}`}>
+                          } ${isCurrent ? 'ring-4 ring-emerald-500/30 scale-110' : ''}`}>
                           {isCompleted ? (
                             <CheckCircle className="h-5 w-5" />
                           ) : (
                             <span className="text-sm font-medium">{index + 1}</span>
                           )}
                         </div>
-                        <span className={`text-xs mt-2 text-center max-w-[80px] ${
-                          isCompleted ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-gray-400'
-                        }`}>
+                        <span className={`text-xs mt-2 text-center max-w-[80px] ${isCompleted ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-gray-400'
+                          }`}>
                           {step.replace('InTransit to Zimbabwe', 'In Transit').replace('Processing in ZW Warehouse', 'Processing')}
                         </span>
                       </div>
@@ -729,7 +728,7 @@ const ShipmentManagementTab = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/50 dark:to-pink-950/50 rounded-xl p-4 border border-purple-100 dark:border-purple-900">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-purple-500 rounded-lg">
@@ -741,7 +740,7 @@ const ShipmentManagementTab = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/50 dark:to-orange-950/50 rounded-xl p-4 border border-amber-100 dark:border-amber-900">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-amber-500 rounded-lg">
@@ -753,7 +752,7 @@ const ShipmentManagementTab = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/50 dark:to-teal-950/50 rounded-xl p-4 border border-emerald-100 dark:border-emerald-900">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-emerald-500 rounded-lg">
@@ -894,8 +893,8 @@ const ShipmentManagementTab = () => {
                       Status Management
                     </h3>
                     {!editingStatus && viewingShipment.status !== 'Delivered' && viewingShipment.status !== 'Cancelled' && (
-                      <Button 
-                        size="sm" 
+                      <Button
+                        size="sm"
                         variant="secondary"
                         onClick={() => setEditingStatus(true)}
                         className="bg-white/20 hover:bg-white/30 text-white border-0"
@@ -916,8 +915,8 @@ const ShipmentManagementTab = () => {
                               </SelectTrigger>
                               <SelectContent>
                                 {STATUS_OPTIONS.map((status) => (
-                                  <SelectItem 
-                                    key={status} 
+                                  <SelectItem
+                                    key={status}
                                     value={status}
                                     disabled={status === viewingShipment.status}
                                   >
@@ -939,7 +938,7 @@ const ShipmentManagementTab = () => {
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          <Button 
+                          <Button
                             onClick={handleUpdateStatus}
                             disabled={selectedStatus === viewingShipment.status || isUpdating}
                             className="bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600"
