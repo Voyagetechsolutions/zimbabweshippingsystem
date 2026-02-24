@@ -1,8 +1,8 @@
 -- ============================================
--- Service Reviews — safe to re-run
+-- Service Reviews v2 — safe to re-run
 -- ============================================
 
--- Drop old tables (cascade drops their policies + indexes too)
+-- Drop old tables (cascade drops policies + indexes)
 drop table if exists public.service_reviews cascade;
 drop table if exists public.feedback_custom_questions cascade;
 
@@ -12,29 +12,35 @@ create table public.service_reviews (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
 
+  -- Identity
   full_name text not null,
   customer_reference_number text not null,
 
-  how_heard_about_us text not null,
-  how_heard_other text null,
+  -- Overall experience (1-3 stars)
+  overall_experience int not null check (overall_experience between 1 and 3),
 
-  overall_experience int not null check (overall_experience between 1 and 5),
+  -- Overall customer service (1-3 stars)
+  overall_customer_service int not null check (overall_customer_service between 1 and 3),
 
-  satisfaction_delivery_time int not null check (satisfaction_delivery_time between 1 and 5),
-  satisfaction_customer_service int not null check (satisfaction_customer_service between 1 and 5),
-  satisfaction_parcel_safety int not null check (satisfaction_parcel_safety between 1 and 5),
-  satisfaction_price_fairness int not null check (satisfaction_price_fairness between 1 and 5),
+  -- Satisfaction ratings (1-3 stars each)
+  satisfaction_bookings_customer_service int not null check (satisfaction_bookings_customer_service between 1 and 3),
+  satisfaction_collections_uk int not null check (satisfaction_collections_uk between 1 and 3),
+  satisfaction_accounts int not null check (satisfaction_accounts between 1 and 3),
+  satisfaction_deliveries int not null check (satisfaction_deliveries between 1 and 3),
 
-  parcel_arrived_on_time text not null check (parcel_arrived_on_time in ('yes','no','partially')),
-  would_recommend text not null check (would_recommend in ('definitely','maybe','no')),
+  -- Did your parcel arrive as anticipated?
+  parcel_arrived_as_anticipated text not null check (parcel_arrived_as_anticipated in ('yes','no','partially')),
 
-  has_additional_comments boolean not null,
+  -- Additional comments (toggle + text)
+  has_additional_comments boolean not null default false,
   additional_comments text null,
 
+  -- Dynamic custom question answers
   custom_answers jsonb null default '{}'::jsonb
 );
 
 create index service_reviews_ref_idx on public.service_reviews (customer_reference_number);
+
 alter table public.service_reviews enable row level security;
 
 create policy "Allow public inserts"

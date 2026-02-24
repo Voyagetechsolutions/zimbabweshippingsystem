@@ -1,524 +1,319 @@
-
 import React, { useState, useEffect } from 'react';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
-import WhatsAppButton from '@/components/WhatsAppButton';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Star, Send, CheckCircle2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
+import { Star, CheckCircle, Send, User, Hash, Package, MessageSquare } from 'lucide-react';
 
-/* ───────── types ───────── */
+/* ──────── star-label map ──────── */
+const STAR_LABELS: Record<number, string> = { 1: 'Poor', 2: 'Good', 3: 'Excellent' };
+
+/* ──────── Custom-question types ──────── */
 interface CustomQuestion {
     id: string;
     question_text: string;
     question_type: 'text' | 'select' | 'radio' | 'linear_scale';
     options: any;
     is_required: boolean;
-    sort_order: number;
 }
 
-const HOW_HEARD_OPTIONS = [
-    { value: 'social_media', label: 'Social Media' },
-    { value: 'referral', label: 'Referral / Word of Mouth' },
-    { value: 'website', label: 'Website' },
-    { value: 'other', label: 'Other' },
-];
-
-const SATISFACTION_LABELS = ['Very Unsatisfied', 'Unsatisfied', 'Neutral', 'Satisfied', 'Very Satisfied'];
-const SATISFACTION_ROWS = [
-    { key: 'satisfaction_delivery_time', label: 'Delivery time' },
-    { key: 'satisfaction_customer_service', label: 'Customer service' },
-    { key: 'satisfaction_parcel_safety', label: 'Parcel safety / packaging' },
-    { key: 'satisfaction_price_fairness', label: 'Price fairness' },
-] as const;
-
-/* ───────── small components ───────── */
-const inputCls =
-    'w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-zim-green/50 focus:border-zim-green transition-all';
-
-const RequiredMark = () => <span className="text-zim-yellow">*</span>;
-
-const LinearScale = ({
-    value,
-    onChange,
-    min = 1,
-    max = 5,
-    minLabel = 'Very Poor',
-    maxLabel = 'Excellent',
-}: {
-    value: number;
-    onChange: (n: number) => void;
-    min?: number;
-    max?: number;
-    minLabel?: string;
-    maxLabel?: string;
-}) => {
-    const range = Array.from({ length: max - min + 1 }, (_, i) => min + i);
-    return (
-        <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 px-1">
-                <span>{minLabel}</span>
-                <span>{maxLabel}</span>
-            </div>
-            <div className="flex gap-2">
-                {range.map((n) => (
+/* ──────── 3-Star rating component ──────── */
+interface StarRatingProps { label: string; icon?: React.ReactNode; value: number; onChange: (v: number) => void }
+const StarRating: React.FC<StarRatingProps> = ({ label, icon, value, onChange }) => (
+    <div className="space-y-2">
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            {icon}{label} <span className="text-zim-yellow">*</span>
+        </label>
+        <div className="flex items-center gap-2">
+            <div className="flex gap-1.5">
+                {[1, 2, 3].map((star) => (
                     <button
-                        key={n}
+                        key={star}
                         type="button"
-                        onClick={() => onChange(n)}
-                        className={`flex-1 py-2.5 rounded-lg border text-sm font-medium transition-all duration-200 ${n === value
-                                ? 'border-zim-green bg-zim-green/15 text-zim-green shadow-sm'
-                                : 'border-gray-300 dark:border-gray-600 text-gray-500 hover:border-zim-green/40'
+                        onClick={() => onChange(star)}
+                        className={`w-10 h-10 rounded-lg border transition-all duration-200 flex items-center justify-center text-lg
+              ${star <= value
+                                ? 'border-zim-yellow/70 bg-zim-yellow/15 text-zim-yellow scale-105 shadow-sm'
+                                : 'border-gray-300 dark:border-gray-600 bg-white/5 text-gray-400 hover:border-zim-yellow/40 hover:text-zim-yellow/60'
                             }`}
+                        aria-label={`${star} star`}
                     >
-                        {n}
+                        <Star className={`h-5 w-5 ${star <= value ? 'fill-current' : ''}`} />
                     </button>
                 ))}
             </div>
+            {value > 0 && <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">{STAR_LABELS[value]}</span>}
         </div>
-    );
-};
-
-const RadioGroup = ({
-    options,
-    value,
-    onChange,
-}: {
-    options: { value: string; label: string }[];
-    value: string;
-    onChange: (v: string) => void;
-}) => (
-    <div className="flex flex-col gap-2">
-        {options.map((opt) => (
-            <label
-                key={opt.value}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all ${value === opt.value
-                        ? 'border-zim-green bg-zim-green/10'
-                        : 'border-gray-300 dark:border-gray-600 hover:border-zim-green/40'
-                    }`}
-            >
-                <div
-                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${value === opt.value ? 'border-zim-green' : 'border-gray-400'
-                        }`}
-                >
-                    {value === opt.value && <div className="w-2.5 h-2.5 rounded-full bg-zim-green" />}
-                </div>
-                <span className="text-sm text-gray-800 dark:text-gray-200">{opt.label}</span>
-            </label>
-        ))}
     </div>
 );
 
-/* ───────── satisfaction grid ───────── */
-const SatisfactionGrid = ({
-    values,
-    onChange,
-}: {
-    values: Record<string, number>;
-    onChange: (key: string, v: number) => void;
-}) => (
-    <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-            <thead>
-                <tr>
-                    <th className="text-left py-2 pr-4 text-gray-500 dark:text-gray-400 font-medium" />
-                    {SATISFACTION_LABELS.map((l, i) => (
-                        <th key={i} className="text-center px-2 py-2 text-xs text-gray-500 dark:text-gray-400 font-medium whitespace-nowrap">
-                            {l}
-                        </th>
-                    ))}
-                </tr>
-            </thead>
-            <tbody>
-                {SATISFACTION_ROWS.map((row) => (
-                    <tr key={row.key} className="border-t border-gray-100 dark:border-gray-700">
-                        <td className="py-3 pr-4 font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">{row.label}</td>
-                        {[1, 2, 3, 4, 5].map((n) => (
-                            <td key={n} className="text-center px-2 py-3">
-                                <button
-                                    type="button"
-                                    onClick={() => onChange(row.key, n)}
-                                    className={`w-8 h-8 rounded-full border-2 transition-all mx-auto flex items-center justify-center ${values[row.key] === n
-                                            ? 'border-zim-green bg-zim-green text-white'
-                                            : 'border-gray-300 dark:border-gray-600 hover:border-zim-green/50'
-                                        }`}
-                                >
-                                    {values[row.key] === n && <CheckCircle2 className="h-4 w-4" />}
-                                </button>
-                            </td>
-                        ))}
-                    </tr>
-                ))}
-            </tbody>
-        </table>
-    </div>
-);
-
-/* ───────── render custom question ───────── */
-const RenderCustomQuestion = ({
-    q,
-    value,
-    onChange,
-}: {
-    q: CustomQuestion;
-    value: string;
-    onChange: (v: string) => void;
-}) => {
-    switch (q.question_type) {
-        case 'text':
-            return <input type="text" value={value} onChange={(e) => onChange(e.target.value)} placeholder="Your answer..." className={inputCls} />;
-        case 'select':
-            return (
-                <select value={value} onChange={(e) => onChange(e.target.value)} className={inputCls}>
-                    <option value="" disabled>Select one</option>
-                    {(q.options as string[])?.map((opt: string) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                </select>
-            );
-        case 'radio':
-            return (
-                <RadioGroup
-                    options={(q.options as string[])?.map((o: string) => ({ value: o, label: o })) || []}
-                    value={value}
-                    onChange={onChange}
-                />
-            );
-        case 'linear_scale': {
-            const opts = q.options as { min?: number; max?: number; min_label?: string; max_label?: string } | null;
-            return (
-                <LinearScale
-                    value={value ? parseInt(value, 10) : 0}
-                    onChange={(n) => onChange(String(n))}
-                    min={opts?.min ?? 1}
-                    max={opts?.max ?? 5}
-                    minLabel={opts?.min_label ?? ''}
-                    maxLabel={opts?.max_label ?? ''}
-                />
-            );
-        }
-        default:
-            return null;
-    }
-};
-
-/* ═══════════════════════════════════════════
-   MAIN COMPONENT
-   ═══════════════════════════════════════════ */
-const Feedback: React.FC = () => {
+/* ══════════════════════════════════════ */
+/*           Feedback Page               */
+/* ══════════════════════════════════════ */
+const Feedback = () => {
     const { toast } = useToast();
-    const [submitting, setSubmitting] = useState(false);
-    const [submitted, setSubmitted] = useState(false);
-    const [customQuestions, setCustomQuestions] = useState<CustomQuestion[]>([]);
 
-    // Fixed fields
+    /* ── fixed fields ── */
     const [fullName, setFullName] = useState('');
     const [refNo, setRefNo] = useState('');
-    const [howHeard, setHowHeard] = useState('');
-    const [howHeardOther, setHowHeardOther] = useState('');
     const [overallExperience, setOverallExperience] = useState(0);
-    const [satisfaction, setSatisfaction] = useState<Record<string, number>>({});
-    const [arrivedOnTime, setArrivedOnTime] = useState('');
-    const [wouldRecommend, setWouldRecommend] = useState('');
-    const [hasComments, setHasComments] = useState('');
+    const [overallCustomerService, setOverallCustomerService] = useState(0);
+    const [satBookings, setSatBookings] = useState(0);
+    const [satCollections, setSatCollections] = useState(0);
+    const [satAccounts, setSatAccounts] = useState(0);
+    const [satDeliveries, setSatDeliveries] = useState(0);
+    const [parcelArrived, setParcelArrived] = useState('');
+    const [hasComments, setHasComments] = useState(false);
     const [comments, setComments] = useState('');
 
-    // Dynamic custom answers
+    /* ── dynamic custom questions ── */
+    const [customQuestions, setCustomQuestions] = useState<CustomQuestion[]>([]);
     const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({});
 
+    const [submitting, setSubmitting] = useState(false);
+    const [submitted, setSubmitted] = useState(false);
+
+    /* fetch active custom questions */
     useEffect(() => {
-        const load = async () => {
-            try {
-                const { data } = await (supabase
-                    .from('feedback_custom_questions' as any)
-                    .select('*')
-                    .eq('is_active', true)
-                    .order('sort_order', { ascending: true }) as any);
-                if (data) setCustomQuestions(data as CustomQuestion[]);
-            } catch (e) {
-                console.error('Failed to load custom questions', e);
-            }
-        };
-        load();
+        document.title = 'Feedback | Zimbabwe Shipping';
+        (async () => {
+            const { data } = await (supabase
+                .from('feedback_custom_questions' as any)
+                .select('*')
+                .eq('is_active', true)
+                .order('sort_order') as any);
+            if (data) setCustomQuestions(data as CustomQuestion[]);
+        })();
     }, []);
 
-    const resetForm = () => {
-        setFullName('');
-        setRefNo('');
-        setHowHeard('');
-        setHowHeardOther('');
-        setOverallExperience(0);
-        setSatisfaction({});
-        setArrivedOnTime('');
-        setWouldRecommend('');
-        setHasComments('');
-        setComments('');
-        setCustomAnswers({});
+    /* ── validation ── */
+    const isValid = () => {
+        if (!fullName.trim() || !refNo.trim()) return false;
+        if (overallExperience === 0 || overallCustomerService === 0) return false;
+        if (satBookings === 0 || satCollections === 0 || satAccounts === 0 || satDeliveries === 0) return false;
+        if (!parcelArrived) return false;
+        for (const q of customQuestions) {
+            if (q.is_required && !customAnswers[q.id]?.trim()) return false;
+        }
+        return true;
     };
 
+    /* ── submit ── */
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-
-        // Validations
-        if (!fullName.trim() || !refNo.trim()) {
-            toast({ title: 'Missing Fields', description: 'Full name and reference number are required.', variant: 'destructive' });
+        if (!isValid()) {
+            toast({ title: 'Please fill in all required fields', variant: 'destructive' });
             return;
         }
-        if (!howHeard) {
-            toast({ title: 'Missing Field', description: 'Please tell us how you heard about us.', variant: 'destructive' });
-            return;
-        }
-        if (overallExperience === 0) {
-            toast({ title: 'Missing Rating', description: 'Please rate your overall experience.', variant: 'destructive' });
-            return;
-        }
-        const missingSatisfaction = SATISFACTION_ROWS.filter((r) => !satisfaction[r.key]);
-        if (missingSatisfaction.length > 0) {
-            toast({ title: 'Missing Satisfaction Ratings', description: `Please rate: ${missingSatisfaction.map((r) => r.label).join(', ')}`, variant: 'destructive' });
-            return;
-        }
-        if (!arrivedOnTime) {
-            toast({ title: 'Missing Field', description: 'Please indicate if your parcel arrived on time.', variant: 'destructive' });
-            return;
-        }
-        if (!wouldRecommend) {
-            toast({ title: 'Missing Field', description: 'Please indicate if you would recommend us.', variant: 'destructive' });
-            return;
-        }
-        if (!hasComments) {
-            toast({ title: 'Missing Field', description: 'Please indicate whether you have additional comments.', variant: 'destructive' });
-            return;
-        }
-
-        // Validate required custom questions
-        const missingCustom = customQuestions.filter((q) => q.is_required && !customAnswers[q.id]?.trim());
-        if (missingCustom.length > 0) {
-            toast({ title: 'Missing Answers', description: `Please answer: ${missingCustom.map((q) => q.question_text).join(', ')}`, variant: 'destructive' });
-            return;
-        }
-
         setSubmitting(true);
         try {
             const { error } = await (supabase.from('service_reviews' as any).insert({
                 full_name: fullName.trim(),
                 customer_reference_number: refNo.trim(),
-                how_heard_about_us: howHeard,
-                how_heard_other: howHeard === 'other' ? howHeardOther.trim() : null,
                 overall_experience: overallExperience,
-                satisfaction_delivery_time: satisfaction.satisfaction_delivery_time,
-                satisfaction_customer_service: satisfaction.satisfaction_customer_service,
-                satisfaction_parcel_safety: satisfaction.satisfaction_parcel_safety,
-                satisfaction_price_fairness: satisfaction.satisfaction_price_fairness,
-                parcel_arrived_on_time: arrivedOnTime,
-                would_recommend: wouldRecommend,
-                has_additional_comments: hasComments === 'true',
-                additional_comments: hasComments === 'true' ? comments.trim() : null,
+                overall_customer_service: overallCustomerService,
+                satisfaction_bookings_customer_service: satBookings,
+                satisfaction_collections_uk: satCollections,
+                satisfaction_accounts: satAccounts,
+                satisfaction_deliveries: satDeliveries,
+                parcel_arrived_as_anticipated: parcelArrived,
+                has_additional_comments: hasComments,
+                additional_comments: hasComments ? comments.trim() || null : null,
                 custom_answers: Object.keys(customAnswers).length > 0 ? customAnswers : null,
-            } as any) as any);
-
+            }) as any);
             if (error) throw error;
-
             setSubmitted(true);
-            resetForm();
-        } catch (err: any) {
-            console.error('Submission error:', err);
-            toast({ title: 'Submission Failed', description: 'Something went wrong. Please try again.', variant: 'destructive' });
+        } catch {
+            toast({ title: 'Something went wrong', description: 'Please try again later.', variant: 'destructive' });
         } finally {
             setSubmitting(false);
         }
     };
 
-    // ─── Success Screen ───
-    if (submitted) {
-        return (
-            <div className="min-h-screen flex flex-col">
-                <Navbar />
-                <main className="flex-grow flex items-center justify-center bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 py-16">
-                    <div className="max-w-md mx-auto text-center px-4">
-                        <div className="w-20 h-20 bg-zim-green/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <CheckCircle2 className="h-10 w-10 text-zim-green" />
-                        </div>
-                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">Thank You!</h1>
-                        <p className="text-gray-600 dark:text-gray-300 mb-8">Your feedback has been submitted successfully. We truly appreciate you taking the time to help us improve.</p>
-                        <Button onClick={() => setSubmitted(false)} className="bg-zim-green hover:bg-zim-green/90 text-white">
-                            Submit Another Review
-                        </Button>
-                    </div>
-                </main>
-                <Footer />
-                <WhatsAppButton />
-            </div>
-        );
-    }
+    /* ── reset ── */
+    const resetForm = () => {
+        setFullName(''); setRefNo('');
+        setOverallExperience(0); setOverallCustomerService(0);
+        setSatBookings(0); setSatCollections(0); setSatAccounts(0); setSatDeliveries(0);
+        setParcelArrived(''); setHasComments(false); setComments('');
+        setCustomAnswers({}); setSubmitted(false);
+    };
 
-    // ─── Form ───
+    /* ══════ Render ══════ */
     return (
-        <div className="min-h-screen flex flex-col">
+        <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
             <Navbar />
-            <main className="flex-grow">
-                <div className="bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 py-16">
-                    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-                        {/* Header */}
-                        <div className="text-center mb-12">
-                            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">Service Review</h1>
-                            <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-                                Thank you for using our shipping services. This takes about 2–3 minutes and helps us improve.
-                            </p>
-                            <div className="flex justify-center mt-6">
-                                <div className="h-1 w-20 bg-zim-green rounded-full mx-1" />
-                                <div className="h-1 w-20 bg-zim-yellow rounded-full mx-1" />
-                                <div className="h-1 w-20 bg-zim-red rounded-full mx-1" />
-                            </div>
+            <main className="container max-w-2xl mx-auto px-4 py-12">
+
+                {/* ── Success Screen ── */}
+                {submitted ? (
+                    <div className="text-center py-16 space-y-4">
+                        <div className="w-20 h-20 mx-auto rounded-full bg-green-100 flex items-center justify-center">
+                            <CheckCircle className="h-10 w-10 text-green-600" />
                         </div>
-
-                        {/* Card */}
-                        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border border-gray-100 dark:border-gray-700">
-                            <div className="p-6 sm:p-8">
-                                <form onSubmit={handleSubmit} className="space-y-8">
-                                    {/* ── 1. Identity ── */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name <RequiredMark /></label>
-                                            <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} required placeholder="e.g. Tendai M." className={inputCls} />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer Reference Number <RequiredMark /></label>
-                                            <input type="text" value={refNo} onChange={(e) => setRefNo(e.target.value)} required placeholder="e.g. ZS-UK-10293" className={inputCls} />
-                                        </div>
-                                    </div>
-
-                                    {/* ── 2. How heard ── */}
-                                    <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                                            How did you hear about our shipping service? <RequiredMark />
-                                        </label>
-                                        <RadioGroup options={HOW_HEARD_OPTIONS} value={howHeard} onChange={setHowHeard} />
-                                        {howHeard === 'other' && (
-                                            <input
-                                                type="text"
-                                                value={howHeardOther}
-                                                onChange={(e) => setHowHeardOther(e.target.value)}
-                                                placeholder="Please specify..."
-                                                className={`${inputCls} mt-3`}
-                                            />
-                                        )}
-                                    </div>
-
-                                    {/* ── 3. Overall Experience 1-5 ── */}
-                                    <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                                            Rate your overall experience with us. <RequiredMark />
-                                        </label>
-                                        <LinearScale value={overallExperience} onChange={setOverallExperience} minLabel="Very Poor" maxLabel="Excellent" />
-                                    </div>
-
-                                    {/* ── 4. Satisfaction Grid ── */}
-                                    <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                                            How satisfied were you with the following? <RequiredMark />
-                                        </label>
-                                        <SatisfactionGrid values={satisfaction} onChange={(k, v) => setSatisfaction((prev) => ({ ...prev, [k]: v }))} />
-                                    </div>
-
-                                    {/* ── 5. Parcel arrived on time ── */}
-                                    <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                                            Did your parcel arrive on time? <RequiredMark />
-                                        </label>
-                                        <RadioGroup
-                                            options={[
-                                                { value: 'yes', label: 'Yes' },
-                                                { value: 'no', label: 'No' },
-                                                { value: 'partially', label: 'Partially' },
-                                            ]}
-                                            value={arrivedOnTime}
-                                            onChange={setArrivedOnTime}
-                                        />
-                                    </div>
-
-                                    {/* ── 6. Would Recommend ── */}
-                                    <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                                            Would you recommend us to others? <RequiredMark />
-                                        </label>
-                                        <RadioGroup
-                                            options={[
-                                                { value: 'definitely', label: 'Definitely' },
-                                                { value: 'maybe', label: 'Maybe' },
-                                                { value: 'no', label: 'No' },
-                                            ]}
-                                            value={wouldRecommend}
-                                            onChange={setWouldRecommend}
-                                        />
-                                    </div>
-
-                                    {/* ── 7. Additional Comments ── */}
-                                    <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                            Any additional comments? <RequiredMark />
-                                        </label>
-                                        <select value={hasComments} onChange={(e) => setHasComments(e.target.value)} required className={inputCls}>
-                                            <option value="" disabled>Select one</option>
-                                            <option value="true">Yes</option>
-                                            <option value="false">No</option>
-                                        </select>
-                                        {hasComments === 'true' && (
-                                            <textarea value={comments} onChange={(e) => setComments(e.target.value)} placeholder="Write your comment here..." rows={4} className={`${inputCls} mt-3 resize-vertical`} />
-                                        )}
-                                    </div>
-
-                                    {/* ── 8. Dynamic Custom Questions ── */}
-                                    {customQuestions.length > 0 && (
-                                        <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-6">
-                                            <h2 className="text-xs font-semibold tracking-wider uppercase text-gray-500 dark:text-gray-400">
-                                                Additional Questions
-                                            </h2>
-                                            {customQuestions.map((q) => (
-                                                <div key={q.id}>
-                                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                                        {q.question_text} {q.is_required && <RequiredMark />}
-                                                    </label>
-                                                    <RenderCustomQuestion
-                                                        q={q}
-                                                        value={customAnswers[q.id] || ''}
-                                                        onChange={(v) => setCustomAnswers((prev) => ({ ...prev, [q.id]: v }))}
-                                                    />
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {/* ── Submit ── */}
-                                    <Button
-                                        type="submit"
-                                        disabled={submitting}
-                                        className="w-full py-6 rounded-xl text-base font-semibold bg-gradient-to-r from-zim-green to-zim-green/80 hover:from-zim-green/90 hover:to-zim-green/70 text-white shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-60"
-                                    >
-                                        {submitting ? (
-                                            <span className="flex items-center justify-center gap-2">
-                                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
-                                                Submitting...
-                                            </span>
-                                        ) : (
-                                            <span className="flex items-center justify-center gap-2">
-                                                <Send className="h-5 w-5" />
-                                                Submit Review
-                                            </span>
-                                        )}
-                                    </Button>
-
-                                    <p className="text-xs text-center text-gray-500 dark:text-gray-400">
-                                        By submitting, you confirm this feedback is honest and related to your shipment experience.
-                                    </p>
-                                </form>
-                            </div>
-                        </div>
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Thank you for your feedback!</h2>
+                        <p className="text-gray-500 dark:text-gray-400">Your response helps us improve our service.</p>
+                        <button onClick={resetForm} className="mt-4 px-6 py-2 rounded-lg bg-zim-green text-white font-medium hover:bg-zim-green/90 transition">
+                            Submit Another
+                        </button>
                     </div>
-                </div>
+                ) : (
+                    <>
+                        {/* Header */}
+                        <div className="text-center mb-10">
+                            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Service Feedback</h1>
+                            <p className="text-gray-500 dark:text-gray-400 mt-2">We value your opinion — please take a moment to rate our service.</p>
+                        </div>
+
+                        <form onSubmit={handleSubmit} className="space-y-8">
+                            {/* ─── Identity ─── */}
+                            <section className="bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-4">
+                                <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2"><User className="h-5 w-5 text-zim-green" /> Your Details</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name <span className="text-zim-yellow">*</span></label>
+                                        <input value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green" placeholder="Your full name" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer Reference <span className="text-zim-yellow">*</span></label>
+                                        <div className="relative">
+                                            <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                            <input value={refNo} onChange={(e) => setRefNo(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green" placeholder="e.g. ZS-12345" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* ─── Overall Ratings ─── */}
+                            <section className="bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-5">
+                                <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2"><Star className="h-5 w-5 text-zim-yellow" /> Overall Ratings</h3>
+                                <StarRating label="Rate Overall Experience" value={overallExperience} onChange={setOverallExperience} />
+                                <StarRating label="Overall Customer Service" value={overallCustomerService} onChange={setOverallCustomerService} />
+                            </section>
+
+                            {/* ─── Satisfaction Grid ─── */}
+                            <section className="bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-5">
+                                <h3 className="font-semibold text-gray-900 dark:text-white">Satisfied with the following</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                    <StarRating label="Bookings & Customer Service" value={satBookings} onChange={setSatBookings} />
+                                    <StarRating label="Collections (UK)" value={satCollections} onChange={setSatCollections} />
+                                    <StarRating label="Accounts" value={satAccounts} onChange={setSatAccounts} />
+                                    <StarRating label="Deliveries" value={satDeliveries} onChange={setSatDeliveries} />
+                                </div>
+                            </section>
+
+                            {/* ─── Parcel Arrival ─── */}
+                            <section className="bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-3">
+                                <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2"><Package className="h-5 w-5 text-zim-green" /> Did your parcel arrive as anticipated? <span className="text-zim-yellow">*</span></h3>
+                                <div className="flex flex-wrap gap-3">
+                                    {[
+                                        { value: 'yes', label: 'Yes', emoji: '✅' },
+                                        { value: 'no', label: 'No', emoji: '❌' },
+                                        { value: 'partially', label: 'Partially', emoji: '⚠️' },
+                                    ].map((opt) => (
+                                        <button
+                                            key={opt.value}
+                                            type="button"
+                                            onClick={() => setParcelArrived(opt.value)}
+                                            className={`px-5 py-2.5 rounded-lg border font-medium text-sm transition-all duration-200 flex items-center gap-2
+                        ${parcelArrived === opt.value
+                                                    ? 'border-zim-green bg-zim-green/10 text-zim-green shadow-sm'
+                                                    : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-zim-green/40'}`}
+                                        >
+                                            <span>{opt.emoji}</span> {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </section>
+
+                            {/* ─── Additional Comments ─── */}
+                            <section className="bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-3">
+                                <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2"><MessageSquare className="h-5 w-5 text-zim-green" /> Any additional comments?</h3>
+                                <div className="flex gap-3">
+                                    {['yes', 'no'].map((val) => (
+                                        <button
+                                            key={val}
+                                            type="button"
+                                            onClick={() => { setHasComments(val === 'yes'); if (val === 'no') setComments(''); }}
+                                            className={`px-5 py-2 rounded-lg border font-medium text-sm transition-all
+                        ${(val === 'yes' ? hasComments : !hasComments)
+                                                    ? 'border-zim-green bg-zim-green/10 text-zim-green'
+                                                    : 'border-gray-300 dark:border-gray-600 text-gray-500 hover:border-zim-green/40'}`}
+                                        >
+                                            {val === 'yes' ? 'Yes' : 'No'}
+                                        </button>
+                                    ))}
+                                </div>
+                                {hasComments && (
+                                    <textarea
+                                        value={comments}
+                                        onChange={(e) => setComments(e.target.value)}
+                                        rows={4}
+                                        className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green resize-none"
+                                        placeholder="Tell us more..."
+                                    />
+                                )}
+                            </section>
+
+                            {/* ─── Dynamic Custom Questions ─── */}
+                            {customQuestions.length > 0 && (
+                                <section className="bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-5">
+                                    <h3 className="font-semibold text-gray-900 dark:text-white">Additional Questions</h3>
+                                    {customQuestions.map((q) => (
+                                        <div key={q.id} className="space-y-2">
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                {q.question_text} {q.is_required && <span className="text-zim-yellow">*</span>}
+                                            </label>
+
+                                            {q.question_type === 'text' && (
+                                                <input value={customAnswers[q.id] || ''} onChange={(e) => setCustomAnswers({ ...customAnswers, [q.id]: e.target.value })} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green" />
+                                            )}
+
+                                            {(q.question_type === 'select' || q.question_type === 'radio') && (
+                                                <div className="flex flex-wrap gap-2">
+                                                    {(q.options as string[])?.map((opt: string) => (
+                                                        <button key={opt} type="button" onClick={() => setCustomAnswers({ ...customAnswers, [q.id]: opt })}
+                                                            className={`px-4 py-2 rounded-lg border text-sm transition-all
+                                ${customAnswers[q.id] === opt ? 'border-zim-green bg-zim-green/10 text-zim-green' : 'border-gray-300 dark:border-gray-600 text-gray-500 hover:border-zim-green/40'}`}>
+                                                            {opt}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {q.question_type === 'linear_scale' && (
+                                                <div className="flex gap-2">
+                                                    {[1, 2, 3, 4, 5].map((n) => (
+                                                        <button key={n} type="button" onClick={() => setCustomAnswers({ ...customAnswers, [q.id]: String(n) })}
+                                                            className={`w-10 h-10 rounded-lg border font-medium transition-all
+                                ${customAnswers[q.id] === String(n) ? 'border-zim-green bg-zim-green/10 text-zim-green' : 'border-gray-300 dark:border-gray-600 text-gray-500 hover:border-zim-green/40'}`}>
+                                                            {n}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </section>
+                            )}
+
+                            {/* ─── Submit ─── */}
+                            <button
+                                type="submit"
+                                disabled={submitting || !isValid()}
+                                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-zim-green to-zim-green/80 text-white font-semibold text-lg flex items-center justify-center gap-2 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            >
+                                {submitting ? (
+                                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                ) : (
+                                    <><Send className="h-5 w-5" /> Submit Feedback</>
+                                )}
+                            </button>
+                        </form>
+                    </>
+                )}
             </main>
             <Footer />
-            <WhatsAppButton />
         </div>
     );
 };

@@ -693,15 +693,13 @@ export type Database = {
           created_at: string
           full_name: string
           customer_reference_number: string
-          how_heard_about_us: string
-          how_heard_other: string | null
           overall_experience: number
-          satisfaction_delivery_time: number
-          satisfaction_customer_service: number
-          satisfaction_parcel_safety: number
-          satisfaction_price_fairness: number
-          parcel_arrived_on_time: string
-          would_recommend: string
+          overall_customer_service: number
+          satisfaction_bookings_customer_service: number
+          satisfaction_collections_uk: number
+          satisfaction_accounts: number
+          satisfaction_deliveries: number
+          parcel_arrived_as_anticipated: string
           has_additional_comments: boolean
           additional_comments: string | null
           custom_answers: Record<string, string> | null
@@ -711,15 +709,13 @@ export type Database = {
           created_at?: string
           full_name: string
           customer_reference_number: string
-          how_heard_about_us: string
-          how_heard_other?: string | null
           overall_experience: number
-          satisfaction_delivery_time: number
-          satisfaction_customer_service: number
-          satisfaction_parcel_safety: number
-          satisfaction_price_fairness: number
-          parcel_arrived_on_time: string
-          would_recommend: string
+          overall_customer_service: number
+          satisfaction_bookings_customer_service: number
+          satisfaction_collections_uk: number
+          satisfaction_accounts: number
+          satisfaction_deliveries: number
+          parcel_arrived_as_anticipated: string
           has_additional_comments: boolean
           additional_comments?: string | null
           custom_answers?: Record<string, string> | null
@@ -729,15 +725,13 @@ export type Database = {
           created_at?: string
           full_name?: string
           customer_reference_number?: string
-          how_heard_about_us?: string
-          how_heard_other?: string | null
           overall_experience?: number
-          satisfaction_delivery_time?: number
-          satisfaction_customer_service?: number
-          satisfaction_parcel_safety?: number
-          satisfaction_price_fairness?: number
-          parcel_arrived_on_time?: string
-          would_recommend?: string
+          overall_customer_service?: number
+          satisfaction_bookings_customer_service?: number
+          satisfaction_collections_uk?: number
+          satisfaction_accounts?: number
+          satisfaction_deliveries?: number
+          parcel_arrived_as_anticipated?: string
           has_additional_comments?: boolean
           additional_comments?: string | null
           custom_answers?: Record<string, string> | null

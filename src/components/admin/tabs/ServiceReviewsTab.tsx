@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -19,7 +18,6 @@ import {
     ChevronUp,
     Settings2,
     ClipboardList,
-    ThumbsUp,
 } from 'lucide-react';
 import CustomQuestionsManager from './CustomQuestionsManager';
 
@@ -28,15 +26,13 @@ interface ServiceReview {
     created_at: string;
     full_name: string;
     customer_reference_number: string;
-    how_heard_about_us: string;
-    how_heard_other: string | null;
     overall_experience: number;
-    satisfaction_delivery_time: number;
-    satisfaction_customer_service: number;
-    satisfaction_parcel_safety: number;
-    satisfaction_price_fairness: number;
-    parcel_arrived_on_time: string;
-    would_recommend: string;
+    overall_customer_service: number;
+    satisfaction_bookings_customer_service: number;
+    satisfaction_collections_uk: number;
+    satisfaction_accounts: number;
+    satisfaction_deliveries: number;
+    parcel_arrived_as_anticipated: string;
     has_additional_comments: boolean;
     additional_comments: string | null;
     custom_answers: Record<string, string> | null;
@@ -47,19 +43,12 @@ interface CustomQuestion {
     question_text: string;
 }
 
-const HOW_HEARD_LABELS: Record<string, string> = {
-    social_media: 'Social Media',
-    referral: 'Referral / Word of Mouth',
-    website: 'Website',
-    other: 'Other',
-};
-
-const Stars5 = ({ count }: { count: number }) => (
+const Stars3 = ({ count }: { count: number }) => (
     <div className="flex items-center gap-0.5">
-        {[1, 2, 3, 4, 5].map((i) => (
+        {[1, 2, 3].map((i) => (
             <Star key={i} className={`h-3.5 w-3.5 ${i <= count ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
         ))}
-        <span className="ml-1.5 text-xs text-gray-500">{count}/5</span>
+        <span className="ml-1.5 text-xs text-gray-500">{count}/3</span>
     </div>
 );
 
@@ -118,18 +107,10 @@ const ServiceReviewsTab: React.FC = () => {
                     <p className="text-gray-500 text-sm mt-1">Customer feedback ({reviews.length} total)</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button
-                        variant={view === 'reviews' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setView('reviews')}
-                    >
+                    <Button variant={view === 'reviews' ? 'default' : 'outline'} size="sm" onClick={() => setView('reviews')}>
                         <ClipboardList className="h-4 w-4 mr-1" /> Reviews
                     </Button>
-                    <Button
-                        variant={view === 'questions' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setView('questions')}
-                    >
+                    <Button variant={view === 'questions' ? 'default' : 'outline'} size="sm" onClick={() => setView('questions')}>
                         <Settings2 className="h-4 w-4 mr-1" /> Manage Questions
                     </Button>
                 </div>
@@ -142,26 +123,22 @@ const ServiceReviewsTab: React.FC = () => {
             {view === 'reviews' && (
                 <>
                     {/* Summary Cards */}
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         <Card><CardContent className="p-3 text-center">
                             <p className="text-xl font-bold text-purple-600">{reviews.length}</p>
-                            <p className="text-xs text-gray-500 mt-0.5">Total</p>
+                            <p className="text-xs text-gray-500 mt-0.5">Total Reviews</p>
                         </CardContent></Card>
                         <Card><CardContent className="p-3 text-center">
                             <p className="text-xl font-bold text-yellow-600">{avg('overall_experience')}</p>
                             <p className="text-xs text-gray-500 mt-0.5">Avg Experience</p>
                         </CardContent></Card>
                         <Card><CardContent className="p-3 text-center">
-                            <p className="text-xl font-bold text-green-600">{pct((r) => r.parcel_arrived_on_time === 'yes')}%</p>
-                            <p className="text-xs text-gray-500 mt-0.5">On Time</p>
-                        </CardContent></Card>
-                        <Card><CardContent className="p-3 text-center">
-                            <p className="text-xl font-bold text-blue-600">{pct((r) => r.would_recommend === 'definitely')}%</p>
-                            <p className="text-xs text-gray-500 mt-0.5">Would Recommend</p>
-                        </CardContent></Card>
-                        <Card><CardContent className="p-3 text-center">
-                            <p className="text-xl font-bold text-pink-600">{avg('satisfaction_customer_service')}</p>
+                            <p className="text-xl font-bold text-blue-600">{avg('overall_customer_service')}</p>
                             <p className="text-xs text-gray-500 mt-0.5">Avg Service</p>
+                        </CardContent></Card>
+                        <Card><CardContent className="p-3 text-center">
+                            <p className="text-xl font-bold text-green-600">{pct((r) => r.parcel_arrived_as_anticipated === 'yes')}%</p>
+                            <p className="text-xs text-gray-500 mt-0.5">Arrived as Expected</p>
                         </CardContent></Card>
                     </div>
 
@@ -197,14 +174,10 @@ const ServiceReviewsTab: React.FC = () => {
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-3 flex-wrap">
-                                                    <Stars5 count={r.overall_experience} />
-                                                    <Badge variant={r.parcel_arrived_on_time === 'yes' ? 'default' : r.parcel_arrived_on_time === 'partially' ? 'secondary' : 'destructive'} className="text-xs">
+                                                    <Stars3 count={r.overall_experience} />
+                                                    <Badge variant={r.parcel_arrived_as_anticipated === 'yes' ? 'default' : r.parcel_arrived_as_anticipated === 'partially' ? 'secondary' : 'destructive'} className="text-xs">
                                                         <Package className="h-3 w-3 mr-1" />
-                                                        {r.parcel_arrived_on_time === 'yes' ? 'On Time' : r.parcel_arrived_on_time === 'partially' ? 'Partial' : 'Late'}
-                                                    </Badge>
-                                                    <Badge variant={r.would_recommend === 'definitely' ? 'default' : 'secondary'} className="text-xs">
-                                                        <ThumbsUp className="h-3 w-3 mr-1" />
-                                                        {r.would_recommend}
+                                                        {r.parcel_arrived_as_anticipated === 'yes' ? 'As Expected' : r.parcel_arrived_as_anticipated === 'partially' ? 'Partial' : 'Not as Expected'}
                                                     </Badge>
                                                     <span className="text-xs text-gray-400 flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(r.created_at).toLocaleDateString()}</span>
                                                     {open ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
@@ -214,24 +187,29 @@ const ServiceReviewsTab: React.FC = () => {
 
                                         {open && (
                                             <div className="border-t border-gray-100 bg-gray-50 p-5 space-y-4">
-                                                {/* How heard */}
-                                                <div className="text-sm">
-                                                    <span className="text-gray-500">How they heard about us: </span>
-                                                    <span className="font-medium">{HOW_HEARD_LABELS[r.how_heard_about_us] || r.how_heard_about_us}</span>
-                                                    {r.how_heard_other && <span className="text-gray-500"> — {r.how_heard_other}</span>}
+                                                {/* Overall ratings */}
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <p className="text-xs text-gray-500 mb-0.5">Overall Experience</p>
+                                                        <Stars3 count={r.overall_experience} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs text-gray-500 mb-0.5">Overall Customer Service</p>
+                                                        <Stars3 count={r.overall_customer_service} />
+                                                    </div>
                                                 </div>
 
                                                 {/* Satisfaction grid */}
                                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                                     {[
-                                                        { label: 'Delivery Time', v: r.satisfaction_delivery_time },
-                                                        { label: 'Customer Service', v: r.satisfaction_customer_service },
-                                                        { label: 'Parcel Safety', v: r.satisfaction_parcel_safety },
-                                                        { label: 'Price Fairness', v: r.satisfaction_price_fairness },
+                                                        { label: 'Bookings & Service', v: r.satisfaction_bookings_customer_service },
+                                                        { label: 'Collections (UK)', v: r.satisfaction_collections_uk },
+                                                        { label: 'Accounts', v: r.satisfaction_accounts },
+                                                        { label: 'Deliveries', v: r.satisfaction_deliveries },
                                                     ].map((s) => (
                                                         <div key={s.label}>
                                                             <p className="text-xs text-gray-500 mb-0.5">{s.label}</p>
-                                                            <Stars5 count={s.v} />
+                                                            <Stars3 count={s.v} />
                                                         </div>
                                                     ))}
                                                 </div>
