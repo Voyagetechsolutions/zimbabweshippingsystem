@@ -13,7 +13,7 @@ const links = [
   },
   {
     label: 'Instagram',
-    href: 'https://www.instagram.com/zimbabwe__shipping/',
+    href: 'https://www.instagram.com/zimbabwe_shipping_services/',
     icon: Instagram,
     gradient: 'from-pink-500 via-purple-500 to-orange-400',
     hoverGlow: 'hover:shadow-pink-500/40',

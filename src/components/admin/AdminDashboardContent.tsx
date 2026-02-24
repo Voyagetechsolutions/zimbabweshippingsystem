@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useIsMobile } from '@/hooks/use-mobile'; // Assuming this hook exists and works correctly
-import { cn } from '@/lib/utils'; // Assuming you have a utility for class concatenation like 'clsx' or 'classnames' configured as 'cn'
+import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 
 // UI Components
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -17,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator'; // Add separator for visual division
+import { Separator } from '@/components/ui/separator';
 
 // Tab Components
 import ShipmentManagementTab from '@/components/admin/tabs/ShipmentManagementTab';
@@ -35,6 +34,7 @@ import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
 import SupportTickets from '@/components/admin/SupportTickets';
 import ContentManagement from '@/components/admin/ContentManagement';
 import PaymentScheduleManagement from '@/components/admin/PaymentScheduleManagement';
+import ServiceReviewsTab from '@/components/admin/tabs/ServiceReviewsTab';
 
 // Icons
 import {
@@ -54,20 +54,35 @@ import {
   MessageSquare,
   ImageIcon,
   Quote,
-  LayoutDashboard, // Added for dashboard overview
+  LayoutDashboard,
   ChevronLeft,
   ChevronRight,
-  CalendarDays
+  ChevronDown,
+  CalendarDays,
+  Star,
 } from 'lucide-react';
+
+interface NavGroup {
+  key: string;
+  label: string;
+  items: { value: string; label: string; icon: any }[];
+}
 
 const AdminDashboardContent = () => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
-  const [activeTab, setActiveTab] = useState('overview'); // Changed default to overview
+  const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // State for sidebar collapse
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
+    main: true,
+    operations: false,
+    finance: false,
+    communications: false,
+    system: false,
+  });
 
   // Dashboard statistics
   const [stats, setStats] = useState({
@@ -79,6 +94,73 @@ const AdminDashboardContent = () => {
     pendingQuotes: 0
   });
 
+  const navGroups: NavGroup[] = [
+    {
+      key: 'main',
+      label: 'Main',
+      items: [
+        { value: 'overview', label: 'Overview', icon: LayoutDashboard },
+        { value: 'shipments', label: 'Shipments', icon: Package },
+        { value: 'customQuotes', label: 'Custom Quotes', icon: Quote },
+        { value: 'customers', label: 'Customers', icon: User },
+      ],
+    },
+    {
+      key: 'operations',
+      label: 'Operations',
+      items: [
+        { value: 'pickupZones', label: 'Pickup Zones', icon: MapPin },
+        { value: 'delivery', label: 'Delivery', icon: Truck },
+        { value: 'schedule', label: 'Schedule', icon: Calendar },
+        { value: 'routes', label: 'Routes', icon: Route },
+      ],
+    },
+    {
+      key: 'finance',
+      label: 'Finance',
+      items: [
+        { value: 'payments', label: 'Payments', icon: CreditCard },
+        { value: 'paymentSchedule', label: '30-Day Payments', icon: CalendarDays },
+        { value: 'reports', label: 'Reports', icon: BarChart3 },
+      ],
+    },
+    {
+      key: 'communications',
+      label: 'Communications',
+      items: [
+        { value: 'notifications', label: 'Notifications', icon: Bell },
+        { value: 'supportTickets', label: 'Support Tickets', icon: MessageSquare },
+        { value: 'feedback', label: 'Feedback', icon: Star },
+      ],
+    },
+    {
+      key: 'system',
+      label: 'System',
+      items: [
+        { value: 'users', label: 'Users', icon: Users },
+        { value: 'contentManagement', label: 'Content', icon: ImageIcon },
+        { value: 'settings', label: 'Settings', icon: Settings },
+      ],
+    },
+  ];
+
+  // Flat list for mobile dropdown
+  const navItems = navGroups.flatMap((g) => g.items);
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  // Auto-expand the group containing the active tab
+  useEffect(() => {
+    for (const group of navGroups) {
+      if (group.items.some((item) => item.value === activeTab)) {
+        setExpandedGroups((prev) => ({ ...prev, [group.key]: true }));
+        break;
+      }
+    }
+  }, [activeTab]);
+
   useEffect(() => {
     fetchDashboardStats();
     fetchNotifications();
@@ -87,21 +169,18 @@ const AdminDashboardContent = () => {
   const fetchDashboardStats = async () => {
     setLoading(true);
     try {
-      // Fetch shipments stats
       const { data: shipments, error: shipmentError } = await supabase
         .from('shipments')
         .select('id, status');
 
       if (shipmentError) throw shipmentError;
 
-      // Fetch payments data for revenue calculation
       const { data: payments, error: paymentError } = await supabase
         .from('payments')
         .select('amount');
 
       if (paymentError) throw paymentError;
 
-      // Fetch custom quotes
       const { data: quotes, error: quotesError } = await supabase
         .from('custom_quotes')
         .select('id, status')
@@ -109,25 +188,17 @@ const AdminDashboardContent = () => {
 
       if (quotesError) throw quotesError;
 
-      // Calculate stats
       const totalShipments = shipments?.length || 0;
-
       const pendingShipments = shipments?.filter(s =>
-        s.status === 'Booking Confirmed' ||
-        s.status === 'Ready for Pickup'
+        s.status === 'Booking Confirmed' || s.status === 'Ready for Pickup'
       ).length || 0;
-
       const activeShipments = shipments?.filter(s =>
         s.status === 'Processing in UK Warehouse' ||
         s.status === 'Customs Clearance' ||
         s.status === 'Processing in ZW Warehouse' ||
         s.status === 'Out for Delivery'
       ).length || 0;
-
-      const deliveredShipments = shipments?.filter(s =>
-        s.status === 'Delivered'
-      ).length || 0;
-
+      const deliveredShipments = shipments?.filter(s => s.status === 'Delivered').length || 0;
       const totalRevenue = payments?.reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0;
 
       setStats({
@@ -152,7 +223,6 @@ const AdminDashboardContent = () => {
 
   const fetchNotifications = async () => {
     try {
-      // Fetch the latest notifications
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
@@ -160,38 +230,16 @@ const AdminDashboardContent = () => {
         .limit(5);
 
       if (error) throw error;
-
       setNotifications(data || []);
     } catch (error) {
       console.error('Error fetching notifications:', error);
     }
   };
 
-  // Function to handle refreshing the dashboard data
   const refreshDashboard = () => {
     fetchDashboardStats();
     fetchNotifications();
   };
-
-  // Define your navigation items
-  const navItems = [
-    { value: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { value: 'shipments', label: 'Shipments', icon: Package },
-    { value: 'customQuotes', label: 'Custom Quotes', icon: Quote },
-    { value: 'customers', label: 'Customers', icon: User },
-    { value: 'pickupZones', label: 'Pickup Zones', icon: MapPin },
-    { value: 'delivery', label: 'Delivery', icon: Truck },
-    { value: 'payments', label: 'Payments', icon: CreditCard },
-    { value: 'paymentSchedule', label: '30-Day Payments', icon: CalendarDays },
-    { value: 'reports', label: 'Reports', icon: BarChart3 },
-    { value: 'notifications', label: 'Notifications', icon: Bell },
-    { value: 'schedule', label: 'Schedule', icon: Calendar },
-    { value: 'routes', label: 'Routes', icon: Route },
-    { value: 'users', label: 'Users', icon: Users },
-    { value: 'supportTickets', label: 'Support Tickets', icon: MessageSquare },
-    { value: 'contentManagement', label: 'Content Management', icon: ImageIcon },
-    { value: 'settings', label: 'System Settings', icon: Settings },
-  ];
 
   const renderTabContent = (tabValue: string) => {
     switch (tabValue) {
@@ -274,38 +322,23 @@ const AdminDashboardContent = () => {
             </Card>
           </div>
         );
-      case 'shipments':
-        return <ShipmentManagementTab />;
-      case 'customQuotes':
-        return <CustomQuoteManagement />;
-      case 'customers':
-        return <CustomerManagementTab />;
-      case 'pickupZones':
-        return <PickupZonesManagementTab />;
-      case 'delivery':
-        return <DeliveryManagementTab />;
-      case 'payments':
-        return <PaymentsInvoicingTab />;
-      case 'paymentSchedule':
-        return <PaymentScheduleManagement />;
-      case 'reports':
-        return <ReportsAnalyticsTab />;
-      case 'notifications':
-        return <NotificationsAlertsTab />;
-      case 'schedule':
-        return <CollectionScheduleTab />;
-      case 'routes':
-        return <RouteManagementTab />;
-      case 'users':
-        return <UserManagementTab />;
-      case 'supportTickets':
-        return <SupportTickets />;
-      case 'contentManagement':
-        return <ContentManagement />;
-      case 'settings':
-        return <SystemSettingsTab />;
-      default:
-        return null;
+      case 'shipments': return <ShipmentManagementTab />;
+      case 'customQuotes': return <CustomQuoteManagement />;
+      case 'customers': return <CustomerManagementTab />;
+      case 'pickupZones': return <PickupZonesManagementTab />;
+      case 'delivery': return <DeliveryManagementTab />;
+      case 'payments': return <PaymentsInvoicingTab />;
+      case 'paymentSchedule': return <PaymentScheduleManagement />;
+      case 'reports': return <ReportsAnalyticsTab />;
+      case 'notifications': return <NotificationsAlertsTab />;
+      case 'schedule': return <CollectionScheduleTab />;
+      case 'routes': return <RouteManagementTab />;
+      case 'users': return <UserManagementTab />;
+      case 'supportTickets': return <SupportTickets />;
+      case 'contentManagement': return <ContentManagement />;
+      case 'feedback': return <ServiceReviewsTab />;
+      case 'settings': return <SystemSettingsTab />;
+      default: return null;
     }
   };
 
@@ -333,20 +366,49 @@ const AdminDashboardContent = () => {
             </Button>
           </div>
           <Separator />
-          <nav className="flex flex-col p-2 space-y-1 mt-4">
-            {navItems.map((item) => (
-              <Button
-                key={item.value}
-                variant={activeTab === item.value ? "secondary" : "ghost"}
-                className={cn(
-                  "justify-start text-sm font-medium px-3 py-2 rounded-md",
-                  isSidebarOpen ? "w-full" : "w-10 h-10 p-0"
+
+          {/* Collapsible grouped nav */}
+          <nav className="flex flex-col p-2 mt-2">
+            {navGroups.map((group) => (
+              <div key={group.key} className="mb-1">
+                {/* Group header with dropdown arrow */}
+                {isSidebarOpen ? (
+                  <button
+                    onClick={() => toggleGroup(group.key)}
+                    className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <span>{group.label}</span>
+                    <ChevronDown
+                      className={cn(
+                        "h-3.5 w-3.5 transition-transform duration-200",
+                        expandedGroups[group.key] && "rotate-180"
+                      )}
+                    />
+                  </button>
+                ) : (
+                  <Separator className="my-2" />
                 )}
-                onClick={() => setActiveTab(item.value)}
-              >
-                <item.icon className={cn("h-5 w-5", isSidebarOpen && "mr-3")} />
-                {isSidebarOpen && <span>{item.label}</span>}
-              </Button>
+
+                {/* Group items */}
+                {(expandedGroups[group.key] || !isSidebarOpen) && (
+                  <div className="space-y-0.5">
+                    {group.items.map((item) => (
+                      <Button
+                        key={item.value}
+                        variant={activeTab === item.value ? "secondary" : "ghost"}
+                        className={cn(
+                          "justify-start text-sm font-medium px-3 py-2 rounded-md w-full",
+                          !isSidebarOpen && "w-10 h-10 p-0 justify-center"
+                        )}
+                        onClick={() => setActiveTab(item.value)}
+                      >
+                        <item.icon className={cn("h-5 w-5", isSidebarOpen && "mr-3")} />
+                        {isSidebarOpen && <span>{item.label}</span>}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
           </nav>
         </aside>
@@ -354,7 +416,7 @@ const AdminDashboardContent = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-auto p-6 space-y-6">
-        {/* Header with title and notification bell */}
+        {/* Header */}
         <header className="flex justify-between items-center pb-4 border-b">
           <h1 className="text-3xl font-bold">
             {navItems.find(item => item.value === activeTab)?.label || 'Admin Dashboard'}
@@ -428,7 +490,7 @@ const AdminDashboardContent = () => {
           </div>
         )}
 
-        {/* Tab Contents - Conditionally rendered based on activeTab */}
+        {/* Tab Content */}
         <div className="flex-1 overflow-auto">
           {renderTabContent(activeTab)}
         </div>
