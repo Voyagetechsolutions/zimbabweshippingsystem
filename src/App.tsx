@@ -44,6 +44,7 @@ const PaymentSuccess = lazy(() => import('@/pages/PaymentSuccess'));
 const Notifications = lazy(() => import('@/pages/Notifications'));
 const TaskManagement = lazy(() => import('@/pages/TaskManagement'));
 const CustomQuoteRequest = lazy(() => import('@/pages/CustomQuoteRequest'));
+const Links = lazy(() => import('@/pages/Links'));
 
 const queryClient = new QueryClient();
 
@@ -64,73 +65,74 @@ function App() {
                         </div>
                       }>
                         <Routes>
-                      <Route path="/" element={<Index />} />
-                      <Route path="/auth" element={
-                        <RedirectIfAuthenticated>
-                          <Auth />
-                        </RedirectIfAuthenticated>
-                      } />
-                      <Route path="/auth/callback" element={<AuthCallback />} />
-                      <Route path="/track" element={<Track />} />
-                      <Route path="/pricing" element={<Pricing />} />
-                      <Route path="/services" element={<Services />} />
-                      <Route path="/contact" element={<Contact />} />
-                      <Route path="/about" element={<AboutUs />} />
-                      <Route path="/about-us" element={<AboutUs />} />
-                      <Route path="/faq" element={<FAQ />} />
-                      <Route path="/support" element={<Support />} />
-                      <Route path="/reviews" element={<Reviews />} />
-                      <Route path="/gallery" element={<Gallery />} />
-                      <Route path="/collection-schedule" element={<CollectionSchedule />} />
-                      <Route path="/shipping-guidelines" element={<ShippingGuidelines />} />
-                      <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-                      <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
-                      <Route path="/quote-submitted" element={<QuoteSubmitted />} />
-                      <Route path="/payment-success" element={<PaymentSuccess />} />
-                      <Route path="/custom-quote-request" element={<CustomQuoteRequest />} />
-                      <Route path="/book" element={<SimpleBooking />} />
-                      
-                      {/* Public booking route */}
-                      <Route path="/book-shipment" element={<BookShipment />} />
-                      
-                      {/* Protected routes */}
-                      <Route path="/dashboard" element={
-                        <RequireAuth>
-                          <Dashboard />
-                        </RequireAuth>
-                      } />
-                      <Route path="/admin" element={
-                        <RequireAdmin>
-                          <AdminDashboard />
-                        </RequireAdmin>
-                      } />
-                      <Route path="/account" element={
-                        <RequireAuth>
-                          <Account />
-                        </RequireAuth>
-                      } />
-                      <Route path="/shipment/:id" element={<ShipmentDetails />} />
-                      <Route path="/admin/gallery" element={
-                        <RequireAdmin>
-                          <GalleryAdmin />
-                        </RequireAdmin>
-                      } />
-                      <Route path="/address-book" element={<AddressBook />} />
-                      <Route path="/confirm-booking" element={<ConfirmBooking />} />
-                      <Route path="/receipt" element={<Receipt />} />
-                      <Route path="/notifications" element={
-                        <RequireAuth>
-                          <Notifications />
-                        </RequireAuth>
-                      } />
-                      <Route path="/tasks" element={
-                        <RequireAuth>
-                          <TaskManagement />
-                        </RequireAuth>
-                      } />
-                      
-                        {/* Catch all route */}
-                        <Route path="*" element={<NotFound />} />
+                          <Route path="/" element={<Index />} />
+                          <Route path="/auth" element={
+                            <RedirectIfAuthenticated>
+                              <Auth />
+                            </RedirectIfAuthenticated>
+                          } />
+                          <Route path="/auth/callback" element={<AuthCallback />} />
+                          <Route path="/track" element={<Track />} />
+                          <Route path="/pricing" element={<Pricing />} />
+                          <Route path="/services" element={<Services />} />
+                          <Route path="/contact" element={<Contact />} />
+                          <Route path="/about" element={<AboutUs />} />
+                          <Route path="/about-us" element={<AboutUs />} />
+                          <Route path="/faq" element={<FAQ />} />
+                          <Route path="/support" element={<Support />} />
+                          <Route path="/reviews" element={<Reviews />} />
+                          <Route path="/gallery" element={<Gallery />} />
+                          <Route path="/collection-schedule" element={<CollectionSchedule />} />
+                          <Route path="/shipping-guidelines" element={<ShippingGuidelines />} />
+                          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                          <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+                          <Route path="/quote-submitted" element={<QuoteSubmitted />} />
+                          <Route path="/payment-success" element={<PaymentSuccess />} />
+                          <Route path="/custom-quote-request" element={<CustomQuoteRequest />} />
+                          <Route path="/links" element={<Links />} />
+                          <Route path="/book" element={<SimpleBooking />} />
+
+                          {/* Public booking route */}
+                          <Route path="/book-shipment" element={<BookShipment />} />
+
+                          {/* Protected routes */}
+                          <Route path="/dashboard" element={
+                            <RequireAuth>
+                              <Dashboard />
+                            </RequireAuth>
+                          } />
+                          <Route path="/admin" element={
+                            <RequireAdmin>
+                              <AdminDashboard />
+                            </RequireAdmin>
+                          } />
+                          <Route path="/account" element={
+                            <RequireAuth>
+                              <Account />
+                            </RequireAuth>
+                          } />
+                          <Route path="/shipment/:id" element={<ShipmentDetails />} />
+                          <Route path="/admin/gallery" element={
+                            <RequireAdmin>
+                              <GalleryAdmin />
+                            </RequireAdmin>
+                          } />
+                          <Route path="/address-book" element={<AddressBook />} />
+                          <Route path="/confirm-booking" element={<ConfirmBooking />} />
+                          <Route path="/receipt" element={<Receipt />} />
+                          <Route path="/notifications" element={
+                            <RequireAuth>
+                              <Notifications />
+                            </RequireAuth>
+                          } />
+                          <Route path="/tasks" element={
+                            <RequireAuth>
+                              <TaskManagement />
+                            </RequireAuth>
+                          } />
+
+                          {/* Catch all route */}
+                          <Route path="*" element={<NotFound />} />
                         </Routes>
                       </Suspense>
                     </Router>

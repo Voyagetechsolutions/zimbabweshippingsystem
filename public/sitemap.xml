@@ -63,6 +63,14 @@
     <priority>0.8</priority>
   </url>
   
+  <!-- Links / Connect With Us -->
+  <url>
+    <loc>https://zimbabweshipping.com/links</loc>
+    <lastmod>2026-02-24</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
   <!-- Gallery -->
   <url>
     <loc>https://zimbabweshipping.com/gallery</loc>
