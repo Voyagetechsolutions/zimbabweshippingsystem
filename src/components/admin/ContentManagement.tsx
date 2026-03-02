@@ -11,7 +11,7 @@ import {
   Image, Upload, Trash, Edit, Plus, Loader2, Filter
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -22,7 +22,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -52,21 +52,23 @@ const ContentManagement = () => {
   const [imageCaption, setImageCaption] = useState('');
   const [imageCategory, setImageCategory] = useState('general');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [clearLoading, setClearLoading] = useState(false);
   const { toast } = useToast();
-  
+
   useEffect(() => {
     fetchGalleryImages();
   }, []);
-  
+
   const fetchGalleryImages = async () => {
     try {
       setLoading(true);
-      
+
       const { data, error } = await supabase
         .from('gallery')
         .select('*')
         .order('created_at', { ascending: false });
-        
+
       if (error) throw error;
       setImages(data || []);
     } catch (error: any) {
@@ -80,7 +82,7 @@ const ContentManagement = () => {
       setLoading(false);
     }
   };
-  
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -89,7 +91,7 @@ const ContentManagement = () => {
       setImagePreview(imageUrl);
     }
   };
-  
+
   const resetUploadForm = () => {
     setImageFile(null);
     setImagePreview(null);
@@ -98,26 +100,26 @@ const ContentManagement = () => {
     setImageCategory('general');
     setShowUploadDialog(false);
   };
-  
+
   const handleUploadImage = async () => {
     if (!imageFile) return;
-    
+
     try {
       setUploadLoading(true);
-      
+
       // Upload the image to storage
       const fileName = `gallery-${Date.now()}-${imageFile.name.replace(/\s+/g, '-')}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('images')
         .upload(`gallery/${fileName}`, imageFile);
-        
+
       if (uploadError) throw uploadError;
-      
+
       // Get the public URL
       const { data: urlData } = await supabase.storage
         .from('images')
         .getPublicUrl(`gallery/${fileName}`);
-        
+
       // Add the image to the gallery table
       const { error: insertError } = await supabase
         .from('gallery')
@@ -129,18 +131,18 @@ const ContentManagement = () => {
             category: imageCategory
           }
         ]);
-        
+
       if (insertError) throw insertError;
-      
+
       toast({
         title: 'Image Uploaded',
         description: 'The image has been successfully added to the gallery.',
       });
-      
+
       // Refresh the gallery images
       fetchGalleryImages();
       resetUploadForm();
-      
+
     } catch (error: any) {
       toast({
         title: 'Upload Failed',
@@ -151,7 +153,7 @@ const ContentManagement = () => {
       setUploadLoading(false);
     }
   };
-  
+
   const handleDeleteImage = async (id: string) => {
     try {
       // Note: In a real application, we would also delete the image from storage
@@ -159,17 +161,17 @@ const ContentManagement = () => {
         .from('gallery')
         .delete()
         .eq('id', id);
-        
+
       if (error) throw error;
-      
+
       toast({
         title: 'Image Deleted',
         description: 'The image has been removed from the gallery.',
       });
-      
+
       // Update the local state
       setImages(images.filter(img => img.id !== id));
-      
+
     } catch (error: any) {
       toast({
         title: 'Delete Failed',
@@ -178,21 +180,48 @@ const ContentManagement = () => {
       });
     }
   };
-  
+
+  const handleClearAll = async () => {
+    try {
+      setClearLoading(true);
+      const { error } = await supabase
+        .from('gallery')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000');
+
+      if (error) throw error;
+
+      setImages([]);
+      setShowClearConfirm(false);
+      toast({
+        title: 'Gallery Cleared',
+        description: 'All gallery images have been removed. Upload new images to populate the gallery.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setClearLoading(false);
+    }
+  };
+
   // Get unique categories for filtering
   const categories = ['all', ...new Set(images.map(img => img.category))];
-  
+
   // Filter images based on selected category
-  const filteredImages = categoryFilter === 'all' 
-    ? images 
+  const filteredImages = categoryFilter === 'all'
+    ? images
     : images.filter(img => img.category === categoryFilter);
-  
+
   // Format date for display
   const formatDate = (dateString: string) => {
-    const options: Intl.DateTimeFormatOptions = { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
+    const options: Intl.DateTimeFormatOptions = {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
     };
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
@@ -217,7 +246,17 @@ const ContentManagement = () => {
               ))}
             </SelectContent>
           </Select>
-          <Button 
+          {images.length > 0 && (
+            <Button
+              variant="destructive"
+              onClick={() => setShowClearConfirm(true)}
+              className="flex items-center gap-2"
+            >
+              <Trash className="h-4 w-4" />
+              <span>Clear All</span>
+            </Button>
+          )}
+          <Button
             onClick={() => setShowUploadDialog(true)}
             className="flex items-center gap-2"
           >
@@ -236,14 +275,14 @@ const ContentManagement = () => {
           {filteredImages.map((image) => (
             <Card key={image.id} className="overflow-hidden">
               <div className="aspect-video relative">
-                <img 
-                  src={image.src} 
-                  alt={image.alt} 
+                <img
+                  src={image.src}
+                  alt={image.alt}
                   className="object-cover w-full h-full"
                 />
                 <div className="absolute bottom-0 right-0 p-2 flex space-x-1">
-                  <Button 
-                    variant="destructive" 
+                  <Button
+                    variant="destructive"
                     size="sm"
                     className="h-8 w-8 p-0"
                     onClick={() => handleDeleteImage(image.id)}
@@ -281,8 +320,8 @@ const ContentManagement = () => {
               <div className="text-center">
                 <p className="text-lg font-medium">No Images Found</p>
                 <p className="text-muted-foreground mb-4">
-                  {categoryFilter === 'all' 
-                    ? "Your media library is empty. Upload some images to get started." 
+                  {categoryFilter === 'all'
+                    ? "Your media library is empty. Upload some images to get started."
                     : `No images found in the "${categoryFilter}" category.`}
                 </p>
                 <Button onClick={() => setShowUploadDialog(true)}>Upload Media</Button>
@@ -301,14 +340,14 @@ const ContentManagement = () => {
               Add a new image to your media library.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
             <div className="flex items-center justify-center">
               {imagePreview ? (
                 <div className="relative">
-                  <img 
-                    src={imagePreview} 
-                    alt="Preview" 
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
                     className="max-h-48 rounded-md object-contain"
                   />
                   <Button
@@ -331,7 +370,7 @@ const ContentManagement = () => {
                 </div>
               )}
             </div>
-            
+
             <div>
               <Label htmlFor="image-upload" className="sr-only">Image</Label>
               <Input
@@ -342,7 +381,7 @@ const ContentManagement = () => {
                 className={imagePreview ? "hidden" : ""}
               />
             </div>
-            
+
             {imagePreview && (
               <>
                 <div>
@@ -354,7 +393,7 @@ const ContentManagement = () => {
                     placeholder="Descriptive text for the image"
                   />
                 </div>
-                
+
                 <div>
                   <Label htmlFor="caption">Caption</Label>
                   <Textarea
@@ -365,7 +404,7 @@ const ContentManagement = () => {
                     rows={3}
                   />
                 </div>
-                
+
                 <div>
                   <Label htmlFor="category">Category</Label>
                   <Select value={imageCategory} onValueChange={setImageCategory}>
@@ -374,18 +413,17 @@ const ContentManagement = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="general">General</SelectItem>
-                      <SelectItem value="hero">Hero</SelectItem>
-                      <SelectItem value="testimonial">Testimonial</SelectItem>
-                      <SelectItem value="service">Service</SelectItem>
-                      <SelectItem value="team">Team</SelectItem>
-                      <SelectItem value="product">Product</SelectItem>
+                      <SelectItem value="facilities">Facilities</SelectItem>
+                      <SelectItem value="shipments">Shipments</SelectItem>
+                      <SelectItem value="team">Our Team</SelectItem>
+                      <SelectItem value="customers">Customers</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </>
             )}
           </div>
-          
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={resetUploadForm} disabled={uploadLoading}>
               Cancel
@@ -406,6 +444,33 @@ const ContentManagement = () => {
                   <Upload className="mr-2 h-4 w-4" />
                   Upload Image
                 </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clear All Confirmation Dialog */}
+      <Dialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Clear All Gallery Images?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete all {images.length} gallery images. Upload new images afterward to populate the gallery.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowClearConfirm(false)} disabled={clearLoading}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleClearAll} disabled={clearLoading}>
+              {clearLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Clearing...
+                </>
+              ) : (
+                'Clear All'
               )}
             </Button>
           </DialogFooter>

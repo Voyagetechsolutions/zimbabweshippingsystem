@@ -11,7 +11,7 @@ export const getContentSecurityPolicy = () => {
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' https://storage.googleapis.com",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: https://api.ipify.org https://*.supabase.co https://oncsaunsqtekwwbzvvyh.supabase.co",
+      "img-src 'self' data: blob: https://api.ipify.org https://*.supabase.co https://oncsaunsqtekwwbzvvyh.supabase.co",
       "font-src 'self'",
       "connect-src 'self' https://api.ipify.org https://*.supabase.co https://oncsaunsqtekwwbzvvyh.supabase.co",
       "frame-src 'self'",
@@ -45,7 +45,7 @@ export const configureSecurityHeaders = () => {
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' https://storage.googleapis.com",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: https://api.ipify.org https://*.supabase.co https://oncsaunsqtekwwbzvvyh.supabase.co",
+      "img-src 'self' data: blob: https://api.ipify.org https://*.supabase.co https://oncsaunsqtekwwbzvvyh.supabase.co",
       "font-src 'self'",
       "connect-src 'self' https://api.ipify.org https://*.supabase.co https://oncsaunsqtekwwbzvvyh.supabase.co",
       "frame-src 'self'",
@@ -55,7 +55,7 @@ export const configureSecurityHeaders = () => {
       // Note: frame-ancestors is excluded as it cannot be set via meta tag
       "upgrade-insecure-requests"
     ].join('; ');
-    
+
     const meta = document.createElement('meta');
     meta.httpEquiv = 'Content-Security-Policy';
     meta.content = cspDirectives;

@@ -51,7 +51,7 @@ export const logSecurityEvent = async (event: {
       timestamp: new Date().toISOString(),
       details: event.details
     });
-    
+
     return { success: true };
   } catch (error) {
     console.error('Error logging security event:', error);
@@ -82,49 +82,51 @@ export const callRpcFunction = async <T>(functionName: string, params?: any): Pr
   try {
     // For functions that no longer exist in the database, let's create mock implementations
     if (functionName === 'get_gallery_images') {
-      // Return mock gallery data using the batchAddGalleryImages helper
-      const mockGalleryData = [
-        {
-          id: '1',
-          src: "https://oncsaunsqtekwwbzvvyh.supabase.co/storage/v1/object/public/images/gallery/shipping_container_1.jpg",
-          alt: "Container loading process",
-          caption: "Professional loading of shipping containers for Zimbabwe export",
-          category: "shipments",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          src: "https://oncsaunsqtekwwbzvvyh.supabase.co/storage/v1/object/public/images/gallery/warehouse_1.jpg",
-          alt: "UK warehouse facility",
-          caption: "Our spacious UK warehouse for secure storage before shipping",
-          category: "facilities",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      ];
-      return { data: mockGalleryData as unknown as T, error: null };
+      const { data, error } = await supabase
+        .from('gallery')
+        .select('*')
+        .order('created_at', { ascending: false });
+      return { data: data as unknown as T, error };
     }
-    
+
     if (functionName === 'insert_gallery_image') {
-      // Create a mock return for gallery image insertion with proper ID
-      const mockImage = {
-        id: Math.random().toString(36).substring(2, 15),
-        src: params.p_src,
-        alt: params.p_alt,
-        caption: params.p_caption,
-        category: params.p_category,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      return { data: mockImage as unknown as T, error: null };
+      const { data, error } = await supabase
+        .from('gallery')
+        .insert([{
+          src: params.p_src,
+          alt: params.p_alt,
+          caption: params.p_caption,
+          category: params.p_category
+        }])
+        .select()
+        .single();
+      return { data: data as unknown as T, error };
     }
-    
+
     if (functionName === 'delete_gallery_image') {
-      // Mock successful deletion
-      return { data: true as unknown as T, error: null };
+      const { error } = await supabase
+        .from('gallery')
+        .delete()
+        .eq('id', params.p_id);
+      return { data: (!error) as unknown as T, error };
     }
-    
+
+    if (functionName === 'update_gallery_image') {
+      const { data, error } = await supabase
+        .from('gallery')
+        .update({
+          src: params.p_src,
+          alt: params.p_alt,
+          caption: params.p_caption,
+          category: params.p_category,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', params.p_id)
+        .select()
+        .single();
+      return { data: data as unknown as T, error };
+    }
+
     if (functionName === 'get_announcements' || functionName === 'get_active_announcements') {
       // Return mock announcements data with proper IDs
       const mockAnnouncementsData = [
@@ -143,7 +145,7 @@ export const callRpcFunction = async <T>(functionName: string, params?: any): Pr
       ];
       return { data: mockAnnouncementsData as unknown as T, error: null };
     }
-    
+
     if (functionName === 'create_announcement') {
       // Mock announcement creation with proper ID
       const mockAnnouncement = {
@@ -174,7 +176,7 @@ export const callRpcFunction = async <T>(functionName: string, params?: any): Pr
     // If we don't have a mock implementation, we'll return an error
     console.warn(`Function ${functionName} is not implemented in the mock callRpcFunction`);
     return { data: null, error: new Error(`Function ${functionName} is not implemented`) };
-    
+
   } catch (error) {
     console.error(`Error calling RPC function ${functionName}:`, error);
     return { data: null, error };

@@ -16,7 +16,6 @@ import { Json } from '@/integrations/supabase/types';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { callRpcFunction } from '@/utils/supabaseUtils';
-import GalleryPopulator from '@/components/admin/GalleryPopulator';
 
 const GalleryAdmin = () => {
   const [images, setImages] = useState<GalleryImage[]>([]);
@@ -42,13 +41,13 @@ const GalleryAdmin = () => {
   const fetchGalleryImages = async () => {
     try {
       setIsLoading(true);
-      
+
       const { data, error } = await callRpcFunction('get_gallery_images');
-      
+
       if (error) {
         throw error;
       }
-      
+
       if (data) {
         setImages(data as unknown as GalleryImage[]);
       }
@@ -153,7 +152,7 @@ const GalleryAdmin = () => {
         }
 
         await fetchGalleryImages();
-        
+
         toast({
           title: 'Success',
           description: 'Image updated successfully.',
@@ -219,7 +218,9 @@ const GalleryAdmin = () => {
         throw error;
       }
 
-      const imageUrl = `https://oncsaunsqtekwwbzvvyh.supabase.co/storage/v1/object/public/images/${filePath}`;
+      const { data: { publicUrl: imageUrl } } = supabase.storage
+        .from('images')
+        .getPublicUrl(filePath);
       setFormData(prev => ({ ...prev, src: imageUrl }));
       toast({
         title: 'Success',
@@ -334,10 +335,8 @@ const GalleryAdmin = () => {
                 </CardContent>
               </Card>
             </div>
-            
+
             <div>
-              <GalleryPopulator />
-              
               <Card className="mt-6">
                 <CardHeader>
                   <CardTitle>Gallery Tips</CardTitle>
@@ -366,7 +365,7 @@ const GalleryAdmin = () => {
             </div>
           </div>
         </div>
-      </main>
+      </main >
       <Footer />
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -462,7 +461,7 @@ const GalleryAdmin = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 };
 
