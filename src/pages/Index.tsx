@@ -37,10 +37,10 @@ const Index = () => {
       <Navbar />
       <main className="flex-grow">
         <HeroSection />
-        
+
         <ServicesSection />
-        <PricingSection />
         <ShippingGallerySlideshow />
+        <PricingSection />
         
         <section id="reviews" className="py-16 bg-gray-50 reviews-section">
           <div className="container mx-auto px-4">
