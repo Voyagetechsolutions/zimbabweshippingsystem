@@ -181,31 +181,31 @@ const ShippingGallerySlideshow: React.FC = () => {
               onMouseEnter={() => setIsHovering(true)}
               onMouseLeave={() => setIsHovering(false)}
             >
-              {/* Image Container */}
-              <div className="relative aspect-[16/9] md:aspect-[21/9]">
+              {/* Image Container - Clickable */}
+              <div
+                className="relative aspect-[16/9] md:aspect-[21/9] cursor-zoom-in"
+                onClick={openLightbox}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && openLightbox()}
+                aria-label="Click to view image in fullscreen"
+              >
                 {images.map((image, index) => (
                   <div
                     key={image.id}
-                    className={`absolute inset-0 transition-all duration-700 ease-in-out ${
+                    className={`absolute inset-0 transition-all duration-700 ease-in-out pointer-events-none ${
                       index === currentIndex
                         ? "opacity-100 scale-100"
                         : "opacity-0 scale-105"
                     }`}
                   >
-                    {/* Clickable Image */}
-                    <button
-                      onClick={openLightbox}
-                      className="w-full h-full cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-slate-900"
-                      aria-label="Open image in fullscreen"
-                    >
-                      <img
-                        src={image.src}
-                        alt={image.alt}
-                        className="w-full h-full object-cover"
-                      />
-                    </button>
+                    <img
+                      src={image.src}
+                      alt={image.alt}
+                      className="w-full h-full object-cover"
+                    />
                     {/* Gradient Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                   </div>
                 ))}
 
@@ -219,14 +219,19 @@ const ShippingGallerySlideshow: React.FC = () => {
                 )}
 
                 {/* Image Counter & Zoom Hint */}
-                <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-                  <button
-                    onClick={openLightbox}
-                    className="p-2 bg-black/50 backdrop-blur-sm text-white rounded-full hover:bg-black/70 transition-colors"
-                    aria-label="Zoom in"
-                  >
-                    <ZoomIn className="h-4 w-4" />
-                  </button>
+                <div className="absolute top-4 right-4 z-10 flex items-center gap-2 pointer-events-none">
+                  <div className="pointer-events-auto">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openLightbox();
+                      }}
+                      className="p-2 bg-black/50 backdrop-blur-sm text-white rounded-full hover:bg-black/70 transition-colors"
+                      aria-label="Zoom in"
+                    >
+                      <ZoomIn className="h-4 w-4" />
+                    </button>
+                  </div>
                   <span className="px-3 py-1 bg-black/50 backdrop-blur-sm text-white text-sm font-medium rounded-full">
                     {currentIndex + 1} / {images.length}
                   </span>
@@ -244,27 +249,31 @@ const ShippingGallerySlideshow: React.FC = () => {
                   )}
                 </div>
 
-                {/* Navigation Arrows */}
-                <div className={`absolute inset-y-0 left-0 right-0 flex items-center justify-between px-4 transition-opacity duration-300 z-20 ${isHovering ? 'opacity-100' : 'opacity-0 md:opacity-100'}`}>
-                  <Button
-                    onClick={handlePrev}
-                    variant="ghost"
-                    size="icon"
-                    className="h-12 w-12 bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 rounded-full border border-white/20 transition-all hover:scale-110"
-                    aria-label="Previous image"
-                  >
-                    <ChevronLeft className="h-6 w-6" />
-                  </Button>
-                  <Button
-                    onClick={handleNext}
-                    variant="ghost"
-                    size="icon"
-                    className="h-12 w-12 bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 rounded-full border border-white/20 transition-all hover:scale-110"
-                    aria-label="Next image"
-                  >
-                    <ChevronRight className="h-6 w-6" />
-                  </Button>
-                </div>
+                {/* Navigation Arrows - positioned individually so they don't block image clicks */}
+                <Button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePrev();
+                  }}
+                  variant="ghost"
+                  size="icon"
+                  className={`absolute left-4 top-1/2 -translate-y-1/2 z-20 h-12 w-12 bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 rounded-full border border-white/20 transition-all hover:scale-110 ${isHovering ? 'opacity-100' : 'opacity-0 md:opacity-100'}`}
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </Button>
+                <Button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleNext();
+                  }}
+                  variant="ghost"
+                  size="icon"
+                  className={`absolute right-4 top-1/2 -translate-y-1/2 z-20 h-12 w-12 bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 rounded-full border border-white/20 transition-all hover:scale-110 ${isHovering ? 'opacity-100' : 'opacity-0 md:opacity-100'}`}
+                  aria-label="Next image"
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </Button>
               </div>
             </div>
 
