@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,7 +30,20 @@ import {
   RefreshCw,
   ChevronDown,
   Star,
+  PlusCircle,
+  Globe,
 } from 'lucide-react';
+
+// Country context for sharing selected country across tabs
+export const AdminCountryContext = createContext<{
+  selectedCountry: 'England' | 'Ireland';
+  setSelectedCountry: (country: 'England' | 'Ireland') => void;
+}>({
+  selectedCountry: 'England',
+  setSelectedCountry: () => {},
+});
+
+export const useAdminCountry = () => useContext(AdminCountryContext);
 
 // Import existing tab components
 import ShipmentManagementTab from './tabs/ShipmentManagementTab';
@@ -49,6 +62,7 @@ import SupportTickets from './SupportTickets';
 import ContentManagement from './ContentManagement';
 import SystemSettingsTab from './tabs/SystemSettingsTab';
 import ServiceReviewsTab from './tabs/ServiceReviewsTab';
+import ManualBookingTab from './tabs/ManualBookingTab';
 
 interface DashboardStats {
   totalShipments: number;
@@ -65,6 +79,7 @@ export const ModernAdminDashboard = () => {
   const { toast } = useToast();
   const [activeView, setActiveView] = useState('overview');
   const [loading, setLoading] = useState(true);
+  const [selectedCountry, setSelectedCountry] = useState<'England' | 'Ireland'>('England');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
     main: true,
     operations: false,
@@ -89,6 +104,7 @@ export const ModernAdminDashboard = () => {
       label: 'Main',
       items: [
         { id: 'overview', label: 'Overview', icon: LayoutDashboard, color: 'text-purple-600' },
+        { id: 'manual-booking', label: 'Add Booking', icon: PlusCircle, color: 'text-emerald-600' },
         { id: 'shipments', label: 'Shipments', icon: Package, color: 'text-blue-600' },
         { id: 'quotes', label: 'Custom Quotes', icon: Quote, color: 'text-orange-600' },
         { id: 'customers', label: 'Customers', icon: Users, color: 'text-green-600' },
@@ -281,6 +297,7 @@ export const ModernAdminDashboard = () => {
   const renderContent = () => {
     switch (activeView) {
       case 'overview': return renderOverview();
+      case 'manual-booking': return <ManualBookingTab />;
       case 'shipments': return <ShipmentManagementTab />;
       case 'quotes': return <CustomQuoteManagement />;
       case 'customers': return <CustomerManagementTab />;
@@ -313,6 +330,7 @@ export const ModernAdminDashboard = () => {
   }
 
   return (
+    <AdminCountryContext.Provider value={{ selectedCountry, setSelectedCountry }}>
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="flex">
         {/* Sidebar with collapsible groups */}
@@ -322,6 +340,37 @@ export const ModernAdminDashboard = () => {
               Admin Panel
             </h2>
           </div>
+
+          {/* Country Toggle */}
+          <div className="px-4 py-4 border-b border-gray-100">
+            <div className="flex items-center gap-2 mb-2">
+              <Globe className="h-4 w-4 text-gray-500" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Region</span>
+            </div>
+            <div className="flex rounded-lg overflow-hidden border border-gray-200">
+              <button
+                onClick={() => setSelectedCountry('England')}
+                className={`flex-1 py-2 px-3 text-sm font-medium transition-all ${
+                  selectedCountry === 'England'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                🇬🇧 England
+              </button>
+              <button
+                onClick={() => setSelectedCountry('Ireland')}
+                className={`flex-1 py-2 px-3 text-sm font-medium transition-all ${
+                  selectedCountry === 'Ireland'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                🇮🇪 Ireland
+              </button>
+            </div>
+          </div>
+
           <nav className="px-3 py-3">
             {menuGroups.map((group) => (
               <div key={group.key} className="mb-1">
@@ -365,7 +414,31 @@ export const ModernAdminDashboard = () => {
         {/* Main Content */}
         <main className="flex-1 p-6 lg:p-8">
           {/* Mobile Menu */}
-          <div className="lg:hidden mb-6">
+          <div className="lg:hidden mb-6 space-y-4">
+            {/* Mobile Country Toggle */}
+            <div className="flex rounded-lg overflow-hidden border border-gray-200">
+              <button
+                onClick={() => setSelectedCountry('England')}
+                className={`flex-1 py-2 px-3 text-sm font-medium transition-all ${
+                  selectedCountry === 'England'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                🇬🇧 England
+              </button>
+              <button
+                onClick={() => setSelectedCountry('Ireland')}
+                className={`flex-1 py-2 px-3 text-sm font-medium transition-all ${
+                  selectedCountry === 'Ireland'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                🇮🇪 Ireland
+              </button>
+            </div>
+
             <select
               value={activeView}
               onChange={(e) => setActiveView(e.target.value)}
@@ -383,5 +456,6 @@ export const ModernAdminDashboard = () => {
         </main>
       </div>
     </div>
+    </AdminCountryContext.Provider>
   );
 };

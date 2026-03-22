@@ -24,12 +24,14 @@ interface CollectionScheduleItem {
   route: string;
   pickup_date: string;
   areas: string[];
+  country?: string;
 }
 
 const CollectionSchedule = () => {
   const [schedules, setSchedules] = useState<CollectionScheduleItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterCountry, setFilterCountry] = useState('');
   const [filterRoute, setFilterRoute] = useState('');
   const [filterArea, setFilterArea] = useState('');
   const [filterDate, setFilterDate] = useState<Date | undefined>();
@@ -90,23 +92,50 @@ const CollectionSchedule = () => {
 
   // Filter schedules based on search term and filters
   const filteredSchedules = schedules.filter(schedule => {
-    const matchesSearch = searchTerm === '' || 
+    const matchesSearch = searchTerm === '' ||
       schedule.route.toLowerCase().includes(searchTerm.toLowerCase()) ||
       schedule.areas.some(area => area.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesRoute = filterRoute === '' || schedule.route === filterRoute;
-    
-    const matchesArea = filterArea === '' || 
+
+    const matchesCountry = filterCountry === '' || filterCountry === 'all-countries' ||
+      schedule.country === filterCountry;
+
+    const matchesRoute = filterRoute === '' || filterRoute === 'all-routes' ||
+      schedule.route === filterRoute;
+
+    const matchesArea = filterArea === '' || filterArea === 'all-areas' ||
       schedule.areas.some(area => area === filterArea);
-    
-    const matchesDate = !filterDate || 
+
+    const matchesDate = !filterDate ||
       schedule.pickup_date.toLowerCase().includes(format(filterDate, "do 'of' MMMM").toLowerCase());
-    
-    return matchesSearch && matchesRoute && matchesArea && matchesDate;
+
+    return matchesSearch && matchesCountry && matchesRoute && matchesArea && matchesDate;
   });
+
+  // Get routes filtered by selected country
+  const getFilteredRoutes = () => {
+    if (filterCountry === '' || filterCountry === 'all-countries') {
+      return allRoutes;
+    }
+    return schedules
+      .filter(s => s.country === filterCountry)
+      .map(s => s.route)
+      .filter((value, index, self) => self.indexOf(value) === index);
+  };
+
+  // Get areas filtered by selected country
+  const getFilteredAreas = () => {
+    if (filterCountry === '' || filterCountry === 'all-countries') {
+      return allAreas;
+    }
+    return schedules
+      .filter(s => s.country === filterCountry)
+      .flatMap(s => s.areas)
+      .filter((value, index, self) => self.indexOf(value) === index);
+  };
 
   const resetFilters = () => {
     setSearchTerm('');
+    setFilterCountry('');
     setFilterRoute('');
     setFilterArea('');
     setFilterDate(undefined);
@@ -131,19 +160,36 @@ const CollectionSchedule = () => {
               <CardDescription>Find specific collection schedules</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div>
                   <div className="relative">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-                    <Input 
-                      placeholder="Search by area or route" 
+                    <Input
+                      placeholder="Search by area or route"
                       className="pl-8"
                       value={searchTerm}
                       onChange={e => setSearchTerm(e.target.value)}
                     />
                   </div>
                 </div>
-                
+
+                <div>
+                  <Select value={filterCountry} onValueChange={(value) => {
+                    setFilterCountry(value);
+                    setFilterRoute(''); // Reset route when country changes
+                    setFilterArea(''); // Reset area when country changes
+                  }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Filter by country" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all-countries">All Countries</SelectItem>
+                      <SelectItem value="England">England</SelectItem>
+                      <SelectItem value="Ireland">Ireland</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div>
                   <Select value={filterRoute} onValueChange={setFilterRoute}>
                     <SelectTrigger>
@@ -151,13 +197,13 @@ const CollectionSchedule = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all-routes">All Routes</SelectItem>
-                      {allRoutes.map(route => (
+                      {getFilteredRoutes().map(route => (
                         <SelectItem key={route} value={route}>{route}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div>
                   <Select value={filterArea} onValueChange={setFilterArea}>
                     <SelectTrigger>
@@ -165,13 +211,13 @@ const CollectionSchedule = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all-areas">All Areas</SelectItem>
-                      {allAreas.map(area => (
+                      {getFilteredAreas().map(area => (
                         <SelectItem key={area} value={area}>{area}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div>
                   <Popover>
                     <PopoverTrigger asChild>
@@ -195,7 +241,7 @@ const CollectionSchedule = () => {
                   </Popover>
                 </div>
 
-                <div className="md:col-span-4 flex justify-end">
+                <div className="md:col-span-5 flex justify-end">
                   <Button variant="outline" onClick={resetFilters} className="ml-2">
                     Reset Filters
                   </Button>
@@ -218,10 +264,23 @@ const CollectionSchedule = () => {
               {filteredSchedules.map((schedule) => (
                 <Card key={schedule.id} className="h-full overflow-hidden hover:shadow-lg transition-shadow">
                   {/* Route Header with Gradient */}
-                  <div className="bg-gradient-to-r from-zim-green to-emerald-600 px-4 py-3">
-                    <div className="flex items-center gap-2 text-white">
-                      <Truck className="h-5 w-5" />
-                      <h3 className="font-bold text-lg">{schedule.route}</h3>
+                  <div className={`px-4 py-3 ${
+                    schedule.country === 'Ireland'
+                      ? 'bg-gradient-to-r from-green-600 to-emerald-500'
+                      : 'bg-gradient-to-r from-zim-green to-emerald-600'
+                  }`}>
+                    <div className="flex items-center justify-between text-white">
+                      <div className="flex items-center gap-2">
+                        <Truck className="h-5 w-5" />
+                        <h3 className="font-bold text-lg">{schedule.route}</h3>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        schedule.country === 'Ireland'
+                          ? 'bg-white/20 text-white'
+                          : 'bg-white/20 text-white'
+                      }`}>
+                        {schedule.country || 'England'}
+                      </span>
                     </div>
                   </div>
                   
