@@ -71,15 +71,15 @@ export const collectionSchedules: RouteSchedule[] = [
     country: "England"
   },
   {
-    route: "LONDON DERRY ROUTE",
+    route: "LONDONDERRY ROUTE",
     date: "18th of April",
-    areas: ["LARNE", "BALLYCLARE", "BALLYMENA", "BALLYMONEY", "KILERA", "COLERAINE", "LONDONDERRY", "LIFFORD", "OMAGH", "COOKSTOWN", "CARRICKFERGUS"],
+    areas: ["LARNE", "BALLYCLARE", "BALLYMENA", "BALLYMONEY", "KILREA", "COLERAINE", "LONDONDERRY", "LIFFORD", "OMAGH", "COOKSTOWN", "CARRICKFERGUS"],
     country: "Ireland"
   },
   {
     route: "BELFAST ROUTE",
     date: "19th of April",
-    areas: ["BELFAST", "BANGOR", "COMBER", "LISBURN", "NEWRY", "COOKSTOWN", "NEWTOWNARDS", "DUNMURRY", "LURGAN", "PORTADOWN", "BANBRIDGE", "MOY", "DUNGANNON", "ARMAGH"],
+    areas: ["BELFAST", "BANGOR", "COMBER", "LISBURN", "NEWRY", "NEWTOWNWARDS", "DUNMURRY", "LURGAN", "PORTADOWN", "BANBRIDGE", "MOY", "DUNGANNON", "ARMAGH"],
     country: "Ireland"
   },
   {
@@ -91,7 +91,7 @@ export const collectionSchedules: RouteSchedule[] = [
   {
     route: "ATHLONE ROUTE",
     date: "23rd of April",
-    areas: ["MALIGURAR", "LONGFORD", "ROSECOMMON", "BOYLE", "SLIGO", "BALLINA", "SWINFORD", "CASTLEBAR", "TAURM", "GALWAY", "ATERNY", "ATHLONE"],
+    areas: ["MALIGURAR", "LONGFORD", "ROSCOMMON", "BOYLE", "SLIGO", "BALLINA", "SWINFORD", "CASTLEBAR", "TUAM", "GALWAY", "ATHENRY", "ATHLONE"],
     country: "Ireland"
   },
   {
@@ -103,13 +103,13 @@ export const collectionSchedules: RouteSchedule[] = [
   {
     route: "DUBLIN CITY ROUTE",
     date: "26th of April",
-    areas: ["SANDFORD", "RIATO", "BALLYMOUNT", "CABRA", "BEAUMONT", "MALAHIDE", "PORTMANOCK", "DALKEY", "SHANDKILL", "BRAY"],
+    areas: ["SANDFORD", "RIALTO", "BALLYMOUNT", "CABRA", "BEAUMONT", "MALAHIDE", "PORTMARNOCK", "DALKEY", "SHANKILL", "BRAY"],
     country: "Ireland"
   },
   {
     route: "CORK ROUTE",
     date: "28th of April",
-    areas: ["PORTALOUSE", "CASHEL", "FERMOY", "CORK", "DUNGARVEAN", "WATERFORD", "NEW ROSS", "WEXFORD", "GOREY", "GREYSTONE"],
+    areas: ["PORTLAOISE", "CASHEL", "FERMOY", "CORK", "DUNGARVAN", "WATERFORD", "NEW ROSS", "WEXFORD", "GOREY", "GREYSTONES"],
     country: "Ireland"
   }
 ];

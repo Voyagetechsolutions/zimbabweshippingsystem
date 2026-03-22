@@ -40,10 +40,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { 
-  Route, 
-  PlusCircle, 
-  Trash2, 
+import {
+  Route,
+  PlusCircle,
+  Trash2,
   MapPin,
   Loader2,
   Search,
@@ -51,6 +51,13 @@ import {
   Calendar,
   Info
 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface RouteData {
   id: string;
@@ -59,6 +66,7 @@ interface RouteData {
   pickup_date: string;
   created_at: string;
   updated_at: string;
+  country?: string;
 }
 
 const RouteManagementTab = () => {
@@ -66,26 +74,38 @@ const RouteManagementTab = () => {
   const [routes, setRoutes] = useState<RouteData[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  
+  const [countryFilter, setCountryFilter] = useState<string>('All');
+
   // Form state for new route
   const [newRouteName, setNewRouteName] = useState('');
   const [newRouteAreas, setNewRouteAreas] = useState('');
+  const [newRouteCountry, setNewRouteCountry] = useState('England');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  
-  // Available predefined routes for quick selection
-  const predefinedRoutes = [
-    'LONDON', 
-    'LEEDS', 
-    'MANCHESTER', 
-    'BIRMINGHAM', 
-    'NOTTINGHAM', 
-    'CARDIFF', 
-    'BOURNEMOUTH', 
-    'SOUTHEND', 
-    'NORTHAMPTON', 
-    'BRIGHTON', 
-    'SCOTLAND'
+
+  // Available predefined routes for quick selection - England
+  const predefinedEnglandRoutes = [
+    'LONDON',
+    'LEEDS',
+    'MANCHESTER',
+    'BIRMINGHAM',
+    'NOTTINGHAM',
+    'CARDIFF',
+    'BOURNEMOUTH',
+    'SOUTHEND',
+    'NORTHAMPTON',
+    'BRIGHTON'
+  ];
+
+  // Available predefined routes for quick selection - Ireland
+  const predefinedIrelandRoutes = [
+    'LONDONDERRY',
+    'BELFAST',
+    'CAVAN',
+    'ATHLONE',
+    'LIMERICK',
+    'DUBLIN CITY',
+    'CORK'
   ];
 
   useEffect(() => {
@@ -135,7 +155,8 @@ const RouteManagementTab = () => {
         .insert({
           route: newRouteName.toUpperCase(),
           areas: areasArray,
-          pickup_date: 'Not set' // Default - will be set in Collection Schedule tab
+          pickup_date: 'Not set', // Default - will be set in Collection Schedule tab
+          country: newRouteCountry
         })
         .select();
       
@@ -149,6 +170,7 @@ const RouteManagementTab = () => {
       // Reset form and close dialog
       setNewRouteName('');
       setNewRouteAreas('');
+      setNewRouteCountry('England');
       setIsDialogOpen(false);
       
       toast({
@@ -197,13 +219,14 @@ const RouteManagementTab = () => {
     setNewRouteName(routeName);
   };
   
-  // Filter routes based on search query
+  // Filter routes based on search query and country
   const filteredRoutes = routes.filter(route => {
     const searchLower = searchQuery.toLowerCase();
-    return (
+    const matchesSearch =
       route.route.toLowerCase().includes(searchLower) ||
-      route.areas.some(area => area.toLowerCase().includes(searchLower))
-    );
+      route.areas.some(area => area.toLowerCase().includes(searchLower));
+    const matchesCountry = countryFilter === 'All' || route.country === countryFilter;
+    return matchesSearch && matchesCountry;
   });
 
   return (
@@ -252,20 +275,33 @@ const RouteManagementTab = () => {
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div>
+                    <Label htmlFor="country">Country</Label>
+                    <Select value={newRouteCountry} onValueChange={setNewRouteCountry}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Select country" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="England">England</SelectItem>
+                        <SelectItem value="Ireland">Ireland</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
                     <Label htmlFor="routeName">Route Name</Label>
-                    <Input 
-                      id="routeName" 
-                      placeholder="e.g., LONDON" 
+                    <Input
+                      id="routeName"
+                      placeholder={newRouteCountry === 'Ireland' ? "e.g., DUBLIN CITY" : "e.g., LONDON"}
                       className="mt-1"
                       value={newRouteName}
                       onChange={(e) => setNewRouteName(e.target.value.toUpperCase())}
                     />
                   </div>
-                  
+
                   <div>
-                    <Label className="text-sm text-gray-500">Quick Select:</Label>
+                    <Label className="text-sm text-gray-500">Quick Select ({newRouteCountry}):</Label>
                     <div className="grid grid-cols-3 gap-2 mt-2">
-                      {predefinedRoutes.map((route) => (
+                      {(newRouteCountry === 'Ireland' ? predefinedIrelandRoutes : predefinedEnglandRoutes).map((route) => (
                         <Badge
                           key={route}
                           variant="outline"
@@ -277,12 +313,12 @@ const RouteManagementTab = () => {
                       ))}
                     </div>
                   </div>
-                  
+
                   <div>
                     <Label htmlFor="areas">Service Areas (comma separated)</Label>
-                    <Input 
-                      id="areas" 
-                      placeholder="e.g., Brixton, Hackney, Camden" 
+                    <Input
+                      id="areas"
+                      placeholder={newRouteCountry === 'Ireland' ? "e.g., Dublin, Cork, Galway" : "e.g., Brixton, Hackney, Camden"}
                       className="mt-1"
                       value={newRouteAreas}
                       onChange={(e) => setNewRouteAreas(e.target.value)}
@@ -313,14 +349,26 @@ const RouteManagementTab = () => {
         </CardHeader>
         
         <CardContent>
-          <div className="relative mb-6">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search routes or areas..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex gap-4 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search routes or areas..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={countryFilter} onValueChange={setCountryFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by country" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Countries</SelectItem>
+                <SelectItem value="England">England</SelectItem>
+                <SelectItem value="Ireland">Ireland</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           
           {loading ? (
@@ -341,6 +389,7 @@ const RouteManagementTab = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Route Name</TableHead>
+                    <TableHead>Country</TableHead>
                     <TableHead>Service Areas</TableHead>
                     <TableHead>Collection Date</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -354,6 +403,15 @@ const RouteManagementTab = () => {
                           <Route className="h-4 w-4 mr-2 text-green-600" />
                           {route.route}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          route.country === 'Ireland'
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                        }`}>
+                          {route.country || 'England'}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1 max-w-md">

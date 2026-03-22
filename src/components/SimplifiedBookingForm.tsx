@@ -9,7 +9,8 @@ import { format, addDays, isAfter, isBefore, startOfDay } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import BookingReceipt from '@/components/BookingReceipt';
-import { getRouteForPostalCode, getIrelandRouteForCity } from '@/utils/postalCodeUtils';
+import { getRouteForPostalCode, getIrelandRouteForCity, irelandCities } from '@/utils/postalCodeUtils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface FormData {
   // Sender Details
@@ -311,20 +312,22 @@ export const SimplifiedBookingForm = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  // Fetch collection schedule based on postal code
-  const fetchCollectionSchedule = async (postcode: string) => {
-    if (!postcode || postcode.length < 2) {
+  // Fetch collection schedule based on postal code or Ireland city
+  const fetchCollectionSchedule = async (postcodeOrCity: string) => {
+    if (!postcodeOrCity || postcodeOrCity.length < 2) {
       setCollectionRoute(null);
       setCollectionDate(null);
       return;
     }
 
+    const isIreland = formData.pickupCountry === 'Ireland' || formData.pickupCountry === 'Northern Ireland';
+
     setLoadingSchedule(true);
     try {
-      // Detect route from postal code
-      const route = formData.pickupCountry === 'Ireland'
+      // Detect route from postal code (UK) or city (Ireland)
+      const route = isIreland
         ? getIrelandRouteForCity(formData.pickupCity)
-        : getRouteForPostalCode(postcode);
+        : getRouteForPostalCode(postcodeOrCity);
 
       if (!route) {
         setCollectionRoute(null);
@@ -405,10 +408,16 @@ export const SimplifiedBookingForm = () => {
   }, [formData.pickupPostcode, formData.pickupCountry, formData.pickupCity]);
 
   const validateStep = (step: number): boolean => {
+    const isIreland = formData.pickupCountry === 'Ireland' || formData.pickupCountry === 'Northern Ireland';
+
     switch (step) {
       case 1:
-        if (!formData.senderFirstName || !formData.senderLastName || !formData.senderEmail || 
-            !formData.senderPhone || !formData.pickupAddress || !formData.pickupCity || !formData.pickupPostcode) {
+        // For Ireland, postal code is not required (city dropdown used instead)
+        const postcodeRequired = !isIreland;
+
+        if (!formData.senderFirstName || !formData.senderLastName || !formData.senderEmail ||
+            !formData.senderPhone || !formData.pickupAddress || !formData.pickupCity ||
+            (postcodeRequired && !formData.pickupPostcode)) {
           toast({
             title: 'Missing Information',
             description: 'Please fill in all required fields.',
@@ -800,6 +809,31 @@ export const SimplifiedBookingForm = () => {
           </div>
         )}
 
+        {/* Country Selector */}
+        <div>
+          <Label htmlFor="country">Pickup Country</Label>
+          <Select
+            value={formData.pickupCountry}
+            onValueChange={(value) => {
+              updateField('pickupCountry', value);
+              // Clear city and postcode when switching countries
+              updateField('pickupCity', '');
+              updateField('pickupPostcode', '');
+              setCollectionRoute(null);
+              setCollectionDate(null);
+            }}
+          >
+            <SelectTrigger id="country">
+              <SelectValue placeholder="Select country" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="England">England</SelectItem>
+              <SelectItem value="Northern Ireland">Northern Ireland</SelectItem>
+              <SelectItem value="Ireland">Ireland</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         <div>
           <Label htmlFor="address">Pickup Address</Label>
           <Input
@@ -810,27 +844,63 @@ export const SimplifiedBookingForm = () => {
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Conditional: City autocomplete for Ireland, or City + Postal code for UK */}
+        {formData.pickupCountry === 'Ireland' || formData.pickupCountry === 'Northern Ireland' ? (
           <div>
-            <Label htmlFor="city">City</Label>
+            <Label htmlFor="irelandCity">City</Label>
             <Input
-              id="city"
-              placeholder="London"
+              id="irelandCity"
+              list="ireland-cities-list"
+              placeholder="Start typing your city..."
               value={formData.pickupCity}
-              onChange={(e) => updateField('pickupCity', e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                updateField('pickupCity', value);
+                // Set a placeholder postcode for Ireland
+                updateField('pickupPostcode', 'N/A');
+                // Try to detect route from city
+                const route = getIrelandRouteForCity(value);
+                if (route) {
+                  setCollectionRoute(route);
+                  fetchCollectionSchedule(value);
+                } else {
+                  setCollectionRoute(null);
+                  setCollectionDate(null);
+                }
+              }}
             />
+            <datalist id="ireland-cities-list">
+              {irelandCities.map((item) => (
+                <option key={item.city} value={item.city} />
+              ))}
+            </datalist>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Type your city name - we'll show matching options
+            </p>
           </div>
-          <div>
-            <Label htmlFor="postcode">Postal Code</Label>
-            <Input
-              id="postcode"
-              placeholder="e.g., SW1, B1"
-              value={formData.pickupPostcode}
-              onChange={(e) => updateField('pickupPostcode', e.target.value)}
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Just the area code is fine</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="city">City</Label>
+              <Input
+                id="city"
+                placeholder="London"
+                value={formData.pickupCity}
+                onChange={(e) => updateField('pickupCity', e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="postcode">Postal Code</Label>
+              <Input
+                id="postcode"
+                placeholder="e.g., SW1, B1"
+                value={formData.pickupPostcode}
+                onChange={(e) => updateField('pickupPostcode', e.target.value)}
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Just the area code is fine</p>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Collection Schedule Info */}
         {collectionRoute && (

@@ -45,6 +45,13 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { formatDate } from '@/utils/formatters';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface CollectionSchedule {
   id: string;
@@ -53,6 +60,7 @@ interface CollectionSchedule {
   pickup_date: string;
   created_at: string;
   updated_at: string;
+  country?: string;
 }
 
 const CollectionScheduleTab = () => {
@@ -62,7 +70,8 @@ const CollectionScheduleTab = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  
+  const [countryFilter, setCountryFilter] = useState<string>('All');
+
   useEffect(() => {
     fetchSchedules();
   }, []);
@@ -205,7 +214,22 @@ const CollectionScheduleTab = () => {
           </div>
         </div>
       </div>
-      
+
+      {/* Country Filter */}
+      <div className="flex items-center gap-4">
+        <Label className="text-sm font-medium">Filter by Country:</Label>
+        <Select value={countryFilter} onValueChange={setCountryFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Select country" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="All">All Countries</SelectItem>
+            <SelectItem value="England">England</SelectItem>
+            <SelectItem value="Ireland">Ireland</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg font-medium">Collection Schedules</CardTitle>
@@ -225,6 +249,7 @@ const CollectionScheduleTab = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Route</TableHead>
+                    <TableHead>Country</TableHead>
                     <TableHead>Areas</TableHead>
                     <TableHead>Pickup Date</TableHead>
                     <TableHead>Last Updated</TableHead>
@@ -232,19 +257,34 @@ const CollectionScheduleTab = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {schedules.length === 0 ? (
+                  {schedules.filter(s => countryFilter === 'All' || s.country === countryFilter).length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-6 text-gray-500">
+                      <TableCell colSpan={6} className="text-center py-6 text-gray-500">
                         <Calendar className="h-12 w-12 mx-auto mb-2 text-gray-400" />
                         <p>No collection schedules found</p>
-                        <p className="text-sm">Create routes first to add collection schedules</p>
+                        <p className="text-sm">
+                          {countryFilter !== 'All'
+                            ? `No ${countryFilter} routes found. Try selecting "All Countries".`
+                            : 'Create routes first to add collection schedules'}
+                        </p>
                       </TableCell>
                     </TableRow>
                   ) : (
-                    schedules.map((schedule) => (
+                    schedules
+                      .filter(s => countryFilter === 'All' || s.country === countryFilter)
+                      .map((schedule) => (
                       <TableRow key={schedule.id}>
                         <TableCell className="font-medium">
                           {schedule.route}
+                        </TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            schedule.country === 'Ireland'
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                              : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                          }`}>
+                            {schedule.country || 'England'}
+                          </span>
                         </TableCell>
                         <TableCell>
                           <span className="max-w-xs truncate block">
