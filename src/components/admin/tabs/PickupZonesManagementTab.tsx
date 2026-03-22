@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAdminCountry } from '../ModernAdminDashboard';
 import { format, isValid } from 'date-fns';
 import { Shipment } from '@/types/shipment';
 
@@ -60,8 +61,7 @@ import {
   CheckCircle,
   Phone,
   Mail,
-  ChevronRight,
-  Filter
+  ChevronRight
 } from 'lucide-react';
 
 // Define the standard routes used across the app - England
@@ -103,9 +103,9 @@ interface CollectionSchedule {
 
 const PickupZonesManagementTab = () => {
   const { toast } = useToast();
+  const { selectedCountry } = useAdminCountry();
   const [loading, setLoading] = useState(true);
   const [selectedRoute, setSelectedRoute] = useState('all');
-  const [countryFilter, setCountryFilter] = useState<'all' | 'England' | 'Ireland'>('all');
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [schedules, setSchedules] = useState<CollectionSchedule[]>([]);
   const [groupedShipments, setGroupedShipments] = useState<{[key: string]: Shipment[]}>({});
@@ -118,10 +118,10 @@ const PickupZonesManagementTab = () => {
   const [shipmentDialogOpen, setShipmentDialogOpen] = useState(false);
   const [markingCollected, setMarkingCollected] = useState<string | null>(null);
 
-  // Get filtered routes based on country filter
+  // Get filtered routes based on selected country from context
   const getFilteredRoutes = () => {
-    if (countryFilter === 'England') return ENGLAND_ROUTES;
-    if (countryFilter === 'Ireland') return IRELAND_ROUTES;
+    if (selectedCountry === 'England') return ENGLAND_ROUTES;
+    if (selectedCountry === 'Ireland') return IRELAND_ROUTES;
     return ROUTES;
   };
 
@@ -667,24 +667,11 @@ const PickupZonesManagementTab = () => {
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="flex flex-col md:flex-row gap-4 items-end">
-          {/* Country Filter */}
-          <div className="w-full md:w-48">
-            <Select value={countryFilter} onValueChange={(value: 'all' | 'England' | 'Ireland') => {
-              setCountryFilter(value);
-              setSelectedRoute('all'); // Reset route selection when country changes
-            }}>
-              <SelectTrigger>
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4" />
-                  <span>Country</span>
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Countries</SelectItem>
-                <SelectItem value="England">England</SelectItem>
-                <SelectItem value="Ireland">Ireland</SelectItem>
-              </SelectContent>
-            </Select>
+          {/* Country Indicator */}
+          <div className="flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+            <span className="text-sm font-medium">
+              {selectedCountry === 'Ireland' ? '🇮🇪' : '🇬🇧'} {selectedCountry} Pickups
+            </span>
           </div>
 
           {/* Route Filter */}

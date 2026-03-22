@@ -2,10 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
+import { useAdminCountry } from '../ModernAdminDashboard';
+import {
+  Card,
+  CardContent,
+  CardHeader,
   CardTitle,
   CardDescription,
   CardFooter
@@ -30,12 +31,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { 
-  Calendar as CalendarIcon, 
-  Loader2, 
-  Save, 
-  Edit, 
-  Calendar 
+import {
+  Calendar as CalendarIcon,
+  Loader2,
+  Save,
+  Edit,
+  Calendar
 } from 'lucide-react';
 import { format, isValid } from 'date-fns';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
@@ -45,13 +46,6 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { formatDate } from '@/utils/formatters';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 interface CollectionSchedule {
   id: string;
@@ -65,12 +59,12 @@ interface CollectionSchedule {
 
 const CollectionScheduleTab = () => {
   const { toast } = useToast();
+  const { selectedCountry } = useAdminCountry();
   const [schedules, setSchedules] = useState<CollectionSchedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [countryFilter, setCountryFilter] = useState<string>('All');
 
   useEffect(() => {
     fetchSchedules();
@@ -215,21 +209,6 @@ const CollectionScheduleTab = () => {
         </div>
       </div>
 
-      {/* Country Filter */}
-      <div className="flex items-center gap-4">
-        <Label className="text-sm font-medium">Filter by Country:</Label>
-        <Select value={countryFilter} onValueChange={setCountryFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Select country" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All">All Countries</SelectItem>
-            <SelectItem value="England">England</SelectItem>
-            <SelectItem value="Ireland">Ireland</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg font-medium">Collection Schedules</CardTitle>
@@ -257,21 +236,19 @@ const CollectionScheduleTab = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {schedules.filter(s => countryFilter === 'All' || s.country === countryFilter).length === 0 ? (
+                  {schedules.filter(s => s.country === selectedCountry).length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-6 text-gray-500">
                         <Calendar className="h-12 w-12 mx-auto mb-2 text-gray-400" />
                         <p>No collection schedules found</p>
                         <p className="text-sm">
-                          {countryFilter !== 'All'
-                            ? `No ${countryFilter} routes found. Try selecting "All Countries".`
-                            : 'Create routes first to add collection schedules'}
+                          No {selectedCountry} routes found. Create routes first in the Routes tab.
                         </p>
                       </TableCell>
                     </TableRow>
                   ) : (
                     schedules
-                      .filter(s => countryFilter === 'All' || s.country === countryFilter)
+                      .filter(s => s.country === selectedCountry)
                       .map((schedule) => (
                       <TableRow key={schedule.id}>
                         <TableCell className="font-medium">
