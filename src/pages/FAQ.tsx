@@ -1,35 +1,47 @@
-
-import React from 'react';
+import React, { useState } from 'react';
+import { Helmet } from 'react-helmet';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { 
+import WhatsAppButton from '@/components/WhatsAppButton';
+import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger
 } from '@/components/ui/accordion';
-import { Card, CardContent } from '@/components/ui/card';
-import { 
-  Truck, 
-  CreditCard, 
-  Box, 
-  Clock, 
-  HelpCircle, 
+import { Button } from '@/components/ui/button';
+import {
+  Truck,
+  CreditCard,
+  Box,
+  Clock,
+  HelpCircle,
   ShoppingBag,
   MapPin,
-  AlertTriangle
+  AlertTriangle,
+  Search,
+  MessageCircle,
+  Phone
 } from 'lucide-react';
 
 const FAQ = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+
   const faqCategories = [
     {
       id: 'shipping',
       title: 'Shipping',
-      icon: <Truck className="h-5 w-5 text-zim-green" />,
+      icon: Truck,
+      color: 'zim-green',
       questions: [
         {
           question: 'How long does shipping from the UK to Zimbabwe take?',
           answer: 'Our standard shipping time from the UK to Zimbabwe is approximately 6 weeks. 10-14 days for parcel delivery. Transit times may vary slightly depending on customs clearance and local delivery conditions in Zimbabwe.'
+        },
+        {
+          question: 'Do you ship from Ireland as well?',
+          answer: 'Yes! We now offer shipping from Ireland to Zimbabwe. Drum shipping from Ireland starts at €340 for 5+ drums, €350 for 2-4 drums, and €360 for a single drum. Collection is available across Ireland.'
         },
         {
           question: 'What items can I ship to Zimbabwe?',
@@ -48,11 +60,16 @@ const FAQ = () => {
     {
       id: 'payment',
       title: 'Payment',
-      icon: <CreditCard className="h-5 w-5 text-zim-yellow" />,
+      icon: CreditCard,
+      color: 'zim-yellow',
       questions: [
         {
           question: 'What payment methods do you accept?',
-          answer: 'We accept cash payment, PayPal, bank transfers, payment in zimbabwe and mobile payment options. All payment methods are secure and encrypted for your protection.'
+          answer: 'We accept cash payment, PayPal, bank transfers, payment in Zimbabwe, and mobile payment options. All payment methods are secure and encrypted for your protection.'
+        },
+        {
+          question: 'Is there a discount for cash payments?',
+          answer: 'Yes! For UK shipments, paying by cash saves you £20 per drum. Cash prices are: £240 (5+ drums), £250 (2-4 drums), £260 (1 drum). Card payments add £20 per drum.'
         },
         {
           question: 'When do I need to pay for my shipment?',
@@ -60,41 +77,43 @@ const FAQ = () => {
         },
         {
           question: 'Do you offer volume discounts?',
-          answer: 'Yes, we offer volume discounts for multiple drums or large parcel shipments. Please contact our customer service team for a custom quote based on your specific shipping requirements.'
+          answer: 'Yes, we offer volume discounts for multiple drums or large parcel shipments. The more drums you ship, the lower the per-drum price. 5+ drums get the best rate.'
         },
         {
-          question: 'Can I pay in Zimbabwean currency?',
-          answer: 'Currently, all payments must be made in British Pounds (GBP) and United States Dollar (USD). However, we are working on implementing local payment options for recipients in Zimbabwe for certain services.'
+          question: 'Can I pay in Euros for Ireland shipments?',
+          answer: 'Yes! All Ireland shipments are priced in Euros (EUR). Our Ireland pricing is: €340 (5+ drums), €350 (2-4 drums), €360 (1 drum).'
         }
       ]
     },
     {
       id: 'collection',
       title: 'Collection',
-      icon: <MapPin className="h-5 w-5 text-zim-red" />,
+      icon: MapPin,
+      color: 'zim-red',
       questions: [
         {
           question: 'How does the collection service work?',
-          answer: 'We offer scheduled collections based on postal code areas across the UK. Once you enter your postal code during booking, you\'ll see the next available collection date for your area. Our driver will arrive at your address on the scheduled date within the specified time window.'
+          answer: 'We offer FREE scheduled collections based on postal code areas across the UK and Ireland. Once you enter your postal code during booking, you\'ll see the next available collection date for your area. Our driver will arrive at your address on the scheduled date within the specified time window.'
+        },
+        {
+          question: 'Do you collect from Ireland?',
+          answer: 'Yes! We now offer free collection across Ireland. Enter your Irish Eircode during booking to see available collection dates for your area.'
         },
         {
           question: 'What if I\'m not available on my area\'s collection date?',
-          answer: 'If you\'re not available on your area\'s scheduled collection date, you can either drop off your items at our depot, or wait for the next collection date in your area (typically every 2-4 weeks) or instruct us on how to access your goods'
+          answer: 'If you\'re not available on your area\'s scheduled collection date, you can either drop off your items at our depot, wait for the next collection date in your area (typically every 2-4 weeks), or instruct us on how to access your goods.'
         },
         {
           question: 'Do you collect from all areas in the UK?',
-          answer: 'We cover most areas across the UK. However, some remote have limited collection schedules or may require additional fees. Check our collection schedule or enter your postal code during booking to confirm service availability.'
-        },
-        {
-          question: 'What happens if my postal code is in a restricted area?',
-          answer: 'For postal codes in restricted areas, we offer collection services only for large business shipments. If you\'re in a restricted area, please contact our support team via WhatsApp at +44 7584 100552 to discuss possible arrangements.'
+          answer: 'We cover most areas across the UK. However, some remote areas have limited collection schedules or may require additional fees. Check our collection schedule or enter your postal code during booking to confirm service availability.'
         }
       ]
     },
     {
       id: 'tracking',
       title: 'Tracking',
-      icon: <Box className="h-5 w-5 text-zim-green" />,
+      icon: Box,
+      color: 'zim-green',
       questions: [
         {
           question: 'How do I track my shipment?',
@@ -105,10 +124,6 @@ const FAQ = () => {
           answer: 'Tracking information is updated at key stages of the shipping process: collection, arrival at our UK depot, departure from the UK, arrival in Zimbabwe, customs clearance, and delivery/ready for collection. Updates typically occur within 24 hours of each milestone.'
         },
         {
-          question: 'What if my tracking information hasn\'t updated for several days?',
-          answer: 'Occasional delays in tracking updates can occur, especially during customs processing. If your tracking hasn\'t updated for more than 3-4 days, please contact our customer service team for assistance.'
-        },
-        {
           question: 'Will my recipient in Zimbabwe be able to track the shipment?',
           answer: 'Yes, anyone with the tracking number can check the shipment status. Additionally, we send SMS notifications to the recipient\'s phone number (if provided) when the shipment arrives in Zimbabwe and is ready for delivery or collection.'
         }
@@ -117,7 +132,8 @@ const FAQ = () => {
     {
       id: 'delivery',
       title: 'Delivery in Zimbabwe',
-      icon: <ShoppingBag className="h-5 w-5 text-zim-yellow" />,
+      icon: ShoppingBag,
+      color: 'zim-yellow',
       questions: [
         {
           question: 'Do you deliver to all areas in Zimbabwe?',
@@ -125,11 +141,7 @@ const FAQ = () => {
         },
         {
           question: 'How does door-to-door delivery work in Zimbabwe?',
-          answer: 'Our door-to-door service delivers your shipment directly to your recipient\'s address in Zimbabwe. We contact the recipient to inform them about the delivery day. A small additional fee applies for this service.'
-        },
-        {
-          question: 'What happens if no one is available to receive the delivery?',
-          answer: 'If no one is available at the delivery address, our driver will leave a notification and attempt delivery once more. After two failed attempts, the shipment will be held at our nearest depot for collection. You can also add or change the receiptant if the main receiptant is not available this is done by contacting support.'
+          answer: 'Our door-to-door service delivers your shipment directly to your recipient\'s address in Zimbabwe. We contact the recipient to inform them about the delivery day. This service costs an additional £25 per address.'
         },
         {
           question: 'Is there a depot collection option in Zimbabwe?',
@@ -140,7 +152,8 @@ const FAQ = () => {
     {
       id: 'customs',
       title: 'Customs & Documentation',
-      icon: <AlertTriangle className="h-5 w-5 text-zim-red" />,
+      icon: AlertTriangle,
+      color: 'zim-red',
       questions: [
         {
           question: 'What customs documentation is required?',
@@ -152,26 +165,19 @@ const FAQ = () => {
         },
         {
           question: 'How do you handle customs clearance?',
-          answer: 'We handle standard customs clearance procedures as part of our service. Our dedicated customs team in Zimbabwe processes documentation and works to ensure smooth clearance. For complex shipments or commercial goods, additional services may be required.'
-        },
-        {
-          question: 'What happens if my shipment is held by customs?',
-          answer: 'If your shipment is held for inspection or requires additional documentation, our customs team will contact you or your recipient promptly with instructions. Most issues can be resolved quickly with proper documentation or clarification.'
+          answer: 'We handle standard customs clearance procedures as part of our service. Our dedicated customs team in Zimbabwe processes documentation and works to ensure smooth clearance.'
         }
       ]
     },
     {
       id: 'business',
       title: 'Business Shipping',
-      icon: <Clock className="h-5 w-5 text-zim-green" />,
+      icon: Clock,
+      color: 'zim-green',
       questions: [
         {
           question: 'Do you offer special rates for businesses?',
           answer: 'Yes, we offer competitive rates for businesses with regular shipping needs. Volume discounts, account management, and customized shipping solutions are available. Contact our business team for a tailored quote.'
-        },
-        {
-          question: 'What additional services do you provide for business customers?',
-          answer: 'Business customers benefit from dedicated account management, bulk shipping discounts, extended payment terms, customized reporting, and priority handling. We also offer specialized services for specific industry requirements.'
         },
         {
           question: 'Can you ship commercial goods and merchandise?',
@@ -186,7 +192,8 @@ const FAQ = () => {
     {
       id: 'general',
       title: 'General',
-      icon: <HelpCircle className="h-5 w-5 text-zim-yellow" />,
+      icon: HelpCircle,
+      color: 'zim-yellow',
       questions: [
         {
           question: 'How do I book a shipment?',
@@ -198,79 +205,206 @@ const FAQ = () => {
         },
         {
           question: 'What is the difference between drum shipping and other items?',
-          answer: 'Drum shipping involves sending items in a large 200L - 220L drums, ideal for multiple items or bulky goods. Other items involves small parcels to palletes and is charged by volume/size/value. Drum shipping is more cost-effective for larger volumes, while parcel shipping may be better for smaller, urgent shipments.'
+          answer: 'Drum shipping involves sending items in a large 200L - 220L drum, ideal for multiple items or bulky goods. Other items involve small parcels to palettes and are charged by volume/size/value. Drum shipping is more cost-effective for larger volumes.'
         },
         {
           question: 'Do you offer any assistance with packing?',
-          answer: 'We don\'t offer packing services at your location, however we consider elderly people who are unable package bigger items or home removal at an additional cost (rate per hour). We provide comprehensive packing guidelines on our website. For drum shipping, we can provide drums for an additional fee if you don\'t have your own.'
+          answer: 'We don\'t offer packing services at your location, however we consider elderly people who are unable to package bigger items or home removal at an additional cost (rate per hour). We provide comprehensive packing guidelines on our website. For drum shipping, we can provide drums for an additional fee if you don\'t have your own.'
         }
       ]
     }
   ];
 
-  return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar />
-      <main className="flex-grow py-12 bg-gray-50">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold mb-4">Frequently Asked Questions</h1>
-            <p className="text-gray-600 max-w-3xl mx-auto">
-              Find answers to common questions about our UK to Zimbabwe shipping services. If you can't find what you're looking for, please contact our support team.
-            </p>
-          </div>
+  // Filter questions based on search
+  const filteredCategories = faqCategories.map(category => ({
+    ...category,
+    questions: category.questions.filter(
+      q => q.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           q.answer.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  })).filter(category => category.questions.length > 0);
 
-          <div className="flex flex-col md:flex-row gap-8 mb-12">
-            <div className="md:w-1/4">
-              <div className="bg-white rounded-lg shadow p-4 sticky top-20">
-                <h3 className="font-bold text-lg mb-4">Categories</h3>
-                <nav className="space-y-2">
-                  {faqCategories.map((category) => (
-                    <a 
-                      key={category.id}
-                      href={`#${category.id}`}
-                      className="flex items-center p-2 hover:bg-gray-100 rounded transition-colors"
-                    >
-                      {category.icon}
-                      <span className="ml-2">{category.title}</span>
-                    </a>
-                  ))}
-                </nav>
+  const displayCategories = searchQuery ? filteredCategories :
+    activeCategory ? faqCategories.filter(c => c.id === activeCategory) : faqCategories;
+
+  return (
+    <>
+      <Helmet>
+        <title>FAQ | Zimbabwe Shipping - UK & Ireland to Zimbabwe</title>
+        <meta name="description" content="Frequently asked questions about shipping from UK and Ireland to Zimbabwe. Learn about pricing, collection, tracking, customs, and more." />
+      </Helmet>
+
+      <Navbar />
+      <main className="min-h-screen">
+        {/* Hero Section */}
+        <section className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white py-16">
+          <div className="container mx-auto px-4">
+            <div className="max-w-3xl mx-auto text-center">
+              <div className="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-400 px-4 py-2 rounded-full text-sm font-medium mb-6">
+                Got questions? We've got answers
+              </div>
+              <h1 className="text-4xl md:text-5xl font-bold mb-4">
+                Frequently Asked Questions
+              </h1>
+              <p className="text-xl text-gray-300 mb-8">
+                Everything you need to know about shipping from UK & Ireland to Zimbabwe
+              </p>
+
+              {/* Search Bar */}
+              <div className="relative max-w-xl mx-auto">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search for answers..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-12 pr-4 py-4 rounded-xl bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-zim-green focus:border-transparent"
+                />
               </div>
             </div>
-            
-            <div className="md:w-3/4">
-              {faqCategories.map((category) => (
-                <div key={category.id} id={category.id} className="mb-10 scroll-mt-20">
-                  <Card className="border-t-4 border-t-zim-green">
-                    <CardContent className="pt-6">
-                      <h2 className="text-2xl font-bold mb-6 flex items-center">
-                        {category.icon}
-                        <span className="ml-2">{category.title} Questions</span>
-                      </h2>
-                      
-                      <Accordion type="single" collapsible className="space-y-4">
-                        {category.questions.map((faq, index) => (
-                          <AccordionItem key={index} value={`${category.id}-${index}`} className="border rounded-md shadow-sm px-4">
-                            <AccordionTrigger className="text-left font-medium py-4">
-                              {faq.question}
-                            </AccordionTrigger>
-                            <AccordionContent className="pt-2 pb-4 text-gray-600">
-                              {faq.answer}
-                            </AccordionContent>
-                          </AccordionItem>
-                        ))}
-                      </Accordion>
-                    </CardContent>
-                  </Card>
-                </div>
-              ))}
+          </div>
+        </section>
+
+        {/* Category Pills */}
+        <section className="bg-white dark:bg-gray-900 border-b dark:border-gray-700 sticky top-0 z-10">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              <button
+                onClick={() => setActiveCategory(null)}
+                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+                  !activeCategory && !searchQuery
+                    ? 'bg-zim-green text-white'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                }`}
+              >
+                All Questions
+              </button>
+              {faqCategories.map((category) => {
+                const Icon = category.icon;
+                return (
+                  <button
+                    key={category.id}
+                    onClick={() => {
+                      setActiveCategory(category.id);
+                      setSearchQuery('');
+                    }}
+                    className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all flex items-center gap-2 ${
+                      activeCategory === category.id
+                        ? 'bg-zim-green text-white'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {category.title}
+                  </button>
+                );
+              })}
             </div>
           </div>
-        </div>
+        </section>
+
+        {/* FAQ Content */}
+        <section className="py-12 bg-gray-50 dark:bg-gray-800">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto">
+              {searchQuery && (
+                <p className="text-gray-600 dark:text-gray-400 mb-6">
+                  Found {filteredCategories.reduce((acc, cat) => acc + cat.questions.length, 0)} results for "{searchQuery}"
+                </p>
+              )}
+
+              {displayCategories.length === 0 ? (
+                <div className="text-center py-12">
+                  <HelpCircle className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-600 dark:text-gray-300 mb-2">No results found</h3>
+                  <p className="text-gray-500 dark:text-gray-400 mb-6">Try a different search term or browse by category</p>
+                  <Button onClick={() => setSearchQuery('')} variant="outline">
+                    Clear Search
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-8">
+                  {displayCategories.map((category) => {
+                    const Icon = category.icon;
+                    return (
+                      <div key={category.id} id={category.id} className="scroll-mt-32">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className={`p-2 rounded-lg ${
+                            category.color === 'zim-green' ? 'bg-zim-green/10' :
+                            category.color === 'zim-yellow' ? 'bg-zim-yellow/10' :
+                            'bg-zim-red/10'
+                          }`}>
+                            <Icon className={`h-5 w-5 ${
+                              category.color === 'zim-green' ? 'text-zim-green' :
+                              category.color === 'zim-yellow' ? 'text-zim-yellow' :
+                              'text-zim-red'
+                            }`} />
+                          </div>
+                          <h2 className="text-xl font-bold text-gray-900 dark:text-white">{category.title}</h2>
+                        </div>
+
+                        <Accordion type="single" collapsible className="space-y-3">
+                          {category.questions.map((faq, index) => (
+                            <AccordionItem
+                              key={index}
+                              value={`${category.id}-${index}`}
+                              className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-6 overflow-hidden"
+                            >
+                              <AccordionTrigger className="text-left font-medium py-5 hover:no-underline text-gray-900 dark:text-white">
+                                {faq.question}
+                              </AccordionTrigger>
+                              <AccordionContent className="pb-5 text-gray-600 dark:text-gray-400 leading-relaxed">
+                                {faq.answer}
+                              </AccordionContent>
+                            </AccordionItem>
+                          ))}
+                        </Accordion>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Still Need Help Section */}
+        <section className="py-16 bg-white dark:bg-gray-900">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto">
+              <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-8 md:p-12 text-center">
+                <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">
+                  Still have questions?
+                </h2>
+                <p className="text-gray-300 mb-8 max-w-xl mx-auto">
+                  Our friendly support team is here to help. Get in touch via WhatsApp or phone and we'll respond as quickly as possible.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <a
+                    href="https://wa.me/447584100552"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button size="lg" className="bg-[#25D366] hover:bg-[#128C7E] text-white w-full sm:w-auto">
+                      <MessageCircle className="mr-2 h-5 w-5" />
+                      Chat on WhatsApp
+                    </Button>
+                  </a>
+                  <a href="tel:+447584100552">
+                    <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10 w-full sm:w-auto">
+                      <Phone className="mr-2 h-5 w-5" />
+                      +44 7584 100552
+                    </Button>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
       <Footer />
-    </div>
+      <WhatsAppButton />
+    </>
   );
 };
 

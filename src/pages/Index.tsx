@@ -1,57 +1,68 @@
-
 import React from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import HeroSection from '@/components/HeroSection';
-import ServicesSection from '@/components/ServicesSection';
+import HowItWorks from '@/components/HowItWorks';
 import PricingSection from '@/components/PricingSection';
+import UpcomingCollections from '@/components/UpcomingCollections';
+import TrustSection from '@/components/TrustSection';
+import TestimonialsSection from '@/components/TestimonialsSection';
 import CallToAction from '@/components/CallToAction';
 import WhatsAppButton from '@/components/WhatsAppButton';
-import ReviewsSection from '@/components/reviews/ReviewsSection';
 import ShippingGallerySlideshow from '@/components/ShippingGallerySlideshow';
+import SocialProofBanner from '@/components/SocialProofBanner';
 import { Helmet } from 'react-helmet';
 
 const Index = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <Helmet>
-        <title>Zimbabwe Shipping | Professional UK to Zimbabwe Courier & Freight Services</title>
+        <title>Zimbabwe Shipping | Ship from UK to Zimbabwe from £240/drum</title>
         <meta
           name="description"
-          content="Professional Zimbabwe shipping and freight services from the UK. Established courier company offering secure door-to-door delivery, competitive rates, and reliable transit times to all Zimbabwe cities."
+          content="Ship to Zimbabwe from £240 per drum. Free UK collection, door-to-door delivery, fully tracked. Family-run business with 14+ years experience. Book online today."
         />
-        <meta name="keywords" content="Zimbabwe courier, UK Zimbabwe freight, professional shipping services, Zimbabwe logistics, international courier" />
+        <meta name="keywords" content="Zimbabwe shipping, UK to Zimbabwe, drum shipping, Zimbabwe courier, send goods to Zimbabwe" />
         <meta name="author" content="Zimbabwe Shipping" />
 
         {/* Open Graph */}
-        <meta property="og:title" content="Zimbabwe Shipping | Professional UK to Zimbabwe Courier Services" />
-        <meta property="og:description" content="Professional Zimbabwe shipping and freight services from the UK with secure delivery and competitive rates." />
+        <meta property="og:title" content="Zimbabwe Shipping | Ship from UK to Zimbabwe from £240" />
+        <meta property="og:description" content="Ship to Zimbabwe from £240 per drum. Free UK collection, door-to-door delivery, fully tracked. Book online today." />
         <meta property="og:type" content="website" />
 
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Zimbabwe Shipping | Professional UK to Zimbabwe Courier Services" />
-        <meta name="twitter:description" content="Professional Zimbabwe shipping and freight services from the UK with secure delivery and competitive rates." />
+        <meta name="twitter:title" content="Zimbabwe Shipping | Ship from UK to Zimbabwe from £240" />
+        <meta name="twitter:description" content="Ship to Zimbabwe from £240 per drum. Free UK collection, door-to-door delivery, fully tracked. Book online today." />
       </Helmet>
 
       <Navbar />
       <main className="flex-grow">
+        {/* Hero with pricing headline and trust stats */}
         <HeroSection />
 
-        <ServicesSection />
+        {/* Social proof stats banner */}
+        <SocialProofBanner />
+
+        {/* How it works - 3 simple steps */}
+        <HowItWorks />
+
+        {/* Gallery - real photos of our operations */}
         <ShippingGallerySlideshow />
+
+        {/* Upcoming collection dates */}
+        <UpcomingCollections />
+
+        {/* Pricing - drums and custom quote */}
         <PricingSection />
-        
-        <section id="reviews" className="py-16 bg-gray-50 reviews-section">
-          <div className="container mx-auto px-4">
-            <h2 className="text-3xl font-bold text-center mb-6">Customer Reviews and Testimonials</h2>
-            <p className="text-center text-gray-600 mb-12 max-w-3xl mx-auto">
-              Read what our customers say about their experience with Zimbabwe Shipping Services. These genuine reviews reflect our commitment to providing exceptional shipping services, reliable delivery times, and outstanding customer support for every shipment from the UK to Zimbabwe.
-            </p>
-            <ReviewsSection />
-          </div>
-        </section>
-        
+
+        {/* Why choose us - trust builders */}
+        <TrustSection />
+
+        {/* Customer testimonials */}
+        <TestimonialsSection />
+
+        {/* Final CTA */}
         <CallToAction />
       </main>
       <Footer />

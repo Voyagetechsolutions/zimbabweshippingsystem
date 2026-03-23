@@ -19,13 +19,13 @@ export const collectionSchedules: RouteSchedule[] = [
   {
     route: "BOURNEMOUTH ROUTE", 
     date: "9th of September",
-    areas: ["SOUTHAMPTON", "OXFORD", "HAMPHIRE", "READING", "GUILFORD", "PORTSMOUTH"],
+    areas: ["SOUTHAMPTON", "OXFORD", "HAMPSHIRE", "READING", "GUILDFORD", "PORTSMOUTH"],
     country: "England"
   },
   {
     route: "BIRMINGHAM ROUTE",
     date: "4th of September", 
-    areas: ["WOLVEHAMPTON", "COVENTRY", "WARWICK", "DUDLEY", "WALSALL", "RUGBY"],
+    areas: ["WOLVERHAMPTON", "COVENTRY", "WARWICK", "DUDLEY", "WALSALL", "RUGBY"],
     country: "England"
   },
   {
@@ -43,19 +43,19 @@ export const collectionSchedules: RouteSchedule[] = [
   {
     route: "NOTTINGHAM ROUTE",
     date: "2nd of September",
-    areas: ["LIECESTER", "DERBY", "PETERSBOROUGH", "CORBY", "MARKET HARB"],
+    areas: ["LEICESTER", "DERBY", "PETERBOROUGH", "CORBY", "MARKET HARBOROUGH"],
     country: "England"
   },
   {
     route: "MANCHESTER ROUTE",
     date: "2nd of August",
-    areas: ["LIVERPOOL", "STOKE ON TRENT", "BOLTON", "WARRINGTON", "OLDHAM", "SHREWBURY"],
+    areas: ["LIVERPOOL", "STOKE ON TRENT", "BOLTON", "WARRINGTON", "OLDHAM", "SHREWSBURY"],
     country: "England"
   },
   {
     route: "BRIGHTON ROUTE",
     date: "10th of September",
-    areas: ["HIGH COMBE", "SLOUGH", "VRAWLEY", "LANCING", "EASTBOURNE", "CANTEBURY"],
+    areas: ["HIGH WYCOMBE", "SLOUGH", "CRAWLEY", "LANCING", "EASTBOURNE", "CANTERBURY"],
     country: "England"
   },
   {
@@ -91,7 +91,7 @@ export const collectionSchedules: RouteSchedule[] = [
   {
     route: "ATHLONE ROUTE",
     date: "23rd of April",
-    areas: ["MALIGURAR", "LONGFORD", "ROSCOMMON", "BOYLE", "SLIGO", "BALLINA", "SWINFORD", "CASTLEBAR", "TUAM", "GALWAY", "ATHENRY", "ATHLONE"],
+    areas: ["MULLINGAR", "LONGFORD", "ROSCOMMON", "BOYLE", "SLIGO", "BALLINA", "SWINFORD", "CASTLEBAR", "TUAM", "GALWAY", "ATHENRY", "ATHLONE"],
     country: "Ireland"
   },
   {

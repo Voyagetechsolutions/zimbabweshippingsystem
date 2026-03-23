@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -15,6 +14,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import WhatsAppButton from '@/components/WhatsAppButton';
+import { Package, Phone, Clock, Check, ArrowRight } from 'lucide-react';
 
 const formSchema = z.object({
   itemCategory: z.string().min(1, 'Please select a category'),
@@ -40,21 +41,23 @@ const CustomQuoteRequest = () => {
   });
 
   const itemCategories = [
+    'Furniture',
     'Electronics',
+    'Appliances',
     'Clothing & Textiles',
     'Food & Beverages',
-    'Books & Documents',
     'Household Items',
     'Sports Equipment',
     'Tools & Hardware',
     'Medical Supplies',
     'Automotive Parts',
+    'Commercial Goods',
     'Other',
   ];
 
   const onSubmit = async (values: FormValues) => {
     setIsSubmitting(true);
-    
+
     try {
       const { data, error } = await supabase
         .from('custom_quotes')
@@ -70,7 +73,6 @@ const CustomQuoteRequest = () => {
 
       if (error) throw error;
 
-      // Create a notification for admins
       await supabase.from('notifications').insert({
         user_id: user?.id || '00000000-0000-0000-0000-000000000000',
         title: 'New Custom Quote Request',
@@ -100,103 +102,203 @@ const CustomQuoteRequest = () => {
 
   return (
     <>
+      <Helmet>
+        <title>Get a Quote | Zimbabwe Shipping - Custom Item Pricing</title>
+        <meta name="description" content="Get a custom quote for shipping furniture, appliances, electronics and more from UK to Zimbabwe. Free quotes within 24 hours." />
+      </Helmet>
+
       <Navbar />
-      <main className="min-h-screen bg-gray-50 py-12 px-4">
-        <div className="container mx-auto max-w-2xl">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-2xl">Request Custom Quote</CardTitle>
-              <CardDescription>
-                Tell us about your item so we can provide a custom shipping quote.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                  <FormField
-                    control={form.control}
-                    name="itemCategory"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Item Category</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a category" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {itemCategories.map((category) => (
-                              <SelectItem key={category} value={category}>
-                                {category}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+      <main className="min-h-screen">
+        {/* Hero */}
+        <section className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white py-16">
+          <div className="container mx-auto px-4 text-center">
+            <div className="inline-flex p-4 bg-zim-yellow/20 rounded-full mb-4">
+              <Package className="h-8 w-8 text-zim-yellow" />
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">
+              Get a Custom Quote
+            </h1>
+            <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+              Shipping something other than drums? Tell us about it and we'll give you a price.
+            </p>
+          </div>
+        </section>
 
-                  <FormField
-                    control={form.control}
-                    name="itemDescription"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Item Description</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Describe the item you want to ship"
-                            className="min-h-[120px]"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+        {/* Main Content */}
+        <section className="py-16 bg-white dark:bg-gray-900">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto">
+              <div className="grid md:grid-cols-5 gap-12">
+                {/* Form */}
+                <div className="md:col-span-3">
+                  <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-8">
+                    <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">Tell Us About Your Item</h2>
+                    <p className="text-gray-600 dark:text-gray-400 mb-8">We'll respond with a quote within 24 hours.</p>
 
-                  <FormField
-                    control={form.control}
-                    name="phoneNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone Number</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="tel"
-                            placeholder="Enter your phone number"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                    <Form {...form}>
+                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                        <FormField
+                          control={form.control}
+                          name="itemCategory"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold">What are you shipping?</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger className="h-12 bg-white dark:bg-gray-700 dark:border-gray-600">
+                                    <SelectValue placeholder="Select a category" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {itemCategories.map((category) => (
+                                    <SelectItem key={category} value={category}>
+                                      {category}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-                  <div className="flex justify-between pt-6">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => navigate(-1)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="bg-zim-green hover:bg-zim-green/90"
-                    >
-                      {isSubmitting ? 'Submitting...' : 'Submit Request'}
-                    </Button>
+                        <FormField
+                          control={form.control}
+                          name="itemDescription"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold">Description</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  placeholder="Include dimensions, weight, and any special requirements..."
+                                  className="min-h-[140px] bg-white dark:bg-gray-700 dark:border-gray-600 resize-none"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="phoneNumber"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold">Your Phone Number</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="tel"
+                                  placeholder="+44 7XXX XXXXXX"
+                                  className="h-12 bg-white dark:bg-gray-700 dark:border-gray-600"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                          <Button
+                            type="submit"
+                            disabled={isSubmitting}
+                            className="flex-1 h-12 bg-zim-green hover:bg-zim-green/90 text-lg"
+                          >
+                            {isSubmitting ? (
+                              <span className="flex items-center gap-2">
+                                <span className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                Submitting...
+                              </span>
+                            ) : (
+                              <>
+                                Submit Request
+                                <ArrowRight className="ml-2 h-5 w-5" />
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => navigate(-1)}
+                            className="h-12"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
                   </div>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
-        </div>
+                </div>
+
+                {/* Side Info */}
+                <div className="md:col-span-2 space-y-6">
+                  <div className="bg-gray-50 rounded-xl p-6">
+                    <h3 className="font-semibold mb-4">What We Can Ship</h3>
+                    <ul className="space-y-3">
+                      <li className="flex items-center gap-3 text-sm">
+                        <Check className="h-5 w-5 text-zim-green flex-shrink-0" />
+                        <span>Furniture & appliances</span>
+                      </li>
+                      <li className="flex items-center gap-3 text-sm">
+                        <Check className="h-5 w-5 text-zim-green flex-shrink-0" />
+                        <span>Electronics & gadgets</span>
+                      </li>
+                      <li className="flex items-center gap-3 text-sm">
+                        <Check className="h-5 w-5 text-zim-green flex-shrink-0" />
+                        <span>Commercial goods</span>
+                      </li>
+                      <li className="flex items-center gap-3 text-sm">
+                        <Check className="h-5 w-5 text-zim-green flex-shrink-0" />
+                        <span>Vehicles & machinery</span>
+                      </li>
+                      <li className="flex items-center gap-3 text-sm">
+                        <Check className="h-5 w-5 text-zim-green flex-shrink-0" />
+                        <span>Personal effects</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-zim-green/10 rounded-xl p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <Clock className="h-5 w-5 text-zim-green" />
+                      <h3 className="font-semibold">Quick Response</h3>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      We aim to respond to all quote requests within 24 hours.
+                    </p>
+                  </div>
+
+                  <div className="bg-gray-50 rounded-xl p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <Phone className="h-5 w-5 text-zim-green" />
+                      <h3 className="font-semibold">Prefer to Call?</h3>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Speak to us directly for an instant quote.
+                    </p>
+                    <a href="tel:+447584100552">
+                      <Button variant="outline" className="w-full">
+                        <Phone className="mr-2 h-4 w-4" />
+                        +44 7584 100552
+                      </Button>
+                    </a>
+                  </div>
+
+                  <div className="text-center">
+                    <p className="text-sm text-gray-500 mb-2">Shipping drums?</p>
+                    <Link to="/book" className="text-zim-green font-medium hover:underline">
+                      Book drums directly →
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
       <Footer />
+      <WhatsAppButton />
     </>
   );
 };
