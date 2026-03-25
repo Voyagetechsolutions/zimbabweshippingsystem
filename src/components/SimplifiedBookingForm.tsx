@@ -23,26 +23,31 @@ interface FormData {
   pickupCity: string;
   pickupPostcode: string;
   pickupCountry: string;
-  
+
   // Receiver Details
   receiverName: string;
   receiverPhone: string;
   receiverPhone2?: string;
   deliveryAddress: string;
   deliveryCity: string;
-  
+
   // Shipment Items
   includeDrums: boolean;
   drumQuantity: number;
   includeBoxes: boolean;
   boxesDescription: string;
-  
+
   // Add-ons
   wantMetalSeal: boolean;
-  
+
+  // Purchase Drums (England only)
+  purchaseDrums: boolean;
+  purchaseDrumType: 'metal' | 'plastic' | null;
+  purchaseDrumQuantity: number;
+
   // Payment (moved to step 5)
   paymentMethod: 'standard' | 'cashOnCollection' | 'payOnArrival';
-  
+
   // Payment Schedule (for standard payment)
   usePaymentSchedule: boolean;
   paymentSchedule: PaymentInstallment[];
@@ -303,6 +308,9 @@ export const SimplifiedBookingForm = () => {
     includeBoxes: false,
     boxesDescription: '',
     wantMetalSeal: false,
+    purchaseDrums: false,
+    purchaseDrumType: null,
+    purchaseDrumQuantity: 0,
     paymentMethod: 'standard',
     usePaymentSchedule: false,
     paymentSchedule: [],
@@ -486,12 +494,19 @@ export const SimplifiedBookingForm = () => {
     if (formData.includeDrums && formData.drumQuantity > 0) {
       const drumPrice = getDrumPrice(formData.drumQuantity);
       total = formData.drumQuantity * drumPrice;
-      
+
       // Add metal seal cost
       if (formData.wantMetalSeal) {
         total += formData.drumQuantity * 5;
       }
     }
+
+    // Add purchased drums cost (England only)
+    if (formData.purchaseDrums && formData.purchaseDrumType && formData.purchaseDrumQuantity > 0) {
+      const drumPurchasePrice = formData.purchaseDrumType === 'metal' ? 40 : 50;
+      total += formData.purchaseDrumQuantity * drumPurchasePrice;
+    }
+
     return total;
   };
 
@@ -524,6 +539,9 @@ export const SimplifiedBookingForm = () => {
       if (formData.wantMetalSeal) notes.push('Metal Coded Seal requested');
       if (formData.paymentMethod === 'cashOnCollection') notes.push('Cash payment (discount applied)');
       if (formData.includeBoxes) notes.push(`Boxes & Other Items: ${formData.boxesDescription}`);
+      if (formData.purchaseDrums && formData.purchaseDrumType && formData.purchaseDrumQuantity > 0) {
+        notes.push(`Purchase ${formData.purchaseDrumQuantity} x ${formData.purchaseDrumType === 'metal' ? 'Metal Drum (£40)' : 'Plastic Barrel (£50)'}`);
+      }
       
       // Prepare metadata for shipment
       const shipmentMetadata = {
@@ -557,7 +575,13 @@ export const SimplifiedBookingForm = () => {
           } : null,
           addOns: {
             metalSeal: formData.wantMetalSeal
-          }
+          },
+          purchasedDrums: formData.purchaseDrums ? {
+            type: formData.purchaseDrumType,
+            quantity: formData.purchaseDrumQuantity,
+            priceEach: formData.purchaseDrumType === 'metal' ? 40 : 50,
+            totalPrice: formData.purchaseDrumQuantity * (formData.purchaseDrumType === 'metal' ? 40 : 50)
+          } : null
         },
         pricing: {
           baseAmount: calculateBaseTotal(),
@@ -1111,6 +1135,93 @@ export const SimplifiedBookingForm = () => {
             </label>
           </div>
 
+          {/* Purchase Drums Option - England Only */}
+          {formData.pickupCountry === 'England' && (
+            <div className={`border-2 rounded-lg p-5 transition-all ${formData.purchaseDrums ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-600' : 'border-gray-200 hover:border-blue-400 dark:border-gray-700 dark:hover:border-blue-600'}`}>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.purchaseDrums}
+                  onChange={(e) => {
+                    updateField('purchaseDrums', e.target.checked);
+                    if (!e.target.checked) {
+                      updateField('purchaseDrumType', null);
+                      updateField('purchaseDrumQuantity', 0);
+                    }
+                  }}
+                  className="mt-1 h-4 w-4"
+                />
+                <div className="flex-1">
+                  <div className="font-semibold text-lg">Need to Purchase Drums?</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    We can supply drums for you at collection
+                  </div>
+
+                  {formData.purchaseDrums && (
+                    <div className="mt-4 space-y-4">
+                      <div>
+                        <Label className="text-base mb-3 block">Select drum type:</Label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {/* Metal Drum Option */}
+                          <label className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${formData.purchaseDrumType === 'metal' ? 'border-blue-500 bg-blue-100 dark:bg-blue-900/40' : 'border-gray-200 dark:border-gray-700 hover:border-blue-300'}`}>
+                            <input
+                              type="radio"
+                              name="drumType"
+                              value="metal"
+                              checked={formData.purchaseDrumType === 'metal'}
+                              onChange={() => updateField('purchaseDrumType', 'metal')}
+                              className="h-4 w-4"
+                            />
+                            <div>
+                              <div className="font-medium">Metal Drum</div>
+                              <div className="text-lg font-bold text-blue-600 dark:text-blue-400">£40 each</div>
+                            </div>
+                          </label>
+
+                          {/* Plastic Barrel Option */}
+                          <label className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${formData.purchaseDrumType === 'plastic' ? 'border-blue-500 bg-blue-100 dark:bg-blue-900/40' : 'border-gray-200 dark:border-gray-700 hover:border-blue-300'}`}>
+                            <input
+                              type="radio"
+                              name="drumType"
+                              value="plastic"
+                              checked={formData.purchaseDrumType === 'plastic'}
+                              onChange={() => updateField('purchaseDrumType', 'plastic')}
+                              className="h-4 w-4"
+                            />
+                            <div>
+                              <div className="font-medium">Plastic Barrel</div>
+                              <div className="text-lg font-bold text-blue-600 dark:text-blue-400">£50 each</div>
+                            </div>
+                          </label>
+                        </div>
+                      </div>
+
+                      {formData.purchaseDrumType && (
+                        <div>
+                          <Label htmlFor="purchaseQty" className="text-base">How many drums to purchase?</Label>
+                          <Input
+                            id="purchaseQty"
+                            type="number"
+                            min="1"
+                            placeholder="1"
+                            value={formData.purchaseDrumQuantity || ''}
+                            onChange={(e) => updateField('purchaseDrumQuantity', parseInt(e.target.value) || 0)}
+                            className="max-w-xs mt-2"
+                          />
+                          {formData.purchaseDrumQuantity > 0 && (
+                            <p className="text-sm text-blue-600 dark:text-blue-400 font-medium mt-2">
+                              Total: £{formData.purchaseDrumQuantity * (formData.purchaseDrumType === 'metal' ? 40 : 50)}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </label>
+            </div>
+          )}
+
           {/* Boxes & Other Items - Custom Quote */}
           <div className={`border-2 rounded-lg p-5 transition-all ${formData.includeBoxes ? 'border-zim-yellow bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-600' : 'border-gray-200 hover:border-zim-yellow dark:border-gray-700 dark:hover:border-yellow-600'}`}>
             <label className="flex items-start gap-3 cursor-pointer">
@@ -1206,6 +1317,18 @@ export const SimplifiedBookingForm = () => {
                     <span>+£{formData.drumQuantity * 5}</span>
                   </div>
                 )}
+
+                {/* Purchased Drums */}
+                {formData.purchaseDrums && formData.purchaseDrumType && formData.purchaseDrumQuantity > 0 && (
+                  <div className="flex justify-between text-gray-700 dark:text-gray-300 border-t pt-2">
+                    <span>
+                      {formData.purchaseDrumQuantity} x {formData.purchaseDrumType === 'metal' ? 'Metal Drum' : 'Plastic Barrel'}
+                      {' '}(£{formData.purchaseDrumType === 'metal' ? '40' : '50'} each)
+                    </span>
+                    <span>+£{formData.purchaseDrumQuantity * (formData.purchaseDrumType === 'metal' ? 40 : 50)}</span>
+                  </div>
+                )}
+
                 {/* Included Services */}
                 <div className="border-t pt-2 text-xs text-gray-500 dark:text-gray-400">
                   ✓ Insurance & Tracking included
@@ -1461,6 +1584,9 @@ export const SimplifiedBookingForm = () => {
             includeBoxes: false,
             boxesDescription: '',
             wantMetalSeal: false,
+            purchaseDrums: false,
+            purchaseDrumType: null,
+            purchaseDrumQuantity: 0,
             paymentMethod: 'standard',
             usePaymentSchedule: false,
             paymentSchedule: [],

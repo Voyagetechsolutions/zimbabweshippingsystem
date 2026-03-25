@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { AdminCountryProvider, useAdminCountry } from '@/contexts/AdminCountryContext';
 
 // UI Components
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,6 +36,7 @@ import SupportTickets from '@/components/admin/SupportTickets';
 import ContentManagement from '@/components/admin/ContentManagement';
 import PaymentScheduleManagement from '@/components/admin/PaymentScheduleManagement';
 import ServiceReviewsTab from '@/components/admin/tabs/ServiceReviewsTab';
+import ManualBookingTab from '@/components/admin/tabs/ManualBookingTab';
 
 // Icons
 import {
@@ -60,6 +62,7 @@ import {
   ChevronDown,
   CalendarDays,
   Star,
+  PlusCircle,
 } from 'lucide-react';
 
 interface NavGroup {
@@ -68,9 +71,10 @@ interface NavGroup {
   items: { value: string; label: string; icon: any }[];
 }
 
-const AdminDashboardContent = () => {
+const AdminDashboardInner = () => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const { selectedCountry, setSelectedCountry } = useAdminCountry();
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -100,6 +104,7 @@ const AdminDashboardContent = () => {
       label: 'Main',
       items: [
         { value: 'overview', label: 'Overview', icon: LayoutDashboard },
+        { value: 'manualBooking', label: 'Manual Booking', icon: PlusCircle },
         { value: 'shipments', label: 'Shipments', icon: Package },
         { value: 'customQuotes', label: 'Custom Quotes', icon: Quote },
         { value: 'customers', label: 'Customers', icon: User },
@@ -322,6 +327,7 @@ const AdminDashboardContent = () => {
             </Card>
           </div>
         );
+      case 'manualBooking': return <ManualBookingTab />;
       case 'shipments': return <ShipmentManagementTab />;
       case 'customQuotes': return <CustomQuoteManagement />;
       case 'customers': return <CustomerManagementTab />;
@@ -418,9 +424,38 @@ const AdminDashboardContent = () => {
       <div className="flex-1 flex flex-col overflow-auto p-6 space-y-6">
         {/* Header */}
         <header className="flex justify-between items-center pb-4 border-b">
-          <h1 className="text-3xl font-bold">
-            {navItems.find(item => item.value === activeTab)?.label || 'Admin Dashboard'}
-          </h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-3xl font-bold">
+              {navItems.find(item => item.value === activeTab)?.label || 'Admin Dashboard'}
+            </h1>
+            {/* Country Toggle */}
+            <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+              <button
+                onClick={() => setSelectedCountry('England')}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                  selectedCountry === 'England'
+                    ? "bg-white dark:bg-gray-700 shadow-sm text-blue-600 dark:text-blue-400"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                )}
+              >
+                <span>🇬🇧</span>
+                <span className="hidden sm:inline">UK</span>
+              </button>
+              <button
+                onClick={() => setSelectedCountry('Ireland')}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                  selectedCountry === 'Ireland'
+                    ? "bg-white dark:bg-gray-700 shadow-sm text-green-600 dark:text-green-400"
+                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                )}
+              >
+                <span>🇮🇪</span>
+                <span className="hidden sm:inline">Ireland</span>
+              </button>
+            </div>
+          </div>
           <div className="flex items-center gap-3">
             {isMobile && (
               <Button variant="outline" size="sm" onClick={() => setShowMobileMenu(!showMobileMenu)}>
@@ -496,6 +531,15 @@ const AdminDashboardContent = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+// Wrap in context provider
+const AdminDashboardContent = () => {
+  return (
+    <AdminCountryProvider>
+      <AdminDashboardInner />
+    </AdminCountryProvider>
   );
 };
 

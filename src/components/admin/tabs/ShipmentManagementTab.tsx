@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Shipment } from '@/types/shipment';
@@ -94,12 +94,19 @@ const STATUS_STEPS = [
   'Delivered'
 ];
 
+// Collection schedule months for filtering
+const COLLECTION_MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
 const ShipmentManagementTab = () => {
   const { toast } = useToast();
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [collectionFilter, setCollectionFilter] = useState('all');
   const [viewingShipment, setViewingShipment] = useState<Shipment | null>(null);
   const [editingStatus, setEditingStatus] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
@@ -368,6 +375,34 @@ const ShipmentManagementTab = () => {
     return currentStep >= 0 ? Math.round((currentStep / (STATUS_STEPS.length - 1)) * 100) : 0;
   };
 
+  // Helper to get collection month from shipment
+  const getCollectionMonth = (shipment: Shipment): string | null => {
+    const metadata = shipment.metadata || {};
+    const collectionDate = metadata.collection?.date || metadata.collectionDate;
+
+    if (!collectionDate) {
+      // Fallback to created_at month
+      const createdDate = new Date(shipment.created_at);
+      return format(createdDate, 'MMMM');
+    }
+
+    try {
+      const date = new Date(collectionDate);
+      if (isValid(date)) {
+        return format(date, 'MMMM');
+      }
+      // If date string contains month name, extract it
+      for (const month of COLLECTION_MONTHS) {
+        if (collectionDate.toLowerCase().includes(month.toLowerCase())) {
+          return month;
+        }
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  };
+
   const filteredShipments = shipments.filter(shipment => {
     const matchesSearch =
       searchQuery === '' ||
@@ -383,7 +418,11 @@ const ShipmentManagementTab = () => {
       statusFilter === 'all' ||
       shipment.status?.toLowerCase() === statusFilter.toLowerCase();
 
-    return matchesSearch && matchesStatus;
+    const matchesCollection =
+      collectionFilter === 'all' ||
+      getCollectionMonth(shipment)?.toLowerCase() === collectionFilter.toLowerCase();
+
+    return matchesSearch && matchesStatus && matchesCollection;
   });
 
   const renderStatusBadge = (status: string) => {
@@ -456,6 +495,21 @@ const ShipmentManagementTab = () => {
               {STATUS_OPTIONS.map((status) => (
                 <SelectItem key={status.toLowerCase()} value={status.toLowerCase()}>
                   {status}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={collectionFilter} onValueChange={setCollectionFilter}>
+            <SelectTrigger className="w-[200px]">
+              <Calendar className="h-4 w-4 mr-2" />
+              <span>Collection Schedule</span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Collections</SelectItem>
+              {COLLECTION_MONTHS.map((month) => (
+                <SelectItem key={month.toLowerCase()} value={month.toLowerCase()}>
+                  {month} Collection
                 </SelectItem>
               ))}
             </SelectContent>

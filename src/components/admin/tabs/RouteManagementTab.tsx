@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useAdminCountry } from '../ModernAdminDashboard';
+import { useAdminCountry } from '@/contexts/AdminCountryContext';
 import { 
   Card, 
   CardContent, 
@@ -50,8 +50,11 @@ import {
   Search,
   RefreshCcw,
   Calendar,
-  Info
+  Info,
+  Edit,
+  Hash
 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -64,6 +67,7 @@ interface RouteData {
   id: string;
   route: string;
   areas: string[];
+  postcodes?: string[];
   pickup_date: string;
   created_at: string;
   updated_at: string;
@@ -77,11 +81,14 @@ const RouteManagementTab = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Form state for new route
+  // Form state for new/edit route
   const [newRouteName, setNewRouteName] = useState('');
   const [newRouteAreas, setNewRouteAreas] = useState('');
+  const [newRoutePostcodes, setNewRoutePostcodes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingRoute, setEditingRoute] = useState<RouteData | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   // Available predefined routes for quick selection - England
   const predefinedEnglandRoutes = [
@@ -144,17 +151,28 @@ const RouteManagementTab = () => {
       });
       return;
     }
-    
+
     setIsSubmitting(true);
     try {
       // Parse areas from comma-separated string
-      const areasArray = newRouteAreas.split(',').map(area => area.trim());
-      
+      const areasArray = newRouteAreas.split(',').map(area => area.trim()).filter(Boolean);
+      // Parse postcodes from comma-separated string (for England)
+      const postcodesArray = newRoutePostcodes.split(',').map(pc => pc.trim().toUpperCase()).filter(Boolean);
+
+      // Combine areas with postcodes in format "City (PC1, PC2)"
+      const combinedAreas = areasArray.map((area, index) => {
+        if (postcodesArray.length > 0 && selectedCountry === 'England') {
+          // If there are postcodes, append them to the areas
+          return area;
+        }
+        return area;
+      });
+
       const { data, error } = await supabase
         .from('collection_schedules')
         .insert({
           route: newRouteName.toUpperCase(),
-          areas: areasArray,
+          areas: [...combinedAreas, ...(postcodesArray.length > 0 ? [`Postcodes: ${postcodesArray.join(', ')}`] : [])],
           pickup_date: 'Not set', // Default - will be set in Collection Schedule tab
           country: selectedCountry
         })
@@ -170,8 +188,9 @@ const RouteManagementTab = () => {
       // Reset form and close dialog
       setNewRouteName('');
       setNewRouteAreas('');
+      setNewRoutePostcodes('');
       setIsDialogOpen(false);
-      
+
       toast({
         title: 'Route created',
         description: 'New route added. Set collection date in the Collection Schedule tab.',
@@ -181,6 +200,71 @@ const RouteManagementTab = () => {
       toast({
         title: 'Error',
         description: error.message || 'Failed to create new route',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEditRoute = (route: RouteData) => {
+    setEditingRoute(route);
+    // Parse areas - separate postcodes from cities
+    const cities = route.areas.filter(a => !a.startsWith('Postcodes:'));
+    const postcodesEntry = route.areas.find(a => a.startsWith('Postcodes:'));
+    const postcodes = postcodesEntry ? postcodesEntry.replace('Postcodes: ', '') : '';
+
+    setNewRouteName(route.route);
+    setNewRouteAreas(cities.join(', '));
+    setNewRoutePostcodes(postcodes);
+    setIsEditDialogOpen(true);
+  };
+
+  const updateRoute = async () => {
+    if (!editingRoute || !newRouteName.trim() || !newRouteAreas.trim()) {
+      toast({
+        title: 'Missing information',
+        description: 'Please provide route name and service areas',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const areasArray = newRouteAreas.split(',').map(area => area.trim()).filter(Boolean);
+      const postcodesArray = newRoutePostcodes.split(',').map(pc => pc.trim().toUpperCase()).filter(Boolean);
+
+      const { error } = await supabase
+        .from('collection_schedules')
+        .update({
+          route: newRouteName.toUpperCase(),
+          areas: [...areasArray, ...(postcodesArray.length > 0 ? [`Postcodes: ${postcodesArray.join(', ')}`] : [])],
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingRoute.id);
+
+      if (error) throw error;
+
+      // Refresh routes
+      await fetchRoutes();
+
+      // Reset form and close dialog
+      setNewRouteName('');
+      setNewRouteAreas('');
+      setNewRoutePostcodes('');
+      setEditingRoute(null);
+      setIsEditDialogOpen(false);
+
+      toast({
+        title: 'Route updated',
+        description: 'Route has been updated successfully.',
+      });
+    } catch (error: any) {
+      console.error('Error updating route:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update route',
         variant: 'destructive',
       });
     } finally {
@@ -308,7 +392,7 @@ const RouteManagementTab = () => {
                   </div>
 
                   <div>
-                    <Label htmlFor="areas">Service Areas (comma separated)</Label>
+                    <Label htmlFor="areas">Cities/Areas (comma separated)</Label>
                     <Input
                       id="areas"
                       placeholder={selectedCountry === 'Ireland' ? "e.g., Dublin, Cork, Galway" : "e.g., Brixton, Hackney, Camden"}
@@ -317,6 +401,25 @@ const RouteManagementTab = () => {
                       onChange={(e) => setNewRouteAreas(e.target.value)}
                     />
                   </div>
+
+                  {selectedCountry === 'England' && (
+                    <div>
+                      <Label htmlFor="postcodes" className="flex items-center gap-2">
+                        <Hash className="h-4 w-4" />
+                        Postal Codes (comma separated)
+                      </Label>
+                      <Textarea
+                        id="postcodes"
+                        placeholder="e.g., SW1, SW2, SE1, NW1, E1, E2"
+                        className="mt-1 min-h-[80px]"
+                        value={newRoutePostcodes}
+                        onChange={(e) => setNewRoutePostcodes(e.target.value.toUpperCase())}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        These postcodes will be used to auto-detect routes in the booking form
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
@@ -424,16 +527,25 @@ const RouteManagementTab = () => {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditRoute(route)}
+                            className="text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
                               <AlertDialogTitle>Delete Route</AlertDialogTitle>
@@ -452,6 +564,7 @@ const RouteManagementTab = () => {
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -461,6 +574,91 @@ const RouteManagementTab = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Route Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setEditingRoute(null);
+          setNewRouteName('');
+          setNewRouteAreas('');
+          setNewRoutePostcodes('');
+        }
+        setIsEditDialogOpen(open);
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Route</DialogTitle>
+            <DialogDescription>
+              Update route details. Changes will appear in the booking form and collection schedule.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+              <Label className="text-sm text-gray-500">Editing route for:</Label>
+              <p className="font-semibold text-lg mt-1">
+                {editingRoute?.country === 'Ireland' ? '🇮🇪' : '🇬🇧'} {editingRoute?.country || 'England'}
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="editRouteName">Route Name</Label>
+              <Input
+                id="editRouteName"
+                className="mt-1"
+                value={newRouteName}
+                onChange={(e) => setNewRouteName(e.target.value.toUpperCase())}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="editAreas">Cities/Areas (comma separated)</Label>
+              <Input
+                id="editAreas"
+                className="mt-1"
+                value={newRouteAreas}
+                onChange={(e) => setNewRouteAreas(e.target.value)}
+              />
+            </div>
+
+            {editingRoute?.country === 'England' && (
+              <div>
+                <Label htmlFor="editPostcodes" className="flex items-center gap-2">
+                  <Hash className="h-4 w-4" />
+                  Postal Codes (comma separated)
+                </Label>
+                <Textarea
+                  id="editPostcodes"
+                  placeholder="e.g., SW1, SW2, SE1, NW1, E1, E2"
+                  className="mt-1 min-h-[80px]"
+                  value={newRoutePostcodes}
+                  onChange={(e) => setNewRoutePostcodes(e.target.value.toUpperCase())}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  These postcodes will be used to auto-detect routes in the booking form
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={updateRoute} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Save Changes
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

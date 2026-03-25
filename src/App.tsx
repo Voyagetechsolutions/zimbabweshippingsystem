@@ -21,7 +21,6 @@ const Services = lazy(() => import('@/pages/Services'));
 const Contact = lazy(() => import('@/pages/Contact'));
 const Auth = lazy(() => import('@/pages/Auth'));
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
-const AdminDashboard = lazy(() => import('@/pages/AdminDashboard'));
 const Account = lazy(() => import('@/pages/Account'));
 const AuthCallback = lazy(() => import('@/pages/AuthCallback'));
 const AboutUs = lazy(() => import('@/pages/AboutUs'));
@@ -102,11 +101,6 @@ function App() {
                             <RequireAuth>
                               <Dashboard />
                             </RequireAuth>
-                          } />
-                          <Route path="/admin" element={
-                            <RequireAdmin>
-                              <AdminDashboard />
-                            </RequireAdmin>
                           } />
                           <Route path="/account" element={
                             <RequireAuth>
