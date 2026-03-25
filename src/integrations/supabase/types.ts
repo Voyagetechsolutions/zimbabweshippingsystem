@@ -95,6 +95,7 @@ export type Database = {
       collection_schedules: {
         Row: {
           areas: string[]
+          country: string | null
           created_at: string
           id: string
           pickup_date: string
@@ -103,6 +104,7 @@ export type Database = {
         }
         Insert: {
           areas?: string[]
+          country?: string | null
           created_at?: string
           id?: string
           pickup_date: string
@@ -111,6 +113,7 @@ export type Database = {
         }
         Update: {
           areas?: string[]
+          country?: string | null
           created_at?: string
           id?: string
           pickup_date?: string

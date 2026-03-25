@@ -9,7 +9,7 @@ import { format, addDays, isAfter, isBefore, startOfDay } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import BookingReceipt from '@/components/BookingReceipt';
-import { getRouteForPostalCode, getIrelandRouteForCity, irelandCities } from '@/utils/postalCodeUtils';
+import { getRouteForPostalCode, getIrelandRouteForCity, irelandCities, initializeRouteCache } from '@/utils/postalCodeUtils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface FormData {
@@ -319,6 +319,11 @@ export const SimplifiedBookingForm = () => {
   const updateField = (field: keyof FormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  // Initialize route cache on component mount
+  useEffect(() => {
+    initializeRouteCache();
+  }, []);
 
   // Fetch collection schedule based on postal code or Ireland city
   const fetchCollectionSchedule = async (postcodeOrCity: string) => {

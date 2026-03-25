@@ -56,7 +56,7 @@ import {
   Phone,
   Truck
 } from 'lucide-react';
-import { format, isValid, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths } from 'date-fns';
+import { format, isValid, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, parse } from 'date-fns';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import {
   Popover,
@@ -257,24 +257,54 @@ const CollectionScheduleTab = () => {
     }
   };
 
+  // Helper function to filter schedules by country (handles missing country field)
+  const filterByCountry = (schedule: CollectionSchedule) => {
+    const scheduleCountry = schedule.country || 'England';
+    return (
+      (selectedCountry === 'England' && (scheduleCountry === 'England' || scheduleCountry === 'UK' || !schedule.country)) ||
+      (selectedCountry === 'Ireland' && scheduleCountry === 'Ireland')
+    );
+  };
+
+  // Helper function to parse pickup_date in format "March 25th, 2026"
+  const parsePickupDate = (dateStr: string): Date | null => {
+    if (!dateStr || dateStr === 'Not set') return null;
+
+    try {
+      // Try parsing "MMMM do, yyyy" format (e.g., "March 25th, 2026")
+      // Remove ordinal suffix (st, nd, rd, th) for easier parsing
+      const cleanedDate = dateStr.replace(/(\d+)(st|nd|rd|th)/, '$1');
+      const parsed = parse(cleanedDate, 'MMMM d, yyyy', new Date());
+      if (isValid(parsed)) return parsed;
+
+      // Try standard date parsing as fallback
+      const fallback = new Date(dateStr);
+      if (isValid(fallback)) return fallback;
+
+      // Try ISO format
+      const isoDate = new Date(dateStr);
+      if (isValid(isoDate)) return isoDate;
+
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
   // Get scheduled dates for the calendar view
   const getScheduledDates = () => {
     const scheduledDates: { date: Date; routes: CollectionSchedule[] }[] = [];
-    const filteredSchedules = schedules.filter(s => s.country === selectedCountry);
+    const filteredSchedules = schedules.filter(filterByCountry);
 
     filteredSchedules.forEach(schedule => {
-      try {
-        const date = new Date(schedule.pickup_date);
-        if (isValid(date)) {
-          const existing = scheduledDates.find(d => isSameDay(d.date, date));
-          if (existing) {
-            existing.routes.push(schedule);
-          } else {
-            scheduledDates.push({ date, routes: [schedule] });
-          }
+      const date = parsePickupDate(schedule.pickup_date);
+      if (date) {
+        const existing = scheduledDates.find(d => isSameDay(d.date, date));
+        if (existing) {
+          existing.routes.push(schedule);
+        } else {
+          scheduledDates.push({ date, routes: [schedule] });
         }
-      } catch {
-        // Ignore invalid dates
       }
     });
 
@@ -333,7 +363,7 @@ const CollectionScheduleTab = () => {
   // Get routes without a date set (for adding to calendar)
   const getUnscheduledRoutes = (): CollectionSchedule[] => {
     return schedules.filter(s =>
-      s.country === selectedCountry &&
+      filterByCountry(s) &&
       (s.pickup_date === 'Not set' || !s.pickup_date || !isValid(new Date(s.pickup_date)))
     );
   };
@@ -543,7 +573,7 @@ const CollectionScheduleTab = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {schedules.filter(s => s.country === selectedCountry).length === 0 ? (
+                  {schedules.filter(s => filterByCountry(s)).length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-6 text-gray-500">
                         <Calendar className="h-12 w-12 mx-auto mb-2 text-gray-400" />
@@ -555,7 +585,7 @@ const CollectionScheduleTab = () => {
                     </TableRow>
                   ) : (
                     schedules
-                      .filter(s => s.country === selectedCountry)
+                      .filter(s => filterByCountry(s))
                       .map((schedule) => (
                         <TableRow key={schedule.id}>
                           <TableCell className="font-medium">

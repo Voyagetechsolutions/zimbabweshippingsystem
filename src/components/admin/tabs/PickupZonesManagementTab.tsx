@@ -6,43 +6,41 @@ import { format, isValid } from 'date-fns';
 import { Shipment } from '@/types/shipment';
 
 // UI Components
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
   CardTitle,
-  CardFooter
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@/components/ui/select';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
 
 // Icons
 import {
@@ -61,36 +59,10 @@ import {
   CheckCircle,
   Phone,
   Mail,
-  ChevronRight
+  Search,
+  ChevronRight,
+  ArrowLeft
 } from 'lucide-react';
-
-// Define the standard routes used across the app - England
-const ENGLAND_ROUTES = [
-  'London Route',
-  'Leeds Route',
-  'Manchester Route',
-  'Birmingham Route',
-  'Nottingham Route',
-  'Cardiff Route',
-  'Bournemouth Route',
-  'Southend Route',
-  'Northampton Route',
-  'Brighton Route'
-];
-
-// Define the standard routes used across the app - Ireland
-const IRELAND_ROUTES = [
-  'Londonderry Route',
-  'Belfast Route',
-  'Cavan Route',
-  'Athlone Route',
-  'Limerick Route',
-  'Dublin City Route',
-  'Cork Route'
-];
-
-// All routes combined
-const ROUTES = [...ENGLAND_ROUTES, ...IRELAND_ROUTES];
 
 interface CollectionSchedule {
   id: string;
@@ -99,56 +71,52 @@ interface CollectionSchedule {
   pickup_date: string;
   created_at: string;
   updated_at: string;
+  country?: string;
 }
 
 const PickupZonesManagementTab = () => {
   const { toast } = useToast();
   const { selectedCountry } = useAdminCountry();
   const [loading, setLoading] = useState(true);
-  const [selectedRoute, setSelectedRoute] = useState('all');
+  const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [schedules, setSchedules] = useState<CollectionSchedule[]>([]);
-  const [groupedShipments, setGroupedShipments] = useState<{[key: string]: Shipment[]}>({});
-  const [schedulingPickups, setSchedulingPickups] = useState(false);
-  const [pickupDate, setPickupDate] = useState('');
-  const [schedulingRoute, setSchedulingRoute] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [exporting, setExporting] = useState(false);
-  const [fetchingUsers, setFetchingUsers] = useState(false);
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
   const [shipmentDialogOpen, setShipmentDialogOpen] = useState(false);
   const [markingCollected, setMarkingCollected] = useState<string | null>(null);
-
-  // Get filtered routes based on selected country from context
-  const getFilteredRoutes = () => {
-    if (selectedCountry === 'England') return ENGLAND_ROUTES;
-    if (selectedCountry === 'Ireland') return IRELAND_ROUTES;
-    return ROUTES;
-  };
+  const [schedulingDialog, setSchedulingDialog] = useState(false);
+  const [schedulingRoute, setSchedulingRoute] = useState<CollectionSchedule | null>(null);
+  const [newPickupDate, setNewPickupDate] = useState('');
+  const [isScheduling, setIsScheduling] = useState(false);
 
   useEffect(() => {
-    fetchShipmentsAndSchedules();
+    fetchData();
   }, []);
 
-  useEffect(() => {
-    if (shipments.length > 0) {
-      groupShipmentsByRoute();
-    }
-  }, [shipments, selectedRoute, schedules]);
+  // Helper function to filter by country
+  const filterByCountry = (schedule: CollectionSchedule) => {
+    const scheduleCountry = schedule.country || 'England';
+    return (
+      (selectedCountry === 'England' && (scheduleCountry === 'England' || scheduleCountry === 'UK' || !schedule.country)) ||
+      (selectedCountry === 'Ireland' && scheduleCountry === 'Ireland')
+    );
+  };
 
-  const fetchShipmentsAndSchedules = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch collection schedules first
+      // Fetch collection schedules (routes)
       const { data: schedulesData, error: schedulesError } = await supabase
         .from('collection_schedules')
         .select('*')
-        .order('pickup_date', { ascending: true });
+        .order('route', { ascending: true });
 
       if (schedulesError) throw schedulesError;
-      
       setSchedules(schedulesData || []);
-      
-      // Then fetch shipments - include Collected to show recently collected ones
+
+      // Fetch shipments ready for pickup
       const { data: shipmentsData, error: shipmentsError } = await supabase
         .from('shipments')
         .select('*')
@@ -156,35 +124,8 @@ const PickupZonesManagementTab = () => {
         .order('created_at', { ascending: false });
 
       if (shipmentsError) throw shipmentsError;
+      setShipments(shipmentsData || []);
 
-      // Now fetch profile data for each shipment
-      const enhancedShipments = await Promise.all(
-        (shipmentsData || []).map(async (shipment) => {
-          let profileData = undefined;
-          
-          if (shipment.user_id) {
-            const { data: userData, error: userError } = await supabase
-              .from('profiles')
-              .select('email, full_name')
-              .eq('id', shipment.user_id)
-              .single();
-              
-            if (!userError && userData) {
-              profileData = userData;
-            }
-          }
-          
-          return {
-            ...shipment,
-            profiles: profileData
-          } as Shipment;
-        })
-      );
-      
-      setShipments(enhancedShipments);
-      
-      console.log('Schedules fetched:', schedulesData);
-      console.log('Shipments fetched:', enhancedShipments);
     } catch (error: any) {
       console.error('Error fetching data:', error);
       toast({
@@ -197,356 +138,116 @@ const PickupZonesManagementTab = () => {
     }
   };
 
-  const groupShipmentsByRoute = () => {
-    const grouped: {[key: string]: Shipment[]} = {};
-    
-    // Initialize all routes
-    ROUTES.forEach(route => {
-      grouped[route] = [];
-    });
-    
-    // Group shipments by route
-    shipments.forEach(shipment => {
-      const routeName = determineShipmentRoute(shipment);
-      if (!grouped[routeName]) {
-        grouped[routeName] = [];
+  // Get routes filtered by country
+  const filteredRoutes = schedules.filter(filterByCountry);
+
+  // Get shipments for a specific route
+  const getShipmentsForRoute = (routeName: string): Shipment[] => {
+    return shipments.filter(shipment => {
+      const metadata = shipment.metadata || {};
+      const collection = metadata.collection || {};
+
+      // Check if route is assigned in metadata
+      if (collection.route) {
+        const assignedRoute = collection.route.toUpperCase().replace(' ROUTE', '');
+        if (assignedRoute === routeName.toUpperCase()) return true;
       }
-      grouped[routeName].push(shipment);
-    });
-    
-    setGroupedShipments(grouped);
-  };
 
-  const determineShipmentRoute = (shipment: Shipment) => {
-    // First check if the shipment has a route assigned in its metadata
-    const metadata = shipment.metadata || {};
-    const collection = metadata.collection || {};
-    
-    if (collection.route) {
-      // If the route doesn't include "Route" suffix, add it
-      const routeName = collection.route.includes('Route') 
-        ? collection.route 
-        : `${collection.route} Route`;
-        
-      // Check if it's one of our standard routes
-      if (ROUTES.includes(routeName)) {
-        return routeName;
-      }
-    }
-    
-    // If no route in metadata, determine from origin address
-    if (!shipment.origin) return 'Other';
-    
-    const origin = shipment.origin.toLowerCase();
-    
-    for (const route of ROUTES) {
-      const routeCity = route.split(' ')[0].toLowerCase();
-      if (origin.includes(routeCity)) {
-        return route;
-      }
-    }
-    
-    // Check for regions/counties that map to specific routes
-    if (origin.includes('manchester') || 
-        origin.includes('salford') || 
-        origin.includes('bolton')) {
-      return 'Manchester Route';
-    }
-    
-    if (origin.includes('london') || 
-        origin.includes('croydon') || 
-        origin.includes('barnet')) {
-      return 'London Route';
-    }
-    
-    if (origin.includes('birmingham') || 
-        origin.includes('solihull') || 
-        origin.includes('wolverhampton')) {
-      return 'Birmingham Route';
-    }
-    
-    if (origin.includes('northampton') || 
-        origin.includes('wellingborough')) {
-      return 'Northampton Route';  
-    }
-
-    if (origin.includes('leeds') || 
-        origin.includes('bradford') || 
-        origin.includes('huddersfield')) {
-      return 'Leeds Route';
-    }
-
-    if (origin.includes('nottingham') || 
-        origin.includes('derby')) {
-      return 'Nottingham Route';
-    }
-    
-    // Default
-    return 'Other';
-  };
-
-  const schedulePickups = async () => {
-    if (!schedulingRoute || !pickupDate) {
-      toast({
-        title: 'Missing Information',
-        description: 'Please select a route and pickup date.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    try {
-      setSchedulingPickups(true);
-      
-      // Get shipments for the selected route
-      const routeShipments = groupedShipments[schedulingRoute] || [];
-      
-      if (routeShipments.length === 0) {
-        toast({
-          title: 'No Shipments',
-          description: 'There are no shipments to schedule for this route.',
-          variant: 'default',
+      // Check origin against route areas
+      const schedule = schedules.find(s => s.route.toUpperCase() === routeName.toUpperCase());
+      if (schedule && shipment.origin) {
+        const originLower = shipment.origin.toLowerCase();
+        return schedule.areas.some(area => {
+          const areaLower = area.toLowerCase();
+          // Skip postcodes entry
+          if (areaLower.startsWith('postcodes:')) return false;
+          return originLower.includes(areaLower) || areaLower.includes(originLower.split(',')[0]);
         });
-        return;
       }
-      
-      // First check if we need to update the collection_schedules table
-      const routeName = schedulingRoute.replace(' Route', ''); // Strip "Route" if needed
-      
-      // Check if this route already exists in the collection_schedules
-      const { data: existingSchedule } = await supabase
+
+      return false;
+    });
+  };
+
+  // Count drums for a route
+  const countDrums = (routeName: string): number => {
+    const routeShipments = getShipmentsForRoute(routeName);
+    return routeShipments.reduce((total, shipment) => {
+      const metadata = shipment.metadata || {};
+      const items = metadata.items || {};
+      if (items.drums?.quantity) {
+        return total + items.drums.quantity;
+      }
+      return total;
+    }, 0);
+  };
+
+  // Schedule pickup for a route
+  const schedulePickup = async () => {
+    if (!schedulingRoute || !newPickupDate) return;
+
+    setIsScheduling(true);
+    try {
+      const formattedDate = format(new Date(newPickupDate), 'MMMM do, yyyy');
+
+      const { error } = await supabase
         .from('collection_schedules')
-        .select('*')
-        .eq('route', routeName)
-        .maybeSingle();
-      
-      if (existingSchedule) {
-        // Update the existing schedule
-        await supabase
-          .from('collection_schedules')
-          .update({
-            pickup_date: pickupDate,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingSchedule.id);
-      } else {
-        // Create a new schedule
-        await supabase
-          .from('collection_schedules')
-          .insert({
-            route: routeName,
-            areas: routeShipments.map(shipment => 
-              shipment.origin.split(',')[0].trim()
-            ).filter((value, index, self) => 
-              self.indexOf(value) === index
-            ), // Get unique areas
-            pickup_date: pickupDate
-          });
-      }
-      
-      // Update all shipments in this route
-      const updates = routeShipments.map(shipment => {
-        // Update shipment metadata
+        .update({
+          pickup_date: formattedDate,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', schedulingRoute.id);
+
+      if (error) throw error;
+
+      // Update shipments in this route
+      const routeShipments = getShipmentsForRoute(schedulingRoute.route);
+      for (const shipment of routeShipments) {
         const updatedMetadata = {
           ...shipment.metadata,
           collection: {
             ...(shipment.metadata?.collection || {}),
-            route: routeName,
-            date: pickupDate,
+            route: schedulingRoute.route,
+            date: formattedDate,
             scheduled: true
           }
         };
-        
-        return supabase
+
+        await supabase
           .from('shipments')
           .update({
             status: 'Ready for Pickup',
             metadata: updatedMetadata
           })
           .eq('id', shipment.id);
-      });
-      
-      await Promise.all(updates);
-      
+      }
+
       toast({
-        title: 'Pickups Scheduled',
-        description: `Successfully scheduled ${routeShipments.length} pickups for ${schedulingRoute} on ${pickupDate}`,
+        title: 'Pickup Scheduled',
+        description: `Collection scheduled for ${formattedDate}`,
       });
-      
-      // Refresh data
-      fetchShipmentsAndSchedules();
-      
+
+      setSchedulingDialog(false);
+      setSchedulingRoute(null);
+      setNewPickupDate('');
+      fetchData();
+
     } catch (error: any) {
-      console.error('Error scheduling pickups:', error);
       toast({
         title: 'Error',
-        description: 'Failed to schedule pickups: ' + error.message,
+        description: 'Failed to schedule pickup: ' + error.message,
         variant: 'destructive',
       });
     } finally {
-      setSchedulingPickups(false);
-      setPickupDate('');
-      setSchedulingRoute('');
+      setIsScheduling(false);
     }
   };
 
-  const exportPickupList = (route: string) => {
-    try {
-      setExporting(true);
-      
-      const shipmentsToExport = route === 'all' ? shipments : groupedShipments[route] || [];
-      
-      if (shipmentsToExport.length === 0) {
-        toast({
-          title: 'No Data',
-          description: 'There are no shipments to export for this route.',
-          variant: 'default',
-        });
-        setExporting(false);
-        return;
-      }
-      
-      // Format data for CSV
-      const headers = [
-        'Tracking Number',
-        'Sender Name',
-        'Sender Phone',
-        'Pickup Address',
-        'Shipment Type',
-        'Status',
-        'Pickup Date'
-      ];
-      
-      const rows = shipmentsToExport.map(shipment => {
-        const metadata = shipment.metadata || {};
-        const senderDetails = metadata.sender || metadata.senderDetails || {};
-        const shipmentDetails = metadata.shipment || metadata.shipmentDetails || {};
-        const collectionDetails = metadata.collection || {};
-        
-        // Get sender name from metadata or profiles
-        const senderName = shipment.profiles?.full_name || 
-          `${senderDetails.firstName || ''} ${senderDetails.lastName || ''}`.trim() || 
-          'N/A';
-        
-        // Get pickup date from collection details or matching schedule
-        let pickupDate = collectionDetails.date || 'Not scheduled';
-        
-        // If no date in collection details, check the schedules
-        if (!collectionDetails.date) {
-          const routeName = schedulingRoute.replace(' Route', '');
-          const schedule = schedules.find(s => s.route === routeName);
-          if (schedule) {
-            pickupDate = schedule.pickup_date;
-          }
-        }
-        
-        return [
-          shipment.tracking_number || '',
-          senderName || '',
-          senderDetails.phone || '',
-          shipment.origin || '',
-          shipmentDetails.type || '',
-          shipment.status || '',
-          pickupDate
-        ];
-      });
-      
-      // Create CSV content
-      const csvContent = [
-        headers.join(','),
-        ...rows.map(row => row.join(','))
-      ].join('\n');
-      
-      // Create and download file
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.setAttribute('href', url);
-      link.setAttribute('download', `${route === 'all' ? 'All' : route}_Pickups_${new Date().toISOString().split('T')[0]}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      toast({
-        title: 'Export Successful',
-        description: 'Pickup list has been exported.',
-      });
-    } catch (error: any) {
-      console.error('Error exporting pickup list:', error);
-      toast({
-        title: 'Export Failed',
-        description: 'Failed to export pickup list: ' + error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  // Count drums in a route's shipments
-  const countDrums = (route: string) => {
-    const routeShipments = groupedShipments[route] || [];
-    return routeShipments.reduce((total, shipment) => {
-      const metadata = shipment.metadata || {};
-      const items = metadata.items || {};
-      const shipmentDetails = metadata.shipment || metadata.shipmentDetails || {};
-      
-      // Check new items structure first
-      if (items.drums?.quantity) {
-        return total + items.drums.quantity;
-      }
-      
-      // Fallback to old structure
-      if (shipmentDetails.type === 'Drums' || shipmentDetails.includeDrums) {
-        const quantity = parseInt(String(shipmentDetails.quantity)) || 1;
-        return total + quantity;
-      }
-      
-      return total;
-    }, 0);
-  };
-
-  // Check if a route is overbooked (more than 10 drums)
-  const isRouteOverbooked = (route: string) => {
-    return countDrums(route) >= 10;
-  };
-
-  // Get the pickup date for a specific route from the schedules
-  const getPickupDateForRoute = (route: string) => {
-    const routeName = route.replace(' Route', '');
-    const schedule = schedules.find(s => s.route === routeName);
-    
-    if (schedule) {
-      return schedule.pickup_date;
-    }
-    
-    return 'Not scheduled';
-  };
-
-  // Safely format dates ensuring they are valid
-  const safeFormatDate = (dateStr: string, formatStr: string = 'dd/MM/yyyy') => {
-    try {
-      if (!dateStr) return 'Not set';
-      
-      const date = new Date(dateStr);
-      
-      if (!isValid(date)) {
-        return dateStr; // Return the original string if it's not a valid date
-      }
-      
-      return format(date, formatStr);
-    } catch (error) {
-      console.error(`Error formatting date: ${dateStr}`, error);
-      return dateStr; // Return the original string if there's an error
-    }
-  };
-
-  // Mark a shipment as collected
+  // Mark shipment as collected
   const markAsCollected = async (shipmentId: string) => {
     try {
       setMarkingCollected(shipmentId);
-      
+
       const { error } = await supabase
         .from('shipments')
         .update({
@@ -554,37 +255,31 @@ const PickupZonesManagementTab = () => {
           updated_at: new Date().toISOString()
         })
         .eq('id', shipmentId);
-      
+
       if (error) throw error;
-      
-      // Close dialog first if open
+
+      setShipments(prev =>
+        prev.map(s =>
+          s.id === shipmentId
+            ? { ...s, status: 'Collected', updated_at: new Date().toISOString() }
+            : s
+        )
+      );
+
       if (shipmentDialogOpen) {
         setShipmentDialogOpen(false);
         setSelectedShipment(null);
       }
-      
-      // Update local state immediately for instant UI feedback
-      setShipments(prevShipments => 
-        prevShipments.map(s => 
-          s.id === shipmentId 
-            ? { ...s, status: 'Collected', updated_at: new Date().toISOString() } 
-            : s
-        )
-      );
-      
+
       toast({
-        title: 'Shipment Collected',
-        description: 'Shipment has been marked as collected.',
+        title: 'Collected',
+        description: 'Shipment marked as collected.',
       });
-      
-      // Also refresh from server to ensure consistency
-      fetchShipmentsAndSchedules();
-      
+
     } catch (error: any) {
-      console.error('Error marking shipment as collected:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update shipment status: ' + error.message,
+        description: 'Failed to update status: ' + error.message,
         variant: 'destructive',
       });
     } finally {
@@ -592,69 +287,325 @@ const PickupZonesManagementTab = () => {
     }
   };
 
-  // View shipment details
-  const viewShipmentDetails = (shipment: Shipment) => {
-    setSelectedShipment(shipment);
-    setShipmentDialogOpen(true);
+  // Export pickup list
+  const exportPickupList = (route: CollectionSchedule) => {
+    try {
+      setExporting(true);
+      const routeShipments = getShipmentsForRoute(route.route);
+
+      if (routeShipments.length === 0) {
+        toast({ title: 'No Data', description: 'No shipments to export.' });
+        setExporting(false);
+        return;
+      }
+
+      const headers = ['Tracking Number', 'Sender Name', 'Phone', 'Address', 'Drums', 'Status'];
+      const rows = routeShipments.map(s => {
+        const meta = s.metadata || {};
+        const sender = meta.sender || meta.senderDetails || {};
+        const items = meta.items || {};
+        return [
+          s.tracking_number,
+          `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || 'N/A',
+          sender.phone || 'N/A',
+          s.origin || 'N/A',
+          items.drums?.quantity || 0,
+          s.status
+        ];
+      });
+
+      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${route.route}_Pickups_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+
+      toast({ title: 'Exported', description: 'Pickup list downloaded.' });
+    } catch (error: any) {
+      toast({ title: 'Error', description: 'Export failed.' });
+    } finally {
+      setExporting(false);
+    }
   };
 
-  const notifyCustomers = async (route: string) => {
-    try {
-      const routeShipments = groupedShipments[route] || [];
-      if (routeShipments.length === 0) {
-        toast({
-          title: 'No Customers',
-          description: 'There are no customers to notify for this route.',
-          variant: 'default',
-        });
-        return;
-      }
-
-      const pickupDate = getPickupDateForRoute(route);
-      if (pickupDate === 'Not scheduled') {
-        toast({
-          title: 'No Pickup Date',
-          description: 'Please schedule a pickup date for this route first.',
-          variant: 'default',
-        });
-        return;
-      }
-
-      // Get all unique emails from the shipments
-      const emails = routeShipments
-        .map(shipment => {
-          const metadata = shipment.metadata || {};
-          const senderDetails = metadata.sender || metadata.senderDetails || {};
-          return senderDetails.email || shipment.profiles?.email;
-        })
-        .filter(Boolean) // Remove nulls/undefined
-        .filter((email, index, self) => self.indexOf(email) === index); // Remove duplicates
-
-      if (emails.length === 0) {
-        toast({
-          title: 'No Emails Found',
-          description: 'No valid email addresses found for customers in this route.',
-          variant: 'default',
-        });
-        return;
-      }
-
-      // For each email, send a notification about their scheduled pickup
-      const routeName = route.replace(' Route', '');
-      const formattedDate = safeFormatDate(pickupDate);
-      
-      // Here we could call the Brevo email function for each email
-      toast({
-        title: 'Notifications Sent',
-        description: `${emails.length} customers have been notified about their pickup in the ${routeName} area.`,
-      });
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: 'Failed to send notifications: ' + error.message,
-        variant: 'destructive',
-      });
+  // Helper to extract sender info
+  const getSenderName = (metadata: any): string => {
+    const sender = metadata?.sender || metadata?.senderDetails || {};
+    if (sender.name) return sender.name;
+    if (sender.firstName || sender.lastName) {
+      return `${sender.firstName || ''} ${sender.lastName || ''}`.trim();
     }
+    return 'Unknown';
+  };
+
+  const getSenderPhone = (metadata: any): string => {
+    const sender = metadata?.sender || metadata?.senderDetails || {};
+    return sender.phone || metadata?.phone || 'N/A';
+  };
+
+  // Filter routes by search
+  const searchFilteredRoutes = filteredRoutes.filter(route =>
+    searchQuery === '' ||
+    route.route.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    route.areas.some(a => a.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  // Render route card
+  const renderRouteCard = (route: CollectionSchedule) => {
+    const routeShipments = getShipmentsForRoute(route.route);
+    const pendingShipments = routeShipments.filter(s => s.status !== 'Collected');
+    const drumCount = countDrums(route.route);
+    const isOverbooked = drumCount >= 10;
+    const hasSchedule = route.pickup_date && route.pickup_date !== 'Not set';
+
+    return (
+      <Card
+        key={route.id}
+        className={`cursor-pointer transition-all hover:shadow-md ${isOverbooked ? 'border-red-300 dark:border-red-700' : pendingShipments.length > 0 ? 'border-green-300 dark:border-green-700' : ''
+          }`}
+        onClick={() => setSelectedRoute(route.route)}
+      >
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${pendingShipments.length > 0 ? 'bg-green-100 dark:bg-green-900/30' : 'bg-gray-100 dark:bg-gray-800'
+                }`}>
+                <Truck className={`h-6 w-6 ${pendingShipments.length > 0 ? 'text-green-600' : 'text-gray-400'}`} />
+              </div>
+              <div>
+                <CardTitle className="text-base">{route.route}</CardTitle>
+                <div className="flex items-center gap-1 text-sm text-muted-foreground mt-0.5">
+                  <Calendar className="h-3 w-3" />
+                  <span>{hasSchedule ? route.pickup_date : 'Not scheduled'}</span>
+                </div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className={`text-2xl font-bold ${pendingShipments.length > 0 ? 'text-green-600' : 'text-gray-300'}`}>
+                {pendingShipments.length}
+              </div>
+              <div className="text-xs text-muted-foreground">pickups</div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {/* Areas/Cities */}
+          <div className="flex flex-wrap gap-1 mb-3">
+            {route.areas.filter(a => !a.startsWith('Postcodes:')).slice(0, 3).map((area, i) => (
+              <Badge key={i} variant="outline" className="text-xs">
+                <MapPin className="h-2.5 w-2.5 mr-1" />
+                {area}
+              </Badge>
+            ))}
+            {route.areas.filter(a => !a.startsWith('Postcodes:')).length > 3 && (
+              <Badge variant="secondary" className="text-xs">
+                +{route.areas.filter(a => !a.startsWith('Postcodes:')).length - 3} more
+              </Badge>
+            )}
+          </div>
+
+          {/* Stats */}
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <Package className="h-3.5 w-3.5" />
+              <span>{drumCount} drums</span>
+            </div>
+            {isOverbooked && (
+              <Badge variant="destructive" className="text-xs">
+                <AlertCircle className="h-3 w-3 mr-1" />
+                Overbooked
+              </Badge>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  // Render selected route details
+  const renderRouteDetails = () => {
+    const route = schedules.find(s => s.route === selectedRoute);
+    if (!route) return null;
+
+    const routeShipments = getShipmentsForRoute(route.route);
+    const pendingShipments = routeShipments.filter(s => s.status !== 'Collected');
+    const collectedShipments = routeShipments.filter(s => s.status === 'Collected');
+    const drumCount = countDrums(route.route);
+
+    return (
+      <div className="space-y-4">
+        {/* Back button and header */}
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedRoute(null)}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Routes
+          </Button>
+        </div>
+
+        {/* Route Summary */}
+        <Card className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
+          <CardContent className="pt-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <div className="h-14 w-14 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
+                  <Truck className="h-7 w-7 text-green-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-green-900 dark:text-green-100">{route.route}</h2>
+                  <div className="flex items-center gap-3 text-sm text-green-700 dark:text-green-300 mt-1">
+                    <span className="flex items-center gap-1">
+                      <Package className="h-4 w-4" />
+                      {pendingShipments.length} pending
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-4 w-4" />
+                      {route.pickup_date !== 'Not set' ? route.pickup_date : 'Not scheduled'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Badge variant="outline" className="text-lg px-3 py-1">
+                  {drumCount} drums
+                </Badge>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => exportPickupList(route)}
+                  disabled={exporting}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setSchedulingRoute(route);
+                    setSchedulingDialog(true);
+                  }}
+                >
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Schedule
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Shipments Table */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Pending Pickups ({pendingShipments.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {pendingShipments.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>No pending pickups for this route</p>
+              </div>
+            ) : (
+              <div className="border rounded-md overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tracking #</TableHead>
+                      <TableHead>Sender</TableHead>
+                      <TableHead>Address</TableHead>
+                      <TableHead>Items</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingShipments.map(shipment => {
+                      const items = shipment.metadata?.items || {};
+                      let itemsText = '';
+                      if (items.drums?.quantity) itemsText += `${items.drums.quantity} drum(s)`;
+                      if (items.boxes) itemsText += itemsText ? ' + boxes' : 'Boxes';
+                      if (!itemsText) itemsText = 'N/A';
+
+                      return (
+                        <TableRow key={shipment.id}>
+                          <TableCell className="font-mono text-sm">{shipment.tracking_number}</TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium text-sm">{getSenderName(shipment.metadata)}</div>
+                              <div className="text-xs text-muted-foreground">{getSenderPhone(shipment.metadata)}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="max-w-[200px] truncate text-sm">{shipment.origin}</TableCell>
+                          <TableCell className="text-sm">{itemsText}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{shipment.status}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedShipment(shipment);
+                                  setShipmentDialogOpen(true);
+                                }}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-green-600 hover:bg-green-50"
+                                onClick={() => markAsCollected(shipment.id)}
+                                disabled={markingCollected === shipment.id}
+                              >
+                                {markingCollected === shipment.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <CheckCircle className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recently Collected */}
+        {collectedShipments.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base text-muted-foreground">Recently Collected ({collectedShipments.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {collectedShipments.slice(0, 5).map(shipment => (
+                  <div key={shipment.id} className="flex items-center justify-between py-2 px-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span className="font-mono text-sm">{shipment.tracking_number}</span>
+                      <span className="text-sm text-muted-foreground">{getSenderName(shipment.metadata)}</span>
+                    </div>
+                    <Badge variant="secondary" className="text-xs">Collected</Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -662,471 +613,114 @@ const PickupZonesManagementTab = () => {
       <CardHeader>
         <CardTitle>Pickup Zones Management</CardTitle>
         <CardDescription>
-          Manage shipments by pickup zone and schedule collections
+          Manage pickups by route and schedule collections
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="flex flex-col md:flex-row gap-4 items-end">
-          {/* Country Indicator */}
-          <div className="flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
-            <span className="text-sm font-medium">
-              {selectedCountry === 'Ireland' ? '🇮🇪' : '🇬🇧'} {selectedCountry} Pickups
-            </span>
-          </div>
+        {!selectedRoute ? (
+          <>
+            {/* Search and filters */}
+            <div className="flex flex-col md:flex-row gap-4 items-end">
+              <div className="relative flex-grow">
+                <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+                <Input
+                  placeholder="Search routes or areas..."
+                  className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="px-3 py-1.5">
+                  {selectedCountry === 'Ireland' ? '🇮🇪' : '🇬🇧'} {selectedCountry}
+                </Badge>
+                <Button variant="outline" onClick={fetchData} disabled={loading}>
+                  <RefreshCcw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
+            </div>
 
-          {/* Route Filter */}
-          <div className="flex-grow">
-            <Select value={selectedRoute} onValueChange={setSelectedRoute}>
-              <SelectTrigger>
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  <span>Select Route</span>
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Routes</SelectItem>
-                {getFilteredRoutes().map(route => (
-                  <SelectItem key={route} value={route}>
-                    {route} ({(groupedShipments[route] || []).length})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => exportPickupList(selectedRoute)}
-              disabled={exporting}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export List
-            </Button>
-            
-            <Button
-              variant="outline"
-              onClick={fetchShipmentsAndSchedules}
-              disabled={loading}
-            >
-              <RefreshCcw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-            
-            <Button
-              onClick={() => {
-                // Pre-select the current pickup date from schedules if available
-                if (selectedRoute !== 'all') {
-                  const currentDate = getPickupDateForRoute(selectedRoute);
-                  if (currentDate !== 'Not scheduled') {
-                    setPickupDate(currentDate);
-                  } else {
-                    setPickupDate('');
-                  }
-                  setSchedulingRoute(selectedRoute);
-                } else {
-                  setPickupDate('');
-                  setSchedulingRoute('');
-                }
-                setSchedulingPickups(true);
-              }}
-              disabled={selectedRoute === 'all' || loading}
-            >
-              <Calendar className="h-4 w-4 mr-2" />
-              Schedule Pickups
-            </Button>
-          </div>
-        </div>
-        
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-          </div>
-        ) : shipments.length === 0 ? (
-          <div className="text-center py-8">
-            <Package className="h-16 w-16 mx-auto text-muted-foreground mb-2" />
-            <h3 className="text-lg font-medium">No shipments found</h3>
-            <p className="text-muted-foreground">There are no shipments ready for pickup</p>
-          </div>
-        ) : selectedRoute === 'all' ? (
-          // Show all routes summary
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {getFilteredRoutes().map(route => {
-              const routeShipments = groupedShipments[route] || [];
-              
-              const drumCount = countDrums(route);
-              const isOverbooked = isRouteOverbooked(route);
-              const pickupDate = getPickupDateForRoute(route);
-              
-              const hasPickups = routeShipments.length > 0;
-              
-              return (
-                <Card 
-                  key={route}
-                  className={`cursor-pointer transition-all ${
-                    isOverbooked 
-                      ? 'border-red-500 dark:border-red-700 hover:shadow-lg' 
-                      : hasPickups 
-                        ? 'hover:shadow-lg hover:border-green-500' 
-                        : 'opacity-60 hover:opacity-100'
-                  }`}
-                  onClick={() => setSelectedRoute(route)}
-                >
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className={`text-lg flex items-center gap-2 ${!hasPickups ? 'text-muted-foreground' : ''}`}>
-                          <Truck className={`h-5 w-5 ${hasPickups ? 'text-green-600' : 'text-gray-400'}`} />
-                          {route}
-                        </CardTitle>
-                        <div className="flex items-center text-sm text-muted-foreground mt-1">
-                          <Calendar className="h-3.5 w-3.5 mr-1" />
-                          <span>{pickupDate !== 'Not scheduled' ? safeFormatDate(pickupDate, 'MMM d, yyyy') : 'Not scheduled'}</span>
-                        </div>
-                      </div>
-                      {/* Pickup Count Badge */}
-                      <div className="text-right">
-                        <div className={`text-3xl font-bold ${hasPickups ? 'text-green-600' : 'text-gray-300'}`}>
-                          {routeShipments.length}
-                        </div>
-                        <div className="text-xs text-muted-foreground">pickups</div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pb-3">
-                    <div className="flex items-center justify-between text-sm mb-2">
-                      <span className="text-muted-foreground">Capacity</span>
-                      <Badge 
-                        variant={isOverbooked ? 'destructive' : 'outline'}
-                      >
-                        {drumCount}/10 drums
-                      </Badge>
-                    </div>
-                    <Progress 
-                      value={drumCount > 10 ? 100 : (drumCount / 10) * 100}
-                      className={`h-2 ${isOverbooked ? 'bg-red-200 dark:bg-red-900' : ''}`}
-                    />
-                    {isOverbooked && (
-                      <div className="flex items-center gap-1 mt-2 text-xs text-red-600">
-                        <AlertCircle className="h-3 w-3" />
-                        <span>Route overbooked</span>
-                      </div>
-                    )}
-                  </CardContent>
-                  <CardFooter className="flex justify-between pt-0 border-t">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={hasPickups ? "text-green-600 hover:text-green-700 hover:bg-green-50" : "text-muted-foreground"}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedRoute(route);
-                      }}
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      {hasPickups ? 'View Pickups' : 'View Route'}
-                    </Button>
-                    {hasPickups && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          exportPickupList(route);
-                        }}
-                      >
-                        <Download className="h-4 w-4 mr-1" />
-                        Export
-                      </Button>
-                    )}
-                  </CardFooter>
-                </Card>
-              );
-            })}
-          </div>
+            {/* Routes Grid */}
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : searchFilteredRoutes.length === 0 ? (
+              <div className="text-center py-12">
+                <Truck className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium">No routes found</h3>
+                <p className="text-muted-foreground">
+                  {filteredRoutes.length === 0
+                    ? `No ${selectedCountry} routes configured. Add routes in the Routes tab.`
+                    : 'Try adjusting your search.'}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {searchFilteredRoutes.map(renderRouteCard)}
+              </div>
+            )}
+
+            {/* Summary */}
+            {searchFilteredRoutes.length > 0 && (
+              <div className="flex items-center justify-between text-sm text-muted-foreground pt-4 border-t">
+                <span>
+                  {searchFilteredRoutes.length} route{searchFilteredRoutes.length !== 1 ? 's' : ''} •{' '}
+                  {shipments.filter(s => s.status !== 'Collected').length} pending pickups
+                </span>
+                <span>
+                  Total: {shipments.reduce((acc, s) => acc + (s.metadata?.items?.drums?.quantity || 0), 0)} drums
+                </span>
+              </div>
+            )}
+          </>
         ) : (
-          // Show selected route details
-          <div className="space-y-4">
-            {/* Route Header with Back Button */}
-            <div className="flex items-center gap-4 pb-4 border-b">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedRoute('all')}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                ← Back to All Routes
-              </Button>
-            </div>
-            
-            {/* Route Summary Card */}
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800 rounded-lg p-6">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="h-16 w-16 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
-                    <Truck className="h-8 w-8 text-green-600" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-green-900 dark:text-green-100">{selectedRoute}</h2>
-                    <div className="flex items-center gap-4 text-sm text-green-700 dark:text-green-300 mt-1">
-                      <span className="flex items-center gap-1">
-                        <Package className="h-4 w-4" />
-                        {(groupedShipments[selectedRoute] || []).length} pickups
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        {getPickupDateForRoute(selectedRoute) !== 'Not scheduled' 
-                          ? safeFormatDate(getPickupDateForRoute(selectedRoute), 'EEEE, MMM d, yyyy')
-                          : 'Not scheduled'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  {isRouteOverbooked(selectedRoute) && (
-                    <Badge variant="destructive" className="flex items-center gap-1">
-                      <AlertCircle className="h-4 w-4" />
-                      Overbooked
-                    </Badge>
-                  )}
-                  <Badge variant="outline" className="text-lg px-4 py-2">
-                    {countDrums(selectedRoute)}/10 drums
-                  </Badge>
-                </div>
-              </div>
-            </div>
-            
-            <div className="border rounded-md overflow-hidden">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[140px]">Tracking #</TableHead>
-                      <TableHead>Sender</TableHead>
-                      <TableHead>Pickup Address</TableHead>
-                      <TableHead>Shipment Type</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(groupedShipments[selectedRoute] || []).length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-6 text-gray-500">
-                          No shipments found for this route
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      (groupedShipments[selectedRoute] || []).map(shipment => {
-                        const metadata = shipment.metadata || {};
-                        const senderDetails = metadata.sender || metadata.senderDetails || {};
-                        const shipmentDetails = metadata.shipment || metadata.shipmentDetails || {};
-                        const items = metadata.items || {};
-                        const collectionDetails = metadata.collection || {};
-                        
-                        // Get sender name from either profiles or metadata
-                        const senderName = shipment.profiles?.full_name || 
-                          `${senderDetails.firstName || ''} ${senderDetails.lastName || ''}`.trim() || 
-                          'N/A';
-                        
-                        // Determine shipment type from new metadata structure
-                        let shipmentType = 'N/A';
-                        if (items.drums) {
-                          shipmentType = 'Drums';
-                          if (items.boxes) shipmentType += ' + Boxes';
-                        } else if (items.boxes) {
-                          shipmentType = 'Boxes';
-                        } else if (shipmentDetails.type) {
-                          shipmentType = shipmentDetails.type;
-                        }
-                        
-                        // Get quantity
-                        const quantity = items.drums?.quantity || shipmentDetails.quantity || 1;
-                        
-                        return (
-                          <TableRow key={shipment.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                            <TableCell className="font-mono text-sm font-medium">
-                              {shipment.tracking_number}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <div className="h-8 w-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                                  <User className="h-4 w-4 text-green-600" />
-                                </div>
-                                <div>
-                                  <div className="text-sm font-medium">{senderName}</div>
-                                  <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                    <Phone className="h-3 w-3" />
-                                    {senderDetails.phone || 'N/A'}
-                                  </div>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="max-w-[250px]">
-                              <div className="flex items-start gap-1">
-                                <MapPin className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                                <span className="text-sm truncate">{shipment.origin}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Package className="h-4 w-4 text-gray-400" />
-                                <div>
-                                  <div className="text-sm">{shipmentType}</div>
-                                  <div className="text-xs text-muted-foreground">Qty: {quantity}</div>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge 
-                                variant={shipment.status === 'Ready for Pickup' || shipment.status === 'Pending Collection' ? 'default' : 'outline'}
-                                className={shipment.status === 'Collected' ? 'bg-green-100 text-green-800 border-green-300' : ''}
-                              >
-                                {shipment.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => viewShipmentDetails(shipment)}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                {shipment.status !== 'Collected' && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="text-green-600 hover:text-green-700 hover:bg-green-50 hover:border-green-500"
-                                    onClick={() => markAsCollected(shipment.id)}
-                                    disabled={markingCollected === shipment.id}
-                                  >
-                                    {markingCollected === shipment.id ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <>
-                                        <CheckCircle className="h-4 w-4 mr-1" />
-                                        Collected
-                                      </>
-                                    )}
-                                  </Button>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-            
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => notifyCustomers(selectedRoute)}
-              >
-                Notify Customers
-              </Button>
-              <Button
-                onClick={() => {
-                  const currentDate = getPickupDateForRoute(selectedRoute);
-                  if (currentDate !== 'Not scheduled') {
-                    setPickupDate(currentDate);
-                  }
-                  setSchedulingRoute(selectedRoute);
-                  setSchedulingPickups(true);
-                }}
-              >
-                <Calendar className="h-4 w-4 mr-2" />
-                Schedule Pickups
-              </Button>
-            </div>
-          </div>
+          renderRouteDetails()
         )}
       </CardContent>
 
-      {/* Schedule Pickups Dialog */}
-      <Dialog open={schedulingPickups} onOpenChange={setSchedulingPickups}>
+      {/* Schedule Pickup Dialog */}
+      <Dialog open={schedulingDialog} onOpenChange={setSchedulingDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Schedule Pickups</DialogTitle>
+            <DialogTitle>Schedule Collection</DialogTitle>
             <DialogDescription>
-              Set a collection date for shipments
+              Set a pickup date for {schedulingRoute?.route}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="route">Route</Label>
-              <Select value={schedulingRoute} onValueChange={setSchedulingRoute}>
-                <SelectTrigger id="route">
-                  <SelectValue placeholder="Select route" />
-                </SelectTrigger>
-                <SelectContent>
-                  {getFilteredRoutes().map(route => (
-                    <SelectItem key={route} value={route}>
-                      {route} ({(groupedShipments[route] || []).length} shipments)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="pickup-date">Pickup Date</Label>
-              <Input 
-                id="pickup-date"
-                type="date"
-                value={pickupDate}
-                onChange={(e) => setPickupDate(e.target.value)}
+            <div>
+              <Label>Current Date</Label>
+              <Input
+                value={schedulingRoute?.pickup_date || 'Not set'}
+                disabled
+                className="mt-1"
               />
             </div>
-            
-            {schedulingRoute && isRouteOverbooked(schedulingRoute) && (
-              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md flex items-start gap-2">
-                <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
-                <div className="text-sm text-red-600 dark:text-red-400">
-                  <p className="font-medium">Warning: Route is overbooked</p>
-                  <p>This route has {countDrums(schedulingRoute)} drums, which exceeds the recommended maximum of 10.</p>
-                </div>
-              </div>
-            )}
-            
-            {/* Show current pickup date if available */}
-            {schedulingRoute && getPickupDateForRoute(schedulingRoute) !== 'Not scheduled' && (
-              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md flex items-start gap-2">
-                <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
-                <div className="text-sm text-blue-600 dark:text-blue-400">
-                  <p className="font-medium">Current Pickup Date</p>
-                  <p>This route currently has a pickup date of {getPickupDateForRoute(schedulingRoute)}.</p>
-                </div>
-              </div>
-            )}
+            <div>
+              <Label>New Pickup Date</Label>
+              <Input
+                type="date"
+                value={newPickupDate}
+                onChange={(e) => setNewPickupDate(e.target.value)}
+                className="mt-1"
+              />
+            </div>
           </div>
-          
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSchedulingPickups(false)}>
+            <Button variant="outline" onClick={() => setSchedulingDialog(false)}>
               Cancel
             </Button>
-            <Button 
-              onClick={schedulePickups}
-              disabled={!schedulingRoute || !pickupDate}
-            >
-              {schedulingPickups ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
+            <Button onClick={schedulePickup} disabled={!newPickupDate || isScheduling}>
+              {isScheduling ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
-                <>
-                  <Check className="h-4 w-4 mr-2" />
-                  Schedule Pickups
-                </>
+                <Check className="h-4 w-4 mr-2" />
               )}
+              Schedule
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1134,7 +728,7 @@ const PickupZonesManagementTab = () => {
 
       {/* Shipment Details Dialog */}
       <Dialog open={shipmentDialogOpen} onOpenChange={setShipmentDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Package className="h-5 w-5 text-green-600" />
@@ -1144,146 +738,49 @@ const PickupZonesManagementTab = () => {
               {selectedShipment?.tracking_number}
             </DialogDescription>
           </DialogHeader>
-          
-          {selectedShipment && (() => {
-            const metadata = selectedShipment.metadata || {};
-            const senderDetails = metadata.sender || metadata.senderDetails || {};
-            const shipmentDetails = metadata.shipment || metadata.shipmentDetails || {};
-            const items = metadata.items || {};
-            const collectionDetails = metadata.collection || {};
-            
-            const senderName = selectedShipment.profiles?.full_name || 
-              `${senderDetails.firstName || ''} ${senderDetails.lastName || ''}`.trim() || 
-              'N/A';
-            
-            let shipmentType = 'N/A';
-            if (items.drums) {
-              shipmentType = `${items.drums.quantity || 1} x Drum(s)`;
-              if (items.boxes) shipmentType += ` + Boxes`;
-            } else if (items.boxes) {
-              shipmentType = 'Boxes';
-            } else if (shipmentDetails.type) {
-              shipmentType = shipmentDetails.type;
-            }
-            
-            return (
-              <div className="space-y-6 py-4">
-                {/* Status Banner */}
-                <div className={`p-4 rounded-lg ${
-                  selectedShipment.status === 'Collected' 
-                    ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
-                    : 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800'
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {selectedShipment.status === 'Collected' ? (
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      ) : (
-                        <Clock className="h-5 w-5 text-yellow-600" />
-                      )}
-                      <span className={`font-medium ${
-                        selectedShipment.status === 'Collected' ? 'text-green-800 dark:text-green-300' : 'text-yellow-800 dark:text-yellow-300'
-                      }`}>
-                        {selectedShipment.status}
-                      </span>
-                    </div>
-                    {selectedShipment.status !== 'Collected' && (
-                      <Button
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700"
-                        onClick={() => markAsCollected(selectedShipment.id)}
-                        disabled={markingCollected === selectedShipment.id}
-                      >
-                        {markingCollected === selectedShipment.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                        ) : (
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                        )}
-                        Mark as Collected
-                      </Button>
-                    )}
-                  </div>
+
+          {selectedShipment && (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-muted-foreground">Sender</Label>
+                  <p className="font-medium">{getSenderName(selectedShipment.metadata)}</p>
+                  <p className="text-sm text-muted-foreground">{getSenderPhone(selectedShipment.metadata)}</p>
                 </div>
-
-                {/* Sender Details */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Sender Details</h3>
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                          <User className="h-5 w-5 text-green-600" />
-                        </div>
-                        <div>
-                          <div className="font-medium">{senderName}</div>
-                          <div className="text-sm text-muted-foreground">Customer</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Phone className="h-4 w-4 text-gray-400" />
-                        <span>{senderDetails.phone || 'N/A'}</span>
-                      </div>
-                      {senderDetails.email && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Mail className="h-4 w-4 text-gray-400" />
-                          <span>{senderDetails.email}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Pickup Address</h3>
-                    <div className="flex items-start gap-2">
-                      <MapPin className="h-5 w-5 text-gray-400 mt-0.5" />
-                      <div className="text-sm">{selectedShipment.origin}</div>
-                    </div>
-                  </div>
+                <div>
+                  <Label className="text-muted-foreground">Status</Label>
+                  <Badge variant="outline" className="mt-1">{selectedShipment.status}</Badge>
                 </div>
-
-                {/* Shipment Info */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <div>
-                    <div className="text-xs text-muted-foreground uppercase">Shipment Type</div>
-                    <div className="font-medium flex items-center gap-2 mt-1">
-                      <Package className="h-4 w-4 text-green-600" />
-                      {shipmentType}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground uppercase">Route</div>
-                    <div className="font-medium flex items-center gap-2 mt-1">
-                      <Truck className="h-4 w-4 text-green-600" />
-                      {collectionDetails.route || selectedRoute || 'N/A'}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground uppercase">Collection Date</div>
-                    <div className="font-medium flex items-center gap-2 mt-1">
-                      <Calendar className="h-4 w-4 text-green-600" />
-                      {collectionDetails.date || getPickupDateForRoute(selectedRoute) || 'Not scheduled'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Additional Notes */}
-                {(items.boxes?.description || shipmentDetails.notes) && (
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Notes</h3>
-                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg text-sm">
-                      {items.boxes?.description || shipmentDetails.notes}
-                    </div>
-                  </div>
-                )}
               </div>
-            );
-          })()}
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShipmentDialogOpen(false)}>
-              Close
-            </Button>
-          </DialogFooter>
+
+              <Separator />
+
+              <div>
+                <Label className="text-muted-foreground">Pickup Address</Label>
+                <p className="text-sm mt-1">{selectedShipment.origin}</p>
+              </div>
+
+              <div>
+                <Label className="text-muted-foreground">Destination</Label>
+                <p className="text-sm mt-1">{selectedShipment.destination}</p>
+              </div>
+
+              {selectedShipment.status !== 'Collected' && (
+                <Button
+                  className="w-full bg-green-600 hover:bg-green-700"
+                  onClick={() => markAsCollected(selectedShipment.id)}
+                  disabled={markingCollected === selectedShipment.id}
+                >
+                  {markingCollected === selectedShipment.id ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                  )}
+                  Mark as Collected
+                </Button>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </Card>

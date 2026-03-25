@@ -29,7 +29,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminCountry } from '@/contexts/AdminCountryContext';
-import { getRouteForPostalCode, getIrelandRouteForCity, irelandCities } from '@/utils/postalCodeUtils';
+import { getRouteForPostalCode, getIrelandRouteForCity, irelandCities, initializeRouteCache } from '@/utils/postalCodeUtils';
 
 interface FormData {
   // Sender Details
@@ -175,6 +175,11 @@ const ManualBookingTab: React.FC = () => {
       setLoadingSchedule(false);
     }
   };
+
+  // Initialize route cache on component mount
+  useEffect(() => {
+    initializeRouteCache();
+  }, []);
 
   // Effect to detect route when postal code or city changes
   useEffect(() => {

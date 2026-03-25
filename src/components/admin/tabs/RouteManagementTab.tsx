@@ -115,6 +115,95 @@ const RouteManagementTab = () => {
     'CORK'
   ];
 
+  // England routes with their cities and postcodes (for seeding)
+  const englandRoutesData: { route: string; cities: string[]; postcodes: string[] }[] = [
+    {
+      route: 'LONDON',
+      cities: ['Central London', 'East London', 'West London', 'North London', 'South London'],
+      postcodes: ['EC', 'WC', 'N', 'NW', 'E', 'SE', 'SW', 'W', 'EN', 'IG', 'RM', 'DA', 'BR', 'UB', 'HA', 'WD']
+    },
+    {
+      route: 'BIRMINGHAM',
+      cities: ['Birmingham', 'Coventry', 'Wolverhampton', 'Dudley', 'Walsall', 'Worcester', 'Shrewsbury', 'Telford'],
+      postcodes: ['B', 'CV', 'WV', 'DY', 'WS', 'WR', 'SY', 'TF']
+    },
+    {
+      route: 'MANCHESTER',
+      cities: ['Manchester', 'Liverpool', 'Warrington', 'Oldham', 'Stockport', 'Stoke', 'Blackburn', 'Preston', 'Blackpool', 'Bolton', 'Wigan', 'Crewe', 'Chester'],
+      postcodes: ['M', 'L', 'WA', 'OL', 'SK', 'ST', 'BB', 'PR', 'FY', 'BL', 'WN', 'CW', 'CH', 'LL']
+    },
+    {
+      route: 'LEEDS',
+      cities: ['Leeds', 'Wakefield', 'Halifax', 'Doncaster', 'Sheffield', 'Huddersfield', 'York', 'Bradford', 'Harrogate'],
+      postcodes: ['LS', 'WF', 'HX', 'DN', 'S', 'HD', 'YO', 'BD', 'HG']
+    },
+    {
+      route: 'CARDIFF',
+      cities: ['Cardiff', 'Gloucester', 'Bristol', 'Swindon', 'Bath', 'Salisbury', 'Newport', 'Swansea'],
+      postcodes: ['CF', 'GL', 'BS', 'SN', 'BA', 'SP', 'NP', 'SA']
+    },
+    {
+      route: 'BOURNEMOUTH',
+      cities: ['Southampton', 'Portsmouth', 'Reading', 'Guildford', 'Bournemouth', 'Oxford'],
+      postcodes: ['SO', 'PO', 'RG', 'GU', 'BH', 'OX']
+    },
+    {
+      route: 'NOTTINGHAM',
+      cities: ['Nottingham', 'Leicester', 'Derby', 'Peterborough', 'Lincoln'],
+      postcodes: ['NG', 'LE', 'DE', 'PE', 'LN']
+    },
+    {
+      route: 'BRIGHTON',
+      cities: ['Brighton', 'Redhill', 'Slough', 'Tunbridge Wells', 'Canterbury', 'Croydon', 'Twickenham', 'Kingston', 'Maidstone'],
+      postcodes: ['BN', 'RH', 'SL', 'TN', 'CT', 'CR', 'TW', 'KT', 'ME']
+    },
+    {
+      route: 'SOUTHEND',
+      cities: ['Norwich', 'Ipswich', 'Colchester', 'Chelmsford', 'Cambridge', 'Southend', 'Stevenage'],
+      postcodes: ['NR', 'IP', 'CO', 'CM', 'CB', 'SS', 'SG']
+    },
+    {
+      route: 'NORTHAMPTON',
+      cities: ['Milton Keynes', 'Luton', 'St Albans', 'Hemel Hempstead', 'Northampton'],
+      postcodes: ['MK', 'LU', 'AL', 'HP', 'NN']
+    }
+  ];
+
+  // Ireland routes with their cities (for seeding)
+  const irelandRoutesData: { route: string; cities: string[] }[] = [
+    {
+      route: 'LONDONDERRY',
+      cities: ['Larne', 'Ballyclare', 'Ballymena', 'Ballymoney', 'Kilrea', 'Coleraine', 'Londonderry', 'Lifford', 'Omagh', 'Cookstown', 'Carrickfergus']
+    },
+    {
+      route: 'BELFAST',
+      cities: ['Belfast', 'Bangor', 'Comber', 'Lisburn', 'Newry', 'Newtownwards', 'Dunmurry', 'Lurgan', 'Portadown', 'Banbridge', 'Moy', 'Dungannon', 'Armagh']
+    },
+    {
+      route: 'CAVAN',
+      cities: ['Maynooth', 'Ashbourne', 'Swords', 'Skerries', 'Drogheda', 'Dundalk', 'Cavan', 'Virginia', 'Kells', 'Navan', 'Trim']
+    },
+    {
+      route: 'ATHLONE',
+      cities: ['Mullingar', 'Longford', 'Roscommon', 'Boyle', 'Sligo', 'Ballina', 'Swinford', 'Castlebar', 'Tuam', 'Galway', 'Athenry', 'Athlone']
+    },
+    {
+      route: 'LIMERICK',
+      cities: ['Newbridge', 'Portlaoise', 'Roscrea', 'Limerick', 'Ennis', 'Doolin', 'Loughrea', 'Ballinasloe', 'Tullamore']
+    },
+    {
+      route: 'DUBLIN CITY',
+      cities: ['Sandyford', 'Rialto', 'Ballymount', 'Cabra', 'Beaumont', 'Malahide', 'Portmarnock', 'Dalkey', 'Shankill', 'Bray', 'Dublin']
+    },
+    {
+      route: 'CORK',
+      cities: ['Cashel', 'Fermoy', 'Cork', 'Dungarvan', 'Waterford', 'New Ross', 'Wexford', 'Gorey', 'Greystones']
+    }
+  ];
+
+  const [isSeedingIreland, setIsSeedingIreland] = useState(false);
+  const [isSeedingEngland, setIsSeedingEngland] = useState(false);
+
   useEffect(() => {
     fetchRoutes();
   }, []);
@@ -141,7 +230,123 @@ const RouteManagementTab = () => {
       setLoading(false);
     }
   };
-  
+
+  // Seed Ireland routes into the database
+  const seedIrelandRoutes = async () => {
+    setIsSeedingIreland(true);
+    try {
+      // Check which routes already exist
+      const existingIrelandRoutes = routes
+        .filter(r => r.country === 'Ireland')
+        .map(r => r.route.toUpperCase());
+
+      const routesToAdd = irelandRoutesData.filter(
+        r => !existingIrelandRoutes.includes(r.route.toUpperCase())
+      );
+
+      if (routesToAdd.length === 0) {
+        toast({
+          title: 'Routes Already Exist',
+          description: 'All Ireland routes are already in the database.',
+        });
+        setIsSeedingIreland(false);
+        return;
+      }
+
+      // Insert new routes
+      for (const routeData of routesToAdd) {
+        const { error } = await supabase
+          .from('collection_schedules')
+          .insert({
+            route: routeData.route,
+            areas: routeData.cities,
+            pickup_date: 'Not set',
+            country: 'Ireland'
+          });
+
+        if (error) {
+          console.error(`Error adding route ${routeData.route}:`, error);
+        }
+      }
+
+      toast({
+        title: 'Ireland Routes Added',
+        description: `Successfully added ${routesToAdd.length} Ireland route(s) with their cities.`,
+      });
+
+      // Refresh routes
+      await fetchRoutes();
+
+    } catch (error: any) {
+      console.error('Error seeding Ireland routes:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add Ireland routes: ' + error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSeedingIreland(false);
+    }
+  };
+
+  // Seed England routes into the database
+  const seedEnglandRoutes = async () => {
+    setIsSeedingEngland(true);
+    try {
+      // Check which routes already exist
+      const existingEnglandRoutes = routes
+        .filter(r => r.country === 'England' || r.country === 'UK' || !r.country)
+        .map(r => r.route.toUpperCase());
+
+      const routesToAdd = englandRoutesData.filter(
+        r => !existingEnglandRoutes.includes(r.route.toUpperCase())
+      );
+
+      if (routesToAdd.length === 0) {
+        toast({
+          title: 'Routes Already Exist',
+          description: 'All England routes are already in the database.',
+        });
+        setIsSeedingEngland(false);
+        return;
+      }
+
+      // Insert new routes
+      for (const routeData of routesToAdd) {
+        const { error } = await supabase
+          .from('collection_schedules')
+          .insert({
+            route: routeData.route,
+            areas: [...routeData.cities, `Postcodes: ${routeData.postcodes.join(', ')}`],
+            pickup_date: 'Not set',
+            country: 'England'
+          });
+
+        if (error) {
+          console.error(`Error adding route ${routeData.route}:`, error);
+        }
+      }
+
+      toast({
+        title: 'England Routes Added',
+        description: `Successfully added ${routesToAdd.length} England route(s) with cities and postcodes.`,
+      });
+
+      // Refresh routes
+      await fetchRoutes();
+
+    } catch (error: any) {
+      console.error('Error seeding England routes:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add England routes: ' + error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSeedingEngland(false);
+    }
+  };
+
   const createNewRoute = async () => {
     if (!newRouteName.trim() || !newRouteAreas.trim()) {
       toast({
@@ -308,7 +513,12 @@ const RouteManagementTab = () => {
     const matchesSearch =
       route.route.toLowerCase().includes(searchLower) ||
       route.areas.some(area => area.toLowerCase().includes(searchLower));
-    const matchesCountry = route.country === selectedCountry;
+    // Handle routes without country field - default to England
+    // Also match "UK" and "England" as the same
+    const routeCountry = route.country || 'England';
+    const matchesCountry =
+      (selectedCountry === 'England' && (routeCountry === 'England' || routeCountry === 'UK' || !route.country)) ||
+      (selectedCountry === 'Ireland' && routeCountry === 'Ireland');
     return matchesSearch && matchesCountry;
   });
 
@@ -341,7 +551,50 @@ const RouteManagementTab = () => {
               <RefreshCcw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
-            
+
+            {/* Seed Routes Button - show based on selected country */}
+            {selectedCountry === 'Ireland' && (
+              <Button
+                variant="outline"
+                onClick={seedIrelandRoutes}
+                disabled={isSeedingIreland}
+                className="bg-green-50 hover:bg-green-100 border-green-300 text-green-700"
+              >
+                {isSeedingIreland ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Adding Routes...
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="h-4 w-4 mr-2" />
+                    Add All Ireland Routes
+                  </>
+                )}
+              </Button>
+            )}
+
+            {selectedCountry === 'England' && (
+              <Button
+                variant="outline"
+                onClick={seedEnglandRoutes}
+                disabled={isSeedingEngland}
+                className="bg-blue-50 hover:bg-blue-100 border-blue-300 text-blue-700"
+              >
+                {isSeedingEngland ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Adding Routes...
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="h-4 w-4 mr-2" />
+                    Add All UK Routes
+                  </>
+                )}
+              </Button>
+            )}
+
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
                 <Button>

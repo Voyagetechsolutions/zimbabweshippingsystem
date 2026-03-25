@@ -1,302 +1,401 @@
 
 /**
- * UK Postal Code validation utilities
+ * UK Postal Code and Ireland City validation utilities
+ * UK routes are fetched from database, Ireland uses city-based routing
  */
 
-// Map of postal code prefixes to routes for England
+import { supabase } from '@/integrations/supabase/client';
+
+// Cache for database routes
+let cachedUKRoutes: { postcodePrefix: string; route: string; pickupDate: string }[] = [];
+let cachedIrelandRoutes: { city: string; route: string; pickupDate: string }[] = [];
+let cacheTimestamp: number = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Fallback map of postal code prefixes to routes for England (used if database is empty)
 export const postalCodeToRouteMap: Record<string, string> = {
   // London area
-  'EC': 'LONDON ROUTE',
-  'WC': 'LONDON ROUTE',
-  'N': 'LONDON ROUTE',
-  'NW': 'LONDON ROUTE',
-  'E': 'LONDON ROUTE',
-  'SE': 'LONDON ROUTE',
-  'SW': 'LONDON ROUTE',
-  'W': 'LONDON ROUTE',
-  'EN': 'LONDON ROUTE',
-  'IG': 'LONDON ROUTE',
-  'RM': 'LONDON ROUTE',
-  'DA': 'LONDON ROUTE',
-  'BR': 'LONDON ROUTE',
-  'UB': 'LONDON ROUTE',
-  'HA': 'LONDON ROUTE',
-  'WD': 'LONDON ROUTE',
+  'EC': 'LONDON',
+  'WC': 'LONDON',
+  'N': 'LONDON',
+  'NW': 'LONDON',
+  'E': 'LONDON',
+  'SE': 'LONDON',
+  'SW': 'LONDON',
+  'W': 'LONDON',
+  'EN': 'LONDON',
+  'IG': 'LONDON',
+  'RM': 'LONDON',
+  'DA': 'LONDON',
+  'BR': 'LONDON',
+  'UB': 'LONDON',
+  'HA': 'LONDON',
+  'WD': 'LONDON',
   // Birmingham area
-  'B': 'BIRMINGHAM ROUTE',
-  'CV': 'BIRMINGHAM ROUTE',
-  'WV': 'BIRMINGHAM ROUTE',
-  'DY': 'BIRMINGHAM ROUTE',
-  'WS': 'BIRMINGHAM ROUTE',
-  'WR': 'BIRMINGHAM ROUTE',
-  'SY': 'BIRMINGHAM ROUTE',
-  'TF': 'BIRMINGHAM ROUTE',
+  'B': 'BIRMINGHAM',
+  'CV': 'BIRMINGHAM',
+  'WV': 'BIRMINGHAM',
+  'DY': 'BIRMINGHAM',
+  'WS': 'BIRMINGHAM',
+  'WR': 'BIRMINGHAM',
+  'SY': 'BIRMINGHAM',
+  'TF': 'BIRMINGHAM',
   // Manchester area
-  'M': 'MANCHESTER ROUTE',
-  'L': 'MANCHESTER ROUTE',
-  'WA': 'MANCHESTER ROUTE',
-  'OL': 'MANCHESTER ROUTE',
-  'SK': 'MANCHESTER ROUTE',
-  'ST': 'MANCHESTER ROUTE',
-  'BB': 'MANCHESTER ROUTE',
-  'PR': 'MANCHESTER ROUTE',
-  'FY': 'MANCHESTER ROUTE',
-  'BL': 'MANCHESTER ROUTE',
-  'WN': 'MANCHESTER ROUTE',
-  'CW': 'MANCHESTER ROUTE',
-  'CH': 'MANCHESTER ROUTE',
-  'LL': 'MANCHESTER ROUTE',
+  'M': 'MANCHESTER',
+  'L': 'MANCHESTER',
+  'WA': 'MANCHESTER',
+  'OL': 'MANCHESTER',
+  'SK': 'MANCHESTER',
+  'ST': 'MANCHESTER',
+  'BB': 'MANCHESTER',
+  'PR': 'MANCHESTER',
+  'FY': 'MANCHESTER',
+  'BL': 'MANCHESTER',
+  'WN': 'MANCHESTER',
+  'CW': 'MANCHESTER',
+  'CH': 'MANCHESTER',
+  'LL': 'MANCHESTER',
   // Leeds area
-  'LS': 'LEEDS ROUTE',
-  'WF': 'LEEDS ROUTE',
-  'HX': 'LEEDS ROUTE',
-  'DN': 'LEEDS ROUTE',
-  'S': 'LEEDS ROUTE',
-  'HD': 'LEEDS ROUTE',
-  'YO': 'LEEDS ROUTE',
-  'BD': 'LEEDS ROUTE',
-  'HG': 'LEEDS ROUTE',
+  'LS': 'LEEDS',
+  'WF': 'LEEDS',
+  'HX': 'LEEDS',
+  'DN': 'LEEDS',
+  'S': 'LEEDS',
+  'HD': 'LEEDS',
+  'YO': 'LEEDS',
+  'BD': 'LEEDS',
+  'HG': 'LEEDS',
   // Cardiff area
-  'CF': 'CARDIFF ROUTE',
-  'GL': 'CARDIFF ROUTE',
-  'BS': 'CARDIFF ROUTE',
-  'SN': 'CARDIFF ROUTE',
-  'BA': 'CARDIFF ROUTE',
-  'SP': 'CARDIFF ROUTE',
-  'NP': 'CARDIFF ROUTE',
-  'CP': 'CARDIFF ROUTE',
-  'SA': 'CARDIFF ROUTE',  
+  'CF': 'CARDIFF',
+  'GL': 'CARDIFF',
+  'BS': 'CARDIFF',
+  'SN': 'CARDIFF',
+  'BA': 'CARDIFF',
+  'SP': 'CARDIFF',
+  'NP': 'CARDIFF',
+  'CP': 'CARDIFF',
+  'SA': 'CARDIFF',
   // Bournemouth area
-  'SO': 'BOURNEMOUTH ROUTE',
-  'PO': 'BOURNEMOUTH ROUTE',
-  'RG': 'BOURNEMOUTH ROUTE',
-  'GU': 'BOURNEMOUTH ROUTE',
-  'BH': 'BOURNEMOUTH ROUTE',
-  'OX': 'BOURNEMOUTH ROUTE',
+  'SO': 'BOURNEMOUTH',
+  'PO': 'BOURNEMOUTH',
+  'RG': 'BOURNEMOUTH',
+  'GU': 'BOURNEMOUTH',
+  'BH': 'BOURNEMOUTH',
+  'OX': 'BOURNEMOUTH',
   // Nottingham area
-  'NG': 'NOTTINGHAM ROUTE',
-  'LE': 'NOTTINGHAM ROUTE',
-  'DE': 'NOTTINGHAM ROUTE',
-  'PE': 'NOTTINGHAM ROUTE',
-  'LN': 'NOTTINGHAM ROUTE',
+  'NG': 'NOTTINGHAM',
+  'LE': 'NOTTINGHAM',
+  'DE': 'NOTTINGHAM',
+  'PE': 'NOTTINGHAM',
+  'LN': 'NOTTINGHAM',
   // Brighton area
-  'BN': 'BRIGHTON ROUTE',
-  'RH': 'BRIGHTON ROUTE',
-  'SL': 'BRIGHTON ROUTE',
-  'TN': 'BRIGHTON ROUTE',
-  'CT': 'BRIGHTON ROUTE',
-  'CR': 'BRIGHTON ROUTE',
-  'TW': 'BRIGHTON ROUTE',
-  'KT': 'BRIGHTON ROUTE',
-  'ME': 'BRIGHTON ROUTE',
+  'BN': 'BRIGHTON',
+  'RH': 'BRIGHTON',
+  'SL': 'BRIGHTON',
+  'TN': 'BRIGHTON',
+  'CT': 'BRIGHTON',
+  'CR': 'BRIGHTON',
+  'TW': 'BRIGHTON',
+  'KT': 'BRIGHTON',
+  'ME': 'BRIGHTON',
   // Southend area
-  'NR': 'SOUTHEND ROUTE',
-  'IP': 'SOUTHEND ROUTE',
-  'CO': 'SOUTHEND ROUTE',
-  'CM': 'SOUTHEND ROUTE',
-  'CB': 'SOUTHEND ROUTE',
-  'SS': 'SOUTHEND ROUTE',
-  'SG': 'SOUTHEND ROUTE',
+  'NR': 'SOUTHEND',
+  'IP': 'SOUTHEND',
+  'CO': 'SOUTHEND',
+  'CM': 'SOUTHEND',
+  'CB': 'SOUTHEND',
+  'SS': 'SOUTHEND',
+  'SG': 'SOUTHEND',
   // Northampton area
-  'MK': 'NORTHAMPTON ROUTE',
-  'LU': 'NORTHAMPTON ROUTE',
-  'AL': 'NORTHAMPTON ROUTE',
-  'HP': 'NORTHAMPTON ROUTE',
-  'NN': 'NORTHAMPTON ROUTE'
+  'MK': 'NORTHAMPTON',
+  'LU': 'NORTHAMPTON',
+  'AL': 'NORTHAMPTON',
+  'HP': 'NORTHAMPTON',
+  'NN': 'NORTHAMPTON'
 };
 
-// Map of Ireland cities to routes
+// Map of Ireland cities to routes (Ireland doesn't use postal codes)
 export const irelandCityToRouteMap: Record<string, string> = {
   // Londonderry Route
-  'LARNE': 'LONDONDERRY ROUTE',
-  'BALLYCLARE': 'LONDONDERRY ROUTE',
-  'BALLYMENA': 'LONDONDERRY ROUTE',
-  'BALLYMONEY': 'LONDONDERRY ROUTE',
-  'KILREA': 'LONDONDERRY ROUTE',
-  'COLERAINE': 'LONDONDERRY ROUTE',
-  'LONDONDERRY': 'LONDONDERRY ROUTE',
-  'LIFFORD': 'LONDONDERRY ROUTE',
-  'OMAGH': 'LONDONDERRY ROUTE',
-  'COOKSTOWN': 'LONDONDERRY ROUTE',
-  'CARRICKFERGUS': 'LONDONDERRY ROUTE',
+  'LARNE': 'LONDONDERRY',
+  'BALLYCLARE': 'LONDONDERRY',
+  'BALLYMENA': 'LONDONDERRY',
+  'BALLYMONEY': 'LONDONDERRY',
+  'KILREA': 'LONDONDERRY',
+  'COLERAINE': 'LONDONDERRY',
+  'LONDONDERRY': 'LONDONDERRY',
+  'LIFFORD': 'LONDONDERRY',
+  'OMAGH': 'LONDONDERRY',
+  'COOKSTOWN': 'LONDONDERRY',
+  'CARRICKFERGUS': 'LONDONDERRY',
   // Belfast Route
-  'BELFAST': 'BELFAST ROUTE',
-  'BANGOR': 'BELFAST ROUTE',
-  'COMBER': 'BELFAST ROUTE',
-  'LISBURN': 'BELFAST ROUTE',
-  'NEWRY': 'BELFAST ROUTE',
-  'NEWTOWNWARDS': 'BELFAST ROUTE',
-  'DUNMURRY': 'BELFAST ROUTE',
-  'LURGAN': 'BELFAST ROUTE',
-  'PORTADOWN': 'BELFAST ROUTE',
-  'BANBRIDGE': 'BELFAST ROUTE',
-  'MOY': 'BELFAST ROUTE',
-  'DUNGANNON': 'BELFAST ROUTE',
-  'ARMAGH': 'BELFAST ROUTE',
+  'BELFAST': 'BELFAST',
+  'BANGOR': 'BELFAST',
+  'COMBER': 'BELFAST',
+  'LISBURN': 'BELFAST',
+  'NEWRY': 'BELFAST',
+  'NEWTOWNWARDS': 'BELFAST',
+  'DUNMURRY': 'BELFAST',
+  'LURGAN': 'BELFAST',
+  'PORTADOWN': 'BELFAST',
+  'BANBRIDGE': 'BELFAST',
+  'MOY': 'BELFAST',
+  'DUNGANNON': 'BELFAST',
+  'ARMAGH': 'BELFAST',
   // Cavan Route
-  'MAYNOOTH': 'CAVAN ROUTE',
-  'ASHBOURNE': 'CAVAN ROUTE',
-  'SWORDS': 'CAVAN ROUTE',
-  'SKERRIES': 'CAVAN ROUTE',
-  'DROGHEDA': 'CAVAN ROUTE',
-  'DUNDALK': 'CAVAN ROUTE',
-  'CAVAN': 'CAVAN ROUTE',
-  'VIRGINIA': 'CAVAN ROUTE',
-  'KELLS': 'CAVAN ROUTE',
-  'NAVAN': 'CAVAN ROUTE',
-  'TRIM': 'CAVAN ROUTE',
+  'MAYNOOTH': 'CAVAN',
+  'ASHBOURNE': 'CAVAN',
+  'SWORDS': 'CAVAN',
+  'SKERRIES': 'CAVAN',
+  'DROGHEDA': 'CAVAN',
+  'DUNDALK': 'CAVAN',
+  'CAVAN': 'CAVAN',
+  'VIRGINIA': 'CAVAN',
+  'KELLS': 'CAVAN',
+  'NAVAN': 'CAVAN',
+  'TRIM': 'CAVAN',
   // Athlone Route
-  'MALIGURAR': 'ATHLONE ROUTE',
-  'LONGFORD': 'ATHLONE ROUTE',
-  'ROSCOMMON': 'ATHLONE ROUTE',
-  'BOYLE': 'ATHLONE ROUTE',
-  'SLIGO': 'ATHLONE ROUTE',
-  'BALLINA': 'ATHLONE ROUTE',
-  'SWINFORD': 'ATHLONE ROUTE',
-  'CASTLEBAR': 'ATHLONE ROUTE',
-  'TUAM': 'ATHLONE ROUTE',
-  'GALWAY': 'ATHLONE ROUTE',
-  'ATHENRY': 'ATHLONE ROUTE',
-  'ATHLONE': 'ATHLONE ROUTE',
+  'MULLINGAR': 'ATHLONE',
+  'LONGFORD': 'ATHLONE',
+  'ROSCOMMON': 'ATHLONE',
+  'BOYLE': 'ATHLONE',
+  'SLIGO': 'ATHLONE',
+  'BALLINA': 'ATHLONE',
+  'SWINFORD': 'ATHLONE',
+  'CASTLEBAR': 'ATHLONE',
+  'TUAM': 'ATHLONE',
+  'GALWAY': 'ATHLONE',
+  'ATHENRY': 'ATHLONE',
+  'ATHLONE': 'ATHLONE',
   // Limerick Route
-  'NEWBRIDGE': 'LIMERICK ROUTE',
-  'PORTLAOISE': 'LIMERICK ROUTE',
-  'ROSCREA': 'LIMERICK ROUTE',
-  'LIMERICK': 'LIMERICK ROUTE',
-  'ENNIS': 'LIMERICK ROUTE',
-  'DOOLIN': 'LIMERICK ROUTE',
-  'LOUGHREA': 'LIMERICK ROUTE',
-  'BALLINASLOE': 'LIMERICK ROUTE',
-  'TULLAMORE': 'LIMERICK ROUTE',
+  'NEWBRIDGE': 'LIMERICK',
+  'PORTLAOISE': 'LIMERICK',
+  'ROSCREA': 'LIMERICK',
+  'LIMERICK': 'LIMERICK',
+  'ENNIS': 'LIMERICK',
+  'DOOLIN': 'LIMERICK',
+  'LOUGHREA': 'LIMERICK',
+  'BALLINASLOE': 'LIMERICK',
+  'TULLAMORE': 'LIMERICK',
   // Dublin City Route
-  'SANDFORD': 'DUBLIN CITY ROUTE',
-  'RIALTO': 'DUBLIN CITY ROUTE',
-  'BALLYMOUNT': 'DUBLIN CITY ROUTE',
-  'CABRA': 'DUBLIN CITY ROUTE',
-  'BEAUMONT': 'DUBLIN CITY ROUTE',
-  'MALAHIDE': 'DUBLIN CITY ROUTE',
-  'PORTMARNOCK': 'DUBLIN CITY ROUTE',
-  'DALKEY': 'DUBLIN CITY ROUTE',
-  'SHANKILL': 'DUBLIN CITY ROUTE',
-  'BRAY': 'DUBLIN CITY ROUTE',
-  'DUBLIN': 'DUBLIN CITY ROUTE',
+  'SANDYFORD': 'DUBLIN CITY',
+  'RIALTO': 'DUBLIN CITY',
+  'BALLYMOUNT': 'DUBLIN CITY',
+  'CABRA': 'DUBLIN CITY',
+  'BEAUMONT': 'DUBLIN CITY',
+  'MALAHIDE': 'DUBLIN CITY',
+  'PORTMARNOCK': 'DUBLIN CITY',
+  'DALKEY': 'DUBLIN CITY',
+  'SHANKILL': 'DUBLIN CITY',
+  'BRAY': 'DUBLIN CITY',
+  'DUBLIN': 'DUBLIN CITY',
   // Cork Route
-  'CASHEL': 'CORK ROUTE',
-  'FERMOY': 'CORK ROUTE',
-  'CORK': 'CORK ROUTE',
-  'DUNGARVAN': 'CORK ROUTE',
-  'WATERFORD': 'CORK ROUTE',
-  'NEW ROSS': 'CORK ROUTE',
-  'WEXFORD': 'CORK ROUTE',
-  'GOREY': 'CORK ROUTE',
-  'GREYSTONES': 'CORK ROUTE'
+  'CASHEL': 'CORK',
+  'FERMOY': 'CORK',
+  'CORK': 'CORK',
+  'DUNGARVAN': 'CORK',
+  'WATERFORD': 'CORK',
+  'NEW ROSS': 'CORK',
+  'WEXFORD': 'CORK',
+  'GOREY': 'CORK',
+  'GREYSTONES': 'CORK'
 };
 
 // List of Ireland cities for dropdown (grouped by route)
 export const irelandCities: { city: string; route: string }[] = [
   // Londonderry Route
-  { city: 'Larne', route: 'LONDONDERRY ROUTE' },
-  { city: 'Ballyclare', route: 'LONDONDERRY ROUTE' },
-  { city: 'Ballymena', route: 'LONDONDERRY ROUTE' },
-  { city: 'Ballymoney', route: 'LONDONDERRY ROUTE' },
-  { city: 'Kilrea', route: 'LONDONDERRY ROUTE' },
-  { city: 'Coleraine', route: 'LONDONDERRY ROUTE' },
-  { city: 'Londonderry', route: 'LONDONDERRY ROUTE' },
-  { city: 'Lifford', route: 'LONDONDERRY ROUTE' },
-  { city: 'Omagh', route: 'LONDONDERRY ROUTE' },
-  { city: 'Cookstown', route: 'LONDONDERRY ROUTE' },
-  { city: 'Carrickfergus', route: 'LONDONDERRY ROUTE' },
+  { city: 'Larne', route: 'LONDONDERRY' },
+  { city: 'Ballyclare', route: 'LONDONDERRY' },
+  { city: 'Ballymena', route: 'LONDONDERRY' },
+  { city: 'Ballymoney', route: 'LONDONDERRY' },
+  { city: 'Kilrea', route: 'LONDONDERRY' },
+  { city: 'Coleraine', route: 'LONDONDERRY' },
+  { city: 'Londonderry', route: 'LONDONDERRY' },
+  { city: 'Lifford', route: 'LONDONDERRY' },
+  { city: 'Omagh', route: 'LONDONDERRY' },
+  { city: 'Cookstown', route: 'LONDONDERRY' },
+  { city: 'Carrickfergus', route: 'LONDONDERRY' },
   // Belfast Route
-  { city: 'Belfast', route: 'BELFAST ROUTE' },
-  { city: 'Bangor', route: 'BELFAST ROUTE' },
-  { city: 'Comber', route: 'BELFAST ROUTE' },
-  { city: 'Lisburn', route: 'BELFAST ROUTE' },
-  { city: 'Newry', route: 'BELFAST ROUTE' },
-  { city: 'Newtownwards', route: 'BELFAST ROUTE' },
-  { city: 'Dunmurry', route: 'BELFAST ROUTE' },
-  { city: 'Lurgan', route: 'BELFAST ROUTE' },
-  { city: 'Portadown', route: 'BELFAST ROUTE' },
-  { city: 'Banbridge', route: 'BELFAST ROUTE' },
-  { city: 'Moy', route: 'BELFAST ROUTE' },
-  { city: 'Dungannon', route: 'BELFAST ROUTE' },
-  { city: 'Armagh', route: 'BELFAST ROUTE' },
+  { city: 'Belfast', route: 'BELFAST' },
+  { city: 'Bangor', route: 'BELFAST' },
+  { city: 'Comber', route: 'BELFAST' },
+  { city: 'Lisburn', route: 'BELFAST' },
+  { city: 'Newry', route: 'BELFAST' },
+  { city: 'Newtownwards', route: 'BELFAST' },
+  { city: 'Dunmurry', route: 'BELFAST' },
+  { city: 'Lurgan', route: 'BELFAST' },
+  { city: 'Portadown', route: 'BELFAST' },
+  { city: 'Banbridge', route: 'BELFAST' },
+  { city: 'Moy', route: 'BELFAST' },
+  { city: 'Dungannon', route: 'BELFAST' },
+  { city: 'Armagh', route: 'BELFAST' },
   // Cavan Route
-  { city: 'Maynooth', route: 'CAVAN ROUTE' },
-  { city: 'Ashbourne', route: 'CAVAN ROUTE' },
-  { city: 'Swords', route: 'CAVAN ROUTE' },
-  { city: 'Skerries', route: 'CAVAN ROUTE' },
-  { city: 'Drogheda', route: 'CAVAN ROUTE' },
-  { city: 'Dundalk', route: 'CAVAN ROUTE' },
-  { city: 'Cavan', route: 'CAVAN ROUTE' },
-  { city: 'Virginia', route: 'CAVAN ROUTE' },
-  { city: 'Kells', route: 'CAVAN ROUTE' },
-  { city: 'Navan', route: 'CAVAN ROUTE' },
-  { city: 'Trim', route: 'CAVAN ROUTE' },
+  { city: 'Maynooth', route: 'CAVAN' },
+  { city: 'Ashbourne', route: 'CAVAN' },
+  { city: 'Swords', route: 'CAVAN' },
+  { city: 'Skerries', route: 'CAVAN' },
+  { city: 'Drogheda', route: 'CAVAN' },
+  { city: 'Dundalk', route: 'CAVAN' },
+  { city: 'Cavan', route: 'CAVAN' },
+  { city: 'Virginia', route: 'CAVAN' },
+  { city: 'Kells', route: 'CAVAN' },
+  { city: 'Navan', route: 'CAVAN' },
+  { city: 'Trim', route: 'CAVAN' },
   // Athlone Route
-  { city: 'Maligurar', route: 'ATHLONE ROUTE' },
-  { city: 'Longford', route: 'ATHLONE ROUTE' },
-  { city: 'Roscommon', route: 'ATHLONE ROUTE' },
-  { city: 'Boyle', route: 'ATHLONE ROUTE' },
-  { city: 'Sligo', route: 'ATHLONE ROUTE' },
-  { city: 'Ballina', route: 'ATHLONE ROUTE' },
-  { city: 'Swinford', route: 'ATHLONE ROUTE' },
-  { city: 'Castlebar', route: 'ATHLONE ROUTE' },
-  { city: 'Tuam', route: 'ATHLONE ROUTE' },
-  { city: 'Galway', route: 'ATHLONE ROUTE' },
-  { city: 'Athenry', route: 'ATHLONE ROUTE' },
-  { city: 'Athlone', route: 'ATHLONE ROUTE' },
+  { city: 'Mullingar', route: 'ATHLONE' },
+  { city: 'Longford', route: 'ATHLONE' },
+  { city: 'Roscommon', route: 'ATHLONE' },
+  { city: 'Boyle', route: 'ATHLONE' },
+  { city: 'Sligo', route: 'ATHLONE' },
+  { city: 'Ballina', route: 'ATHLONE' },
+  { city: 'Swinford', route: 'ATHLONE' },
+  { city: 'Castlebar', route: 'ATHLONE' },
+  { city: 'Tuam', route: 'ATHLONE' },
+  { city: 'Galway', route: 'ATHLONE' },
+  { city: 'Athenry', route: 'ATHLONE' },
+  { city: 'Athlone', route: 'ATHLONE' },
   // Limerick Route
-  { city: 'Newbridge', route: 'LIMERICK ROUTE' },
-  { city: 'Portlaoise', route: 'LIMERICK ROUTE' },
-  { city: 'Roscrea', route: 'LIMERICK ROUTE' },
-  { city: 'Limerick', route: 'LIMERICK ROUTE' },
-  { city: 'Ennis', route: 'LIMERICK ROUTE' },
-  { city: 'Doolin', route: 'LIMERICK ROUTE' },
-  { city: 'Loughrea', route: 'LIMERICK ROUTE' },
-  { city: 'Ballinasloe', route: 'LIMERICK ROUTE' },
-  { city: 'Tullamore', route: 'LIMERICK ROUTE' },
+  { city: 'Newbridge', route: 'LIMERICK' },
+  { city: 'Portlaoise', route: 'LIMERICK' },
+  { city: 'Roscrea', route: 'LIMERICK' },
+  { city: 'Limerick', route: 'LIMERICK' },
+  { city: 'Ennis', route: 'LIMERICK' },
+  { city: 'Doolin', route: 'LIMERICK' },
+  { city: 'Loughrea', route: 'LIMERICK' },
+  { city: 'Ballinasloe', route: 'LIMERICK' },
+  { city: 'Tullamore', route: 'LIMERICK' },
   // Dublin City Route
-  { city: 'Sandford', route: 'DUBLIN CITY ROUTE' },
-  { city: 'Rialto', route: 'DUBLIN CITY ROUTE' },
-  { city: 'Ballymount', route: 'DUBLIN CITY ROUTE' },
-  { city: 'Cabra', route: 'DUBLIN CITY ROUTE' },
-  { city: 'Beaumont', route: 'DUBLIN CITY ROUTE' },
-  { city: 'Malahide', route: 'DUBLIN CITY ROUTE' },
-  { city: 'Portmarnock', route: 'DUBLIN CITY ROUTE' },
-  { city: 'Dalkey', route: 'DUBLIN CITY ROUTE' },
-  { city: 'Shankill', route: 'DUBLIN CITY ROUTE' },
-  { city: 'Bray', route: 'DUBLIN CITY ROUTE' },
+  { city: 'Sandyford', route: 'DUBLIN CITY' },
+  { city: 'Rialto', route: 'DUBLIN CITY' },
+  { city: 'Ballymount', route: 'DUBLIN CITY' },
+  { city: 'Cabra', route: 'DUBLIN CITY' },
+  { city: 'Beaumont', route: 'DUBLIN CITY' },
+  { city: 'Malahide', route: 'DUBLIN CITY' },
+  { city: 'Portmarnock', route: 'DUBLIN CITY' },
+  { city: 'Dalkey', route: 'DUBLIN CITY' },
+  { city: 'Shankill', route: 'DUBLIN CITY' },
+  { city: 'Bray', route: 'DUBLIN CITY' },
+  { city: 'Dublin', route: 'DUBLIN CITY' },
   // Cork Route
-  { city: 'Portlaoise', route: 'CORK ROUTE' },
-  { city: 'Cashel', route: 'CORK ROUTE' },
-  { city: 'Fermoy', route: 'CORK ROUTE' },
-  { city: 'Cork', route: 'CORK ROUTE' },
-  { city: 'Dungarvan', route: 'CORK ROUTE' },
-  { city: 'Waterford', route: 'CORK ROUTE' },
-  { city: 'New Ross', route: 'CORK ROUTE' },
-  { city: 'Wexford', route: 'CORK ROUTE' },
-  { city: 'Gorey', route: 'CORK ROUTE' },
-  { city: 'Greystones', route: 'CORK ROUTE' },
+  { city: 'Cashel', route: 'CORK' },
+  { city: 'Fermoy', route: 'CORK' },
+  { city: 'Cork', route: 'CORK' },
+  { city: 'Dungarvan', route: 'CORK' },
+  { city: 'Waterford', route: 'CORK' },
+  { city: 'New Ross', route: 'CORK' },
+  { city: 'Wexford', route: 'CORK' },
+  { city: 'Gorey', route: 'CORK' },
+  { city: 'Greystones', route: 'CORK' },
 ];
 
-// List of restricted postal codes
+// List of restricted postal codes (areas we don't service)
 export const restrictedPostalCodes: string[] = [
-  'EX', 'TQ', 'DT', 'LD', 'HR', 'IP', 'NR', 'HU',
+  'EX', 'TQ', 'DT', 'LD', 'HR', 'HU',
   'TS', 'DL', 'SR', 'CA', 'NE', 'TD', 'EH', 'ML',
   'KA', 'DG', 'G', 'DH', 'KY', 'PA', 'IV', 'AB', 'DD'
 ];
 
+/**
+ * Fetch routes from database and cache them
+ */
+export const fetchRoutesFromDatabase = async (): Promise<void> => {
+  const now = Date.now();
+
+  // Return cached data if still valid
+  if (cachedUKRoutes.length > 0 && (now - cacheTimestamp) < CACHE_DURATION) {
+    return;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('collection_schedules')
+      .select('*')
+      .order('route', { ascending: true });
+
+    if (error) throw error;
+
+    // Process UK routes (England)
+    cachedUKRoutes = [];
+    cachedIrelandRoutes = [];
+
+    (data || []).forEach((schedule: any) => {
+      const route = schedule.route;
+      const pickupDate = schedule.pickup_date || 'Not set';
+      const country = schedule.country || 'England';
+
+      if (country === 'England') {
+        // Extract postcodes from areas (stored as "Postcodes: SW1, SW2, ...")
+        const postcodesEntry = schedule.areas.find((a: string) => a.startsWith('Postcodes:'));
+        if (postcodesEntry) {
+          const postcodes = postcodesEntry.replace('Postcodes: ', '').split(',').map((p: string) => p.trim());
+          postcodes.forEach((postcode: string) => {
+            if (postcode) {
+              cachedUKRoutes.push({
+                postcodePrefix: postcode.toUpperCase(),
+                route: route,
+                pickupDate: pickupDate
+              });
+            }
+          });
+        }
+      } else if (country === 'Ireland') {
+        // Extract cities from areas (excluding postcodes entries)
+        const cities = schedule.areas.filter((a: string) => !a.startsWith('Postcodes:'));
+        cities.forEach((city: string) => {
+          cachedIrelandRoutes.push({
+            city: city.toUpperCase(),
+            route: route,
+            pickupDate: pickupDate
+          });
+        });
+      }
+    });
+
+    cacheTimestamp = now;
+    console.log('Routes loaded from database:', {
+      ukRoutes: cachedUKRoutes.length,
+      irelandRoutes: cachedIrelandRoutes.length
+    });
+  } catch (error) {
+    console.error('Error fetching routes from database:', error);
+  }
+};
+
+/**
+ * Clear the route cache (call when routes are updated in admin)
+ */
+export const clearRouteCache = (): void => {
+  cachedUKRoutes = [];
+  cachedIrelandRoutes = [];
+  cacheTimestamp = 0;
+};
+
+/**
+ * Get Ireland cities from database (with fallback to hardcoded list)
+ */
+export const getIrelandCitiesFromDatabase = async (): Promise<{ city: string; route: string }[]> => {
+  await fetchRoutesFromDatabase();
+
+  if (cachedIrelandRoutes.length > 0) {
+    // Convert cached routes to city list format
+    return cachedIrelandRoutes.map(r => ({
+      city: r.city.charAt(0) + r.city.slice(1).toLowerCase(),
+      route: r.route
+    }));
+  }
+
+  // Fallback to hardcoded list
+  return irelandCities;
+};
+
 // Check if a postal code matches the required format (starts with 1-2 letters followed by numbers)
 export const isValidUKPostcode = (postcode: string): boolean => {
-  // Updated UK postcode validation: 
-  // Should start with 1-2 letters, or 1 letter followed by 1 number
   const regex = /^[A-Z]{1,2}[0-9]/i;
   return regex.test(postcode.trim());
 };
 
 // Format a postcode to standard UK format
 export const formatUKPostcode = (postcode: string): string => {
-  // Remove all non-alphanumeric characters and convert to uppercase
   const cleanPostcode = postcode.replace(/[^a-z0-9]/gi, '').toUpperCase();
   return cleanPostcode;
 };
@@ -304,46 +403,128 @@ export const formatUKPostcode = (postcode: string): string => {
 // Get the outward part of the postcode (the first part)
 export const getOutwardPostcode = (postcode: string): string => {
   const cleanPostcode = formatUKPostcode(postcode);
-  // The outward code is everything before the last 3 characters
   return cleanPostcode.slice(0, -3);
 };
 
 // Get the inward part of the postcode (the last part)
 export const getInwardPostcode = (postcode: string): string => {
   const cleanPostcode = formatUKPostcode(postcode);
-  // The inward code is the last 3 characters
   return cleanPostcode.slice(-3);
 };
 
-// Determine the route for a UK postal code
+/**
+ * Determine the route for a UK postal code
+ * First checks database cache, then falls back to hardcoded map
+ */
 export const getRouteForPostalCode = (postalCode: string): string | null => {
   if (!postalCode) return null;
-  
+
   // Format and clean the postal code
   const formattedCode = formatUKPostcode(postalCode);
-  
+
   // Check if it's a restricted postal code
   for (const restrictedCode of restrictedPostalCodes) {
     if (formattedCode.startsWith(restrictedCode)) {
       return null;
     }
   }
-  
+
   // Extract the prefix (first 1-2 letters)
-  const prefix = formattedCode.match(/^[A-Z]{1,2}/i);
-  if (!prefix) return null;
-  
-  // Look up the route based on the prefix
-  return postalCodeToRouteMap[prefix[0]] || null;
+  const prefixMatch = formattedCode.match(/^[A-Z]{1,2}/i);
+  if (!prefixMatch) return null;
+
+  const prefix = prefixMatch[0].toUpperCase();
+
+  // First, check database cache for exact match
+  if (cachedUKRoutes.length > 0) {
+    // Try to find exact prefix match first (e.g., "SW1" before "SW")
+    const exactMatch = cachedUKRoutes.find(r =>
+      formattedCode.startsWith(r.postcodePrefix)
+    );
+    if (exactMatch) return exactMatch.route;
+
+    // Try prefix match
+    const prefixMatches = cachedUKRoutes.filter(r =>
+      prefix === r.postcodePrefix || r.postcodePrefix.startsWith(prefix) || prefix.startsWith(r.postcodePrefix)
+    );
+    if (prefixMatches.length > 0) {
+      // Return the most specific match
+      const sorted = prefixMatches.sort((a, b) => b.postcodePrefix.length - a.postcodePrefix.length);
+      return sorted[0].route;
+    }
+  }
+
+  // Fallback to hardcoded map
+  return postalCodeToRouteMap[prefix] || null;
 };
 
-// Determine the route for an Ireland city
+/**
+ * Determine the route for an Ireland city
+ * First checks database cache, then falls back to hardcoded map
+ */
 export const getIrelandRouteForCity = (city: string): string | null => {
   if (!city) return null;
-  
+
   // Clean and format city name
   const formattedCity = city.trim().toUpperCase();
-  
-  // Look up the route based on the city
+
+  // First, check database cache
+  if (cachedIrelandRoutes.length > 0) {
+    const match = cachedIrelandRoutes.find(r =>
+      r.city === formattedCity || r.city.includes(formattedCity) || formattedCity.includes(r.city)
+    );
+    if (match) return match.route;
+  }
+
+  // Fallback to hardcoded map
   return irelandCityToRouteMap[formattedCity] || null;
+};
+
+/**
+ * Get the pickup date for a route
+ */
+export const getPickupDateForRoute = async (routeName: string, isIreland: boolean): Promise<string | null> => {
+  await fetchRoutesFromDatabase();
+
+  const routes = isIreland ? cachedIrelandRoutes : cachedUKRoutes;
+  const match = routes.find(r => r.route === routeName || r.route === routeName.replace(' ROUTE', ''));
+
+  if (match && match.pickupDate !== 'Not set') {
+    return match.pickupDate;
+  }
+
+  // Fallback: fetch directly from database
+  try {
+    const { data, error } = await supabase
+      .from('collection_schedules')
+      .select('pickup_date')
+      .eq('route', routeName)
+      .single();
+
+    if (!error && data) {
+      return data.pickup_date;
+    }
+
+    // Try without " ROUTE" suffix
+    const { data: data2, error: error2 } = await supabase
+      .from('collection_schedules')
+      .select('pickup_date')
+      .eq('route', routeName.replace(' ROUTE', ''))
+      .single();
+
+    if (!error2 && data2) {
+      return data2.pickup_date;
+    }
+  } catch (error) {
+    console.error('Error fetching pickup date:', error);
+  }
+
+  return null;
+};
+
+/**
+ * Initialize route cache (call on app startup or when booking form loads)
+ */
+export const initializeRouteCache = async (): Promise<void> => {
+  await fetchRoutesFromDatabase();
 };
