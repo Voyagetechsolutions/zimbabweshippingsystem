@@ -74,8 +74,7 @@ const HeroSection: React.FC = () => {
 
           {/* Main headline */}
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 leading-tight drop-shadow-lg">
-            Ship to Zimbabwe from{' '}
-            <span className="text-zim-green">£240</span>/drum
+            Ship to <span className="text-zim-green">Zimbabwe</span> with Confidence
           </h1>
 
           {/* Subheadline */}
