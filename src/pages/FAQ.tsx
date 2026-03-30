@@ -230,8 +230,19 @@ const FAQ = () => {
   return (
     <>
       <Helmet>
-        <title>FAQ | Zimbabwe Shipping - UK & Ireland to Zimbabwe</title>
-        <meta name="description" content="Frequently asked questions about shipping from UK and Ireland to Zimbabwe. Learn about pricing, collection, tracking, customs, and more." />
+        <title>FAQ | Zimbabwe Shipping - Questions Answered</title>
+        <meta name="description" content="Frequently asked questions about shipping from UK and Ireland to Zimbabwe. Learn about drums, trunks, collection, tracking, customs, and delivery." />
+        <meta name="keywords" content="Zimbabwe shipping FAQ, drum shipping questions, trunk shipping Ireland, Zimbabwe delivery questions, shipping customs Zimbabwe" />
+
+        {/* Open Graph */}
+        <meta property="og:title" content="FAQ | Zimbabwe Shipping" />
+        <meta property="og:description" content="Get answers to common questions about shipping from UK & Ireland to Zimbabwe." />
+        <meta property="og:type" content="website" />
+
+        {/* Twitter Card */}
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="FAQ | Zimbabwe Shipping" />
+        <meta name="twitter:description" content="Get answers to common questions about shipping from UK & Ireland to Zimbabwe." />
       </Helmet>
 
       <Navbar />

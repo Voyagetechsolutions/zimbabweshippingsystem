@@ -14,8 +14,19 @@ const AboutUs = () => {
         <title>About Us | Zimbabwe Shipping - Family Business Since 2011</title>
         <meta
           name="description"
-          content="Zimbabwe Shipping Services - a family-run business since 2011. We ship to all cities in Zimbabwe with our own trucks. Free UK collection, door-to-door delivery."
+          content="Zimbabwe Shipping Services - a family-run business since 2011. We ship to all cities in Zimbabwe from UK & Ireland. Free collection, door-to-door delivery."
         />
+        <meta name="keywords" content="Zimbabwe Shipping about us, family shipping business, UK to Zimbabwe, Ireland to Zimbabwe, trusted Zimbabwe courier" />
+
+        {/* Open Graph */}
+        <meta property="og:title" content="About Us | Zimbabwe Shipping" />
+        <meta property="og:description" content="Family-run shipping service since 2011. Ship from UK & Ireland to all cities in Zimbabwe." />
+        <meta property="og:type" content="website" />
+
+        {/* Twitter Card */}
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="About Us | Zimbabwe Shipping" />
+        <meta name="twitter:description" content="Family-run shipping service since 2011. Ship from UK & Ireland to all cities in Zimbabwe." />
       </Helmet>
 
       <Navbar />

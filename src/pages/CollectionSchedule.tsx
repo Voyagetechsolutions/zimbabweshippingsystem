@@ -79,8 +79,19 @@ const CollectionSchedule = () => {
   return (
     <>
       <Helmet>
-        <title>Collection Schedule | Zimbabwe Shipping - UK Pickup Dates</title>
-        <meta name="description" content="View our UK collection schedule for Zimbabwe shipping. Free pickup from anywhere in the UK. Check dates for your area." />
+        <title>Collection Schedule | Zimbabwe Shipping - UK & Ireland Pickup Dates</title>
+        <meta name="description" content="View our collection schedule for Zimbabwe shipping. Free pickup from anywhere in UK & Ireland. Check dates for your area and book your slot." />
+        <meta name="keywords" content="Zimbabwe shipping collection, UK pickup schedule, Ireland collection dates, free shipping pickup, Zimbabwe drum collection" />
+
+        {/* Open Graph */}
+        <meta property="og:title" content="Collection Schedule | Zimbabwe Shipping" />
+        <meta property="og:description" content="Free collection from UK & Ireland. Check dates for your area." />
+        <meta property="og:type" content="website" />
+
+        {/* Twitter Card */}
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="Collection Schedule | Zimbabwe Shipping" />
+        <meta name="twitter:description" content="Free collection from UK & Ireland. Check dates for your area." />
       </Helmet>
 
       <Navbar />

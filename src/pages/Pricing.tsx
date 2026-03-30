@@ -11,8 +11,19 @@ const Pricing = () => {
   return (
     <>
       <Helmet>
-        <title>Pricing | Zimbabwe Shipping - Drums from £240</title>
-        <meta name="description" content="Transparent pricing for UK to Zimbabwe shipping. Drums from £240 with cash discount. Volume discounts available. Free UK collection included." />
+        <title>Pricing | Zimbabwe Shipping - UK & Ireland Rates</title>
+        <meta name="description" content="Transparent pricing for UK & Ireland to Zimbabwe shipping. Drums and trunks with volume discounts. Free collection included. No hidden fees." />
+        <meta name="keywords" content="Zimbabwe shipping prices, drum shipping cost, trunk shipping Ireland, UK to Zimbabwe rates, Ireland to Zimbabwe pricing" />
+
+        {/* Open Graph */}
+        <meta property="og:title" content="Pricing | Zimbabwe Shipping" />
+        <meta property="og:description" content="Transparent pricing for UK & Ireland to Zimbabwe shipping. Volume discounts available." />
+        <meta property="og:type" content="website" />
+
+        {/* Twitter Card */}
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="Pricing | Zimbabwe Shipping" />
+        <meta name="twitter:description" content="Transparent pricing for UK & Ireland to Zimbabwe shipping. Volume discounts available." />
       </Helmet>
 
       <Navbar />

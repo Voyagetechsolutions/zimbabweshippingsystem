@@ -114,8 +114,19 @@ const Track = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <Helmet>
-        <title>Track Your Shipment | Zimbabwe Shipping</title>
-        <meta name="description" content="Track your shipment from the UK to Zimbabwe. Enter your tracking number to get real-time updates on your package status." />
+        <title>Track Your Shipment | Zimbabwe Shipping - Real-Time Updates</title>
+        <meta name="description" content="Track your shipment from UK or Ireland to Zimbabwe. Enter your tracking number for real-time updates on your package status and delivery." />
+        <meta name="keywords" content="track Zimbabwe shipment, shipping tracking, Zimbabwe delivery tracking, parcel tracking Zimbabwe" />
+
+        {/* Open Graph */}
+        <meta property="og:title" content="Track Your Shipment | Zimbabwe Shipping" />
+        <meta property="og:description" content="Track your shipment from UK or Ireland to Zimbabwe with real-time updates." />
+        <meta property="og:type" content="website" />
+
+        {/* Twitter Card */}
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="Track Your Shipment | Zimbabwe Shipping" />
+        <meta name="twitter:description" content="Track your shipment from UK or Ireland to Zimbabwe with real-time updates." />
       </Helmet>
 
       <Navbar />

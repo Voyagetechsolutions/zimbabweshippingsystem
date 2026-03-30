@@ -11,7 +11,18 @@ const Contact = () => {
     <>
       <Helmet>
         <title>Contact Us | Zimbabwe Shipping - Get in Touch</title>
-        <meta name="description" content="Contact Zimbabwe Shipping for quotes, bookings, or support. Call +44 7584 100552 or email info@zimbabweshipping.com. WhatsApp available." />
+        <meta name="description" content="Contact Zimbabwe Shipping for quotes, bookings, or support. Serving UK & Ireland. Call +44 7584 100552 or WhatsApp us. Fast response guaranteed." />
+        <meta name="keywords" content="contact Zimbabwe Shipping, Zimbabwe shipping phone, shipping support UK Ireland, WhatsApp Zimbabwe shipping" />
+
+        {/* Open Graph */}
+        <meta property="og:title" content="Contact Us | Zimbabwe Shipping" />
+        <meta property="og:description" content="Get in touch for quotes, bookings, or support. Serving UK & Ireland." />
+        <meta property="og:type" content="website" />
+
+        {/* Twitter Card */}
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="Contact Us | Zimbabwe Shipping" />
+        <meta name="twitter:description" content="Get in touch for quotes, bookings, or support. Serving UK & Ireland." />
       </Helmet>
 
       <Navbar />
