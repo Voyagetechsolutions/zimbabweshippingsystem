@@ -43,7 +43,7 @@ const PricingSection = () => {
         </div>
 
         <div className="max-w-6xl mx-auto">
-          <div className={`grid gap-8 ${selectedRegion === 'ireland' ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+          <div className="grid gap-8 md:grid-cols-3">
             {/* Drum Shipping Card */}
             <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl overflow-hidden border-2 border-zim-green">
               <div className="bg-zim-green px-6 py-4">
@@ -159,90 +159,88 @@ const PricingSection = () => {
               </div>
             </div>
 
-            {/* Trunk/Storage Box Card - Ireland Only */}
-            {selectedRegion === 'ireland' && (
-              <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl overflow-hidden border-2 border-purple-500">
-                <div className="bg-purple-600 px-6 py-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Box className="h-6 w-6 text-white" />
-                      <h3 className="text-xl font-bold text-white">Trunks / Storage Boxes</h3>
+            {/* Trunk/Storage Box Card - Ireland Exclusive */}
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl overflow-hidden border-2 border-purple-500">
+              <div className="bg-purple-600 px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Box className="h-6 w-6 text-white" />
+                    <h3 className="text-xl font-bold text-white">Trunks / Storage Boxes</h3>
+                  </div>
+                  <span className="bg-white/20 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                    Ireland Exclusive
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-6">
+                <p className="text-gray-600 dark:text-gray-400 mb-6">
+                  Perfect for clothes, household items, and personal belongings. Secure and affordable.
+                </p>
+
+                {/* Pricing tiers */}
+                <div className="space-y-4 mb-6">
+                  <div className="flex justify-between items-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                    <div>
+                      <span className="font-semibold text-gray-900 dark:text-white">5+ trunks</span>
+                      <span className="text-sm text-gray-500 ml-2">Best value</span>
                     </div>
-                    <span className="bg-white/20 text-white text-xs font-semibold px-3 py-1 rounded-full">
-                      Ireland Only
+                    <span className="text-2xl font-bold text-purple-600">
+                      {trunkPrices.fivePlus}
+                      <span className="text-sm font-normal text-gray-500">/each</span>
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <span className="font-semibold text-gray-900 dark:text-white">2-4 trunks</span>
+                    <span className="text-2xl font-bold text-gray-700 dark:text-gray-300">
+                      {trunkPrices.twoToFour}
+                      <span className="text-sm font-normal text-gray-500">/each</span>
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <span className="font-semibold text-gray-900 dark:text-white">1 trunk</span>
+                    <span className="text-2xl font-bold text-gray-700 dark:text-gray-300">
+                      {trunkPrices.one}
                     </span>
                   </div>
                 </div>
 
-                <div className="p-6">
-                  <p className="text-gray-600 dark:text-gray-400 mb-6">
-                    Perfect for clothes, household items, and personal belongings. Secure and affordable.
-                  </p>
-
-                  {/* Pricing tiers */}
-                  <div className="space-y-4 mb-6">
-                    <div className="flex justify-between items-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                      <div>
-                        <span className="font-semibold text-gray-900 dark:text-white">5+ trunks</span>
-                        <span className="text-sm text-gray-500 ml-2">Best value</span>
-                      </div>
-                      <span className="text-2xl font-bold text-purple-600">
-                        {trunkPrices.fivePlus}
-                        <span className="text-sm font-normal text-gray-500">/each</span>
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      <span className="font-semibold text-gray-900 dark:text-white">2-4 trunks</span>
-                      <span className="text-2xl font-bold text-gray-700 dark:text-gray-300">
-                        {trunkPrices.twoToFour}
-                        <span className="text-sm font-normal text-gray-500">/each</span>
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      <span className="font-semibold text-gray-900 dark:text-white">1 trunk</span>
-                      <span className="text-2xl font-bold text-gray-700 dark:text-gray-300">
-                        {trunkPrices.one}
-                      </span>
-                    </div>
+                {/* Optional add-on */}
+                <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg mb-6">
+                  <div>
+                    <span className="font-medium text-gray-700 dark:text-gray-300">Metal Coded Seal</span>
+                    <span className="text-gray-500 ml-1">(optional)</span>
+                    <span className="ml-2 font-semibold text-purple-600">+€7/trunk</span>
                   </div>
-
-                  {/* Optional add-on */}
-                  <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg mb-6">
-                    <div>
-                      <span className="font-medium text-gray-700 dark:text-gray-300">Metal Coded Seal</span>
-                      <span className="text-gray-500 ml-1">(optional)</span>
-                      <span className="ml-2 font-semibold text-purple-600">+€7/trunk</span>
-                    </div>
-                  </div>
-
-                  {/* What's included */}
-                  <div className="space-y-3 mb-6">
-                    <div className="flex items-center gap-3">
-                      <Check className="h-5 w-5 text-purple-500 flex-shrink-0" />
-                      <span className="text-gray-600 dark:text-gray-400">Free Ireland collection</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Check className="h-5 w-5 text-purple-500 flex-shrink-0" />
-                      <span className="text-gray-600 dark:text-gray-400">Insurance included</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Check className="h-5 w-5 text-purple-500 flex-shrink-0" />
-                      <span className="text-gray-600 dark:text-gray-400">Full tracking</span>
-                    </div>
-                  </div>
-
-                  <Button
-                    className="w-full text-lg py-6 h-auto bg-purple-600 hover:bg-purple-700"
-                    onClick={() => navigate('/book')}
-                  >
-                    Book Trunk Shipping
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
                 </div>
+
+                {/* What's included */}
+                <div className="space-y-3 mb-6">
+                  <div className="flex items-center gap-3">
+                    <Check className="h-5 w-5 text-purple-500 flex-shrink-0" />
+                    <span className="text-gray-600 dark:text-gray-400">Free Ireland collection</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Check className="h-5 w-5 text-purple-500 flex-shrink-0" />
+                    <span className="text-gray-600 dark:text-gray-400">Insurance included</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Check className="h-5 w-5 text-purple-500 flex-shrink-0" />
+                    <span className="text-gray-600 dark:text-gray-400">Full tracking</span>
+                  </div>
+                </div>
+
+                <Button
+                  className="w-full text-lg py-6 h-auto bg-purple-600 hover:bg-purple-700"
+                  onClick={() => navigate('/book')}
+                >
+                  Book Trunk Shipping
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
               </div>
-            )}
+            </div>
 
             {/* Other Items Card */}
             <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl overflow-hidden border-2 border-gray-200 dark:border-gray-700">

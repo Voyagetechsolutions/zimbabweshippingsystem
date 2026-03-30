@@ -79,8 +79,22 @@ const Services = () => {
   return (
     <>
       <Helmet>
-        <title>Services | Zimbabwe Shipping - UK & Ireland to Zimbabwe</title>
-        <meta name="description" content="UK & Ireland to Zimbabwe shipping services: drum shipping from £240/€340, furniture, appliances, commercial goods. Free collection, door-to-door delivery." />
+        <title>Services | Zimbabwe Shipping - Ship from UK & Ireland</title>
+        <meta
+          name="description"
+          content="Zimbabwe shipping services from UK & Ireland. Drum shipping, trunk shipping (Ireland exclusive), furniture, appliances. Free collection, door-to-door delivery, fully tracked."
+        />
+        <meta name="keywords" content="Zimbabwe shipping services, drum shipping, trunk shipping Ireland, UK to Zimbabwe, Ireland to Zimbabwe, furniture shipping, commercial shipping Zimbabwe" />
+
+        {/* Open Graph */}
+        <meta property="og:title" content="Services | Zimbabwe Shipping" />
+        <meta property="og:description" content="Shipping services from UK & Ireland to Zimbabwe. Drums, trunks, furniture, appliances. Free collection, door-to-door delivery." />
+        <meta property="og:type" content="website" />
+
+        {/* Twitter Card */}
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="Services | Zimbabwe Shipping" />
+        <meta name="twitter:description" content="Shipping services from UK & Ireland to Zimbabwe. Drums, trunks, furniture. Free collection." />
       </Helmet>
 
       <Navbar />
