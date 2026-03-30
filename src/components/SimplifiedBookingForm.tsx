@@ -37,6 +37,10 @@ interface FormData {
   includeBoxes: boolean;
   boxesDescription: string;
 
+  // Trunks/Storage Boxes (Ireland only)
+  includeTrunks: boolean;
+  trunkQuantity: number;
+
   // Add-ons
   wantMetalSeal: boolean;
 
@@ -60,10 +64,29 @@ interface PaymentInstallment {
   paid: boolean;
 }
 
+// UK drum prices (GBP)
 const getDrumPrice = (quantity: number): number => {
   if (quantity >= 5) return 260;
   if (quantity >= 2) return 270;
   return 280;
+};
+
+// Ireland drum prices (EUR)
+const getIrelandDrumPrice = (quantity: number): number => {
+  if (quantity >= 5) return 340;
+  if (quantity >= 2) return 350;
+  return 360;
+};
+
+// Ireland trunk/storage box prices (EUR)
+const getTrunkPrice = (quantity: number): number => {
+  if (quantity >= 2) return 200;
+  return 220;
+};
+
+// Metal seal prices
+const getMetalSealPrice = (country: string): number => {
+  return country === 'Ireland' || country === 'Northern Ireland' ? 7 : 5;
 };
 
 // Payment Schedule Builder Component
@@ -71,13 +94,16 @@ interface PaymentScheduleBuilderProps {
   totalAmount: number;
   schedule: PaymentInstallment[];
   onScheduleChange: (schedule: PaymentInstallment[]) => void;
+  currencySymbol?: string;
 }
 
 const PaymentScheduleBuilder: React.FC<PaymentScheduleBuilderProps> = ({
   totalAmount,
   schedule,
-  onScheduleChange
+  onScheduleChange,
+  currencySymbol = '£'
 }) => {
+  const cs = currencySymbol;
   const today = startOfDay(new Date());
   const maxDate = addDays(today, 30);
   
@@ -135,9 +161,9 @@ const PaymentScheduleBuilder: React.FC<PaymentScheduleBuilderProps> = ({
       {/* Progress Bar */}
       <div className="space-y-1">
         <div className="flex justify-between text-xs">
-          <span>Scheduled: £{scheduledTotal.toFixed(2)}</span>
+          <span>Scheduled: {cs}{scheduledTotal.toFixed(2)}</span>
           <span className={remainingAmount > 0.01 ? 'text-orange-600' : 'text-green-600'}>
-            {remainingAmount > 0.01 ? `Remaining: £${remainingAmount.toFixed(2)}` : '✓ Fully scheduled'}
+            {remainingAmount > 0.01 ? `Remaining: ${cs}${remainingAmount.toFixed(2)}` : '✓ Fully scheduled'}
           </span>
         </div>
         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
@@ -160,7 +186,7 @@ const PaymentScheduleBuilder: React.FC<PaymentScheduleBuilderProps> = ({
             
             <div className="flex-1 grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Amount (£)</label>
+                <label className="text-xs text-gray-500 mb-1 block">Amount ({cs})</label>
                 <Input
                   type="number"
                   min="1"
@@ -257,7 +283,7 @@ const PaymentScheduleBuilder: React.FC<PaymentScheduleBuilderProps> = ({
           <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
           <div className="text-orange-700 dark:text-orange-300">
             {Math.abs(scheduledTotal - totalAmount) > 0.01 && (
-              <p>Total scheduled (£{scheduledTotal.toFixed(2)}) must equal bill amount (£{totalAmount.toFixed(2)})</p>
+              <p>Total scheduled ({cs}{scheduledTotal.toFixed(2)}) must equal bill amount ({cs}{totalAmount.toFixed(2)})</p>
             )}
           </div>
         </div>
@@ -307,6 +333,8 @@ export const SimplifiedBookingForm = () => {
     drumQuantity: 0,
     includeBoxes: false,
     boxesDescription: '',
+    includeTrunks: false,
+    trunkQuantity: 0,
     wantMetalSeal: false,
     purchaseDrums: false,
     purchaseDrumType: null,
@@ -461,7 +489,7 @@ export const SimplifiedBookingForm = () => {
         return true;
       
       case 3:
-        if (!formData.includeDrums && !formData.includeBoxes) {
+        if (!formData.includeDrums && !formData.includeBoxes && !formData.includeTrunks) {
           toast({
             title: 'Select Items',
             description: 'Please select at least one type of shipment.',
@@ -473,6 +501,14 @@ export const SimplifiedBookingForm = () => {
           toast({
             title: 'Drum Quantity',
             description: 'Please enter how many drums you want to ship.',
+            variant: 'destructive',
+          });
+          return false;
+        }
+        if (formData.includeTrunks && formData.trunkQuantity < 1) {
+          toast({
+            title: 'Trunk Quantity',
+            description: 'Please enter how many trunks/storage boxes you want to ship.',
             variant: 'destructive',
           });
           return false;
@@ -494,15 +530,35 @@ export const SimplifiedBookingForm = () => {
     setCurrentStep(prev => Math.max(prev - 1, 1));
   };
 
+  const isIrelandBooking = formData.pickupCountry === 'Ireland' || formData.pickupCountry === 'Northern Ireland';
+  const currencySymbol = isIrelandBooking ? '€' : '£';
+
   const calculateBaseTotal = () => {
     let total = 0;
-    if (formData.includeDrums && formData.drumQuantity > 0) {
-      const drumPrice = getDrumPrice(formData.drumQuantity);
-      total = formData.drumQuantity * drumPrice;
 
-      // Add metal seal cost
+    // Drums pricing (different for UK vs Ireland)
+    if (formData.includeDrums && formData.drumQuantity > 0) {
+      const drumPrice = isIrelandBooking
+        ? getIrelandDrumPrice(formData.drumQuantity)
+        : getDrumPrice(formData.drumQuantity);
+      total += formData.drumQuantity * drumPrice;
+    }
+
+    // Metal seal cost (different for UK vs Ireland)
+    if (formData.wantMetalSeal && formData.includeDrums && formData.drumQuantity > 0) {
+      const sealPrice = getMetalSealPrice(formData.pickupCountry);
+      total += formData.drumQuantity * sealPrice;
+    }
+
+    // Trunks/Storage boxes (Ireland only)
+    if (formData.includeTrunks && formData.trunkQuantity > 0) {
+      const trunkPrice = getTrunkPrice(formData.trunkQuantity);
+      total += formData.trunkQuantity * trunkPrice;
+
+      // Metal seal for trunks (if selected)
       if (formData.wantMetalSeal) {
-        total += formData.drumQuantity * 5;
+        const sealPrice = getMetalSealPrice(formData.pickupCountry);
+        total += formData.trunkQuantity * sealPrice;
       }
     }
 
@@ -517,15 +573,21 @@ export const SimplifiedBookingForm = () => {
 
   const calculateFinalTotal = () => {
     const baseTotal = calculateBaseTotal();
-    
+
     // Apply payment method adjustments
     if (formData.paymentMethod === 'cashOnCollection' && formData.includeDrums) {
-      return baseTotal - (formData.drumQuantity * 20); // £20 discount per drum
+      // Cash discount: £20/drum for UK, €20/drum for Ireland
+      return baseTotal - (formData.drumQuantity * 20);
     }
     if (formData.paymentMethod === 'payOnArrival') {
       return baseTotal * 1.20; // 20% premium
     }
     return baseTotal;
+  };
+
+  // Helper to get drum price based on country
+  const getCurrentDrumPrice = (quantity: number) => {
+    return isIrelandBooking ? getIrelandDrumPrice(quantity) : getDrumPrice(quantity);
   };
 
   const handleSubmit = async () => {
@@ -544,6 +606,7 @@ export const SimplifiedBookingForm = () => {
       if (formData.wantMetalSeal) notes.push('Metal Coded Seal requested');
       if (formData.paymentMethod === 'cashOnCollection') notes.push('Cash payment (discount applied)');
       if (formData.includeBoxes) notes.push(`Boxes & Other Items: ${formData.boxesDescription}`);
+      if (formData.includeTrunks && formData.trunkQuantity > 0) notes.push(`${formData.trunkQuantity} x Trunk/Storage Box`);
       if (formData.purchaseDrums && formData.purchaseDrumType && formData.purchaseDrumQuantity > 0) {
         notes.push(`Purchase ${formData.purchaseDrumQuantity} x ${formData.purchaseDrumType === 'metal' ? 'Metal Drum (£40)' : 'Plastic Barrel (£50)'}`);
       }
@@ -572,14 +635,22 @@ export const SimplifiedBookingForm = () => {
         items: {
           drums: formData.includeDrums ? {
             quantity: formData.drumQuantity,
-            pricePerDrum: getDrumPrice(formData.drumQuantity),
-            totalPrice: formData.drumQuantity * getDrumPrice(formData.drumQuantity)
+            pricePerDrum: getCurrentDrumPrice(formData.drumQuantity),
+            totalPrice: formData.drumQuantity * getCurrentDrumPrice(formData.drumQuantity),
+            currency: isIrelandBooking ? 'EUR' : 'GBP'
+          } : null,
+          trunks: formData.includeTrunks ? {
+            quantity: formData.trunkQuantity,
+            pricePerTrunk: getTrunkPrice(formData.trunkQuantity),
+            totalPrice: formData.trunkQuantity * getTrunkPrice(formData.trunkQuantity),
+            currency: 'EUR'
           } : null,
           boxes: formData.includeBoxes ? {
             description: formData.boxesDescription
           } : null,
           addOns: {
-            metalSeal: formData.wantMetalSeal
+            metalSeal: formData.wantMetalSeal,
+            metalSealPrice: getMetalSealPrice(formData.pickupCountry)
           },
           purchasedDrums: formData.purchaseDrums ? {
             type: formData.purchaseDrumType,
@@ -591,7 +662,8 @@ export const SimplifiedBookingForm = () => {
         pricing: {
           baseAmount: calculateBaseTotal(),
           finalAmount: finalAmount,
-          paymentMethod: formData.paymentMethod
+          paymentMethod: formData.paymentMethod,
+          currency: isIrelandBooking ? 'EUR' : 'GBP'
         },
         collection: {
           route: collectionRoute,
@@ -610,11 +682,17 @@ export const SimplifiedBookingForm = () => {
           remainingBalance: finalAmount
         } : null,
         shipmentDetails: {
-          type: formData.includeDrums && formData.includeBoxes ? 'Drums + Boxes' :
-                formData.includeDrums ? 'Drums' :
-                formData.includeBoxes ? 'Boxes/Items' : 'Standard',
+          type: (() => {
+            const types = [];
+            if (formData.includeDrums) types.push('Drums');
+            if (formData.includeTrunks) types.push('Trunks');
+            if (formData.includeBoxes) types.push('Boxes/Items');
+            return types.length > 0 ? types.join(' + ') : 'Standard';
+          })(),
           includeDrums: formData.includeDrums,
-          quantity: formData.drumQuantity,
+          drumQuantity: formData.drumQuantity,
+          includeTrunks: formData.includeTrunks,
+          trunkQuantity: formData.trunkQuantity,
           includeOtherItems: formData.includeBoxes,
           wantMetalSeal: formData.wantMetalSeal,
           category: formData.boxesDescription
@@ -647,7 +725,7 @@ export const SimplifiedBookingForm = () => {
           user_id: null,
           shipment_id: shipmentData.id,
           amount: finalAmount,
-          currency: 'GBP',
+          currency: isIrelandBooking ? 'EUR' : 'GBP',
           payment_method: formData.paymentMethod,
           payment_status: 'pending',
           transaction_id: `TX-${timestamp.slice(-12)}`
@@ -666,7 +744,7 @@ export const SimplifiedBookingForm = () => {
           payment_id: paymentData.id,
           receipt_number: receiptNumber,
           amount: finalAmount,
-          currency: 'GBP',
+          currency: isIrelandBooking ? 'EUR' : 'GBP',
           payment_method: formData.paymentMethod,
           status: 'pending',
           sender_details: shipmentMetadata.sender,
@@ -1057,8 +1135,10 @@ export const SimplifiedBookingForm = () => {
   );
 
   const renderStep3 = () => {
-    const drumPrice = formData.drumQuantity > 0 ? getDrumPrice(formData.drumQuantity) : 280;
-    
+    const drumPrice = formData.drumQuantity > 0 ? getCurrentDrumPrice(formData.drumQuantity) : (isIrelandBooking ? 360 : 280);
+    const metalSealPrice = getMetalSealPrice(formData.pickupCountry);
+    const trunkPrice = formData.trunkQuantity > 0 ? getTrunkPrice(formData.trunkQuantity) : 220;
+
     return (
       <Card>
         <CardHeader>
@@ -1080,12 +1160,21 @@ export const SimplifiedBookingForm = () => {
               />
               <div className="flex-1">
                 <div className="font-semibold text-lg">Drums (200-220 L)</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 space-y-1">
-                  <div>• 5+ drums: £260 each</div>
-                  <div>• 2-4 drums: £270 each</div>
-                  <div>• 1 drum: £280</div>
-                </div>
-                
+                {/* Show country-specific pricing */}
+                {isIrelandBooking ? (
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 space-y-1">
+                    <div className="text-green-600 dark:text-green-400 font-medium">• 5+ drums: €340 each (Best value!)</div>
+                    <div>• 2-4 drums: €350 each</div>
+                    <div>• 1 drum: €360</div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 space-y-1">
+                    <div>• 5+ drums: £260 each</div>
+                    <div>• 2-4 drums: £270 each</div>
+                    <div>• 1 drum: £280</div>
+                  </div>
+                )}
+
                 {formData.includeDrums && (
                   <div className="mt-4 space-y-4">
                     <div>
@@ -1101,7 +1190,7 @@ export const SimplifiedBookingForm = () => {
                       />
                       {formData.drumQuantity > 0 && (
                         <p className="text-sm text-zim-green font-medium mt-2">
-                          £{drumPrice} per drum
+                          {currencySymbol}{drumPrice} per drum
                         </p>
                       )}
                     </div>
@@ -1109,7 +1198,7 @@ export const SimplifiedBookingForm = () => {
                     {/* Add-on Services */}
                     <div className="border-t pt-4 space-y-3">
                       <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300">Add-on Services</h4>
-                      
+
                       {/* Metal Seal */}
                       <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg hover:bg-white dark:hover:bg-gray-700 transition-colors">
                         <input
@@ -1121,7 +1210,7 @@ export const SimplifiedBookingForm = () => {
                         <div className="flex-1">
                           <div className="font-medium text-sm">Metal Coded Seal</div>
                           <div className="text-xs text-gray-600 dark:text-gray-400">Secure coded seals for drums</div>
-                          <div className="text-sm font-semibold text-zim-green mt-1">+£5/drum</div>
+                          <div className="text-sm font-semibold text-zim-green mt-1">+{currencySymbol}{metalSealPrice}/drum</div>
                         </div>
                       </label>
 
@@ -1139,6 +1228,67 @@ export const SimplifiedBookingForm = () => {
               </div>
             </label>
           </div>
+
+          {/* Trunks/Storage Boxes Option - Ireland Only */}
+          {isIrelandBooking && (
+            <div className={`border-2 rounded-lg p-5 transition-all ${formData.includeTrunks ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 dark:border-purple-600' : 'border-gray-200 hover:border-purple-400 dark:border-gray-700 dark:hover:border-purple-600'}`}>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.includeTrunks}
+                  onChange={(e) => updateField('includeTrunks', e.target.checked)}
+                  className="mt-1 h-4 w-4"
+                />
+                <div className="flex-1">
+                  <div className="font-semibold text-lg">Trunks / Storage Boxes</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 space-y-1">
+                    <div className="text-purple-600 dark:text-purple-400 font-medium">• 5+ trunks: €200 each (Best value!)</div>
+                    <div>• 2-4 trunks: €200 each</div>
+                    <div>• 1 trunk: €220</div>
+                  </div>
+
+                  {formData.includeTrunks && (
+                    <div className="mt-4 space-y-4">
+                      <div>
+                        <Label htmlFor="trunkQty" className="text-base">How many trunks/storage boxes?</Label>
+                        <Input
+                          id="trunkQty"
+                          type="number"
+                          min="1"
+                          placeholder="1"
+                          value={formData.trunkQuantity || ''}
+                          onChange={(e) => updateField('trunkQuantity', parseInt(e.target.value) || 0)}
+                          className="max-w-xs mt-2"
+                        />
+                        {formData.trunkQuantity > 0 && (
+                          <p className="text-sm text-purple-600 font-medium mt-2">
+                            €{trunkPrice} per trunk
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Optional Metal Seal for Trunks */}
+                      <div className="border-t pt-4">
+                        <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg hover:bg-white dark:hover:bg-gray-700 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={formData.wantMetalSeal}
+                            onChange={(e) => updateField('wantMetalSeal', e.target.checked)}
+                            className="mt-0.5 h-4 w-4"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">Metal Coded Seal (Optional)</div>
+                            <div className="text-xs text-gray-600 dark:text-gray-400">Secure coded seals for trunks</div>
+                            <div className="text-sm font-semibold text-purple-600 mt-1">+€{metalSealPrice}/trunk</div>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </label>
+            </div>
+          )}
 
           {/* Purchase Drums Option - England Only */}
           {formData.pickupCountry === 'England' && (
@@ -1309,21 +1459,21 @@ export const SimplifiedBookingForm = () => {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span>{formData.drumQuantity} x Drum (200-220 L)</span>
-                  <span className="font-medium">£{formData.drumQuantity * getDrumPrice(formData.drumQuantity)}</span>
+                  <span className="font-medium">{currencySymbol}{formData.drumQuantity * getCurrentDrumPrice(formData.drumQuantity)}</span>
                 </div>
                 <div className="text-xs text-gray-600 dark:text-gray-400">
-                  @ £{getDrumPrice(formData.drumQuantity)} per drum
+                  @ {currencySymbol}{getCurrentDrumPrice(formData.drumQuantity)} per drum
                 </div>
-                
-                {/* Add-ons */}
+
+                {/* Add-ons - Metal Seal for drums */}
                 {formData.wantMetalSeal && (
                   <div className="flex justify-between text-gray-700 dark:text-gray-300 border-t pt-2">
-                    <span>Metal Coded Seal ({formData.drumQuantity} x £5)</span>
-                    <span>+£{formData.drumQuantity * 5}</span>
+                    <span>Metal Coded Seal ({formData.drumQuantity} x {currencySymbol}{getMetalSealPrice(formData.pickupCountry)})</span>
+                    <span>+{currencySymbol}{formData.drumQuantity * getMetalSealPrice(formData.pickupCountry)}</span>
                   </div>
                 )}
 
-                {/* Purchased Drums */}
+                {/* Purchased Drums - UK only */}
                 {formData.purchaseDrums && formData.purchaseDrumType && formData.purchaseDrumQuantity > 0 && (
                   <div className="flex justify-between text-gray-700 dark:text-gray-300 border-t pt-2">
                     <span>
@@ -1340,9 +1490,32 @@ export const SimplifiedBookingForm = () => {
                 </div>
               </div>
             )}
-            
-            {formData.includeBoxes && (
+
+            {/* Trunks Summary - Ireland only */}
+            {formData.includeTrunks && formData.trunkQuantity > 0 && (
               <div className={formData.includeDrums ? 'border-t pt-3' : ''}>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>{formData.trunkQuantity} x Trunk/Storage Box</span>
+                    <span className="font-medium">€{formData.trunkQuantity * getTrunkPrice(formData.trunkQuantity)}</span>
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    @ €{getTrunkPrice(formData.trunkQuantity)} per trunk
+                  </div>
+
+                  {/* Metal seal for trunks */}
+                  {formData.wantMetalSeal && !formData.includeDrums && (
+                    <div className="flex justify-between text-gray-700 dark:text-gray-300 border-t pt-2">
+                      <span>Metal Coded Seal ({formData.trunkQuantity} x €{getMetalSealPrice(formData.pickupCountry)})</span>
+                      <span>+€{formData.trunkQuantity * getMetalSealPrice(formData.pickupCountry)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {formData.includeBoxes && (
+              <div className={(formData.includeDrums || formData.includeTrunks) ? 'border-t pt-3' : ''}>
                 <p className="font-medium text-gray-700 dark:text-gray-300">Boxes & Other Items:</p>
                 <p className="text-gray-600 dark:text-gray-400 mt-1">{formData.boxesDescription}</p>
                 <p className="text-xs italic mt-2 text-blue-600 dark:text-blue-400">Custom quote will be provided</p>
@@ -1352,15 +1525,15 @@ export const SimplifiedBookingForm = () => {
         </div>
 
         {/* Total */}
-        {formData.includeDrums && formData.drumQuantity > 0 && (
+        {((formData.includeDrums && formData.drumQuantity > 0) || (formData.includeTrunks && formData.trunkQuantity > 0)) && (
           <div className="border-t pt-4">
             <div className="flex justify-between items-center text-xl font-bold">
               <span>Total</span>
-              <span className="text-zim-green">£{calculateBaseTotal()}</span>
+              <span className="text-zim-green">{currencySymbol}{calculateBaseTotal()}</span>
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {formData.includeBoxes && '* Drums total only. Custom quote for other items will be sent separately.'}
-              {!formData.includeBoxes && 'Final amount for drums'}
+              {formData.includeBoxes && '* Total shown is for drums/trunks only. Custom quote for other items will be sent separately.'}
+              {!formData.includeBoxes && `Final amount for ${formData.includeDrums ? 'drums' : ''}${formData.includeDrums && formData.includeTrunks ? ' & ' : ''}${formData.includeTrunks ? 'trunks' : ''}`}
             </p>
           </div>
         )}
@@ -1379,7 +1552,8 @@ export const SimplifiedBookingForm = () => {
     const cashDiscount = formData.includeDrums ? formData.drumQuantity * 20 : 0;
     const cashTotal = baseTotal - cashDiscount;
     const premiumTotal = baseTotal * 1.20;
-    
+    const cs = currencySymbol; // shorthand for currency symbol
+
     return (
       <Card>
         <CardHeader>
@@ -1405,7 +1579,7 @@ export const SimplifiedBookingForm = () => {
                       <CreditCard className="h-5 w-5" />
                       Standard Payment
                     </span>
-                    <span className="text-xl font-bold text-zim-green">£{baseTotal.toFixed(2)}</span>
+                    <span className="text-xl font-bold text-zim-green">{cs}{baseTotal.toFixed(2)}</span>
                   </div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Pay by card or schedule payments within 30 days</p>
                 </div>
@@ -1437,6 +1611,7 @@ export const SimplifiedBookingForm = () => {
                       totalAmount={baseTotal}
                       schedule={formData.paymentSchedule}
                       onScheduleChange={(schedule) => updateField('paymentSchedule', schedule)}
+                      currencySymbol={cs}
                     />
                   )}
                 </div>
@@ -1456,11 +1631,11 @@ export const SimplifiedBookingForm = () => {
                     <div className="text-right">
                       {formData.includeDrums && cashDiscount > 0 ? (
                         <>
-                          <span className="text-sm text-gray-500 dark:text-gray-400 line-through mr-2">£{baseTotal.toFixed(2)}</span>
-                          <span className="text-xl font-bold text-green-600 dark:text-green-400">£{cashTotal.toFixed(2)}</span>
+                          <span className="text-sm text-gray-500 dark:text-gray-400 line-through mr-2">{cs}{baseTotal.toFixed(2)}</span>
+                          <span className="text-xl font-bold text-green-600 dark:text-green-400">{cs}{cashTotal.toFixed(2)}</span>
                         </>
                       ) : (
-                        <span className="text-xl font-bold text-zim-green">£{baseTotal.toFixed(2)}</span>
+                        <span className="text-xl font-bold text-zim-green">{cs}{baseTotal.toFixed(2)}</span>
                       )}
                     </div>
                   </div>
@@ -1470,8 +1645,8 @@ export const SimplifiedBookingForm = () => {
                     <div className="flex items-start rounded-md bg-green-100 dark:bg-green-900/30 p-3 text-sm mt-2">
                       <CheckCircle2 className="mr-2 h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
                       <div>
-                        <span className="font-semibold text-green-800 dark:text-green-300">Save £{cashDiscount}!</span>
-                        <p className="text-green-700 dark:text-green-400">Get £20 discount per drum when you pay cash</p>
+                        <span className="font-semibold text-green-800 dark:text-green-300">Save {cs}{cashDiscount}!</span>
+                        <p className="text-green-700 dark:text-green-400">Get {cs}20 discount per drum when you pay cash</p>
                       </div>
                     </div>
                   )}
@@ -1490,15 +1665,15 @@ export const SimplifiedBookingForm = () => {
                       Pay on Arrival
                     </span>
                     <div className="text-right">
-                      <span className="text-sm text-gray-500 dark:text-gray-400 line-through mr-2">£{baseTotal.toFixed(2)}</span>
-                      <span className="text-xl font-bold text-orange-600 dark:text-orange-400">£{premiumTotal.toFixed(2)}</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400 line-through mr-2">{cs}{baseTotal.toFixed(2)}</span>
+                      <span className="text-xl font-bold text-orange-600 dark:text-orange-400">{cs}{premiumTotal.toFixed(2)}</span>
                     </div>
                   </div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Pay when your shipment reaches Zimbabwe</p>
                   
                   <div className="flex items-start rounded-md bg-orange-100 dark:bg-orange-900/30 p-3 text-sm mt-2">
                     <AlertCircle className="mr-2 h-5 w-5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
-                    <span className="text-orange-700 dark:text-orange-400">This option adds a 20% premium (+£{(premiumTotal - baseTotal).toFixed(2)}) to the total cost.</span>
+                    <span className="text-orange-700 dark:text-orange-400">This option adds a 20% premium (+{cs}{(premiumTotal - baseTotal).toFixed(2)}) to the total cost.</span>
                   </div>
                 </div>
               </label>
@@ -1510,26 +1685,26 @@ export const SimplifiedBookingForm = () => {
             <div className="space-y-2">
               <div className="flex justify-between text-gray-600 dark:text-gray-400">
                 <span>Base Amount:</span>
-                <span>£{baseTotal.toFixed(2)}</span>
+                <span>{cs}{baseTotal.toFixed(2)}</span>
               </div>
-              
+
               {formData.paymentMethod === 'cashOnCollection' && cashDiscount > 0 && (
                 <div className="flex justify-between text-green-600 dark:text-green-400 font-medium">
                   <span>Cash Discount:</span>
-                  <span>-£{cashDiscount.toFixed(2)}</span>
+                  <span>-{cs}{cashDiscount.toFixed(2)}</span>
                 </div>
               )}
-              
+
               {formData.paymentMethod === 'payOnArrival' && (
                 <div className="flex justify-between text-orange-600 dark:text-orange-400 font-medium">
                   <span>Payment Premium (20%):</span>
-                  <span>+£{(premiumTotal - baseTotal).toFixed(2)}</span>
+                  <span>+{cs}{(premiumTotal - baseTotal).toFixed(2)}</span>
                 </div>
               )}
-              
+
               <div className="flex justify-between text-xl font-bold border-t pt-2">
                 <span>Total to Pay:</span>
-                <span className="text-zim-green">£{calculateFinalTotal().toFixed(2)}</span>
+                <span className="text-zim-green">{cs}{calculateFinalTotal().toFixed(2)}</span>
               </div>
             </div>
           </div>
@@ -1588,6 +1763,8 @@ export const SimplifiedBookingForm = () => {
             drumQuantity: 0,
             includeBoxes: false,
             boxesDescription: '',
+            includeTrunks: false,
+            trunkQuantity: 0,
             wantMetalSeal: false,
             purchaseDrums: false,
             purchaseDrumType: null,

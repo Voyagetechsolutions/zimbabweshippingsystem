@@ -300,22 +300,43 @@ const ShipmentManagementTab = () => {
 
   const getCollectionInfo = (shipment: Shipment) => {
     const metadata = shipment.metadata || {};
-    let collectionData = metadata.collection;
+    let collectionData = metadata.collection || {};
 
-    if (!collectionData) {
-      collectionData = {
-        route: metadata.collectionRoute || metadata.route || 'Standard Route',
-        date: metadata.collectionDate || metadata.date || 'Next available date',
-        scheduled: metadata.collectionScheduled || metadata.scheduled || false,
-        completed: metadata.collectionCompleted ||
-          (shipment.status !== 'Booking Confirmed' && shipment.status !== 'Ready for Pickup'),
-        notes: metadata.collectionNotes ||
-          metadata.specialInstructions ||
-          'No additional notes'
-      };
-    }
+    // Get pickup/postal code
+    const postalCode = metadata.senderDetails?.postcode ||
+      metadata.senderDetails?.postalCode ||
+      metadata.sender?.postcode ||
+      metadata.sender?.postalCode ||
+      metadata.pickupPostcode ||
+      metadata.postalCode ||
+      metadata.postcode ||
+      '';
 
-    return collectionData;
+    // Get pickup city/area
+    const pickupCity = metadata.senderDetails?.city ||
+      metadata.sender?.city ||
+      metadata.pickupCity ||
+      metadata.city ||
+      '';
+
+    // Get country
+    const country = metadata.senderDetails?.country ||
+      metadata.sender?.country ||
+      metadata.pickupCountry ||
+      metadata.country ||
+      'England';
+
+    return {
+      route: collectionData.route || metadata.collectionRoute || metadata.route || 'Not assigned',
+      date: collectionData.date || metadata.collectionDate || metadata.date || 'To be confirmed',
+      scheduled: collectionData.scheduled || metadata.collectionScheduled || metadata.scheduled || false,
+      completed: collectionData.completed || metadata.collectionCompleted ||
+        (shipment.status !== 'Booking Confirmed' && shipment.status !== 'Ready for Pickup' && shipment.status !== 'Pending'),
+      notes: collectionData.notes || metadata.collectionNotes || metadata.specialInstructions || '',
+      postalCode: postalCode,
+      city: pickupCity,
+      country: country
+    };
   };
 
   const getPaymentAmount = (shipment: Shipment): string => {
@@ -820,6 +841,58 @@ const ShipmentManagementTab = () => {
                   </div>
                 </div>
 
+                {/* Collection Details Card */}
+                <div className="bg-white dark:bg-gray-900 rounded-xl border shadow-sm overflow-hidden">
+                  <div className="bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-3">
+                    <h3 className="font-semibold text-white flex items-center gap-2">
+                      <Truck className="h-4 w-4" />
+                      Collection Details
+                    </h3>
+                  </div>
+                  <div className="p-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1">Route</p>
+                        <p className="font-semibold text-blue-600 dark:text-blue-400">
+                          {getCollectionInfo(viewingShipment).route || 'Not assigned'}
+                        </p>
+                      </div>
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1">Collection Date</p>
+                        <p className="font-semibold text-purple-600 dark:text-purple-400">
+                          {getCollectionInfo(viewingShipment).date || 'To be confirmed'}
+                        </p>
+                      </div>
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1">Postal Code</p>
+                        <p className="font-semibold text-cyan-600 dark:text-cyan-400">
+                          {getCollectionInfo(viewingShipment).postalCode || 'N/A'}
+                        </p>
+                      </div>
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1">Area / City</p>
+                        <p className="font-semibold text-teal-600 dark:text-teal-400">
+                          {getCollectionInfo(viewingShipment).city || 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center gap-4 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">Country:</span>
+                        <span className="font-medium">
+                          {getCollectionInfo(viewingShipment).country === 'Ireland' ? '🇮🇪 Ireland' : '🇬🇧 UK'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">Status:</span>
+                        <span className={`font-medium ${getCollectionInfo(viewingShipment).completed ? 'text-green-600' : 'text-amber-600'}`}>
+                          {getCollectionInfo(viewingShipment).completed ? 'Collected' : 'Pending Collection'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Sender & Receiver Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Sender Card */}
@@ -850,6 +923,18 @@ const ShipmentManagementTab = () => {
                           <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
                           <span>{getPickupAddress(viewingShipment)}</span>
                         </div>
+                        {getCollectionInfo(viewingShipment).postalCode && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded font-mono">
+                              {getCollectionInfo(viewingShipment).postalCode}
+                            </span>
+                            {getCollectionInfo(viewingShipment).city && (
+                              <span className="text-xs text-muted-foreground">
+                                {getCollectionInfo(viewingShipment).city}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
