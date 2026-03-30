@@ -23,7 +23,8 @@ const PricingSection = () => {
   };
 
   const trunkPrices = {
-    twoPlus: '€200',
+    fivePlus: '€200',
+    twoToFour: '€210',
     one: '€220',
   };
 
@@ -182,11 +183,19 @@ const PricingSection = () => {
                   <div className="space-y-4 mb-6">
                     <div className="flex justify-between items-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                       <div>
-                        <span className="font-semibold text-gray-900 dark:text-white">2+ trunks</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">5+ trunks</span>
                         <span className="text-sm text-gray-500 ml-2">Best value</span>
                       </div>
                       <span className="text-2xl font-bold text-purple-600">
-                        {trunkPrices.twoPlus}
+                        {trunkPrices.fivePlus}
+                        <span className="text-sm font-normal text-gray-500">/each</span>
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <span className="font-semibold text-gray-900 dark:text-white">2-4 trunks</span>
+                      <span className="text-2xl font-bold text-gray-700 dark:text-gray-300">
+                        {trunkPrices.twoToFour}
                         <span className="text-sm font-normal text-gray-500">/each</span>
                       </span>
                     </div>

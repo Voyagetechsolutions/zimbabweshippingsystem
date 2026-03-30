@@ -80,7 +80,8 @@ const getIrelandDrumPrice = (quantity: number): number => {
 
 // Ireland trunk/storage box prices (EUR)
 const getTrunkPrice = (quantity: number): number => {
-  if (quantity >= 2) return 200;
+  if (quantity >= 5) return 200;
+  if (quantity >= 2) return 210;
   return 220;
 };
 
@@ -1243,7 +1244,7 @@ export const SimplifiedBookingForm = () => {
                   <div className="font-semibold text-lg">Trunks / Storage Boxes</div>
                   <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 space-y-1">
                     <div className="text-purple-600 dark:text-purple-400 font-medium">• 5+ trunks: €200 each (Best value!)</div>
-                    <div>• 2-4 trunks: €200 each</div>
+                    <div>• 2-4 trunks: €210 each</div>
                     <div>• 1 trunk: €220</div>
                   </div>
 
