@@ -118,7 +118,6 @@ SELECT
   created_at,
   first_name,
   last_name,
-  email,
   whatsapp_number,
   booking_ease,
   communication_rating,
@@ -128,8 +127,6 @@ SELECT
   overall_satisfaction,
   follow_up_answers,
   additional_feedback,
-  liked_most,
-  can_improve,
   needs_admin_attention
 FROM public.service_reviews
 WHERE needs_admin_attention = true

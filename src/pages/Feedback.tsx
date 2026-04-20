@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { CheckCircle, Send, User, Mail, Phone, MessageSquare } from 'lucide-react';
+import { CheckCircle, Send, User, Phone, MessageSquare } from 'lucide-react';
 
 /* ──────── Rating options ──────── */
 const RATING_OPTIONS = {
@@ -45,7 +45,7 @@ interface RatingProps {
 
 const RatingComponent: React.FC<RatingProps> = ({ label, icon, value, onChange, options, required = true }) => (
     <div className="space-y-3">
-        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+        <label className="flex items-center gap-2 text-base font-semibold text-gray-800 dark:text-gray-200">
             {icon}{label} {required && <span className="text-red-500">*</span>}
         </label>
         <div className="flex flex-wrap gap-2">
@@ -76,7 +76,6 @@ const Feedback = () => {
     /* ── Contact Information ── */
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
-    const [email, setEmail] = useState('');
     const [whatsappNumber, setWhatsappNumber] = useState('');
 
     /* ── Main Questions ── */
@@ -93,8 +92,6 @@ const Feedback = () => {
 
     /* ── Additional feedback ── */
     const [additionalFeedback, setAdditionalFeedback] = useState('');
-    const [likedMost, setLikedMost] = useState('');
-    const [canImprove, setCanImprove] = useState('');
 
     /* ── dynamic custom questions ── */
     const [customQuestions, setCustomQuestions] = useState<CustomQuestion[]>([]);
@@ -125,7 +122,7 @@ const Feedback = () => {
     /* ── validation ── */
     const isValid = () => {
         // Required contact information
-        if (!firstName.trim() || !lastName.trim() || !email.trim() || !whatsappNumber.trim()) return false;
+        if (!firstName.trim() || !lastName.trim() || !whatsappNumber.trim()) return false;
         
         // Required main questions
         if (!isFirstTime || !bookingEase || !communication || !customerService || 
@@ -158,11 +155,15 @@ const Feedback = () => {
     /* ── submit ── */
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        e.stopPropagation();
+        
         if (!isValid()) {
             toast({ title: 'Please fill in all required fields', variant: 'destructive' });
             return;
         }
+        
         setSubmitting(true);
+        
         try {
             // Check if any ratings are poor to flag for admin attention
             const poorRatings = ['Poor', 'Very Poor', 'Difficult', 'Very Difficult', 'Dissatisfied', 'Very Dissatisfied'];
@@ -173,7 +174,6 @@ const Feedback = () => {
                 // Contact information
                 first_name: firstName.trim(),
                 last_name: lastName.trim(),
-                email: email.trim(),
                 whatsapp_number: whatsappNumber.trim(),
                 
                 // Main questions
@@ -190,8 +190,6 @@ const Feedback = () => {
                 
                 // Additional feedback
                 additional_feedback: additionalFeedback.trim() || null,
-                liked_most: likedMost.trim() || null,
-                can_improve: canImprove.trim() || null,
                 
                 // Custom answers
                 custom_answers: Object.keys(customAnswers).length > 0 ? customAnswers : null,
@@ -209,7 +207,7 @@ const Feedback = () => {
                 satisfaction_accounts: 2, // Default neutral rating for legacy field  
                 satisfaction_deliveries: deliveryOnTime === 'Yes' ? 3 : 1,
                 parcel_arrived_as_anticipated: deliveryOnTime === 'Yes' ? 'yes' : 'no',
-                has_additional_comments: !!(additionalFeedback.trim() || likedMost.trim() || canImprove.trim()),
+                has_additional_comments: !!(additionalFeedback.trim()),
                 additional_comments: additionalFeedback.trim() || null,
             }) as any);
             
@@ -232,10 +230,10 @@ const Feedback = () => {
 
     /* ── reset ── */
     const resetForm = () => {
-        setFirstName(''); setLastName(''); setEmail(''); setWhatsappNumber('');
+        setFirstName(''); setLastName(''); setWhatsappNumber('');
         setIsFirstTime(''); setBookingEase(''); setCommunication(''); setCustomerService('');
         setDeliveryOnTime(''); setGoodsCondition(''); setOverallSatisfaction('');
-        setFollowUpAnswers({}); setAdditionalFeedback(''); setLikedMost(''); setCanImprove('');
+        setFollowUpAnswers({}); setAdditionalFeedback('');
         setCustomAnswers({}); setSubmitted(false);
     };
 
@@ -253,7 +251,13 @@ const Feedback = () => {
                         </div>
                         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Thank you for your feedback!</h2>
                         <p className="text-gray-500 dark:text-gray-400">Your response helps us improve our service.</p>
-                        <button onClick={resetForm} className="mt-4 px-6 py-2 rounded-lg bg-zim-green text-white font-medium hover:bg-zim-green/90 transition">
+                        <button 
+                            onClick={(e) => {
+                                e.preventDefault();
+                                resetForm();
+                            }} 
+                            className="mt-4 px-6 py-2 rounded-lg bg-zim-green text-white font-medium hover:bg-zim-green/90 transition"
+                        >
                             Submit Another
                         </button>
                     </div>
@@ -265,7 +269,7 @@ const Feedback = () => {
                             <p className="text-gray-500 dark:text-gray-400 mt-2">We value your opinion — please take a moment to rate our service.</p>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="space-y-8">
+                        <form onSubmit={handleSubmit} className="space-y-8" noValidate>
                             {/* ─── Contact Information ─── */}
                             <section className="bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-4">
                                 <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
@@ -294,22 +298,7 @@ const Feedback = () => {
                                             placeholder="Your last name" 
                                         />
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                            Email Address <span className="text-red-500">*</span>
-                                        </label>
-                                        <div className="relative">
-                                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                                            <input 
-                                                type="email"
-                                                value={email} 
-                                                onChange={(e) => setEmail(e.target.value)} 
-                                                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green" 
-                                                placeholder="your.email@example.com" 
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
+                                    <div className="sm:col-span-2">
                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                             WhatsApp Number <span className="text-red-500">*</span>
                                         </label>
@@ -348,7 +337,7 @@ const Feedback = () => {
                                 />
                                 {shouldShowFollowUp('booking_ease', bookingEase) && (
                                     <div className="ml-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                                        <label className="block text-sm font-medium text-red-700 dark:text-red-300 mb-2">
+                                        <label className="block text-base font-semibold text-red-700 dark:text-red-300 mb-2">
                                             {FOLLOW_UP_QUESTIONS.booking_ease} <span className="text-red-500">*</span>
                                         </label>
                                         <textarea
@@ -370,7 +359,7 @@ const Feedback = () => {
                                 />
                                 {shouldShowFollowUp('communication', communication) && (
                                     <div className="ml-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                                        <label className="block text-sm font-medium text-red-700 dark:text-red-300 mb-2">
+                                        <label className="block text-base font-semibold text-red-700 dark:text-red-300 mb-2">
                                             {FOLLOW_UP_QUESTIONS.communication} <span className="text-red-500">*</span>
                                         </label>
                                         <textarea
@@ -392,7 +381,7 @@ const Feedback = () => {
                                 />
                                 {shouldShowFollowUp('customer_service', customerService) && (
                                     <div className="ml-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                                        <label className="block text-sm font-medium text-red-700 dark:text-red-300 mb-2">
+                                        <label className="block text-base font-semibold text-red-700 dark:text-red-300 mb-2">
                                             {FOLLOW_UP_QUESTIONS.customer_service} <span className="text-red-500">*</span>
                                         </label>
                                         <textarea
@@ -414,7 +403,7 @@ const Feedback = () => {
                                 />
                                 {deliveryOnTime === 'No' && (
                                     <div className="ml-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                                        <label className="block text-sm font-medium text-red-700 dark:text-red-300 mb-2">
+                                        <label className="block text-base font-semibold text-red-700 dark:text-red-300 mb-2">
                                             {FOLLOW_UP_QUESTIONS.delivery_time} <span className="text-red-500">*</span>
                                         </label>
                                         <textarea
@@ -436,7 +425,7 @@ const Feedback = () => {
                                 />
                                 {shouldShowFollowUp('goods_condition', goodsCondition) && (
                                     <div className="ml-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                                        <label className="block text-sm font-medium text-red-700 dark:text-red-300 mb-2">
+                                        <label className="block text-base font-semibold text-red-700 dark:text-red-300 mb-2">
                                             {FOLLOW_UP_QUESTIONS.goods_condition} <span className="text-red-500">*</span>
                                         </label>
                                         <textarea
@@ -458,7 +447,7 @@ const Feedback = () => {
                                 />
                                 {shouldShowFollowUp('overall_satisfaction', overallSatisfaction) && (
                                     <div className="ml-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                                        <label className="block text-sm font-medium text-red-700 dark:text-red-300 mb-2">
+                                        <label className="block text-base font-semibold text-red-700 dark:text-red-300 mb-2">
                                             {FOLLOW_UP_QUESTIONS.overall_satisfaction} <span className="text-red-500">*</span>
                                         </label>
                                         <textarea
@@ -474,48 +463,22 @@ const Feedback = () => {
 
                             {/* ─── Additional Feedback ─── */}
                             <section className="bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-4">
-                                <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                <h3 className="font-semibold text-lg text-gray-900 dark:text-white flex items-center gap-2">
                                     <MessageSquare className="h-5 w-5 text-zim-green" /> Additional Feedback
                                 </h3>
                                 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Please share any additional feedback, testimonials, or complaints about your experience with Zimbabwe Shipping Services:
+                                    <label className="block text-base font-semibold text-gray-800 dark:text-gray-200 mb-3">
+                                        Please share any additional feedback, testimonials, or complaints about your experience with Zimbabwe Shipping Services. 
+                                        Tell us what you liked most and what we can improve:
                                     </label>
                                     <textarea
                                         value={additionalFeedback}
                                         onChange={(e) => setAdditionalFeedback(e.target.value)}
-                                        rows={4}
+                                        rows={6}
                                         className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green resize-none"
-                                        placeholder="Share your thoughts..."
+                                        placeholder="Share your thoughts, what you liked most, and suggestions for improvement..."
                                     />
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            What did you like most about our service?
-                                        </label>
-                                        <textarea
-                                            value={likedMost}
-                                            onChange={(e) => setLikedMost(e.target.value)}
-                                            rows={3}
-                                            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green resize-none"
-                                            placeholder="Tell us what you enjoyed..."
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                            What can we improve?
-                                        </label>
-                                        <textarea
-                                            value={canImprove}
-                                            onChange={(e) => setCanImprove(e.target.value)}
-                                            rows={3}
-                                            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green resize-none"
-                                            placeholder="Suggestions for improvement..."
-                                        />
-                                    </div>
                                 </div>
                             </section>
 

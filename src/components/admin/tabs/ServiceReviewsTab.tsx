@@ -104,11 +104,11 @@ const ServiceReviewsTab: React.FC = () => {
         if (!searchQuery) return true;
         const q = searchQuery.toLowerCase();
         const fullName = r.full_name || `${r.first_name || ''} ${r.last_name || ''}`.trim();
-        const email = r.email || '';
         const refNumber = r.customer_reference_number || '';
+        const whatsapp = r.whatsapp_number || '';
         return fullName.toLowerCase().includes(q) || 
-               email.toLowerCase().includes(q) || 
-               refNumber.toLowerCase().includes(q);
+               refNumber.toLowerCase().includes(q) ||
+               whatsapp.toLowerCase().includes(q);
     });
 
     const attentionReviews = reviews.filter(r => r.needs_admin_attention);
@@ -199,7 +199,7 @@ const ServiceReviewsTab: React.FC = () => {
                     {view !== 'attention' && (
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                            <Input placeholder="Search by name, email, or reference..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
+                            <Input placeholder="Search by name, WhatsApp, or reference..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
                         </div>
                     )}
 
@@ -287,9 +287,6 @@ const ServiceReviewsTab: React.FC = () => {
                                                             {r.first_name && (
                                                                 <div><span className="text-gray-500">Name:</span> <span className="font-medium">{r.first_name} {r.last_name}</span></div>
                                                             )}
-                                                            {r.email && (
-                                                                <div><span className="text-gray-500">Email:</span> <span className="font-medium">{r.email}</span></div>
-                                                            )}
                                                             {r.whatsapp_number && (
                                                                 <div><span className="text-gray-500">WhatsApp:</span> <span className="font-medium">{r.whatsapp_number}</span></div>
                                                             )}
@@ -376,29 +373,15 @@ const ServiceReviewsTab: React.FC = () => {
                                                 )}
 
                                                 {/* Additional Feedback */}
-                                                {(r.additional_comments || r.liked_most || r.can_improve) && (
+                                                {r.additional_comments && (
                                                     <div className="p-3 bg-white rounded-lg border border-gray-200 space-y-3">
                                                         <p className="text-xs font-medium text-gray-500 flex items-center gap-1">
                                                             <MessageSquare className="h-3 w-3" /> Additional Feedback
                                                         </p>
-                                                        {r.additional_comments && (
-                                                            <div>
-                                                                <p className="text-xs text-gray-500 mb-1">General Comments:</p>
-                                                                <p className="text-sm text-gray-700">{r.additional_comments}</p>
-                                                            </div>
-                                                        )}
-                                                        {r.liked_most && (
-                                                            <div>
-                                                                <p className="text-xs text-gray-500 mb-1">What they liked most:</p>
-                                                                <p className="text-sm text-gray-700">{r.liked_most}</p>
-                                                            </div>
-                                                        )}
-                                                        {r.can_improve && (
-                                                            <div>
-                                                                <p className="text-xs text-gray-500 mb-1">What can be improved:</p>
-                                                                <p className="text-sm text-gray-700">{r.can_improve}</p>
-                                                            </div>
-                                                        )}
+                                                        <div>
+                                                            <p className="text-xs text-gray-500 mb-1">General Comments:</p>
+                                                            <p className="text-sm text-gray-700">{r.additional_comments}</p>
+                                                        </div>
                                                     </div>
                                                 )}
 
