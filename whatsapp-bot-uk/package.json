@@ -1,0 +1,26 @@
+{
+  "name": "zimbabwe-shipping-whatsapp-bot-uk",
+  "version": "1.0.0",
+  "description": "WhatsApp bot for Zimbabwe Shipping - UK operations",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "keywords": ["whatsapp", "bot", "shipping", "zimbabwe", "uk", "england"],
+  "author": "Zimbabwe Shipping",
+  "license": "MIT",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.8",
+    "@supabase/supabase-js": "^2.45.4",
+    "qrcode-terminal": "^0.12.0",
+    "qrcode": "^1.5.4",
+    "pino": "^9.4.0",
+    "dotenv": "^16.4.5",
+    "node-cache": "^5.1.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  }
+}

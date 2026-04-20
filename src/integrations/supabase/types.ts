@@ -706,22 +706,56 @@ export type Database = {
           has_additional_comments: boolean
           additional_comments: string | null
           custom_answers: Record<string, string> | null
+          // New feedback fields
+          first_name?: string | null
+          last_name?: string | null
+          email?: string | null
+          whatsapp_number?: string | null
+          is_first_time?: string | null
+          booking_ease?: string | null
+          communication_rating?: string | null
+          customer_service_rating?: string | null
+          delivery_on_time?: string | null
+          goods_condition?: string | null
+          overall_satisfaction?: string | null
+          follow_up_answers?: Record<string, string> | null
+          additional_feedback?: string | null
+          liked_most?: string | null
+          can_improve?: string | null
+          needs_admin_attention?: boolean | null
         }
         Insert: {
           id?: string
           created_at?: string
-          full_name: string
-          customer_reference_number: string
-          overall_experience: number
-          overall_customer_service: number
-          satisfaction_bookings_customer_service: number
-          satisfaction_collections_uk: number
-          satisfaction_accounts: number
-          satisfaction_deliveries: number
-          parcel_arrived_as_anticipated: string
-          has_additional_comments: boolean
+          full_name?: string
+          customer_reference_number?: string
+          overall_experience?: number
+          overall_customer_service?: number
+          satisfaction_bookings_customer_service?: number
+          satisfaction_collections_uk?: number
+          satisfaction_accounts?: number
+          satisfaction_deliveries?: number
+          parcel_arrived_as_anticipated?: string
+          has_additional_comments?: boolean
           additional_comments?: string | null
           custom_answers?: Record<string, string> | null
+          // New feedback fields
+          first_name?: string | null
+          last_name?: string | null
+          email?: string | null
+          whatsapp_number?: string | null
+          is_first_time?: string | null
+          booking_ease?: string | null
+          communication_rating?: string | null
+          customer_service_rating?: string | null
+          delivery_on_time?: string | null
+          goods_condition?: string | null
+          overall_satisfaction?: string | null
+          follow_up_answers?: Record<string, string> | null
+          additional_feedback?: string | null
+          liked_most?: string | null
+          can_improve?: string | null
+          needs_admin_attention?: boolean | null
         }
         Update: {
           id?: string
@@ -738,6 +772,23 @@ export type Database = {
           has_additional_comments?: boolean
           additional_comments?: string | null
           custom_answers?: Record<string, string> | null
+          // New feedback fields
+          first_name?: string | null
+          last_name?: string | null
+          email?: string | null
+          whatsapp_number?: string | null
+          is_first_time?: string | null
+          booking_ease?: string | null
+          communication_rating?: string | null
+          customer_service_rating?: string | null
+          delivery_on_time?: string | null
+          goods_condition?: string | null
+          overall_satisfaction?: string | null
+          follow_up_answers?: Record<string, string> | null
+          additional_feedback?: string | null
+          liked_most?: string | null
+          can_improve?: string | null
+          needs_admin_attention?: boolean | null
         }
         Relationships: []
       }

@@ -3,10 +3,26 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { Star, CheckCircle, Send, User, Hash, Package, MessageSquare } from 'lucide-react';
+import { CheckCircle, Send, User, Mail, Phone, MessageSquare } from 'lucide-react';
 
-/* ──────── star-label map ──────── */
-const STAR_LABELS: Record<number, string> = { 1: 'Poor', 2: 'Good', 3: 'Excellent' };
+/* ──────── Rating options ──────── */
+const RATING_OPTIONS = {
+    ease: ['Very Easy', 'Easy', 'Neutral', 'Difficult', 'Very Difficult'],
+    quality: ['Excellent', 'Good', 'Average', 'Poor', 'Very Poor'],
+    yesNo: ['Yes', 'No'],
+    satisfaction: ['Very Satisfied', 'Satisfied', 'Neutral', 'Dissatisfied', 'Very Dissatisfied'],
+    condition: ['Excellent', 'Good', 'Average', 'Poor', 'Very Poor']
+};
+
+/* ──────── Follow-up questions for poor ratings ──────── */
+const FOLLOW_UP_QUESTIONS = {
+    booking_ease: "What can we do to make the booking process easier for you?",
+    communication: "How can we improve our communication during the shipping process?",
+    customer_service: "What can we do to provide better customer service?",
+    delivery_time: "What can we do so that deliveries are completed on time?",
+    goods_condition: "What can we do to ensure your goods arrive in better condition?",
+    overall_satisfaction: "What can we do to improve your overall experience with our service?"
+};
 
 /* ──────── Custom-question types ──────── */
 interface CustomQuestion {
@@ -17,32 +33,36 @@ interface CustomQuestion {
     is_required: boolean;
 }
 
-/* ──────── 3-Star rating component ──────── */
-interface StarRatingProps { label: string; icon?: React.ReactNode; value: number; onChange: (v: number) => void }
-const StarRating: React.FC<StarRatingProps> = ({ label, icon, value, onChange }) => (
-    <div className="space-y-2">
+/* ──────── Rating component ──────── */
+interface RatingProps { 
+    label: string; 
+    icon?: React.ReactNode; 
+    value: string; 
+    onChange: (v: string) => void;
+    options: string[];
+    required?: boolean;
+}
+
+const RatingComponent: React.FC<RatingProps> = ({ label, icon, value, onChange, options, required = true }) => (
+    <div className="space-y-3">
         <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-            {icon}{label} <span className="text-zim-yellow">*</span>
+            {icon}{label} {required && <span className="text-red-500">*</span>}
         </label>
-        <div className="flex items-center gap-2">
-            <div className="flex gap-1.5">
-                {[1, 2, 3].map((star) => (
-                    <button
-                        key={star}
-                        type="button"
-                        onClick={() => onChange(star)}
-                        className={`w-10 h-10 rounded-lg border transition-all duration-200 flex items-center justify-center text-lg
-              ${star <= value
-                                ? 'border-zim-yellow/70 bg-zim-yellow/15 text-zim-yellow scale-105 shadow-sm'
-                                : 'border-gray-300 dark:border-gray-600 bg-white/5 text-gray-400 hover:border-zim-yellow/40 hover:text-zim-yellow/60'
-                            }`}
-                        aria-label={`${star} star`}
-                    >
-                        <Star className={`h-5 w-5 ${star <= value ? 'fill-current' : ''}`} />
-                    </button>
-                ))}
-            </div>
-            {value > 0 && <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">{STAR_LABELS[value]}</span>}
+        <div className="flex flex-wrap gap-2">
+            {options.map((option) => (
+                <button
+                    key={option}
+                    type="button"
+                    onClick={() => onChange(option)}
+                    className={`px-4 py-2 rounded-lg border font-medium text-sm transition-all duration-200
+                        ${value === option
+                            ? 'border-zim-green bg-zim-green/10 text-zim-green shadow-sm'
+                            : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-zim-green/40'
+                        }`}
+                >
+                    {option}
+                </button>
+            ))}
         </div>
     </div>
 );
@@ -53,18 +73,28 @@ const StarRating: React.FC<StarRatingProps> = ({ label, icon, value, onChange })
 const Feedback = () => {
     const { toast } = useToast();
 
-    /* ── fixed fields ── */
-    const [fullName, setFullName] = useState('');
-    const [refNo, setRefNo] = useState('');
-    const [overallExperience, setOverallExperience] = useState(0);
-    const [overallCustomerService, setOverallCustomerService] = useState(0);
-    const [satBookings, setSatBookings] = useState(0);
-    const [satCollections, setSatCollections] = useState(0);
-    const [satAccounts, setSatAccounts] = useState(0);
-    const [satDeliveries, setSatDeliveries] = useState(0);
-    const [parcelArrived, setParcelArrived] = useState('');
-    const [hasComments, setHasComments] = useState(false);
-    const [comments, setComments] = useState('');
+    /* ── Contact Information ── */
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
+    const [email, setEmail] = useState('');
+    const [whatsappNumber, setWhatsappNumber] = useState('');
+
+    /* ── Main Questions ── */
+    const [isFirstTime, setIsFirstTime] = useState('');
+    const [bookingEase, setBookingEase] = useState('');
+    const [communication, setCommunication] = useState('');
+    const [customerService, setCustomerService] = useState('');
+    const [deliveryOnTime, setDeliveryOnTime] = useState('');
+    const [goodsCondition, setGoodsCondition] = useState('');
+    const [overallSatisfaction, setOverallSatisfaction] = useState('');
+
+    /* ── Follow-up questions for poor ratings ── */
+    const [followUpAnswers, setFollowUpAnswers] = useState<Record<string, string>>({});
+
+    /* ── Additional feedback ── */
+    const [additionalFeedback, setAdditionalFeedback] = useState('');
+    const [likedMost, setLikedMost] = useState('');
+    const [canImprove, setCanImprove] = useState('');
 
     /* ── dynamic custom questions ── */
     const [customQuestions, setCustomQuestions] = useState<CustomQuestion[]>([]);
@@ -86,15 +116,42 @@ const Feedback = () => {
         })();
     }, []);
 
+    /* ── Check if follow-up question should be shown ── */
+    const shouldShowFollowUp = (field: string, value: string) => {
+        const poorRatings = ['Poor', 'Very Poor', 'Difficult', 'Very Difficult', 'Dissatisfied', 'Very Dissatisfied'];
+        return poorRatings.includes(value);
+    };
+
     /* ── validation ── */
     const isValid = () => {
-        if (!fullName.trim() || !refNo.trim()) return false;
-        if (overallExperience === 0 || overallCustomerService === 0) return false;
-        if (satBookings === 0 || satCollections === 0 || satAccounts === 0 || satDeliveries === 0) return false;
-        if (!parcelArrived) return false;
+        // Required contact information
+        if (!firstName.trim() || !lastName.trim() || !email.trim() || !whatsappNumber.trim()) return false;
+        
+        // Required main questions
+        if (!isFirstTime || !bookingEase || !communication || !customerService || 
+            !deliveryOnTime || !goodsCondition || !overallSatisfaction) return false;
+        
+        // Check follow-up questions for poor ratings
+        const followUpFields = [
+            { field: 'booking_ease', value: bookingEase },
+            { field: 'communication', value: communication },
+            { field: 'customer_service', value: customerService },
+            { field: 'delivery_time', value: deliveryOnTime },
+            { field: 'goods_condition', value: goodsCondition },
+            { field: 'overall_satisfaction', value: overallSatisfaction }
+        ];
+
+        for (const { field, value } of followUpFields) {
+            if (shouldShowFollowUp(field, value) && !followUpAnswers[field]?.trim()) {
+                return false;
+            }
+        }
+        
+        // Check required custom questions
         for (const q of customQuestions) {
             if (q.is_required && !customAnswers[q.id]?.trim()) return false;
         }
+        
         return true;
     };
 
@@ -107,20 +164,47 @@ const Feedback = () => {
         }
         setSubmitting(true);
         try {
+            // Check if any ratings are poor to flag for admin attention
+            const poorRatings = ['Poor', 'Very Poor', 'Difficult', 'Very Difficult', 'Dissatisfied', 'Very Dissatisfied'];
+            const hasPoorRating = [bookingEase, communication, customerService, deliveryOnTime, goodsCondition, overallSatisfaction]
+                .some(rating => poorRatings.includes(rating));
+
             const { error } = await (supabase.from('service_reviews' as any).insert({
-                full_name: fullName.trim(),
-                customer_reference_number: refNo.trim(),
-                overall_experience: overallExperience,
-                overall_customer_service: overallCustomerService,
-                satisfaction_bookings_customer_service: satBookings,
-                satisfaction_collections_uk: satCollections,
-                satisfaction_accounts: satAccounts,
-                satisfaction_deliveries: satDeliveries,
-                parcel_arrived_as_anticipated: parcelArrived,
-                has_additional_comments: hasComments,
-                additional_comments: hasComments ? comments.trim() || null : null,
+                // Contact information
+                first_name: firstName.trim(),
+                last_name: lastName.trim(),
+                email: email.trim(),
+                whatsapp_number: whatsappNumber.trim(),
+                
+                // Main questions
+                is_first_time: isFirstTime,
+                booking_ease: bookingEase,
+                communication_rating: communication,
+                customer_service_rating: customerService,
+                delivery_on_time: deliveryOnTime,
+                goods_condition: goodsCondition,
+                overall_satisfaction: overallSatisfaction,
+                
+                // Follow-up answers
+                follow_up_answers: Object.keys(followUpAnswers).length > 0 ? followUpAnswers : null,
+                
+                // Additional feedback
+                additional_feedback: additionalFeedback.trim() || null,
+                liked_most: likedMost.trim() || null,
+                can_improve: canImprove.trim() || null,
+                
+                // Custom answers
                 custom_answers: Object.keys(customAnswers).length > 0 ? customAnswers : null,
+                
+                // Flag for admin attention
+                needs_admin_attention: hasPoorRating,
+                
+                // Legacy fields for compatibility (can be removed later)
+                full_name: `${firstName.trim()} ${lastName.trim()}`,
+                overall_experience: overallSatisfaction === 'Very Satisfied' ? 3 : overallSatisfaction === 'Satisfied' ? 2 : 1,
+                overall_customer_service: customerService === 'Excellent' ? 3 : customerService === 'Good' ? 2 : 1,
             }) as any);
+            
             if (error) throw error;
             setSubmitted(true);
         } catch {
@@ -132,10 +216,10 @@ const Feedback = () => {
 
     /* ── reset ── */
     const resetForm = () => {
-        setFullName(''); setRefNo('');
-        setOverallExperience(0); setOverallCustomerService(0);
-        setSatBookings(0); setSatCollections(0); setSatAccounts(0); setSatDeliveries(0);
-        setParcelArrived(''); setHasComments(false); setComments('');
+        setFirstName(''); setLastName(''); setEmail(''); setWhatsappNumber('');
+        setIsFirstTime(''); setBookingEase(''); setCommunication(''); setCustomerService('');
+        setDeliveryOnTime(''); setGoodsCondition(''); setOverallSatisfaction('');
+        setFollowUpAnswers({}); setAdditionalFeedback(''); setLikedMost(''); setCanImprove('');
         setCustomAnswers({}); setSubmitted(false);
     };
 
@@ -166,93 +250,257 @@ const Feedback = () => {
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-8">
-                            {/* ─── Identity ─── */}
+                            {/* ─── Contact Information ─── */}
                             <section className="bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-4">
-                                <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2"><User className="h-5 w-5 text-zim-green" /> Your Details</h3>
+                                <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <User className="h-5 w-5 text-zim-green" /> Contact Information
+                                </h3>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name <span className="text-zim-yellow">*</span></label>
-                                        <input value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green" placeholder="Your full name" />
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            First Name <span className="text-red-500">*</span>
+                                        </label>
+                                        <input 
+                                            value={firstName} 
+                                            onChange={(e) => setFirstName(e.target.value)} 
+                                            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green" 
+                                            placeholder="Your first name" 
+                                        />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer Reference <span className="text-zim-yellow">*</span></label>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Last Name <span className="text-red-500">*</span>
+                                        </label>
+                                        <input 
+                                            value={lastName} 
+                                            onChange={(e) => setLastName(e.target.value)} 
+                                            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green" 
+                                            placeholder="Your last name" 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Email Address <span className="text-red-500">*</span>
+                                        </label>
                                         <div className="relative">
-                                            <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                                            <input value={refNo} onChange={(e) => setRefNo(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green" placeholder="e.g. ZS-12345" />
+                                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                            <input 
+                                                type="email"
+                                                value={email} 
+                                                onChange={(e) => setEmail(e.target.value)} 
+                                                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green" 
+                                                placeholder="your.email@example.com" 
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            WhatsApp Number <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className="relative">
+                                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                            <input 
+                                                type="tel"
+                                                value={whatsappNumber} 
+                                                onChange={(e) => setWhatsappNumber(e.target.value)} 
+                                                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green" 
+                                                placeholder="+44 7XXX XXXXXX" 
+                                            />
                                         </div>
                                     </div>
                                 </div>
                             </section>
 
-                            {/* ─── Overall Ratings ─── */}
-                            <section className="bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-5">
-                                <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2"><Star className="h-5 w-5 text-zim-yellow" /> Overall Ratings</h3>
-                                <StarRating label="Rate Overall Experience" value={overallExperience} onChange={setOverallExperience} />
-                                <StarRating label="Overall Customer Service" value={overallCustomerService} onChange={setOverallCustomerService} />
+                            {/* ─── Main Questions ─── */}
+                            <section className="bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-6">
+                                <h3 className="font-semibold text-gray-900 dark:text-white">Service Experience</h3>
+                                
+                                {/* First time using service */}
+                                <RatingComponent
+                                    label="Is this your first time using Zimbabwe Shipping Services?"
+                                    value={isFirstTime}
+                                    onChange={setIsFirstTime}
+                                    options={RATING_OPTIONS.yesNo}
+                                />
+
+                                {/* Booking ease */}
+                                <RatingComponent
+                                    label="How easy was the booking process?"
+                                    value={bookingEase}
+                                    onChange={setBookingEase}
+                                    options={RATING_OPTIONS.ease}
+                                />
+                                {shouldShowFollowUp('booking_ease', bookingEase) && (
+                                    <div className="ml-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                                        <label className="block text-sm font-medium text-red-700 dark:text-red-300 mb-2">
+                                            {FOLLOW_UP_QUESTIONS.booking_ease} <span className="text-red-500">*</span>
+                                        </label>
+                                        <textarea
+                                            value={followUpAnswers.booking_ease || ''}
+                                            onChange={(e) => setFollowUpAnswers({...followUpAnswers, booking_ease: e.target.value})}
+                                            rows={3}
+                                            className="w-full px-3 py-2 rounded-lg border border-red-300 dark:border-red-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500"
+                                            placeholder="Please tell us how we can improve..."
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Communication */}
+                                <RatingComponent
+                                    label="How would you rate our communication during the shipping process?"
+                                    value={communication}
+                                    onChange={setCommunication}
+                                    options={RATING_OPTIONS.quality}
+                                />
+                                {shouldShowFollowUp('communication', communication) && (
+                                    <div className="ml-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                                        <label className="block text-sm font-medium text-red-700 dark:text-red-300 mb-2">
+                                            {FOLLOW_UP_QUESTIONS.communication} <span className="text-red-500">*</span>
+                                        </label>
+                                        <textarea
+                                            value={followUpAnswers.communication || ''}
+                                            onChange={(e) => setFollowUpAnswers({...followUpAnswers, communication: e.target.value})}
+                                            rows={3}
+                                            className="w-full px-3 py-2 rounded-lg border border-red-300 dark:border-red-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500"
+                                            placeholder="Please tell us how we can improve..."
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Customer service */}
+                                <RatingComponent
+                                    label="How would you rate our customer service?"
+                                    value={customerService}
+                                    onChange={setCustomerService}
+                                    options={RATING_OPTIONS.quality}
+                                />
+                                {shouldShowFollowUp('customer_service', customerService) && (
+                                    <div className="ml-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                                        <label className="block text-sm font-medium text-red-700 dark:text-red-300 mb-2">
+                                            {FOLLOW_UP_QUESTIONS.customer_service} <span className="text-red-500">*</span>
+                                        </label>
+                                        <textarea
+                                            value={followUpAnswers.customer_service || ''}
+                                            onChange={(e) => setFollowUpAnswers({...followUpAnswers, customer_service: e.target.value})}
+                                            rows={3}
+                                            className="w-full px-3 py-2 rounded-lg border border-red-300 dark:border-red-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500"
+                                            placeholder="Please tell us how we can improve..."
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Delivery timing */}
+                                <RatingComponent
+                                    label="Was your delivery completed on time?"
+                                    value={deliveryOnTime}
+                                    onChange={setDeliveryOnTime}
+                                    options={RATING_OPTIONS.yesNo}
+                                />
+                                {deliveryOnTime === 'No' && (
+                                    <div className="ml-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                                        <label className="block text-sm font-medium text-red-700 dark:text-red-300 mb-2">
+                                            {FOLLOW_UP_QUESTIONS.delivery_time} <span className="text-red-500">*</span>
+                                        </label>
+                                        <textarea
+                                            value={followUpAnswers.delivery_time || ''}
+                                            onChange={(e) => setFollowUpAnswers({...followUpAnswers, delivery_time: e.target.value})}
+                                            rows={3}
+                                            className="w-full px-3 py-2 rounded-lg border border-red-300 dark:border-red-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500"
+                                            placeholder="Please tell us how we can improve..."
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Goods condition */}
+                                <RatingComponent
+                                    label="What was the condition of your goods upon arrival?"
+                                    value={goodsCondition}
+                                    onChange={setGoodsCondition}
+                                    options={RATING_OPTIONS.condition}
+                                />
+                                {shouldShowFollowUp('goods_condition', goodsCondition) && (
+                                    <div className="ml-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                                        <label className="block text-sm font-medium text-red-700 dark:text-red-300 mb-2">
+                                            {FOLLOW_UP_QUESTIONS.goods_condition} <span className="text-red-500">*</span>
+                                        </label>
+                                        <textarea
+                                            value={followUpAnswers.goods_condition || ''}
+                                            onChange={(e) => setFollowUpAnswers({...followUpAnswers, goods_condition: e.target.value})}
+                                            rows={3}
+                                            className="w-full px-3 py-2 rounded-lg border border-red-300 dark:border-red-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500"
+                                            placeholder="Please tell us how we can improve..."
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Overall satisfaction */}
+                                <RatingComponent
+                                    label="How satisfied are you overall with our service?"
+                                    value={overallSatisfaction}
+                                    onChange={setOverallSatisfaction}
+                                    options={RATING_OPTIONS.satisfaction}
+                                />
+                                {shouldShowFollowUp('overall_satisfaction', overallSatisfaction) && (
+                                    <div className="ml-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                                        <label className="block text-sm font-medium text-red-700 dark:text-red-300 mb-2">
+                                            {FOLLOW_UP_QUESTIONS.overall_satisfaction} <span className="text-red-500">*</span>
+                                        </label>
+                                        <textarea
+                                            value={followUpAnswers.overall_satisfaction || ''}
+                                            onChange={(e) => setFollowUpAnswers({...followUpAnswers, overall_satisfaction: e.target.value})}
+                                            rows={3}
+                                            className="w-full px-3 py-2 rounded-lg border border-red-300 dark:border-red-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500"
+                                            placeholder="Please tell us how we can improve..."
+                                        />
+                                    </div>
+                                )}
                             </section>
 
-                            {/* ─── Satisfaction Grid ─── */}
-                            <section className="bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-5">
-                                <h3 className="font-semibold text-gray-900 dark:text-white">Satisfied with the following</h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                                    <StarRating label="Bookings & Customer Service" value={satBookings} onChange={setSatBookings} />
-                                    <StarRating label="Collections (UK)" value={satCollections} onChange={setSatCollections} />
-                                    <StarRating label="Accounts" value={satAccounts} onChange={setSatAccounts} />
-                                    <StarRating label="Deliveries" value={satDeliveries} onChange={setSatDeliveries} />
-                                </div>
-                            </section>
-
-                            {/* ─── Parcel Arrival ─── */}
-                            <section className="bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-3">
-                                <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2"><Package className="h-5 w-5 text-zim-green" /> Did your parcel arrive as anticipated? <span className="text-zim-yellow">*</span></h3>
-                                <div className="flex flex-wrap gap-3">
-                                    {[
-                                        { value: 'yes', label: 'Yes', emoji: '✅' },
-                                        { value: 'no', label: 'No', emoji: '❌' },
-                                        { value: 'partially', label: 'Partially', emoji: '⚠️' },
-                                    ].map((opt) => (
-                                        <button
-                                            key={opt.value}
-                                            type="button"
-                                            onClick={() => setParcelArrived(opt.value)}
-                                            className={`px-5 py-2.5 rounded-lg border font-medium text-sm transition-all duration-200 flex items-center gap-2
-                        ${parcelArrived === opt.value
-                                                    ? 'border-zim-green bg-zim-green/10 text-zim-green shadow-sm'
-                                                    : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-zim-green/40'}`}
-                                        >
-                                            <span>{opt.emoji}</span> {opt.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </section>
-
-                            {/* ─── Additional Comments ─── */}
-                            <section className="bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-3">
-                                <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2"><MessageSquare className="h-5 w-5 text-zim-green" /> Any additional comments?</h3>
-                                <div className="flex gap-3">
-                                    {['yes', 'no'].map((val) => (
-                                        <button
-                                            key={val}
-                                            type="button"
-                                            onClick={() => { setHasComments(val === 'yes'); if (val === 'no') setComments(''); }}
-                                            className={`px-5 py-2 rounded-lg border font-medium text-sm transition-all
-                        ${(val === 'yes' ? hasComments : !hasComments)
-                                                    ? 'border-zim-green bg-zim-green/10 text-zim-green'
-                                                    : 'border-gray-300 dark:border-gray-600 text-gray-500 hover:border-zim-green/40'}`}
-                                        >
-                                            {val === 'yes' ? 'Yes' : 'No'}
-                                        </button>
-                                    ))}
-                                </div>
-                                {hasComments && (
+                            {/* ─── Additional Feedback ─── */}
+                            <section className="bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-4">
+                                <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <MessageSquare className="h-5 w-5 text-zim-green" /> Additional Feedback
+                                </h3>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Please share any additional feedback, testimonials, or complaints about your experience with Zimbabwe Shipping Services:
+                                    </label>
                                     <textarea
-                                        value={comments}
-                                        onChange={(e) => setComments(e.target.value)}
+                                        value={additionalFeedback}
+                                        onChange={(e) => setAdditionalFeedback(e.target.value)}
                                         rows={4}
                                         className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green resize-none"
-                                        placeholder="Tell us more..."
+                                        placeholder="Share your thoughts..."
                                     />
-                                )}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            What did you like most about our service?
+                                        </label>
+                                        <textarea
+                                            value={likedMost}
+                                            onChange={(e) => setLikedMost(e.target.value)}
+                                            rows={3}
+                                            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green resize-none"
+                                            placeholder="Tell us what you enjoyed..."
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            What can we improve?
+                                        </label>
+                                        <textarea
+                                            value={canImprove}
+                                            onChange={(e) => setCanImprove(e.target.value)}
+                                            rows={3}
+                                            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green resize-none"
+                                            placeholder="Suggestions for improvement..."
+                                        />
+                                    </div>
+                                </div>
                             </section>
 
                             {/* ─── Dynamic Custom Questions ─── */}
