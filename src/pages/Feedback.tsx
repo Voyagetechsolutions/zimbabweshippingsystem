@@ -1,4 +1,3 @@
-/* UPDATED FEEDBACK FORM - VERSION 2.0 - NO EMAIL FIELD */
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -266,13 +265,10 @@ const Feedback = () => {
                     </div>
                 ) : (
                     <>
-                        {/* UPDATED Header */}
+                        {/* Header */}
                         <div className="text-center mb-10">
-                            <h1 className="text-4xl font-bold text-gray-900 dark:text-white">🔄 Updated Service Feedback</h1>
-                            <p className="text-gray-500 dark:text-gray-400 mt-2 text-lg">We value your opinion — please take a moment to rate our service.</p>
-                            <div className="mt-4 p-3 bg-green-100 border border-green-300 rounded-lg">
-                                <p className="text-green-800 font-semibold">✅ Form Updated: No email required, larger text, combined feedback</p>
-                            </div>
+                            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Service Feedback</h1>
+                            <p className="text-gray-500 dark:text-gray-400 mt-2">We value your opinion — please take a moment to rate our service.</p>
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-8" noValidate>
