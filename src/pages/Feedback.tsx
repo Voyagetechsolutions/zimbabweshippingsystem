@@ -199,16 +199,32 @@ const Feedback = () => {
                 // Flag for admin attention
                 needs_admin_attention: hasPoorRating,
                 
-                // Legacy fields for compatibility (can be removed later)
+                // Required legacy fields for compatibility
                 full_name: `${firstName.trim()} ${lastName.trim()}`,
+                customer_reference_number: `FB-${Date.now()}`, // Generate a feedback reference number
                 overall_experience: overallSatisfaction === 'Very Satisfied' ? 3 : overallSatisfaction === 'Satisfied' ? 2 : 1,
                 overall_customer_service: customerService === 'Excellent' ? 3 : customerService === 'Good' ? 2 : 1,
+                satisfaction_bookings_customer_service: bookingEase === 'Very Easy' ? 3 : bookingEase === 'Easy' ? 2 : 1,
+                satisfaction_collections_uk: 2, // Default neutral rating for legacy field
+                satisfaction_accounts: 2, // Default neutral rating for legacy field  
+                satisfaction_deliveries: deliveryOnTime === 'Yes' ? 3 : 1,
+                parcel_arrived_as_anticipated: deliveryOnTime === 'Yes' ? 'yes' : 'no',
+                has_additional_comments: !!(additionalFeedback.trim() || likedMost.trim() || canImprove.trim()),
+                additional_comments: additionalFeedback.trim() || null,
             }) as any);
             
-            if (error) throw error;
+            if (error) {
+                console.error('Feedback submission error:', error);
+                throw error;
+            }
             setSubmitted(true);
-        } catch {
-            toast({ title: 'Something went wrong', description: 'Please try again later.', variant: 'destructive' });
+        } catch (error) {
+            console.error('Feedback submission failed:', error);
+            toast({ 
+                title: 'Something went wrong', 
+                description: 'Please try again later. If the problem persists, please contact support.', 
+                variant: 'destructive' 
+            });
         } finally {
             setSubmitting(false);
         }
