@@ -1,0 +1,441 @@
+# WhatsApp Bot Flow Diagram
+
+## 🔄 Complete Conversation Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    CUSTOMER STARTS CHAT                      │
+│                  (Sends "Hi" or "Hello")                     │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      MAIN MENU                               │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  🇮🇪 Zimbabwe Shipping - Ireland                      │  │
+│  │                                                         │  │
+│  │  1️⃣ 📦 Book a Shipment                                │  │
+│  │  2️⃣ 💰 View Pricing                                   │  │
+│  │  3️⃣ 🔍 Track Shipment                                 │  │
+│  │  4️⃣ 📍 Collection Schedule                            │  │
+│  │  5️⃣ ❓ FAQ & Help                                      │  │
+│  │  6️⃣ 📞 Contact Us                                      │  │
+│  └───────────────────────────────────────────────────────┘  │
+└───┬────────┬────────┬────────┬────────┬────────────────────┘
+    │        │        │        │        │
+    │        │        │        │        └──────────┐
+    │        │        │        └────────┐          │
+    │        │        └──────┐          │          │
+    │        └────┐           │          │          │
+    │             │           │          │          │
+    ▼             ▼           ▼          ▼          ▼
+┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐
+│ BOOK   │  │PRICING │  │ TRACK  │  │COLLECT │  │  FAQ   │
+│ FLOW   │  │  INFO  │  │  FLOW  │  │  INFO  │  │  FLOW  │
+└───┬────┘  └────────┘  └───┬────┘  └────────┘  └───┬────┘
+    │                        │                        │
+    │                        │                        │
+    ▼                        ▼                        ▼
+```
+
+## 📦 BOOKING FLOW (Detailed)
+
+```
+START BOOKING
+     │
+     ▼
+┌─────────────────────────────────────┐
+│  STEP 1: SENDER DETAILS             │
+├─────────────────────────────────────┤
+│  ✅ Full Name                        │
+│  ✅ Phone Number                     │
+│  ✅ Email Address                    │
+│  ✅ Collection Address               │
+│  ✅ City (from Ireland list)        │
+│  ✅ Eircode (optional)               │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  STEP 2: RECEIVER DETAILS           │
+├─────────────────────────────────────┤
+│  ✅ Full Name                        │
+│  ✅ Phone Number                     │
+│  ✅ Delivery Address                 │
+│  ✅ City in Zimbabwe                 │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  STEP 3: SHIPMENT TYPE              │
+├─────────────────────────────────────┤
+│  1️⃣ Drums only                      │
+│  2️⃣ Boxes only                      │
+│  3️⃣ Both drums and boxes            │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  STEP 4: QUANTITY & ADD-ONS         │
+├─────────────────────────────────────┤
+│  🥁 Number of drums                  │
+│  📦 Number of boxes                  │
+│  🔒 Metal seal? (€7)                │
+│  🚪 Door-to-door? (€25)             │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  STEP 5: PAYMENT METHOD             │
+├─────────────────────────────────────┤
+│  1️⃣ Cash on collection              │
+│  2️⃣ Card payment                    │
+│  3️⃣ Bank transfer                   │
+│  4️⃣ Mobile payment                  │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  BOOKING SUMMARY                    │
+├─────────────────────────────────────┤
+│  📋 All details displayed            │
+│  💰 Total price calculated           │
+│  ✅ Confirm or Edit                  │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  CONFIRMATION                       │
+├─────────────────────────────────────┤
+│  🎉 Booking confirmed!               │
+│  📦 Tracking: ZS-ABC12345            │
+│  📧 Email sent                       │
+│  💾 Saved to database                │
+└─────────────────────────────────────┘
+```
+
+## 🔍 TRACKING FLOW
+
+```
+START TRACKING
+     │
+     ▼
+┌─────────────────────────────────────┐
+│  ASK FOR TRACKING NUMBER            │
+│  "Enter tracking number:"           │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  VALIDATE FORMAT                    │
+│  Must be: ZS-XXXXXXXX               │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  FETCH FROM DATABASE                │
+│  Query Supabase shipments table     │
+└──────────────┬──────────────────────┘
+               │
+        ┌──────┴──────┐
+        │             │
+        ▼             ▼
+   ┌────────┐    ┌────────┐
+   │ FOUND  │    │NOT FOUND│
+   └───┬────┘    └───┬────┘
+       │             │
+       │             ▼
+       │        ┌────────────────┐
+       │        │ Error message  │
+       │        │ Try again      │
+       │        └────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────┐
+│  DISPLAY TRACKING INFO              │
+├─────────────────────────────────────┤
+│  📦 Tracking number                  │
+│  📍 Current status                   │
+│  🇮🇪 Origin                          │
+│  🇿🇼 Destination                     │
+│  👤 Sender details                   │
+│  👤 Receiver details                 │
+│  📊 Status timeline                  │
+│  ⏱️ Estimated delivery               │
+└─────────────────────────────────────┘
+```
+
+## 💰 PRICING FLOW
+
+```
+VIEW PRICING
+     │
+     ▼
+┌─────────────────────────────────────┐
+│  DISPLAY PRICING TABLE              │
+├─────────────────────────────────────┤
+│  DRUMS (200-220L):                  │
+│  • 5+ drums: €340 each              │
+│  • 2-4 drums: €350 each             │
+│  • 1 drum: €360                     │
+│                                     │
+│  TRUNKS/BOXES:                      │
+│  • 5+ items: €200 each              │
+│  • 2-4 items: €210 each             │
+│  • 1 item: €220                     │
+│                                     │
+│  ADD-ONS:                           │
+│  • Metal seal: €7                   │
+│  • Door-to-door: €25                │
+│                                     │
+│  INCLUDED:                          │
+│  ✅ FREE collection                  │
+│  ✅ Full tracking                    │
+│  ✅ 6 weeks delivery                 │
+└─────────────────────────────────────┘
+```
+
+## ❓ FAQ FLOW
+
+```
+START FAQ
+     │
+     ▼
+┌─────────────────────────────────────┐
+│  SHOW CATEGORIES                    │
+├─────────────────────────────────────┤
+│  1️⃣ Shipping FAQs                   │
+│  2️⃣ Payment FAQs                    │
+│  3️⃣ Collection FAQs                 │
+└──────────────┬──────────────────────┘
+               │
+        ┌──────┼──────┐
+        │      │      │
+        ▼      ▼      ▼
+    ┌────┐  ┌────┐  ┌────┐
+    │ 1  │  │ 2  │  │ 3  │
+    └─┬──┘  └─┬──┘  └─┬──┘
+      │       │       │
+      ▼       ▼       ▼
+┌──────────────────────────────────┐
+│  DISPLAY CATEGORY QUESTIONS      │
+│  • Question 1 + Answer           │
+│  • Question 2 + Answer           │
+│  • Question 3 + Answer           │
+└──────────────────────────────────┘
+```
+
+## 🗺️ IRELAND ROUTE MAPPING
+
+```
+CUSTOMER ENTERS CITY
+         │
+         ▼
+┌─────────────────────────────────────┐
+│  VALIDATE CITY                      │
+│  Check against 76 Irish cities      │
+└──────────────┬──────────────────────┘
+               │
+        ┌──────┴──────┐
+        │             │
+        ▼             ▼
+   ┌────────┐    ┌────────┐
+   │ VALID  │    │INVALID │
+   └───┬────┘    └───┬────┘
+       │             │
+       │             ▼
+       │        ┌────────────────┐
+       │        │ Ask to re-enter│
+       │        │ Show examples  │
+       │        └────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────┐
+│  MAP TO COLLECTION ROUTE            │
+├─────────────────────────────────────┤
+│  Dublin → DUBLIN CITY Route         │
+│  Cork → CORK Route                  │
+│  Belfast → BELFAST Route            │
+│  Galway → ATHLONE Route             │
+│  Limerick → LIMERICK Route          │
+│  Drogheda → CAVAN Route             │
+│  Londonderry → LONDONDERRY Route    │
+└─────────────────────────────────────┘
+```
+
+## 💾 DATABASE INTEGRATION
+
+```
+BOOKING CONFIRMED
+         │
+         ▼
+┌─────────────────────────────────────┐
+│  GENERATE TRACKING NUMBER           │
+│  Format: ZS-XXXXXXXX                │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  CREATE SHIPMENT RECORD             │
+├─────────────────────────────────────┤
+│  tracking_number: ZS-ABC12345       │
+│  status: Pending Collection         │
+│  origin: Dublin, Ireland            │
+│  destination: Harare, Zimbabwe      │
+│  metadata: {                        │
+│    sender: {...}                    │
+│    recipient: {...}                 │
+│    shipment: {...}                  │
+│    payment: {...}                   │
+│    whatsappNumber: +353...          │
+│  }                                  │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  INSERT INTO SUPABASE               │
+│  Table: shipments                   │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  RETURN TRACKING NUMBER             │
+│  Send confirmation to customer      │
+└─────────────────────────────────────┘
+```
+
+## 👤 USER SESSION MANAGEMENT
+
+```
+MESSAGE RECEIVED
+         │
+         ▼
+┌─────────────────────────────────────┐
+│  GET USER SESSION                   │
+│  Key: WhatsApp phone number         │
+└──────────────┬──────────────────────┘
+               │
+        ┌──────┴──────┐
+        │             │
+        ▼             ▼
+   ┌────────┐    ┌────────┐
+   │ EXISTS │    │  NEW   │
+   └───┬────┘    └───┬────┘
+       │             │
+       │             ▼
+       │        ┌────────────────┐
+       │        │ Create session │
+       │        │ state: MAIN    │
+       │        └────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────┐
+│  SESSION DATA                       │
+├─────────────────────────────────────┤
+│  phoneNumber: +353...               │
+│  state: BOOKING_FLOW                │
+│  step: SENDER_NAME                  │
+│  userName: John                     │
+│  bookingData: {...}                 │
+│  lastActivity: timestamp            │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  ROUTE TO APPROPRIATE HANDLER       │
+│  Based on current state             │
+└─────────────────────────────────────┘
+```
+
+## 🔄 ERROR HANDLING
+
+```
+ERROR OCCURS
+         │
+         ▼
+┌─────────────────────────────────────┐
+│  CATCH ERROR                        │
+└──────────────┬──────────────────────┘
+               │
+        ┌──────┴──────┐
+        │             │
+        ▼             ▼
+┌──────────────┐  ┌──────────────┐
+│ INPUT ERROR  │  │ SYSTEM ERROR │
+└──────┬───────┘  └──────┬───────┘
+       │                 │
+       ▼                 ▼
+┌──────────────┐  ┌──────────────┐
+│ User-friendly│  │ Log error    │
+│ message      │  │ Generic msg  │
+│ Try again    │  │ Offer menu   │
+└──────────────┘  └──────────────┘
+```
+
+## 🎯 COMPLETE USER JOURNEY
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    CUSTOMER JOURNEY                          │
+└─────────────────────────────────────────────────────────────┘
+
+1. DISCOVERY
+   Customer finds WhatsApp number
+   ↓
+2. FIRST CONTACT
+   Sends "Hi" → Bot greets and shows menu
+   ↓
+3. BOOKING
+   Types "1" → Guided through 5 steps → Gets tracking number
+   ↓
+4. CONFIRMATION
+   Receives email and WhatsApp confirmation
+   ↓
+5. TRACKING
+   Can track anytime by typing "track"
+   ↓
+6. COLLECTION
+   Items collected on scheduled date
+   ↓
+7. UPDATES
+   Can check status throughout journey
+   ↓
+8. DELIVERY
+   Items delivered in Zimbabwe
+   ↓
+9. REPEAT
+   Next time, bot remembers them by name!
+```
+
+## 📊 DATA FLOW
+
+```
+┌──────────────┐
+│   CUSTOMER   │
+└──────┬───────┘
+       │ WhatsApp Message
+       ▼
+┌──────────────┐
+│  WHATSAPP    │
+│   SERVER     │
+└──────┬───────┘
+       │ Encrypted
+       ▼
+┌──────────────┐
+│   BOT APP    │
+│  (Node.js)   │
+└──────┬───────┘
+       │
+       ├─────────────────┐
+       │                 │
+       ▼                 ▼
+┌──────────────┐  ┌──────────────┐
+│   SESSION    │  │   SUPABASE   │
+│    CACHE     │  │   DATABASE   │
+│ (In-Memory)  │  │ (PostgreSQL) │
+└──────────────┘  └──────────────┘
+```
+
+---
+
+**This diagram shows the complete flow of the WhatsApp bot from customer interaction to database storage!** 🎯

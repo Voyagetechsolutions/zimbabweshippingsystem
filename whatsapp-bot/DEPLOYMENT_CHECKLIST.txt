@@ -1,0 +1,83 @@
+╔══════════════════════════════════════════════════════════════╗
+║  DEPLOYMENT CHECKLIST - QR Code Image Method                ║
+╚══════════════════════════════════════════════════════════════╝
+
+PRE-DEPLOYMENT
+□ Bot tested locally (npm start works)
+□ .env file configured with Supabase credentials
+□ GitHub account created
+□ DigitalOcean account created
+
+GITHUB SETUP
+□ Repository created (private!)
+□ Code pushed to GitHub
+□ Verified .env is NOT in repository
+
+SERVER SETUP
+□ Droplet created (Ubuntu 22.04, $6/month)
+□ Server IP address noted: ___________________
+□ Can SSH into server
+□ Node.js installed (v18+)
+□ PM2 installed globally
+
+BOT DEPLOYMENT
+□ Repository cloned to /opt/
+□ Dependencies installed (npm install)
+□ .env file created on server
+□ Supabase credentials added to .env
+
+START BOT
+□ Bot started with PM2
+□ Logs show "QR code saved to: qr-code.png"
+□ QR code image downloaded to local computer
+□ QR code scanned with WhatsApp
+□ Connection successful message shown
+
+FINALIZE
+□ PM2 configuration saved (pm2 save)
+□ Auto-start enabled (pm2 startup)
+□ QR code image deleted from server
+□ Firewall configured (ufw enable)
+
+TESTING
+□ Sent "Hi" to bot → Received welcome message
+□ Started booking → Bot guided through process
+□ Checked Supabase → Booking saved to database
+□ Sent message in group → Bot ignored it
+□ Restarted server → Bot auto-started
+
+CUSTOMER SETUP
+□ Generated customer WhatsApp link
+□ Added link to website
+□ Added link to Facebook page
+□ Added link to Instagram bio
+□ Created QR code for print materials
+
+MONITORING
+□ Bot status is "online" (pm2 status)
+□ No errors in logs (pm2 logs)
+□ Memory usage normal (<500MB)
+□ Set up monitoring alerts
+
+DOCUMENTATION
+□ Saved server IP address
+□ Saved server password
+□ Saved GitHub repository URL
+□ Saved WhatsApp business number
+□ Team trained on monitoring
+
+╔══════════════════════════════════════════════════════════════╗
+║  ✅ ALL CHECKED? YOUR BOT IS LIVE! 🎉                       ║
+╚══════════════════════════════════════════════════════════════╝
+
+NEXT STEPS:
+1. Monitor for 24 hours
+2. Test all features thoroughly
+3. Share bot number with customers
+4. Promote on social media
+5. Celebrate! 🎊
+
+SUPPORT:
+- Check SIMPLE_SETUP.md for detailed steps
+- Check REMOTE_QR_SCANNING.md for QR code help
+- Check TROUBLESHOOTING.md for common issues

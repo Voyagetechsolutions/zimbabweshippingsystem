@@ -1,0 +1,102 @@
+# Quick Deployment Guide
+
+## Step 1: Push to GitHub
+
+```powershell
+cd whatsapp-bot
+git init
+git add .
+git commit -m "Initial commit"
+git remote add origin https://github.com/YOUR_USERNAME/zimbabwe-shipping-whatsapp-bot.git
+git push -u origin main
+```
+
+## Step 2: Create DigitalOcean Server
+
+1. Go to https://www.digitalocean.com
+2. Create account (get $200 free credit!)
+3. Create Droplet:
+   - Ubuntu 22.04 LTS
+   - Basic plan ($6/month)
+   - London or Amsterdam datacenter
+   - Add SSH key or use password
+4. Note your server IP address
+
+## Step 3: Connect to Server
+
+```powershell
+ssh root@YOUR_SERVER_IP
+```
+
+## Step 4: Clone and Setup
+
+```bash
+# Clone repository
+cd /opt
+git clone https://github.com/YOUR_USERNAME/zimbabwe-shipping-whatsapp-bot.git
+cd zimbabwe-shipping-whatsapp-bot
+
+# Make deployment script executable
+chmod +x deploy-to-server.sh
+
+# Run deployment script
+./deploy-to-server.sh
+```
+
+## Step 5: Configure Environment
+
+```bash
+# Edit .env file
+nano .env
+```
+
+Add your credentials:
+```
+SUPABASE_URL=https://oncsaunsqtekwwbzvvyh.supabase.co
+SUPABASE_ANON_KEY=your_key_here
+BOT_NAME=Zimbabwe Shipping Ireland
+SESSION_PATH=./whatsapp-session
+NODE_ENV=production
+```
+
+Save: Ctrl+X, Y, Enter
+
+## Step 6: Start Bot
+
+```bash
+pm2 start src/index.js --name zimbabwe-bot
+pm2 logs zimbabwe-bot
+```
+
+## Step 7: Scan QR Code
+
+1. QR code appears in logs
+2. Open WhatsApp on phone
+3. Settings → Linked Devices → Link Device
+4. Scan QR code
+
+## Step 8: Test
+
+Send "Hi" to the bot number - it should respond!
+
+## Useful Commands
+
+```bash
+pm2 status                  # Check status
+pm2 logs zimbabwe-bot       # View logs
+pm2 restart zimbabwe-bot    # Restart
+pm2 stop zimbabwe-bot       # Stop
+pm2 monit                   # Monitor
+```
+
+## Cost
+
+- DigitalOcean: $6/month (or free with $200 credit = 33 months free!)
+- Domain (optional): ~$10/year
+
+## Support
+
+If you need help, check:
+- README.md - Full documentation
+- SETUP_GUIDE.md - Detailed setup
+- DEPLOYMENT.md - Production deployment guide

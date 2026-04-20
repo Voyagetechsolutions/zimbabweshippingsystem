@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate WhatsApp QR Code - Zimbabwe Shipping</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #25D366;
+            text-align: center;
+        }
+        .input-group {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            background: #25D366;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+        }
+        button:hover {
+            background: #128C7E;
+        }
+        #qrcode {
+            text-align: center;
+            margin: 30px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 10px;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e8f5e9;
+            border-radius: 5px;
+            display: none;
+        }
+        .link {
+            word-break: break-all;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        .copy-btn {
+            background: #128C7E;
+            padding: 10px 20px;
+            margin-top: 10px;
+            width: auto;
+        }
+        .instructions {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🇮🇪 Zimbabwe Shipping WhatsApp QR Code Generator</h1>
+        
+        <div class="input-group">
+            <label for="phone">Your WhatsApp Business Number:</label>
+            <input type="tel" id="phone" placeholder="353871234567" value="353">
+            <small>Enter with country code, no + or spaces (e.g., 353871234567)</small>
+        </div>
+
+        <div class="input-group">
+            <label for="message">Pre-filled Message (Optional):</label>
+            <textarea id="message" rows="3" placeholder="Hi, I want to ship to Zimbabwe">Hi</textarea>
+            <small>This message will be pre-filled when customers click the link</small>
+        </div>
+
+        <button onclick="generateQR()">Generate QR Code & Link</button>
+
+        <div id="result" class="result">
+            <h3>✅ Your WhatsApp Link:</h3>
+            <div class="link" id="link"></div>
+            <button class="copy-btn" onclick="copyLink()">Copy Link</button>
+
+            <h3 style="margin-top: 20px;">📱 QR Code:</h3>
+            <div id="qrcode"></div>
+            <button class="copy-btn" onclick="downloadQR()">Download QR Code</button>
+        </div>
+
+        <div class="instructions">
+            <h3>📋 How to Use:</h3>
+            <ol>
+                <li><strong>Enter your WhatsApp number</strong> (the one connected to the bot)</li>
+                <li><strong>Click "Generate"</strong></li>
+                <li><strong>Use the link</strong> on your website, Facebook, emails</li>
+                <li><strong>Use the QR code</strong> on flyers, posters, business cards</li>
+            </ol>
+            
+            <h3>💡 Where to Place:</h3>
+            <ul>
+                <li>✅ Website header/footer</li>
+                <li>✅ Facebook page</li>
+                <li>✅ Instagram bio</li>
+                <li>✅ Email signature</li>
+                <li>✅ Business cards</li>
+                <li>✅ Flyers and posters</li>
+                <li>✅ Google My Business</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let qrCodeInstance = null;
+
+        function generateQR() {
+            const phone = document.getElementById('phone').value.replace(/\D/g, '');
+            const message = document.getElementById('message').value;
+            
+            if (!phone) {
+                alert('Please enter your WhatsApp number');
+                return;
+            }
+
+            // Generate WhatsApp link
+            let link = `https://wa.me/${phone}`;
+            if (message) {
+                link += `?text=${encodeURIComponent(message)}`;
+            }
+
+            // Display link
+            document.getElementById('link').textContent = link;
+            document.getElementById('result').style.display = 'block';
+
+            // Clear previous QR code
+            document.getElementById('qrcode').innerHTML = '';
+
+            // Generate QR code
+            QRCode.toCanvas(link, {
+                width: 300,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                }
+            }, function (error, canvas) {
+                if (error) {
+                    console.error(error);
+                    alert('Error generating QR code');
+                    return;
+                }
+                document.getElementById('qrcode').appendChild(canvas);
+                qrCodeInstance = canvas;
+            });
+        }
+
+        function copyLink() {
+            const link = document.getElementById('link').textContent;
+            navigator.clipboard.writeText(link).then(() => {
+                alert('✅ Link copied to clipboard!');
+            }).catch(err => {
+                alert('Failed to copy link');
+            });
+        }
+
+        function downloadQR() {
+            if (!qrCodeInstance) {
+                alert('Please generate QR code first');
+                return;
+            }
+
+            const link = document.createElement('a');
+            link.download = 'zimbabwe-shipping-whatsapp-qr.png';
+            link.href = qrCodeInstance.toDataURL();
+            link.click();
+        }
+    </script>
+</body>
+</html>

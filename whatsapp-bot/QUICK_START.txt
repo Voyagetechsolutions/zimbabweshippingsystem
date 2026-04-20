@@ -1,0 +1,163 @@
+╔══════════════════════════════════════════════════════════════╗
+║  ZIMBABWE SHIPPING WHATSAPP BOT - QUICK START GUIDE         ║
+║  QR Code Image Method (Easiest!)                            ║
+╚══════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────┐
+│  STEP 1: PUSH TO GITHUB (5 minutes)                         │
+└──────────────────────────────────────────────────────────────┘
+
+cd whatsapp-bot
+git init
+git add .
+git commit -m "Initial commit"
+git remote add origin https://github.com/YOUR_USERNAME/repo.git
+git push -u origin main
+
+┌──────────────────────────────────────────────────────────────┐
+│  STEP 2: CREATE SERVER (5 minutes)                          │
+└──────────────────────────────────────────────────────────────┘
+
+1. Go to digitalocean.com
+2. Create account (get $200 free!)
+3. Create Droplet:
+   - Ubuntu 22.04
+   - $6/month plan
+   - London datacenter
+4. Note IP address
+
+┌──────────────────────────────────────────────────────────────┐
+│  STEP 3: SETUP SERVER (10 minutes)                          │
+└──────────────────────────────────────────────────────────────┘
+
+ssh root@YOUR_SERVER_IP
+
+# Install Node.js
+curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+apt install -y nodejs
+npm install -g pm2
+
+# Clone bot
+cd /opt
+git clone https://github.com/YOUR_USERNAME/repo.git
+cd zimbabwe-shipping-whatsapp-bot
+npm install
+
+# Create .env
+nano .env
+[Paste your Supabase credentials]
+[Save: Ctrl+X, Y, Enter]
+
+┌──────────────────────────────────────────────────────────────┐
+│  STEP 4: START BOT (2 minutes)                              │
+└──────────────────────────────────────────────────────────────┘
+
+pm2 start src/index.js --name zimbabwe-bot
+pm2 logs zimbabwe-bot
+
+You'll see:
+  📸 QR code saved to: qr-code.png
+  💡 Download this file and scan it with your phone!
+
+┌──────────────────────────────────────────────────────────────┐
+│  STEP 5: DOWNLOAD QR CODE (1 minute)                        │
+└──────────────────────────────────────────────────────────────┘
+
+Open NEW PowerShell on your computer:
+
+scp root@YOUR_SERVER_IP:/opt/zimbabwe-shipping-whatsapp-bot/qr-code.png ./
+
+[Enter password]
+[File downloads to current folder]
+
+┌──────────────────────────────────────────────────────────────┐
+│  STEP 6: SCAN QR CODE (1 minute)                            │
+└──────────────────────────────────────────────────────────────┘
+
+1. Open qr-code.png on your computer
+2. Open WhatsApp on your phone
+3. Settings → Linked Devices → Link a Device
+4. Scan the QR code from your screen
+5. Wait for "Connected Successfully!"
+
+┌──────────────────────────────────────────────────────────────┐
+│  STEP 7: FINALIZE (2 minutes)                               │
+└──────────────────────────────────────────────────────────────┘
+
+pm2 save
+pm2 startup
+[Run the command it shows]
+
+┌──────────────────────────────────────────────────────────────┐
+│  STEP 8: TEST (1 minute)                                    │
+└──────────────────────────────────────────────────────────────┘
+
+Send "Hi" to your WhatsApp number
+Bot should respond with welcome message!
+
+╔══════════════════════════════════════════════════════════════╗
+║  ✅ DONE! Total Time: ~30 minutes                           ║
+║  💰 Cost: $6/month (or FREE with $200 credit!)              ║
+║  🎉 Bot now runs 24/7 automatically!                        ║
+╚══════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────┐
+│  USEFUL COMMANDS                                             │
+└──────────────────────────────────────────────────────────────┘
+
+pm2 status              # Check if bot is running
+pm2 logs zimbabwe-bot   # View logs
+pm2 restart zimbabwe-bot # Restart bot
+pm2 stop zimbabwe-bot   # Stop bot
+pm2 monit               # Monitor resources
+
+┌──────────────────────────────────────────────────────────────┐
+│  TROUBLESHOOTING                                             │
+└──────────────────────────────────────────────────────────────┘
+
+QR Code Expired?
+  → pm2 restart zimbabwe-bot
+  → Download new qr-code.png
+  → Scan again
+
+Bot Not Responding?
+  → pm2 logs zimbabwe-bot
+  → Check for errors
+  → pm2 restart zimbabwe-bot
+
+Can't Download QR Code?
+  → Check file exists: ls -la qr-code.png
+  → Check permissions: chmod 644 qr-code.png
+  → Try again
+
+┌──────────────────────────────────────────────────────────────┐
+│  WHAT HAPPENS NEXT?                                          │
+└──────────────────────────────────────────────────────────────┘
+
+✅ Bot runs 24/7 on server
+✅ Responds to WhatsApp messages automatically
+✅ Saves all bookings to Supabase database
+✅ Remembers users by phone number
+✅ Ignores group messages
+✅ Auto-restarts if it crashes
+✅ Survives server reboots
+
+┌──────────────────────────────────────────────────────────────┐
+│  SHARE WITH CUSTOMERS                                        │
+└──────────────────────────────────────────────────────────────┘
+
+Create customer link:
+  https://wa.me/353XXXXXXXXX?text=Hi
+
+Put on:
+  ✓ Website
+  ✓ Facebook page
+  ✓ Instagram bio
+  ✓ Email signature
+  ✓ Business cards
+
+Customers click → WhatsApp opens → Bot responds!
+
+╔══════════════════════════════════════════════════════════════╗
+║  🎊 CONGRATULATIONS! YOUR BOT IS LIVE! 🎊                   ║
+╚══════════════════════════════════════════════════════════════╝
