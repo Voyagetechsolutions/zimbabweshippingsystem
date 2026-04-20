@@ -1,3 +1,4 @@
+/* UPDATED FEEDBACK FORM - VERSION 2.0 - NO EMAIL FIELD */
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -44,20 +45,22 @@ interface RatingProps {
 }
 
 const RatingComponent: React.FC<RatingProps> = ({ label, icon, value, onChange, options, required = true }) => (
-    <div className="space-y-3">
-        <label className="flex items-center gap-2 text-base font-semibold text-gray-800 dark:text-gray-200">
-            {icon}{label} {required && <span className="text-red-500">*</span>}
+    <div className="space-y-4">
+        <label className="flex items-center gap-3 text-xl font-bold text-gray-900 dark:text-gray-100">
+            {icon && <span className="text-zim-green">{icon}</span>}
+            <span>{label}</span> 
+            {required && <span className="text-red-600 text-2xl">*</span>}
         </label>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-3">
             {options.map((option) => (
                 <button
                     key={option}
                     type="button"
                     onClick={() => onChange(option)}
-                    className={`px-4 py-2 rounded-lg border font-medium text-sm transition-all duration-200
+                    className={`px-5 py-3 rounded-lg border-2 font-medium text-base transition-all duration-200
                         ${value === option
-                            ? 'border-zim-green bg-zim-green/10 text-zim-green shadow-sm'
-                            : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-zim-green/40'
+                            ? 'border-zim-green bg-zim-green/20 text-zim-green shadow-md scale-105'
+                            : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-zim-green/50 hover:bg-zim-green/5'
                         }`}
                 >
                     {option}
@@ -263,52 +266,57 @@ const Feedback = () => {
                     </div>
                 ) : (
                     <>
-                        {/* Header */}
+                        {/* UPDATED Header */}
                         <div className="text-center mb-10">
-                            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Service Feedback</h1>
-                            <p className="text-gray-500 dark:text-gray-400 mt-2">We value your opinion — please take a moment to rate our service.</p>
+                            <h1 className="text-4xl font-bold text-gray-900 dark:text-white">🔄 Updated Service Feedback</h1>
+                            <p className="text-gray-500 dark:text-gray-400 mt-2 text-lg">We value your opinion — please take a moment to rate our service.</p>
+                            <div className="mt-4 p-3 bg-green-100 border border-green-300 rounded-lg">
+                                <p className="text-green-800 font-semibold">✅ Form Updated: No email required, larger text, combined feedback</p>
+                            </div>
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-8" noValidate>
-                            {/* ─── Contact Information ─── */}
+                            {/* ─── UPDATED Contact Information ─── */}
                             <section className="bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-4">
-                                <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                    <User className="h-5 w-5 text-zim-green" /> Contact Information
+                                <h3 className="font-bold text-xl text-gray-900 dark:text-white flex items-center gap-2">
+                                    <User className="h-6 w-6 text-zim-green" /> Contact Information
                                 </h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                            First Name <span className="text-red-500">*</span>
-                                        </label>
-                                        <input 
-                                            value={firstName} 
-                                            onChange={(e) => setFirstName(e.target.value)} 
-                                            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green" 
-                                            placeholder="Your first name" 
-                                        />
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">
+                                                First Name <span className="text-red-600 text-xl">*</span>
+                                            </label>
+                                            <input 
+                                                value={firstName} 
+                                                onChange={(e) => setFirstName(e.target.value)} 
+                                                className="w-full px-4 py-3 text-lg rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green focus:border-zim-green" 
+                                                placeholder="Enter your first name" 
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">
+                                                Last Name <span className="text-red-600 text-xl">*</span>
+                                            </label>
+                                            <input 
+                                                value={lastName} 
+                                                onChange={(e) => setLastName(e.target.value)} 
+                                                className="w-full px-4 py-3 text-lg rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green focus:border-zim-green" 
+                                                placeholder="Enter your last name" 
+                                            />
+                                        </div>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                            Last Name <span className="text-red-500">*</span>
-                                        </label>
-                                        <input 
-                                            value={lastName} 
-                                            onChange={(e) => setLastName(e.target.value)} 
-                                            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green" 
-                                            placeholder="Your last name" 
-                                        />
-                                    </div>
-                                    <div className="sm:col-span-2">
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                            WhatsApp Number <span className="text-red-500">*</span>
+                                        <label className="block text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">
+                                            WhatsApp Number <span className="text-red-600 text-xl">*</span>
                                         </label>
                                         <div className="relative">
-                                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                                             <input 
                                                 type="tel"
                                                 value={whatsappNumber} 
                                                 onChange={(e) => setWhatsappNumber(e.target.value)} 
-                                                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green" 
+                                                className="w-full pl-12 pr-4 py-3 text-lg rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green focus:border-zim-green" 
                                                 placeholder="+44 7XXX XXXXXX" 
                                             />
                                         </div>
@@ -317,8 +325,8 @@ const Feedback = () => {
                             </section>
 
                             {/* ─── Main Questions ─── */}
-                            <section className="bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-6">
-                                <h3 className="font-semibold text-gray-900 dark:text-white">Service Experience</h3>
+                            <section className="bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-8">
+                                <h3 className="font-bold text-xl text-gray-900 dark:text-white">Service Experience</h3>
                                 
                                 {/* First time using service */}
                                 <RatingComponent
@@ -336,9 +344,9 @@ const Feedback = () => {
                                     options={RATING_OPTIONS.ease}
                                 />
                                 {shouldShowFollowUp('booking_ease', bookingEase) && (
-                                    <div className="ml-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                                        <label className="block text-base font-semibold text-red-700 dark:text-red-300 mb-2">
-                                            {FOLLOW_UP_QUESTIONS.booking_ease} <span className="text-red-500">*</span>
+                                    <div className="ml-6 p-5 bg-red-50 dark:bg-red-900/20 rounded-xl border-2 border-red-300 dark:border-red-700">
+                                        <label className="block text-lg font-bold text-red-800 dark:text-red-200 mb-3 leading-relaxed">
+                                            {FOLLOW_UP_QUESTIONS.booking_ease} <span className="text-red-600 text-xl">*</span>
                                         </label>
                                         <textarea
                                             value={followUpAnswers.booking_ease || ''}
@@ -461,22 +469,22 @@ const Feedback = () => {
                                 )}
                             </section>
 
-                            {/* ─── Additional Feedback ─── */}
-                            <section className="bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-4">
-                                <h3 className="font-semibold text-lg text-gray-900 dark:text-white flex items-center gap-2">
-                                    <MessageSquare className="h-5 w-5 text-zim-green" /> Additional Feedback
+                            {/* ─── UPDATED Additional Feedback ─── */}
+                            <section className="bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-6">
+                                <h3 className="font-bold text-xl text-gray-900 dark:text-white flex items-center gap-3">
+                                    <MessageSquare className="h-6 w-6 text-zim-green" /> Additional Feedback
                                 </h3>
                                 
-                                <div>
-                                    <label className="block text-base font-semibold text-gray-800 dark:text-gray-200 mb-3">
+                                <div className="space-y-4">
+                                    <label className="block text-lg font-bold text-gray-900 dark:text-gray-100 leading-relaxed">
                                         Please share any additional feedback, testimonials, or complaints about your experience with Zimbabwe Shipping Services. 
                                         Tell us what you liked most and what we can improve:
                                     </label>
                                     <textarea
                                         value={additionalFeedback}
                                         onChange={(e) => setAdditionalFeedback(e.target.value)}
-                                        rows={6}
-                                        className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green resize-none"
+                                        rows={8}
+                                        className="w-full px-4 py-4 text-lg rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-zim-green focus:border-zim-green resize-none"
                                         placeholder="Share your thoughts, what you liked most, and suggestions for improvement..."
                                     />
                                 </div>
@@ -524,18 +532,23 @@ const Feedback = () => {
                                 </section>
                             )}
 
-                            {/* ─── Submit ─── */}
-                            <button
-                                type="submit"
-                                disabled={submitting || !isValid()}
-                                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-zim-green to-zim-green/80 text-white font-semibold text-lg flex items-center justify-center gap-2 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                            >
-                                {submitting ? (
-                                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                                ) : (
-                                    <><Send className="h-5 w-5" /> Submit Feedback</>
-                                )}
-                            </button>
+                            {/* ─── UPDATED Submit Button ─── */}
+                            <div className="pt-4">
+                                <button
+                                    type="submit"
+                                    disabled={submitting || !isValid()}
+                                    className="w-full py-4 text-xl font-bold rounded-xl bg-gradient-to-r from-zim-green to-green-600 text-white flex items-center justify-center gap-3 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105"
+                                >
+                                    {submitting ? (
+                                        <div className="h-6 w-6 animate-spin rounded-full border-3 border-white border-t-transparent" />
+                                    ) : (
+                                        <>
+                                            <Send className="h-6 w-6" /> 
+                                            Submit Feedback
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </form>
                     </>
                 )}
