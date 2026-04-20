@@ -1,0 +1,100 @@
+═══════════════════════════════════════════════════════════
+   WHATSAPP BOT - QUICK COMMAND REFERENCE
+═══════════════════════════════════════════════════════════
+
+📋 COPY & PASTE THESE COMMANDS IN ORDER:
+
+═══════════════════════════════════════════════════════════
+1️⃣ CONNECT TO SERVER
+═══════════════════════════════════════════════════════════
+
+ssh root@YOUR_SERVER_IP
+
+(Replace YOUR_SERVER_IP with your actual IP)
+
+═══════════════════════════════════════════════════════════
+2️⃣ INSTALL NODE.JS
+═══════════════════════════════════════════════════════════
+
+apt update && apt upgrade -y
+curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+apt install -y nodejs
+npm install -g pm2
+node --version
+npm --version
+
+═══════════════════════════════════════════════════════════
+3️⃣ DOWNLOAD BOT
+═══════════════════════════════════════════════════════════
+
+cd /opt
+git clone https://github.com/Mtho-kozisi/zimbabwe-shipping-nexus.git
+cd zimbabwe-shipping-nexus/whatsapp-bot
+npm install
+
+═══════════════════════════════════════════════════════════
+4️⃣ CREATE .ENV FILE
+═══════════════════════════════════════════════════════════
+
+nano .env
+
+Then paste:
+
+SUPABASE_URL=https://oncsaunsqtekwwbzvvyh.supabase.co
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9uY3NhdW5zcXRla3d3Ynp2dnloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM2MjY4NDEsImV4cCI6MjA1OTIwMjg0MX0.pzj7yFjXaCgAETrVauXF3JgtAI_-N9DPP-sF1i1QfAA
+BOT_NAME=Zimbabwe Shipping Ireland
+SESSION_PATH=./whatsapp-session
+NODE_ENV=production
+
+Save: Ctrl+X, then Y, then Enter
+
+═══════════════════════════════════════════════════════════
+5️⃣ START BOT
+═══════════════════════════════════════════════════════════
+
+pm2 start src/index.js --name zimbabwe-bot
+pm2 logs zimbabwe-bot
+
+═══════════════════════════════════════════════════════════
+6️⃣ DOWNLOAD QR CODE (NEW POWERSHELL WINDOW ON YOUR PC)
+═══════════════════════════════════════════════════════════
+
+scp root@YOUR_SERVER_IP:/opt/zimbabwe-shipping-nexus/whatsapp-bot/qr-code.png C:\Users\Mthokozisi.DESKTOP-DPOBCC1\Downloads\
+
+═══════════════════════════════════════════════════════════
+7️⃣ MAKE BOT AUTO-START
+═══════════════════════════════════════════════════════════
+
+pm2 save
+pm2 startup
+
+(Copy and run the command it shows)
+
+═══════════════════════════════════════════════════════════
+8️⃣ DELETE QR CODE (AFTER SCANNING)
+═══════════════════════════════════════════════════════════
+
+rm /opt/zimbabwe-shipping-nexus/whatsapp-bot/qr-code.png
+
+═══════════════════════════════════════════════════════════
+📊 USEFUL COMMANDS
+═══════════════════════════════════════════════════════════
+
+Check status:     pm2 status
+View logs:        pm2 logs zimbabwe-bot
+Restart bot:      pm2 restart zimbabwe-bot
+Stop bot:         pm2 stop zimbabwe-bot
+Monitor:          pm2 monit
+
+═══════════════════════════════════════════════════════════
+🔄 UPDATE BOT (WHEN YOU MAKE CHANGES)
+═══════════════════════════════════════════════════════════
+
+cd /opt/zimbabwe-shipping-nexus/whatsapp-bot
+git pull
+npm install
+pm2 restart zimbabwe-bot
+
+═══════════════════════════════════════════════════════════
+✅ DONE! Your bot is live 24/7!
+═══════════════════════════════════════════════════════════
