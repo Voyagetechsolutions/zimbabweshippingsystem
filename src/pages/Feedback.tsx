@@ -105,6 +105,13 @@ const Feedback = () => {
     /* fetch active custom questions */
     useEffect(() => {
         document.title = 'Feedback | Zimbabwe Shipping';
+        
+        // Scroll to top when page loads
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+        
         (async () => {
             const { data } = await (supabase
                 .from('feedback_custom_questions' as any)
@@ -160,6 +167,11 @@ const Feedback = () => {
         e.stopPropagation();
         
         if (!isValid()) {
+            // Scroll to top to show validation error
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
             toast({ title: 'Please fill in all required fields', variant: 'destructive' });
             return;
         }
@@ -217,7 +229,15 @@ const Feedback = () => {
                 console.error('Feedback submission error:', error);
                 throw error;
             }
+            
             setSubmitted(true);
+            
+            // Scroll to top smoothly after successful submission
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+            
         } catch (error) {
             console.error('Feedback submission failed:', error);
             toast({ 
@@ -237,6 +257,12 @@ const Feedback = () => {
         setDeliveryOnTime(''); setGoodsCondition(''); setOverallSatisfaction('');
         setFollowUpAnswers({}); setAdditionalFeedback('');
         setCustomAnswers({}); setSubmitted(false);
+        
+        // Scroll to top smoothly when resetting form
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
     };
 
     /* ══════ Render ══════ */

@@ -10,6 +10,8 @@ import { ShippingProvider } from '@/contexts/ShippingContext';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { RequireAuth, RequireAdmin, RedirectIfAuthenticated } from '@/components/RouteGuard';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import ScrollToTop from '@/components/ScrollToTop';
+import ScrollToTopButton from '@/components/ScrollToTopButton';
 
 // Lazy load pages for code splitting and better performance
 const Index = lazy(() => import('@/pages/Index'));
@@ -59,6 +61,7 @@ function App() {
                 <ShippingProvider>
                   <TooltipProvider>
                     <Router>
+                      <ScrollToTop />
                       <Suspense fallback={
                         <div className="min-h-screen flex items-center justify-center">
                           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -137,6 +140,7 @@ function App() {
               </ThemeProvider>
             </RoleProvider>
           </AuthProvider>
+          <ScrollToTopButton />
           <Toaster />
         </div>
       </QueryClientProvider>
