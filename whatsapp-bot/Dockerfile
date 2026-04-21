@@ -13,8 +13,12 @@ RUN npm ci --only=production
 # Copy source code
 COPY . .
 
-# Create session directory
-RUN mkdir -p whatsapp-session
+# Create session directory with proper permissions
+RUN mkdir -p /app/data/whatsapp-session && \
+    chown -R node:node /app/data
+
+# Switch to non-root user
+USER node
 
 # Expose port (Railway will set PORT env var)
 EXPOSE $PORT

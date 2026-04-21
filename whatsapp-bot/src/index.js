@@ -17,11 +17,20 @@ let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY = 5000; // 5 seconds
 
+// Use persistent session path
+const SESSION_PATH = process.env.SESSION_PATH || '/app/data/whatsapp-session';
+
 async function connectToWhatsApp() {
   try {
-    const { state, saveCreds } = await useMultiFileAuthState(
-      process.env.SESSION_PATH || './whatsapp-session'
-    );
+    // Ensure session directory exists
+    const fs = await import('fs');
+    const path = await import('path');
+    
+    if (!fs.existsSync(SESSION_PATH)) {
+      fs.mkdirSync(SESSION_PATH, { recursive: true });
+    }
+
+    const { state, saveCreds } = await useMultiFileAuthState(SESSION_PATH);
     
     const { version } = await fetchLatestBaileysVersion();
 
@@ -35,7 +44,32 @@ async function connectToWhatsApp() {
       defaultQueryTimeoutMs: 0,
       keepAliveIntervalMs: 10000,
       emitOwnEvents: true,
-      markOnlineOnConnect: true
+      markOnlineOnConnect: true,
+      // Enhanced session options
+      syncFullHistory: false,
+      shouldSyncHistoryMessage: () => false,
+      shouldIgnoreJid: () => false,
+      patchMessageBeforeSending: (message) => {
+        const requiresPatch = !!(
+          message.buttonsMessage ||
+          message.templateMessage ||
+          message.listMessage
+        );
+        if (requiresPatch) {
+          message = {
+            viewOnceMessage: {
+              message: {
+                messageContextInfo: {
+                  deviceListMetadataVersion: 2,
+                  deviceListMetadata: {},
+                },
+                ...message,
+              },
+            },
+          };
+        }
+        return message;
+      },
     });
 
     sock.ev.on('connection.update', async (update) => {
@@ -84,6 +118,7 @@ async function connectToWhatsApp() {
         reconnectAttempts = 0; // Reset counter on successful connection
         console.log('✅ WhatsApp Bot Connected Successfully!');
         console.log('🇮🇪 Zimbabwe Shipping Ireland Bot is now active');
+        console.log('🔒 Session saved - no QR code needed on restart!');
       }
     });
 
