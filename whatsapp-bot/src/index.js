@@ -87,7 +87,9 @@ async function connectToWhatsApp() {
             margin: 2
           });
           console.log('\n📸 QR code saved to: qr-code.png');
-          console.log('💡 Download this file and scan it with your phone!\n');
+          console.log('💡 Download this file and scan it with your phone!');
+          console.log('⚠️  This QR code will expire in ~30 seconds');
+          console.log('🔄 A new QR code will be generated automatically\n');
         } catch (qrError) {
           console.log('Could not save QR code file:', qrError.message);
         }
