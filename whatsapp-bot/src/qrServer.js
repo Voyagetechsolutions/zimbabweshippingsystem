@@ -9,13 +9,22 @@ const QR_DATA_PATH = '/app/data';
 // Serve QR code files
 app.get('/qr-code', (req, res) => {
   try {
+    // First check for qr-code-latest.png (most recent)
+    const latestPath = path.join(QR_DATA_PATH, 'qr-code-latest.png');
+    if (fs.existsSync(latestPath)) {
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Content-Disposition', 'attachment; filename="qr-code-latest.png"');
+      return res.sendFile(latestPath);
+    }
+    
+    // Otherwise get the most recent timestamped file
     const files = fs.readdirSync(QR_DATA_PATH);
     const qrFiles = files.filter(f => f.startsWith('qr-code-') && f.endsWith('.png'));
     
     if (qrFiles.length === 0) {
       return res.status(404).json({ 
         error: 'No QR code available yet',
-        message: 'QR code will be generated when bot starts connecting to WhatsApp'
+        message: 'QR code will be generated when bot starts connecting to WhatsApp. Please wait a moment and refresh.'
       });
     }
     

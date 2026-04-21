@@ -91,16 +91,16 @@ async function connectToWhatsApp() {
       const { connection, lastDisconnect, qr } = update;
       
       if (qr) {
-        // Check if we should generate a new QR code
+        // Always generate and display QR code, but limit file saves to prevent spam
+        console.log('\n🔗 New QR code received from WhatsApp:\n');
+        qrcode.generate(qr, { small: true });
+        
+        // Check if we should save a new QR code file
         const now = Date.now();
-        const shouldGenerateQR = !qrCodeGenerated || 
+        const shouldSaveQR = !qrCodeGenerated || 
           (qrCodeTimestamp && (now - qrCodeTimestamp) > QR_CODE_TIMEOUT);
         
-        if (shouldGenerateQR) {
-          console.log('\n🔗 Generating QR code for WhatsApp connection:\n');
-          qrcode.generate(qr, { small: true });
-          
-          // Mark QR code as generated and set timestamp
+        if (shouldSaveQR) {
           qrCodeGenerated = true;
           qrCodeTimestamp = now;
           
@@ -117,7 +117,7 @@ async function connectToWhatsApp() {
             
             const railwayUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
               ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/qr-code`
-              : 'Railway URL will be available after deployment';
+              : 'https://zimship-bot-production.up.railway.app/qr-code';
             
             console.log(`\n📸 QR code saved to: ${qrFileName}`);
             console.log('💡 QR code is valid for 12 hours');
@@ -127,6 +127,7 @@ async function connectToWhatsApp() {
             console.log(`📥 ${railwayUrl}`);
             console.log('💡 Open this URL in your browser to download the QR code');
             console.log('📱 Then scan it with your WhatsApp device');
+            console.log('⚠️  IMPORTANT: Scan within 60 seconds!');
             console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
             
           } catch (qrError) {
@@ -134,14 +135,19 @@ async function connectToWhatsApp() {
             console.log('💡 QR code is displayed above - scan it with your phone!');
           }
         } else {
-          const timeRemaining = QR_CODE_TIMEOUT - (now - qrCodeTimestamp);
-          const hoursRemaining = Math.floor(timeRemaining / (60 * 60 * 1000));
-          const minutesRemaining = Math.floor((timeRemaining % (60 * 60 * 1000)) / (60 * 1000));
-          
-          console.log('⏭️  QR code already generated - valid for 12 hours');
-          console.log(`⏰ Time remaining: ${hoursRemaining}h ${minutesRemaining}m`);
-          if (currentQRCodePath) {
-            console.log(`📥 Current QR code: ${currentQRCodePath}`);
+          // Still save the latest QR code even if within timeout
+          try {
+            const QRCode = await import('qrcode');
+            const qrFileName = `/app/data/qr-code-latest.png`;
+            await QRCode.toFile(qrFileName, qr, {
+              width: 400,
+              margin: 2
+            });
+            currentQRCodePath = qrFileName;
+            console.log('📸 Updated QR code saved (latest)');
+            console.log('⚠️  Scan this QR code within 60 seconds!');
+          } catch (err) {
+            console.log('Could not update QR code file');
           }
         }
       }
