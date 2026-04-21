@@ -26,8 +26,13 @@ const logger = pino({
 });
 
 let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 5;
-const RECONNECT_DELAY = 5000; // 5 seconds
+const BASE_RECONNECT_DELAY = 5000;
+const MAX_RECONNECT_DELAY = 60000;
+
+function nextReconnectDelay() {
+  const delay = Math.min(BASE_RECONNECT_DELAY * Math.pow(2, Math.max(0, reconnectAttempts - 1)), MAX_RECONNECT_DELAY);
+  return delay;
+}
 
 // QR Code tracking
 let qrCodeGenerated = false;
@@ -106,7 +111,7 @@ async function connectToWhatsApp() {
       const { connection, lastDisconnect, qr } = update;
       
       if (qr) {
-        // Always generate and display QR code, but limit file saves to prevent spam
+        reconnectAttempts = 0;
         console.log('\n🔗 New QR code received from WhatsApp:\n');
         qrcode.generate(qr, { small: true });
         
@@ -130,19 +135,16 @@ async function connectToWhatsApp() {
             
             currentQRCodePath = qrFileName;
             
-            const railwayUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
-              ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/qr-code`
-              : 'https://zimship-bot-production.up.railway.app/qr-code';
-            
-            console.log(`\n📸 QR code saved to: ${qrFileName}`);
-            console.log('💡 QR code is valid for 12 hours');
-            console.log('⏰ Expires at:', new Date(now + QR_CODE_TIMEOUT).toLocaleString());
-            console.log('\n🔗 DOWNLOAD LINK:');
+            const railwayUrl = process.env.RAILWAY_PUBLIC_DOMAIN
+              ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/`
+              : 'https://zimship-bot-production.up.railway.app/';
+
+            console.log(`\n📸 Latest QR saved to: ${qrFileName}`);
+            console.log('\n🔗 OPEN THIS PAGE TO SCAN:');
             console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-            console.log(`📥 ${railwayUrl}`);
-            console.log('💡 Open this URL in your browser to download the QR code');
-            console.log('📱 Then scan it with your WhatsApp device');
-            console.log('⚠️  IMPORTANT: Scan within 60 seconds!');
+            console.log(`🖥️  ${railwayUrl}`);
+            console.log('💡 Page auto-refreshes every 3s — keep it open and scan from screen');
+            console.log('📱 WhatsApp rotates the QR every ~30s; the viewer always shows the current one');
             console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
             
           } catch (qrError) {
@@ -217,18 +219,15 @@ async function connectToWhatsApp() {
           process.exit(0);
         }
         
-        if (shouldReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        if (shouldReconnect) {
           reconnectAttempts++;
-          console.log(`\n🔄 Reconnection attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${RECONNECT_DELAY/1000}s...`);
+          const delay = nextReconnectDelay();
+          console.log(`\n🔄 Reconnection attempt ${reconnectAttempts} in ${delay/1000}s (exponential backoff, no limit)...`);
           console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-          
+
           setTimeout(() => {
             connectToWhatsApp();
-          }, RECONNECT_DELAY);
-        } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-          console.error('\n❌ Max reconnection attempts reached. Bot stopped.');
-          console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-          process.exit(1);
+          }, delay);
         }
       } else if (connection === 'open') {
         reconnectAttempts = 0; // Reset counter on successful connection
@@ -303,19 +302,21 @@ async function connectToWhatsApp() {
     return sock;
   } catch (error) {
     console.error('Error in connectToWhatsApp:', error);
-    
-    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-      reconnectAttempts++;
-      console.log(`Retrying connection in ${RECONNECT_DELAY/1000}s... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
-      setTimeout(() => {
-        connectToWhatsApp();
-      }, RECONNECT_DELAY);
-    } else {
-      console.error('Failed to connect after maximum attempts');
-      process.exit(1);
-    }
+    reconnectAttempts++;
+    const delay = nextReconnectDelay();
+    console.log(`Retrying connection in ${delay/1000}s (attempt ${reconnectAttempts})...`);
+    setTimeout(() => {
+      connectToWhatsApp();
+    }, delay);
   }
 }
+
+process.on('unhandledRejection', (reason) => {
+  console.error('⚠️  Unhandled promise rejection (non-fatal):', reason);
+});
+process.on('uncaughtException', (error) => {
+  console.error('⚠️  Uncaught exception (non-fatal):', error);
+});
 
 // Initialize and start
 (async () => {
