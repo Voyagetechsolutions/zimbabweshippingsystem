@@ -8,6 +8,7 @@ import pino from 'pino';
 import dotenv from 'dotenv';
 import { handleMessage } from './handlers/messageHandler.js';
 import { initializeDatabase } from './services/database.js';
+import { startQRServer } from './qrServer.js';
 
 dotenv.config();
 
@@ -20,8 +21,8 @@ const RECONNECT_DELAY = 5000; // 5 seconds
 // QR Code tracking
 let qrCodeGenerated = false;
 let qrCodeTimestamp = null;
-const QR_CODE_TIMEOUT = 2 * 60 * 1000; // 2 minutes in milliseconds
-const TARGET_WHATSAPP_NUMBER = process.env.TARGET_WHATSAPP_NUMBER || '+27745846005'; // Target number to send QR code
+const QR_CODE_TIMEOUT = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
+let currentQRCodePath = null;
 
 // Use persistent session path
 const SESSION_PATH = process.env.SESSION_PATH || '/app/data/whatsapp-session';
@@ -30,6 +31,7 @@ const SESSION_PATH = process.env.SESSION_PATH || '/app/data/whatsapp-session';
 function resetQRCodeGeneration() {
   qrCodeGenerated = false;
   qrCodeTimestamp = null;
+  currentQRCodePath = null;
   console.log('🔄 QR code generation reset - next QR will be generated');
 }
 
@@ -95,7 +97,7 @@ async function connectToWhatsApp() {
           (qrCodeTimestamp && (now - qrCodeTimestamp) > QR_CODE_TIMEOUT);
         
         if (shouldGenerateQR) {
-          console.log('\n🔗 Generating ONE-TIME QR code for WhatsApp connection:\n');
+          console.log('\n🔗 Generating QR code for WhatsApp connection:\n');
           qrcode.generate(qr, { small: true });
           
           // Mark QR code as generated and set timestamp
@@ -105,51 +107,42 @@ async function connectToWhatsApp() {
           // Save QR code as image file
           try {
             const QRCode = await import('qrcode');
-            const qrFileName = `./qr-code-${Date.now()}.png`;
+            const qrFileName = `/app/data/qr-code-${Date.now()}.png`;
             await QRCode.toFile(qrFileName, qr, {
               width: 400,
               margin: 2
             });
             
-            console.log(`\n📸 QR code saved to: ${qrFileName}`);
-            console.log('💡 This is a ONE-TIME QR code - no spam!');
-            console.log('⚠️  QR code expires in 2 minutes');
-            console.log(`📱 Sending QR code to: ${TARGET_WHATSAPP_NUMBER}`);
+            currentQRCodePath = qrFileName;
             
-            // Try to send QR code to target number (this will work once bot is connected)
-            setTimeout(async () => {
-              try {
-                if (sock.user) {
-                  const qrCodeBuffer = await QRCode.toBuffer(qr, {
-                    width: 400,
-                    margin: 2
-                  });
-                  
-                  const targetJid = TARGET_WHATSAPP_NUMBER.replace('+', '') + '@s.whatsapp.net';
-                  
-                  await sock.sendMessage(targetJid, {
-                    image: qrCodeBuffer,
-                    caption: `🔗 *Zimbabwe Shipping Bot - QR Code*\n\n` +
-                            `📱 Scan this QR code to connect the bot\n` +
-                            `⏰ Expires in 2 minutes\n` +
-                            `🚫 This is a ONE-TIME code - no more spam!\n\n` +
-                            `Generated: ${new Date().toLocaleString()}`
-                  });
-                  
-                  console.log(`✅ QR code sent to ${TARGET_WHATSAPP_NUMBER}`);
-                }
-              } catch (sendError) {
-                console.log('Note: Could not send QR code via WhatsApp (bot not connected yet)');
-                console.log('QR code is available in the generated PNG file');
-              }
-            }, 2000); // Wait 2 seconds for potential connection
+            const railwayUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
+              ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/qr-code`
+              : 'Railway URL will be available after deployment';
+            
+            console.log(`\n📸 QR code saved to: ${qrFileName}`);
+            console.log('💡 QR code is valid for 12 hours');
+            console.log('⏰ Expires at:', new Date(now + QR_CODE_TIMEOUT).toLocaleString());
+            console.log('\n🔗 DOWNLOAD LINK:');
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log(`📥 ${railwayUrl}`);
+            console.log('💡 Open this URL in your browser to download the QR code');
+            console.log('📱 Then scan it with your WhatsApp device');
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
             
           } catch (qrError) {
             console.log('Could not save QR code file:', qrError.message);
+            console.log('💡 QR code is displayed above - scan it with your phone!');
           }
         } else {
-          console.log('⏭️  QR code already generated recently - skipping to prevent spam');
-          console.log(`⏰ Next QR code available in: ${Math.ceil((QR_CODE_TIMEOUT - (now - qrCodeTimestamp)) / 1000)}s`);
+          const timeRemaining = QR_CODE_TIMEOUT - (now - qrCodeTimestamp);
+          const hoursRemaining = Math.floor(timeRemaining / (60 * 60 * 1000));
+          const minutesRemaining = Math.floor((timeRemaining % (60 * 60 * 1000)) / (60 * 1000));
+          
+          console.log('⏭️  QR code already generated - valid for 12 hours');
+          console.log(`⏰ Time remaining: ${hoursRemaining}h ${minutesRemaining}m`);
+          if (currentQRCodePath) {
+            console.log(`📥 Current QR code: ${currentQRCodePath}`);
+          }
         }
       }
       
@@ -177,24 +170,10 @@ async function connectToWhatsApp() {
       } else if (connection === 'open') {
         reconnectAttempts = 0; // Reset counter on successful connection
         qrCodeGenerated = false; // Reset QR code flag for future use
+        currentQRCodePath = null;
         console.log('✅ WhatsApp Bot Connected Successfully!');
         console.log('🇮🇪 Zimbabwe Shipping Ireland Bot is now active');
         console.log('🔒 Session saved - no QR code needed on restart!');
-        
-        // Send confirmation to target number
-        try {
-          const targetJid = TARGET_WHATSAPP_NUMBER.replace('+', '') + '@s.whatsapp.net';
-          await sock.sendMessage(targetJid, {
-            text: `🎉 *Zimbabwe Shipping Bot Connected!*\n\n` +
-                  `✅ Bot is now active and ready to help\n` +
-                  `🇮🇪 Ireland shipping services available\n` +
-                  `📱 Connected: ${new Date().toLocaleString()}\n\n` +
-                  `Type "help" to see available commands`
-          });
-          console.log(`📱 Connection confirmation sent to ${TARGET_WHATSAPP_NUMBER}`);
-        } catch (confirmError) {
-          console.log('Could not send connection confirmation:', confirmError.message);
-        }
       }
     });
 
@@ -248,6 +227,10 @@ async function connectToWhatsApp() {
 (async () => {
   try {
     console.log('🚀 Starting Zimbabwe Shipping WhatsApp Bot (Ireland)...');
+    
+    // Start QR code download server
+    startQRServer();
+    
     await initializeDatabase();
     await connectToWhatsApp();
   } catch (error) {
