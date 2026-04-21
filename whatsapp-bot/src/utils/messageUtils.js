@@ -1,11 +1,25 @@
+const SEND_RETRIES = 2;
+const SEND_RETRY_BASE_MS = 400;
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 export async function sendMessage(sock, phoneNumber, text) {
-  try {
-    await sock.sendMessage(phoneNumber, { text });
-    return true;
-  } catch (error) {
-    console.error('Error sending message:', error);
-    return false;
+  let lastError = null;
+  for (let attempt = 0; attempt <= SEND_RETRIES; attempt++) {
+    try {
+      await sock.sendMessage(phoneNumber, { text });
+      return true;
+    } catch (error) {
+      lastError = error;
+      if (attempt < SEND_RETRIES) {
+        await sleep(SEND_RETRY_BASE_MS * Math.pow(2, attempt));
+      }
+    }
   }
+  console.error(`Error sending message after ${SEND_RETRIES + 1} attempts:`, lastError?.message || lastError);
+  return false;
 }
 
 export async function sendImage(sock, phoneNumber, imageUrl, caption = '') {

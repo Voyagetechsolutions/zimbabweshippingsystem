@@ -273,17 +273,30 @@ async function connectToWhatsApp() {
     });
 
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
-      if (type === 'notify') {
-        for (const message of messages) {
-          if (!message.key.fromMe && message.message) {
+      if (type !== 'notify') return;
+
+      // Group by sender so messages from the same user stay in order,
+      // but different users get processed in parallel — one slow reply
+      // no longer blocks the whole batch.
+      const byUser = new Map();
+      for (const message of messages) {
+        if (message.key.fromMe || !message.message) continue;
+        const jid = message.key.remoteJid;
+        if (!byUser.has(jid)) byUser.set(jid, []);
+        byUser.get(jid).push(message);
+      }
+
+      await Promise.allSettled(
+        Array.from(byUser.values()).map(async (userMessages) => {
+          for (const message of userMessages) {
             try {
               await handleMessage(sock, message);
             } catch (error) {
               console.error('Error handling message:', error);
             }
           }
-        }
-      }
+        })
+      );
     });
 
     // Handle process termination gracefully
