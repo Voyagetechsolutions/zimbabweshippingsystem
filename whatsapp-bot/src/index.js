@@ -1,7 +1,8 @@
 import makeWASocket, { 
   DisconnectReason, 
   useMultiFileAuthState,
-  fetchLatestBaileysVersion 
+  fetchLatestBaileysVersion,
+  Browsers
 } from '@whiskeysockets/baileys';
 import qrcode from 'qrcode-terminal';
 import pino from 'pino';
@@ -12,7 +13,17 @@ import { startQRServer } from './qrServer.js';
 
 dotenv.config();
 
-const logger = pino({ level: 'info' });
+const logger = pino({ 
+  level: process.env.LOG_LEVEL || 'info',
+  transport: {
+    target: 'pino-pretty',
+    options: {
+      colorize: false,
+      translateTime: 'SYS:standard',
+      ignore: 'pid,hostname'
+    }
+  }
+});
 
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
@@ -54,16 +65,20 @@ async function connectToWhatsApp() {
       logger,
       printQRInTerminal: false,
       auth: state,
+      browser: Browsers.ubuntu('Chrome'),
       getMessage: async () => ({ conversation: '' }),
       connectTimeoutMs: 60000,
       defaultQueryTimeoutMs: 0,
       keepAliveIntervalMs: 10000,
       emitOwnEvents: true,
       markOnlineOnConnect: true,
-      // Enhanced session options
+      // Enhanced session options to reduce sync errors
       syncFullHistory: false,
       shouldSyncHistoryMessage: () => false,
       shouldIgnoreJid: () => false,
+      // Retry configuration
+      retryRequestDelayMs: 250,
+      maxMsgRetryCount: 5,
       patchMessageBeforeSending: (message) => {
         const requiresPatch = !!(
           message.buttonsMessage ||
@@ -156,22 +171,64 @@ async function connectToWhatsApp() {
         const statusCode = lastDisconnect?.error?.output?.statusCode;
         const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
         
-        console.log('Connection closed. Status:', statusCode);
-        console.log('Should reconnect:', shouldReconnect);
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('⚠️  CONNECTION CLOSED');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('Status Code:', statusCode);
+        console.log('Reason:', statusCode === DisconnectReason.loggedOut ? 'LOGGED OUT (401)' : 'Connection Lost');
+        console.log('Should Reconnect:', shouldReconnect);
+        
+        if (statusCode === DisconnectReason.loggedOut) {
+          console.log('\n🚨 SESSION LOGGED OUT (401 ERROR)');
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('This means the WhatsApp session has been invalidated.');
+          console.log('\n📋 RECOVERY STEPS:');
+          console.log('1. Restart this Railway service');
+          console.log('2. Wait for new QR code generation');
+          console.log('3. Scan the new QR code with WhatsApp');
+          console.log('4. Verify connection success');
+          console.log('\n📖 For detailed recovery guide, see:');
+          console.log('   whatsapp-bot/SESSION_401_RECOVERY.md');
+          console.log('\n💡 COMMON CAUSES:');
+          console.log('   - Manual logout from WhatsApp device');
+          console.log('   - Multiple bot instances running');
+          console.log('   - WhatsApp security check');
+          console.log('   - Session expiration');
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+          
+          // Clear session files before exit
+          try {
+            const fs = await import('fs');
+            const path = await import('path');
+            
+            if (fs.existsSync(SESSION_PATH)) {
+              const files = fs.readdirSync(SESSION_PATH);
+              for (const file of files) {
+                const filePath = path.join(SESSION_PATH, file);
+                fs.unlinkSync(filePath);
+              }
+              console.log('🧹 Cleared invalid session files');
+              console.log('✅ Ready for fresh QR code on restart\n');
+            }
+          } catch (cleanupError) {
+            console.log('⚠️  Could not clear session files:', cleanupError.message);
+          }
+          
+          process.exit(0);
+        }
         
         if (shouldReconnect && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
           reconnectAttempts++;
-          console.log(`Reconnection attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${RECONNECT_DELAY/1000}s...`);
+          console.log(`\n🔄 Reconnection attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${RECONNECT_DELAY/1000}s...`);
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
           
           setTimeout(() => {
             connectToWhatsApp();
           }, RECONNECT_DELAY);
         } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-          console.error('Max reconnection attempts reached. Bot stopped.');
+          console.error('\n❌ Max reconnection attempts reached. Bot stopped.');
+          console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
           process.exit(1);
-        } else {
-          console.log('Bot logged out. Stopping...');
-          process.exit(0);
         }
       } else if (connection === 'open') {
         reconnectAttempts = 0; // Reset counter on successful connection
@@ -180,10 +237,41 @@ async function connectToWhatsApp() {
         console.log('✅ WhatsApp Bot Connected Successfully!');
         console.log('🇮🇪 Zimbabwe Shipping Ireland Bot is now active');
         console.log('🔒 Session saved - no QR code needed on restart!');
+        
+        // Clean up old QR code files after successful connection
+        try {
+          const fs = await import('fs');
+          const path = await import('path');
+          const dataPath = '/app/data';
+          
+          if (fs.existsSync(dataPath)) {
+            const files = fs.readdirSync(dataPath);
+            const qrFiles = files.filter(f => f.startsWith('qr-code-') && f.endsWith('.png'));
+            
+            for (const file of qrFiles) {
+              const filePath = path.join(dataPath, file);
+              fs.unlinkSync(filePath);
+              console.log(`🧹 Cleaned up QR code: ${file}`);
+            }
+          }
+        } catch (cleanupError) {
+          console.log('Note: Could not clean up QR codes:', cleanupError.message);
+        }
       }
     });
 
     sock.ev.on('creds.update', saveCreds);
+
+    // Handle sync errors gracefully (common with Baileys, usually non-critical)
+    sock.ev.on('messaging-history.set', ({ chats, contacts, messages, isLatest }) => {
+      console.log(`📚 Received ${messages.length} messages, ${chats.length} chats, ${contacts.length} contacts (isLatest: ${isLatest})`);
+    });
+
+    // Handle connection errors
+    sock.ev.on('connection.error', (error) => {
+      console.error('⚠️ Connection error:', error.message);
+      // Don't crash on connection errors, let connection.update handle reconnection
+    });
 
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
       if (type === 'notify') {
