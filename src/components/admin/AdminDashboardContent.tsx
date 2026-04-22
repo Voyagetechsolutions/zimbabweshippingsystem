@@ -256,81 +256,184 @@ const AdminDashboardInner = () => {
     switch (tabValue) {
       case 'overview':
         return (
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Shipments</CardTitle>
-                <Package className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.totalShipments}</div>
-                <Progress value={100} className="h-1 mt-2" />
-              </CardContent>
-            </Card>
+          <div className="space-y-6">
+            {/* Welcome Banner */}
+            <div className="bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 rounded-2xl p-6 text-white shadow-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-3xl font-bold mb-2">Welcome back! 👋</h2>
+                  <p className="text-white/90 text-lg">Here's what's happening with your shipments today</p>
+                </div>
+                <div className="hidden md:block">
+                  <div className="w-24 h-24 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+                    <LayoutDashboard className="h-12 w-12 text-white" />
+                  </div>
+                </div>
+              </div>
+            </div>
 
-            <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Pending Shipments</CardTitle>
-                <Package className="h-4 w-4 text-yellow-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.pendingShipments}</div>
-                <Progress
-                  value={stats.totalShipments ? (stats.pendingShipments / stats.totalShipments) * 100 : 0}
-                  className="h-1 mt-2 bg-yellow-200 dark:bg-yellow-900"
-                />
-              </CardContent>
-            </Card>
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Total Shipments */}
+              <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-semibold text-gray-600 dark:text-gray-400">Total Shipments</CardTitle>
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center shadow-lg">
+                      <Package className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-4xl font-bold text-gray-900 dark:text-white mb-2">{stats.totalShipments}</div>
+                  <Progress value={100} className="h-2 bg-blue-200 dark:bg-blue-900" />
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">All time shipments</p>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Active Shipments</CardTitle>
-                <Truck className="h-4 w-4 text-blue-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.activeShipments}</div>
-                <Progress
-                  value={stats.totalShipments ? (stats.activeShipments / stats.totalShipments) * 100 : 0}
-                  className="h-1 mt-2 bg-blue-200 dark:bg-blue-900"
-                />
-              </CardContent>
-            </Card>
+              {/* Pending Shipments */}
+              <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/50 dark:to-orange-950/50">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-semibold text-gray-600 dark:text-gray-400">Pending Collection</CardTitle>
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg">
+                      <Package className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-4xl font-bold text-gray-900 dark:text-white mb-2">{stats.pendingShipments}</div>
+                  <Progress
+                    value={stats.totalShipments ? (stats.pendingShipments / stats.totalShipments) * 100 : 0}
+                    className="h-2 bg-amber-200 dark:bg-amber-900"
+                  />
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                    {stats.totalShipments ? Math.round((stats.pendingShipments / stats.totalShipments) * 100) : 0}% of total
+                  </p>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Delivered</CardTitle>
-                <Truck className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.deliveredShipments}</div>
-                <Progress
-                  value={stats.totalShipments ? (stats.deliveredShipments / stats.totalShipments) * 100 : 0}
-                  className="h-1 mt-2 bg-green-200 dark:bg-green-900"
-                />
-              </CardContent>
-            </Card>
+              {/* Active Shipments */}
+              <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-gradient-to-br from-cyan-50 to-blue-50 dark:from-cyan-950/50 dark:to-blue-950/50">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-semibold text-gray-600 dark:text-gray-400">In Transit</CardTitle>
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center shadow-lg">
+                      <Truck className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-4xl font-bold text-gray-900 dark:text-white mb-2">{stats.activeShipments}</div>
+                  <Progress
+                    value={stats.totalShipments ? (stats.activeShipments / stats.totalShipments) * 100 : 0}
+                    className="h-2 bg-cyan-200 dark:bg-cyan-900"
+                  />
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">Currently being shipped</p>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Revenue</CardTitle>
-                <CreditCard className="h-4 w-4 text-purple-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">£{stats.totalRevenue.toFixed(2)}</div>
-                <Progress value={100} className="h-1 mt-2" />
-              </CardContent>
-            </Card>
+              {/* Delivered */}
+              <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/50 dark:to-emerald-950/50">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-semibold text-gray-600 dark:text-gray-400">Delivered</CardTitle>
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg">
+                      <Truck className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-4xl font-bold text-gray-900 dark:text-white mb-2">{stats.deliveredShipments}</div>
+                  <Progress
+                    value={stats.totalShipments ? (stats.deliveredShipments / stats.totalShipments) * 100 : 0}
+                    className="h-2 bg-green-200 dark:bg-green-900"
+                  />
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">Successfully completed</p>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Pending Quotes</CardTitle>
-                <Quote className="h-4 w-4 text-orange-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.pendingQuotes}</div>
-                <div className="text-xs text-muted-foreground mt-1">Awaiting response</div>
-              </CardContent>
-            </Card>
+              {/* Total Revenue */}
+              <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/50 dark:to-pink-950/50">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-semibold text-gray-600 dark:text-gray-400">Total Revenue</CardTitle>
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg">
+                      <CreditCard className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-4xl font-bold text-gray-900 dark:text-white mb-2">£{stats.totalRevenue.toFixed(2)}</div>
+                  <Progress value={100} className="h-2 bg-purple-200 dark:bg-purple-900" />
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">Total earnings</p>
+                </CardContent>
+              </Card>
+
+              {/* Pending Quotes */}
+              <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-gradient-to-br from-rose-50 to-red-50 dark:from-rose-950/50 dark:to-red-950/50">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-semibold text-gray-600 dark:text-gray-400">Pending Quotes</CardTitle>
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-rose-500 to-red-500 flex items-center justify-center shadow-lg">
+                      <Quote className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-4xl font-bold text-gray-900 dark:text-white mb-2">{stats.pendingQuotes}</div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="flex-1 h-2 bg-rose-200 dark:bg-rose-900 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-rose-500 to-red-500 animate-pulse" style={{ width: '60%' }} />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">Awaiting response</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Button
+                onClick={() => setActiveTab('manualBooking')}
+                className="h-24 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl transition-all"
+              >
+                <div className="flex flex-col items-center gap-2">
+                  <PlusCircle className="h-8 w-8" />
+                  <span className="font-semibold">New Booking</span>
+                </div>
+              </Button>
+              <Button
+                onClick={() => setActiveTab('shipments')}
+                variant="outline"
+                className="h-24 border-2 hover:bg-blue-50 dark:hover:bg-blue-950 hover:border-blue-300 dark:hover:border-blue-700 transition-all"
+              >
+                <div className="flex flex-col items-center gap-2">
+                  <Package className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                  <span className="font-semibold">View Shipments</span>
+                </div>
+              </Button>
+              <Button
+                onClick={() => setActiveTab('customQuotes')}
+                variant="outline"
+                className="h-24 border-2 hover:bg-orange-50 dark:hover:bg-orange-950 hover:border-orange-300 dark:hover:border-orange-700 transition-all"
+              >
+                <div className="flex flex-col items-center gap-2">
+                  <Quote className="h-8 w-8 text-orange-600 dark:text-orange-400" />
+                  <span className="font-semibold">Manage Quotes</span>
+                </div>
+              </Button>
+              <Button
+                onClick={() => setActiveTab('reports')}
+                variant="outline"
+                className="h-24 border-2 hover:bg-purple-50 dark:hover:bg-purple-950 hover:border-purple-300 dark:hover:border-purple-700 transition-all"
+              >
+                <div className="flex flex-col items-center gap-2">
+                  <BarChart3 className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+                  <span className="font-semibold">View Reports</span>
+                </div>
+              </Button>
+            </div>
           </div>
         );
       case 'manualBooking': return <ManualBookingTab />;
@@ -357,176 +460,247 @@ const AdminDashboardInner = () => {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
       {/* Sidebar for Desktop */}
       {!isMobile && (
         <aside className={cn(
-          "h-full border-r bg-card transition-all duration-300 ease-in-out",
-          isSidebarOpen ? "w-64" : "w-20"
+          "h-full bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 shadow-lg transition-all duration-300 ease-in-out flex flex-col",
+          isSidebarOpen ? "w-72" : "w-20"
         )}>
-          <div className="flex items-center justify-between p-4 h-16">
+          {/* Logo/Brand Section */}
+          <div className="flex items-center justify-between p-4 h-20 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-700 dark:to-emerald-700">
             {isSidebarOpen ? (
-              <h2 className="text-lg font-semibold text-primary">Admin Panel</h2>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <LayoutDashboard className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">Admin Panel</h2>
+                  <p className="text-xs text-white/80">Zimbabwe Shipping</p>
+                </div>
+              </div>
             ) : (
-              <LayoutDashboard className="h-6 w-6 text-primary" />
+              <div className="w-10 h-10 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center mx-auto">
+                <LayoutDashboard className="h-6 w-6 text-white" />
+              </div>
             )}
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="hidden md:flex"
+              className="hidden md:flex text-white hover:bg-white/20"
             >
               {isSidebarOpen ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
             </Button>
           </div>
-          <Separator />
 
-          {/* Collapsible grouped nav */}
-          <nav className="flex flex-col p-2 mt-2">
+          {/* Navigation */}
+          <nav className="flex-1 overflow-y-auto p-3 space-y-1">
             {navGroups.map((group) => (
-              <div key={group.key} className="mb-1">
-                {/* Group header with dropdown arrow */}
+              <div key={group.key} className="mb-2">
+                {/* Group header */}
                 {isSidebarOpen ? (
                   <button
                     onClick={() => toggleGroup(group.key)}
-                    className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+                    className="w-full flex items-center justify-between px-3 py-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
                   >
                     <span>{group.label}</span>
                     <ChevronDown
                       className={cn(
-                        "h-3.5 w-3.5 transition-transform duration-200",
+                        "h-4 w-4 transition-transform duration-200",
                         expandedGroups[group.key] && "rotate-180"
                       )}
                     />
                   </button>
                 ) : (
-                  <Separator className="my-2" />
+                  <div className="h-px bg-gray-200 dark:bg-gray-800 my-3" />
                 )}
 
                 {/* Group items */}
                 {(expandedGroups[group.key] || !isSidebarOpen) && (
-                  <div className="space-y-0.5">
-                    {group.items.map((item) => (
-                      <Button
-                        key={item.value}
-                        variant={activeTab === item.value ? "secondary" : "ghost"}
-                        className={cn(
-                          "justify-start text-sm font-medium px-3 py-2 rounded-md w-full",
-                          !isSidebarOpen && "w-10 h-10 p-0 justify-center"
-                        )}
-                        onClick={() => setActiveTab(item.value)}
-                      >
-                        <item.icon className={cn("h-5 w-5", isSidebarOpen && "mr-3")} />
-                        {isSidebarOpen && <span>{item.label}</span>}
-                      </Button>
-                    ))}
+                  <div className="space-y-1 mt-1">
+                    {group.items.map((item) => {
+                      const isActive = activeTab === item.value;
+                      return (
+                        <Button
+                          key={item.value}
+                          variant="ghost"
+                          className={cn(
+                            "justify-start text-sm font-medium px-3 py-2.5 rounded-lg w-full transition-all duration-200",
+                            !isSidebarOpen && "w-12 h-12 p-0 justify-center",
+                            isActive
+                              ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md hover:from-green-600 hover:to-emerald-600"
+                              : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
+                          )}
+                          onClick={() => setActiveTab(item.value)}
+                        >
+                          <item.icon className={cn("h-5 w-5", isSidebarOpen && "mr-3", isActive && "drop-shadow-sm")} />
+                          {isSidebarOpen && <span>{item.label}</span>}
+                          {isActive && isSidebarOpen && (
+                            <div className="ml-auto w-2 h-2 rounded-full bg-white animate-pulse" />
+                          )}
+                        </Button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
             ))}
           </nav>
+
+          {/* Footer - Country Selector */}
+          {isSidebarOpen && (
+            <div className="p-3 border-t border-gray-200 dark:border-gray-800">
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-2">
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 px-2">Region</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setSelectedCountry('England')}
+                    className={cn(
+                      "flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all",
+                      selectedCountry === 'England'
+                        ? "bg-blue-500 text-white shadow-md"
+                        : "bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600"
+                    )}
+                  >
+                    <span className="text-lg">🇬🇧</span>
+                    <span className="text-xs">UK</span>
+                  </button>
+                  <button
+                    onClick={() => setSelectedCountry('Ireland')}
+                    className={cn(
+                      "flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all",
+                      selectedCountry === 'Ireland'
+                        ? "bg-green-500 text-white shadow-md"
+                        : "bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600"
+                    )}
+                  >
+                    <span className="text-lg">🇮🇪</span>
+                    <span className="text-xs">IE</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </aside>
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-auto p-6 space-y-6">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="flex justify-between items-center pb-4 border-b">
-          <div className="flex items-center gap-4">
-            <h1 className="text-3xl font-bold">
-              {navItems.find(item => item.value === activeTab)?.label || 'Admin Dashboard'}
-            </h1>
-            {/* Country Toggle */}
-            <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-              <button
-                onClick={() => setSelectedCountry('England')}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
-                  selectedCountry === 'England'
-                    ? "bg-white dark:bg-gray-700 shadow-sm text-blue-600 dark:text-blue-400"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
-                )}
-              >
-                <span>🇬🇧</span>
-                <span className="hidden sm:inline">UK</span>
-              </button>
-              <button
-                onClick={() => setSelectedCountry('Ireland')}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
-                  selectedCountry === 'Ireland'
-                    ? "bg-white dark:bg-gray-700 shadow-sm text-green-600 dark:text-green-400"
-                    : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
-                )}
-              >
-                <span>🇮🇪</span>
-                <span className="hidden sm:inline">Ireland</span>
-              </button>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {isMobile && (
-              <Button variant="outline" size="sm" onClick={() => setShowMobileMenu(!showMobileMenu)}>
-                <Menu className="h-4 w-4" />
-              </Button>
-            )}
-            <Button variant="outline" size="sm" onClick={refreshDashboard} disabled={loading}>
-              <RefreshCcw className={cn("h-4 w-4", loading && "animate-spin mr-2")} />
-              {!loading && "Refresh"}
-            </Button>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="relative">
-                  <Bell className="h-4 w-4" />
-                  {notifications.length > 0 && (
-                    <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full flex items-center justify-center text-white text-xs">
-                      {notifications.length}
-                    </span>
-                  )}
+        <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
+          <div className="flex justify-between items-center px-6 py-4">
+            <div className="flex items-center gap-4">
+              {isMobile && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setShowMobileMenu(!showMobileMenu)}
+                  className="md:hidden"
+                >
+                  <Menu className="h-5 w-5" />
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80 p-2">
-                <div className="space-y-2">
-                  <h3 className="font-medium text-lg">Notifications</h3>
-                  <Separator />
+              )}
+              <div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                  {navItems.find(item => item.value === activeTab)?.label || 'Dashboard'}
+                </h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                  {selectedCountry === 'England' ? '🇬🇧 United Kingdom' : '🇮🇪 Ireland'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={refreshDashboard}
+                disabled={loading}
+                className="hidden sm:flex hover:bg-green-50 dark:hover:bg-green-950 hover:border-green-300 dark:hover:border-green-700 transition-colors"
+              >
+                <RefreshCcw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
+                Refresh
+              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="relative hover:bg-green-50 dark:hover:bg-green-950 hover:border-green-300 dark:hover:border-green-700 transition-colors"
+                  >
+                    <Bell className="h-5 w-5" />
+                    {notifications.length > 0 && (
+                      <span className="absolute -top-1 -right-1 h-5 w-5 bg-gradient-to-r from-red-500 to-pink-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg animate-pulse">
+                        {notifications.length}
+                      </span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-0" align="end">
+                  <div className="bg-gradient-to-r from-green-600 to-emerald-600 p-4 text-white">
+                    <h3 className="font-bold text-lg flex items-center gap-2">
+                      <Bell className="h-5 w-5" />
+                      Notifications
+                    </h3>
+                    <p className="text-sm text-white/80 mt-1">
+                      {notifications.length} unread notification{notifications.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
                   {notifications.length > 0 ? (
-                    <div className="space-y-2 max-h-[300px] overflow-auto">
+                    <div className="max-h-[400px] overflow-auto p-2">
                       {notifications.map((notification) => (
-                        <div key={notification.id} className="p-3 bg-muted rounded-md hover:bg-muted/80 transition-colors cursor-pointer">
-                          <h4 className="font-medium text-sm">{notification.title}</h4>
-                          <p className="text-xs text-muted-foreground mt-1">{notification.message}</p>
-                          <span className="text-xs text-right text-gray-500 block mt-1">
-                            {new Date(notification.created_at).toLocaleDateString()}
+                        <div
+                          key={notification.id}
+                          className="p-3 mb-2 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer border border-gray-200 dark:border-gray-700"
+                        >
+                          <h4 className="font-semibold text-sm text-gray-900 dark:text-white">{notification.title}</h4>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">{notification.message}</p>
+                          <span className="text-xs text-gray-500 dark:text-gray-500 mt-2 block">
+                            {new Date(notification.created_at).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
                           </span>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-4 text-muted-foreground">
-                      No new notifications
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                      <Bell className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                      <p className="text-sm font-medium">No new notifications</p>
+                      <p className="text-xs mt-1">You're all caught up!</p>
                     </div>
                   )}
-                </div>
-              </PopoverContent>
-            </Popover>
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
         </header>
 
         {/* Mobile Navigation Dropdown */}
         {isMobile && showMobileMenu && (
-          <div className="mb-6 border-b pb-4">
+          <div className="p-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
             <Select value={activeTab} onValueChange={(value) => { setActiveTab(value); setShowMobileMenu(false); }}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select a section" />
               </SelectTrigger>
               <SelectContent>
-                {navItems.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    <div className="flex items-center gap-2">
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.label}</span>
+                {navGroups.map((group) => (
+                  <div key={group.key}>
+                    <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase">
+                      {group.label}
                     </div>
-                  </SelectItem>
+                    {group.items.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        <div className="flex items-center gap-2">
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.label}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </div>
                 ))}
               </SelectContent>
             </Select>
@@ -534,8 +708,10 @@ const AdminDashboardInner = () => {
         )}
 
         {/* Tab Content */}
-        <div className="flex-1 overflow-auto">
-          {renderTabContent(activeTab)}
+        <div className="flex-1 overflow-auto p-6">
+          <div className="max-w-[1600px] mx-auto">
+            {renderTabContent(activeTab)}
+          </div>
         </div>
       </div>
     </div>
