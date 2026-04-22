@@ -4,7 +4,7 @@ import { handleBookingFlow } from '../flows/bookingFlow.js';
 import { handleTrackingFlow } from '../flows/trackingFlow.js';
 import { handlePricingInquiry } from '../flows/pricingFlow.js';
 import { handleFAQFlow } from '../flows/faqFlow.js';
-import { sendMessage } from '../utils/messageUtils.js';
+import { sendMessage, sendListMessage } from '../utils/messageUtils.js';
 
 export async function handleMessage(sock, message) {
   try {
@@ -52,32 +52,25 @@ export async function handleMessage(sock, message) {
 }
 
 async function sendWelcomeMessage(sock, phoneNumber) {
-  const welcomeMsg = `🇮🇪 *Welcome to Zimbabwe Shipping*
-_Ireland Branch_
+  const bodyText = `🇮🇪 *Welcome to Zimbabwe Shipping*\n_Ireland Branch_\n\nThank you for contacting us! We're excited to serve you.\n\n📢 *Collections commence in August 2026*\n\nTap the button below to get started.`;
 
-Thank you for contacting us! We're excited to serve you.
-
-📢 *Important Notice:*
-Collections in Ireland will commence in *August 2026*
-
-*Our Services:*
-✈️ Ship drums, trunks & boxes to Zimbabwe
-🚚 FREE collection across Ireland
-📦 Full tracking & insurance
-💰 Competitive pricing with volume discounts
-
-*How can we help you today?*
-
-1️⃣ 📦 Book a Shipment
-2️⃣ 💰 View Pricing
-3️⃣ 🔍 Track Shipment
-4️⃣ 📍 Collection Areas
-5️⃣ ❓ FAQ & Help
-6️⃣ 📞 Contact Us
-
-_Reply with a number (1-6) or describe what you need._`;
-
-  await sendMessage(sock, phoneNumber, welcomeMsg);
+  await sendListMessage(
+    sock,
+    phoneNumber,
+    bodyText,
+    '≡  Zimbabwe Shipping Menu',
+    [{
+      title: 'What would you like to do?',
+      rows: [
+        { id: '1', title: '📦 Book a Shipment', description: 'Ship drums or boxes to Zimbabwe' },
+        { id: '2', title: '💰 View Pricing', description: 'See our rates and what\'s included' },
+        { id: '3', title: '🔍 Track Shipment', description: 'Check your shipment status' },
+        { id: '4', title: '📍 Collection Areas', description: 'See where we collect from in Ireland' },
+        { id: '5', title: '❓ FAQ & Help', description: 'Common questions answered' },
+        { id: '6', title: '📞 Contact Us', description: 'Get in touch with our team' }
+      ]
+    }]
+  );
 }
 
 function extractMessageText(message) {
@@ -97,17 +90,17 @@ async function handleMainMenu(sock, phoneNumber, text, session) {
   
   // Menu request
   if (lowerText === 'menu' || lowerText === 'start' || lowerText === 'main') {
-    await sendMessage(sock, phoneNumber, getMainMenu(session.userName));
+    await sendMainMenuList(sock, phoneNumber, session.userName);
     return;
   }
 
-  // Handle menu options
+  // Handle menu options (works for both typed numbers AND list selection IDs)
   switch (lowerText) {
     case '1':
     case 'book':
     case 'booking':
       await updateUserSession(phoneNumber, { state: 'BOOKING_FLOW', step: 'START' });
-      await sendMessage(sock, phoneNumber, getBookingMenu());
+      await handleBookingFlow(sock, phoneNumber, text, { ...session, state: 'BOOKING_FLOW', step: 'START' });
       break;
 
     case '2':
@@ -148,12 +141,31 @@ async function handleMainMenu(sock, phoneNumber, text, session) {
       break;
 
     default:
-      await sendMessage(
-        sock,
-        phoneNumber,
-        `I didn't quite understand that. Type *menu* to see available options.`
-      );
+      await sendMainMenuList(sock, phoneNumber, session.userName);
   }
+}
+
+async function sendMainMenuList(sock, phoneNumber, userName = null) {
+  const greeting = userName ? `Hello ${userName}! 👋` : 'Hello! 👋';
+  const bodyText = `${greeting}\n\n🇮🇪 *Zimbabwe Shipping - Ireland*\n\n📢 Collections commence in *August 2026*\n\nTap the button below to choose an option.`;
+
+  await sendListMessage(
+    sock,
+    phoneNumber,
+    bodyText,
+    '≡  Main Menu',
+    [{
+      title: 'What would you like to do?',
+      rows: [
+        { id: '1', title: '📦 Book a Shipment', description: 'Ship drums or boxes to Zimbabwe' },
+        { id: '2', title: '💰 View Pricing', description: 'See our rates and what\'s included' },
+        { id: '3', title: '🔍 Track Shipment', description: 'Check your shipment status' },
+        { id: '4', title: '📍 Collection Areas', description: 'See where we collect from in Ireland' },
+        { id: '5', title: '❓ FAQ & Help', description: 'Common questions answered' },
+        { id: '6', title: '📞 Contact Us', description: 'Get in touch with our team' }
+      ]
+    }]
+  );
 }
 
 function getCollectionInfo() {

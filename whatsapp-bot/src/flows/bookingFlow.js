@@ -33,8 +33,8 @@ export async function handleBookingFlow(sock, phoneNumber, text, session) {
         );
         await updateUserSession(phoneNumber, { step: 'USE_SAVED_OR_NEW' });
       } else {
-        // Ask for sender's name
         await updateUserSession(phoneNumber, { step: 'SENDER_NAME' });
+        await sendMessage(sock, phoneNumber, `📦 *Start Your Booking*\n\nI'll guide you through a quick booking.\n\n👤 What's your full name?`);
       }
       break;
 
