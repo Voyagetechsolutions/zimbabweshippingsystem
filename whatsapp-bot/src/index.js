@@ -29,6 +29,9 @@ let reconnectAttempts = 0;
 const BASE_RECONNECT_DELAY = 5000;
 const MAX_RECONNECT_DELAY = 60000;
 
+let _activeSock = null;
+export function getActiveSock() { return _activeSock; }
+
 function nextReconnectDelay() {
   const delay = Math.min(BASE_RECONNECT_DELAY * Math.pow(2, Math.max(0, reconnectAttempts - 1)), MAX_RECONNECT_DELAY);
   return delay;
@@ -230,9 +233,10 @@ async function connectToWhatsApp() {
           }, delay);
         }
       } else if (connection === 'open') {
-        reconnectAttempts = 0; // Reset counter on successful connection
-        qrCodeGenerated = false; // Reset QR code flag for future use
+        reconnectAttempts = 0;
+        qrCodeGenerated = false;
         currentQRCodePath = null;
+        _activeSock = sock;
         console.log('✅ WhatsApp Bot Connected Successfully!');
         console.log('🇮🇪 Zimbabwe Shipping Ireland Bot is now active');
         console.log('🔒 Session saved - no QR code needed on restart!');

@@ -1,11 +1,16 @@
 html, body, #root {
   height: 100%;
   overflow-x: hidden;
+  /* Prevent content from being wider than the viewport on mobile */
+  max-width: 100vw;
 }
 
 body {
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
+  /* Prevent font size inflation on mobile */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 
@@ -270,5 +275,86 @@ body {
   
   .dark .text-contrast-dark {
     color: rgb(229 231 235); /* text-gray-200 equivalent */
+  }
+}
+
+/* ── Mobile scaling fixes ── */
+@layer utilities {
+  /* Tables that overflow on small screens get horizontal scroll */
+  .table-responsive {
+    @apply w-full overflow-x-auto -mx-0;
+  }
+
+  /* Cards and panels should never overflow viewport */
+  .mobile-safe {
+    @apply max-w-full overflow-hidden;
+  }
+}
+
+/* Prevent wide fixed-width elements from breaking mobile layout */
+@media (max-width: 640px) {
+  /* Admin sidebar collapses fully on mobile */
+  .admin-sidebar {
+    max-width: 100vw;
+  }
+
+  /* Tables scroll horizontally instead of overflowing */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+
+  /* Cards take full width */
+  .card, [class*="Card"] {
+    max-width: 100%;
+  }
+
+  /* Dialogs/modals fit the screen */
+  [role="dialog"] {
+    max-width: calc(100vw - 2rem) !important;
+    max-height: calc(100dvh - 2rem) !important;
+    overflow-y: auto;
+  }
+
+  /* Navigation menus don't overflow */
+  nav, header {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  /* Inputs and buttons are touch-friendly */
+  input, select, textarea, button {
+    font-size: 16px; /* prevents iOS zoom on focus */
+  }
+
+  /* Grid columns collapse to single column */
+  .grid-cols-2,
+  .grid-cols-3,
+  .grid-cols-4 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Flex rows wrap on mobile */
+  .flex-row-mobile-wrap {
+    flex-wrap: wrap;
+  }
+
+  /* Tabs scroll horizontally */
+  [role="tablist"] {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  [role="tablist"]::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Tablet adjustments */
+@media (min-width: 641px) and (max-width: 1024px) {
+  [role="dialog"] {
+    max-width: calc(100vw - 3rem) !important;
   }
 }

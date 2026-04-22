@@ -38,6 +38,7 @@ import PaymentScheduleManagement from '@/components/admin/PaymentScheduleManagem
 import ServiceReviewsTab from '@/components/admin/tabs/ServiceReviewsTab';
 import ManualBookingTab from '@/components/admin/tabs/ManualBookingTab';
 import WhatsAppBotSettingsTab from '@/components/admin/tabs/WhatsAppBotSettingsTab';
+import DeliveryNotesTab from '@/components/admin/tabs/DeliveryNotesTab';
 
 // Icons
 import {
@@ -64,6 +65,7 @@ import {
   CalendarDays,
   Star,
   PlusCircle,
+  FileText,
 } from 'lucide-react';
 
 interface NavGroup {
@@ -117,6 +119,7 @@ const AdminDashboardInner = () => {
       items: [
         { value: 'pickupZones', label: 'Pickup Zones', icon: MapPin },
         { value: 'delivery', label: 'Delivery', icon: Truck },
+        { value: 'deliveryNotes', label: 'Delivery Notes', icon: FileText },
         { value: 'schedule', label: 'Schedule', icon: Calendar },
         { value: 'routes', label: 'Routes', icon: Route },
       ],
@@ -345,6 +348,7 @@ const AdminDashboardInner = () => {
       case 'supportTickets': return <SupportTickets />;
       case 'contentManagement': return <ContentManagement />;
       case 'feedback': return <ServiceReviewsTab />;
+      case 'deliveryNotes': return <DeliveryNotesTab />;
       case 'whatsappBot': return <WhatsAppBotSettingsTab />;
       case 'settings': return <SystemSettingsTab />;
       default: return null;

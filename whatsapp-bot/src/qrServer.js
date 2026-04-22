@@ -114,6 +114,35 @@ app.get('/', (req, res) => {
 });
 
 export function startQRServer() {
+  // Parse JSON bodies for the send-message endpoint
+  app.use(express.json());
+
+  // Internal endpoint — called by Supabase Edge Function to push a WhatsApp message
+  app.post('/send-message', async (req, res) => {
+    const apiKey = process.env.BOT_API_KEY;
+    if (apiKey && req.headers['x-api-key'] !== apiKey) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { phone_number, message } = req.body;
+    if (!phone_number || !message) {
+      return res.status(400).json({ error: 'phone_number and message are required' });
+    }
+
+    try {
+      // Import the active sock from index.js via a shared module
+      const { getActiveSock } = await import('./index.js');
+      const sock = getActiveSock();
+      if (!sock) return res.status(503).json({ error: 'Bot not connected' });
+
+      await sock.sendMessage(phone_number, { text: message });
+      res.json({ success: true });
+    } catch (err) {
+      console.error('send-message error:', err);
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   app.listen(PORT, () => {
     console.log(`\n🌐 QR Code Server started on port ${PORT}`);
     console.log(`📥 Download QR code at: http://localhost:${PORT}/qr-code`);

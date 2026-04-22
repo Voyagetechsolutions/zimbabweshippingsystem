@@ -169,9 +169,25 @@ const ShipmentManagementTab = () => {
 
       if (error) throw error;
 
+      // Trigger WhatsApp status notification via edge function / webhook
+      try {
+        const whatsappNumber = viewingShipment.metadata?.whatsappNumber;
+        if (whatsappNumber) {
+          await supabase.functions.invoke('notify-shipment-status', {
+            body: {
+              phone_number: whatsappNumber,
+              tracking_number: viewingShipment.tracking_number,
+              status: selectedStatus,
+            }
+          });
+        }
+      } catch (notifyErr) {
+        console.warn('WhatsApp notification failed (non-critical):', notifyErr);
+      }
+
       toast({
         title: 'Status Updated',
-        description: `Shipment ${viewingShipment.tracking_number} status updated to ${selectedStatus}`,
+        description: `Shipment ${viewingShipment.tracking_number} updated to ${selectedStatus}`,
       });
 
       setShipments(shipments.map(s =>
