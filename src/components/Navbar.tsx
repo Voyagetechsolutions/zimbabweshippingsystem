@@ -338,11 +338,6 @@ const Navbar = () => {
                 My Shipments
               </Link>
               
-              {/* Add Switch to Admin option in mobile menu */}
-              <Link to="/admin" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
-                Switch to Admin
-              </Link>
-              
               {isAdmin && (
                 <Link to="/admin" className="block px-3 py-2 rounded-md text-base font-medium hover:bg-accent" onClick={() => setIsOpen(false)}>
                   Admin Panel

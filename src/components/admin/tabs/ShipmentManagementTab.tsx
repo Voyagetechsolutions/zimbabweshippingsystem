@@ -76,22 +76,22 @@ import {
 
 const STATUS_OPTIONS = [
   'Pending',
-  'Booking Confirmed',
-  'Ready for Pickup',
-  'InTransit to Zimbabwe',
-  'Goods Arrived in Zimbabwe',
-  'Processing in ZW Warehouse',
+  'Confirmed',
+  'Collected',
+  'In Transit',
+  'Zim Warehouse',
+  'Out for Delivery',
   'Delivered',
   'Cancelled',
 ];
 
 const STATUS_STEPS = [
   'Pending',
-  'Booking Confirmed',
-  'Ready for Pickup',
-  'InTransit to Zimbabwe',
-  'Goods Arrived in Zimbabwe',
-  'Processing in ZW Warehouse',
+  'Confirmed',
+  'Collected',
+  'In Transit',
+  'Zim Warehouse',
+  'Out for Delivery',
   'Delivered'
 ];
 
@@ -115,10 +115,29 @@ const ShipmentManagementTab = () => {
   const [sortField, setSortField] = useState('created_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [selectedShipments, setSelectedShipments] = useState<string[]>([]);
+  const [showBulkUpdate, setShowBulkUpdate] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState('');
+  const [collectionPeriods, setCollectionPeriods] = useState<any[]>([]);
 
   useEffect(() => {
     fetchShipments();
+    fetchCollectionPeriods();
   }, [sortField, sortDirection]);
+
+  const fetchCollectionPeriods = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('collection_periods')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setCollectionPeriods(data || []);
+    } catch (error: any) {
+      console.error('Error fetching collection periods:', error);
+    }
+  };
 
   const fetchShipments = async () => {
     setLoading(true);
@@ -214,6 +233,93 @@ const ShipmentManagementTab = () => {
       });
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleBulkStatusUpdate = async () => {
+    if (!bulkStatus || selectedShipments.length === 0) return;
+
+    setIsUpdating(true);
+    try {
+      const { error } = await supabase
+        .from('shipments')
+        .update({
+          status: bulkStatus,
+          updated_at: new Date().toISOString()
+        })
+        .in('id', selectedShipments);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Bulk Update Complete',
+        description: `Updated ${selectedShipments.length} shipment(s) to ${bulkStatus}`,
+      });
+
+      // Refresh shipments
+      await fetchShipments();
+      
+      // Reset selection
+      setSelectedShipments([]);
+      setShowBulkUpdate(false);
+      setBulkStatus('');
+    } catch (error: any) {
+      console.error('Error bulk updating:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to bulk update: ${error.message}`,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleBulkUpdateByPeriod = async (periodId: string, newStatus: string) => {
+    setIsUpdating(true);
+    try {
+      const { error } = await supabase
+        .from('shipments')
+        .update({
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('collection_period_id', periodId);
+
+      if (error) throw error;
+
+      const period = collectionPeriods.find(p => p.id === periodId);
+      toast({
+        title: 'Bulk Update Complete',
+        description: `Updated all shipments in ${period?.name} to ${newStatus}`,
+      });
+
+      await fetchShipments();
+    } catch (error: any) {
+      console.error('Error bulk updating by period:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to bulk update: ${error.message}`,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const toggleShipmentSelection = (shipmentId: string) => {
+    setSelectedShipments(prev =>
+      prev.includes(shipmentId)
+        ? prev.filter(id => id !== shipmentId)
+        : [...prev, shipmentId]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedShipments.length === filteredShipments.length) {
+      setSelectedShipments([]);
+    } else {
+      setSelectedShipments(filteredShipments.map(s => s.id));
     }
   };
 
@@ -409,8 +515,35 @@ const ShipmentManagementTab = () => {
   };
 
   const getStatusProgress = (status: string) => {
-    const currentStep = STATUS_STEPS.indexOf(status);
-    return currentStep >= 0 ? Math.round((currentStep / (STATUS_STEPS.length - 1)) * 100) : 0;
+    const statusMap: Record<string, number> = {
+      'pending': 0,
+      'confirmed': 1,
+      'collected': 2,
+      'in transit': 3,
+      'intransit': 3,
+      'ontransit': 3,
+      'zim warehouse': 4,
+      'out for delivery': 5,
+      'delivered': 6
+    };
+    
+    const currentStep = statusMap[status?.toLowerCase()] ?? 0;
+    return Math.round((currentStep / (STATUS_STEPS.length - 1)) * 100);
+  };
+
+  const getCurrentStepIndex = (status: string) => {
+    const statusMap: Record<string, number> = {
+      'pending': 0,
+      'confirmed': 1,
+      'collected': 2,
+      'in transit': 3,
+      'intransit': 3,
+      'ontransit': 3,
+      'zim warehouse': 4,
+      'out for delivery': 5,
+      'delivered': 6
+    };
+    return statusMap[status?.toLowerCase()] ?? 0;
   };
 
   // Helper to get collection month from shipment
@@ -475,15 +608,22 @@ const ShipmentManagementTab = () => {
       );
     } else if (statusLower.includes('delivered')) {
       return (
-        <Badge variant="secondary" className="flex items-center gap-1">
+        <Badge variant="secondary" className="flex items-center gap-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
           <CheckCircle className="h-3 w-3" />
           {status}
         </Badge>
       );
-    } else if (statusLower.includes('processing') || statusLower.includes('pickup') || statusLower.includes('transit') || statusLower.includes('arrived')) {
+    } else if (statusLower.includes('transit') || statusLower.includes('warehouse') || statusLower.includes('delivery') || statusLower.includes('collected')) {
       return (
         <Badge variant="outline" className="flex items-center gap-1">
           <Loader2 className="h-3 w-3 animate-spin" />
+          {status}
+        </Badge>
+      );
+    } else if (statusLower.includes('confirmed')) {
+      return (
+        <Badge className="flex items-center gap-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100">
+          <CheckCircle className="h-3 w-3" />
           {status}
         </Badge>
       );
@@ -498,10 +638,22 @@ const ShipmentManagementTab = () => {
         title="Shipment Management"
         description="Track and manage all customer shipments"
         actions={
-          <Button variant="outline" size="sm" onClick={fetchShipments} className="h-8 text-xs">
-            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            {selectedShipments.length > 0 && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setShowBulkUpdate(true)}
+                className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700"
+              >
+                Bulk Update ({selectedShipments.length})
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={fetchShipments} className="h-8 text-xs">
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+              Refresh
+            </Button>
+          </div>
         }
       />
 
@@ -569,8 +721,8 @@ const ShipmentManagementTab = () => {
               </div>
               <CardTitle className="text-xl">
                 {shipments.filter(s =>
-                  ['InTransit to Zimbabwe', 'Goods Arrived in Zimbabwe', 'Processing in ZW Warehouse']
-                    .includes(s.status)).length}
+                  ['In Transit', 'InTransit', 'OnTransit', 'Zim Warehouse', 'Out for Delivery']
+                    .some(status => s.status?.toLowerCase().includes(status.toLowerCase()))).length}
               </CardTitle>
             </CardHeader>
           </Card>
@@ -623,6 +775,14 @@ const ShipmentManagementTab = () => {
             <Table>
               <TableHeader className="bg-muted/50">
                 <TableRow>
+                  <TableHead className="w-[50px]">
+                    <input
+                      type="checkbox"
+                      checked={selectedShipments.length === filteredShipments.length && filteredShipments.length > 0}
+                      onChange={toggleSelectAll}
+                      className="rounded border-gray-300"
+                    />
+                  </TableHead>
                   <TableHead className="w-[120px]">Tracking #</TableHead>
                   <TableHead>Sender</TableHead>
                   <TableHead>Receiver</TableHead>
@@ -633,6 +793,14 @@ const ShipmentManagementTab = () => {
               <TableBody>
                 {filteredShipments.map(shipment => (
                   <TableRow key={shipment.id} className="hover:bg-muted/50">
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        checked={selectedShipments.includes(shipment.id)}
+                        onChange={() => toggleShipmentSelection(shipment.id)}
+                        className="rounded border-gray-300"
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -704,427 +872,278 @@ const ShipmentManagementTab = () => {
         </div>
       </div>
 
-      {/* Shipment Details Dialog - Modern Youthful Design */}
+      {/* Shipment Details Dialog - Clean Admin Style */}
       <Dialog open={!!viewingShipment} onOpenChange={(open) => !open && setViewingShipment(null)}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-0 gap-0" aria-describedby={undefined}>
-          <DialogHeader className="sr-only">
-            <DialogTitle>Shipment Details</DialogTitle>
-            <DialogDescription>View and manage shipment information</DialogDescription>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold">Shipment Details</DialogTitle>
+            <DialogDescription className="text-xs">
+              Tracking: {viewingShipment?.tracking_number}
+            </DialogDescription>
           </DialogHeader>
           {viewingShipment && (
-            <div className="flex flex-col">
-              {/* Header with Gradient */}
-              <div className="bg-emerald-600 p-6 text-white">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
-                        <Package className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <p className="text-white/80 text-sm font-medium">Tracking Number</p>
-                        <h2 className="text-2xl font-bold tracking-wide">{viewingShipment.tracking_number}</h2>
-                      </div>
-                    </div>
+            <div className="space-y-4">
+              {/* Status and Basic Info */}
+              <div className="flex items-center justify-between pb-3 border-b">
+                <div>
+                  <p className="text-xs text-muted-foreground">Current Status</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    {renderStatusBadge(viewingShipment.status)}
                   </div>
-                  <div className="text-right">
-                    <Badge className={`text-sm px-4 py-1.5 font-semibold ${viewingShipment.status === 'Delivered' ? 'bg-green-600' :
-                        viewingShipment.status === 'Cancelled' ? 'bg-red-500' :
-                          viewingShipment.status === 'InTransit to Zimbabwe' ? 'bg-blue-500' :
-                            'bg-white/20 backdrop-blur-sm'
-                      }`}>
-                      {viewingShipment.status}
-                    </Badge>
-                    <p className="text-white/70 text-xs mt-2">
-                      Created {format(new Date(viewingShipment.created_at), 'MMM d, yyyy')}
-                    </p>
-                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Last Updated</p>
+                  <p className="text-sm font-medium mt-1">{format(new Date(viewingShipment.updated_at), 'MMM d, yyyy')}</p>
                 </div>
               </div>
 
-              {/* Progress Timeline - Modern Style */}
-              <div className="px-6 py-5 bg-gray-50 dark:bg-gray-900 border-b">
-                <div className="flex items-center justify-between relative">
-                  {/* Progress Line */}
-                  <div className="absolute top-5 left-0 right-0 h-1 bg-gray-200 dark:bg-gray-700 rounded-full">
-                    <div
-                      className="h-full bg-emerald-600 rounded-full transition-all duration-500"
-                      style={{ width: `${getStatusProgress(viewingShipment.status)}%` }}
-                    />
-                  </div>
-
+              {/* Progress Bar */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-medium text-muted-foreground">Progress</p>
+                  <p className="text-xs text-muted-foreground">{getStatusProgress(viewingShipment.status)}%</p>
+                </div>
+                <Progress value={getStatusProgress(viewingShipment.status)} className="h-2" />
+                <div className="flex justify-between mt-2">
                   {STATUS_STEPS.map((step, index) => {
-                    const isCompleted = STATUS_STEPS.indexOf(viewingShipment.status) >= index;
-                    const isCurrent = STATUS_STEPS.indexOf(viewingShipment.status) === index;
+                    const isCompleted = getCurrentStepIndex(viewingShipment.status) >= index;
                     return (
-                      <div key={step} className="relative z-10 flex flex-col items-center">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${isCompleted
-                            ? 'bg-emerald-600 text-white shadow shadow-emerald-500/20'
-                            : 'bg-gray-200 dark:bg-gray-700 text-gray-400'
-                          } ${isCurrent ? 'ring-4 ring-emerald-500/30 scale-110' : ''}`}>
-                          {isCompleted ? (
-                            <CheckCircle className="h-5 w-5" />
-                          ) : (
-                            <span className="text-sm font-medium">{index + 1}</span>
-                          )}
-                        </div>
-                        <span className={`text-xs mt-2 text-center max-w-[80px] ${isCompleted ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-gray-400'
-                          }`}>
-                          {step.replace('InTransit to Zimbabwe', 'In Transit').replace('Processing in ZW Warehouse', 'Processing')}
-                        </span>
-                      </div>
+                      <span key={step} className={`text-[10px] ${isCompleted ? 'text-emerald-600 font-medium' : 'text-muted-foreground'}`}>
+                        {step}
+                      </span>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Main Content */}
-              <div className="p-6 space-y-6">
-                {/* Shipment Type Banner */}
-                <div className="bg-slate-800 dark:bg-slate-700 rounded-lg p-4 text-white">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-white/10 rounded-lg">
-                        <Package className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="text-white/70 text-xs font-medium">Shipment Type</p>
-                        <p className="text-lg font-bold">{getShipmentType(viewingShipment).type}</p>
-                        {getShipmentType(viewingShipment).details && (
-                          <p className="text-white/60 text-sm">{getShipmentType(viewingShipment).details}</p>
-                        )}
-                      </div>
+              {/* Sender & Receiver - Side by Side */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+                  <p className="text-xs font-semibold text-muted-foreground">Sender</p>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">{getSenderName(viewingShipment)}</p>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Mail className="h-3 w-3" />
+                      {getSenderEmail(viewingShipment)}
+                    </p>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Phone className="h-3 w-3" />
+                      {getSenderPhone(viewingShipment)}
+                    </p>
+                    <p className="text-xs text-muted-foreground flex items-start gap-1">
+                      <MapPin className="h-3 w-3 mt-0.5" />
+                      <span>{getPickupAddress(viewingShipment)}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+                  <p className="text-xs font-semibold text-muted-foreground">Receiver</p>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">{getReceiverName(viewingShipment)}</p>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Phone className="h-3 w-3" />
+                      {getReceiverPhone(viewingShipment)}
+                    </p>
+                    <p className="text-xs text-muted-foreground flex items-start gap-1">
+                      <MapPin className="h-3 w-3 mt-0.5" />
+                      <span>{getDeliveryAddress(viewingShipment)}</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Collection & Shipment Info */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2 p-3 border rounded-lg">
+                  <p className="text-xs font-semibold text-muted-foreground">Collection Details</p>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Route:</span>
+                      <span className="font-medium">{getCollectionInfo(viewingShipment).route}</span>
                     </div>
-                    <div className="text-right">
-                      <p className="text-white/70 text-xs">Origin → Destination</p>
-                      <p className="font-medium">{viewingShipment.origin || 'UK'} → {viewingShipment.destination || 'Zimbabwe'}</p>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Date:</span>
+                      <span className="font-medium">{getCollectionInfo(viewingShipment).date}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Postal Code:</span>
+                      <span className="font-medium">{getCollectionInfo(viewingShipment).postalCode || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">City:</span>
+                      <span className="font-medium">{getCollectionInfo(viewingShipment).city || 'N/A'}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Quick Stats Row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-blue-50 dark:bg-blue-950/40 rounded-lg p-4 border border-blue-100 dark:border-blue-900">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-blue-500 rounded-lg">
-                        <Truck className="h-4 w-4 text-white" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">Route</p>
-                        <p className="font-semibold text-blue-900 dark:text-blue-100">{getCollectionInfo(viewingShipment).route || 'N/A'}</p>
-                      </div>
+                <div className="space-y-2 p-3 border rounded-lg">
+                  <p className="text-xs font-semibold text-muted-foreground">Shipment Info</p>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Type:</span>
+                      <span className="font-medium">{getShipmentType(viewingShipment).type}</span>
                     </div>
-                  </div>
-
-                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/50 dark:to-pink-950/50 rounded-xl p-4 border border-purple-100 dark:border-purple-900">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-purple-500 rounded-lg">
-                        <Calendar className="h-4 w-4 text-white" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-purple-600 dark:text-purple-400 font-medium">Collection</p>
-                        <p className="font-semibold text-purple-900 dark:text-purple-100">{getCollectionInfo(viewingShipment).date || 'TBC'}</p>
-                      </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Origin:</span>
+                      <span className="font-medium">{viewingShipment.origin || 'UK'}</span>
                     </div>
-                  </div>
-
-                  <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/50 dark:to-orange-950/50 rounded-xl p-4 border border-amber-100 dark:border-amber-900">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-amber-500 rounded-lg">
-                        <FileSpreadsheet className="h-4 w-4 text-white" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">Payment</p>
-                        <p className="font-semibold text-amber-900 dark:text-amber-100">{getPaymentAmount(viewingShipment)}</p>
-                      </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Destination:</span>
+                      <span className="font-medium">{viewingShipment.destination || 'Zimbabwe'}</span>
                     </div>
-                  </div>
-
-                  <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/50 dark:to-teal-950/50 rounded-xl p-4 border border-emerald-100 dark:border-emerald-900">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-emerald-500 rounded-lg">
-                        <Clock className="h-4 w-4 text-white" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Updated</p>
-                        <p className="font-semibold text-emerald-900 dark:text-emerald-100">{format(new Date(viewingShipment.updated_at), 'MMM d')}</p>
-                      </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Payment:</span>
+                      <span className="font-medium">{getPaymentAmount(viewingShipment)}</span>
                     </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Collection Details Card */}
-                <div className="bg-white dark:bg-gray-900 rounded-xl border shadow-sm overflow-hidden">
-                  <div className="bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-3">
-                    <h3 className="font-semibold text-white flex items-center gap-2">
-                      <Truck className="h-4 w-4" />
-                      Collection Details
-                    </h3>
-                  </div>
-                  <div className="p-4">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <p className="text-xs text-muted-foreground mb-1">Route</p>
-                        <p className="font-semibold text-blue-600 dark:text-blue-400">
-                          {getCollectionInfo(viewingShipment).route || 'Not assigned'}
-                        </p>
-                      </div>
-                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <p className="text-xs text-muted-foreground mb-1">Collection Date</p>
-                        <p className="font-semibold text-purple-600 dark:text-purple-400">
-                          {getCollectionInfo(viewingShipment).date || 'To be confirmed'}
-                        </p>
-                      </div>
-                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <p className="text-xs text-muted-foreground mb-1">Postal Code</p>
-                        <p className="font-semibold text-cyan-600 dark:text-cyan-400">
-                          {getCollectionInfo(viewingShipment).postalCode || 'N/A'}
-                        </p>
-                      </div>
-                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        <p className="text-xs text-muted-foreground mb-1">Area / City</p>
-                        <p className="font-semibold text-teal-600 dark:text-teal-400">
-                          {getCollectionInfo(viewingShipment).city || 'N/A'}
-                        </p>
-                      </div>
+              {/* Shipment Contents */}
+              {viewingShipment.metadata?.shipmentDetails && (
+                <div className="p-3 border rounded-lg">
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">Shipment Contents</p>
+                  <div className="grid grid-cols-4 gap-2 text-center">
+                    <div className="p-2 bg-muted/50 rounded">
+                      <p className="text-lg font-bold">{viewingShipment.metadata.shipmentDetails.quantity || 0}</p>
+                      <p className="text-[10px] text-muted-foreground">Drums</p>
                     </div>
-                    <div className="mt-3 flex items-center gap-4 text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">Country:</span>
-                        <span className="font-medium">
-                          {getCollectionInfo(viewingShipment).country === 'Ireland' ? '🇮🇪 Ireland' : '🇬🇧 UK'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">Status:</span>
-                        <span className={`font-medium ${getCollectionInfo(viewingShipment).completed ? 'text-green-600' : 'text-amber-600'}`}>
-                          {getCollectionInfo(viewingShipment).completed ? 'Collected' : 'Pending Collection'}
-                        </span>
-                      </div>
+                    <div className="p-2 bg-muted/50 rounded">
+                      <p className="text-lg font-bold">{viewingShipment.metadata.shipmentDetails.wantMetalSeal ? '✓' : '—'}</p>
+                      <p className="text-[10px] text-muted-foreground">Metal Seal</p>
+                    </div>
+                    <div className="p-2 bg-muted/50 rounded">
+                      <p className="text-xs font-bold truncate">{viewingShipment.metadata.shipmentDetails.category || '—'}</p>
+                      <p className="text-[10px] text-muted-foreground">Category</p>
+                    </div>
+                    <div className="p-2 bg-muted/50 rounded">
+                      <p className="text-lg font-bold">{viewingShipment.metadata.shipmentDetails.services?.length || 0}</p>
+                      <p className="text-[10px] text-muted-foreground">Add-ons</p>
                     </div>
                   </div>
+                  {viewingShipment.metadata.shipmentDetails.description && (
+                    <p className="text-xs text-muted-foreground mt-2 p-2 bg-muted/30 rounded">
+                      {viewingShipment.metadata.shipmentDetails.description}
+                    </p>
+                  )}
                 </div>
+              )}
 
-                {/* Sender & Receiver Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Sender Card */}
-                  <div className="bg-white dark:bg-gray-900 rounded-xl border shadow-sm overflow-hidden">
-                    <div className="bg-gradient-to-r from-blue-500 to-indigo-500 px-4 py-3">
-                      <h3 className="font-semibold text-white flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        Sender Details
-                      </h3>
+              {/* Status Update Section */}
+              <div className="pt-3 border-t">
+                {editingStatus ? (
+                  <div className="space-y-3">
+                    <div>
+                      <Label htmlFor="status" className="text-xs">Update Status</Label>
+                      <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                        <SelectTrigger className="w-full mt-1 h-9 text-sm">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STATUS_OPTIONS.map((status) => (
+                            <SelectItem
+                              key={status}
+                              value={status}
+                              disabled={status === viewingShipment.status}
+                            >
+                              {status}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <div className="p-4 space-y-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                          <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                        </div>
-                        <div>
-                          <p className="font-semibold">{getSenderName(viewingShipment)}</p>
-                          <p className="text-sm text-muted-foreground">{getSenderEmail(viewingShipment)}</p>
-                        </div>
-                      </div>
-                      <Separator />
-                      <div className="space-y-2 text-sm">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Phone className="h-4 w-4" />
-                          <span>{getSenderPhone(viewingShipment)}</span>
-                        </div>
-                        <div className="flex items-start gap-2 text-muted-foreground">
-                          <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                          <span>{getPickupAddress(viewingShipment)}</span>
-                        </div>
-                        {getCollectionInfo(viewingShipment).postalCode && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded font-mono">
-                              {getCollectionInfo(viewingShipment).postalCode}
-                            </span>
-                            {getCollectionInfo(viewingShipment).city && (
-                              <span className="text-xs text-muted-foreground">
-                                {getCollectionInfo(viewingShipment).city}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Receiver Card */}
-                  <div className="bg-white dark:bg-gray-900 rounded-xl border shadow-sm overflow-hidden">
-                    <div className="bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-3">
-                      <h3 className="font-semibold text-white flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        Receiver Details
-                      </h3>
-                    </div>
-                    <div className="p-4 space-y-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center">
-                          <User className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                        </div>
-                        <div>
-                          <p className="font-semibold">{getReceiverName(viewingShipment)}</p>
-                          <p className="text-sm text-muted-foreground">Zimbabwe</p>
-                        </div>
-                      </div>
-                      <Separator />
-                      <div className="space-y-2 text-sm">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Phone className="h-4 w-4" />
-                          <span>{getReceiverPhone(viewingShipment)}</span>
-                          {viewingShipment.metadata?.additionalRecipientPhone && (
-                            <span className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">
-                              Alt: {viewingShipment.metadata.additionalRecipientPhone}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-start gap-2 text-muted-foreground">
-                          <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                          <span>{getDeliveryAddress(viewingShipment)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Shipment Items */}
-                {viewingShipment.metadata?.shipmentDetails && (
-                  <div className="bg-white dark:bg-gray-900 rounded-xl border shadow-sm overflow-hidden">
-                    <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-3">
-                      <h3 className="font-semibold text-white flex items-center gap-2">
-                        <Package className="h-4 w-4" />
-                        Shipment Contents
-                      </h3>
-                    </div>
-                    <div className="p-4">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="text-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                          <p className="text-2xl font-bold text-amber-600">
-                            {viewingShipment.metadata.shipmentDetails.quantity || '—'}
-                          </p>
-                          <p className="text-xs text-muted-foreground">Drums</p>
-                        </div>
-                        <div className="text-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                          <p className="text-2xl font-bold text-orange-600">
-                            {viewingShipment.metadata.shipmentDetails.wantMetalSeal ? '✓' : '—'}
-                          </p>
-                          <p className="text-xs text-muted-foreground">Metal Seal</p>
-                        </div>
-                        <div className="text-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                          <p className="text-lg font-bold text-purple-600 truncate">
-                            {viewingShipment.metadata.shipmentDetails.category || '—'}
-                          </p>
-                          <p className="text-xs text-muted-foreground">Category</p>
-                        </div>
-                        <div className="text-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                          <p className="text-lg font-bold text-blue-600">
-                            {viewingShipment.metadata.shipmentDetails.services?.length || 0}
-                          </p>
-                          <p className="text-xs text-muted-foreground">Add-ons</p>
-                        </div>
-                      </div>
-                      {viewingShipment.metadata.shipmentDetails.description && (
-                        <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                          <p className="text-sm text-muted-foreground">
-                            <strong>Description:</strong> {viewingShipment.metadata.shipmentDetails.description}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Status Update Section */}
-                <div className="bg-white dark:bg-gray-900 rounded-xl border shadow-sm overflow-hidden">
-                  <div className="bg-gradient-to-r from-violet-500 to-purple-500 px-4 py-3 flex items-center justify-between">
-                    <h3 className="font-semibold text-white flex items-center gap-2">
-                      <Edit className="h-4 w-4" />
-                      Status Management
-                    </h3>
-                    {!editingStatus && viewingShipment.status !== 'Delivered' && viewingShipment.status !== 'Cancelled' && (
+                    <div className="flex gap-2">
                       <Button
                         size="sm"
-                        variant="secondary"
-                        onClick={() => setEditingStatus(true)}
-                        className="bg-white/20 hover:bg-white/30 text-white border-0"
+                        onClick={handleUpdateStatus}
+                        disabled={selectedStatus === viewingShipment.status || isUpdating}
+                        className="h-8 text-xs"
                       >
+                        {isUpdating ? (
+                          <>
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Updating...
+                          </>
+                        ) : (
+                          'Update Status'
+                        )}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingStatus(false)} className="h-8 text-xs">
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Status Management</p>
+                      <p className="text-sm font-medium">{viewingShipment.status}</p>
+                    </div>
+                    {viewingShipment.status !== 'Delivered' && viewingShipment.status !== 'Cancelled' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditingStatus(true)}
+                        className="h-8 text-xs"
+                      >
+                        <Edit className="h-3 w-3 mr-1" />
                         Update Status
                       </Button>
                     )}
                   </div>
-                  <div className="p-4">
-                    {editingStatus ? (
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <Label htmlFor="status" className="text-sm font-medium">New Status</Label>
-                            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                              <SelectTrigger className="w-full mt-2">
-                                <SelectValue placeholder="Select status" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {STATUS_OPTIONS.map((status) => (
-                                  <SelectItem
-                                    key={status}
-                                    value={status}
-                                    disabled={status === viewingShipment.status}
-                                  >
-                                    {status}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <Label htmlFor="note" className="text-sm font-medium">Note (Optional)</Label>
-                            <Textarea
-                              id="note"
-                              value={statusNote}
-                              onChange={(e) => setStatusNote(e.target.value)}
-                              placeholder="Add notes..."
-                              className="mt-2 h-[42px] min-h-[42px]"
-                            />
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={handleUpdateStatus}
-                            disabled={selectedStatus === viewingShipment.status || isUpdating}
-                            className="bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600"
-                          >
-                            {isUpdating ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Updating...
-                              </>
-                            ) : (
-                              'Confirm Update'
-                            )}
-                          </Button>
-                          <Button variant="outline" onClick={() => setEditingStatus(false)}>
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Current Status</p>
-                          <p className="font-semibold">{viewingShipment.status}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Last Updated</p>
-                          <p className="font-medium">{format(new Date(viewingShipment.updated_at), 'PPpp')}</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Status Update Dialog */}
+      <Dialog open={showBulkUpdate} onOpenChange={setShowBulkUpdate}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Bulk Status Update</DialogTitle>
+            <DialogDescription>
+              Update status for {selectedShipments.length} selected shipment(s)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="bulk-status">New Status</Label>
+              <Select value={bulkStatus} onValueChange={setBulkStatus}>
+                <SelectTrigger className="w-full mt-2">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {status}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkUpdate(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBulkStatusUpdate}
+              disabled={!bulkStatus || isUpdating}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              {isUpdating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                'Update All'
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
