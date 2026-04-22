@@ -701,6 +701,23 @@ export const SimplifiedBookingForm = () => {
         notes: notes.length > 0 ? notes.join(' | ') : null
       };
       
+      // Find matching collection schedule based on route and date
+      let collectionScheduleId = null;
+      try {
+        const { data: scheduleData, error: scheduleError } = await supabase
+          .from('collection_schedules')
+          .select('id')
+          .eq('route', collectionRoute)
+          .eq('pickup_date', collectionDate)
+          .maybeSingle();
+        
+        if (!scheduleError && scheduleData) {
+          collectionScheduleId = scheduleData.id;
+        }
+      } catch (err) {
+        console.warn('Could not link to collection schedule:', err);
+      }
+      
       // Create shipment with proper schema
       const { data: shipmentData, error: shipmentError } = await supabase
         .from('shipments')
@@ -711,6 +728,7 @@ export const SimplifiedBookingForm = () => {
           destination: `${formData.deliveryCity}, Zimbabwe`,
           status: 'pending',
           metadata: shipmentMetadata,
+          collection_schedule_id: collectionScheduleId,
           can_modify: true,
           can_cancel: true
         })

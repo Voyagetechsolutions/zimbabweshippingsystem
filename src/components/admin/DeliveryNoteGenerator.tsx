@@ -146,7 +146,7 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
           {/* Logo */}
           <img
-            src="/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png"
+            src="/logo.png"
             alt="Zimbabwe Shipping"
             crossOrigin="anonymous"
             style={{ height: '80px', width: 'auto' }}

@@ -27,12 +27,29 @@ export async function createShipment(phoneNumber, bookingData) {
 
   const trackingNumber = generateTrackingNumber();
   
+  // Find matching collection schedule based on route
+  let collectionScheduleId = null;
+  try {
+    const { data: scheduleData, error: scheduleError } = await supabase
+      .from('collection_schedules')
+      .select('id')
+      .eq('route', bookingData.collectionRoute)
+      .maybeSingle();
+    
+    if (!scheduleError && scheduleData) {
+      collectionScheduleId = scheduleData.id;
+    }
+  } catch (err) {
+    console.warn('Could not link to collection schedule:', err);
+  }
+  
   const shipmentData = {
     tracking_number: trackingNumber,
     status: 'Pending Collection',
     origin: `${bookingData.senderCity}, Ireland`,
     destination: `${bookingData.receiverCity}, Zimbabwe`,
     user_id: null,
+    collection_schedule_id: collectionScheduleId,
     metadata: {
       sender: {
         name: bookingData.senderName,

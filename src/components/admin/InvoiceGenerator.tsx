@@ -226,18 +226,18 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                 {/* Company Logo */}
                 <div className="flex items-center gap-3 mb-4">
                   <img 
-                    src="/lovable-uploads/12c9c9ec-cde2-4bbb-b612-4413526287bf.png" 
+                    src="/logo.png" 
                     alt="Zimbabwe Shipping" 
                     className="h-14 w-auto"
                     crossOrigin="anonymous"
                   />
                   <div>
                     <h1 className="text-2xl font-bold text-gray-900">Zimbabwe Shipping</h1>
-                    <p className="text-sm text-gray-500">UK to Zimbabwe Express</p>
+                    <p className="text-sm text-gray-500">Ireland to Zimbabwe Express</p>
                   </div>
                 </div>
                 <div className="text-sm text-gray-600 space-y-1">
-                  <p>London, United Kingdom</p>
+                  <p>Ireland Branch</p>
                   <p>support@zimbabweshipping.com</p>
                   <p>www.zimbabweshipping.com</p>
                 </div>

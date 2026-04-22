@@ -28,6 +28,7 @@ import PaymentsInvoicingTab from '@/components/admin/tabs/PaymentsInvoicingTab';
 import ReportsAnalyticsTab from '@/components/admin/tabs/ReportsAnalyticsTab';
 import NotificationsAlertsTab from '@/components/admin/tabs/NotificationsAlertsTab';
 import CollectionScheduleTab from '@/components/admin/tabs/CollectionScheduleTab';
+import CollectionScheduleManagementEnhanced from '@/components/admin/tabs/CollectionScheduleManagementEnhanced';
 import RouteManagementTab from '@/components/admin/tabs/RouteManagementTab';
 import UserManagementTab from '@/components/admin/tabs/UserManagementTab';
 import SystemSettingsTab from '@/components/admin/tabs/SystemSettingsTab';
@@ -342,7 +343,7 @@ const AdminDashboardInner = () => {
       case 'paymentSchedule': return <PaymentScheduleManagement />;
       case 'reports': return <ReportsAnalyticsTab />;
       case 'notifications': return <NotificationsAlertsTab />;
-      case 'schedule': return <CollectionScheduleTab />;
+      case 'schedule': return <CollectionScheduleManagementEnhanced />;
       case 'routes': return <RouteManagementTab />;
       case 'users': return <UserManagementTab />;
       case 'supportTickets': return <SupportTickets />;
