@@ -350,78 +350,77 @@ const UserManagementTab = () => {
               )}
             </>
           )}
-          
-          {/* Edit User Dialog */}
-          <Dialog open={selectedUser !== null} onOpenChange={(open) => !open && setSelectedUser(null)}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Edit User Role</DialogTitle>
-                <DialogDescription>
-                  Update role and permissions for {selectedUser?.full_name || selectedUser?.email}
-                </DialogDescription>
-              </DialogHeader>
-              
-              {selectedUser && (
-                <div className="grid gap-4 py-4">
-                  <div>
-                    <Label htmlFor="userRole">User Role</Label>
-                    <Select value={editRole} onValueChange={setEditRole}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="customer">Customer</SelectItem>
-                        <SelectItem value="staff">Staff</SelectItem>
-                        <SelectItem value="driver">Driver</SelectItem>
-                        <SelectItem value="warehouse">Warehouse</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="checkbox" 
-                      id="isAdmin" 
-                      checked={editIsAdmin}
-                      onChange={(e) => setEditIsAdmin(e.target.checked)}
-                      className="rounded border-gray-300 text-primary focus:ring-primary"
-                    />
-                    <Label htmlFor="isAdmin" className="cursor-pointer">
-                      Grant Admin Privileges
-                    </Label>
-                  </div>
-                  
-                  <div className="text-sm text-gray-500 mt-2">
-                    <p className="flex items-center">
-                      <Shield className="h-4 w-4 mr-1 text-amber-500" />
-                      <span>
-                        Admins have full access to all system features and settings.
-                      </span>
-                    </p>
-                  </div>
-                </div>
-              )}
-              
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setSelectedUser(null)}>Cancel</Button>
-                <Button 
-                  onClick={updateUserRole} 
-                  disabled={isUpdating}
-                >
-                  {isUpdating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Changes'
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
       </div>
+      
+      {/* Edit User Dialog */}
+      <Dialog open={selectedUser !== null} onOpenChange={(open) => !open && setSelectedUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit User Role</DialogTitle>
+            <DialogDescription>
+              Update role and permissions for {selectedUser?.full_name || selectedUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedUser && (
+            <div className="grid gap-4 py-4">
+              <div>
+                <Label htmlFor="userRole">User Role</Label>
+                <Select value={editRole} onValueChange={setEditRole}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="customer">Customer</SelectItem>
+                    <SelectItem value="staff">Staff</SelectItem>
+                    <SelectItem value="driver">Driver</SelectItem>
+                    <SelectItem value="warehouse">Warehouse</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <input 
+                  type="checkbox" 
+                  id="isAdmin" 
+                  checked={editIsAdmin}
+                  onChange={(e) => setEditIsAdmin(e.target.checked)}
+                  className="rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <Label htmlFor="isAdmin" className="cursor-pointer">
+                  Grant Admin Privileges
+                </Label>
+              </div>
+              
+              <div className="text-sm text-gray-500 mt-2">
+                <p className="flex items-center">
+                  <Shield className="h-4 w-4 mr-1 text-amber-500" />
+                  <span>
+                    Admins have full access to all system features and settings.
+                  </span>
+                </p>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedUser(null)}>Cancel</Button>
+            <Button 
+              onClick={updateUserRole} 
+              disabled={isUpdating}
+            >
+              {isUpdating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Changes'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

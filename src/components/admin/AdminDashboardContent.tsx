@@ -154,7 +154,7 @@ const AdminDashboardInner = () => {
       items: [
         { value: 'pickupZones', label: 'Pickup Zones', icon: MapPin },
         { value: 'delivery', label: 'Delivery', icon: Truck },
-        { value: 'deliveryNotes', label: 'Delivery Notes', icon: FileText },
+        // { value: 'deliveryNotes', label: 'Delivery Notes', icon: FileText }, // Disabled
         { value: 'schedule', label: 'Schedule', icon: Calendar },
         { value: 'routes', label: 'Routes', icon: Route },
       ],

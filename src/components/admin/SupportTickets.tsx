@@ -422,9 +422,9 @@ const SupportTickets = () => {
               </Table>
             </div>
           )}
-        </div>
       </div>
 
+      {/* View Ticket Dialog */}
       {viewingTicket && (
         <Dialog open={!!viewingTicket} onOpenChange={(open) => !open && setViewingTicket(null)}>
           <DialogContent className="sm:max-w-[750px]">
