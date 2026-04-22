@@ -110,17 +110,16 @@ export async function sendButtonMessage(sock, phoneNumber, bodyText, buttons) {
 
 function buildListFallback(bodyText, sections) {
   let text = bodyText + '\n\n';
-  let i = 1;
   for (const section of sections) {
-    if (section.title) text += `*${section.title}*\n`;
-    for (const row of section.rows) {
-      text += `${i}️⃣ ${row.title}`;
-      if (row.description) text += ` - ${row.description}`;
-      text += '\n';
-      i++;
-    }
+    if (section.title) text += `*${section.title}*\n\n`;
+    const emojis = ['1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣'];
+    section.rows.forEach((row, i) => {
+      text += `${emojis[i] || `${i+1}.`} ${row.title}`;
+      if (row.description) text += `\n   _${row.description}_`;
+      text += '\n\n';
+    });
   }
-  text += '\n_Reply with the number of your choice_';
+  text += '_Reply with a number to choose_';
   return text;
 }
 

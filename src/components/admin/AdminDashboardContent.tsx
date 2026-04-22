@@ -37,6 +37,7 @@ import ContentManagement from '@/components/admin/ContentManagement';
 import PaymentScheduleManagement from '@/components/admin/PaymentScheduleManagement';
 import ServiceReviewsTab from '@/components/admin/tabs/ServiceReviewsTab';
 import ManualBookingTab from '@/components/admin/tabs/ManualBookingTab';
+import WhatsAppBotSettingsTab from '@/components/admin/tabs/WhatsAppBotSettingsTab';
 
 // Icons
 import {
@@ -144,6 +145,7 @@ const AdminDashboardInner = () => {
       items: [
         { value: 'users', label: 'Users', icon: Users },
         { value: 'contentManagement', label: 'Content', icon: ImageIcon },
+        { value: 'whatsappBot', label: 'WhatsApp Bot', icon: MessageSquare },
         { value: 'settings', label: 'Settings', icon: Settings },
       ],
     },
@@ -343,6 +345,7 @@ const AdminDashboardInner = () => {
       case 'supportTickets': return <SupportTickets />;
       case 'contentManagement': return <ContentManagement />;
       case 'feedback': return <ServiceReviewsTab />;
+      case 'whatsappBot': return <WhatsAppBotSettingsTab />;
       case 'settings': return <SystemSettingsTab />;
       default: return null;
     }

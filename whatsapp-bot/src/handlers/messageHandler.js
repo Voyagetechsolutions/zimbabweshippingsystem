@@ -52,7 +52,7 @@ export async function handleMessage(sock, message) {
 }
 
 async function sendWelcomeMessage(sock, phoneNumber) {
-  const bodyText = `🇮🇪 *Welcome to Zimbabwe Shipping*\n_Ireland Branch_\n\nThank you for contacting us! We're excited to serve you.\n\n📢 *Collections commence in August 2026*\n\nTap the button below to get started.`;
+  const bodyText = `🇮🇪 *Welcome to Zimbabwe Shipping*\n_Ireland Branch_\n\nThank you for contacting us. We're ready to assist you.\n\n📢 *Collections in Ireland begin August 2026*\n\nTap the button below to get started.`;
 
   await sendListMessage(
     sock,
@@ -60,7 +60,7 @@ async function sendWelcomeMessage(sock, phoneNumber) {
     bodyText,
     '≡  Zimbabwe Shipping Menu',
     [{
-      title: 'What would you like to do?',
+      title: 'How can we help you today?',
       rows: [
         { id: '1', title: '📦 Book a Shipment', description: 'Ship drums or boxes to Zimbabwe' },
         { id: '2', title: '💰 View Pricing', description: 'See our rates and what\'s included' },
@@ -145,7 +145,7 @@ async function handleMainMenu(sock, phoneNumber, text, session) {
   }
 }
 
-async function sendMainMenuList(sock, phoneNumber, userName = null) {
+export async function sendMainMenuList(sock, phoneNumber, userName = null) {
   const greeting = userName ? `Hello ${userName}! 👋` : 'Hello! 👋';
   const bodyText = `${greeting}\n\n🇮🇪 *Zimbabwe Shipping - Ireland*\n\n📢 Collections commence in *August 2026*\n\nTap the button below to choose an option.`;
 

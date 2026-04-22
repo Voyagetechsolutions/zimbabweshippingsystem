@@ -169,3 +169,28 @@ function generateTrackingNumber() {
   }
   return result;
 }
+
+export async function getBotSettingsFromDB() {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase.from('bot_settings').select('key, value');
+    if (error) return null;
+    const result = {};
+    for (const row of data) result[row.key] = row.value;
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveBotSetting(key, value) {
+  if (!supabase) return false;
+  try {
+    const { error } = await supabase
+      .from('bot_settings')
+      .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+    return !error;
+  } catch {
+    return false;
+  }
+}
