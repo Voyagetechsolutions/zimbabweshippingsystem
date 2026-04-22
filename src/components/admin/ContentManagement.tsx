@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import TabHeader from './TabHeader';
 import {
   Card,
   CardContent,
@@ -227,44 +228,46 @@ const ContentManagement = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold">Media Library</h2>
-          <p className="text-gray-500">Manage images for your website gallery</p>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="Filter by category" />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map((category) => (
-                <SelectItem key={category} value={category}>
-                  {category.charAt(0).toUpperCase() + category.slice(1)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {images.length > 0 && (
+    <div className="space-y-4">
+      <TabHeader
+        title="Media Library"
+        description="Manage images for your website gallery"
+        actions={
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Filter by category" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {images.length > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowClearConfirm(true)}
+              >
+                <Trash className="h-4 w-4 mr-2" />
+                Clear All
+              </Button>
+            )}
             <Button
-              variant="destructive"
-              onClick={() => setShowClearConfirm(true)}
-              className="flex items-center gap-2"
+              size="sm"
+              onClick={() => setShowUploadDialog(true)}
             >
-              <Trash className="h-4 w-4" />
-              <span>Clear All</span>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Image
             </Button>
-          )}
-          <Button
-            onClick={() => setShowUploadDialog(true)}
-            className="flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add Image</span>
-          </Button>
-        </div>
-      </div>
+          </div>
+        }
+      />
+
+      <div className="space-y-4">
 
       {loading ? (
         <div className="flex justify-center py-16">

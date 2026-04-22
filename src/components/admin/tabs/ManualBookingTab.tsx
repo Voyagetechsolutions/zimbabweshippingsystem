@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import TabHeader from '@/components/admin/TabHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -434,39 +435,32 @@ const ManualBookingTab: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Manual Booking</h2>
-          <p className="text-gray-500">Create a booking for {selectedCountry} (WhatsApp/Phone orders)</p>
-        </div>
-        <div className={`px-4 py-2 rounded-full text-sm font-medium ${
-          selectedCountry === 'Ireland'
-            ? 'bg-green-100 text-green-800'
-            : 'bg-blue-100 text-blue-800'
-        }`}>
-          {selectedCountry === 'Ireland' ? '🇮🇪' : '🇬🇧'} {selectedCountry}
-        </div>
-      </div>
+    <div className="space-y-4">
+      <TabHeader
+        title="Manual Booking"
+        description={`Create a booking for ${selectedCountry} (WhatsApp/Phone orders)`}
+        actions={
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
+            <span>{selectedCountry === 'Ireland' ? '🇮🇪' : '🇬🇧'}</span>
+            {selectedCountry}
+          </span>
+        }
+      />
 
       {/* Info Banner */}
-      <div className="bg-amber-50 border-2 border-amber-200 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <Info className="h-5 w-5 text-amber-600 mt-0.5" />
-          <div>
-            <h3 className="font-semibold text-amber-900">Manual Booking Entry</h3>
-            <p className="text-sm text-amber-800">
-              Use this form to enter bookings received via WhatsApp, phone calls, or other channels.
-              The booking source will be recorded for tracking purposes.
-            </p>
-          </div>
+      <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-md p-3">
+        <div className="flex items-start gap-2">
+          <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+          <p className="text-xs text-amber-900 dark:text-amber-200">
+            Use this form to enter bookings received via WhatsApp, phone calls, or other channels.
+            The booking source will be recorded for tracking purposes.
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Left Column - Sender & Receiver */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Sender Details */}
           <Card>
             <CardHeader>
@@ -681,7 +675,7 @@ const ManualBookingTab: React.FC = () => {
         </div>
 
         {/* Right Column - Items & Payment */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Shipment Items */}
           <Card>
             <CardHeader>

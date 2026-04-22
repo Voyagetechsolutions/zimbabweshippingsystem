@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import TabHeader from '../TabHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -135,13 +136,10 @@ const WhatsAppBotSettingsTab = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <MessageSquare className="h-5 w-5 text-zim-green" />
-        <h2 className="text-xl font-semibold">WhatsApp Bot Settings</h2>
-      </div>
-      <p className="text-sm text-muted-foreground">
-        Manage all pricing and messages sent by the WhatsApp booking bot. Changes take effect within 5 minutes.
-      </p>
+      <TabHeader
+        title="WhatsApp Bot Settings"
+        description="Manage all pricing and messages sent by the WhatsApp booking bot. Changes take effect within 5 minutes."
+      />
 
       <Tabs defaultValue="pricing">
         <TabsList className="w-full sm:w-auto">

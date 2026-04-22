@@ -49,12 +49,16 @@ const Dashboard = () => {
     );
   }
 
-  // Show the appropriate dashboard based on user role
+  // Admins get a full-viewport dashboard with its own chrome — skip the public Navbar/Footer
+  if (isAdmin) {
+    return <AdminDashboardContent />;
+  }
+
   return (
     <>
       <Navbar />
       <main className="container max-w-7xl mx-auto px-4 py-8">
-        {isAdmin ? <AdminDashboardContent /> : <CustomerDashboard />}
+        <CustomerDashboard />
       </main>
       <Footer />
     </>

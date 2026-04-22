@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import TabHeader from '../TabHeader';
 import { 
   Card, 
   CardContent, 
@@ -204,15 +205,11 @@ const UserManagementTab = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <div>
-            <CardTitle className="text-lg font-medium">User Management</CardTitle>
-            <CardDescription>
-              Manage users and assign roles
-            </CardDescription>
-          </div>
+    <div className="space-y-4">
+      <TabHeader
+        title="User Management"
+        description="Manage users and assign roles"
+        actions={
           <Button 
             variant="outline" 
             size="sm" 
@@ -222,39 +219,40 @@ const UserManagementTab = () => {
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-        </CardHeader>
-        
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="relative flex-grow">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search users by email or name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            
-            <Select 
-              value={roleFilter} 
-              onValueChange={setRoleFilter}
-            >
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Filter by role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Roles</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="customer">Customer</SelectItem>
-                <SelectItem value="staff">Staff</SelectItem>
-                <SelectItem value="driver">Driver</SelectItem>
-                <SelectItem value="warehouse">Warehouse</SelectItem>
-              </SelectContent>
-            </Select>
+        }
+      />
+
+      <div className="space-y-4">
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="relative flex-grow">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search users by email or name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
           </div>
           
-          {loading ? (
+          <Select 
+            value={roleFilter} 
+            onValueChange={setRoleFilter}
+          >
+            <SelectTrigger className="w-full md:w-[180px]">
+              <SelectValue placeholder="Filter by role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Roles</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem value="customer">Customer</SelectItem>
+              <SelectItem value="staff">Staff</SelectItem>
+              <SelectItem value="driver">Driver</SelectItem>
+              <SelectItem value="warehouse">Warehouse</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        {loading ? (
             <div className="flex justify-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
             </div>
@@ -422,8 +420,8 @@ const UserManagementTab = () => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 };

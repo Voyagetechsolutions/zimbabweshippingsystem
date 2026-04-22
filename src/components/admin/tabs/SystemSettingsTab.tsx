@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
+import TabHeader from '../TabHeader';
 
 import {
   Card,
@@ -329,12 +330,13 @@ const SystemSettingsTab = () => {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>System Settings</CardTitle>
-        <CardDescription>Configure system settings and preferences</CardDescription>
-      </CardHeader>
-      <CardContent>
+    <div className="space-y-4">
+      <TabHeader
+        title="System Settings"
+        description="Configure system settings and preferences"
+      />
+
+      <div className="space-y-4">
         {loading ? (
           <div className="flex justify-center items-center p-12">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
@@ -870,8 +872,8 @@ const SystemSettingsTab = () => {
             </TabsContent>
           </Tabs>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import TabHeader from '@/components/admin/TabHeader';
 import { format, isValid } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -492,39 +493,34 @@ const ShipmentManagementTab = () => {
   };
 
   return (
-    <Card className="border-none shadow-none">
-      <CardHeader className="px-0">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <CardTitle className="text-2xl font-bold">Shipment Management</CardTitle>
-            <CardDescription>
-              Track and manage all customer shipments
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={fetchShipments}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="px-0 space-y-4">
+    <div className="space-y-4">
+      <TabHeader
+        title="Shipment Management"
+        description="Track and manage all customer shipments"
+        actions={
+          <Button variant="outline" size="sm" onClick={fetchShipments} className="h-8 text-xs">
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            Refresh
+          </Button>
+        }
+      />
+
+      <div className="space-y-4">
         {/* Search and Filter Controls */}
-        <div className="flex flex-col md:flex-row gap-4">
+        <div className="flex flex-col md:flex-row gap-2">
           <div className="relative flex-grow">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="Search shipments..."
-              className="pl-10"
+              className="pl-8 h-9 text-sm"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px]">
-              <Filter className="h-4 w-4 mr-2" />
+            <SelectTrigger className="w-[180px] h-9 text-sm">
+              <Filter className="h-3.5 w-3.5 mr-1.5" />
               <span>Filter by status</span>
             </SelectTrigger>
             <SelectContent>
@@ -538,8 +534,8 @@ const ShipmentManagementTab = () => {
           </Select>
 
           <Select value={collectionFilter} onValueChange={setCollectionFilter}>
-            <SelectTrigger className="w-[200px]">
-              <Calendar className="h-4 w-4 mr-2" />
+            <SelectTrigger className="w-[200px] h-9 text-sm">
+              <Calendar className="h-3.5 w-3.5 mr-1.5" />
               <span>Collection Schedule</span>
             </SelectTrigger>
             <SelectContent>
@@ -554,24 +550,24 @@ const ShipmentManagementTab = () => {
         </div>
 
         {/* Stats Overview */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="hover:bg-muted/50 transition-colors">
-            <CardHeader className="p-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <Card className="shadow-none border border-gray-200 dark:border-gray-800">
+            <CardHeader className="p-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Shipments</CardTitle>
-                <Package className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-[11px] font-medium text-muted-foreground">Total Shipments</CardTitle>
+                <Package className="h-3.5 w-3.5 text-muted-foreground" />
               </div>
-              <CardTitle className="text-2xl">{shipments.length}</CardTitle>
+              <CardTitle className="text-xl">{shipments.length}</CardTitle>
             </CardHeader>
           </Card>
 
-          <Card className="hover:bg-muted/50 transition-colors">
-            <CardHeader className="p-4">
+          <Card className="shadow-none border border-gray-200 dark:border-gray-800">
+            <CardHeader className="p-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground">In Transit</CardTitle>
-                <Truck className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-[11px] font-medium text-muted-foreground">In Transit</CardTitle>
+                <Truck className="h-3.5 w-3.5 text-muted-foreground" />
               </div>
-              <CardTitle className="text-2xl">
+              <CardTitle className="text-xl">
                 {shipments.filter(s =>
                   ['InTransit to Zimbabwe', 'Goods Arrived in Zimbabwe', 'Processing in ZW Warehouse']
                     .includes(s.status)).length}
@@ -579,25 +575,25 @@ const ShipmentManagementTab = () => {
             </CardHeader>
           </Card>
 
-          <Card className="hover:bg-muted/50 transition-colors">
-            <CardHeader className="p-4">
+          <Card className="shadow-none border border-gray-200 dark:border-gray-800">
+            <CardHeader className="p-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Delivered</CardTitle>
-                <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-[11px] font-medium text-muted-foreground">Delivered</CardTitle>
+                <CheckCircle className="h-3.5 w-3.5 text-muted-foreground" />
               </div>
-              <CardTitle className="text-2xl">
+              <CardTitle className="text-xl">
                 {shipments.filter(s => s.status === 'Delivered').length}
               </CardTitle>
             </CardHeader>
           </Card>
 
-          <Card className="hover:bg-muted/50 transition-colors">
-            <CardHeader className="p-4">
+          <Card className="shadow-none border border-gray-200 dark:border-gray-800">
+            <CardHeader className="p-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Cancelled</CardTitle>
-                <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-[11px] font-medium text-muted-foreground">Cancelled</CardTitle>
+                <AlertCircle className="h-3.5 w-3.5 text-muted-foreground" />
               </div>
-              <CardTitle className="text-2xl">
+              <CardTitle className="text-xl">
                 {shipments.filter(s => s.status === 'Cancelled').length}
               </CardTitle>
             </CardHeader>
@@ -702,11 +698,11 @@ const ShipmentManagementTab = () => {
           </div>
         )}
 
-        <div className="text-sm text-muted-foreground">
+        <div className="text-xs text-muted-foreground">
           Showing <span className="font-medium">{filteredShipments.length}</span> of{' '}
           <span className="font-medium">{shipments.length}</span> shipments
         </div>
-      </CardContent>
+      </div>
 
       {/* Shipment Details Dialog - Modern Youthful Design */}
       <Dialog open={!!viewingShipment} onOpenChange={(open) => !open && setViewingShipment(null)}>
@@ -718,7 +714,7 @@ const ShipmentManagementTab = () => {
           {viewingShipment && (
             <div className="flex flex-col">
               {/* Header with Gradient */}
-              <div className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 p-6 text-white">
+              <div className="bg-emerald-600 p-6 text-white">
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="flex items-center gap-3 mb-2">
@@ -747,12 +743,12 @@ const ShipmentManagementTab = () => {
               </div>
 
               {/* Progress Timeline - Modern Style */}
-              <div className="px-6 py-5 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950 border-b">
+              <div className="px-6 py-5 bg-gray-50 dark:bg-gray-900 border-b">
                 <div className="flex items-center justify-between relative">
                   {/* Progress Line */}
                   <div className="absolute top-5 left-0 right-0 h-1 bg-gray-200 dark:bg-gray-700 rounded-full">
                     <div
-                      className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-500"
+                      className="h-full bg-emerald-600 rounded-full transition-all duration-500"
                       style={{ width: `${getStatusProgress(viewingShipment.status)}%` }}
                     />
                   </div>
@@ -763,7 +759,7 @@ const ShipmentManagementTab = () => {
                     return (
                       <div key={step} className="relative z-10 flex flex-col items-center">
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${isCompleted
-                            ? 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30'
+                            ? 'bg-emerald-600 text-white shadow shadow-emerald-500/20'
                             : 'bg-gray-200 dark:bg-gray-700 text-gray-400'
                           } ${isCurrent ? 'ring-4 ring-emerald-500/30 scale-110' : ''}`}>
                           {isCompleted ? (
@@ -785,7 +781,7 @@ const ShipmentManagementTab = () => {
               {/* Main Content */}
               <div className="p-6 space-y-6">
                 {/* Shipment Type Banner */}
-                <div className="bg-gradient-to-r from-slate-800 to-slate-900 dark:from-slate-700 dark:to-slate-800 rounded-xl p-4 text-white">
+                <div className="bg-slate-800 dark:bg-slate-700 rounded-lg p-4 text-white">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-white/10 rounded-lg">
@@ -808,7 +804,7 @@ const ShipmentManagementTab = () => {
 
                 {/* Quick Stats Row */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50 rounded-xl p-4 border border-blue-100 dark:border-blue-900">
+                  <div className="bg-blue-50 dark:bg-blue-950/40 rounded-lg p-4 border border-blue-100 dark:border-blue-900">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-blue-500 rounded-lg">
                         <Truck className="h-4 w-4 text-white" />
@@ -1131,7 +1127,7 @@ const ShipmentManagementTab = () => {
           )}
         </DialogContent>
       </Dialog>
-    </Card>
+    </div>
   );
 };
 

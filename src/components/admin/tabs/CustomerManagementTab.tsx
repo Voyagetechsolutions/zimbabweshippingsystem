@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import TabHeader from '../TabHeader';
 
 // UI Components
 import {
@@ -246,30 +247,28 @@ const CustomerManagementTab = () => {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Customer Management</CardTitle>
-        <CardDescription>
-          View and manage all customers and their bookings
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Search Controls */}
-        <div className="flex flex-col md:flex-row gap-4 items-end">
-          <div className="relative flex-grow">
-            <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
-            <Input
-              placeholder="Search by name, email, phone..."
-              className="pl-10"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-
-          <Button variant="outline" onClick={fetchCustomersWithBookings}>
+    <div className="space-y-4">
+      <TabHeader
+        title="Customer Management"
+        description="View and manage all customers and their bookings"
+        actions={
+          <Button variant="outline" size="sm" onClick={fetchCustomersWithBookings}>
             <RefreshCcw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
+        }
+      />
+
+      <div className="space-y-4">
+        {/* Search Controls */}
+        <div className="relative">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by name, email, phone..."
+            className="pl-9"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
 
         {/* Customers Table */}
@@ -345,10 +344,10 @@ const CustomerManagementTab = () => {
           </div>
         )}
 
-        <div className="text-sm text-muted-foreground mt-2">
+        <div className="text-xs text-muted-foreground">
           Showing {filteredCustomers.length} of {customers.length} customers
         </div>
-      </CardContent>
+      </div>
 
       {/* View Customer Details Dialog */}
       {viewingCustomer && (
@@ -494,7 +493,7 @@ const CustomerManagementTab = () => {
           </DialogContent>
         </Dialog>
       )}
-    </Card>
+    </div>
   );
 };
 

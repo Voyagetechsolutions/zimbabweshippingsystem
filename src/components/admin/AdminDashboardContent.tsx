@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import type { FC } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -6,18 +7,27 @@ import { cn } from '@/lib/utils';
 import { AdminCountryProvider, useAdminCountry } from '@/contexts/AdminCountryContext';
 
 // UI Components
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
+  SelectValue,
 } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 // Tab Components
 import ShipmentManagementTab from '@/components/admin/tabs/ShipmentManagementTab';
@@ -27,7 +37,6 @@ import DeliveryManagementTab from '@/components/admin/tabs/DeliveryManagementTab
 import PaymentsInvoicingTab from '@/components/admin/tabs/PaymentsInvoicingTab';
 import ReportsAnalyticsTab from '@/components/admin/tabs/ReportsAnalyticsTab';
 import NotificationsAlertsTab from '@/components/admin/tabs/NotificationsAlertsTab';
-import CollectionScheduleTab from '@/components/admin/tabs/CollectionScheduleTab';
 import CollectionScheduleManagementEnhanced from '@/components/admin/tabs/CollectionScheduleManagementEnhanced';
 import RouteManagementTab from '@/components/admin/tabs/RouteManagementTab';
 import UserManagementTab from '@/components/admin/tabs/UserManagementTab';
@@ -60,20 +69,46 @@ import {
   ImageIcon,
   Quote,
   LayoutDashboard,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
   CalendarDays,
   Star,
   PlusCircle,
   FileText,
+  Search,
+  ArrowRight,
+  AlertCircle,
+  CheckCircle2,
 } from 'lucide-react';
+
+interface NavItem {
+  value: string;
+  label: string;
+  icon: any;
+  badge?: number;
+}
 
 interface NavGroup {
   key: string;
   label: string;
-  items: { value: string; label: string; icon: any }[];
+  items: NavItem[];
 }
+
+interface RecentShipment {
+  id: string;
+  tracking_number: string | null;
+  status: string | null;
+  created_at: string;
+  metadata: any;
+}
+
+const STATUS_VARIANT: Record<string, string> = {
+  'Delivered': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
+  'Out for Delivery': 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
+  'Processing in UK Warehouse': 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
+  'Processing in ZW Warehouse': 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
+  'Customs Clearance': 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
+  'Booking Confirmed': 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
+  'Ready for Pickup': 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
+};
 
 const AdminDashboardInner = () => {
   const { toast } = useToast();
@@ -82,35 +117,34 @@ const AdminDashboardInner = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [showMobileMenu, setShowMobileMenu] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
-    main: true,
-    operations: false,
-    finance: false,
-    communications: false,
-    system: false,
-  });
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [navQuery, setNavQuery] = useState('');
 
-  // Dashboard statistics
   const [stats, setStats] = useState({
     totalShipments: 0,
     pendingShipments: 0,
     activeShipments: 0,
     deliveredShipments: 0,
     totalRevenue: 0,
-    pendingQuotes: 0
+    pendingQuotes: 0,
   });
+  const [recentShipments, setRecentShipments] = useState<RecentShipment[]>([]);
 
-  const navGroups: NavGroup[] = [
+  const navGroups: NavGroup[] = useMemo(() => [
     {
       key: 'main',
-      label: 'Main',
+      label: 'Overview',
       items: [
-        { value: 'overview', label: 'Overview', icon: LayoutDashboard },
+        { value: 'overview', label: 'Dashboard', icon: LayoutDashboard },
         { value: 'manualBooking', label: 'Manual Booking', icon: PlusCircle },
-        { value: 'shipments', label: 'Shipments', icon: Package },
-        { value: 'customQuotes', label: 'Custom Quotes', icon: Quote },
+      ],
+    },
+    {
+      key: 'shipments',
+      label: 'Shipments',
+      items: [
+        { value: 'shipments', label: 'All Shipments', icon: Package, badge: stats.pendingShipments || undefined },
+        { value: 'customQuotes', label: 'Custom Quotes', icon: Quote, badge: stats.pendingQuotes || undefined },
         { value: 'customers', label: 'Customers', icon: User },
       ],
     },
@@ -153,28 +187,23 @@ const AdminDashboardInner = () => {
         { value: 'settings', label: 'Settings', icon: Settings },
       ],
     },
-  ];
+  ], [stats.pendingShipments, stats.pendingQuotes]);
 
-  // Flat list for mobile dropdown
-  const navItems = navGroups.flatMap((g) => g.items);
+  const filteredNavGroups = useMemo(() => {
+    const q = navQuery.trim().toLowerCase();
+    if (!q) return navGroups;
+    return navGroups
+      .map((g) => ({ ...g, items: g.items.filter((i) => i.label.toLowerCase().includes(q)) }))
+      .filter((g) => g.items.length > 0);
+  }, [navGroups, navQuery]);
 
-  const toggleGroup = (key: string) => {
-    setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  // Auto-expand the group containing the active tab
-  useEffect(() => {
-    for (const group of navGroups) {
-      if (group.items.some((item) => item.value === activeTab)) {
-        setExpandedGroups((prev) => ({ ...prev, [group.key]: true }));
-        break;
-      }
-    }
-  }, [activeTab]);
+  const allItems = useMemo(() => navGroups.flatMap((g) => g.items), [navGroups]);
+  const activeLabel = allItems.find((i) => i.value === activeTab)?.label ?? 'Dashboard';
 
   useEffect(() => {
     fetchDashboardStats();
     fetchNotifications();
+    fetchRecentShipments();
   }, []);
 
   const fetchDashboardStats = async () => {
@@ -183,34 +212,32 @@ const AdminDashboardInner = () => {
       const { data: shipments, error: shipmentError } = await supabase
         .from('shipments')
         .select('id, status');
-
       if (shipmentError) throw shipmentError;
 
       const { data: payments, error: paymentError } = await supabase
         .from('payments')
         .select('amount');
-
       if (paymentError) throw paymentError;
 
       const { data: quotes, error: quotesError } = await supabase
         .from('custom_quotes')
         .select('id, status')
         .eq('status', 'pending');
-
       if (quotesError) throw quotesError;
 
       const totalShipments = shipments?.length || 0;
-      const pendingShipments = shipments?.filter(s =>
-        s.status === 'Booking Confirmed' || s.status === 'Ready for Pickup'
+      const pendingShipments = shipments?.filter(
+        (s) => s.status === 'Booking Confirmed' || s.status === 'Ready for Pickup'
       ).length || 0;
-      const activeShipments = shipments?.filter(s =>
-        s.status === 'Processing in UK Warehouse' ||
-        s.status === 'Customs Clearance' ||
-        s.status === 'Processing in ZW Warehouse' ||
-        s.status === 'Out for Delivery'
+      const activeShipments = shipments?.filter(
+        (s) =>
+          s.status === 'Processing in UK Warehouse' ||
+          s.status === 'Customs Clearance' ||
+          s.status === 'Processing in ZW Warehouse' ||
+          s.status === 'Out for Delivery'
       ).length || 0;
-      const deliveredShipments = shipments?.filter(s => s.status === 'Delivered').length || 0;
-      const totalRevenue = payments?.reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0;
+      const deliveredShipments = shipments?.filter((s) => s.status === 'Delivered').length || 0;
+      const totalRevenue = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
 
       setStats({
         totalShipments,
@@ -218,14 +245,14 @@ const AdminDashboardInner = () => {
         activeShipments,
         deliveredShipments,
         totalRevenue,
-        pendingQuotes: quotes?.length || 0
+        pendingQuotes: quotes?.length || 0,
       });
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
       toast({
         title: 'Error',
         description: 'Failed to load dashboard statistics',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -239,7 +266,6 @@ const AdminDashboardInner = () => {
         .select('*')
         .order('created_at', { ascending: false })
         .limit(5);
-
       if (error) throw error;
       setNotifications(data || []);
     } catch (error) {
@@ -247,195 +273,214 @@ const AdminDashboardInner = () => {
     }
   };
 
+  const fetchRecentShipments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('shipments')
+        .select('id, tracking_number, status, created_at, metadata')
+        .order('created_at', { ascending: false })
+        .limit(5);
+      if (error) throw error;
+      setRecentShipments((data as RecentShipment[]) || []);
+    } catch (error) {
+      console.error('Error fetching recent shipments:', error);
+    }
+  };
+
   const refreshDashboard = () => {
     fetchDashboardStats();
     fetchNotifications();
+    fetchRecentShipments();
   };
+
+  const handleNavClick = (value: string) => {
+    setActiveTab(value);
+    setMobileNavOpen(false);
+    setNavQuery('');
+  };
+
+  const greeting = useMemo(() => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  }, []);
+
+  const formattedDate = useMemo(
+    () =>
+      new Date().toLocaleDateString(undefined, {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+      }),
+    []
+  );
+
+  const renderOverview = () => (
+    <div className="space-y-4">
+      {/* Greeting */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{greeting}</h2>
+        <p className="text-xs text-gray-500 dark:text-gray-400">{formattedDate}</p>
+      </div>
+
+      {/* Quick actions */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <QuickAction
+          icon={PlusCircle}
+          label="New Booking"
+          description="Create a shipment"
+          onClick={() => setActiveTab('manualBooking')}
+          primary
+        />
+        <QuickAction
+          icon={Package}
+          label="Shipments"
+          description="Manage active"
+          onClick={() => setActiveTab('shipments')}
+        />
+        <QuickAction
+          icon={Quote}
+          label="Quotes"
+          description="Review requests"
+          onClick={() => setActiveTab('customQuotes')}
+        />
+        <QuickAction
+          icon={BarChart3}
+          label="Reports"
+          description="View analytics"
+          onClick={() => setActiveTab('reports')}
+        />
+      </div>
+
+      {/* Needs attention */}
+      {(stats.pendingShipments > 0 || stats.pendingQuotes > 0) && (
+        <section>
+          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+            Needs attention
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {stats.pendingShipments > 0 && (
+              <AttentionCard
+                icon={AlertCircle}
+                count={stats.pendingShipments}
+                title="pending collection"
+                description="Shipments waiting to be picked up"
+                onClick={() => setActiveTab('shipments')}
+              />
+            )}
+            {stats.pendingQuotes > 0 && (
+              <AttentionCard
+                icon={Quote}
+                count={stats.pendingQuotes}
+                title="quote requests"
+                description="Awaiting your response"
+                onClick={() => setActiveTab('customQuotes')}
+              />
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* KPIs */}
+      <section>
+        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+          At a glance
+        </h3>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+          <StatCard icon={Package} label="Total shipments" value={stats.totalShipments.toLocaleString()} />
+          <StatCard icon={Truck} label="In transit" value={stats.activeShipments.toLocaleString()} accent />
+          <StatCard icon={CheckCircle2} label="Delivered" value={stats.deliveredShipments.toLocaleString()} />
+          <StatCard icon={CreditCard} label="Total revenue" value={`£${stats.totalRevenue.toFixed(2)}`} />
+        </div>
+      </section>
+
+      {/* Recent shipments */}
+      <section>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            Recent shipments
+          </h3>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950"
+            onClick={() => setActiveTab('shipments')}
+          >
+            View all
+            <ArrowRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="p-0">
+            {recentShipments.length === 0 ? (
+              <div className="py-12 text-center text-sm text-gray-500 dark:text-gray-400">
+                <Package className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                No recent shipments
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tracking</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Created</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {recentShipments.map((s) => {
+                      const customer =
+                        s.metadata?.sender_name ||
+                        s.metadata?.customer_name ||
+                        s.metadata?.recipient_name ||
+                        '—';
+                      const statusClass =
+                        (s.status && STATUS_VARIANT[s.status]) ||
+                        'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
+                      return (
+                        <TableRow
+                          key={s.id}
+                          className="cursor-pointer"
+                          onClick={() => setActiveTab('shipments')}
+                        >
+                          <TableCell className="font-mono text-xs">
+                            {s.tracking_number || '—'}
+                          </TableCell>
+                          <TableCell className="truncate max-w-[200px]">{customer}</TableCell>
+                          <TableCell>
+                            <span
+                              className={cn(
+                                'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
+                                statusClass
+                              )}
+                            >
+                              {s.status || 'Unknown'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right text-xs text-gray-500 dark:text-gray-400">
+                            {new Date(s.created_at).toLocaleDateString(undefined, {
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+    </div>
+  );
 
   const renderTabContent = (tabValue: string) => {
     switch (tabValue) {
-      case 'overview':
-        return (
-          <div className="space-y-6">
-            {/* Welcome Banner */}
-            <div className="bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 rounded-2xl p-6 text-white shadow-xl">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-3xl font-bold mb-2">Welcome back! 👋</h2>
-                  <p className="text-white/90 text-lg">Here's what's happening with your shipments today</p>
-                </div>
-                <div className="hidden md:block">
-                  <div className="w-24 h-24 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                    <LayoutDashboard className="h-12 w-12 text-white" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Total Shipments */}
-              <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-semibold text-gray-600 dark:text-gray-400">Total Shipments</CardTitle>
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center shadow-lg">
-                      <Package className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-4xl font-bold text-gray-900 dark:text-white mb-2">{stats.totalShipments}</div>
-                  <Progress value={100} className="h-2 bg-blue-200 dark:bg-blue-900" />
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">All time shipments</p>
-                </CardContent>
-              </Card>
-
-              {/* Pending Shipments */}
-              <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/50 dark:to-orange-950/50">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-semibold text-gray-600 dark:text-gray-400">Pending Collection</CardTitle>
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg">
-                      <Package className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-4xl font-bold text-gray-900 dark:text-white mb-2">{stats.pendingShipments}</div>
-                  <Progress
-                    value={stats.totalShipments ? (stats.pendingShipments / stats.totalShipments) * 100 : 0}
-                    className="h-2 bg-amber-200 dark:bg-amber-900"
-                  />
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-                    {stats.totalShipments ? Math.round((stats.pendingShipments / stats.totalShipments) * 100) : 0}% of total
-                  </p>
-                </CardContent>
-              </Card>
-
-              {/* Active Shipments */}
-              <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-gradient-to-br from-cyan-50 to-blue-50 dark:from-cyan-950/50 dark:to-blue-950/50">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-semibold text-gray-600 dark:text-gray-400">In Transit</CardTitle>
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center shadow-lg">
-                      <Truck className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-4xl font-bold text-gray-900 dark:text-white mb-2">{stats.activeShipments}</div>
-                  <Progress
-                    value={stats.totalShipments ? (stats.activeShipments / stats.totalShipments) * 100 : 0}
-                    className="h-2 bg-cyan-200 dark:bg-cyan-900"
-                  />
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">Currently being shipped</p>
-                </CardContent>
-              </Card>
-
-              {/* Delivered */}
-              <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/50 dark:to-emerald-950/50">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-semibold text-gray-600 dark:text-gray-400">Delivered</CardTitle>
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg">
-                      <Truck className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-4xl font-bold text-gray-900 dark:text-white mb-2">{stats.deliveredShipments}</div>
-                  <Progress
-                    value={stats.totalShipments ? (stats.deliveredShipments / stats.totalShipments) * 100 : 0}
-                    className="h-2 bg-green-200 dark:bg-green-900"
-                  />
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">Successfully completed</p>
-                </CardContent>
-              </Card>
-
-              {/* Total Revenue */}
-              <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/50 dark:to-pink-950/50">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-semibold text-gray-600 dark:text-gray-400">Total Revenue</CardTitle>
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg">
-                      <CreditCard className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-4xl font-bold text-gray-900 dark:text-white mb-2">£{stats.totalRevenue.toFixed(2)}</div>
-                  <Progress value={100} className="h-2 bg-purple-200 dark:bg-purple-900" />
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">Total earnings</p>
-                </CardContent>
-              </Card>
-
-              {/* Pending Quotes */}
-              <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-gradient-to-br from-rose-50 to-red-50 dark:from-rose-950/50 dark:to-red-950/50">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-semibold text-gray-600 dark:text-gray-400">Pending Quotes</CardTitle>
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-rose-500 to-red-500 flex items-center justify-center shadow-lg">
-                      <Quote className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-4xl font-bold text-gray-900 dark:text-white mb-2">{stats.pendingQuotes}</div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <div className="flex-1 h-2 bg-rose-200 dark:bg-rose-900 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-rose-500 to-red-500 animate-pulse" style={{ width: '60%' }} />
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">Awaiting response</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Button
-                onClick={() => setActiveTab('manualBooking')}
-                className="h-24 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-lg hover:shadow-xl transition-all"
-              >
-                <div className="flex flex-col items-center gap-2">
-                  <PlusCircle className="h-8 w-8" />
-                  <span className="font-semibold">New Booking</span>
-                </div>
-              </Button>
-              <Button
-                onClick={() => setActiveTab('shipments')}
-                variant="outline"
-                className="h-24 border-2 hover:bg-blue-50 dark:hover:bg-blue-950 hover:border-blue-300 dark:hover:border-blue-700 transition-all"
-              >
-                <div className="flex flex-col items-center gap-2">
-                  <Package className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-                  <span className="font-semibold">View Shipments</span>
-                </div>
-              </Button>
-              <Button
-                onClick={() => setActiveTab('customQuotes')}
-                variant="outline"
-                className="h-24 border-2 hover:bg-orange-50 dark:hover:bg-orange-950 hover:border-orange-300 dark:hover:border-orange-700 transition-all"
-              >
-                <div className="flex flex-col items-center gap-2">
-                  <Quote className="h-8 w-8 text-orange-600 dark:text-orange-400" />
-                  <span className="font-semibold">Manage Quotes</span>
-                </div>
-              </Button>
-              <Button
-                onClick={() => setActiveTab('reports')}
-                variant="outline"
-                className="h-24 border-2 hover:bg-purple-50 dark:hover:bg-purple-950 hover:border-purple-300 dark:hover:border-purple-700 transition-all"
-              >
-                <div className="flex flex-col items-center gap-2">
-                  <BarChart3 className="h-8 w-8 text-purple-600 dark:text-purple-400" />
-                  <span className="font-semibold">View Reports</span>
-                </div>
-              </Button>
-            </div>
-          </div>
-        );
+      case 'overview': return renderOverview();
       case 'manualBooking': return <ManualBookingTab />;
       case 'shipments': return <ShipmentManagementTab />;
       case 'customQuotes': return <CustomQuoteManagement />;
@@ -459,218 +504,202 @@ const AdminDashboardInner = () => {
     }
   };
 
-  return (
-    <div className="flex h-screen overflow-hidden bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
-      {/* Sidebar for Desktop */}
-      {!isMobile && (
-        <aside className={cn(
-          "h-full bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 shadow-lg transition-all duration-300 ease-in-out flex flex-col",
-          isSidebarOpen ? "w-72" : "w-20"
-        )}>
-          {/* Logo/Brand Section */}
-          <div className="flex items-center justify-between p-4 h-20 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-700 dark:to-emerald-700">
-            {isSidebarOpen ? (
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                  <LayoutDashboard className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-white">Admin Panel</h2>
-                  <p className="text-xs text-white/80">Zimbabwe Shipping</p>
-                </div>
-              </div>
-            ) : (
-              <div className="w-10 h-10 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center mx-auto">
-                <LayoutDashboard className="h-6 w-6 text-white" />
-              </div>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="hidden md:flex text-white hover:bg-white/20"
-            >
-              {isSidebarOpen ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
-            </Button>
+  const sidebar = (
+    <div className="h-full flex flex-col bg-white dark:bg-gray-900">
+      {/* Brand */}
+      <div className="flex items-center gap-3 px-4 h-12 border-b border-gray-200 dark:border-gray-800">
+        <div className="w-8 h-8 rounded-md bg-emerald-600 flex items-center justify-center shrink-0">
+          <LayoutDashboard className="h-4 w-4 text-white" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-gray-900 dark:text-white leading-tight">Admin Panel</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">Zimbabwe Shipping</p>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-800">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+          <Input
+            value={navQuery}
+            onChange={(e) => setNavQuery(e.target.value)}
+            placeholder="Search sections…"
+            className="pl-8 h-8 text-xs"
+          />
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto px-2 py-2">
+        {filteredNavGroups.length === 0 ? (
+          <div className="text-center text-xs text-gray-500 dark:text-gray-400 py-6">
+            No sections match "{navQuery}"
           </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-            {navGroups.map((group) => (
-              <div key={group.key} className="mb-2">
-                {/* Group header */}
-                {isSidebarOpen ? (
-                  <button
-                    onClick={() => toggleGroup(group.key)}
-                    className="w-full flex items-center justify-between px-3 py-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    <span>{group.label}</span>
-                    <ChevronDown
+        ) : (
+          filteredNavGroups.map((group, groupIdx) => (
+            <div key={group.key} className={cn(groupIdx > 0 && 'mt-3')}>
+              <p className="px-2.5 mb-0.5 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                {group.label}
+              </p>
+              <div className="space-y-px">
+                {group.items.map((item) => {
+                  const isActive = activeTab === item.value;
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.value}
+                      onClick={() => handleNavClick(item.value)}
                       className={cn(
-                        "h-4 w-4 transition-transform duration-200",
-                        expandedGroups[group.key] && "rotate-180"
+                        'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors',
+                        isActive
+                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                       )}
-                    />
-                  </button>
-                ) : (
-                  <div className="h-px bg-gray-200 dark:bg-gray-800 my-3" />
-                )}
-
-                {/* Group items */}
-                {(expandedGroups[group.key] || !isSidebarOpen) && (
-                  <div className="space-y-1 mt-1">
-                    {group.items.map((item) => {
-                      const isActive = activeTab === item.value;
-                      return (
-                        <Button
-                          key={item.value}
-                          variant="ghost"
+                    >
+                      <Icon
+                        className={cn(
+                          'h-3.5 w-3.5 shrink-0',
+                          isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'
+                        )}
+                      />
+                      <span className="flex-1 text-left truncate">{item.label}</span>
+                      {item.badge ? (
+                        <Badge
+                          variant="secondary"
                           className={cn(
-                            "justify-start text-sm font-medium px-3 py-2.5 rounded-lg w-full transition-all duration-200",
-                            !isSidebarOpen && "w-12 h-12 p-0 justify-center",
+                            'h-4 px-1.5 text-[10px] font-semibold',
                             isActive
-                              ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md hover:from-green-600 hover:to-emerald-600"
-                              : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white"
+                              ? 'bg-emerald-600 text-white hover:bg-emerald-600'
+                              : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200'
                           )}
-                          onClick={() => setActiveTab(item.value)}
                         >
-                          <item.icon className={cn("h-5 w-5", isSidebarOpen && "mr-3", isActive && "drop-shadow-sm")} />
-                          {isSidebarOpen && <span>{item.label}</span>}
-                          {isActive && isSidebarOpen && (
-                            <div className="ml-auto w-2 h-2 rounded-full bg-white animate-pulse" />
-                          )}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            ))}
-          </nav>
-
-          {/* Footer - Country Selector */}
-          {isSidebarOpen && (
-            <div className="p-3 border-t border-gray-200 dark:border-gray-800">
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-2">
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 px-2">Region</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => setSelectedCountry('England')}
-                    className={cn(
-                      "flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all",
-                      selectedCountry === 'England'
-                        ? "bg-blue-500 text-white shadow-md"
-                        : "bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600"
-                    )}
-                  >
-                    <span className="text-lg">🇬🇧</span>
-                    <span className="text-xs">UK</span>
-                  </button>
-                  <button
-                    onClick={() => setSelectedCountry('Ireland')}
-                    className={cn(
-                      "flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all",
-                      selectedCountry === 'Ireland'
-                        ? "bg-green-500 text-white shadow-md"
-                        : "bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600"
-                    )}
-                  >
-                    <span className="text-lg">🇮🇪</span>
-                    <span className="text-xs">IE</span>
-                  </button>
-                </div>
+                          {item.badge}
+                        </Badge>
+                      ) : null}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-          )}
+          ))
+        )}
+      </nav>
+    </div>
+  );
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
+      {/* Desktop sidebar */}
+      {!isMobile && (
+        <aside className="w-56 border-r border-gray-200 dark:border-gray-800 shrink-0">
+          {sidebar}
         </aside>
       )}
 
-      {/* Main Content Area */}
+      {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
-          <div className="flex justify-between items-center px-6 py-4">
-            <div className="flex items-center gap-4">
-              {isMobile && (
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setShowMobileMenu(!showMobileMenu)}
-                  className="md:hidden"
-                >
-                  <Menu className="h-5 w-5" />
-                </Button>
-              )}
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                  {navItems.find(item => item.value === activeTab)?.label || 'Dashboard'}
-                </h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                  {selectedCountry === 'England' ? '🇬🇧 United Kingdom' : '🇮🇪 Ireland'}
-                </p>
-              </div>
+        <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+          <div className="flex items-center gap-2 px-3 md:px-4 h-12">
+            {isMobile && (
+              <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="icon" className="shrink-0 h-8 w-8">
+                    <Menu className="h-4 w-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="p-0 w-64">
+                  {sidebar}
+                </SheetContent>
+              </Sheet>
+            )}
+
+            <div className="min-w-0 flex-1">
+              <h1 className="text-sm md:text-base font-semibold text-gray-900 dark:text-white truncate">
+                {activeLabel}
+              </h1>
             </div>
-            <div className="flex items-center gap-3">
+
+            <div className="flex items-center gap-1.5">
+              <Select
+                value={selectedCountry}
+                onValueChange={(v) => setSelectedCountry(v as 'England' | 'Ireland')}
+              >
+                <SelectTrigger className="h-8 w-[100px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="England">
+                    <span className="flex items-center gap-2">
+                      <span>🇬🇧</span> UK
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="Ireland">
+                    <span className="flex items-center gap-2">
+                      <span>🇮🇪</span> Ireland
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+
               <Button
                 variant="outline"
-                size="sm"
+                size="icon"
                 onClick={refreshDashboard}
                 disabled={loading}
-                className="hidden sm:flex hover:bg-green-50 dark:hover:bg-green-950 hover:border-green-300 dark:hover:border-green-700 transition-colors"
+                className="h-8 w-8"
+                title="Refresh"
               >
-                <RefreshCcw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
-                Refresh
+                <RefreshCcw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
               </Button>
+
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="relative hover:bg-green-50 dark:hover:bg-green-950 hover:border-green-300 dark:hover:border-green-700 transition-colors"
-                  >
-                    <Bell className="h-5 w-5" />
+                  <Button variant="outline" size="icon" className="h-8 w-8 relative" title="Notifications">
+                    <Bell className="h-3.5 w-3.5" />
                     {notifications.length > 0 && (
-                      <span className="absolute -top-1 -right-1 h-5 w-5 bg-gradient-to-r from-red-500 to-pink-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg animate-pulse">
+                      <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 bg-emerald-600 rounded-full flex items-center justify-center text-white text-[10px] font-semibold">
                         {notifications.length}
                       </span>
                     )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0" align="end">
-                  <div className="bg-gradient-to-r from-green-600 to-emerald-600 p-4 text-white">
-                    <h3 className="font-bold text-lg flex items-center gap-2">
-                      <Bell className="h-5 w-5" />
-                      Notifications
-                    </h3>
-                    <p className="text-sm text-white/80 mt-1">
-                      {notifications.length} unread notification{notifications.length !== 1 ? 's' : ''}
+                  <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">Notifications</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {notifications.length} unread
                     </p>
                   </div>
                   {notifications.length > 0 ? (
-                    <div className="max-h-[400px] overflow-auto p-2">
-                      {notifications.map((notification) => (
+                    <div className="max-h-[360px] overflow-auto divide-y divide-gray-100 dark:divide-gray-800">
+                      {notifications.map((n) => (
                         <div
-                          key={notification.id}
-                          className="p-3 mb-2 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer border border-gray-200 dark:border-gray-700"
+                          key={n.id}
+                          className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
                         >
-                          <h4 className="font-semibold text-sm text-gray-900 dark:text-white">{notification.title}</h4>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">{notification.message}</p>
-                          <span className="text-xs text-gray-500 dark:text-gray-500 mt-2 block">
-                            {new Date(notification.created_at).toLocaleDateString('en-US', {
+                          <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                            {n.title}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
+                            {n.message}
+                          </p>
+                          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
+                            {new Date(n.created_at).toLocaleDateString(undefined, {
                               month: 'short',
                               day: 'numeric',
                               hour: '2-digit',
-                              minute: '2-digit'
+                              minute: '2-digit',
                             })}
-                          </span>
+                          </p>
                         </div>
                       ))}
                     </div>
                   ) : (
                     <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                      <Bell className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                      <p className="text-sm font-medium">No new notifications</p>
-                      <p className="text-xs mt-1">You're all caught up!</p>
+                      <Bell className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">You're all caught up</p>
                     </div>
                   )}
                 </PopoverContent>
@@ -679,52 +708,107 @@ const AdminDashboardInner = () => {
           </div>
         </header>
 
-        {/* Mobile Navigation Dropdown */}
-        {isMobile && showMobileMenu && (
-          <div className="p-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-            <Select value={activeTab} onValueChange={(value) => { setActiveTab(value); setShowMobileMenu(false); }}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a section" />
-              </SelectTrigger>
-              <SelectContent>
-                {navGroups.map((group) => (
-                  <div key={group.key}>
-                    <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase">
-                      {group.label}
-                    </div>
-                    {group.items.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        <div className="flex items-center gap-2">
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.label}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </div>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        {/* Tab Content */}
-        <div className="flex-1 overflow-auto p-6">
-          <div className="max-w-[1600px] mx-auto">
-            {renderTabContent(activeTab)}
-          </div>
-        </div>
+        <main className="flex-1 overflow-auto">
+          <div className="w-full p-3 md:p-4">{renderTabContent(activeTab)}</div>
+        </main>
       </div>
     </div>
   );
 };
 
-// Wrap in context provider
-const AdminDashboardContent = () => {
-  return (
-    <AdminCountryProvider>
-      <AdminDashboardInner />
-    </AdminCountryProvider>
-  );
-};
+// --- Small presentational components ---
+
+const QuickAction: FC<{
+  icon: any;
+  label: string;
+  description: string;
+  onClick: () => void;
+  primary?: boolean;
+}> = ({ icon: Icon, label, description, onClick, primary }) => (
+  <button
+    onClick={onClick}
+    className={cn(
+      'flex items-center gap-2.5 rounded-md border p-2.5 text-left transition-colors',
+      primary
+        ? 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700'
+        : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800'
+    )}
+  >
+    <div
+      className={cn(
+        'h-8 w-8 rounded-md flex items-center justify-center shrink-0',
+        primary ? 'bg-white/15' : 'bg-emerald-50 dark:bg-emerald-950'
+      )}
+    >
+      <Icon className={cn('h-4 w-4', primary ? 'text-white' : 'text-emerald-600 dark:text-emerald-400')} />
+    </div>
+    <div className="min-w-0">
+      <p className={cn('text-xs font-semibold truncate', primary ? 'text-white' : 'text-gray-900 dark:text-white')}>
+        {label}
+      </p>
+      <p className={cn('text-[11px] truncate', primary ? 'text-white/80' : 'text-gray-500 dark:text-gray-400')}>
+        {description}
+      </p>
+    </div>
+  </button>
+);
+
+const AttentionCard: FC<{
+  icon: any;
+  count: number;
+  title: string;
+  description: string;
+  onClick: () => void;
+}> = ({ icon: Icon, count, title, description, onClick }) => (
+  <button
+    onClick={onClick}
+    className="flex items-center justify-between gap-3 rounded-md border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 px-3 py-2.5 text-left hover:bg-amber-100/70 dark:hover:bg-amber-950 transition-colors"
+  >
+    <div className="flex items-center gap-2.5 min-w-0">
+      <div className="h-8 w-8 rounded-md bg-amber-100 dark:bg-amber-900/60 flex items-center justify-center shrink-0">
+        <Icon className="h-4 w-4 text-amber-700 dark:text-amber-300" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs font-semibold text-gray-900 dark:text-white">
+          {count} {title}
+        </p>
+        <p className="text-[11px] text-gray-600 dark:text-gray-400 truncate">{description}</p>
+      </div>
+    </div>
+    <ArrowRight className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+  </button>
+);
+
+const StatCard: FC<{
+  icon: any;
+  label: string;
+  value: string;
+  accent?: boolean;
+}> = ({ icon: Icon, label, value, accent }) => (
+  <Card className="shadow-none border border-gray-200 dark:border-gray-800">
+    <CardContent className="p-3">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">{label}</span>
+        <div
+          className={cn(
+            'h-6 w-6 rounded-md flex items-center justify-center',
+            accent
+              ? 'bg-emerald-600 text-white'
+              : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+          )}
+        >
+          <Icon className="h-3.5 w-3.5" />
+        </div>
+      </div>
+      <p className="text-xl font-semibold text-gray-900 dark:text-white">{value}</p>
+    </CardContent>
+  </Card>
+);
+
+const AdminDashboardContent = () => (
+  <AdminCountryProvider>
+    <AdminDashboardInner />
+  </AdminCountryProvider>
+);
 
 export default AdminDashboardContent;

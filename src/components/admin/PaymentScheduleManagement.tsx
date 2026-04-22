@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import TabHeader from './TabHeader';
 import { 
   Card, 
   CardContent, 
@@ -252,39 +253,34 @@ const PaymentScheduleManagement = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            30-Day Payment Plans
-          </CardTitle>
-          <CardDescription>
-            Track customers who selected "Pay within 30 days" payment option
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="relative flex-grow">
-              <Input
-                placeholder="Search by name, email, phone, receipt number, or tracking number..."
-                className="pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-            </div>
-            <Button 
-              variant="outline"
-              onClick={fetchPaymentSchedules}
-              className="h-10 px-4"
-            >
-              <RefreshCcw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-          </div>
+    <div className="space-y-4">
+      <TabHeader
+        title="30-Day Payment Plans"
+        description="Track customers who selected 'Pay within 30 days' payment option"
+        actions={
+          <Button 
+            variant="outline"
+            size="sm"
+            onClick={fetchPaymentSchedules}
+          >
+            <RefreshCcw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        }
+      />
 
-          {loading ? (
+      <div className="space-y-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by name, email, phone, receipt number, or tracking number..."
+            className="pl-9"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        {loading ? (
             <div className="flex justify-center items-center p-12">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-zim-green"></div>
             </div>
@@ -396,12 +392,11 @@ const PaymentScheduleManagement = () => {
             </div>
           )}
 
-          <div className="mt-4 text-sm text-gray-500">
-            Showing {filteredRecords.length} payment schedule{filteredRecords.length !== 1 ? 's' : ''} 
-            {searchQuery && ` matching "${searchQuery}"`}
-          </div>
-        </CardContent>
-      </Card>
+        <div className="text-xs text-muted-foreground">
+          Showing {filteredRecords.length} payment schedule{filteredRecords.length !== 1 ? 's' : ''} 
+          {searchQuery && ` matching "${searchQuery}"`}
+        </div>
+      </div>
     </div>
   );
 };
