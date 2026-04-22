@@ -1,5 +1,5 @@
 import { updateUserSession, getUserSession } from '../services/userSession.js';
-import { sendMessage } from '../utils/messageUtils.js';
+import { sendMessage, sendButtonMessage, sendListMessage } from '../utils/messageUtils.js';
 import { getIrelandCities, getCityToRouteMap } from '../menus/mainMenu.js';
 import { createShipment } from '../services/database.js';
 import { calculatePrice } from '../utils/pricingUtils.js';
@@ -22,10 +22,14 @@ export async function handleBookingFlow(sock, phoneNumber, text, session) {
     case 'START':
       // Check if user has saved information
       if (session.userName && session.userEmail) {
-        await sendMessage(
+        await sendButtonMessage(
           sock,
           phoneNumber,
-          `📦 *Start Your Booking*\n\nWelcome back ${session.userName}! 👋\n\nI have your details saved. Would you like to:\n\n1️⃣ Use saved details (faster)\n2️⃣ Enter new details\n\nType *1* or *2*`
+          `📦 *Start Your Booking*\n\nWelcome back ${session.userName}! 👋\n\nI have your details saved. How would you like to proceed?`,
+          [
+            { id: '1', displayText: '⚡ Use saved details' },
+            { id: '2', displayText: '✏️ Enter new details' }
+          ]
         );
         await updateUserSession(phoneNumber, { step: 'USE_SAVED_OR_NEW' });
       } else {
@@ -51,9 +55,13 @@ export async function handleBookingFlow(sock, phoneNumber, text, session) {
         if (session.userAddress) savedInfo += `🏠 Address: ${session.userAddress}\n`;
         if (session.userCity) savedInfo += `🏙️ City: ${session.userCity}\n`;
         if (session.userEircode) savedInfo += `📮 Eircode: ${session.userEircode}\n`;
-        savedInfo += `\nIs this information still correct?\n\nType *yes* to continue or *no* to update`;
+        savedInfo += `\nIs this information still correct?`;
         
         await sendMessage(sock, phoneNumber, savedInfo);
+        await sendButtonMessage(sock, phoneNumber, 'Is this information still correct?', [
+          { id: 'yes', displayText: '✅ Yes, looks good' },
+          { id: 'no', displayText: '✏️ No, update details' }
+        ]);
       } else if (text === '2') {
         await updateUserSession(phoneNumber, { step: 'SENDER_NAME' });
         await sendMessage(sock, phoneNumber, 'Great! Let\'s start fresh.\n\n👤 What\'s your full name?');
@@ -215,10 +223,19 @@ export async function handleBookingFlow(sock, phoneNumber, text, session) {
     case 'RECEIVER_CITY':
       bookingData.receiverCity = text;
       await updateUserSession(phoneNumber, { bookingData, step: 'SHIPMENT_TYPE' });
-      await sendMessage(
+      await sendListMessage(
         sock,
         phoneNumber,
-        `📦 *What would you like to ship?*\n\nType the number:\n\n1️⃣ Drums (200-220L)\n2️⃣ Trunks/Storage Boxes\n3️⃣ Both drums and boxes`
+        '📦 *What would you like to ship?*',
+        'View shipment types',
+        [{
+          title: 'Shipment Options',
+          rows: [
+            { id: '1', title: '🥁 Drums', description: '200-220L barrels' },
+            { id: '2', title: '📦 Trunks / Storage Boxes', description: 'Standard shipping boxes' },
+            { id: '3', title: '🥁📦 Both', description: 'Drums and boxes together' }
+          ]
+        }]
       );
       break;
 
@@ -254,10 +271,14 @@ export async function handleBookingFlow(sock, phoneNumber, text, session) {
         await sendMessage(sock, phoneNumber, '📦 How many trunks/boxes? (Enter a number)');
       } else {
         await updateUserSession(phoneNumber, { bookingData, step: 'METAL_SEAL' });
-        await sendMessage(
+        await sendButtonMessage(
           sock,
           phoneNumber,
-          '🔒 Would you like to add metal coded seals for security?\n\n€7 per seal\n\nType *yes* or *no*'
+          '🔒 *Metal Coded Seals*\n\nWould you like to add metal coded seals for extra security?\n\n_€7 per seal_',
+          [
+            { id: 'yes', displayText: '✅ Yes, add seals' },
+            { id: 'no', displayText: '❌ No thanks' }
+          ]
         );
       }
       break;
@@ -270,20 +291,28 @@ export async function handleBookingFlow(sock, phoneNumber, text, session) {
       }
       bookingData.boxes = boxQty;
       await updateUserSession(phoneNumber, { bookingData, step: 'METAL_SEAL' });
-      await sendMessage(
+      await sendButtonMessage(
         sock,
         phoneNumber,
-        '🔒 Would you like to add metal coded seals for security?\n\n€7 per seal\n\nType *yes* or *no*'
+        '🔒 *Metal Coded Seals*\n\nWould you like to add metal coded seals for extra security?\n\n_€7 per seal_',
+        [
+          { id: 'yes', displayText: '✅ Yes, add seals' },
+          { id: 'no', displayText: '❌ No thanks' }
+        ]
       );
       break;
 
     case 'METAL_SEAL':
       bookingData.metalSeal = lowerText === 'yes';
       await updateUserSession(phoneNumber, { bookingData, step: 'DOOR_TO_DOOR' });
-      await sendMessage(
+      await sendButtonMessage(
         sock,
         phoneNumber,
-        '🚪 Would you like door-to-door delivery in Zimbabwe?\n\n€25 extra\n\nType *yes* or *no*'
+        '🚪 *Door-to-Door Delivery*\n\nWould you like door-to-door delivery in Zimbabwe?\n\n_€25 extra charge_',
+        [
+          { id: 'yes', displayText: '🚪 Yes, deliver to door' },
+          { id: 'no', displayText: '🏪 No, depot pickup' }
+        ]
       );
       break;
 
@@ -296,10 +325,20 @@ export async function handleBookingFlow(sock, phoneNumber, text, session) {
       const summary = generateBookingSummary(bookingData, pricing);
       
       await sendMessage(sock, phoneNumber, summary);
-      await sendMessage(
+      await sendListMessage(
         sock,
         phoneNumber,
-        `💳 *Payment Method*\n\nHow would you like to pay?\n\n1️⃣ Cash on collection\n2️⃣ Card payment\n3️⃣ Bank transfer\n4️⃣ Mobile payment\n\nType the number (1-4):`
+        '💳 *How would you like to pay?*',
+        'Choose payment method',
+        [{
+          title: 'Payment Options',
+          rows: [
+            { id: '1', title: '💵 Cash on Collection', description: 'Pay when we collect your items' },
+            { id: '2', title: '💳 Card Payment', description: 'Debit or credit card' },
+            { id: '3', title: '🏦 Bank Transfer', description: 'Direct bank transfer' },
+            { id: '4', title: '📱 Mobile Payment', description: 'Revolut, PayPal, etc.' }
+          ]
+        }]
       );
       break;
 
@@ -319,10 +358,14 @@ export async function handleBookingFlow(sock, phoneNumber, text, session) {
       bookingData.paymentMethod = paymentMethods[text];
       await updateUserSession(phoneNumber, { bookingData, step: 'CONFIRM' });
       
-      await sendMessage(
+      await sendButtonMessage(
         sock,
         phoneNumber,
-        `✅ *Confirm Your Booking*\n\nEverything looks good?\n\nType *CONFIRM* to submit your booking or *EDIT* to make changes.`
+        `✅ *Ready to confirm your booking?*\n\nPayment: ${paymentMethods[text]}\n\nTap below to submit or go back to the menu.`,
+        [
+          { id: 'confirm', displayText: '✅ Confirm Booking' },
+          { id: 'edit', displayText: '✏️ Start Over' }
+        ]
       );
       break;
 

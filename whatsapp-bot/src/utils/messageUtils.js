@@ -49,6 +49,90 @@ export async function sendDocument(sock, phoneNumber, documentUrl, fileName, cap
   }
 }
 
+/**
+ * Send a list message (tap to open a scrollable menu — like Mukuru)
+ * @param {object} sock
+ * @param {string} phoneNumber
+ * @param {string} bodyText - main message text
+ * @param {string} buttonLabel - label on the button that opens the list
+ * @param {Array<{title: string, rows: Array<{id: string, title: string, description?: string}>}>} sections
+ */
+export async function sendListMessage(sock, phoneNumber, bodyText, buttonLabel, sections) {
+  try {
+    await sock.sendMessage(phoneNumber, {
+      listMessage: {
+        title: '',
+        text: bodyText,
+        footerText: 'Tap the button below to see options',
+        buttonText: buttonLabel,
+        listType: 1,
+        sections
+      }
+    });
+    return true;
+  } catch (error) {
+    console.error('Error sending list message:', error?.message || error);
+    // Fallback to plain text
+    const fallback = buildListFallback(bodyText, sections);
+    return sendMessage(sock, phoneNumber, fallback);
+  }
+}
+
+/**
+ * Send reply buttons (up to 3 tappable buttons)
+ * @param {object} sock
+ * @param {string} phoneNumber
+ * @param {string} bodyText
+ * @param {Array<{id: string, displayText: string}>} buttons
+ */
+export async function sendButtonMessage(sock, phoneNumber, bodyText, buttons) {
+  try {
+    await sock.sendMessage(phoneNumber, {
+      buttonMessage: {
+        text: bodyText,
+        footerText: '',
+        buttons: buttons.map(b => ({
+          buttonId: b.id,
+          buttonText: { displayText: b.displayText },
+          type: 1
+        })),
+        headerType: 1
+      }
+    });
+    return true;
+  } catch (error) {
+    console.error('Error sending button message:', error?.message || error);
+    // Fallback to plain text
+    const fallback = buildButtonFallback(bodyText, buttons);
+    return sendMessage(sock, phoneNumber, fallback);
+  }
+}
+
+function buildListFallback(bodyText, sections) {
+  let text = bodyText + '\n\n';
+  let i = 1;
+  for (const section of sections) {
+    if (section.title) text += `*${section.title}*\n`;
+    for (const row of section.rows) {
+      text += `${i}️⃣ ${row.title}`;
+      if (row.description) text += ` - ${row.description}`;
+      text += '\n';
+      i++;
+    }
+  }
+  text += '\n_Reply with the number of your choice_';
+  return text;
+}
+
+function buildButtonFallback(bodyText, buttons) {
+  let text = bodyText + '\n\n';
+  buttons.forEach((b, i) => {
+    text += `${i + 1}️⃣ ${b.displayText}\n`;
+  });
+  text += '\n_Reply with the number of your choice_';
+  return text;
+}
+
 export function formatPhoneNumber(phone) {
   // Remove all non-digit characters
   let cleaned = phone.replace(/\D/g, '');

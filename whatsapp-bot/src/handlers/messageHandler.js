@@ -84,6 +84,10 @@ function extractMessageText(message) {
   return (
     message.message?.conversation ||
     message.message?.extendedTextMessage?.text ||
+    // Button reply — user tapped a button
+    message.message?.buttonsResponseMessage?.selectedButtonId ||
+    // List reply — user selected a list row
+    message.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
     ''
   ).trim();
 }
