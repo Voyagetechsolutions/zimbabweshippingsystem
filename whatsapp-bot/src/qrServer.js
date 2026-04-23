@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.QR_PORT || 3000;
 const QR_DATA_PATH = '/app/data';
 
 function resolveLatestQRPath() {
