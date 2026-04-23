@@ -839,7 +839,7 @@ const ManualBookingTab: React.FC = () => {
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="w-full h-14 text-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+            className="w-full h-11 text-sm bg-emerald-600 hover:bg-emerald-700"
           >
             {isSubmitting ? (
               <>

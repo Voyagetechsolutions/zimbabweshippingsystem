@@ -7,7 +7,12 @@
       "Bash(npm run build:*)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(node --check whatsapp-bot-uk/src/flows/bookingFlow.js)",
+      "Bash(node --check whatsapp-bot-uk/src/handlers/messageHandler.js)",
+      "Bash(node --check whatsapp-bot-uk/src/utils/messageUtils.js)",
+      "Bash(node --check whatsapp-bot-uk/src/services/database.js)",
+      "Bash(node --check whatsapp-bot-uk/src/menus/mainMenu.js)"
     ]
   }
 }

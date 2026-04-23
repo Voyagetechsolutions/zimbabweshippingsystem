@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import TabHeader from '../TabHeader';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -293,34 +294,28 @@ const NotificationsAlertsTab = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <div>
-            <CardTitle className="text-lg font-medium">Notifications & Alerts</CardTitle>
-            <CardDescription>
-              Manage system notifications and user alerts
-            </CardDescription>
-          </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={fetchNotifications}
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
+    <div className="space-y-4">
+      <TabHeader
+        title="Notifications & Alerts"
+        description="Manage system notifications and user alerts"
+        actions={
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={fetchNotifications}>
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
             Refresh
           </Button>
-        </CardHeader>
-        
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
+        }
+      />
+
+      <Card className="shadow-none border border-gray-200 dark:border-gray-800">
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row gap-2 mb-4">
             <div className="relative flex-grow">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
               <Input
                 placeholder="Search notifications..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-8 h-9 text-sm"
               />
             </div>
             

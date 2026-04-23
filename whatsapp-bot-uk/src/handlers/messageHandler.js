@@ -4,7 +4,7 @@ import { handleBookingFlow } from '../flows/bookingFlow.js';
 import { handleTrackingFlow } from '../flows/trackingFlow.js';
 import { handlePricingInquiry } from '../flows/pricingFlow.js';
 import { handleFAQFlow } from '../flows/faqFlow.js';
-import { sendMessage } from '../utils/messageUtils.js';
+import { sendMessage, sendListMessage } from '../utils/messageUtils.js';
 
 export async function handleMessage(sock, message) {
   try {
@@ -52,29 +52,33 @@ export async function handleMessage(sock, message) {
 }
 
 async function sendWelcomeMessage(sock, phoneNumber) {
-  const welcomeMsg = `🇬🇧 *Welcome to Zimbabwe Shipping*
-_UK Branch_
+  await sendMainMenuList(sock, phoneNumber);
+}
 
-Thank you for contacting us! We're excited to serve you.
+export async function sendMainMenuList(sock, phoneNumber, userName = null) {
+  const greeting = userName ? `Hello ${userName}! 👋` : 'Hello! 👋';
+  const bodyText = `${greeting}\n\n🇬🇧 *Zimbabwe Shipping — UK*\n\n` +
+    `✈️ Ship drums, trunks & boxes to Zimbabwe\n` +
+    `🚚 FREE collection across England\n` +
+    `📦 Full tracking end-to-end\n` +
+    `💰 Competitive pricing with volume discounts\n\n` +
+    `Tap the button below to choose an option.`;
 
-*Our Services:*
-✈️ Ship drums, trunks & boxes to Zimbabwe
-🚚 FREE collection across England & Wales
-📦 Full tracking & insurance
-💰 Competitive pricing with volume discounts
+  await sendListMessage(sock, phoneNumber, bodyText,
+    '≡  Main Menu',
+    [{ title: 'What would you like to do?', rows: getMainMenuRows() }]
+  );
+}
 
-*How can we help you today?*
-
-1️⃣ 📦 Book a Shipment
-2️⃣ 💰 View Pricing
-3️⃣ 🔍 Track Shipment
-4️⃣ 📍 Collection Areas
-5️⃣ ❓ FAQ & Help
-6️⃣ 📞 Contact Us
-
-_Reply with a number (1-6) or describe what you need._`;
-
-  await sendMessage(sock, phoneNumber, welcomeMsg);
+function getMainMenuRows() {
+  return [
+    { id: '1', title: '📦 Book a Shipment', description: 'Ship drums, boxes or other items to Zimbabwe' },
+    { id: '2', title: '💰 View Pricing', description: 'See our rates and what\'s included' },
+    { id: '3', title: '🔍 Track Shipment', description: 'Check your shipment status' },
+    { id: '4', title: '📍 Collection Areas', description: 'See where we collect from in England' },
+    { id: '5', title: '❓ FAQ & Help', description: 'Get answers to common questions' },
+    { id: '6', title: '📞 Contact Us', description: 'Speak to our team' }
+  ];
 }
 
 function extractMessageText(message) {
@@ -90,7 +94,7 @@ async function handleMainMenu(sock, phoneNumber, text, session) {
   
   // Menu request
   if (lowerText === 'menu' || lowerText === 'start' || lowerText === 'main') {
-    await sendMessage(sock, phoneNumber, getMainMenu(session.userName));
+    await sendMainMenuList(sock, phoneNumber, session.userName);
     return;
   }
 
@@ -124,7 +128,7 @@ async function handleMainMenu(sock, phoneNumber, text, session) {
     case '4':
     case 'collection':
     case 'schedule':
-      await sendMessage(sock, phoneNumber, getCollectionInfo());
+      await sendMessage(sock, phoneNumber, await getCollectionInfo());
       break;
 
     case '5':
@@ -163,32 +167,48 @@ Let's get started! I'll guide you through the booking process step by step.
 Type *continue* to start or *cancel* to go back.`;
 }
 
-function getCollectionInfo() {
-  return `📍 *Collection Schedule - UK*
+async function getCollectionInfo() {
+  // Fetch live route dates from Supabase if available
+  let routeLines = '';
+  try {
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+    const { data } = await supabase
+      .from('collection_schedules')
+      .select('route, pickup_date')
+      .eq('country', 'England')
+      .order('route');
 
-We offer FREE collection across England & Wales!
+    if (data?.length) {
+      routeLines = data.map(r =>
+        `🔹 *${r.route}* — ${r.pickup_date && r.pickup_date !== 'Not set' ? r.pickup_date : 'Date TBC'}`
+      ).join('\n');
+    }
+  } catch { /* fallback below */ }
 
-*Major Collection Routes:*
-🔹 London Route
-🔹 Birmingham Route
-🔹 Manchester Route
-🔹 Leeds Route
-🔹 Cardiff Route
-🔹 Nottingham Route
-🔹 Northampton Route
-🔹 Bournemouth Route
-🔹 Brighton Route
-🔹 Southend Route
+  if (!routeLines) {
+    routeLines = [
+      '🔹 *London Route* — Date TBC',
+      '🔹 *Birmingham Route* — Date TBC',
+      '🔹 *Manchester Route* — Date TBC',
+      '🔹 *Leeds Route* — Date TBC',
+      '🔹 *Nottingham Route* — Date TBC',
+      '🔹 *Northampton Route* — Date TBC',
+      '🔹 *Bournemouth Route* — Date TBC',
+      '🔹 *Brighton Route* — Date TBC',
+      '🔹 *Southend Route* — Date TBC',
+    ].join('\n');
+  }
 
-Collections are scheduled based on your postcode. When you book, we'll automatically assign the next available collection date for your area.
-
-*How it works:*
-1. Book your shipment
-2. We'll confirm your collection date
-3. Our driver arrives at your address
-4. Items are collected and shipped to Zimbabwe
-
-Type *book* to start your booking or *menu* for main menu.`;
+  return `📍 *Collection Areas — England*\n\n` +
+    `We offer FREE collection across England!\n\n` +
+    `*Collection Routes & Next Dates:*\n${routeLines}\n\n` +
+    `*How it works:*\n` +
+    `1️⃣ Book your shipment\n` +
+    `2️⃣ We confirm your collection date\n` +
+    `3️⃣ Our driver collects from your address\n` +
+    `4️⃣ Items shipped to Zimbabwe\n\n` +
+    `Type *book* to start your booking or *menu* for main menu.`;
 }
 
 function getContactInfo() {

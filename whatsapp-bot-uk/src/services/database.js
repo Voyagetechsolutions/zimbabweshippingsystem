@@ -29,11 +29,16 @@ export async function initializeDatabase() {
 export async function createShipment(phoneNumber, bookingData) {
   try {
     const trackingNumber = generateTrackingNumber();
-    
+
+    const isOtherItem = bookingData.shipmentType === '4';
+    const originLabel = bookingData.collectionRoute
+      ? `${bookingData.collectionRoute.charAt(0)}${bookingData.collectionRoute.slice(1).toLowerCase()} Route, UK`
+      : 'UK';
+
     const shipmentData = {
       tracking_number: trackingNumber,
-      status: 'Pending Collection',
-      origin: `${bookingData.senderCity}, UK`,
+      status: isOtherItem ? 'Awaiting Quote' : 'Pending Collection',
+      origin: originLabel,
       destination: `${bookingData.receiverCity}, Zimbabwe`,
       user_id: null,
       metadata: {
@@ -42,10 +47,10 @@ export async function createShipment(phoneNumber, bookingData) {
           phone: bookingData.senderPhone,
           email: bookingData.senderEmail,
           address: bookingData.senderAddress,
-          city: bookingData.senderCity,
           postcode: bookingData.senderPostcode,
           country: 'England',
-          collectionRoute: bookingData.collectionRoute
+          collectionRoute: bookingData.collectionRoute,
+          collectionDate: bookingData.collectionDate || null
         },
         recipient: {
           name: bookingData.receiverName,
@@ -57,10 +62,12 @@ export async function createShipment(phoneNumber, bookingData) {
           drums: bookingData.drums || 0,
           boxes: bookingData.boxes || 0,
           metalSeal: bookingData.metalSeal || false,
-          doorToDoor: bookingData.doorToDoor || false
+          doorToDoor: bookingData.doorToDoor || false,
+          otherItem: isOtherItem,
+          otherItemDescription: isOtherItem ? bookingData.otherItemDescription : null
         },
         payment: {
-          method: bookingData.paymentMethod,
+          method: bookingData.paymentMethod || (isOtherItem ? 'TBC (agent quote)' : null),
           status: 'Pending'
         },
         bookingSource: 'whatsapp-bot-uk',

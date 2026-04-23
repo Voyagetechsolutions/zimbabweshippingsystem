@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import TabHeader from '../TabHeader';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
@@ -127,43 +128,35 @@ const ServiceReviewsTab: React.FC = () => {
     const getQuestionText = (id: string) => allQuestions.find((q) => q.id === id)?.question_text ?? id;
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Service Reviews</h2>
-                    <p className="text-gray-500 text-sm mt-1">
-                        Customer feedback ({reviews.length} total
-                        {attentionReviews.length > 0 && (
-                            <span className="text-red-600 font-medium">
-                                , {attentionReviews.length} need attention
-                            </span>
-                        )})
-                    </p>
-                </div>
-                <div className="flex gap-2">
-                    <Button variant={view === 'reviews' ? 'default' : 'outline'} size="sm" onClick={() => setView('reviews')}>
-                        <ClipboardList className="h-4 w-4 mr-1" /> All Reviews
-                    </Button>
-                    {attentionReviews.length > 0 && (
-                        <Button 
-                            variant={view === 'attention' ? 'default' : 'outline'} 
-                            size="sm" 
-                            onClick={() => setView('attention')}
-                            className="relative"
-                        >
-                            <AlertTriangle className="h-4 w-4 mr-1" /> 
-                            Need Attention
-                            <Badge variant="destructive" className="ml-2 px-1.5 py-0.5 text-xs">
-                                {attentionReviews.length}
-                            </Badge>
+        <div className="space-y-4">
+            <TabHeader
+                title="Service Reviews"
+                description={`Customer feedback — ${reviews.length} total${attentionReviews.length > 0 ? `, ${attentionReviews.length} need attention` : ''}`}
+                actions={
+                    <>
+                        <Button variant={view === 'reviews' ? 'default' : 'outline'} size="sm" className="h-8 text-xs" onClick={() => setView('reviews')}>
+                            <ClipboardList className="h-3.5 w-3.5 mr-1" /> All Reviews
                         </Button>
-                    )}
-                    <Button variant={view === 'questions' ? 'default' : 'outline'} size="sm" onClick={() => setView('questions')}>
-                        <Settings2 className="h-4 w-4 mr-1" /> Manage Questions
-                    </Button>
-                </div>
-            </div>
+                        {attentionReviews.length > 0 && (
+                            <Button
+                                variant={view === 'attention' ? 'default' : 'outline'}
+                                size="sm"
+                                className="h-8 text-xs relative"
+                                onClick={() => setView('attention')}
+                            >
+                                <AlertTriangle className="h-3.5 w-3.5 mr-1" />
+                                Need Attention
+                                <Badge variant="destructive" className="ml-1.5 px-1 py-0 text-[10px]">
+                                    {attentionReviews.length}
+                                </Badge>
+                            </Button>
+                        )}
+                        <Button variant={view === 'questions' ? 'default' : 'outline'} size="sm" className="h-8 text-xs" onClick={() => setView('questions')}>
+                            <Settings2 className="h-3.5 w-3.5 mr-1" /> Manage Questions
+                        </Button>
+                    </>
+                }
+            />
 
             {/* ─── Questions Manager View ─── */}
             {view === 'questions' && <CustomQuestionsManager />}

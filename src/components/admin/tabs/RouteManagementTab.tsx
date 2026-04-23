@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import TabHeader from '../TabHeader';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminCountry } from '@/contexts/AdminCountryContext';
@@ -523,34 +524,28 @@ const RouteManagementTab = () => {
   });
 
   return (
-    <div className="space-y-6">
-      {/* Info Banner */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-          <div>
-            <h3 className="font-semibold text-blue-900 dark:text-blue-300 mb-1">Route Management</h3>
-            <p className="text-sm text-blue-800 dark:text-blue-400">
-              Add and view shipping routes here. To <strong>update collection dates</strong>, go to the <strong>Collection Schedule</strong> tab.
-            </p>
-          </div>
-        </div>
-      </div>
-      
-      <Card>
+    <div className="space-y-4">
+      <TabHeader
+        title="Route Management"
+        description="Add and view shipping routes. For collection dates, use the Collection Schedule tab."
+        actions={
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={fetchRoutes} disabled={loading}>
+            <RefreshCcw className={`h-3.5 w-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        }
+      />
+
+      <Card className="shadow-none border border-gray-200 dark:border-gray-800">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <div>
-            <CardTitle className="text-lg font-medium">Routes</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-sm font-medium">Routes</CardTitle>
+            <CardDescription className="text-xs">
               View all shipping routes in the system
             </CardDescription>
           </div>
-          
+
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={fetchRoutes} disabled={loading}>
-              <RefreshCcw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
 
             {/* Seed Routes Button - show based on selected country */}
             {selectedCountry === 'Ireland' && (

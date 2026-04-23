@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import TabHeader from '../TabHeader';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminCountry } from '@/contexts/AdminCountryContext';
@@ -449,7 +450,7 @@ const PickupZonesManagementTab = () => {
         </div>
 
         {/* Route Summary */}
-        <Card className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
+        <Card className="bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900 shadow-none">
           <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div className="flex items-center gap-4">
@@ -609,36 +610,35 @@ const PickupZonesManagementTab = () => {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Pickup Zones Management</CardTitle>
-        <CardDescription>
-          Manage pickups by route and schedule collections
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <div className="space-y-4">
+      <TabHeader
+        title="Pickup Zones Management"
+        description="Manage pickups by route and schedule collections"
+        actions={
+          <>
+            <Badge variant="outline" className="px-2 py-1 text-xs">
+              {selectedCountry === 'Ireland' ? '🇮🇪' : '🇬🇧'} {selectedCountry}
+            </Badge>
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={fetchData} disabled={loading}>
+              <RefreshCcw className={`h-3.5 w-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </>
+        }
+      />
+
+      <div className="space-y-4">
         {!selectedRoute ? (
           <>
-            {/* Search and filters */}
-            <div className="flex flex-col md:flex-row gap-4 items-end">
-              <div className="relative flex-grow">
-                <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
-                <Input
-                  placeholder="Search routes or areas..."
-                  className="pl-10"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="px-3 py-1.5">
-                  {selectedCountry === 'Ireland' ? '🇮🇪' : '🇬🇧'} {selectedCountry}
-                </Badge>
-                <Button variant="outline" onClick={fetchData} disabled={loading}>
-                  <RefreshCcw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
-              </div>
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Search routes or areas..."
+                className="pl-8 h-9 text-sm"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
 
             {/* Routes Grid */}
@@ -678,7 +678,7 @@ const PickupZonesManagementTab = () => {
         ) : (
           renderRouteDetails()
         )}
-      </CardContent>
+      </div>
 
       {/* Schedule Pickup Dialog */}
       <Dialog open={schedulingDialog} onOpenChange={setSchedulingDialog}>
@@ -783,7 +783,7 @@ const PickupZonesManagementTab = () => {
           )}
         </DialogContent>
       </Dialog>
-    </Card>
+    </div>
   );
 };
 

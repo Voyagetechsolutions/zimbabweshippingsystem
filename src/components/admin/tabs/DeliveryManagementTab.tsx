@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import TabHeader from '../TabHeader';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -329,9 +330,13 @@ const DeliveryManagementTab = () => {
   };
 
   return (
-    <>
+    <div className="space-y-4">
+      <TabHeader
+        title="Delivery Management"
+        description="Monitor deliveries, track driver performance, and manage complaints"
+      />
       <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-6 grid w-full grid-cols-2 md:grid-cols-3">
+        <TabsList className="mb-4 grid w-full grid-cols-2 md:grid-cols-3 h-9">
           <TabsTrigger value="monitor" className="flex items-center gap-2">
             <Truck className="h-4 w-4" />
             <span>Monitor Deliveries</span>
@@ -572,7 +577,7 @@ const DeliveryManagementTab = () => {
           </Card>
         </TabsContent>
       </Tabs>
-    </>
+    </div>
   );
 };
 

@@ -28,14 +28,16 @@ export function getPricingMenu() {
 📦 2-4 boxes: £23 each
 📦 5+ boxes: £20 each
 
+*OTHER ITEMS:*
+📋 Custom items are quoted individually by our agent.
+
 *ADDITIONAL SERVICES:*
 🔒 Metal coded seal: £7 per seal
 🚪 Door-to-door delivery (Zimbabwe): £25
 
 *INCLUDED FREE:*
-✅ Collection anywhere in England & Wales
+✅ Collection anywhere in England
 ✅ Full tracking
-✅ Insurance
 ✅ 6 weeks delivery time
 
 *Volume Discounts Available!*

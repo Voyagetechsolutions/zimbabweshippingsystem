@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import TabHeader from '../TabHeader';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format, isValid, parse } from 'date-fns';
@@ -279,35 +280,25 @@ const CollectionScheduleManagementEnhanced = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Info Banner */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-4">
-        <div className="flex items-start gap-3">
-          <CalendarIcon className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-          <div>
-            <h3 className="font-semibold text-blue-900 dark:text-blue-300 mb-1">Collection Schedule Management</h3>
-            <p className="text-sm text-blue-800 dark:text-blue-400">
-              Group shipments by collection schedule for easy bulk status updates. Name your schedules for better organization.
-            </p>
-          </div>
-        </div>
-      </div>
+    <div className="space-y-4">
+      <TabHeader
+        title="Collection Schedule"
+        description="Group shipments by collection schedule for easy bulk status updates"
+        actions={
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => { fetchSchedules(); fetchShipments(); }}>
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            Refresh
+          </Button>
+        }
+      />
 
       {/* Collection Schedules Table */}
-      <Card>
+      <Card className="shadow-none border border-gray-200 dark:border-gray-800">
         <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-lg font-medium">Collection Schedules</CardTitle>
-              <CardDescription>
-                Manage collection schedules and update shipments in bulk
-              </CardDescription>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => { fetchSchedules(); fetchShipments(); }}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-          </div>
+          <CardTitle className="text-sm font-medium">Collection Schedules</CardTitle>
+          <CardDescription className="text-xs">
+            Name your schedules for better organization
+          </CardDescription>
         </CardHeader>
 
         <CardContent>

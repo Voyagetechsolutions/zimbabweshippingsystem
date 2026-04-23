@@ -1,8 +1,27 @@
 import { updateUserSession, getUserSession } from '../services/userSession.js';
 import { sendMessage } from '../utils/messageUtils.js';
 import { getRouteFromPostcode } from '../menus/mainMenu.js';
-import { createShipment } from '../services/database.js';
+import { createShipment, supabase } from '../services/database.js';
 import { calculatePrice } from '../utils/pricingUtils.js';
+
+async function getPickupDateForRoute(route) {
+  if (!route) return null;
+  try {
+    // Route codes in the bot (e.g. 'LONDON') are uppercase; DB stores proper case (e.g. 'London Route').
+    // Match by ilike so we find "London Route", "London", etc.
+    const { data } = await supabase
+      .from('collection_schedules')
+      .select('route, pickup_date')
+      .eq('country', 'England')
+      .ilike('route', `%${route}%`)
+      .limit(1);
+    const row = data?.[0];
+    if (row?.pickup_date && row.pickup_date !== 'Not set') return row.pickup_date;
+  } catch (err) {
+    console.error('Error fetching pickup date for route:', err?.message || err);
+  }
+  return null;
+}
 
 export async function handleBookingFlow(sock, phoneNumber, text, session) {
   const lowerText = text.toLowerCase();
@@ -68,12 +87,22 @@ export async function handleBookingFlow(sock, phoneNumber, text, session) {
 
     case 'CONFIRM_SAVED_INFO':
       if (lowerText === 'yes') {
-        // Skip to receiver details
+        // Derive route + pickup date from saved postcode
+        const savedRoute = getRouteFromPostcode(bookingData.senderPostcode || '');
+        if (savedRoute && savedRoute !== 'RESTRICTED') {
+          bookingData.collectionRoute = savedRoute;
+          const savedDate = await getPickupDateForRoute(savedRoute);
+          bookingData.collectionDate = savedDate || null;
+        }
+
         await updateUserSession(phoneNumber, { bookingData, step: 'RECEIVER_NAME' });
+        const dateLine = bookingData.collectionDate
+          ? `📅 Next collection date: *${bookingData.collectionDate}*\n\n`
+          : '';
         await sendMessage(
           sock,
           phoneNumber,
-          '✅ Perfect! Now let\'s get the receiver details in Zimbabwe.\n\n👤 What\'s the receiver\'s full name?'
+          `✅ Perfect!\n\n${dateLine}Now let's get the receiver details in Zimbabwe.\n\n👤 What\'s the receiver\'s full name?`
         );
       } else if (lowerText === 'no') {
         await updateUserSession(phoneNumber, { bookingData: {}, step: 'SENDER_NAME' });
@@ -130,42 +159,25 @@ export async function handleBookingFlow(sock, phoneNumber, text, session) {
 
     case 'SENDER_ADDRESS':
       bookingData.senderAddress = text;
-      
-      // Save address for future
-      await updateUserSession(phoneNumber, { 
-        bookingData, 
-        step: 'SENDER_CITY',
+
+      // Save address for future, then jump straight to postcode (no separate city step)
+      await updateUserSession(phoneNumber, {
+        bookingData,
+        step: 'SENDER_POSTCODE',
         userAddress: text
       });
-      
+
       await sendMessage(
         sock,
         phoneNumber,
-        `🏙️ Which city/town are you in?\n\n_Examples: London, Birmingham, Manchester, Leeds, Cardiff_`
+        '📮 Enter your postal code to get your collection dates.\n\n_Example: SW1A 1AA_'
       );
       break;
 
-    case 'SENDER_CITY':
-      bookingData.senderCity = text;
-      
-      // Save city for future
-      await updateUserSession(phoneNumber, { 
-        bookingData, 
-        step: 'SENDER_POSTCODE',
-        userCity: text
-      });
-      
-      await sendMessage(
-        sock,
-        phoneNumber,
-        '📮 What\'s your postcode?\n\n_Example: SW1A 1AA_'
-      );
-      break;
-
-    case 'SENDER_POSTCODE':
+    case 'SENDER_POSTCODE': {
       const postcode = text.toUpperCase();
       const route = getRouteFromPostcode(postcode);
-      
+
       if (route === 'RESTRICTED') {
         await sendMessage(
           sock,
@@ -175,7 +187,7 @@ export async function handleBookingFlow(sock, phoneNumber, text, session) {
         await updateUserSession(phoneNumber, { state: 'MAIN_MENU', bookingData: {} });
         return;
       }
-      
+
       if (!route) {
         await sendMessage(
           sock,
@@ -184,23 +196,32 @@ export async function handleBookingFlow(sock, phoneNumber, text, session) {
         );
         return;
       }
-      
+
       bookingData.senderPostcode = postcode;
       bookingData.collectionRoute = route;
-      
-      // Save postcode for future
-      await updateUserSession(phoneNumber, { 
-        bookingData, 
+
+      // Pretty-print route ("LONDON" -> "London Route") for both bot and DB lookup
+      const routeLabel = route.charAt(0) + route.slice(1).toLowerCase() + ' Route';
+      const pickupDate = await getPickupDateForRoute(route);
+      bookingData.collectionDate = pickupDate || null;
+
+      await updateUserSession(phoneNumber, {
+        bookingData,
         step: 'RECEIVER_NAME',
         userPostcode: postcode
       });
-      
+
+      const dateLine = pickupDate
+        ? `📅 Next collection date: *${pickupDate}*`
+        : `📅 Collection date: *To be confirmed* — our team will call to arrange.`;
+
       await sendMessage(
         sock,
         phoneNumber,
-        `✅ Great! Your collection route is: *${route}*\n\nNow let's get the receiver details in Zimbabwe.\n\n👤 What's the receiver's full name?`
+        `✅ Great! Your collection route is: *${routeLabel}*\n${dateLine}\n\nNow let's get the receiver details in Zimbabwe.\n\n👤 What's the receiver's full name?`
       );
       break;
+    }
 
     case 'RECEIVER_NAME':
       bookingData.receiverName = text;
@@ -230,27 +251,52 @@ export async function handleBookingFlow(sock, phoneNumber, text, session) {
       await sendMessage(
         sock,
         phoneNumber,
-        `📦 *What would you like to ship?*\n\nType the number:\n\n1️⃣ Drums (200-220L)\n2️⃣ Trunks/Storage Boxes\n3️⃣ Both drums and boxes`
+        `📦 *What would you like to ship?*\n\nType the number:\n\n1️⃣ Drums (200-220L)\n2️⃣ Trunks/Storage Boxes\n3️⃣ Both drums and boxes\n4️⃣ Other item (our agent will quote you)`
       );
       break;
 
     case 'SHIPMENT_TYPE':
-      if (!['1', '2', '3'].includes(text)) {
-        await sendMessage(sock, phoneNumber, '❌ Please type 1, 2, or 3.');
+      if (!['1', '2', '3', '4'].includes(text)) {
+        await sendMessage(sock, phoneNumber, '❌ Please type 1, 2, 3, or 4.');
         return;
       }
       bookingData.shipmentType = text;
-      
+
       if (text === '1') {
         await updateUserSession(phoneNumber, { bookingData, step: 'DRUM_QUANTITY' });
         await sendMessage(sock, phoneNumber, '🥁 How many drums? (Enter a number)');
       } else if (text === '2') {
         await updateUserSession(phoneNumber, { bookingData, step: 'BOX_QUANTITY' });
         await sendMessage(sock, phoneNumber, '📦 How many trunks/boxes? (Enter a number)');
-      } else {
+      } else if (text === '3') {
         await updateUserSession(phoneNumber, { bookingData, step: 'DRUM_QUANTITY' });
         await sendMessage(sock, phoneNumber, '🥁 How many drums? (Enter a number)');
+      } else {
+        await updateUserSession(phoneNumber, { bookingData, step: 'OTHER_ITEM_DESCRIPTION' });
+        await sendMessage(
+          sock,
+          phoneNumber,
+          '📝 Please describe what you\'d like to ship.\n\nInclude size, weight and quantity if you can. Our agent will review and send you a personalised quote.'
+        );
       }
+      break;
+
+    case 'OTHER_ITEM_DESCRIPTION':
+      if (!text || text.length < 3) {
+        await sendMessage(sock, phoneNumber, '❌ Please enter a short description of what you\'d like to ship.');
+        return;
+      }
+      bookingData.otherItemDescription = text;
+      await updateUserSession(phoneNumber, { bookingData, step: 'CONFIRM' });
+
+      // Skip metal seal / door-to-door / payment method — agent will quote separately
+      const otherSummary = generateBookingSummary(bookingData, null);
+      await sendMessage(sock, phoneNumber, otherSummary);
+      await sendMessage(
+        sock,
+        phoneNumber,
+        `✅ *Confirm Your Booking Request*\n\nYour details look good? Type *CONFIRM* to submit. Our agent will call you back with a quote, or *EDIT* to make changes.`
+      );
       break;
 
     case 'DRUM_QUANTITY':
@@ -342,7 +388,7 @@ export async function handleBookingFlow(sock, phoneNumber, text, session) {
       if (lowerText === 'confirm') {
         // Create shipment in database
         const trackingNumber = await createShipment(phoneNumber, bookingData);
-        
+
         // Add to booking history
         const currentSession = await getUserSession(phoneNumber);
         const bookingHistory = currentSession.bookingHistory || [];
@@ -350,13 +396,21 @@ export async function handleBookingFlow(sock, phoneNumber, text, session) {
           trackingNumber,
           date: new Date().toISOString(),
           drums: bookingData.drums || 0,
-          boxes: bookingData.boxes || 0
+          boxes: bookingData.boxes || 0,
+          otherItem: bookingData.shipmentType === '4' ? bookingData.otherItemDescription : null
         });
-        
+
+        const routeLabel = bookingData.collectionRoute
+          ? bookingData.collectionRoute.charAt(0) + bookingData.collectionRoute.slice(1).toLowerCase() + ' Route'
+          : 'TBC';
+        const followUp = bookingData.shipmentType === '4'
+          ? `📞 Our agent will contact you shortly with a quote for your item(s).`
+          : `📞 We'll contact you within 24 hours to confirm your collection date.`;
+
         await sendMessage(
           sock,
           phoneNumber,
-          `🎉 *Booking Confirmed!*\n\n✅ Your tracking number: *${trackingNumber}*\n\n📧 Confirmation email sent to ${bookingData.senderEmail}\n\n📞 We'll contact you within 24 hours to confirm your collection date.\n\n📦 Your collection route: *${bookingData.collectionRoute}*\n\nType *track* to track your shipment or *menu* for main menu.`
+          `🎉 *Booking Confirmed!*\n\n✅ Your tracking number: *${trackingNumber}*\n\n📧 Confirmation email sent to ${bookingData.senderEmail}\n\n${followUp}\n\n📦 Your collection route: *${routeLabel}*\n\nType *track* to track your shipment or *menu* for main menu.`
         );
         
         // Reset session but keep user info
@@ -390,36 +444,43 @@ function isValidEmail(email) {
 
 function generateBookingSummary(data, pricing) {
   let summary = `📋 *Booking Summary*\n\n`;
-  
+
+  const routeLabel = data.collectionRoute
+    ? data.collectionRoute.charAt(0) + data.collectionRoute.slice(1).toLowerCase() + ' Route'
+    : '';
+
   summary += `*SENDER (UK):*\n`;
   summary += `👤 ${data.senderName}\n`;
   summary += `📱 ${data.senderPhone}\n`;
   summary += `📧 ${data.senderEmail}\n`;
   summary += `🏠 ${data.senderAddress}\n`;
-  summary += `🏙️ ${data.senderCity}\n`;
   summary += `📮 ${data.senderPostcode}\n`;
-  summary += `🚚 Route: ${data.collectionRoute}\n`;
+  if (routeLabel) summary += `🚚 Route: ${routeLabel}\n`;
+  if (data.collectionDate) summary += `📅 Collection: ${data.collectionDate}\n`;
   summary += `\n`;
-  
+
   summary += `*RECEIVER (Zimbabwe):*\n`;
   summary += `👤 ${data.receiverName}\n`;
   summary += `📱 ${data.receiverPhone}\n`;
   summary += `🏠 ${data.receiverAddress}\n`;
   summary += `🏙️ ${data.receiverCity}\n`;
   summary += `\n`;
-  
+
   summary += `*SHIPMENT:*\n`;
-  if (data.drums) summary += `🥁 ${data.drums} drum(s) - £${pricing.drumTotal}\n`;
-  if (data.boxes) summary += `📦 ${data.boxes} box(es) - £${pricing.boxTotal}\n`;
-  if (data.metalSeal) summary += `🔒 Metal seal - £${pricing.sealCost}\n`;
-  if (data.doorToDoor) summary += `🚪 Door-to-door - £${pricing.doorToDoorCost}\n`;
-  summary += `\n`;
-  
-  summary += `💰 *TOTAL: £${pricing.total}*\n`;
+  if (data.shipmentType === '4') {
+    summary += `📝 Other item: ${data.otherItemDescription}\n`;
+    summary += `\n💰 *TOTAL: Our agent will quote you*\n`;
+  } else {
+    if (data.drums) summary += `🥁 ${data.drums} drum(s) - £${pricing.drumTotal}\n`;
+    if (data.boxes) summary += `📦 ${data.boxes} box(es) - £${pricing.boxTotal}\n`;
+    if (data.metalSeal) summary += `🔒 Metal seal - £${pricing.sealCost}\n`;
+    if (data.doorToDoor) summary += `🚪 Door-to-door - £${pricing.doorToDoorCost}\n`;
+    summary += `\n💰 *TOTAL: £${pricing.total}*\n`;
+  }
   summary += `\n`;
   summary += `✅ FREE collection included\n`;
   summary += `✅ Full tracking\n`;
   summary += `✅ 6 weeks delivery`;
-  
+
   return summary;
 }

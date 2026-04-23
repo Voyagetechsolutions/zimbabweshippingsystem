@@ -606,7 +606,7 @@ export const SimplifiedBookingForm = () => {
       let notes = [];
       if (formData.wantMetalSeal) notes.push('Metal Coded Seal requested');
       if (formData.paymentMethod === 'cashOnCollection') notes.push('Cash payment (discount applied)');
-      if (formData.includeBoxes) notes.push(`Boxes & Other Items: ${formData.boxesDescription}`);
+      if (formData.includeBoxes) notes.push(`Other Items (agent quote): ${formData.boxesDescription}`);
       if (formData.includeTrunks && formData.trunkQuantity > 0) notes.push(`${formData.trunkQuantity} x Trunk/Storage Box`);
       if (formData.purchaseDrums && formData.purchaseDrumType && formData.purchaseDrumQuantity > 0) {
         notes.push(`Purchase ${formData.purchaseDrumQuantity} x ${formData.purchaseDrumType === 'metal' ? 'Metal Drum (£40)' : 'Plastic Barrel (£50)'}`);
@@ -687,7 +687,7 @@ export const SimplifiedBookingForm = () => {
             const types = [];
             if (formData.includeDrums) types.push('Drums');
             if (formData.includeTrunks) types.push('Trunks');
-            if (formData.includeBoxes) types.push('Boxes/Items');
+            if (formData.includeBoxes) types.push('Other Items');
             return types.length > 0 ? types.join(' + ') : 'Standard';
           })(),
           includeDrums: formData.includeDrums,
@@ -1396,7 +1396,7 @@ export const SimplifiedBookingForm = () => {
             </div>
           )}
 
-          {/* Boxes & Other Items - Custom Quote */}
+          {/* Other Items - Custom Quote (agent-quoted) */}
           <div className={`border-2 rounded-lg p-5 transition-all ${formData.includeBoxes ? 'border-zim-yellow bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-600' : 'border-gray-200 hover:border-zim-yellow dark:border-gray-700 dark:hover:border-yellow-600'}`}>
             <label className="flex items-start gap-3 cursor-pointer">
               <input
@@ -1406,22 +1406,27 @@ export const SimplifiedBookingForm = () => {
                 className="mt-1 h-4 w-4"
               />
               <div className="flex-1">
-                <div className="font-semibold text-lg">Boxes & Other Items</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">We'll give you a custom quote</div>
-                
+                <div className="font-semibold text-lg">Other Items</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Shipping something else? Tell us what you're sending and our agent will contact you with a personalised quote.
+                </div>
+
                 {formData.includeBoxes && (
                   <div className="mt-4">
-                    <Label htmlFor="boxesDesc" className="text-base">What are you sending?</Label>
+                    <Label htmlFor="boxesDesc" className="text-base">What are you shipping?</Label>
                     <textarea
                       id="boxesDesc"
-                      placeholder="e.g., 3 boxes of clothes, 1 suitcase, books"
+                      placeholder="e.g., 3 boxes of clothes, 1 suitcase of books, small furniture, electronics…"
                       value={formData.boxesDescription}
                       onChange={(e) => updateField('boxesDescription', e.target.value)}
                       className="w-full mt-2 p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md focus:ring-2 focus:ring-zim-yellow focus:border-transparent min-h-[100px]"
                     />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                      Describe what you're shipping and we'll get back to you with a custom price
-                    </p>
+                    <div className="flex items-start gap-2 mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                      <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                      <p className="text-xs text-blue-900 dark:text-blue-300">
+                        These items don't have a fixed price. Once you submit your booking, an agent will contact you within 24 hours with a quote.
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1535,9 +1540,9 @@ export const SimplifiedBookingForm = () => {
 
             {formData.includeBoxes && (
               <div className={(formData.includeDrums || formData.includeTrunks) ? 'border-t pt-3' : ''}>
-                <p className="font-medium text-gray-700 dark:text-gray-300">Boxes & Other Items:</p>
+                <p className="font-medium text-gray-700 dark:text-gray-300">Other Items:</p>
                 <p className="text-gray-600 dark:text-gray-400 mt-1">{formData.boxesDescription}</p>
-                <p className="text-xs italic mt-2 text-blue-600 dark:text-blue-400">Custom quote will be provided</p>
+                <p className="text-xs italic mt-2 text-blue-600 dark:text-blue-400">Our agent will contact you with a quote</p>
               </div>
             )}
           </div>

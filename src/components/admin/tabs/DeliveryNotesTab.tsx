@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import TabHeader from '../TabHeader';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -212,34 +213,28 @@ const DeliveryNotesTab = () => {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            <FileText className="h-5 w-5 text-zim-green" />
-            Delivery Notes
-          </h2>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Auto-generated office copies for every booking. Not for customer distribution.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={fetchShipments} disabled={loading}>
-            <RefreshCw className="h-4 w-4 mr-1.5" /> Refresh
-          </Button>
-          <Button
-            size="sm"
-            onClick={downloadBulk}
-            disabled={selected.size === 0 || bulkGenerating}
-            className="bg-zim-green hover:bg-zim-green/90"
-          >
-            {bulkGenerating
-              ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Generating…</>
-              : <><Download className="h-4 w-4 mr-1.5" />Download Selected ({selected.size})</>
-            }
-          </Button>
-        </div>
-      </div>
+      <TabHeader
+        title="Delivery Notes"
+        description="Auto-generated office copies for every booking. Not for customer distribution."
+        actions={
+          <>
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={fetchShipments} disabled={loading}>
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh
+            </Button>
+            <Button
+              size="sm"
+              onClick={downloadBulk}
+              disabled={selected.size === 0 || bulkGenerating}
+              className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700"
+            >
+              {bulkGenerating
+                ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Generating…</>
+                : <><Download className="h-3.5 w-3.5 mr-1.5" />Download ({selected.size})</>
+              }
+            </Button>
+          </>
+        }
+      />
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">

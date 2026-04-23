@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import TabHeader from '../TabHeader';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -217,42 +218,44 @@ const ReportsAnalyticsTab = () => {
   }));
 
   return (
-    <div className="space-y-6">
-      {/* Controls */}
-      <div className="flex justify-between items-center">
-        <Select value={timeRange} onValueChange={setTimeRange}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Select time range" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="1m">Last Month</SelectItem>
-            <SelectItem value="3m">Last 3 Months</SelectItem>
-            <SelectItem value="6m">Last 6 Months</SelectItem>
-            <SelectItem value="12m">Last Year</SelectItem>
-          </SelectContent>
-        </Select>
-        
-        <div className="space-x-2">
-          <Button variant="outline" onClick={handleRefresh}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-          <Button variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-4">
+      <TabHeader
+        title="Reports & Analytics"
+        description="Revenue, shipment, and route insights"
+        actions={
+          <>
+            <Select value={timeRange} onValueChange={setTimeRange}>
+              <SelectTrigger className="w-[140px] h-8 text-xs">
+                <SelectValue placeholder="Select time range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1m">Last Month</SelectItem>
+                <SelectItem value="3m">Last 3 Months</SelectItem>
+                <SelectItem value="6m">Last 6 Months</SelectItem>
+                <SelectItem value="12m">Last Year</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleRefresh}>
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+              Refresh
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 text-xs">
+              <Download className="h-3.5 w-3.5 mr-1.5" />
+              Export
+            </Button>
+          </>
+        }
+      />
 
       {/* Revenue Over Time */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Revenue Over Time</CardTitle>
-          <CardDescription>
+      <Card className="shadow-none border border-gray-200 dark:border-gray-800">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">Revenue Over Time</CardTitle>
+          <CardDescription className="text-xs">
             Monthly revenue for the {timeRange === '1m' ? 'last month' : `last ${timeRange.replace('m', '')} months`}
           </CardDescription>
         </CardHeader>
-        <CardContent className="h-80">
+        <CardContent className="h-72">
           {loading ? (
             <div className="flex flex-col gap-4">
               <Skeleton className="h-[300px] w-full" />
@@ -279,14 +282,14 @@ const ReportsAnalyticsTab = () => {
       </Card>
 
       {/* Shipment Distribution & Route Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Shipment Status Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Shipment Distribution</CardTitle>
-            <CardDescription>Shipments by status</CardDescription>
+        <Card className="shadow-none border border-gray-200 dark:border-gray-800">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Shipment Distribution</CardTitle>
+            <CardDescription className="text-xs">Shipments by status</CardDescription>
           </CardHeader>
-          <CardContent className="h-80">
+          <CardContent className="h-72">
             {loading ? (
               <div className="flex flex-col gap-4">
                 <Skeleton className="h-[300px] w-full" />
@@ -316,12 +319,12 @@ const ReportsAnalyticsTab = () => {
         </Card>
 
         {/* Shipments by Route */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Shipments by Route</CardTitle>
-            <CardDescription>Number of shipments per route</CardDescription>
+        <Card className="shadow-none border border-gray-200 dark:border-gray-800">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Shipments by Route</CardTitle>
+            <CardDescription className="text-xs">Number of shipments per route</CardDescription>
           </CardHeader>
-          <CardContent className="h-80">
+          <CardContent className="h-72">
             {loading ? (
               <div className="flex flex-col gap-4">
                 <Skeleton className="h-[300px] w-full" />
