@@ -8,18 +8,92 @@ import { getBotSettings } from '../utils/pricingUtils.js';
 
 export async function handleMessage(sock, message) {
   try {
-    const phoneNumber = message.key.remoteJid;
+    const rawJid = message.key.remoteJid;
+    
+    console.log('📨 Received message from:', rawJid);
 
-    if (phoneNumber.endsWith('@g.us')) return;
+    if (rawJid.endsWith('@g.us')) {
+      console.log('⏭️  Skipping group message');
+      return;
+    }
+
+    // Resolve LID (@lid) to real phone JID (@s.whatsapp.net)
+    // Baileys newer versions use LID format; we need the s.whatsapp.net JID to send replies
+    let phoneNumber = rawJid;
+    if (rawJid.endsWith('@lid')) {
+      // The real JID is available in sock.store or we can derive it from the number part
+      // LID format: <number>@lid — try converting to @s.whatsapp.net
+      const lidNumber = rawJid.replace('@lid', '');
+      // Check if sock has a contact store with the mapping
+      try {
+        const contacts = sock.store?.contacts || {};
+        const match = Object.keys(contacts).find(jid =>
+          jid.endsWith('@s.whatsapp.net') && contacts[jid]?.lid === rawJid
+        );
+        if (match) {
+          phoneNumber = match;
+        } else {
+          // Try direct conversion — LID numbers sometimes map directly
+          phoneNumber = lidNumber + '@s.whatsapp.net';
+        }
+      } catch {
+        phoneNumber = lidNumber + '@s.whatsapp.net';
+      }
+      console.log(`🔄 LID resolved: ${rawJid} → ${phoneNumber}`);
+    }
 
     const messageText = extractMessageText(message);
-    if (!messageText) return;
+    console.log('📝 Message text:', messageText);
+    
+    if (!messageText) {
+      console.log('⚠️  No message text extracted');
+      return;
+    }
 
     const session = await getUserSession(phoneNumber);
+    console.log('👤 User session:', { 
+      state: session.state, 
+      hasBeenGreeted: session.hasBeenGreeted,
+      needsGreeting: session.needsGreeting 
+    });
 
-    if (!session.hasBeenGreeted) {
-      await sendWelcomeMessage(sock, phoneNumber);
-      await updateUserSession(phoneNumber, { hasBeenGreeted: true });
+    // Check if user needs greeting (new session or expired session)
+    if (session.needsGreeting || !session.hasBeenGreeted) {
+      console.log('👋 Sending welcome message to user');
+      console.log('🔌 Socket state:', sock.user ? 'Connected' : 'Disconnected');
+      console.log('👤 Bot user ID:', sock.user?.id || 'Unknown');
+      
+      await sendMainMenuList(sock, phoneNumber, session.userName);
+      await updateUserSession(phoneNumber, { 
+        hasBeenGreeted: true, 
+        needsGreeting: false,
+        state: 'MAIN_MENU', 
+        step: null 
+      });
+      return;
+    }
+
+    // Reset greeting on explicit start words so users can always get the menu
+    const lowerText = messageText.toLowerCase().trim();
+    const isGreeting = ['hi', 'hello', 'hey', 'start', 'menu'].includes(lowerText);
+    
+    // Test command to verify message delivery
+    if (lowerText === 'test' || lowerText === 'ping') {
+      console.log('🧪 Test command received - sending test message');
+      const testMessage = `✅ *Bot is working!*\n\n` +
+        `📱 Your number: ${phoneNumber}\n` +
+        `⏰ Time: ${new Date().toLocaleString()}\n` +
+        `🔌 Connection: Active\n\n` +
+        `If you can see this message, the bot is sending messages correctly!\n\n` +
+        `Type *menu* to see the main menu.`;
+      await sendMessage(sock, phoneNumber, testMessage);
+      return;
+    }
+
+    if (isGreeting) {
+      console.log('👋 User requested menu - sending main menu');
+      await sendMainMenuList(sock, phoneNumber, session.userName);
+      await updateUserSession(phoneNumber, { state: 'MAIN_MENU', step: null });
       return;
     }
 
@@ -52,11 +126,22 @@ async function sendWelcomeMessage(sock, phoneNumber) {
 }
 
 function extractMessageText(message) {
+  const msg = message.message;
+  // Interactive button/list response (nativeFlowResponseMessage)
+  if (msg?.interactiveResponseMessage) {
+    try {
+      const body = msg.interactiveResponseMessage.nativeFlowResponseMessage?.paramsJson;
+      if (body) {
+        const parsed = JSON.parse(body);
+        return (parsed.id || parsed.display_text || '').trim();
+      }
+    } catch { /* fall through */ }
+  }
   return (
-    message.message?.conversation ||
-    message.message?.extendedTextMessage?.text ||
-    message.message?.buttonsResponseMessage?.selectedButtonId ||
-    message.message?.listResponseMessage?.singleSelectReply?.selectedRowId ||
+    msg?.conversation ||
+    msg?.extendedTextMessage?.text ||
+    msg?.buttonsResponseMessage?.selectedButtonId ||
+    msg?.listResponseMessage?.singleSelectReply?.selectedRowId ||
     ''
   ).trim();
 }

@@ -25,6 +25,8 @@ async function connectToWhatsApp() {
     logger,
     printQRInTerminal: false,
     auth: state,
+    syncFullHistory: false,
+    markOnlineOnConnect: false,
     getMessage: async () => ({ conversation: '' })
   });
 
@@ -63,9 +65,19 @@ async function connectToWhatsApp() {
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    console.log(`📨 messages.upsert type=${type} count=${messages.length}`);
     if (type === 'notify') {
       for (const message of messages) {
-        if (!message.key.fromMe && message.message) {
+        const from = message.key.remoteJid;
+        const fromMe = message.key.fromMe;
+        const text = message.message?.conversation || message.message?.extendedTextMessage?.text || '[non-text]';
+        console.log(`  → from=${from} fromMe=${fromMe} text="${text}"`);
+        if (from.endsWith('@lid')) {
+          console.log('  LID message full key:', JSON.stringify(message.key));
+          console.log('  LID message verifiedBizName:', message.verifiedBizName);
+          console.log('  LID message pushName:', message.pushName);
+        }
+        if (!fromMe && message.message) {
           await handleMessage(sock, message);
         }
       }

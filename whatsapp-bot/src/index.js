@@ -13,17 +13,27 @@ import { startQRServer } from './qrServer.js';
 
 dotenv.config();
 
-const logger = pino({ 
-  level: process.env.LOG_LEVEL || 'info',
-  transport: {
-    target: 'pino-pretty',
-    options: {
-      colorize: false,
-      translateTime: 'SYS:standard',
-      ignore: 'pid,hostname'
+// Configure logger with fallback if pino-pretty is not available
+let logger;
+try {
+  logger = pino({ 
+    level: process.env.LOG_LEVEL || 'info',
+    transport: {
+      target: 'pino-pretty',
+      options: {
+        colorize: false,
+        translateTime: 'SYS:standard',
+        ignore: 'pid,hostname'
+      }
     }
-  }
-});
+  });
+} catch (error) {
+  // Fallback to basic pino logger if pino-pretty fails
+  console.log('⚠️  pino-pretty not available, using basic logger');
+  logger = pino({ 
+    level: process.env.LOG_LEVEL || 'info'
+  });
+}
 
 let reconnectAttempts = 0;
 const BASE_RECONNECT_DELAY = 5000;
@@ -276,19 +286,46 @@ async function connectToWhatsApp() {
       // Don't crash on connection errors, let connection.update handle reconnection
     });
 
+    // Suppress non-critical decryption errors (common during history sync)
+    const originalConsoleError = console.error;
+    console.error = (...args) => {
+      const msg = args.join(' ');
+      // Filter out known non-critical Baileys errors
+      if (msg.includes('Failed to decrypt message') || 
+          msg.includes('Bad MAC') || 
+          msg.includes('No matching sessions found') ||
+          msg.includes('Session error')) {
+        // Silently ignore these - they're expected during sync
+        return;
+      }
+      originalConsoleError.apply(console, args);
+    };
+
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
-      if (type !== 'notify') return;
+      console.log(`📬 Messages upsert event - type: ${type}, count: ${messages.length}`);
+      
+      if (type !== 'notify') {
+        console.log(`⏭️  Skipping non-notify type: ${type}`);
+        return;
+      }
 
       // Group by sender so messages from the same user stay in order,
       // but different users get processed in parallel — one slow reply
       // no longer blocks the whole batch.
       const byUser = new Map();
       for (const message of messages) {
-        if (message.key.fromMe || !message.message) continue;
+        console.log(`📨 Processing message - fromMe: ${message.key.fromMe}, hasMessage: ${!!message.message}, jid: ${message.key.remoteJid}`);
+        
+        if (message.key.fromMe || !message.message) {
+          console.log(`⏭️  Skipping message (fromMe: ${message.key.fromMe}, hasMessage: ${!!message.message})`);
+          continue;
+        }
         const jid = message.key.remoteJid;
         if (!byUser.has(jid)) byUser.set(jid, []);
         byUser.get(jid).push(message);
       }
+
+      console.log(`👥 Processing messages from ${byUser.size} users`);
 
       await Promise.allSettled(
         Array.from(byUser.values()).map(async (userMessages) => {

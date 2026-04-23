@@ -1,34 +1,37 @@
+// UK pricing — matches website (SimplifiedBookingForm)
 export function calculatePrice(bookingData) {
   const drums = bookingData.drums || 0;
-  const boxes = bookingData.boxes || 0;
-  
-  // Calculate drum price based on quantity (in GBP)
-  let drumPrice = 75; // Default for 1 drum
-  if (drums >= 5) drumPrice = 65;
-  else if (drums >= 2) drumPrice = 70;
-  
-  // Calculate box price based on quantity (in GBP)
-  let boxPrice = 25; // Default for 1 box
-  if (boxes >= 5) boxPrice = 20;
-  else if (boxes >= 2) boxPrice = 23;
-  
+
+  // Drum price by quantity (GBP)
+  let drumPrice = 280; // 1 drum
+  if (drums >= 5) drumPrice = 260;
+  else if (drums >= 2) drumPrice = 270;
+
   const drumTotal = drums * drumPrice;
-  const boxTotal = boxes * boxPrice;
-  
-  // Additional services (in GBP)
-  const sealCost = bookingData.metalSeal ? 7 : 0;
+
+  // Metal seal: £5 per drum (only if metalSeal chosen and drums present)
+  const sealCost = bookingData.metalSeal && drums > 0 ? drums * 5 : 0;
+
+  // Door-to-door flat £25
   const doorToDoorCost = bookingData.doorToDoor ? 25 : 0;
-  
-  const subtotal = drumTotal + boxTotal;
-  const total = subtotal + sealCost + doorToDoorCost;
-  
+
+  // Purchased drums (if supplied by us at collection)
+  const purchaseDrumQty = bookingData.purchaseDrumQuantity || 0;
+  let purchaseDrumUnitPrice = 0;
+  if (bookingData.purchaseDrumType === 'metal') purchaseDrumUnitPrice = 40;
+  else if (bookingData.purchaseDrumType === 'plastic') purchaseDrumUnitPrice = 50;
+  const purchaseDrumsCost = purchaseDrumQty * purchaseDrumUnitPrice;
+
+  const subtotal = drumTotal;
+  const total = subtotal + sealCost + doorToDoorCost + purchaseDrumsCost;
+
   return {
     drumPrice,
-    boxPrice,
     drumTotal,
-    boxTotal,
     sealCost,
     doorToDoorCost,
+    purchaseDrumsCost,
+    purchaseDrumUnitPrice,
     subtotal,
     total
   };

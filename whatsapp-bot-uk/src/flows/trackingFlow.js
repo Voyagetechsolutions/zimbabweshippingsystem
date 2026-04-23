@@ -17,8 +17,8 @@ export async function handleTrackingFlow(sock, phoneNumber, text, session) {
   if (step === 'ASK_TRACKING') {
     // User provided tracking number
     const trackingNumber = text.toUpperCase().trim();
-    
-    // Validate format
+
+    // Validate format (sync)
     if (!trackingNumber.startsWith('ZS-') || trackingNumber.length < 8) {
       await sendMessage(
         sock,
@@ -27,6 +27,16 @@ export async function handleTrackingFlow(sock, phoneNumber, text, session) {
       );
       return;
     }
+
+    // Advance state immediately so duplicate sends don't re-trigger the DB lookup
+    await updateUserSession(phoneNumber, { state: 'MAIN_MENU', step: null });
+
+    // Send immediate ack so user sees activity while the DB query runs
+    await sendMessage(
+      sock,
+      phoneNumber,
+      `🔍 Looking up *${trackingNumber}*…`
+    );
 
     // Fetch shipment from database
     const shipment = await getShipmentByTracking(trackingNumber);
@@ -43,9 +53,6 @@ export async function handleTrackingFlow(sock, phoneNumber, text, session) {
     // Format and send tracking information
     const trackingInfo = formatTrackingInfo(shipment);
     await sendMessage(sock, phoneNumber, trackingInfo);
-
-    // Reset to main menu
-    await updateUserSession(phoneNumber, { state: 'MAIN_MENU', step: null });
   }
 }
 

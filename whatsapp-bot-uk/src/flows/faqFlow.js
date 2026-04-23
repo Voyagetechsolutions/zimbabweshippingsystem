@@ -65,13 +65,10 @@ function getShippingFAQs() {
   return `📦 *Shipping & Transit FAQs*
 
 *Q: How long does shipping take?*
-A: Standard shipping from UK to Zimbabwe takes approximately 6 weeks. Parcels take 10-14 days.
+A: Delivery times vary depending on route and collection schedule. Our team will confirm the estimated timeline when we arrange your collection.
 
 *Q: What can I ship?*
 A: You can ship household items, clothing, electronics, furniture, and personal effects. Prohibited items include weapons, drugs, and perishable goods.
-
-*Q: Are my items insured?*
-A: Yes, all shipments include basic insurance coverage.
 
 *Q: How do I track my shipment?*
 A: Use your tracking number (ZS-XXXXXXXX) by typing *track* in the main menu.
@@ -83,18 +80,21 @@ function getPricingFAQs() {
   return `💰 *Pricing & Discounts FAQs*
 
 *Q: What are your prices?*
-A: 
-• Drums: £75 (1), £70 (2-4), £65 (5+)
-• Boxes: £25 (1), £23 (2-4), £20 (5+)
+A:
+• Drums: £280 (1), £270 (2-4), £260 (5+)
+• Other items: quoted individually by our agent
+
+*Q: Can I buy drums from you?*
+A: Yes — Metal Drum £40 each, Plastic Barrel £50 each.
 
 *Q: Are there volume discounts?*
-A: Yes! The more you ship, the lower the price per item.
+A: Yes! The more drums you ship, the lower the price per drum.
 
 *Q: What's included in the price?*
-A: FREE collection, tracking, insurance, and delivery to our Zimbabwe depot.
+A: FREE collection in England, full tracking, and delivery to our Zimbabwe depot.
 
 *Q: Are there extra charges?*
-A: Optional: Metal seals (£7), Door-to-door delivery in Zimbabwe (£25)
+A: Optional: Metal coded seals (£5 per drum), Door-to-door delivery in Zimbabwe (£25).
 
 Type *menu* to return to main menu.`;
 }
@@ -103,13 +103,13 @@ function getCollectionFAQs() {
   return `🚚 *Collection Process FAQs*
 
 *Q: Is collection really free?*
-A: Yes! We offer FREE collection anywhere in England & Wales.
+A: Yes! We offer FREE collection anywhere in England.
 
 *Q: When will you collect?*
 A: Collections are scheduled based on your postcode and route. We'll confirm the date within 24 hours of booking.
 
 *Q: What areas do you cover?*
-A: We cover most of England & Wales. Some remote areas (Scotland, Northern Ireland) may have restrictions.
+A: We cover most of England. Some remote areas (Scotland, Wales, Northern Ireland) may have restrictions.
 
 *Q: Do I need to be home?*
 A: Yes, someone must be present to hand over the items and sign.

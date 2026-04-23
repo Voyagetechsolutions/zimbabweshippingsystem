@@ -76,10 +76,24 @@ export async function handleBookingFlow(sock, phoneNumber, text, session) {
 
     case 'CONFIRM_SAVED_INFO': {
       if (lowerText === 'yes') {
-        await updateUserSession(phoneNumber, { step: 'RECEIVER_NAME' });
-        await sendMessage(sock, phoneNumber,
-          `✅ Perfect! Now let's get the receiver details in Zimbabwe.\n\n➡️ *What's the receiver's full name?*`
-        );
+        if (freshSession.receiverName && freshSession.receiverPhone) {
+          await updateUserSession(phoneNumber, { step: 'USE_SAVED_RECEIVER' });
+          let savedReceiverInfo = `✅ Perfect! Now for the receiver in Zimbabwe.\n\nI have a saved receiver:\n\n`;
+          savedReceiverInfo += `👤 ${freshSession.receiverName}\n`;
+          savedReceiverInfo += `📱 ${freshSession.receiverPhone}\n`;
+          savedReceiverInfo += `🏠 ${freshSession.receiverAddress}\n`;
+          savedReceiverInfo += `🏙️ ${freshSession.receiverCity}\n`;
+          await sendMessage(sock, phoneNumber, savedReceiverInfo);
+          await sendButtonMessage(sock, phoneNumber, 'Is this the same receiver?', [
+            { id: 'yes', displayText: '✅ Yes, same receiver' },
+            { id: 'no', displayText: '✏️ No, enter new receiver' }
+          ]);
+        } else {
+          await updateUserSession(phoneNumber, { step: 'RECEIVER_NAME' });
+          await sendMessage(sock, phoneNumber,
+            `✅ Perfect! Now let's get the receiver details in Zimbabwe.\n\n➡️ *What's the receiver's full name?*`
+          );
+        }
       } else if (lowerText === 'no') {
         await updateUserSession(phoneNumber, { bookingData: {}, step: 'SENDER_NAME' });
         await sendMessage(sock, phoneNumber, `No problem! Let's update your information.\n\n➡️ *Please type your full name*`);
@@ -152,30 +166,77 @@ export async function handleBookingFlow(sock, phoneNumber, text, session) {
 
       bookingData.senderCity = text.trim();
       bookingData.collectionRoute = cityMap[city];
-      await updateUserSession(phoneNumber, { bookingData, step: 'RECEIVER_NAME', userCity: text.trim() });
-      await sendMessage(sock, phoneNumber,
-        `✅ Got it!\n\nNow let's get the receiver details in Zimbabwe.\n\n➡️ *What's the receiver's full name?*`
-      );
+      await updateUserSession(phoneNumber, { bookingData, userCity: text.trim() });
+
+      if (freshSession.receiverName && freshSession.receiverPhone) {
+        await updateUserSession(phoneNumber, { step: 'USE_SAVED_RECEIVER' });
+        let savedReceiverInfo = `✅ Got it!\n\nNow for the receiver in Zimbabwe.\n\nI have a saved receiver:\n\n`;
+        savedReceiverInfo += `👤 ${freshSession.receiverName}\n`;
+        savedReceiverInfo += `📱 ${freshSession.receiverPhone}\n`;
+        savedReceiverInfo += `🏠 ${freshSession.receiverAddress}\n`;
+        savedReceiverInfo += `🏙️ ${freshSession.receiverCity}\n`;
+        await sendMessage(sock, phoneNumber, savedReceiverInfo);
+        await sendButtonMessage(sock, phoneNumber, 'Is this the same receiver?', [
+          { id: 'yes', displayText: '✅ Yes, same receiver' },
+          { id: 'no', displayText: '✏️ No, enter new receiver' }
+        ]);
+      } else {
+        await updateUserSession(phoneNumber, { step: 'RECEIVER_NAME' });
+        await sendMessage(sock, phoneNumber,
+          `✅ Got it!\n\nNow let's get the receiver details in Zimbabwe.\n\n➡️ *What's the receiver's full name?*`
+        );
+      }
+      break;
+    }
+
+    case 'USE_SAVED_RECEIVER': {
+      if (lowerText === 'yes') {
+        bookingData.receiverName = freshSession.receiverName;
+        bookingData.receiverPhone = freshSession.receiverPhone;
+        bookingData.receiverAddress = freshSession.receiverAddress;
+        bookingData.receiverCity = freshSession.receiverCity;
+        await updateUserSession(phoneNumber, { bookingData, step: 'SHIPMENT_TYPE' });
+        await sendListMessage(sock, phoneNumber,
+          `✅ Receiver confirmed!\n\n📦 *What would you like to ship?*`,
+          'View shipment types',
+          [{
+            title: 'Shipment Options',
+            rows: [
+              { id: '1', title: '🥁 Drums', description: '200-220L barrels' },
+              { id: '2', title: '📦 Trunks / Storage Boxes', description: 'Standard shipping boxes' },
+              { id: '3', title: '🥁📦 Both', description: 'Drums and boxes together' }
+            ]
+          }]
+        );
+      } else if (lowerText === 'no') {
+        await updateUserSession(phoneNumber, { step: 'RECEIVER_NAME' });
+        await sendMessage(sock, phoneNumber, `No problem!\n\n➡️ *What's the receiver's full name?*`);
+      } else {
+        await sendButtonMessage(sock, phoneNumber, 'Is this the same receiver?', [
+          { id: 'yes', displayText: '✅ Yes, same receiver' },
+          { id: 'no', displayText: '✏️ No, enter new receiver' }
+        ]);
+      }
       break;
     }
 
     case 'RECEIVER_NAME': {
       bookingData.receiverName = text.trim();
-      await updateUserSession(phoneNumber, { bookingData, step: 'RECEIVER_PHONE' });
+      await updateUserSession(phoneNumber, { bookingData, step: 'RECEIVER_PHONE', receiverName: text.trim() });
       await sendMessage(sock, phoneNumber, `➡️ *What's the receiver's phone number in Zimbabwe?*`);
       break;
     }
 
     case 'RECEIVER_PHONE': {
       bookingData.receiverPhone = text.trim();
-      await updateUserSession(phoneNumber, { bookingData, step: 'RECEIVER_ADDRESS' });
+      await updateUserSession(phoneNumber, { bookingData, step: 'RECEIVER_ADDRESS', receiverPhone: text.trim() });
       await sendMessage(sock, phoneNumber, `➡️ *What's the delivery address in Zimbabwe?*`);
       break;
     }
 
     case 'RECEIVER_ADDRESS': {
       bookingData.receiverAddress = text.trim();
-      await updateUserSession(phoneNumber, { bookingData, step: 'RECEIVER_CITY' });
+      await updateUserSession(phoneNumber, { bookingData, step: 'RECEIVER_CITY', receiverAddress: text.trim() });
       await sendMessage(sock, phoneNumber,
         `➡️ *Which city in Zimbabwe?*\n\n_e.g. Harare, Bulawayo, Mutare, Gweru_`
       );
@@ -184,7 +245,7 @@ export async function handleBookingFlow(sock, phoneNumber, text, session) {
 
     case 'RECEIVER_CITY': {
       bookingData.receiverCity = text.trim();
-      await updateUserSession(phoneNumber, { bookingData, step: 'SHIPMENT_TYPE' });
+      await updateUserSession(phoneNumber, { bookingData, step: 'SHIPMENT_TYPE', receiverCity: text.trim() });
       await sendListMessage(sock, phoneNumber,
         `📦 *What would you like to ship?*`,
         'View shipment types',

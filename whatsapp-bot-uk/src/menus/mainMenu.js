@@ -19,26 +19,24 @@ export function getPricingMenu() {
   return `💰 *Our Pricing - UK to Zimbabwe*
 
 *DRUMS (200-220L):*
-🥁 1 drum: £75
-🥁 2-4 drums: £70 each
-🥁 5+ drums: £65 each
+🥁 1 drum: £280
+🥁 2-4 drums: £270 each
+🥁 5+ drums: £260 each
 
-*TRUNKS/BOXES:*
-📦 1 box: £25
-📦 2-4 boxes: £23 each
-📦 5+ boxes: £20 each
+*NEED TO PURCHASE A DRUM?*
+🛢️ Metal Drum: £40 each
+🛢️ Plastic Barrel: £50 each
 
 *OTHER ITEMS:*
 📋 Custom items are quoted individually by our agent.
 
 *ADDITIONAL SERVICES:*
-🔒 Metal coded seal: £7 per seal
+🔒 Metal coded seal: £5 per drum
 🚪 Door-to-door delivery (Zimbabwe): £25
 
 *INCLUDED FREE:*
 ✅ Collection anywhere in England
 ✅ Full tracking
-✅ 6 weeks delivery time
 
 *Volume Discounts Available!*
 The more you ship, the more you save.

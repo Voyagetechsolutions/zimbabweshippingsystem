@@ -6,19 +6,31 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "start:twilio": "node src/index-twilio.js",
+    "dev": "nodemon src/index.js",
+    "dev:twilio": "nodemon src/index-twilio.js"
   },
-  "keywords": ["whatsapp", "bot", "shipping", "zimbabwe", "uk", "england"],
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "shipping",
+    "zimbabwe",
+    "uk",
+    "england"
+  ],
   "author": "Zimbabwe Shipping",
   "license": "MIT",
   "dependencies": {
-    "@whiskeysockets/baileys": "^6.7.8",
     "@supabase/supabase-js": "^2.45.4",
-    "qrcode-terminal": "^0.12.0",
-    "qrcode": "^1.5.4",
-    "pino": "^9.4.0",
+    "@whiskeysockets/baileys": "^6.7.8",
+    "body-parser": "^2.2.2",
     "dotenv": "^16.4.5",
-    "node-cache": "^5.1.2"
+    "express": "^5.2.1",
+    "node-cache": "^5.1.2",
+    "pino": "^9.4.0",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
+    "twilio": "^6.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.7"

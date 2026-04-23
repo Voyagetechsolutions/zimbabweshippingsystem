@@ -12,7 +12,10 @@
       "Bash(node --check whatsapp-bot-uk/src/handlers/messageHandler.js)",
       "Bash(node --check whatsapp-bot-uk/src/utils/messageUtils.js)",
       "Bash(node --check whatsapp-bot-uk/src/services/database.js)",
-      "Bash(node --check whatsapp-bot-uk/src/menus/mainMenu.js)"
+      "Bash(node --check whatsapp-bot-uk/src/menus/mainMenu.js)",
+      "Bash(node --check whatsapp-bot-uk/src/flows/trackingFlow.js)",
+      "Bash(node --check whatsapp-bot-uk/src/flows/faqFlow.js)",
+      "Bash(node --check whatsapp-bot-uk/src/utils/pricingUtils.js)"
     ]
   }
 }
