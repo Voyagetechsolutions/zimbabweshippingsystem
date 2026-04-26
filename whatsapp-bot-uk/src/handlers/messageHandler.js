@@ -178,7 +178,7 @@ async function handleMainMenu(sock, phoneNumber, text, session) {
     case 'book':
     case 'booking':
       await updateUserSession(phoneNumber, { state: 'BOOKING_FLOW', step: 'START' });
-      await sendMessage(sock, phoneNumber, getBookingMenu());
+      await handleBookingFlow(sock, phoneNumber, text, { ...session, state: 'BOOKING_FLOW', step: 'START' });
       break;
 
     case '2':

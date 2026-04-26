@@ -34,12 +34,14 @@ interface FormData {
   // Shipment Items
   includeDrums: boolean;
   drumQuantity: number;
+  drumsDescription: string;
   includeBoxes: boolean;
   boxesDescription: string;
 
   // Trunks/Storage Boxes (Ireland only)
   includeTrunks: boolean;
   trunkQuantity: number;
+  trunksDescription: string;
 
   // Add-ons
   wantMetalSeal: boolean;
@@ -332,10 +334,12 @@ export const SimplifiedBookingForm = () => {
     deliveryCity: '',
     includeDrums: false,
     drumQuantity: 0,
+    drumsDescription: '',
     includeBoxes: false,
     boxesDescription: '',
     includeTrunks: false,
     trunkQuantity: 0,
+    trunksDescription: '',
     wantMetalSeal: false,
     purchaseDrums: false,
     purchaseDrumType: null,
@@ -506,10 +510,26 @@ export const SimplifiedBookingForm = () => {
           });
           return false;
         }
+        if (formData.includeDrums && formData.drumsDescription.trim().length < 3) {
+          toast({
+            title: 'Describe Your Drums',
+            description: 'Please describe your drums (color, markings) so the driver can identify them.',
+            variant: 'destructive',
+          });
+          return false;
+        }
         if (formData.includeTrunks && formData.trunkQuantity < 1) {
           toast({
             title: 'Trunk Quantity',
             description: 'Please enter how many trunks/storage boxes you want to ship.',
+            variant: 'destructive',
+          });
+          return false;
+        }
+        if (formData.includeTrunks && formData.trunksDescription.trim().length < 3) {
+          toast({
+            title: 'Describe Your Trunks',
+            description: 'Please describe your trunks/storage boxes so the driver can identify them.',
             variant: 'destructive',
           });
           return false;
@@ -638,13 +658,15 @@ export const SimplifiedBookingForm = () => {
             quantity: formData.drumQuantity,
             pricePerDrum: getCurrentDrumPrice(formData.drumQuantity),
             totalPrice: formData.drumQuantity * getCurrentDrumPrice(formData.drumQuantity),
-            currency: isIrelandBooking ? 'EUR' : 'GBP'
+            currency: isIrelandBooking ? 'EUR' : 'GBP',
+            description: formData.drumsDescription || null
           } : null,
           trunks: formData.includeTrunks ? {
             quantity: formData.trunkQuantity,
             pricePerTrunk: getTrunkPrice(formData.trunkQuantity),
             totalPrice: formData.trunkQuantity * getTrunkPrice(formData.trunkQuantity),
-            currency: 'EUR'
+            currency: 'EUR',
+            description: formData.trunksDescription || null
           } : null,
           boxes: formData.includeBoxes ? {
             description: formData.boxesDescription
@@ -692,8 +714,10 @@ export const SimplifiedBookingForm = () => {
           })(),
           includeDrums: formData.includeDrums,
           drumQuantity: formData.drumQuantity,
+          drumsDescription: formData.drumsDescription || null,
           includeTrunks: formData.includeTrunks,
           trunkQuantity: formData.trunkQuantity,
+          trunksDescription: formData.trunksDescription || null,
           includeOtherItems: formData.includeBoxes,
           wantMetalSeal: formData.wantMetalSeal,
           category: formData.boxesDescription
@@ -1214,6 +1238,24 @@ export const SimplifiedBookingForm = () => {
                       )}
                     </div>
 
+                    <div>
+                      <Label htmlFor="drumsDesc" className="text-base">
+                        Describe your {formData.drumQuantity === 1 ? 'drum' : 'drums'}
+                      </Label>
+                      <textarea
+                        id="drumsDesc"
+                        placeholder={formData.drumQuantity > 1
+                          ? 'e.g. 3 blue plastic drums with red lids'
+                          : 'e.g. blue plastic drum with red lid'}
+                        value={formData.drumsDescription}
+                        onChange={(e) => updateField('drumsDescription', e.target.value)}
+                        className="w-full mt-2 p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md focus:ring-2 focus:ring-zim-green focus:border-transparent min-h-[70px]"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Color, markings, anything that helps the driver spot {formData.drumQuantity === 1 ? 'it' : 'them'}.
+                      </p>
+                    </div>
+
                     {/* Add-on Services */}
                     <div className="border-t pt-4 space-y-3">
                       <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300">Add-on Services</h4>
@@ -1284,6 +1326,24 @@ export const SimplifiedBookingForm = () => {
                             €{trunkPrice} per trunk
                           </p>
                         )}
+                      </div>
+
+                      <div>
+                        <Label htmlFor="trunksDesc" className="text-base">
+                          Describe your {formData.trunkQuantity === 1 ? 'trunk' : 'trunks'}
+                        </Label>
+                        <textarea
+                          id="trunksDesc"
+                          placeholder={formData.trunkQuantity > 1
+                            ? 'e.g. 2 large black storage trunks'
+                            : 'e.g. medium grey storage box'}
+                          value={formData.trunksDescription}
+                          onChange={(e) => updateField('trunksDescription', e.target.value)}
+                          className="w-full mt-2 p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent min-h-[70px]"
+                        />
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Color, size, markings — anything that helps the driver spot {formData.trunkQuantity === 1 ? 'it' : 'them'}.
+                        </p>
                       </div>
 
                       {/* Optional Metal Seal for Trunks */}
@@ -1488,6 +1548,11 @@ export const SimplifiedBookingForm = () => {
                 <div className="text-xs text-gray-600 dark:text-gray-400">
                   @ {currencySymbol}{getCurrentDrumPrice(formData.drumQuantity)} per drum
                 </div>
+                {formData.drumsDescription && (
+                  <div className="text-xs italic text-gray-700 dark:text-gray-300">
+                    {formData.drumsDescription}
+                  </div>
+                )}
 
                 {/* Add-ons - Metal Seal for drums */}
                 {formData.wantMetalSeal && (
@@ -1526,6 +1591,11 @@ export const SimplifiedBookingForm = () => {
                   <div className="text-xs text-gray-600 dark:text-gray-400">
                     @ €{getTrunkPrice(formData.trunkQuantity)} per trunk
                   </div>
+                  {formData.trunksDescription && (
+                    <div className="text-xs italic text-gray-700 dark:text-gray-300">
+                      {formData.trunksDescription}
+                    </div>
+                  )}
 
                   {/* Metal seal for trunks */}
                   {formData.wantMetalSeal && !formData.includeDrums && (
@@ -1785,10 +1855,12 @@ export const SimplifiedBookingForm = () => {
             deliveryCity: '',
             includeDrums: false,
             drumQuantity: 0,
+            drumsDescription: '',
             includeBoxes: false,
             boxesDescription: '',
             includeTrunks: false,
             trunkQuantity: 0,
+            trunksDescription: '',
             wantMetalSeal: false,
             purchaseDrums: false,
             purchaseDrumType: null,

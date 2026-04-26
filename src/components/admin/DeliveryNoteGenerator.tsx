@@ -22,6 +22,11 @@ function getSenderName(s: Shipment) {
     'Unknown Sender';
 }
 
+function getSenderPhone(s: Shipment) {
+  const m = s.metadata || {};
+  return m.sender?.phone || m.senderDetails?.phone || '';
+}
+
 function getSenderAddress(s: Shipment) {
   const m = s.metadata || {};
   const parts: string[] = [];
@@ -50,83 +55,127 @@ function getRecipientAddress(s: Shipment) {
   return parts.length ? parts : [s.destination || 'Zimbabwe'];
 }
 
+// Builds one row per physical item. Description is taken from the customer's
+// booking ("blue plastic drum with red lid", etc.) so the driver can identify
+// each item without guessing.
 function buildLineItems(s: Shipment) {
   const m = s.metadata || {};
   const ship = m.shipment || m.shipmentDetails || {};
-  const items: { item: string; description: string; qty: number; uom: string }[] = [];
+  const itemsMeta = m.items || {};
+  const rows: { item: string; description: string }[] = [];
 
-  // WhatsApp bot bookings
-  if (ship.drums && ship.drums > 0) {
-    const sealText = ship.metalSeal
-      ? ` Seals included.`
-      : '';
-    items.push({
-      item: 'DRUMS',
-      description: `Metal Drums (200-220L).${sealText}`,
-      qty: ship.drums,
-      uom: 'Pcs',
-    });
-  }
-  if (ship.boxes && ship.boxes > 0) {
-    items.push({
-      item: 'TRUNKS/BOXES',
-      description: 'Storage Boxes / Trunks.',
-      qty: ship.boxes,
-      uom: 'Pcs',
+  const sealOn = !!(ship.metalSeal || ship.wantMetalSeal);
+  const sealNote = sealOn ? ' Sealed.' : '';
+
+  const drumsDescription =
+    ship.drumsDescription || itemsMeta.drums?.description || null;
+  const trunksDescription =
+    ship.trunksDescription || itemsMeta.trunks?.description || null;
+
+  const drumQty = Number(
+    ship.drums ?? ship.drumQuantity ?? (ship.includeDrums ? ship.quantity : 0) ?? 0,
+  );
+  for (let i = 1; i <= drumQty; i++) {
+    rows.push({
+      item: `Drum #${i}`,
+      description: `${drumsDescription || '200–220L drum'}.${sealNote}`,
     });
   }
 
-  // Website bookings (legacy structure)
-  if (items.length === 0 && ship.includeDrums) {
-    const qty = Number(ship.quantity) || 1;
-    const sealText = ship.wantMetalSeal ? ' Metal seals included.' : '';
-    items.push({
-      item: 'DRUMS',
-      description: `Metal Drums (200-220L).${sealText}`,
-      qty,
-      uom: 'Pcs',
-    });
-  }
-  if (ship.includeOtherItems || ship.includeBoxes) {
-    items.push({
-      item: 'BOXES/ITEMS',
-      description: ship.category || ship.description || 'General goods.',
-      qty: 1,
-      uom: 'Lot',
+  const trunkQty = Number(ship.boxes ?? ship.trunkQuantity ?? 0);
+  for (let i = 1; i <= trunkQty; i++) {
+    rows.push({
+      item: `Trunk / Box #${i}`,
+      description: `${trunksDescription || 'Storage box / trunk'}.${sealNote}`,
     });
   }
 
-  // Fallback
-  if (items.length === 0) {
-    items.push({
-      item: 'SHIPMENT',
+  // Drums supplied by us at collection (UK only)
+  const purchased = itemsMeta.purchasedDrums;
+  if (purchased && purchased.quantity > 0) {
+    const label = purchased.type === 'metal' ? 'Metal Drum' : 'Plastic Barrel';
+    for (let i = 1; i <= purchased.quantity; i++) {
+      rows.push({
+        item: `${label} #${i} (supplied)`,
+        description: `${label} supplied at collection.`,
+      });
+    }
+  }
+
+  // Custom-quote items (free text from booking)
+  const otherDesc =
+    ship.boxesDescription || ship.category || ship.description ||
+    ship.otherItemDescription || itemsMeta.boxes?.description || null;
+  if (ship.includeOtherItems || ship.includeBoxes || otherDesc) {
+    rows.push({
+      item: 'Other Items',
+      description: otherDesc || 'General goods.',
+    });
+  }
+
+  if (rows.length === 0) {
+    rows.push({
+      item: 'Shipment',
       description: m.shipmentType || 'General shipment.',
-      qty: 1,
-      uom: 'Lot',
     });
   }
 
-  return items;
+  return rows;
 }
 
-function buildDNNumber(s: Shipment) {
-  // DN-YYYYMMDD + last 4 of tracking
-  const date = format(new Date(s.created_at), 'yyyyMMdd');
-  const suffix = s.tracking_number?.replace('ZS-', '').slice(-4) || '0000';
-  return `DN-${date}${suffix}`;
+// Quick at-a-glance count above the per-item table.
+function buildItemsSummary(s: Shipment) {
+  const m = s.metadata || {};
+  const ship = m.shipment || m.shipmentDetails || {};
+  const itemsMeta = m.items || {};
+  const parts: string[] = [];
+
+  const drumQty = Number(ship.drums ?? ship.drumQuantity ?? 0);
+  if (drumQty > 0) parts.push(`${drumQty} × Drum`);
+
+  const trunkQty = Number(ship.boxes ?? ship.trunkQuantity ?? 0);
+  if (trunkQty > 0) parts.push(`${trunkQty} × Trunk`);
+
+  const purchasedQty = Number(itemsMeta.purchasedDrums?.quantity ?? 0);
+  if (purchasedQty > 0) {
+    const t = itemsMeta.purchasedDrums?.type === 'metal' ? 'Metal Drum' : 'Plastic Barrel';
+    parts.push(`${purchasedQty} × ${t} (supplied)`);
+  }
+
+  if (ship.includeOtherItems || ship.includeBoxes || itemsMeta.boxes) {
+    parts.push('plus other items');
+  }
+
+  return parts.length ? parts.join(', ') : 'See items below';
+}
+
+// Ref # = first 3 letters of sender name + last 4 digits of their phone.
+// Example: John Smith / +353 87 123 4567 → JOH-4567
+function buildRefNumber(s: Shipment) {
+  const name = getSenderName(s);
+  const phone = getSenderPhone(s);
+  const letters = name.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 3);
+  const digits = phone.replace(/\D/g, '').slice(-4);
+  if (letters && digits) return `${letters}-${digits}`;
+  // Fallbacks when sender data is missing on legacy shipments
+  const trackingTail = (s.tracking_number || '').replace(/[^0-9A-Z]/gi, '').slice(-4) || '0000';
+  if (letters) return `${letters}-${trackingTail}`;
+  if (digits) return `REF-${digits}`;
+  return `REF-${trackingTail}`;
 }
 
 // ── Delivery Note print template ─────────────────────────────────────────────
 
 const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipment }>(
   ({ shipment }, ref) => {
-    const dnNumber = buildDNNumber(shipment);
+    const refNumber = buildRefNumber(shipment);
     const deliveryDate = format(new Date(shipment.created_at), 'yyyy-MM-dd');
     const senderName = getSenderName(shipment);
     const senderAddress = getSenderAddress(shipment);
     const recipientName = getRecipientName(shipment);
     const recipientAddress = getRecipientAddress(shipment);
     const lineItems = buildLineItems(shipment);
+    const itemsSummary = buildItemsSummary(shipment);
 
     return (
       <div
@@ -157,7 +206,7 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
               DELIVERY NOTE
             </div>
             <div style={{ fontSize: '12px', color: '#444', lineHeight: '1.6' }}>
-              <div>Delivery Note #: <strong>{dnNumber}</strong></div>
+              <div>Ref #: <strong style={{ fontSize: '16px', color: '#111' }}>{refNumber}</strong></div>
               <div>Delivery Date: <strong>{deliveryDate}</strong></div>
             </div>
           </div>
@@ -194,15 +243,19 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
           </div>
         </div>
 
-        {/* ── Items Table ── */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+        {/* ── Items summary ── */}
+        <div style={{ marginBottom: '12px', fontSize: '12px', color: '#444' }}>
+          <strong>Items in this shipment:</strong> {itemsSummary}
+        </div>
+
+        {/* ── Per-item Table — courier ticks each off and notes color/contents ── */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
           <thead>
             <tr style={{ backgroundColor: '#2563eb', color: '#fff' }}>
+              <th style={{ padding: '10px 12px', textAlign: 'center', width: '32px' }}>✓</th>
               <th style={{ padding: '10px 12px', textAlign: 'left', width: '40px' }}>#</th>
-              <th style={{ padding: '10px 12px', textAlign: 'left', width: '140px' }}>Item</th>
-              <th style={{ padding: '10px 12px', textAlign: 'left' }}>Description</th>
-              <th style={{ padding: '10px 12px', textAlign: 'center', width: '60px' }}>Qty</th>
-              <th style={{ padding: '10px 12px', textAlign: 'center', width: '60px' }}>UOM</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left', width: '170px' }}>Item</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left' }}>Description / Item Details</th>
             </tr>
           </thead>
           <tbody>
@@ -211,11 +264,12 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
                 key={i}
                 style={{ backgroundColor: i % 2 === 0 ? '#f8fafc' : '#fff', borderBottom: '1px solid #e2e8f0' }}
               >
-                <td style={{ padding: '10px 12px' }}>{i + 1}</td>
-                <td style={{ padding: '10px 12px', fontWeight: '600' }}>{row.item}</td>
-                <td style={{ padding: '10px 12px' }}>{row.description}</td>
-                <td style={{ padding: '10px 12px', textAlign: 'center' }}>{row.qty}</td>
-                <td style={{ padding: '10px 12px', textAlign: 'center' }}>{row.uom}</td>
+                <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: '14px' }}>☐</td>
+                <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>{i + 1}</td>
+                <td style={{ padding: '10px 12px', fontWeight: '600', verticalAlign: 'top' }}>{row.item}</td>
+                <td style={{ padding: '10px 12px', whiteSpace: 'pre-line', verticalAlign: 'top', lineHeight: '1.7' }}>
+                  {row.description}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -259,9 +313,9 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       const pdf = new jsPDF('p', 'mm', 'a4');
       pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, imgWidth, imgHeight);
-      pdf.save(`${buildDNNumber(shipment)}.pdf`);
+      pdf.save(`${buildRefNumber(shipment)}.pdf`);
 
-      toast({ title: 'Downloaded', description: `${buildDNNumber(shipment)}.pdf saved.` });
+      toast({ title: 'Downloaded', description: `${buildRefNumber(shipment)}.pdf saved.` });
     } catch (err) {
       console.error(err);
       toast({ title: 'Error', description: 'Could not generate PDF.', variant: 'destructive' });
@@ -275,7 +329,7 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
     const win = window.open('', '_blank');
     if (!win) return;
     win.document.write(`
-      <html><head><title>${buildDNNumber(shipment)}</title>
+      <html><head><title>${buildRefNumber(shipment)}</title>
       <style>body{margin:0;padding:0;}@media print{body{margin:0;}}</style>
       </head><body>${noteRef.current.outerHTML}</body></html>
     `);
@@ -289,7 +343,7 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Delivery Note — {buildDNNumber(shipment)}</DialogTitle>
+          <DialogTitle>Delivery Note — Ref {buildRefNumber(shipment)}</DialogTitle>
           <DialogDescription>
             Office copy for {shipment.tracking_number}. Not for customer distribution.
           </DialogDescription>
@@ -319,4 +373,4 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
 };
 
 export default DeliveryNoteGenerator;
-export { buildDNNumber, DeliveryNoteTemplate };
+export { buildRefNumber, DeliveryNoteTemplate };

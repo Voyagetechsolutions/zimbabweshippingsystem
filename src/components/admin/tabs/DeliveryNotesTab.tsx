@@ -18,7 +18,7 @@ import {
 import {
   Search, Download, RefreshCw, FileText, Loader2, Eye, CheckSquare, Square,
 } from 'lucide-react';
-import DeliveryNoteGenerator, { buildDNNumber, DeliveryNoteTemplate } from '@/components/admin/DeliveryNoteGenerator';
+import DeliveryNoteGenerator, { buildRefNumber, DeliveryNoteTemplate } from '@/components/admin/DeliveryNoteGenerator';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -76,7 +76,7 @@ const DeliveryNotesTab = () => {
       s.tracking_number?.toLowerCase().includes(q) ||
       getSenderName(s).toLowerCase().includes(q) ||
       getRecipientName(s).toLowerCase().includes(q) ||
-      buildDNNumber(s).toLowerCase().includes(q);
+      buildRefNumber(s).toLowerCase().includes(q);
     const matchStatus = statusFilter === 'all' || s.status?.toLowerCase() === statusFilter.toLowerCase();
     return matchSearch && matchStatus;
   });
@@ -124,7 +124,7 @@ const DeliveryNotesTab = () => {
               const imgH = (canvas.height * imgW) / canvas.width;
               const pdf = new jsPDF('p', 'mm', 'a4');
               pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, imgW, imgH);
-              pdf.save(`${buildDNNumber(shipment)}.pdf`);
+              pdf.save(`${buildRefNumber(shipment)}.pdf`);
               root.unmount();
               document.body.removeChild(container);
               resolve();
@@ -174,7 +174,7 @@ const DeliveryNotesTab = () => {
                 const pdf = new jsPDF('p', 'mm', 'a4');
                 pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, imgW, imgH);
                 const blob = pdf.output('blob');
-                zip.file(`${buildDNNumber(shipment)}.pdf`, blob);
+                zip.file(`${buildRefNumber(shipment)}.pdf`, blob);
                 root.unmount();
                 document.body.removeChild(container);
                 resolve();
@@ -241,7 +241,7 @@ const DeliveryNotesTab = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by tracking #, DN #, sender or recipient…"
+            placeholder="Search by tracking #, ref #, sender or recipient…"
             className="pl-9"
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -298,7 +298,7 @@ const DeliveryNotesTab = () => {
                         className={someSelected ? 'opacity-70' : ''}
                       />
                     </TableHead>
-                    <TableHead>DN Number</TableHead>
+                    <TableHead>Ref #</TableHead>
                     <TableHead>Tracking #</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Shipper</TableHead>
@@ -310,7 +310,7 @@ const DeliveryNotesTab = () => {
                 </TableHeader>
                 <TableBody>
                   {filtered.map(shipment => {
-                    const dnNum = buildDNNumber(shipment);
+                    const refNum = buildRefNumber(shipment);
                     const isChecked = selected.has(shipment.id);
                     const collectionRoute = shipment.metadata?.collectionRoute ||
                       shipment.metadata?.collection?.route ||
@@ -323,10 +323,10 @@ const DeliveryNotesTab = () => {
                           <Checkbox
                             checked={isChecked}
                             onCheckedChange={() => toggleOne(shipment.id)}
-                            aria-label={`Select ${dnNum}`}
+                            aria-label={`Select ${refNum}`}
                           />
                         </TableCell>
-                        <TableCell className="font-mono text-sm font-medium">{dnNum}</TableCell>
+                        <TableCell className="font-mono text-sm font-medium">{refNum}</TableCell>
                         <TableCell className="font-mono text-sm">{shipment.tracking_number}</TableCell>
                         <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                           {format(new Date(shipment.created_at), 'dd MMM yyyy')}

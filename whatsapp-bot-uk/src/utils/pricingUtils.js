@@ -1,45 +1,85 @@
-// UK pricing — matches website (SimplifiedBookingForm)
-export function calculatePrice(bookingData) {
-  const drums = bookingData.drums || 0;
+// UK pricing — matches the website (SimplifiedBookingForm).
 
-  // Drum price by quantity (GBP)
-  let drumPrice = 280; // 1 drum
-  if (drums >= 5) drumPrice = 260;
-  else if (drums >= 2) drumPrice = 270;
+export const CURRENCY = 'GBP';
+export const CURRENCY_SYMBOL = '£';
+export const COUNTRY = 'England';
+export const CASH_DISCOUNT_PER_DRUM = 20;
+export const PAY_ON_ARRIVAL_MULTIPLIER = 1.20;
+export const METAL_SEAL_PRICE = 5;
 
-  const drumTotal = drums * drumPrice;
+export function getDrumPrice(quantity) {
+  if (quantity >= 5) return 260;
+  if (quantity >= 2) return 270;
+  return 280;
+}
 
-  // Metal seal: £5 per drum (only if metalSeal chosen and drums present)
-  const sealCost = bookingData.metalSeal && drums > 0 ? drums * 5 : 0;
+export const PURCHASE_DRUM_PRICES = {
+  metal: 40,
+  plastic: 50,
+};
 
-  // Door-to-door flat £25
-  const doorToDoorCost = bookingData.doorToDoor ? 25 : 0;
+export function getPurchaseDrumPrice(type) {
+  return PURCHASE_DRUM_PRICES[type] || 0;
+}
 
-  // Purchased drums (if supplied by us at collection)
-  const purchaseDrumQty = bookingData.purchaseDrumQuantity || 0;
-  let purchaseDrumUnitPrice = 0;
-  if (bookingData.purchaseDrumType === 'metal') purchaseDrumUnitPrice = 40;
-  else if (bookingData.purchaseDrumType === 'plastic') purchaseDrumUnitPrice = 50;
-  const purchaseDrumsCost = purchaseDrumQty * purchaseDrumUnitPrice;
+export function getMetalSealPrice() {
+  return METAL_SEAL_PRICE;
+}
 
-  const subtotal = drumTotal;
-  const total = subtotal + sealCost + doorToDoorCost + purchaseDrumsCost;
+// Mirrors SimplifiedBookingForm.calculateBaseTotal / calculateFinalTotal.
+export function calculatePricing(bookingData) {
+  const drumQty = bookingData.includeDrums ? (bookingData.drumQuantity || 0) : 0;
+  const drumUnit = drumQty > 0 ? getDrumPrice(drumQty) : 0;
+  const drumTotal = drumQty * drumUnit;
+
+  const sealUnit = METAL_SEAL_PRICE;
+  const sealQty = bookingData.wantMetalSeal && drumQty > 0 ? drumQty : 0;
+  const sealCost = sealQty * sealUnit;
+
+  // Purchase-drums add-on (UK only).
+  let purchaseDrumQty = 0;
+  let purchaseDrumUnit = 0;
+  let purchaseDrumTotal = 0;
+  if (bookingData.purchaseDrums && bookingData.purchaseDrumType) {
+    purchaseDrumQty = bookingData.purchaseDrumQuantity || 0;
+    purchaseDrumUnit = getPurchaseDrumPrice(bookingData.purchaseDrumType);
+    purchaseDrumTotal = purchaseDrumQty * purchaseDrumUnit;
+  }
+
+  const baseTotal = drumTotal + sealCost + purchaseDrumTotal;
+
+  let finalTotal = baseTotal;
+  let cashDiscount = 0;
+  let payOnArrivalPremium = 0;
+
+  if (bookingData.paymentMethod === 'cashOnCollection' && drumQty > 0) {
+    cashDiscount = drumQty * CASH_DISCOUNT_PER_DRUM;
+    finalTotal = baseTotal - cashDiscount;
+  } else if (bookingData.paymentMethod === 'payOnArrival') {
+    finalTotal = baseTotal * PAY_ON_ARRIVAL_MULTIPLIER;
+    payOnArrivalPremium = finalTotal - baseTotal;
+  }
 
   return {
-    drumPrice,
+    drumQty,
+    drumUnit,
     drumTotal,
+    sealQty,
+    sealUnit,
     sealCost,
-    doorToDoorCost,
-    purchaseDrumsCost,
-    purchaseDrumUnitPrice,
-    subtotal,
-    total
+    purchaseDrumQty,
+    purchaseDrumUnit,
+    purchaseDrumTotal,
+    purchaseDrumType: bookingData.purchaseDrumType || null,
+    baseTotal,
+    cashDiscount,
+    payOnArrivalPremium,
+    finalTotal,
+    currency: CURRENCY,
+    currencySymbol: CURRENCY_SYMBOL,
   };
 }
 
-export function formatCurrency(amount, currency = 'GBP') {
-  return new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency
-  }).format(amount);
+export function formatMoney(amount) {
+  return `${CURRENCY_SYMBOL}${Number(amount).toFixed(2)}`;
 }
