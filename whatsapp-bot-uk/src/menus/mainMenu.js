@@ -32,14 +32,15 @@ export function getPricingMenu() {
 
 *ADDITIONAL SERVICES:*
 🔒 Metal coded seal: £5 per drum
-🚪 Door-to-door delivery (Zimbabwe): £25
 
 *INCLUDED FREE:*
 ✅ Collection anywhere in England
 ✅ Full tracking
 
-*Volume Discounts Available!*
-The more you ship, the more you save.
+*PAYMENT OPTIONS:*
+💳 Standard payment (card / bank transfer)
+💵 Cash on Collection (save £20 per drum)
+⏳ Pay on Arrival (+20% premium)
 
 Type *book* to start booking or *menu* for main menu.`;
 }

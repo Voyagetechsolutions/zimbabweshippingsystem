@@ -18,7 +18,8 @@
       "Bash(node --check whatsapp-bot-uk/src/utils/pricingUtils.js)",
       "Bash(node --check whatsapp-bot/src/flows/bookingFlow.js)",
       "Bash(node --check whatsapp-bot/src/services/database.js)",
-      "Bash(node --check whatsapp-bot/src/utils/pricingUtils.js)"
+      "Bash(node --check whatsapp-bot/src/utils/pricingUtils.js)",
+      "Bash(git stash *)"
     ]
   }
 }

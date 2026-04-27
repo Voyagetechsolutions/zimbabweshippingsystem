@@ -377,6 +377,21 @@ const ShipmentManagementTab = () => {
       'No Phone';
   };
 
+  // Customer Ref — first 3 letters of sender name + last 4 digits of phone
+  // (e.g. "John Smith" / "+353 87 123 4567" → "JOH-4567"). This is how the
+  // company identifies people internally.
+  const getCustomerRef = (shipment: Shipment): string => {
+    const name = getSenderName(shipment);
+    const phone = getSenderPhone(shipment);
+    const letters = (name === 'No Name' ? '' : name).replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 3);
+    const digits = (phone === 'No Phone' ? '' : phone).replace(/\D/g, '').slice(-4);
+    if (letters && digits) return `${letters}-${digits}`;
+    const trackingTail = (shipment.tracking_number || '').replace(/[^0-9A-Z]/gi, '').slice(-4) || '0000';
+    if (letters) return `${letters}-${trackingTail}`;
+    if (digits) return `REF-${digits}`;
+    return `REF-${trackingTail}`;
+  };
+
   const getReceiverName = (shipment: Shipment): string => {
     if (!shipment?.metadata) return 'No Name';
 
@@ -578,6 +593,7 @@ const ShipmentManagementTab = () => {
     const matchesSearch =
       searchQuery === '' ||
       shipment.tracking_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      getCustomerRef(shipment).toLowerCase().includes(searchQuery.toLowerCase()) ||
       getSenderName(shipment).toLowerCase().includes(searchQuery.toLowerCase()) ||
       getReceiverName(shipment).toLowerCase().includes(searchQuery.toLowerCase()) ||
       getSenderPhone(shipment).toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -663,7 +679,7 @@ const ShipmentManagementTab = () => {
           <div className="relative flex-grow">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
-              placeholder="Search shipments..."
+              placeholder="Search by ref, tracking #, name, phone, email..."
               className="pl-8 h-9 text-sm"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -783,6 +799,7 @@ const ShipmentManagementTab = () => {
                       className="rounded border-gray-300"
                     />
                   </TableHead>
+                  <TableHead className="w-[110px]">Customer Ref</TableHead>
                   <TableHead className="w-[120px]">Tracking #</TableHead>
                   <TableHead>Sender</TableHead>
                   <TableHead>Receiver</TableHead>
@@ -800,6 +817,9 @@ const ShipmentManagementTab = () => {
                         onChange={() => toggleShipmentSelection(shipment.id)}
                         className="rounded border-gray-300"
                       />
+                    </TableCell>
+                    <TableCell className="font-mono text-sm font-semibold text-zim-green">
+                      {getCustomerRef(shipment)}
                     </TableCell>
                     <TableCell className="font-medium">
                       <Tooltip>

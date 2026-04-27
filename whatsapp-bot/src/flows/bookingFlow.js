@@ -674,8 +674,7 @@ async function submitBooking(sock, phoneNumber, bookingData) {
     msg += `📦 Tracking: *${trackingNumber}*\n`;
     if (receiptNumber) msg += `🧾 Receipt: *${receiptNumber}*\n`;
     if (pricing.finalTotal > 0) msg += `💰 Amount: *${formatMoney(pricing.finalTotal)}*\n`;
-    msg += `\n📧 A confirmation will be sent to ${bookingData.senderEmail}.\n`;
-    msg += `📞 We'll be in touch within 24 hours to confirm collection.\n\n`;
+    msg += `\n📞 We'll be in touch within 24 hours to confirm your collection.\n\n`;
     msg += `Type *track* to track your shipment or *menu* for the main menu.`;
 
     return sendMessage(sock, phoneNumber, msg);

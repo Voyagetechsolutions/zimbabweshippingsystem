@@ -94,7 +94,7 @@ A: Yes! The more drums you ship, the lower the price per drum.
 A: FREE collection in England, full tracking, and delivery to our Zimbabwe depot.
 
 *Q: Are there extra charges?*
-A: Optional: Metal coded seals (£5 per drum), Door-to-door delivery in Zimbabwe (£25).
+A: Optional: Metal coded seals (£5 per drum).
 
 Type *menu* to return to main menu.`;
 }
@@ -123,8 +123,8 @@ function getDeliveryFAQs() {
 *Q: Where do you deliver in Zimbabwe?*
 A: We deliver to all major cities: Harare, Bulawayo, Mutare, Gweru, and more.
 
-*Q: What's the difference between depot and door-to-door?*
-A: Standard delivery is to our depot where you collect. Door-to-door (£25 extra) delivers directly to the address.
+*Q: How is delivery handled in Zimbabwe?*
+A: Your shipment arrives at our Zimbabwe depot. We'll notify the receiver to arrange collection — you can also discuss door-to-door arrangements with our agent on arrival.
 
 *Q: How will I know when it arrives?*
 A: We'll notify you via SMS and WhatsApp when your shipment arrives in Zimbabwe.

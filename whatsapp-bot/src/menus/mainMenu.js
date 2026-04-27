@@ -32,8 +32,7 @@ export function getPricingMenu() {
 📦 1 item: €220 per item
 
 *ADDITIONAL SERVICES:*
-🔒 Metal Coded Seal: €7
-🚪 Door-to-Door Delivery (Zimbabwe): €25
+🔒 Metal Coded Seal: €7 per item
 
 *WHAT'S INCLUDED:*
 ✅ FREE collection anywhere in Ireland
@@ -43,10 +42,9 @@ export function getPricingMenu() {
 ✅ Professional handling
 
 *PAYMENT OPTIONS:*
-💳 Card payment
-💶 Cash on collection
-🏦 Bank transfer
-📱 Mobile payment
+💳 Standard payment (card / bank transfer)
+💵 Cash on Collection (save €20 per drum)
+⏳ Pay on Arrival (+20% premium)
 
 Type *book* to start booking or *menu* for main menu.`;
 }

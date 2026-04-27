@@ -27,13 +27,52 @@ function getSenderPhone(s: Shipment) {
   return m.sender?.phone || m.senderDetails?.phone || '';
 }
 
+function getSenderPhone2(s: Shipment) {
+  const m = s.metadata || {};
+  return m.sender?.phone2 || m.senderDetails?.phone2 || '';
+}
+
+function getRecipientPhone(s: Shipment) {
+  const m = s.metadata || {};
+  return m.recipient?.phone || m.recipientDetails?.phone || '';
+}
+
+function getRecipientPhone2(s: Shipment) {
+  const m = s.metadata || {};
+  return m.recipient?.phone2 || m.recipientDetails?.phone2 || '';
+}
+
+// Country dialling code ("post code") per country.
+const DIAL_CODES: Record<string, string> = {
+  Ireland: '+353',
+  'Northern Ireland': '+353',
+  England: '+44',
+  UK: '+44',
+  'United Kingdom': '+44',
+  Scotland: '+44',
+  Wales: '+44',
+  Zimbabwe: '+263',
+};
+
+// Prepend the country dialling code if the phone doesn't already have one.
+function withDialCode(phone: string, country: string | undefined): string {
+  const trimmed = (phone || '').trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('+')) return trimmed;
+  const code = country ? DIAL_CODES[country] : '';
+  if (!code) return trimmed;
+  // Strip a single leading 0 (typical for IE/UK local format) before adding the code.
+  const local = trimmed.replace(/^0+/, '');
+  return `${code} ${local}`;
+}
+
 function getSenderAddress(s: Shipment) {
   const m = s.metadata || {};
   const parts: string[] = [];
   const src = m.sender || m.senderDetails || {};
   if (src.address) parts.push(src.address);
   if (src.city) parts.push(src.city);
-  if (src.postcode || src.postalCode) parts.push(src.postcode || src.postalCode);
+  // Postcode intentionally omitted — not useful to the courier.
   if (src.country) parts.push(src.country);
   return parts.length ? parts : [s.origin || 'Ireland'];
 }
@@ -102,15 +141,25 @@ function buildLineItems(s: Shipment) {
     }
   }
 
-  // Custom-quote items (free text from booking)
+  // Custom-quote items (free text from booking) — split into one row per item
+  // so the courier can tick each off. We split on newlines, semicolons, and " + "
+  // to respect natural list formatting; commas are left alone (they appear in
+  // sentences like "1 box of clothes, books and shoes").
   const otherDesc =
     ship.boxesDescription || ship.category || ship.description ||
     ship.otherItemDescription || itemsMeta.boxes?.description || null;
   if (ship.includeOtherItems || ship.includeBoxes || otherDesc) {
-    rows.push({
-      item: 'Other Items',
-      description: otherDesc || 'General goods.',
-    });
+    const splitOther = (otherDesc || 'General goods.')
+      .split(/\n+|;|\s\+\s/g)
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (splitOther.length <= 1) {
+      rows.push({ item: 'Other Items', description: splitOther[0] || 'General goods.' });
+    } else {
+      splitOther.forEach((piece, idx) => {
+        rows.push({ item: `Other Item #${idx + 1}`, description: piece });
+      });
+    }
   }
 
   if (rows.length === 0) {
@@ -172,8 +221,13 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
     const deliveryDate = format(new Date(shipment.created_at), 'yyyy-MM-dd');
     const senderName = getSenderName(shipment);
     const senderAddress = getSenderAddress(shipment);
+    const senderCountry = (shipment.metadata?.sender?.country || shipment.metadata?.senderDetails?.country) as string | undefined;
+    const senderPhone = withDialCode(getSenderPhone(shipment), senderCountry);
+    const senderPhone2 = withDialCode(getSenderPhone2(shipment), senderCountry);
     const recipientName = getRecipientName(shipment);
     const recipientAddress = getRecipientAddress(shipment);
+    const recipientPhone = withDialCode(getRecipientPhone(shipment), 'Zimbabwe');
+    const recipientPhone2 = withDialCode(getRecipientPhone2(shipment), 'Zimbabwe');
     const lineItems = buildLineItems(shipment);
     const itemsSummary = buildItemsSummary(shipment);
 
@@ -224,6 +278,8 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
             </div>
             <div style={{ lineHeight: '1.7', color: '#222' }}>
               <div style={{ fontWeight: '600' }}>{senderName}</div>
+              {senderPhone && <div>📞 {senderPhone}</div>}
+              {senderPhone2 && <div>📞 {senderPhone2}</div>}
               {senderAddress.map((line, i) => (
                 <div key={i}>{line}</div>
               ))}
@@ -236,6 +292,8 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
             </div>
             <div style={{ lineHeight: '1.7', color: '#222' }}>
               <div style={{ fontWeight: '600' }}>{recipientName}</div>
+              {recipientPhone && <div>📞 {recipientPhone}</div>}
+              {recipientPhone2 && <div>📞 {recipientPhone2}</div>}
               {recipientAddress.map((line, i) => (
                 <div key={i}>{line}</div>
               ))}

@@ -237,17 +237,16 @@ async function sendPricingMessage(sock, phoneNumber) {
     `📦 2-4 items: €${settings.box_price_2_4} per item\n` +
     `📦 1 item: €${settings.box_price_1} per item\n\n` +
     `*ADDITIONAL SERVICES:*\n` +
-    `🔒 Metal Coded Seal: €${settings.seal_price} per item\n` +
-    `🚪 Door-to-Door Delivery (Zimbabwe): €${settings.door_to_door_price}\n\n` +
+    `🔒 Metal Coded Seal: €${settings.seal_price} per item\n\n` +
     `*WHAT'S INCLUDED:*\n` +
     `✅ FREE collection anywhere in Ireland\n` +
     `✅ Full tracking\n` +
     `✅ 6–8 weeks delivery\n` +
     `✅ Professional handling\n\n` +
     `*PAYMENT OPTIONS:*\n` +
-    `💵 Cash on collection\n` +
-    `💵 Cash on delivery\n` +
-    `🏦 Bank transfer\n\n` +
+    `💳 Standard payment (card / bank transfer)\n` +
+    `💵 Cash on Collection (save €20 per drum)\n` +
+    `⏳ Pay on Arrival (+20% premium)\n\n` +
     `Type *book* to start booking or *menu* for main menu.`;
   await sendMessage(sock, phoneNumber, msg);
 }

@@ -228,7 +228,13 @@ const CustomerManagementTab = () => {
       searchQuery === '' ||
       customer.full_name?.toLowerCase().includes(searchLower) ||
       customer.email?.toLowerCase().includes(searchLower) ||
-      customer.phone?.includes(searchQuery)
+      customer.phone?.includes(searchQuery) ||
+      // Match on customer ref (e.g. "JOH-4567")
+      (() => {
+        const letters = (customer.full_name || '').replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 3);
+        const digits = (customer.phone || '').replace(/\D/g, '').slice(-4);
+        return letters && digits && `${letters}-${digits}`.toLowerCase().includes(searchLower);
+      })()
     );
   });
 
@@ -290,6 +296,7 @@ const CustomerManagementTab = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[110px]">Customer Ref</TableHead>
                     <TableHead>Full Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Phone</TableHead>
@@ -298,8 +305,18 @@ const CustomerManagementTab = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredCustomers.map(customer => (
+                  {filteredCustomers.map(customer => {
+                    // Customer Ref — first 3 letters of name + last 4 digits of phone
+                    const letters = (customer.full_name || '').replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 3);
+                    const digits = (customer.phone || '').replace(/\D/g, '').slice(-4);
+                    const customerRef = letters && digits
+                      ? `${letters}-${digits}`
+                      : (letters ? `${letters}-0000` : (digits ? `REF-${digits}` : 'REF-0000'));
+                    return (
                     <TableRow key={customer.id}>
+                      <TableCell className="font-mono text-sm font-semibold text-zim-green">
+                        {customerRef}
+                      </TableCell>
                       <TableCell className="font-medium">
                         {customer.full_name}
                       </TableCell>
@@ -337,7 +354,8 @@ const CustomerManagementTab = () => {
                         </Button>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  );
+                  })}
                 </TableBody>
               </Table>
             </div>
