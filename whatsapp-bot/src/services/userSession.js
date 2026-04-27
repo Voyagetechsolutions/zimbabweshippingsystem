@@ -1,75 +1,141 @@
 import NodeCache from 'node-cache';
+import { getSupabase } from './database.js';
 
-// In-memory cache for user sessions (24 hour TTL)
+// L1: in-memory cache (24-hour TTL). Fast lookup for active conversations.
+// L2: Supabase bot_sessions table — survives bot restarts.
 const sessionCache = new NodeCache({ stdTTL: 86400, checkperiod: 3600 });
 
-export async function getUserSession(phoneNumber) {
-  let session = sessionCache.get(phoneNumber);
-  const now = new Date();
-  const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
-  
-  if (!session) {
-    // New session - needs greeting
-    session = {
-      phoneNumber,
-      state: 'MAIN_MENU',
-      step: null,
-      bookingData: {},
-      userName: null,           // first name, used in greetings
-      userFirstName: null,
-      userLastName: null,
-      userEmail: null,
-      userPhone: null,
-      userPhone2: null,
-      userAddress: null,
-      userCity: null,
-      receiverName: null,
-      receiverPhone: null,
-      receiverPhone2: null,
-      receiverAddress: null,
-      receiverCity: null,
-      hasBeenGreeted: false,
-      needsGreeting: true,
-      bookingHistory: [],
-      createdAt: now.toISOString(),
-      lastActivity: now.toISOString()
-    };
-    sessionCache.set(phoneNumber, session);
-  } else {
-    // Check if session has expired (30 minutes of inactivity)
-    const lastActivityTime = new Date(session.lastActivity);
-    const timeSinceLastActivity = now - lastActivityTime;
-    
-    if (timeSinceLastActivity > SESSION_TIMEOUT_MS) {
-      // Session expired - reset and needs greeting
-      console.log(`🔄 Session expired for ${phoneNumber} (${Math.round(timeSinceLastActivity / 60000)} minutes inactive)`);
-      session.hasBeenGreeted = false;
-      session.needsGreeting = true;
-      session.state = 'MAIN_MENU';
-      session.step = null;
-      session.bookingData = {};
-    }
-    
-    // Update last activity
-    session.lastActivity = now.toISOString();
-    sessionCache.set(phoneNumber, session);
+const BOT_SOURCE = 'whatsapp-bot-ireland';
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes of inactivity
+
+function newSession(phoneNumber, now) {
+  return {
+    phoneNumber,
+    state: 'MAIN_MENU',
+    step: null,
+    bookingData: {},
+    userName: null,           // first name, used in greetings
+    userFirstName: null,
+    userLastName: null,
+    userEmail: null,
+    userPhone: null,
+    userPhone2: null,
+    userAddress: null,
+    userCity: null,
+    receiverName: null,
+    receiverPhone: null,
+    receiverPhone2: null,
+    receiverAddress: null,
+    receiverCity: null,
+    hasBeenGreeted: false,
+    needsGreeting: true,
+    bookingHistory: [],
+    createdAt: now.toISOString(),
+    lastActivity: now.toISOString(),
+  };
+}
+
+async function loadFromDB(phoneNumber) {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('bot_sessions')
+      .select('session_data')
+      .eq('phone_number', phoneNumber)
+      .eq('bot_source', BOT_SOURCE)
+      .maybeSingle();
+    if (error || !data) return null;
+    return data.session_data;
+  } catch (err) {
+    console.warn('Session DB read failed:', err?.message || err);
+    return null;
   }
-  
+}
+
+// Fire-and-forget — bot response shouldn't wait for the DB write.
+function saveToDBAsync(phoneNumber, session) {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  supabase
+    .from('bot_sessions')
+    .upsert(
+      {
+        phone_number: phoneNumber,
+        bot_source: BOT_SOURCE,
+        session_data: session,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'phone_number,bot_source' },
+    )
+    .then(({ error }) => {
+      if (error) console.warn('Session DB write failed:', error.message);
+    });
+}
+
+function expireIfStale(session, now) {
+  const lastActivity = new Date(session.lastActivity || session.createdAt);
+  const idleMs = now - lastActivity;
+  if (idleMs > SESSION_TIMEOUT_MS) {
+    console.log(`🔄 Session expired for ${session.phoneNumber} (${Math.round(idleMs / 60000)} min idle)`);
+    session.hasBeenGreeted = false;
+    session.needsGreeting = true;
+    session.state = 'MAIN_MENU';
+    session.step = null;
+    session.bookingData = {};
+  }
+  session.lastActivity = now.toISOString();
+}
+
+export async function getUserSession(phoneNumber) {
+  const now = new Date();
+  let session = sessionCache.get(phoneNumber);
+
+  if (!session) {
+    // L1 miss — try L2
+    session = await loadFromDB(phoneNumber);
+  }
+
+  if (!session) {
+    // Never seen this user
+    session = newSession(phoneNumber, now);
+    sessionCache.set(phoneNumber, session);
+    saveToDBAsync(phoneNumber, session);
+    return session;
+  }
+
+  expireIfStale(session, now);
+  sessionCache.set(phoneNumber, session);
+  // Don't write on every read — only when the caller updates.
   return session;
 }
 
 export async function updateUserSession(phoneNumber, updates) {
   const session = await getUserSession(phoneNumber);
-  const updatedSession = { ...session, ...updates };
-  sessionCache.set(phoneNumber, updatedSession);
-  return updatedSession;
+  const updated = { ...session, ...updates, lastActivity: new Date().toISOString() };
+  sessionCache.set(phoneNumber, updated);
+  saveToDBAsync(phoneNumber, updated);
+  return updated;
 }
 
 export async function clearUserSession(phoneNumber) {
   sessionCache.del(phoneNumber);
+  const supabase = getSupabase();
+  if (!supabase) return;
+  try {
+    await supabase
+      .from('bot_sessions')
+      .delete()
+      .eq('phone_number', phoneNumber)
+      .eq('bot_source', BOT_SOURCE);
+  } catch (err) {
+    console.warn('Session DB delete failed:', err?.message || err);
+  }
 }
 
 export function getAllSessions() {
+  // Returns whatever is in the L1 cache. Sufficient for in-process diagnostics;
+  // for full inventory, query the bot_sessions table directly.
   const keys = sessionCache.keys();
   return keys.map(key => sessionCache.get(key));
 }
