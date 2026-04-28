@@ -55,8 +55,8 @@ import {
   CheckSquare,
   Square,
   RefreshCw,
-  Plus,
   MapPin,
+  Plus,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
@@ -70,6 +70,7 @@ interface CollectionSchedule {
   created_at: string;
   updated_at: string;
   country: string;
+  collection_period_id: string | null;
 }
 
 interface CollectionPeriod {
@@ -114,13 +115,27 @@ const CollectionScheduleCalendarTab = () => {
   const [shipments, setShipments] = useState<ShipmentData[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Collection Period Management
+  // Collection Period Creation Flow
+  const [showCreatePeriodDialog, setShowCreatePeriodDialog] = useState(false);
   const [newPeriodName, setNewPeriodName] = useState('');
+  const [creatingPeriod, setCreatingPeriod] = useState<CollectionPeriod | null>(null);
+  const [periodSchedules, setPeriodSchedules] = useState<Array<{
+    date: Date;
+    routeId: string;
+    country: string;
+  }>>([]);
+  
+  // Selected Period for Viewing
   const [selectedPeriod, setSelectedPeriod] = useState<CollectionPeriod | null>(null);
   
   // Calendar Dialog States
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showAddRouteDialog, setShowAddRouteDialog] = useState(false);
+  const [selectedRouteId, setSelectedRouteId] = useState('');
+  const [availableRoutes, setAvailableRoutes] = useState<CollectionSchedule[]>([]);
+  
+  // Create New Route States
+  const [showCreateRouteDialog, setShowCreateRouteDialog] = useState(false);
   const [newRouteName, setNewRouteName] = useState('');
   const [newRouteAreas, setNewRouteAreas] = useState('');
   
@@ -135,6 +150,12 @@ const CollectionScheduleCalendarTab = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    // Get available routes (routes without dates or that can be reused)
+    const routes = schedules.filter(s => s.country === selectedCountry);
+    setAvailableRoutes(routes);
+  }, [schedules, selectedCountry]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -231,12 +252,17 @@ const CollectionScheduleCalendarTab = () => {
 
       toast({
         title: 'Period Created',
-        description: `Collection period "${newPeriodName}" has been created`,
+        description: `Now add collection dates for ${newPeriodName}`,
       });
 
       await fetchPeriods();
       setNewPeriodName('');
-      setSelectedPeriod(data);
+      setShowCreatePeriodDialog(false);
+      
+      // Enter period creation mode - show calendar to add dates
+      setCreatingPeriod(data);
+      setPeriodSchedules([]);
+      
     } catch (error: any) {
       console.error('Error creating period:', error);
       toast({
@@ -249,8 +275,137 @@ const CollectionScheduleCalendarTab = () => {
     }
   };
 
+  const handleAddDateToPeriod = (date: Date, routeId: string) => {
+    // Add this date/route combination to the period being created
+    setPeriodSchedules(prev => [...prev, {
+      date,
+      routeId,
+      country: selectedCountry
+    }]);
+    
+    toast({
+      title: 'Date Added',
+      description: `Collection date added to ${creatingPeriod?.name}`,
+    });
+  };
+
+  const handleRemoveDateFromPeriod = (index: number) => {
+    setPeriodSchedules(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSavePeriodSchedules = async () => {
+    if (periodSchedules.length === 0) {
+      toast({
+        title: 'No Dates Added',
+        description: 'Please add at least one collection date',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      // Update all routes with their pickup dates and link to period
+      for (const schedule of periodSchedules) {
+        const pickupDate = format(schedule.date, 'MMMM do, yyyy');
+        
+        await supabase
+          .from('collection_schedules')
+          .update({
+            pickup_date: pickupDate,
+            collection_period_id: creatingPeriod?.id,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', schedule.routeId);
+      }
+
+      toast({
+        title: 'Collection Period Saved',
+        description: `${periodSchedules.length} collection dates saved for ${creatingPeriod?.name}`,
+      });
+
+      await fetchSchedules();
+      setCreatingPeriod(null);
+      setPeriodSchedules([]);
+      setSelectedPeriod(creatingPeriod);
+      
+    } catch (error: any) {
+      console.error('Error saving period schedules:', error);
+      toast({
+        title: 'Save Failed',
+        description: error.message || 'Failed to save collection schedules',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleCancelPeriodCreation = () => {
+    setCreatingPeriod(null);
+    setPeriodSchedules([]);
+  };
+
   const handleAddRoute = async () => {
-    if (!selectedDate || !newRouteName.trim() || !newRouteAreas.trim()) {
+    if (!selectedDate || !selectedRouteId) {
+      toast({
+        title: 'Missing Information',
+        description: 'Please select a route',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // If we're in period creation mode, add to the list
+    if (creatingPeriod) {
+      handleAddDateToPeriod(selectedDate, selectedRouteId);
+      setShowAddRouteDialog(false);
+      setSelectedRouteId('');
+      setSelectedDate(null);
+      return;
+    }
+
+    // Otherwise, update the route directly
+    setIsUpdating(true);
+    try {
+      const pickupDate = format(selectedDate, 'MMMM do, yyyy');
+
+      const { error } = await supabase
+        .from('collection_schedules')
+        .update({
+          pickup_date: pickupDate,
+          collection_period_id: selectedPeriod?.id || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedRouteId);
+
+      if (error) throw error;
+
+      const selectedRoute = schedules.find(s => s.id === selectedRouteId);
+
+      toast({
+        title: 'Route Scheduled',
+        description: `Route "${selectedRoute?.route}" has been scheduled for ${pickupDate}`,
+      });
+
+      await fetchSchedules();
+      setShowAddRouteDialog(false);
+      setSelectedRouteId('');
+      setSelectedDate(null);
+    } catch (error: any) {
+      console.error('Error scheduling route:', error);
+      toast({
+        title: 'Failed to Schedule Route',
+        description: error.message || 'Failed to schedule route',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleCreateNewRoute = async () => {
+    if (!newRouteName.trim() || !newRouteAreas.trim()) {
       toast({
         title: 'Missing Information',
         description: 'Please fill in all fields',
@@ -262,7 +417,7 @@ const CollectionScheduleCalendarTab = () => {
     setIsUpdating(true);
     try {
       const areas = newRouteAreas.split(',').map(a => a.trim()).filter(a => a);
-      const pickupDate = format(selectedDate, 'MMMM do, yyyy');
+      const pickupDate = selectedDate ? format(selectedDate, 'MMMM do, yyyy') : '';
 
       const { error } = await supabase
         .from('collection_schedules')
@@ -270,27 +425,26 @@ const CollectionScheduleCalendarTab = () => {
           route: newRouteName.trim().toUpperCase(),
           areas: areas,
           pickup_date: pickupDate,
-          schedule_name: `${newRouteName.trim().toUpperCase()} - ${pickupDate}`,
+          schedule_name: `${newRouteName.trim().toUpperCase()}${pickupDate ? ' - ' + pickupDate : ''}`,
           country: selectedCountry,
         });
 
       if (error) throw error;
 
       toast({
-        title: 'Route Added',
-        description: `Route "${newRouteName}" has been added for ${pickupDate}`,
+        title: 'Route Created',
+        description: `Route "${newRouteName}" has been created`,
       });
 
       await fetchSchedules();
-      setShowAddRouteDialog(false);
+      setShowCreateRouteDialog(false);
       setNewRouteName('');
       setNewRouteAreas('');
-      setSelectedDate(null);
     } catch (error: any) {
-      console.error('Error adding route:', error);
+      console.error('Error creating route:', error);
       toast({
-        title: 'Failed to Add Route',
-        description: error.message || 'Failed to add route',
+        title: 'Failed to Create Route',
+        description: error.message || 'Failed to create route',
         variant: 'destructive',
       });
     } finally {
@@ -381,24 +535,44 @@ const CollectionScheduleCalendarTab = () => {
 
   const getSchedulesForDate = (date: Date): CollectionSchedule[] => {
     const dateStr = format(date, 'MMMM do, yyyy');
+    
+    // If creating a period, show scheduled dates from periodSchedules
+    if (creatingPeriod) {
+      const scheduledRouteIds = periodSchedules
+        .filter(ps => 
+          format(ps.date, 'MMMM do, yyyy') === dateStr && 
+          ps.country === selectedCountry
+        )
+        .map(ps => ps.routeId);
+      
+      return schedules.filter(s => scheduledRouteIds.includes(s.id));
+    }
+    
+    // Otherwise show actual schedules
     return schedules.filter(s => 
       s.country === selectedCountry && 
-      s.pickup_date === dateStr
+      s.pickup_date === dateStr &&
+      (!selectedPeriod || s.collection_period_id === selectedPeriod.id)
     );
   };
 
   const getShipmentCountForSchedule = (scheduleId: string): number => {
-    let count = shipments.filter(s => s.collection_schedule_id === scheduleId).length;
-    
-    // If a period is selected, only count shipments in that period
-    if (selectedPeriod) {
-      count = shipments.filter(s => 
-        s.collection_schedule_id === scheduleId && 
-        s.collection_period_id === selectedPeriod.id
-      ).length;
-    }
-    
-    return count;
+    return shipments.filter(s => 
+      s.collection_schedule_id === scheduleId &&
+      (!selectedPeriod || s.collection_period_id === selectedPeriod.id)
+    ).length;
+  };
+
+  const getPeriodShipmentCount = (periodId: string): number => {
+    return shipments.filter(s => s.collection_period_id === periodId).length;
+  };
+
+  const handleViewPeriodShipments = (period: CollectionPeriod) => {
+    const periodShipments = shipments.filter(s => s.collection_period_id === period.id);
+    setScheduleShipments(periodShipments);
+    setSelectedShipmentIds(new Set());
+    setShowShipmentsDialog(true);
+    setSelectedSchedule(null); // Clear schedule, we're viewing by period
   };
 
   const getSenderName = (metadata: any): string => {
@@ -464,6 +638,16 @@ const CollectionScheduleCalendarTab = () => {
             const isCurrentMonth = day.getMonth() === currentMonth.getMonth();
             const schedulesForDay = getSchedulesForDate(day);
             const hasSchedules = schedulesForDay.length > 0;
+            
+            // Check if this date is in periodSchedules (during creation mode)
+            const dateStr = format(day, 'MMMM do, yyyy');
+            const periodSchedulesForDay = creatingPeriod 
+              ? periodSchedules.filter(ps => 
+                  format(ps.date, 'MMMM do, yyyy') === dateStr && 
+                  ps.country === selectedCountry
+                )
+              : [];
+            const hasPeriodSchedules = periodSchedulesForDay.length > 0;
 
             return (
               <div
@@ -471,13 +655,15 @@ const CollectionScheduleCalendarTab = () => {
                 className={`
                   min-h-[100px] border rounded-lg p-2 cursor-pointer transition-all
                   ${isCurrentMonth ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800/50'}
-                  ${hasSchedules ? 'border-green-500 hover:border-green-600' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'}
+                  ${hasSchedules || hasPeriodSchedules 
+                    ? 'border-green-500 hover:border-green-600 bg-green-50 dark:bg-green-900/20' 
+                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                  }
+                  ${creatingPeriod ? 'hover:bg-green-100 dark:hover:bg-green-900/30' : ''}
                 `}
                 onClick={() => {
                   setSelectedDate(day);
-                  if (hasSchedules) {
-                    // Show schedules for this day
-                  } else {
+                  if (creatingPeriod || !hasSchedules) {
                     // Open add route dialog
                     setShowAddRouteDialog(true);
                   }
@@ -487,7 +673,30 @@ const CollectionScheduleCalendarTab = () => {
                   {format(day, 'd')}
                 </div>
                 
-                {hasSchedules && (
+                {/* Show period schedules during creation mode */}
+                {creatingPeriod && hasPeriodSchedules && (
+                  <div className="space-y-1">
+                    {periodSchedulesForDay.map((ps, psIdx) => {
+                      const route = schedules.find(s => s.id === ps.routeId);
+                      return (
+                        <div
+                          key={psIdx}
+                          className="text-xs bg-green-600 text-white rounded px-2 py-1 truncate font-medium"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="truncate">{route?.route}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                
+                {/* Show actual schedules when not in creation mode */}
+                {!creatingPeriod && hasSchedules && (
                   <div className="space-y-1">
                     {schedulesForDay.map(schedule => (
                       <div
@@ -507,6 +716,13 @@ const CollectionScheduleCalendarTab = () => {
                     ))}
                   </div>
                 )}
+                
+                {/* Show "Add date" hint in creation mode for empty days */}
+                {creatingPeriod && !hasPeriodSchedules && isCurrentMonth && (
+                  <div className="text-xs text-gray-400 text-center mt-2">
+                    Click to add
+                  </div>
+                )}
               </div>
             );
           })}
@@ -521,75 +737,195 @@ const CollectionScheduleCalendarTab = () => {
         title="Collection Schedule"
         description="Manage collection schedules by region with calendar view"
         actions={
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={fetchData}>
-            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            {!creatingPeriod && (
+              <>
+                <Button 
+                  variant="default" 
+                  size="sm" 
+                  className="h-8 text-xs bg-green-600 hover:bg-green-700"
+                  onClick={() => setShowCreatePeriodDialog(true)}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  Create Collection Period
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 text-xs"
+                  onClick={() => setShowCreateRouteDialog(true)}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  Create Route
+                </Button>
+              </>
+            )}
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={fetchData}>
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+              Refresh
+            </Button>
+          </div>
         }
       />
 
-      {/* Collection Period Management */}
-      <Card className="shadow-none border border-gray-200 dark:border-gray-800">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium">Collection Period</CardTitle>
-          <CardDescription className="text-xs">
-            Select or create a collection period to group shipments for bulk updates
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex gap-2">
-            <Select
-              value={selectedPeriod?.id || ''}
-              onValueChange={(value) => {
-                const period = periods.find(p => p.id === value);
-                setSelectedPeriod(period || null);
-              }}
-            >
-              <SelectTrigger className="flex-1">
-                <SelectValue placeholder="Select a collection period" />
-              </SelectTrigger>
-              <SelectContent>
-                {periods.map(period => (
-                  <SelectItem key={period.id} value={period.id}>
-                    {period.name} ({period.status})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex gap-2">
-            <Input
-              placeholder="e.g., May 2026"
-              value={newPeriodName}
-              onChange={(e) => setNewPeriodName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleCreatePeriod();
-                }
-              }}
-            />
-            <Button onClick={handleCreatePeriod} disabled={isUpdating}>
-              <Plus className="h-4 w-4 mr-1" />
-              Create Period
-            </Button>
-          </div>
-
-          {selectedPeriod && (
-            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
-              <div className="flex items-center gap-2">
-                <CalendarIcon className="h-4 w-4 text-green-600" />
-                <span className="text-sm font-medium">
-                  Active Period: {selectedPeriod.name}
-                </span>
-                <Badge variant="outline" className="ml-auto">
-                  {shipments.filter(s => s.collection_period_id === selectedPeriod.id).length} shipments
+      {/* Period Creation Mode Banner */}
+      {creatingPeriod && (
+        <Card className="shadow-none border-2 border-green-500 bg-green-50 dark:bg-green-900/20">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-green-600 flex items-center justify-center">
+                  <CalendarIcon className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-green-900 dark:text-green-100">
+                    Adding Collection Dates for {creatingPeriod.name}
+                  </h3>
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    Click on calendar dates to schedule routes. Dates can span multiple months.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Badge variant="outline" className="bg-white">
+                  {periodSchedules.length} dates added
                 </Badge>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCancelPeriodCreation}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={handleSavePeriodSchedules}
+                  disabled={isUpdating || periodSchedules.length === 0}
+                >
+                  {isUpdating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Period
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            {/* Show scheduled dates */}
+            {periodSchedules.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <h4 className="text-sm font-medium text-green-900 dark:text-green-100">
+                  Scheduled Dates:
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                  {periodSchedules.map((ps, index) => {
+                    const route = schedules.find(s => s.id === ps.routeId);
+                    return (
+                      <div
+                        key={index}
+                        className="bg-white dark:bg-gray-800 rounded-lg p-2 border border-green-200 dark:border-green-800 flex items-center justify-between"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-medium truncate">{route?.route}</div>
+                          <div className="text-xs text-gray-500">{format(ps.date, 'MMM d, yyyy')}</div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={() => handleRemoveDateFromPeriod(index)}
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Collection Periods List (when not creating) */}
+      {!creatingPeriod && (
+        <Card className="shadow-none border border-gray-200 dark:border-gray-800">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Collection Periods</CardTitle>
+            <CardDescription className="text-xs">
+              Select a period to view its shipments or create a new period
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {periods.length === 0 ? (
+              <div className="text-center py-6 text-gray-500">
+                <CalendarIcon className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                <p className="mb-2">No collection periods yet</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCreatePeriodDialog(true)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create First Period
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {periods.map((period) => (
+                  <Card
+                    key={period.id}
+                    className={`cursor-pointer transition-all ${
+                      selectedPeriod?.id === period.id
+                        ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                        : 'hover:border-gray-400'
+                    }`}
+                    onClick={() => setSelectedPeriod(period)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <h3 className="font-semibold">{period.name}</h3>
+                          <Badge variant="outline" className="mt-1">
+                            {period.status}
+                          </Badge>
+                        </div>
+                        {selectedPeriod?.id === period.id && (
+                          <div className="h-6 w-6 rounded-full bg-green-600 flex items-center justify-center">
+                            <span className="text-white text-xs">✓</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+                        <span>{getPeriodShipmentCount(period.id)} shipments</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewPeriodShipments(period);
+                          }}
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          View
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Region Tabs */}
       <Tabs value={selectedCountry} onValueChange={(v) => setSelectedCountry(v as 'England' | 'Ireland')}>
@@ -643,9 +979,146 @@ const CollectionScheduleCalendarTab = () => {
       <Dialog open={showAddRouteDialog} onOpenChange={setShowAddRouteDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Collection Route</DialogTitle>
+            <DialogTitle>Schedule Collection Route</DialogTitle>
             <DialogDescription>
-              Create a new collection route for {selectedDate && format(selectedDate, 'MMMM do, yyyy')}
+              Select a route to schedule for {selectedDate && format(selectedDate, 'MMMM do, yyyy')}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label>Select Route</Label>
+              <Select value={selectedRouteId} onValueChange={setSelectedRouteId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a route" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableRoutes.map((route) => (
+                    <SelectItem key={route.id} value={route.id}>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{route.route}</span>
+                        <span className="text-xs text-gray-500">
+                          {route.areas.slice(0, 3).join(', ')}
+                          {route.areas.length > 3 && ` +${route.areas.length - 3} more`}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-2">
+                Select from existing routes in the system
+              </p>
+            </div>
+
+            {selectedRouteId && (
+              <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <MapPin className="h-4 w-4 text-gray-500" />
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Country: <strong>{selectedCountry}</strong>
+                  </span>
+                </div>
+                {(() => {
+                  const route = availableRoutes.find(r => r.id === selectedRouteId);
+                  return route ? (
+                    <div className="text-sm">
+                      <div className="font-medium mb-1">Areas covered:</div>
+                      <div className="text-gray-600 dark:text-gray-400">
+                        {route.areas.join(', ')}
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddRouteDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddRoute} disabled={isUpdating || !selectedRouteId}>
+              {isUpdating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Scheduling...
+                </>
+              ) : (
+                <>
+                  <CalendarIcon className="h-4 w-4 mr-2" />
+                  Schedule Route
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Period Dialog */}
+      <Dialog open={showCreatePeriodDialog} onOpenChange={setShowCreatePeriodDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Collection Period</DialogTitle>
+            <DialogDescription>
+              Create a new collection period and then add collection dates
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label>Period Name</Label>
+              <Input
+                placeholder="e.g., May 2026"
+                value={newPeriodName}
+                onChange={(e) => setNewPeriodName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newPeriodName.trim()) {
+                    handleCreatePeriod();
+                  }
+                }}
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                Format: Month Year (e.g., "May 2026", "June 2026")
+              </p>
+            </div>
+
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                After creating the period, you'll be able to add collection dates using the calendar. 
+                Dates can span multiple months as long as they belong to this collection period.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreatePeriodDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreatePeriod} disabled={isUpdating || !newPeriodName.trim()}>
+              {isUpdating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create & Add Dates
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create New Route Dialog */}
+      <Dialog open={showCreateRouteDialog} onOpenChange={setShowCreateRouteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Route</DialogTitle>
+            <DialogDescription>
+              Add a new collection route to the system for {selectedCountry}
             </DialogDescription>
           </DialogHeader>
 
@@ -669,30 +1142,33 @@ const CollectionScheduleCalendarTab = () => {
               />
             </div>
 
-            <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
               <div className="flex items-center gap-2 text-sm">
-                <MapPin className="h-4 w-4 text-gray-500" />
-                <span className="text-gray-600 dark:text-gray-400">
-                  Country: <strong>{selectedCountry}</strong>
+                <MapPin className="h-4 w-4 text-blue-600" />
+                <span className="text-blue-800 dark:text-blue-200">
+                  This route will be created for <strong>{selectedCountry}</strong>
                 </span>
               </div>
+              <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">
+                After creating, you can schedule it on the calendar
+              </p>
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddRouteDialog(false)}>
+            <Button variant="outline" onClick={() => setShowCreateRouteDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAddRoute} disabled={isUpdating}>
+            <Button onClick={handleCreateNewRoute} disabled={isUpdating}>
               {isUpdating ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Adding...
+                  Creating...
                 </>
               ) : (
                 <>
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Route
+                  Create Route
                 </>
               )}
             </Button>
@@ -706,11 +1182,18 @@ const CollectionScheduleCalendarTab = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Truck className="h-5 w-5 text-green-600" />
-              {selectedSchedule?.schedule_name || selectedSchedule?.route}
+              {selectedSchedule 
+                ? (selectedSchedule.schedule_name || selectedSchedule.route)
+                : selectedPeriod
+                ? `All Shipments - ${selectedPeriod.name}`
+                : 'Shipments'
+              }
             </DialogTitle>
             <DialogDescription>
-              Manage shipments for this collection schedule
-              {selectedPeriod && ` in ${selectedPeriod.name}`}
+              {selectedSchedule 
+                ? `Manage shipments for this collection schedule`
+                : `Viewing all shipments for this collection period`
+              }
             </DialogDescription>
           </DialogHeader>
 
