@@ -1,0 +1,386 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║                                                                      ║
+║   📱 WHATSAPP BOT CONNECTION FLOW                                    ║
+║                                                                      ║
+║   Visual guide to understand how everything connects                ║
+║                                                                      ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  🎯 THE BIG PICTURE                                                  │
+└──────────────────────────────────────────────────────────────────────┘
+
+    Your Computer          Cloud Server         WhatsApp         Database
+    ─────────────         ─────────────        ─────────        ─────────
+         │                      │                  │                │
+         │  1. Deploy Code      │                  │                │
+         │─────────────────────>│                  │                │
+         │                      │                  │                │
+         │                      │  2. Generate QR  │                │
+         │<─────────────────────│                  │                │
+         │                      │                  │                │
+         │  3. Scan QR Code     │                  │                │
+         │──────────────────────┼─────────────────>│                │
+         │                      │                  │                │
+         │                      │  4. Connected!   │                │
+         │                      │<─────────────────│                │
+         │                      │                  │                │
+         │                      │  5. Customer     │                │
+         │                      │     Messages     │                │
+         │                      │<─────────────────│                │
+         │                      │                  │                │
+         │                      │  6. Bot Responds │                │
+         │                      │─────────────────>│                │
+         │                      │                  │                │
+         │                      │  7. Save Data    │                │
+         │                      │─────────────────────────────────>│
+         │                      │                  │                │
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  📋 DETAILED FLOW                                                    │
+└──────────────────────────────────────────────────────────────────────┘
+
+PHASE 1: SETUP (One-time, 20 minutes)
+═══════════════════════════════════════════════════════════════════════
+
+  Step 1: Create Server
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  You                    DigitalOcean                            │
+  │  ───                    ────────────                            │
+  │   │                          │                                  │
+  │   │  Sign up & create        │                                  │
+  │   │  Ubuntu server           │                                  │
+  │   │─────────────────────────>│                                  │
+  │   │                          │                                  │
+  │   │  Server IP address       │                                  │
+  │   │<─────────────────────────│                                  │
+  │   │  (e.g., 165.232.123.45)  │                                  │
+  └─────────────────────────────────────────────────────────────────┘
+
+  Step 2: Deploy Bot
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  Your Computer          Server                                  │
+  │  ──────────────         ──────                                  │
+  │       │                   │                                     │
+  │       │  SSH connect      │                                     │
+  │       │──────────────────>│                                     │
+  │       │                   │                                     │
+  │       │  Install Node.js  │                                     │
+  │       │──────────────────>│                                     │
+  │       │                   │                                     │
+  │       │  Clone bot code   │                                     │
+  │       │──────────────────>│                                     │
+  │       │                   │                                     │
+  │       │  Start bot        │                                     │
+  │       │──────────────────>│                                     │
+  │       │                   │                                     │
+  │       │                   │ ✅ Bot running                      │
+  │       │                   │ 📸 QR code saved                    │
+  └─────────────────────────────────────────────────────────────────┘
+
+  Step 3: Connect WhatsApp
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  Server          Your Computer       Customer's Phone           │
+  │  ──────          ──────────────      ─────────────────          │
+  │    │                   │                     │                  │
+  │    │  QR code image    │                     │                  │
+  │    │──────────────────>│                     │                  │
+  │    │                   │                     │                  │
+  │    │                   │  Display QR code    │                  │
+  │    │                   │────────────────────>│                  │
+  │    │                   │                     │                  │
+  │    │                   │  Scan with WhatsApp │                  │
+  │    │                   │<────────────────────│                  │
+  │    │                   │                     │                  │
+  │    │  ✅ Connected!                          │                  │
+  │    │<────────────────────────────────────────│                  │
+  └─────────────────────────────────────────────────────────────────┘
+
+
+PHASE 2: OPERATION (Automatic, 24/7)
+═══════════════════════════════════════════════════════════════════════
+
+  Customer Interaction
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  Customer        WhatsApp        Server         Database        │
+  │  ────────        ────────        ──────         ────────        │
+  │     │                │              │               │            │
+  │     │  "Hi"          │              │               │            │
+  │     │───────────────>│              │               │            │
+  │     │                │              │               │            │
+  │     │                │  Message     │               │            │
+  │     │                │─────────────>│               │            │
+  │     │                │              │               │            │
+  │     │                │              │ Load user     │            │
+  │     │                │              │ session       │            │
+  │     │                │              │──────────────>│            │
+  │     │                │              │               │            │
+  │     │                │              │ User data     │            │
+  │     │                │              │<──────────────│            │
+  │     │                │              │               │            │
+  │     │                │              │ Process       │            │
+  │     │                │              │ message       │            │
+  │     │                │              │               │            │
+  │     │                │  Response    │               │            │
+  │     │                │<─────────────│               │            │
+  │     │                │              │               │            │
+  │     │  Menu          │              │               │            │
+  │     │<───────────────│              │               │            │
+  │     │                │              │               │            │
+  │     │  "1" (Book)    │              │               │            │
+  │     │───────────────>│─────────────>│               │            │
+  │     │                │              │               │            │
+  │     │                │              │ Start booking │            │
+  │     │                │              │ flow          │            │
+  │     │                │              │               │            │
+  │     │                │  "First name?"               │            │
+  │     │<───────────────│<─────────────│               │            │
+  │     │                │              │               │            │
+  │     │  "John"        │              │               │            │
+  │     │───────────────>│─────────────>│               │            │
+  │     │                │              │               │            │
+  │     │                │              │ Save data     │            │
+  │     │                │              │──────────────>│            │
+  │     │                │              │               │            │
+  │     │                │  "Last name?"                │            │
+  │     │<───────────────│<─────────────│               │            │
+  │     │                │              │               │            │
+  │     │  [continues through 5 steps...]               │            │
+  │     │                │              │               │            │
+  │     │                │              │ Create        │            │
+  │     │                │              │ booking       │            │
+  │     │                │              │──────────────>│            │
+  │     │                │              │               │            │
+  │     │                │  "✅ Booking confirmed!"     │            │
+  │     │<───────────────│<─────────────│               │            │
+  └─────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  🔄 SYSTEM ARCHITECTURE                                              │
+└──────────────────────────────────────────────────────────────────────┘
+
+                    ┌─────────────────────────────────┐
+                    │     Customer's WhatsApp         │
+                    │     +353 87 195 4910            │
+                    └──────────────┬──────────────────┘
+                                   │
+                                   │ Messages
+                                   │
+                    ┌──────────────▼──────────────────┐
+                    │   WhatsApp Web Protocol         │
+                    │   (Baileys Library)             │
+                    └──────────────┬──────────────────┘
+                                   │
+                                   │
+                    ┌──────────────▼──────────────────┐
+                    │   Bot Server (Node.js)          │
+                    │   DigitalOcean Droplet          │
+                    │   - Message Handler             │
+                    │   - Booking Flow Logic          │
+                    │   - Pricing Calculator          │
+                    │   - Session Manager             │
+                    └──────────────┬──────────────────┘
+                                   │
+                                   │ API Calls
+                                   │
+                    ┌──────────────▼──────────────────┐
+                    │   Supabase Database             │
+                    │   - user_sessions               │
+                    │   - bookings                    │
+                    │   - bot_settings                │
+                    │   - bot_messages                │
+                    └─────────────────────────────────┘
+
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  📊 DATA FLOW                                                        │
+└──────────────────────────────────────────────────────────────────────┘
+
+  When Customer Sends Message:
+  
+  1. WhatsApp → Bot Server
+     ├─ Message text
+     ├─ Sender phone number
+     └─ Timestamp
+  
+  2. Bot Server → Database
+     ├─ Load user session
+     ├─ Get bot settings
+     └─ Get bot messages
+  
+  3. Bot Server (Processing)
+     ├─ Identify current step
+     ├─ Validate input
+     ├─ Calculate pricing (if needed)
+     └─ Generate response
+  
+  4. Bot Server → Database
+     ├─ Update user session
+     ├─ Save booking data
+     └─ Log interaction
+  
+  5. Bot Server → WhatsApp
+     └─ Send response message
+  
+  6. WhatsApp → Customer
+     └─ Display message
+
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  🔐 AUTHENTICATION FLOW                                              │
+└──────────────────────────────────────────────────────────────────────┘
+
+  One-Time Setup (QR Code Scan):
+  
+  ┌─────────────────────────────────────────────────────────────────┐
+  │                                                                 │
+  │  1. Bot starts → Generates QR code                             │
+  │                                                                 │
+  │  2. You scan QR code with customer's phone                     │
+  │                                                                 │
+  │  3. WhatsApp sends authentication token                        │
+  │                                                                 │
+  │  4. Bot saves session data locally                             │
+  │     (in whatsapp-session/ folder)                              │
+  │                                                                 │
+  │  5. Connection established ✅                                   │
+  │                                                                 │
+  │  6. Bot can now send/receive messages                          │
+  │     as the customer's WhatsApp number                          │
+  │                                                                 │
+  │  7. Session persists forever                                   │
+  │     (no need to scan again)                                    │
+  │                                                                 │
+  └─────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  💾 SESSION PERSISTENCE                                              │
+└──────────────────────────────────────────────────────────────────────┘
+
+  How Session Data is Saved:
+  
+  Server Filesystem:
+  /opt/zimship-bot/
+  ├── whatsapp-session/
+  │   ├── creds.json          ← Authentication credentials
+  │   ├── app-state-sync-*.json  ← WhatsApp state
+  │   └── session-*.json      ← Session data
+  ├── qr-code.png             ← QR code image (temporary)
+  └── src/                    ← Bot code
+  
+  Database (Supabase):
+  ├── user_sessions           ← Customer conversation state
+  ├── bookings                ← Completed bookings
+  ├── bot_settings            ← Pricing configuration
+  └── bot_messages            ← Bot response templates
+
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  🔄 AUTO-RESTART & RECOVERY                                          │
+└──────────────────────────────────────────────────────────────────────┘
+
+  PM2 Process Manager:
+  
+  ┌─────────────────────────────────────────────────────────────────┐
+  │                                                                 │
+  │  Bot crashes? → PM2 restarts it automatically                  │
+  │                                                                 │
+  │  Server reboots? → PM2 starts bot on boot                      │
+  │                                                                 │
+  │  High memory? → PM2 monitors and alerts                        │
+  │                                                                 │
+  │  Need logs? → PM2 captures all output                          │
+  │                                                                 │
+  └─────────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  📱 CUSTOMER EXPERIENCE                                              │
+└──────────────────────────────────────────────────────────────────────┘
+
+  What Customer Sees:
+  
+  1. Customer opens WhatsApp
+  2. Sends message to +353 87 195 4910
+  3. Receives instant response (< 2 seconds)
+  4. Interacts with menu
+  5. Completes booking in 5 steps
+  6. Gets confirmation with tracking number
+  
+  Customer NEVER:
+  - Sees QR codes
+  - Knows it's a bot (unless told)
+  - Needs to install anything
+  - Needs to scan anything
+  
+  It's just like chatting with a person! 💬
+
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  🎯 KEY POINTS                                                       │
+└──────────────────────────────────────────────────────────────────────┘
+
+  ✅ QR code is scanned ONCE during setup
+  ✅ After that, connection lasts FOREVER
+  ✅ Customers NEVER see QR codes
+  ✅ Bot responds automatically 24/7
+  ✅ All data saved to database
+  ✅ Bot survives crashes and reboots
+  ✅ No human intervention needed
+
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  🔧 MAINTENANCE FLOW                                                 │
+└──────────────────────────────────────────────────────────────────────┘
+
+  Regular Maintenance:
+  
+  Daily:
+  ├─ Check bot status (pm2 status)
+  └─ Review logs for errors
+  
+  Weekly:
+  ├─ Update system packages
+  ├─ Restart bot (pm2 restart)
+  └─ Check database for bookings
+  
+  Monthly:
+  ├─ Backup session data
+  ├─ Review pricing settings
+  └─ Update bot messages if needed
+  
+  As Needed:
+  ├─ Update bot code (git pull)
+  ├─ Adjust pricing (admin panel)
+  └─ Customize messages (admin panel)
+
+
+╔══════════════════════════════════════════════════════════════════════╗
+║  💡 UNDERSTANDING THE FLOW                                           ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+  Think of it like this:
+  
+  1. You rent a computer in the cloud (DigitalOcean)
+  2. You install your bot on that computer
+  3. You connect your customer's WhatsApp to the bot (QR scan)
+  4. The bot runs 24/7 on that computer
+  5. When customers message, the bot responds automatically
+  6. All data is saved to your database
+  
+  That's it! Simple, right? 🎉
+
+╔══════════════════════════════════════════════════════════════════════╗
+║  📚 NEXT STEPS                                                       ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+  Now that you understand the flow:
+  
+  1. Read: CONNECT_TODAY.md (detailed guide)
+  2. Follow: DEPLOYMENT_CHECKLIST.md (step-by-step)
+  3. Reference: COMMANDS_REFERENCE.txt (commands)
+  
+  You'll be live in 20-30 minutes! 🚀
+

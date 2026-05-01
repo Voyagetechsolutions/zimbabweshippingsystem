@@ -1,0 +1,459 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║                                                                      ║
+║   📋 WHATSAPP BOT - COMMAND REFERENCE                                ║
+║                                                                      ║
+║   Quick copy-paste commands for deployment and management           ║
+║                                                                      ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  🚀 INITIAL DEPLOYMENT                                               │
+└──────────────────────────────────────────────────────────────────────┘
+
+# 1. Push to GitHub (from whatsapp-bot folder)
+cd whatsapp-bot
+git init
+git add .
+git commit -m "WhatsApp bot ready for deployment"
+git branch -M main
+git remote add origin https://github.com/YOUR_USERNAME/zimship-bot.git
+git push -u origin main
+
+# 2. Connect to server
+ssh root@YOUR_SERVER_IP
+
+# 3. Install Node.js and PM2
+curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+apt install -y nodejs
+npm install -g pm2
+
+# 4. Clone and setup
+cd /opt
+git clone https://github.com/YOUR_USERNAME/zimship-bot.git
+cd zimship-bot
+npm install
+
+# 5. Start bot
+pm2 start src/index.js --name zimship-bot
+pm2 logs zimship-bot
+
+# 6. Download QR code (from local computer)
+scp root@YOUR_SERVER_IP:/opt/zimship-bot/qr-code.png ./Desktop/
+
+# 7. Make permanent
+pm2 save
+pm2 startup
+# [Run the command PM2 shows]
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  🔧 DAILY MANAGEMENT                                                 │
+└──────────────────────────────────────────────────────────────────────┘
+
+# Check if bot is running
+pm2 status
+
+# View live logs
+pm2 logs zimship-bot
+
+# View last 50 lines of logs
+pm2 logs zimship-bot --lines 50
+
+# View only errors
+pm2 logs zimship-bot --err
+
+# Restart bot
+pm2 restart zimship-bot
+
+# Stop bot
+pm2 stop zimship-bot
+
+# Start bot (if stopped)
+pm2 start zimship-bot
+
+# Monitor resources (CPU, memory)
+pm2 monit
+
+# Get detailed info
+pm2 info zimship-bot
+
+# Clear logs
+pm2 flush zimship-bot
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  🔄 UPDATE BOT CODE                                                  │
+└──────────────────────────────────────────────────────────────────────┘
+
+# Connect to server
+ssh root@YOUR_SERVER_IP
+
+# Navigate to bot folder
+cd /opt/zimship-bot
+
+# Pull latest code
+git pull
+
+# Install new dependencies (if any)
+npm install
+
+# Restart bot
+pm2 restart zimship-bot
+
+# Verify it's running
+pm2 status
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  🆘 TROUBLESHOOTING                                                  │
+└──────────────────────────────────────────────────────────────────────┘
+
+# QR code expired - get new one
+pm2 restart zimship-bot
+pm2 logs zimship-bot
+# [Download new qr-code.png]
+
+# Bot not responding - check logs
+pm2 logs zimship-bot --lines 100
+
+# Connection lost - reconnect
+rm -rf /opt/zimship-bot/whatsapp-session
+pm2 restart zimship-bot
+# [Scan QR code again]
+
+# Check if file exists
+ls -la /opt/zimship-bot/qr-code.png
+
+# Make QR code readable
+chmod 644 /opt/zimship-bot/qr-code.png
+
+# Check Node.js version
+node --version
+
+# Check npm version
+npm --version
+
+# Check disk space
+df -h
+
+# Check memory usage
+free -h
+
+# Check running processes
+ps aux | grep node
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  🔐 SECURITY                                                         │
+└──────────────────────────────────────────────────────────────────────┘
+
+# Change root password
+passwd
+
+# Setup firewall
+ufw allow 22
+ufw allow 3001
+ufw enable
+
+# Check firewall status
+ufw status
+
+# Update system
+apt update
+apt upgrade -y
+
+# Check for security updates
+apt list --upgradable
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  💾 BACKUP & RESTORE                                                 │
+└──────────────────────────────────────────────────────────────────────┘
+
+# Backup session data
+cd /opt/zimship-bot
+tar -czf session-backup-$(date +%Y%m%d).tar.gz whatsapp-session/
+
+# Download backup to local computer
+scp root@YOUR_SERVER_IP:/opt/zimship-bot/session-backup-*.tar.gz ./
+
+# Restore session (if needed)
+cd /opt/zimship-bot
+tar -xzf session-backup-YYYYMMDD.tar.gz
+pm2 restart zimship-bot
+
+# Backup entire bot folder
+cd /opt
+tar -czf zimship-bot-backup-$(date +%Y%m%d).tar.gz zimship-bot/
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  📊 MONITORING                                                       │
+└──────────────────────────────────────────────────────────────────────┘
+
+# Check uptime
+pm2 info zimship-bot | grep uptime
+
+# Check memory usage
+pm2 info zimship-bot | grep memory
+
+# Check CPU usage
+pm2 info zimship-bot | grep cpu
+
+# View all PM2 processes
+pm2 list
+
+# View PM2 dashboard
+pm2 monit
+
+# Check system resources
+htop
+# [Press 'q' to exit]
+
+# Check network connections
+netstat -tulpn | grep node
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  🗂️ FILE MANAGEMENT                                                  │
+└──────────────────────────────────────────────────────────────────────┘
+
+# View .env file
+cat /opt/zimship-bot/.env
+
+# Edit .env file
+nano /opt/zimship-bot/.env
+# [Ctrl+X, Y, Enter to save]
+
+# View package.json
+cat /opt/zimship-bot/package.json
+
+# List all files
+ls -la /opt/zimship-bot/
+
+# Check folder size
+du -sh /opt/zimship-bot/
+
+# Find large files
+find /opt/zimship-bot/ -type f -size +10M
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  🔍 DEBUGGING                                                        │
+└──────────────────────────────────────────────────────────────────────┘
+
+# Test if bot can connect to Supabase
+cd /opt/zimship-bot
+node -e "const { createClient } = require('@supabase/supabase-js'); \
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY); \
+supabase.from('bot_settings').select('*').limit(1).then(console.log);"
+
+# Check environment variables
+cd /opt/zimship-bot
+node -e "require('dotenv').config(); console.log(process.env);"
+
+# Test Node.js
+node -v
+
+# Test npm
+npm -v
+
+# Check if port 3001 is in use
+lsof -i :3001
+
+# Kill process on port 3001 (if needed)
+kill -9 $(lsof -t -i:3001)
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  📱 WHATSAPP SPECIFIC                                                │
+└──────────────────────────────────────────────────────────────────────┘
+
+# Check session folder
+ls -la /opt/zimship-bot/whatsapp-session/
+
+# Clear session (forces re-authentication)
+rm -rf /opt/zimship-bot/whatsapp-session
+pm2 restart zimship-bot
+
+# View QR code path
+ls -la /opt/zimship-bot/qr-code.png
+
+# Download QR code (from local computer)
+scp root@YOUR_SERVER_IP:/opt/zimship-bot/qr-code.png ./Desktop/
+
+# Check if QR code was generated
+pm2 logs zimship-bot | grep "QR code"
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  🌐 NETWORK                                                          │
+└──────────────────────────────────────────────────────────────────────┘
+
+# Check server IP
+curl ifconfig.me
+
+# Test internet connection
+ping -c 3 google.com
+
+# Check DNS resolution
+nslookup supabase.co
+
+# Test Supabase connection
+curl https://oncsaunsqtekwwbzvvyh.supabase.co
+
+# Check open ports
+netstat -tulpn
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  📝 LOGS                                                             │
+└──────────────────────────────────────────────────────────────────────┘
+
+# View all logs
+pm2 logs zimship-bot
+
+# View last 100 lines
+pm2 logs zimship-bot --lines 100
+
+# View only errors
+pm2 logs zimship-bot --err
+
+# View only output
+pm2 logs zimship-bot --out
+
+# Follow logs in real-time
+pm2 logs zimship-bot --raw
+
+# Save logs to file
+pm2 logs zimship-bot --lines 1000 > bot-logs.txt
+
+# Clear all logs
+pm2 flush
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  🔄 PM2 MANAGEMENT                                                   │
+└──────────────────────────────────────────────────────────────────────┘
+
+# Save PM2 configuration
+pm2 save
+
+# Setup auto-start on boot
+pm2 startup
+
+# Disable auto-start
+pm2 unstartup
+
+# Delete bot from PM2
+pm2 delete zimship-bot
+
+# Restart all PM2 processes
+pm2 restart all
+
+# Stop all PM2 processes
+pm2 stop all
+
+# Update PM2
+npm install -g pm2
+pm2 update
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  🧪 TESTING                                                          │
+└──────────────────────────────────────────────────────────────────────┘
+
+# Test bot locally (before deploying)
+cd whatsapp-bot
+npm install
+npm start
+
+# Run in development mode
+NODE_ENV=development npm start
+
+# Test with specific port
+PORT=3002 npm start
+
+# Check if dependencies are installed
+npm list
+
+# Install missing dependencies
+npm install
+
+# Clean install
+rm -rf node_modules package-lock.json
+npm install
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  📞 CUSTOMER SUPPORT                                                 │
+└──────────────────────────────────────────────────────────────────────┘
+
+# Check recent bookings in database
+# [Go to Supabase dashboard]
+# [Open 'bookings' table]
+# [Sort by created_at DESC]
+
+# Check user sessions
+# [Go to Supabase dashboard]
+# [Open 'user_sessions' table]
+
+# Check bot settings
+# [Go to Supabase dashboard]
+# [Open 'bot_settings' table]
+
+# WhatsApp direct link
+https://wa.me/353871954910?text=Hi
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  💡 QUICK TIPS                                                       │
+└──────────────────────────────────────────────────────────────────────┘
+
+# Always check logs first when troubleshooting
+pm2 logs zimship-bot --lines 50
+
+# Restart fixes most issues
+pm2 restart zimship-bot
+
+# Keep system updated
+apt update && apt upgrade -y
+
+# Backup before making changes
+tar -czf backup.tar.gz /opt/zimship-bot/
+
+# Monitor for first 24 hours after deployment
+pm2 monit
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  🎯 COMMON TASKS                                                     │
+└──────────────────────────────────────────────────────────────────────┘
+
+# Daily check
+ssh root@YOUR_SERVER_IP
+pm2 status
+pm2 logs zimship-bot --lines 20
+
+# Weekly maintenance
+ssh root@YOUR_SERVER_IP
+apt update && apt upgrade -y
+pm2 restart zimship-bot
+pm2 logs zimship-bot --lines 50
+
+# Monthly backup
+ssh root@YOUR_SERVER_IP
+cd /opt/zimship-bot
+tar -czf session-backup-$(date +%Y%m%d).tar.gz whatsapp-session/
+exit
+scp root@YOUR_SERVER_IP:/opt/zimship-bot/session-backup-*.tar.gz ./
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  📚 DOCUMENTATION                                                    │
+└──────────────────────────────────────────────────────────────────────┘
+
+CONNECT_TODAY.md          - Full deployment guide
+DEPLOYMENT_CHECKLIST.md   - Step-by-step checklist
+QUICK_CONNECT_GUIDE.txt   - Visual quick guide
+COMMANDS_REFERENCE.txt    - This file
+START_HERE.txt            - Overview and getting started
+QUICK_START.txt           - Quick start guide
+DEPLOYMENT.txt            - Basic deployment steps
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  🆘 EMERGENCY CONTACTS                                               │
+└──────────────────────────────────────────────────────────────────────┘
+
+Server IP: ___________________
+Root Password: (stored securely)
+GitHub Repo: ___________________
+Supabase URL: https://oncsaunsqtekwwbzvvyh.supabase.co
+Bot Phone: +353 87 195 4910
+
+╔══════════════════════════════════════════════════════════════════════╗
+║  💡 TIP: Bookmark this file for quick command reference!             ║
+╚══════════════════════════════════════════════════════════════════════╝
