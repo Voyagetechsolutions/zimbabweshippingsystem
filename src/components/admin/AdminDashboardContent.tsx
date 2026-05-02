@@ -50,6 +50,7 @@ import ServiceReviewsTab from '@/components/admin/tabs/ServiceReviewsTab';
 import ManualBookingTab from '@/components/admin/tabs/ManualBookingTab';
 import WhatsAppBotSettingsTab from '@/components/admin/tabs/WhatsAppBotSettingsTab';
 import DeliveryNotesTab from '@/components/admin/tabs/DeliveryNotesTab';
+import InvoicesTab from '@/components/admin/tabs/InvoicesTab';
 
 // Icons
 import {
@@ -164,6 +165,7 @@ const AdminDashboardInner = () => {
       key: 'finance',
       label: 'Finance',
       items: [
+        { value: 'invoices', label: 'Invoices', icon: FileText },
         { value: 'payments', label: 'Payments', icon: CreditCard },
         { value: 'paymentSchedule', label: '30-Day Payments', icon: CalendarDays },
         { value: 'reports', label: 'Reports', icon: BarChart3 },
@@ -499,6 +501,7 @@ const AdminDashboardInner = () => {
       case 'contentManagement': return <ContentManagement />;
       case 'feedback': return <ServiceReviewsTab />;
       case 'deliveryNotes': return <DeliveryNotesTab />;
+      case 'invoices': return <InvoicesTab />;
       case 'whatsappBot': return <WhatsAppBotSettingsTab />;
       case 'settings': return <SystemSettingsTab />;
       default: return null;
