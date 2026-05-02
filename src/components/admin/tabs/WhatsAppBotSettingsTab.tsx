@@ -10,7 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Save, RefreshCcw, MessageSquare, DollarSign, Info } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Save, RefreshCcw, MessageSquare, DollarSign, Info, ToggleRight } from 'lucide-react';
 
 interface BotSetting {
   key: string;
@@ -41,6 +42,16 @@ const SETTING_GROUPS = [
     title: 'Additional Services',
     description: 'Add-on charges during booking',
     keys: ['seal_price', 'door_to_door_price'],
+  },
+];
+
+// Boolean feature flags stored in bot_settings (value 1 = on, 0 = off)
+const FEATURE_TOGGLES: { key: string; label: string; description: string }[] = [
+  {
+    key: 'delivery_notes_enabled',
+    label: 'Enable Delivery Notes',
+    description:
+      'When on, the bot asks customers for delivery instructions during booking and saves them on the shipment.',
   },
 ];
 
@@ -94,6 +105,18 @@ const WhatsAppBotSettingsTab = () => {
     const value = parseFloat(raw);
     if (isNaN(value)) return;
     setSettings(prev => ({ ...prev, [key]: { ...prev[key], value } }));
+  };
+
+  const handleToggleChange = (key: string, on: boolean, label: string, description: string) => {
+    setSettings(prev => ({
+      ...prev,
+      [key]: {
+        key,
+        value: on ? 1 : 0,
+        label: prev[key]?.label || label,
+        description: prev[key]?.description || description,
+      },
+    }));
   };
 
   const handleMessageChange = (key: string, message: string) => {
@@ -190,6 +213,36 @@ const WhatsAppBotSettingsTab = () => {
                   </CardContent>
                 </Card>
               ))}
+
+              {/* Feature toggles */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                    <ToggleRight className="h-4 w-4" /> Features
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Turn optional bot behaviours on or off
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {FEATURE_TOGGLES.map(t => {
+                    const on = (settings[t.key]?.value ?? 0) > 0;
+                    return (
+                      <div key={t.key} className="flex items-start justify-between gap-4">
+                        <div className="space-y-0.5">
+                          <Label htmlFor={t.key} className="text-sm font-medium">{t.label}</Label>
+                          <p className="text-xs text-muted-foreground">{t.description}</p>
+                        </div>
+                        <Switch
+                          id={t.key}
+                          checked={on}
+                          onCheckedChange={v => handleToggleChange(t.key, v, t.label, t.description)}
+                        />
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
 
               {/* Pricing preview */}
               <Card>

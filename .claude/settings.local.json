@@ -23,7 +23,22 @@
       "Bash(node --check whatsapp-bot/src/services/userSession.js)",
       "Bash(node --check whatsapp-bot-uk/src/services/userSession.js)",
       "Bash(node --check whatsapp-bot/src/handlers/messageHandler.js)",
-      "Bash(node --check whatsapp-bot/src/menus/mainMenu.js)"
+      "Bash(node --check whatsapp-bot/src/menus/mainMenu.js)",
+      "Bash(node --check flows/booking.js)",
+      "Bash(node --check bot.js)",
+      "Bash(node --check flows/tracking.js)",
+      "Bash(node --check utils/database.js)",
+      "Bash(node --check utils/pricing.js)",
+      "Bash(node --check utils/sessions.js)",
+      "Bash(timeout 8 node bot.js)",
+      "Bash(node --check ireland-whatsapp-bot/bot.js)",
+      "Bash(nslookup oncsaunsqtekwwbzvvyh.supabase.co)",
+      "Bash(nslookup oncsaunsqtekwwbzvvyh.supabase.co 8.8.8.8)",
+      "Bash(nslookup supabase.co 8.8.8.8)",
+      "Bash(node --check ireland-whatsapp-bot/flows/booking.js)",
+      "Bash(node --check ireland-whatsapp-bot/utils/database.js)",
+      "Bash(npx -y -p typescript@5 tsc --noEmit -p tsconfig.app.json)",
+      "Bash(node --check ireland-whatsapp-bot/utils/sessions.js)"
     ]
   }
 }
