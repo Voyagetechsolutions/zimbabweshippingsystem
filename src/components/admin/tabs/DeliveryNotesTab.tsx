@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -16,7 +17,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  Search, Download, RefreshCw, FileText, Loader2, Eye, CheckSquare, Square, Lock,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Search, Download, RefreshCw, FileText, Loader2, Eye, CheckSquare, Square, Lock, Pencil,
 } from 'lucide-react';
 import DeliveryNoteGenerator, { buildRefNumber, DeliveryNoteTemplate } from '@/components/admin/DeliveryNoteGenerator';
 
@@ -53,6 +57,9 @@ const DeliveryNotesTab = () => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [previewShipment, setPreviewShipment] = useState<Shipment | null>(null);
   const [bulkGenerating, setBulkGenerating] = useState(false);
+  const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
+  const [editNoteText, setEditNoteText] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
 
   // Hidden render area for bulk PDF generation
   const bulkRenderRef = useRef<HTMLDivElement>(null);
@@ -130,6 +137,43 @@ const DeliveryNotesTab = () => {
       title: newValue ? 'Marked as paid' : 'Marked as unpaid',
       description: `Delivery note ${newValue ? 'unlocked' : 'locked'} for ${buildRefNumber(shipment)}`,
     });
+  };
+
+  // ── Edit delivery note (free-text instruction collected during booking) ──
+  const openEditNote = (shipment: Shipment) => {
+    const current = (shipment.metadata as Record<string, unknown> | undefined)?.deliveryNote;
+    setEditNoteText(typeof current === 'string' ? current : '');
+    setEditingShipment(shipment);
+  };
+
+  const saveDeliveryNote = async () => {
+    if (!editingShipment) return;
+    const trimmed = editNoteText.trim();
+    const normalised = trimmed === '' ? null : trimmed.slice(0, 500);
+    const newMetadata = { ...(editingShipment.metadata || {}), deliveryNote: normalised };
+
+    setSavingNote(true);
+    const previous = editingShipment;
+
+    // Optimistic update
+    setShipments(prev => prev.map(s =>
+      s.id === editingShipment.id ? { ...s, metadata: newMetadata } : s,
+    ));
+
+    const { error } = await supabase
+      .from('shipments')
+      .update({ metadata: newMetadata })
+      .eq('id', editingShipment.id);
+
+    setSavingNote(false);
+
+    if (error) {
+      setShipments(prev => prev.map(s => s.id === previous.id ? previous : s));
+      toast({ title: 'Could not save note', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Delivery note updated', description: buildRefNumber(editingShipment) });
+    setEditingShipment(null);
   };
 
   // ── Single PDF download ──
@@ -427,6 +471,16 @@ const DeliveryNotesTab = () => {
                             <Button
                               variant="ghost"
                               size="sm"
+                              onClick={() => openEditNote(shipment)}
+                              className="h-8 px-2"
+                              title="Edit delivery note text"
+                            >
+                              <Pencil className="h-4 w-4 mr-1" />
+                              Note
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => togglePaid(shipment)}
                               className="h-8 px-2 text-xs"
                               title={paid ? 'Mark this delivery note as unpaid' : 'Customer paid — unlock delivery note'}
@@ -479,6 +533,43 @@ const DeliveryNotesTab = () => {
           shipment={previewShipment}
         />
       )}
+
+      {/* Edit delivery note dialog */}
+      <Dialog open={!!editingShipment} onOpenChange={(open) => !open && setEditingShipment(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Delivery Note</DialogTitle>
+            <DialogDescription>
+              {editingShipment && (
+                <>
+                  Customer instruction for <span className="font-mono">{buildRefNumber(editingShipment)}</span>
+                  {' '}({editingShipment.tracking_number}).
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Textarea
+              rows={5}
+              maxLength={500}
+              placeholder="Landmarks, gate codes, preferred drop-off times, etc. Leave blank to remove."
+              value={editNoteText}
+              onChange={(e) => setEditNoteText(e.target.value)}
+            />
+            <div className="text-xs text-muted-foreground text-right">
+              {editNoteText.length}/500
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingShipment(null)} disabled={savingNote}>
+              Cancel
+            </Button>
+            <Button onClick={saveDeliveryNote} disabled={savingNote}>
+              {savingNote ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</> : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
