@@ -38,7 +38,16 @@
       "Bash(node --check ireland-whatsapp-bot/flows/booking.js)",
       "Bash(node --check ireland-whatsapp-bot/utils/database.js)",
       "Bash(npx -y -p typescript@5 tsc --noEmit -p tsconfig.app.json)",
-      "Bash(node --check ireland-whatsapp-bot/utils/sessions.js)"
+      "Bash(node --check ireland-whatsapp-bot/utils/sessions.js)",
+      "Read(//c/Users/Mthokozisi.DESKTOP-DPOBCC1/Documents/**)",
+      "Read(//c/Users/Mthokozisi.DESKTOP-DPOBCC1/Documents/whatsapp-bot-uk/**)",
+      "Read(//c/Users/Mthokozisi.DESKTOP-DPOBCC1/Documents/whatsapp-bot-uk/src/**)",
+      "Bash(node --check utils/validation.js)",
+      "Bash(npm install *)",
+      "Bash(node --check uk-whatsapp-bot/bot.js)",
+      "Bash(node --check uk-whatsapp-bot/utils/pricing.js)",
+      "Bash(node --check uk-whatsapp-bot/flows/booking.js)",
+      "Bash(node --check qr-server.js)"
     ]
   }
 }
