@@ -16,6 +16,7 @@ import { getPricingMessage } from './utils/pricing.js';
 import { getUserSession, updateUserSession } from './utils/sessions.js';
 import { handleBookingFlow } from './flows/booking.js';
 import { handleTrackingFlow } from './flows/tracking.js';
+import { startQrServer, setQr, setConnected, setDisconnected } from './qr-server.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -315,6 +316,7 @@ async function startBot() {
       const { connection, lastDisconnect, qr } = update;
       
       if (qr) {
+        setQr(qr);
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         console.log('📱 SCAN THIS QR CODE WITH YOUR WHATSAPP:');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
@@ -329,9 +331,10 @@ async function startBot() {
       }
       
       if (connection === 'close') {
+        setDisconnected();
         const statusCode = lastDisconnect?.error?.output?.statusCode;
         const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-        
+
         console.log('\n❌ Connection closed');
         console.log(`Status: ${statusCode}`);
         console.log(`Reconnecting: ${shouldReconnect}\n`);
@@ -345,6 +348,7 @@ async function startBot() {
         }
       } else if (connection === 'open') {
         botConnected = true;
+        setConnected(sock.user?.id || 'Unknown');
         console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         console.log('✅ BOT CONNECTED SUCCESSFULLY!');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -390,6 +394,10 @@ process.on('SIGINT', () => {
   console.log('\n\n🛑 Bot stopped by user');
   process.exit(0);
 });
+
+// Start the QR server (Railway provides PORT, locally defaults to 3000)
+const QR_PORT = parseInt(process.env.PORT || '3000', 10);
+startQrServer(QR_PORT);
 
 // Start the bot
 console.log('🚀 Starting bot...\n');
