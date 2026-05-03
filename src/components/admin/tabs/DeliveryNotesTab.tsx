@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import TabHeader from '../TabHeader';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,7 +20,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  Search, Download, RefreshCw, FileText, Loader2, Eye, CheckSquare, Square, Lock, Pencil,
+  Search, Download, RefreshCw, FileText, Loader2, Eye, Pencil,
 } from 'lucide-react';
 import DeliveryNoteGenerator, { buildRefNumber, DeliveryNoteTemplate } from '@/components/admin/DeliveryNoteGenerator';
 
@@ -41,11 +41,6 @@ function getRecipientName(s: Shipment) {
     'Unknown';
 }
 
-// Delivery notes are a paid feature — flagged in the shipment's metadata.
-function isDeliveryNotePaid(s: Shipment): boolean {
-  return Boolean(s.metadata?.deliveryNotePaid);
-}
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const DeliveryNotesTab = () => {
@@ -60,9 +55,6 @@ const DeliveryNotesTab = () => {
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
   const [editNoteText, setEditNoteText] = useState('');
   const [savingNote, setSavingNote] = useState(false);
-
-  // Hidden render area for bulk PDF generation
-  const bulkRenderRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { fetchShipments(); }, []);
 
@@ -110,35 +102,6 @@ const DeliveryNotesTab = () => {
     }
   };
 
-  // ── Toggle paid status (delivery notes are a paid feature) ──
-  const togglePaid = async (shipment: Shipment) => {
-    const newValue = !isDeliveryNotePaid(shipment);
-    const newMetadata = { ...(shipment.metadata || {}), deliveryNotePaid: newValue };
-
-    // Optimistic update
-    setShipments(prev => prev.map(s =>
-      s.id === shipment.id ? { ...s, metadata: newMetadata } : s,
-    ));
-
-    const { error } = await supabase
-      .from('shipments')
-      .update({ metadata: newMetadata })
-      .eq('id', shipment.id);
-
-    if (error) {
-      // Revert on failure
-      setShipments(prev => prev.map(s =>
-        s.id === shipment.id ? shipment : s,
-      ));
-      toast({ title: 'Could not update', description: error.message, variant: 'destructive' });
-      return;
-    }
-    toast({
-      title: newValue ? 'Marked as paid' : 'Marked as unpaid',
-      description: `Delivery note ${newValue ? 'unlocked' : 'locked'} for ${buildRefNumber(shipment)}`,
-    });
-  };
-
   // ── Edit delivery note (free-text instruction collected during booking) ──
   const openEditNote = (shipment: Shipment) => {
     const current = (shipment.metadata as Record<string, unknown> | undefined)?.deliveryNote;
@@ -178,14 +141,6 @@ const DeliveryNotesTab = () => {
 
   // ── Single PDF download ──
   const downloadSingle = async (shipment: Shipment) => {
-    if (!isDeliveryNotePaid(shipment)) {
-      toast({
-        title: 'Payment required',
-        description: 'This delivery note is a paid feature. Mark as paid to unlock.',
-        variant: 'destructive',
-      });
-      return;
-    }
     try {
       const html2canvas = (await import('html2canvas')).default;
       const { jsPDF } = await import('jspdf');
@@ -230,23 +185,6 @@ const DeliveryNotesTab = () => {
       toast({ title: 'Nothing selected', description: 'Select at least one shipment.', variant: 'destructive' });
       return;
     }
-    const allSelected = shipments.filter(s => selected.has(s.id));
-    const paidOnly = allSelected.filter(isDeliveryNotePaid);
-    const unpaidCount = allSelected.length - paidOnly.length;
-    if (paidOnly.length === 0) {
-      toast({
-        title: 'All selected notes are unpaid',
-        description: 'Mark at least one as paid to download.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    if (unpaidCount > 0) {
-      toast({
-        title: `${unpaidCount} unpaid note(s) skipped`,
-        description: `Only ${paidOnly.length} paid note(s) will be downloaded.`,
-      });
-    }
     setBulkGenerating(true);
     try {
       const html2canvas = (await import('html2canvas')).default;
@@ -254,7 +192,7 @@ const DeliveryNotesTab = () => {
       const JSZip = (await import('jszip')).default;
 
       const zip = new JSZip();
-      const selectedShipments = paidOnly;
+      const selectedShipments = shipments.filter(s => selected.has(s.id));
 
       for (const shipment of selectedShipments) {
         const container = document.createElement('div');
@@ -408,7 +346,6 @@ const DeliveryNotesTab = () => {
                     <TableHead>Recipient</TableHead>
                     <TableHead>Route</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Paid</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -416,7 +353,6 @@ const DeliveryNotesTab = () => {
                   {filtered.map(shipment => {
                     const refNum = buildRefNumber(shipment);
                     const isChecked = selected.has(shipment.id);
-                    const paid = isDeliveryNotePaid(shipment);
                     const collectionRoute = shipment.metadata?.collectionRoute ||
                       shipment.metadata?.collection?.route ||
                       shipment.metadata?.sender?.city ||
@@ -456,16 +392,6 @@ const DeliveryNotesTab = () => {
                             {shipment.status}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          {paid ? (
-                            <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs">Paid</Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-xs text-amber-700 border-amber-300 dark:text-amber-300 dark:border-amber-700">
-                              <Lock className="h-3 w-3 mr-1" />
-                              Unpaid
-                            </Badge>
-                          )}
-                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
                             <Button
@@ -481,23 +407,9 @@ const DeliveryNotesTab = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => togglePaid(shipment)}
-                              className="h-8 px-2 text-xs"
-                              title={paid ? 'Mark this delivery note as unpaid' : 'Customer paid — unlock delivery note'}
-                            >
-                              {paid ? 'Unmark paid' : 'Mark paid'}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => paid ? setPreviewShipment(shipment) : toast({
-                                title: 'Payment required',
-                                description: 'Mark this delivery note as paid to preview.',
-                                variant: 'destructive',
-                              })}
-                              disabled={!paid}
+                              onClick={() => setPreviewShipment(shipment)}
                               className="h-8 px-2"
-                              title={paid ? 'Preview delivery note' : 'Locked — customer has not paid'}
+                              title="Preview delivery note"
                             >
                               <Eye className="h-4 w-4 mr-1" />
                               Preview
@@ -506,9 +418,8 @@ const DeliveryNotesTab = () => {
                               variant="ghost"
                               size="sm"
                               onClick={() => downloadSingle(shipment)}
-                              disabled={!paid}
                               className="h-8 px-2"
-                              title={paid ? 'Download PDF' : 'Locked — customer has not paid'}
+                              title="Download PDF"
                             >
                               <Download className="h-4 w-4 mr-1" />
                               PDF
