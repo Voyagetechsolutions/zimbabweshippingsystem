@@ -11,20 +11,35 @@ cd ireland-whatsapp-bot
 npm install
 ```
 
-### 2. Start the Bot
+### 2. Run Diagnostics (Recommended)
+
+Before starting the bot, run diagnostics to check everything is set up correctly:
+
+```bash
+# Linux/Mac
+bash diagnose.sh
+
+# Windows
+diagnose.bat
+
+# Or use Node.js
+node check-status.js
+```
+
+### 3. Start the Bot
 
 ```bash
 npm start
 ```
 
-### 3. Scan QR Code
+### 4. Scan QR Code
 
-- A QR code will appear in the terminal
+- Visit http://localhost:3000 in your browser (or check terminal for QR code)
 - Open WhatsApp on your phone
 - Go to Settings → Linked Devices → Link a Device
 - Scan the QR code
 
-### 4. Test the Bot
+### 5. Test the Bot
 
 From **another phone**, send "hi" to the WhatsApp number you connected.
 
@@ -120,10 +135,24 @@ npm start
 
 ## 🚨 Troubleshooting
 
+### QR Code Not Loading?
+
+**Quick Fix:**
+```bash
+# Check bot status
+node check-status.js
+
+# Test QR server independently
+node test-qr-server.js
+```
+
+**See detailed guide:** [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+
 ### Bot not responding?
 1. Check if bot is connected (should say "BOT CONNECTED SUCCESSFULLY")
 2. Make sure you're testing from a DIFFERENT phone
 3. Check terminal for error messages
+4. Visit http://localhost:3000/health to check status
 
 ### QR code expired?
 1. Stop bot (Ctrl+C)
@@ -134,6 +163,34 @@ npm start
 1. Check internet connection
 2. Delete session folder
 3. Restart bot
+
+## 📚 Documentation
+
+- **[DEPLOY.md](DEPLOY.md)** - Deploy to Railway (production)
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Detailed troubleshooting guide
+- **[FEATURES.md](FEATURES.md)** - Complete feature list
+- **[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)** - Technical details
+
+## 🛠️ Diagnostic Tools
+
+### check-status.js
+Quick health check:
+```bash
+node check-status.js
+```
+
+### test-qr-server.js
+Test QR server independently:
+```bash
+node test-qr-server.js
+```
+
+### diagnose.sh / diagnose.bat
+Full system diagnostic:
+```bash
+bash diagnose.sh  # Linux/Mac
+diagnose.bat      # Windows
+```
 
 ## ✅ Success Checklist
 

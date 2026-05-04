@@ -54,25 +54,40 @@ function renderPage(body) {
 }
 
 async function handleRequest(req, res) {
+  // Health check - always respond even if bot isn't ready
   if (req.url === '/health') {
+    const status = connectedUser ? 'connected' : currentQr ? 'awaiting_scan' : 'starting';
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: connectedUser ? 'connected' : currentQr ? 'awaiting_scan' : 'starting', updated: lastUpdated }));
+    res.end(JSON.stringify({ 
+      status, 
+      updated: lastUpdated,
+      hasQr: !!currentQr,
+      connected: !!connectedUser,
+      uptime: process.uptime()
+    }));
     return;
   }
 
-  if (req.url === '/qr.png' && currentQr) {
+  // QR image endpoint
+  if (req.url.startsWith('/qr.png')) {
+    if (!currentQr) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('QR code not ready yet');
+      return;
+    }
     try {
       const buf = await QRCode.toBuffer(currentQr, { width: 360, margin: 2 });
       res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-store' });
       res.end(buf);
       return;
     } catch (err) {
-      res.writeHead(500);
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end('QR error: ' + err.message);
       return;
     }
   }
 
+  // Main page
   let body = '';
   if (connectedUser) {
     body = `
@@ -83,7 +98,8 @@ async function handleRequest(req, res) {
   } else if (currentQr) {
     body = `
       <p class="pending">📱 Waiting for QR scan</p>
-      <img src="/qr.png?t=${lastUpdated}" alt="WhatsApp QR Code" />
+      <img src="/qr.png?t=${lastUpdated}" alt="WhatsApp QR Code" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+      <p style="display:none; color:#f59e0b; margin:16px 0;">⏳ Loading QR code...</p>
       <ol>
         <li>Open WhatsApp on the phone you want to use as the bot</li>
         <li>Tap <b>Settings → Linked Devices</b></li>
@@ -91,7 +107,8 @@ async function handleRequest(req, res) {
       </ol>
     `;
   } else {
-    body = `<p class="pending">⏳ Starting up — waiting for WhatsApp to issue a QR code…</p>`;
+    body = `<p class="pending">⏳ Starting up — waiting for WhatsApp to issue a QR code…</p>
+    <p style="font-size:12px; color:#94a3b8; margin-top:16px;">Uptime: ${Math.floor(process.uptime())} seconds</p>`;
   }
 
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -102,12 +119,27 @@ export function startQrServer(port) {
   const server = http.createServer((req, res) => {
     handleRequest(req, res).catch(err => {
       console.error('QR server error:', err);
-      res.writeHead(500);
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
       res.end('Internal error');
     });
   });
+  
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`❌ Port ${port} is already in use. Please set a different PORT environment variable.`);
+      process.exit(1);
+    } else {
+      console.error('❌ QR server error:', err);
+    }
+  });
+  
   server.listen(port, '0.0.0.0', () => {
     console.log(`🌐 QR server listening on port ${port}`);
+    console.log(`📱 Open this URL to scan QR code: http://localhost:${port}`);
+    if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+      console.log(`🌍 Public URL: https://${process.env.RAILWAY_PUBLIC_DOMAIN}`);
+    }
   });
+  
   return server;
 }

@@ -397,6 +397,7 @@ process.on('uncaughtException', (err) => {
 
 // Start the QR server (Railway provides PORT, locally defaults to 3000)
 const QR_PORT = parseInt(process.env.PORT || '3000', 10);
+console.log(`🌐 Starting QR server on port ${QR_PORT}...`);
 startQrServer(QR_PORT);
 
 // Start the bot
@@ -404,6 +405,12 @@ console.log('🚀 Starting bot...\n');
 
 // Initialize database first
 console.log('🔌 Initializing database connection...');
-await initDatabase();
+try {
+  await initDatabase();
+  console.log('✅ Database initialized successfully\n');
+} catch (err) {
+  console.error('❌ Database initialization failed:', err.message);
+  console.error('The bot will continue but database features may not work.\n');
+}
 
 startBot();
