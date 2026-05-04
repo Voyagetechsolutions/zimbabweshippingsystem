@@ -69,6 +69,9 @@ function saveToDBAsync(phoneNumber, session) {
     )
     .then(({ error }) => {
       if (error) console.warn('Session DB write failed:', error.message);
+    })
+    .catch((err) => {
+      console.warn('Session DB write threw:', err?.message || err);
     });
 }
 

@@ -387,6 +387,14 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
+// Don't let stray async errors kill the bot — log and keep running.
+process.on('unhandledRejection', (reason) => {
+  console.warn('⚠️  unhandledRejection:', reason?.message || reason);
+});
+process.on('uncaughtException', (err) => {
+  console.warn('⚠️  uncaughtException:', err?.message || err);
+});
+
 // Start the QR server (Railway provides PORT, locally defaults to 3000)
 const QR_PORT = parseInt(process.env.PORT || '3000', 10);
 startQrServer(QR_PORT);
