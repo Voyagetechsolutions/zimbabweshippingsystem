@@ -106,7 +106,7 @@ export function startQrServer(port) {
       res.end('Internal error');
     });
   });
-  server.listen(port, () => {
+  server.listen(port, '0.0.0.0', () => {
     console.log(`🌐 QR server listening on port ${port}`);
   });
   return server;

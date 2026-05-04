@@ -47,7 +47,8 @@
       "Bash(node --check uk-whatsapp-bot/bot.js)",
       "Bash(node --check uk-whatsapp-bot/utils/pricing.js)",
       "Bash(node --check uk-whatsapp-bot/flows/booking.js)",
-      "Bash(node --check qr-server.js)"
+      "Bash(node --check qr-server.js)",
+      "Bash(node --check /c/Users/Mthokozisi.DESKTOP-DPOBCC1/Documents/zimbabwe-shipping-nexus/ireland-whatsapp-bot/qr-server.js)"
     ]
   }
 }

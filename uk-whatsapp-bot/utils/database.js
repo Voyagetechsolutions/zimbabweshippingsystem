@@ -148,14 +148,9 @@ export async function createBookingRecords(phoneNumber, bookingData, pricing) {
           currency: CURRENCY,
         }
       : null,
-    addOns: {
-      metalSeal: !!bookingData.wantMetalSeal,
-      metalSealPrice: pricing.sealUnit,
-    },
   };
 
   const notes = [];
-  if (bookingData.wantMetalSeal) notes.push('Metal Coded Seal requested');
   if (bookingData.paymentMethod === 'cashOnCollection') notes.push('Cash payment (discount applied)');
   if (bookingData.includeBoxes) notes.push(`Other Items (agent quote): ${bookingData.boxesDescription}`);
   if (bookingData.purchaseDrums && bookingData.purchaseDrumQuantity > 0) {
@@ -193,7 +188,6 @@ export async function createBookingRecords(phoneNumber, bookingData, pricing) {
       purchaseDrumType: bookingData.purchaseDrumType || null,
       purchaseDrumQuantity: bookingData.purchaseDrumQuantity || 0,
       includeOtherItems: !!bookingData.includeBoxes,
-      wantMetalSeal: !!bookingData.wantMetalSeal,
       category: bookingData.boxesDescription || null,
     },
     notes: notes.length ? notes.join(' | ') : null,

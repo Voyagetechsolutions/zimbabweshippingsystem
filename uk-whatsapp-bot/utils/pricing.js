@@ -7,7 +7,6 @@ const UK_PRICING = {
   drum_price_1: 280,
   drum_price_2_4: 270,
   drum_price_5_plus: 260,
-  seal_price: 5,
   purchase_drum_metal: 40,
   purchase_drum_plastic: 50,
 };
@@ -57,10 +56,6 @@ export function getDrumPrice(quantity, settings = DEFAULTS) {
   return settings.drum_price_1;
 }
 
-export function getSealPrice(settings = DEFAULTS) {
-  return settings.seal_price;
-}
-
 export function getPurchaseDrumPrice(type, settings = DEFAULTS) {
   if (type === 'metal') return settings.purchase_drum_metal;
   if (type === 'plastic') return settings.purchase_drum_plastic;
@@ -72,10 +67,6 @@ export function calculatePricing(bookingData, settings = DEFAULTS) {
   const drumUnit = drumQty > 0 ? getDrumPrice(drumQty, settings) : 0;
   const drumTotal = drumQty * drumUnit;
 
-  const sealUnit = getSealPrice(settings);
-  const sealQty = bookingData.wantMetalSeal && drumQty > 0 ? drumQty : 0;
-  const sealCost = sealQty * sealUnit;
-
   let purchaseDrumQty = 0;
   let purchaseDrumUnit = 0;
   let purchaseDrumTotal = 0;
@@ -85,7 +76,7 @@ export function calculatePricing(bookingData, settings = DEFAULTS) {
     purchaseDrumTotal = purchaseDrumQty * purchaseDrumUnit;
   }
 
-  const baseTotal = drumTotal + sealCost + purchaseDrumTotal;
+  const baseTotal = drumTotal + purchaseDrumTotal;
 
   let finalTotal = baseTotal;
   let cashDiscount = 0;
@@ -101,7 +92,6 @@ export function calculatePricing(bookingData, settings = DEFAULTS) {
 
   return {
     drumQty, drumUnit, drumTotal,
-    sealQty, sealUnit, sealCost,
     purchaseDrumQty, purchaseDrumUnit, purchaseDrumTotal,
     purchaseDrumType: bookingData.purchaseDrumType || null,
     baseTotal, cashDiscount, payOnArrivalPremium, finalTotal,
@@ -128,9 +118,6 @@ export async function getPricingMessage() {
 
 *OTHER ITEMS:*
 📋 Custom items quoted individually by our agent.
-
-*ADDITIONAL SERVICES:*
-🔒 Metal coded seal: ${formatMoney(s.seal_price)} per drum
 
 *INCLUDED FREE:*
 ✅ Collection anywhere in England

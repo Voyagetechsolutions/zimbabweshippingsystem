@@ -4,7 +4,6 @@ import { isValidEmail, isValidPhone, isYes, isNo } from '../utils/validation.js'
 import {
   getBotSettings,
   getDrumPrice,
-  getSealPrice,
   getPurchaseDrumPrice,
   calculatePricing,
   formatMoney,
@@ -213,8 +212,8 @@ export async function handleBookingFlow(sock, phoneNumber, text, _session) {
       bookingData.collectionDate = pickupDate || 'To be confirmed';
 
       const dateLine = pickupDate
-        ? `📅 Next collection: *${pickupDate}*`
-        : `📅 Collection date: *to be confirmed* — our team will arrange this with you.`;
+        ? `Next collection: *${pickupDate}*`
+        : `Collection date: *to be confirmed* — our team will arrange this with you.`;
 
       if (session.receiverName && session.receiverPhone) {
         await updateUserSession(phoneNumber, { bookingData, step: 'USE_SAVED_RECEIVER' });
@@ -237,7 +236,7 @@ export async function handleBookingFlow(sock, phoneNumber, text, _session) {
         bookingData.receiverPhone2 = session.receiverPhone2 || null;
         bookingData.receiverAddress = session.receiverAddress;
         bookingData.receiverCity = session.receiverCity;
-        await updateUserSession(phoneNumber, { bookingData, step: 'ASK_DRUMS' });
+        await updateUserSession(phoneNumber, { bookingData, step: 'SHIPPING_TYPE' });
         return askDrums(sock, phoneNumber);
       }
       if (isNo(text)) {
@@ -297,114 +296,98 @@ export async function handleBookingFlow(sock, phoneNumber, text, _session) {
       const v = text.trim();
       if (v.length < 2) return sendMessage(sock, phoneNumber, '❌ Please enter the delivery city.');
       bookingData.receiverCity = v;
-      await updateUserSession(phoneNumber, { bookingData, step: 'ASK_DRUMS', receiverCity: v });
+      await updateUserSession(phoneNumber, { bookingData, step: 'SHIPPING_TYPE', receiverCity: v });
       return askDrums(sock, phoneNumber);
     }
 
-    case 'ASK_DRUMS': {
-      if (isYes(text)) {
+    case 'SHIPPING_TYPE': {
+      const choice = text.trim();
+      if (choice === '1') {
         bookingData.includeDrums = true;
         await updateUserSession(phoneNumber, { bookingData, step: 'DRUM_QUANTITY' });
         const settings = await getBotSettings();
         return sendMessage(sock, phoneNumber,
-          `➡️ *How many drums?*\n\n_Pricing per drum:_\n• 1 drum: ${formatMoney(getDrumPrice(1, settings))}\n• 2–4 drums: ${formatMoney(getDrumPrice(2, settings))} each\n• 5+ drums: ${formatMoney(getDrumPrice(5, settings))} each (best value!)`
+          `➡️ *How many drums?*\n\n_Shipping per drum:_\n• 1 drum: ${formatMoney(getDrumPrice(1, settings))}\n• 2–4 drums: ${formatMoney(getDrumPrice(2, settings))} each\n• 5+ drums: ${formatMoney(getDrumPrice(5, settings))} each (best value!)`
         );
       }
-      if (isNo(text)) {
+      if (choice === '2') {
         bookingData.includeDrums = false;
         bookingData.drumQuantity = 0;
-        await updateUserSession(phoneNumber, { bookingData, step: 'ASK_PURCHASE_DRUMS' });
-        return askPurchaseDrums(sock, phoneNumber);
+        bookingData.includeBoxes = true;
+        await updateUserSession(phoneNumber, { bookingData, step: 'OTHER_ITEMS_DESC' });
+        return sendMessage(sock, phoneNumber,
+          '🎁 *Other Items*\n\n_Other items are anything that won\'t travel inside a drum — for example suitcases, storage tubs, boxes, or household furniture._\n\n➡️ *Please describe what you\'re shipping* (items, approximate sizes/quantities).\n\nOur agent will review your list and send you a personalised quote within 24 hours.'
+        );
       }
-      return sendMessage(sock, phoneNumber, '❌ Please reply *1* (yes) or *2* (no).');
+      return sendMessage(sock, phoneNumber, '❌ Please reply *1* (drums) or *2* (other items).');
     }
 
     case 'DRUM_QUANTITY': {
       const qty = parseInt(text, 10);
       if (isNaN(qty) || qty < 1) return sendMessage(sock, phoneNumber, '❌ Please enter a number (1 or more).');
       bookingData.drumQuantity = qty;
-      await updateUserSession(phoneNumber, { bookingData, step: 'DRUMS_DESCRIPTION' });
+      await updateUserSession(phoneNumber, { bookingData, step: 'DRUM_OWNERSHIP' });
       const settings = await getBotSettings();
       const unit = getDrumPrice(qty, settings);
-      await sendMessage(sock, phoneNumber, `✅ ${qty} × drum @ ${formatMoney(unit)} each = *${formatMoney(qty * unit)}*`);
+      await sendMessage(sock, phoneNumber, `✅ ${qty} × drum shipping @ ${formatMoney(unit)} each = *${formatMoney(qty * unit)}*`);
       return sendMessage(sock, phoneNumber,
-        `📝 *Describe your ${qty === 1 ? 'drum' : 'drums'}*\n\nWhat ${qty === 1 ? 'does it' : 'do they'} look like? (color, markings, anything that helps the driver spot ${qty === 1 ? 'it' : 'them'})\n\n_e.g. ${qty > 1 ? '"3 blue plastic drums with red lids"' : '"blue plastic drum with red lid"'}_`
+        `🛢️ *Do you have your own ${qty === 1 ? 'drum' : 'drums'}, or would you like us to supply ${qty === 1 ? 'one' : 'them'}?*\n\n1️⃣ I have my own\n2️⃣ Supply from you\n\n_Supply prices: Metal Drum ${formatMoney(getPurchaseDrumPrice('metal', settings))} each · Plastic Barrel ${formatMoney(getPurchaseDrumPrice('plastic', settings))} each_`
       );
     }
 
-    case 'DRUMS_DESCRIPTION': {
-      const v = text.trim();
-      if (v.length < 3) return sendMessage(sock, phoneNumber, '❌ Please give a short description so the driver can identify your drums.');
-      bookingData.drumsDescription = v;
-      await updateUserSession(phoneNumber, { bookingData, step: 'ASK_PURCHASE_DRUMS' });
-      return askPurchaseDrums(sock, phoneNumber);
-    }
-
-    case 'ASK_PURCHASE_DRUMS': {
-      if (isYes(text)) {
+    case 'DRUM_OWNERSHIP': {
+      const choice = text.trim();
+      if (choice === '1') {
+        bookingData.purchaseDrums = false;
+        bookingData.purchaseDrumType = null;
+        bookingData.purchaseDrumQuantity = 0;
+        await updateUserSession(phoneNumber, { bookingData, step: 'DRUMS_DESCRIPTION' });
+        const qty = bookingData.drumQuantity;
+        return sendMessage(sock, phoneNumber,
+          `📝 *Describe your ${qty === 1 ? 'drum' : 'drums'}*\n\nWhat ${qty === 1 ? 'does it' : 'do they'} look like? (color, markings, anything that helps the driver spot ${qty === 1 ? 'it' : 'them'})\n\n_e.g. ${qty > 1 ? '"3 blue plastic drums with red lids"' : '"blue plastic drum with red lid"'}_`
+        );
+      }
+      if (choice === '2') {
         bookingData.purchaseDrums = true;
         await updateUserSession(phoneNumber, { bookingData, step: 'PURCHASE_DRUM_TYPE' });
         const settings = await getBotSettings();
         return sendMessage(sock, phoneNumber,
-          `➡️ *Which drum type?*\n\n1️⃣ 🛢️ Metal Drum — ${formatMoney(getPurchaseDrumPrice('metal', settings))} each\n2️⃣ 🛢️ Plastic Barrel — ${formatMoney(getPurchaseDrumPrice('plastic', settings))} each`
+          `➡️ *Which type would you like?*\n\n1️⃣ 🛢️ Metal Drum — ${formatMoney(getPurchaseDrumPrice('metal', settings))} each\n2️⃣ 🛢️ Plastic Barrel — ${formatMoney(getPurchaseDrumPrice('plastic', settings))} each`
         );
       }
-      if (isNo(text)) {
-        bookingData.purchaseDrums = false;
-        bookingData.purchaseDrumType = null;
-        bookingData.purchaseDrumQuantity = 0;
-        await updateUserSession(phoneNumber, { bookingData, step: 'ASK_OTHER_ITEMS' });
-        return askOtherItems(sock, phoneNumber);
-      }
-      return sendMessage(sock, phoneNumber, '❌ Please reply *1* (yes) or *2* (no).');
+      return sendMessage(sock, phoneNumber, '❌ Please reply *1* (I have my own) or *2* (supply from you).');
     }
 
     case 'PURCHASE_DRUM_TYPE': {
       if (text.trim() === '1') bookingData.purchaseDrumType = 'metal';
       else if (text.trim() === '2') bookingData.purchaseDrumType = 'plastic';
       else return sendMessage(sock, phoneNumber, '❌ Please reply *1* (metal) or *2* (plastic).');
-      await updateUserSession(phoneNumber, { bookingData, step: 'PURCHASE_DRUM_QUANTITY' });
-      return sendMessage(sock, phoneNumber, `➡️ *How many ${bookingData.purchaseDrumType === 'metal' ? 'metal drums' : 'plastic barrels'} would you like to buy?*`);
-    }
 
-    case 'PURCHASE_DRUM_QUANTITY': {
-      const qty = parseInt(text, 10);
-      if (isNaN(qty) || qty < 1) return sendMessage(sock, phoneNumber, '❌ Please enter a number (1 or more).');
-      bookingData.purchaseDrumQuantity = qty;
+      bookingData.purchaseDrumQuantity = bookingData.drumQuantity;
       const settings = await getBotSettings();
-      const unit = getPurchaseDrumPrice(bookingData.purchaseDrumType, settings);
-      await sendMessage(sock, phoneNumber, `✅ ${qty} × ${bookingData.purchaseDrumType === 'metal' ? 'metal drum' : 'plastic barrel'} @ ${formatMoney(unit)} = *${formatMoney(qty * unit)}*`);
-      await updateUserSession(phoneNumber, { bookingData, step: 'ASK_OTHER_ITEMS' });
-      return askOtherItems(sock, phoneNumber);
+      const drumUnit = getPurchaseDrumPrice(bookingData.purchaseDrumType, settings);
+      const shipUnit = getDrumPrice(bookingData.drumQuantity, settings);
+      const qty = bookingData.drumQuantity;
+      const drumLabel = bookingData.purchaseDrumType === 'metal' ? 'metal drum' : 'plastic barrel';
+      await sendMessage(sock, phoneNumber,
+        `✅ ${qty} × ${drumLabel} @ ${formatMoney(drumUnit)} = *${formatMoney(qty * drumUnit)}*\n` +
+        `   + shipping ${qty} × ${formatMoney(shipUnit)} = *${formatMoney(qty * shipUnit)}*\n\n` +
+        `*Drums total: ${formatMoney(qty * drumUnit + qty * shipUnit)}*`
+      );
+      return proceedToSummaryOrNotes(sock, phoneNumber, bookingData);
     }
 
-    case 'ASK_OTHER_ITEMS': {
-      if (isYes(text)) {
-        bookingData.includeBoxes = true;
-        await updateUserSession(phoneNumber, { bookingData, step: 'OTHER_ITEMS_DESC' });
-        return sendMessage(sock, phoneNumber,
-          '➡️ *What are you shipping?*\n\n_e.g. 3 boxes of clothes, 1 suitcase, small furniture, electronics..._\n\nOur agent will contact you with a personalised quote within 24 hours.'
-        );
-      }
-      if (isNo(text)) {
-        bookingData.includeBoxes = false;
-        bookingData.boxesDescription = null;
-        return afterItemsSelected(sock, phoneNumber, bookingData);
-      }
-      return sendMessage(sock, phoneNumber, '❌ Please reply *1* (yes) or *2* (no).');
+    case 'DRUMS_DESCRIPTION': {
+      const v = text.trim();
+      if (v.length < 3) return sendMessage(sock, phoneNumber, '❌ Please give a short description so the driver can identify your drums.');
+      bookingData.drumsDescription = v;
+      return proceedToSummaryOrNotes(sock, phoneNumber, bookingData);
     }
 
     case 'OTHER_ITEMS_DESC': {
       const v = text.trim();
       if (v.length < 3) return sendMessage(sock, phoneNumber, '❌ Please give a short description of what you\'re shipping.');
       bookingData.boxesDescription = v;
-      return afterItemsSelected(sock, phoneNumber, bookingData);
-    }
-
-    case 'ASK_METAL_SEAL': {
-      if (isYes(text)) bookingData.wantMetalSeal = true;
-      else if (isNo(text)) bookingData.wantMetalSeal = false;
-      else return sendMessage(sock, phoneNumber, '❌ Please reply *1* (yes) or *2* (no).');
       return proceedToSummaryOrNotes(sock, phoneNumber, bookingData);
     }
 
@@ -505,7 +488,7 @@ async function startBooking(sock, phoneNumber, session) {
   }
 
   await updateUserSession(phoneNumber, { step: 'SENDER_FIRST_NAME', bookingData: {} });
-  return sendMessage(sock, phoneNumber, `${intro}\n\nWhere should we collect from?\n\n➡️ *What\'s your first name?*`);
+  return sendMessage(sock, phoneNumber, `${intro}\n\n➡️ *What\'s your first name?*`);
 }
 
 async function useSavedOrNew(sock, phoneNumber, text, session) {
@@ -545,8 +528,8 @@ async function useSavedOrNew(sock, phoneNumber, text, session) {
     }
 
     const dateLine = bookingData.collectionDate && bookingData.collectionDate !== 'To be confirmed'
-      ? `📅 Next collection: *${bookingData.collectionDate}*`
-      : `📅 Collection date: *to be confirmed*`;
+      ? `Next collection: *${bookingData.collectionDate}*`
+      : `Collection date: *to be confirmed*`;
 
     if (session.receiverName && session.receiverPhone) {
       await updateUserSession(phoneNumber, { bookingData, step: 'USE_SAVED_RECEIVER' });
@@ -570,43 +553,8 @@ async function useSavedOrNew(sock, phoneNumber, text, session) {
 
 async function askDrums(sock, phoneNumber) {
   return sendMessage(sock, phoneNumber,
-    '*Step 3 of 5 — What are you shipping?*\n\n🥁 *Drums (200–220L)?*\n\n1️⃣ Yes\n2️⃣ No'
+    '*Step 3 of 5 — What are you shipping?*\n\n1️⃣ 🥁 Drums (200–220L)\n2️⃣ 🎁 Other items'
   );
-}
-
-async function askPurchaseDrums(sock, phoneNumber) {
-  const settings = await getBotSettings();
-  return sendMessage(sock, phoneNumber,
-    `🛢️ *Need to purchase drums from us?*\n\nWe can supply drums for you at collection.\n\n• Metal Drum: ${formatMoney(getPurchaseDrumPrice('metal', settings))} each\n• Plastic Barrel: ${formatMoney(getPurchaseDrumPrice('plastic', settings))} each\n\n1️⃣ Yes\n2️⃣ No`
-  );
-}
-
-async function askOtherItems(sock, phoneNumber) {
-  return sendMessage(sock, phoneNumber,
-    '🎁 *Anything else?* (clothes, suitcases, small furniture, electronics...)\n\nOur agent will quote these separately.\n\n1️⃣ Yes\n2️⃣ No'
-  );
-}
-
-async function afterItemsSelected(sock, phoneNumber, bookingData) {
-  if (!bookingData.includeDrums && !bookingData.purchaseDrums && !bookingData.includeBoxes) {
-    bookingData.includeDrums = undefined;
-    bookingData.purchaseDrums = undefined;
-    bookingData.includeBoxes = undefined;
-    await updateUserSession(phoneNumber, { bookingData, step: 'ASK_DRUMS' });
-    await sendMessage(sock, phoneNumber, '❌ You haven\'t selected anything to ship. Let\'s try again.');
-    return askDrums(sock, phoneNumber);
-  }
-
-  if (bookingData.includeDrums) {
-    await updateUserSession(phoneNumber, { bookingData, step: 'ASK_METAL_SEAL' });
-    const settings = await getBotSettings();
-    return sendMessage(sock, phoneNumber,
-      `🔒 *Add metal coded seals?*\n\nSecure coded seals for extra peace of mind — *${formatMoney(getSealPrice(settings))} per drum*.\n\n1️⃣ Yes, add seals\n2️⃣ No thanks`
-    );
-  }
-
-  bookingData.wantMetalSeal = false;
-  return proceedToSummaryOrNotes(sock, phoneNumber, bookingData);
 }
 
 async function proceedToSummaryOrNotes(sock, phoneNumber, bookingData) {
@@ -634,7 +582,7 @@ async function showSummary(sock, phoneNumber, bookingData) {
   msg += `${bookingData.senderEmail}\n`;
   msg += `${bookingData.senderAddress}, ${bookingData.senderCity}, ${bookingData.senderPostcode}\n`;
   if (bookingData.collectionRoute) msg += `🚚 Route: ${routeLabel(bookingData.collectionRoute)}\n`;
-  if (bookingData.collectionDate) msg += `📅 Next collection: ${bookingData.collectionDate}\n`;
+  if (bookingData.collectionDate) msg += `Next collection: ${bookingData.collectionDate}\n`;
   msg += `\n`;
 
   msg += `*🇿🇼 Delivery*\n`;
@@ -655,9 +603,6 @@ async function showSummary(sock, phoneNumber, bookingData) {
   }
   if (bookingData.includeBoxes) {
     msg += `🎁 Other items: ${bookingData.boxesDescription}\n   _(agent will quote separately)_\n`;
-  }
-  if (pricing.sealQty > 0) {
-    msg += `🔒 Metal seals × ${pricing.sealQty} = *${formatMoney(pricing.sealCost)}*\n`;
   }
   msg += `\n`;
 
