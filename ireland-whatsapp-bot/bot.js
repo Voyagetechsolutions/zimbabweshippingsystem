@@ -117,9 +117,7 @@ Please press the 📞 *call icon* and click *Voice Call* to speak to one of our 
 🌐 Website: www.zimbabweshipping.ie
 
 *Office Hours:*
-Monday - Friday: 9:00 AM - 6:00 PM
-Saturday: 10:00 AM - 4:00 PM
-Sunday: Closed
+Open daily: 7:00 AM - 8:00 PM
 
 ⏱️ *Response times:*
 • Off-peak: 0–15 minutes

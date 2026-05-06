@@ -105,7 +105,7 @@ export async function createBookingRecords(phoneNumber, bookingData, pricing) {
   const transactionId = generateTransactionId(timestamp);
 
   const isOtherItemsOnly =
-    bookingData.includeBoxes && !bookingData.includeDrums && !bookingData.includeTrunks;
+    bookingData.includeBoxes && !bookingData.includeDrums && !bookingData.purchaseDrums;
 
   const sender = {
     firstName: bookingData.senderFirstName,
@@ -138,34 +138,30 @@ export async function createBookingRecords(phoneNumber, bookingData, pricing) {
           description: bookingData.drumsDescription || null,
         }
       : null,
-    trunks: bookingData.includeTrunks
+    boxes: bookingData.includeBoxes ? { description: bookingData.boxesDescription } : null,
+    purchasedDrums: bookingData.purchaseDrums && bookingData.purchaseDrumQuantity > 0
       ? {
-          quantity: pricing.trunkQty,
-          pricePerTrunk: pricing.trunkUnit,
-          totalPrice: pricing.trunkTotal,
+          type: bookingData.purchaseDrumType,
+          quantity: pricing.purchaseDrumQty,
+          unitPrice: pricing.purchaseDrumUnit,
+          totalPrice: pricing.purchaseDrumTotal,
           currency: CURRENCY,
-          description: bookingData.trunksDescription || null,
         }
       : null,
-    boxes: bookingData.includeBoxes ? { description: bookingData.boxesDescription } : null,
-    addOns: {
-      metalSeal: !!bookingData.wantMetalSeal,
-      metalSealPrice: pricing.sealUnit,
-    },
   };
 
   const notes = [];
-  if (bookingData.wantMetalSeal) notes.push('Metal Coded Seal requested');
   if (bookingData.paymentMethod === 'cashOnCollection') notes.push('Cash payment (discount applied)');
   if (bookingData.includeBoxes) notes.push(`Other Items (agent quote): ${bookingData.boxesDescription}`);
-  if (bookingData.includeTrunks && bookingData.trunkQuantity > 0) {
-    notes.push(`${bookingData.trunkQuantity} x Trunk/Storage Box`);
+  if (bookingData.purchaseDrums && bookingData.purchaseDrumQuantity > 0) {
+    const label = bookingData.purchaseDrumType === 'metal' ? 'Metal Drum' : 'Plastic Barrel';
+    notes.push(`${bookingData.purchaseDrumQuantity} x ${label} (supplied)`);
   }
   if (bookingData.deliveryNote) notes.push(`Delivery note: ${bookingData.deliveryNote}`);
 
   const types = [];
   if (bookingData.includeDrums) types.push('Drums');
-  if (bookingData.includeTrunks) types.push('Trunks');
+  if (bookingData.purchaseDrums) types.push('Supplied Drums');
   if (bookingData.includeBoxes) types.push('Other Items');
 
   const shipmentMetadata = {
@@ -188,11 +184,10 @@ export async function createBookingRecords(phoneNumber, bookingData, pricing) {
       includeDrums: !!bookingData.includeDrums,
       drumQuantity: bookingData.drumQuantity || 0,
       drumsDescription: bookingData.drumsDescription || null,
-      includeTrunks: !!bookingData.includeTrunks,
-      trunkQuantity: bookingData.trunkQuantity || 0,
-      trunksDescription: bookingData.trunksDescription || null,
+      purchaseDrums: !!bookingData.purchaseDrums,
+      purchaseDrumType: bookingData.purchaseDrumType || null,
+      purchaseDrumQuantity: bookingData.purchaseDrumQuantity || 0,
       includeOtherItems: !!bookingData.includeBoxes,
-      wantMetalSeal: !!bookingData.wantMetalSeal,
       category: bookingData.boxesDescription || null,
     },
     notes: notes.length ? notes.join(' | ') : null,

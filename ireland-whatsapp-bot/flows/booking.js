@@ -3,44 +3,34 @@ import { getSupabase, createBookingRecords } from '../utils/database.js';
 import {
   getBotSettings,
   getDrumPrice,
-  getTrunkPrice,
-  getSealPrice,
+  getPurchaseDrumPrice,
   calculatePricing,
   formatMoney,
   CURRENCY_SYMBOL,
   CASH_DISCOUNT_PER_DRUM,
-  PAY_ON_ARRIVAL_MULTIPLIER,
 } from '../utils/pricing.js';
 
-// Simple send message function
 async function sendMessage(sock, phoneNumber, text) {
   await sock.sendMessage(phoneNumber, { text });
 }
 
-// Ireland cities and routes mapping
+// ── Ireland city → route mapping ─────────────────────────────────────────────
 function getIrelandCities() {
   return [
-    // Londonderry Route
-    'LARNE', 'BALLYCLARE', 'BALLYMENA', 'BALLYMONEY', 'KILREA', 
+    'LARNE', 'BALLYCLARE', 'BALLYMENA', 'BALLYMONEY', 'KILREA',
     'COLERAINE', 'LONDONDERRY', 'LIFFORD', 'OMAGH', 'COOKSTOWN', 'CARRICKFERGUS',
-    // Belfast Route
     'BELFAST', 'BANGOR', 'COMBER', 'LISBURN', 'NEWRY', 'NEWTOWNWARDS',
     'DUNMURRY', 'LURGAN', 'PORTADOWN', 'BANBRIDGE', 'MOY', 'DUNGANNON', 'ARMAGH',
-    // Cavan Route
     'MAYNOOTH', 'ASHBOURNE', 'SWORDS', 'SKERRIES', 'DROGHEDA', 'DUNDALK',
     'CAVAN', 'VIRGINIA', 'KELLS', 'NAVAN', 'TRIM',
-    // Athlone Route
     'MULLINGAR', 'LONGFORD', 'ROSCOMMON', 'BOYLE', 'SLIGO', 'BALLINA',
     'SWINFORD', 'CASTLEBAR', 'TUAM', 'GALWAY', 'ATHENRY', 'ATHLONE',
-    // Limerick Route
     'NEWBRIDGE', 'PORTLAOISE', 'ROSCREA', 'LIMERICK', 'ENNIS', 'DOOLIN',
     'LOUGHREA', 'BALLINASLOE', 'TULLAMORE',
-    // Dublin City Route
     'SANDYFORD', 'RIALTO', 'BALLYMOUNT', 'CABRA', 'BEAUMONT', 'MALAHIDE',
     'PORTMARNOCK', 'DALKEY', 'SHANKILL', 'BRAY', 'DUBLIN',
-    // Cork Route
     'CASHEL', 'FERMOY', 'CORK', 'DUNGARVAN', 'WATERFORD', 'NEW ROSS',
-    'WEXFORD', 'GOREY', 'GREYSTONES'
+    'WEXFORD', 'GOREY', 'GREYSTONES',
   ];
 }
 
@@ -70,7 +60,7 @@ function getCityToRouteMap() {
     'BRAY': 'DUBLIN CITY', 'DUBLIN': 'DUBLIN CITY',
     'CASHEL': 'CORK', 'FERMOY': 'CORK', 'CORK': 'CORK',
     'DUNGARVAN': 'CORK', 'WATERFORD': 'CORK', 'NEW ROSS': 'CORK',
-    'WEXFORD': 'CORK', 'GOREY': 'CORK', 'GREYSTONES': 'CORK'
+    'WEXFORD': 'CORK', 'GOREY': 'CORK', 'GREYSTONES': 'CORK',
   };
 }
 
@@ -100,6 +90,8 @@ async function lookupPickupDate(route) {
   return null;
 }
 
+// ── Main handler ─────────────────────────────────────────────────────────────
+
 export async function handleBookingFlow(sock, phoneNumber, text, _session) {
   const lowerText = (text || '').toLowerCase().trim();
 
@@ -110,7 +102,6 @@ export async function handleBookingFlow(sock, phoneNumber, text, _session) {
     return;
   }
 
-  // Always read fresh so multiple in-flight messages don't clobber each other.
   const session = await getUserSession(phoneNumber);
   const step = session.step || 'START';
   const bookingData = { ...(session.bookingData || {}) };
@@ -154,9 +145,7 @@ export async function handleBookingFlow(sock, phoneNumber, text, _session) {
       if (!isValidPhone(v)) return sendMessage(sock, phoneNumber, '❌ Please enter a valid phone number.');
       bookingData.senderPhone = v;
       await updateUserSession(phoneNumber, { bookingData, step: 'ASK_SENDER_PHONE2', userPhone: v });
-      return sendMessage(sock, phoneNumber,
-        '➡️ *Add another phone number?*\n\n1️⃣ Yes\n2️⃣ No, continue'
-      );
+      return sendMessage(sock, phoneNumber, '➡️ *Add another phone number?*\n\n1️⃣ Yes\n2️⃣ No, continue');
     }
 
     case 'ASK_SENDER_PHONE2': {
@@ -183,7 +172,7 @@ export async function handleBookingFlow(sock, phoneNumber, text, _session) {
       const v = text.trim();
       if (v.length < 4) return sendMessage(sock, phoneNumber, '❌ Please enter your full pickup address.');
       bookingData.senderAddress = v;
-      bookingData.senderPostcode = 'N/A'; // Ireland uses city-based routing
+      bookingData.senderPostcode = 'N/A';
       await updateUserSession(phoneNumber, { bookingData, step: 'SENDER_CITY', userAddress: v });
       return sendMessage(sock, phoneNumber,
         '➡️ *Which city or town are you in?*\n\n_e.g. Dublin, Cork, Belfast, Galway, Limerick, Waterford_'
@@ -205,7 +194,6 @@ export async function handleBookingFlow(sock, phoneNumber, text, _session) {
       bookingData.senderCity = cityInput;
       bookingData.collectionRoute = cityMap[cityKey];
 
-      // Send a quick ack first; date lookup may take a beat.
       await updateUserSession(phoneNumber, { bookingData, userCity: cityInput });
       await sendMessage(sock, phoneNumber,
         `✅ Got it! Your collection route is *${bookingData.collectionRoute}*.\n\n_Looking up the next collection date..._`
@@ -215,20 +203,16 @@ export async function handleBookingFlow(sock, phoneNumber, text, _session) {
       bookingData.collectionDate = pickupDate || 'To be confirmed';
 
       const dateLine = pickupDate
-        ? `📅 Next collection: *${pickupDate}*`
-        : `📅 Collection date: *to be confirmed* — our team will arrange this with you.`;
+        ? `Next collection: *${pickupDate}*`
+        : `Collection date: *to be confirmed* — our team will arrange this with you.`;
 
-      // Move into Step 2 (receiver). Offer saved receiver if we have one.
       if (session.receiverName && session.receiverPhone) {
         await updateUserSession(phoneNumber, { bookingData, step: 'USE_SAVED_RECEIVER' });
-        const saved =
+        return sendMessage(sock, phoneNumber,
           `${dateLine}\n\n*Step 2 of 5 — Receiver*\n\nI have a saved receiver in Zimbabwe:\n\n` +
-          `👤 ${session.receiverName}\n` +
-          `📱 ${session.receiverPhone}\n` +
-          `🏠 ${session.receiverAddress}\n` +
-          `🏙️ ${session.receiverCity}\n\n` +
-          `Use this receiver?\n\n1️⃣ Yes, same receiver\n2️⃣ No, enter a new one`;
-        return sendMessage(sock, phoneNumber, saved);
+          `👤 ${session.receiverName}\n📱 ${session.receiverPhone}\n🏠 ${session.receiverAddress}\n🏙️ ${session.receiverCity}\n\n` +
+          `Use this receiver?\n\n1️⃣ Yes, same receiver\n2️⃣ No, enter a new one`
+        );
       }
       await updateUserSession(phoneNumber, { bookingData, step: 'RECEIVER_NAME' });
       return sendMessage(sock, phoneNumber,
@@ -243,7 +227,7 @@ export async function handleBookingFlow(sock, phoneNumber, text, _session) {
         bookingData.receiverPhone2 = session.receiverPhone2 || null;
         bookingData.receiverAddress = session.receiverAddress;
         bookingData.receiverCity = session.receiverCity;
-        await updateUserSession(phoneNumber, { bookingData, step: 'ASK_DRUMS' });
+        await updateUserSession(phoneNumber, { bookingData, step: 'SHIPPING_TYPE' });
         return askDrums(sock, phoneNumber);
       }
       if (isNo(text)) {
@@ -266,9 +250,7 @@ export async function handleBookingFlow(sock, phoneNumber, text, _session) {
       if (!isValidPhone(v)) return sendMessage(sock, phoneNumber, '❌ Please enter a valid phone number.');
       bookingData.receiverPhone = v;
       await updateUserSession(phoneNumber, { bookingData, step: 'ASK_RECEIVER_PHONE2', receiverPhone: v });
-      return sendMessage(sock, phoneNumber,
-        '➡️ *Add another receiver phone number?*\n\n1️⃣ Yes\n2️⃣ No, continue'
-      );
+      return sendMessage(sock, phoneNumber, '➡️ *Add another receiver phone number?*\n\n1️⃣ Yes\n2️⃣ No, continue');
     }
 
     case 'ASK_RECEIVER_PHONE2': {
@@ -305,119 +287,98 @@ export async function handleBookingFlow(sock, phoneNumber, text, _session) {
       const v = text.trim();
       if (v.length < 2) return sendMessage(sock, phoneNumber, '❌ Please enter the delivery city.');
       bookingData.receiverCity = v;
-      await updateUserSession(phoneNumber, { bookingData, step: 'ASK_DRUMS', receiverCity: v });
+      await updateUserSession(phoneNumber, { bookingData, step: 'SHIPPING_TYPE', receiverCity: v });
       return askDrums(sock, phoneNumber);
     }
 
-    case 'ASK_DRUMS': {
-      if (isYes(text)) {
+    case 'SHIPPING_TYPE': {
+      const choice = text.trim();
+      if (choice === '1') {
         bookingData.includeDrums = true;
         await updateUserSession(phoneNumber, { bookingData, step: 'DRUM_QUANTITY' });
         const settings = await getBotSettings();
         return sendMessage(sock, phoneNumber,
-          `➡️ *How many drums?*\n\n_Pricing per drum:_\n• 1 drum: ${formatMoney(getDrumPrice(1, settings))}\n• 2–4 drums: ${formatMoney(getDrumPrice(2, settings))} each\n• 5+ drums: ${formatMoney(getDrumPrice(5, settings))} each (best value!)`
+          `➡️ *How many drums?*\n\n_Shipping per drum:_\n• 1 drum: ${formatMoney(getDrumPrice(1, settings))}\n• 2–4 drums: ${formatMoney(getDrumPrice(2, settings))} each\n• 5+ drums: ${formatMoney(getDrumPrice(5, settings))} each (best value!)`
         );
       }
-      if (isNo(text)) {
+      if (choice === '2') {
         bookingData.includeDrums = false;
         bookingData.drumQuantity = 0;
-        await updateUserSession(phoneNumber, { bookingData, step: 'ASK_TRUNKS' });
-        return askTrunks(sock, phoneNumber);
+        bookingData.includeBoxes = true;
+        await updateUserSession(phoneNumber, { bookingData, step: 'OTHER_ITEMS_DESC' });
+        return sendMessage(sock, phoneNumber,
+          '🎁 *Other Items*\n\n_Other items are anything that won\'t travel inside a drum — for example suitcases, storage tubs, boxes, or household furniture._\n\n➡️ *Please describe what you\'re shipping* (items, approximate sizes/quantities).\n\nOur agent will review your list and send you a personalised quote within 24 hours.'
+        );
       }
-      return sendMessage(sock, phoneNumber, '❌ Please reply *1* (yes) or *2* (no).');
+      return sendMessage(sock, phoneNumber, '❌ Please reply *1* (drums) or *2* (other items).');
     }
 
     case 'DRUM_QUANTITY': {
       const qty = parseInt(text, 10);
       if (isNaN(qty) || qty < 1) return sendMessage(sock, phoneNumber, '❌ Please enter a number (1 or more).');
       bookingData.drumQuantity = qty;
-      await updateUserSession(phoneNumber, { bookingData, step: 'DRUMS_DESCRIPTION' });
+      await updateUserSession(phoneNumber, { bookingData, step: 'DRUM_OWNERSHIP' });
       const settings = await getBotSettings();
       const unit = getDrumPrice(qty, settings);
-      await sendMessage(sock, phoneNumber, `✅ ${qty} × drum @ ${formatMoney(unit)} each = *${formatMoney(qty * unit)}*`);
+      await sendMessage(sock, phoneNumber, `✅ ${qty} × drum shipping @ ${formatMoney(unit)} each = *${formatMoney(qty * unit)}*`);
       return sendMessage(sock, phoneNumber,
-        `📝 *Describe your ${qty === 1 ? 'drum' : 'drums'}*\n\nWhat ${qty === 1 ? 'does it' : 'do they'} look like? (color, markings, anything that helps the driver spot ${qty === 1 ? 'it' : 'them'})\n\n_e.g. ${qty > 1 ? '"3 blue plastic drums with red lids"' : '"blue plastic drum with red lid"'}_`
+        `🛢️ *Do you have your own ${qty === 1 ? 'drum' : 'drums'}, or would you like us to supply ${qty === 1 ? 'one' : 'them'}?*\n\n1️⃣ I have my own\n2️⃣ Supply from you\n\n_Supply prices: Metal Drum ${formatMoney(getPurchaseDrumPrice('metal', settings))} each · Plastic Barrel ${formatMoney(getPurchaseDrumPrice('plastic', settings))} each_`
       );
+    }
+
+    case 'DRUM_OWNERSHIP': {
+      const choice = text.trim();
+      if (choice === '1') {
+        bookingData.purchaseDrums = false;
+        bookingData.purchaseDrumType = null;
+        bookingData.purchaseDrumQuantity = 0;
+        await updateUserSession(phoneNumber, { bookingData, step: 'DRUMS_DESCRIPTION' });
+        const qty = bookingData.drumQuantity;
+        return sendMessage(sock, phoneNumber,
+          `📝 *Describe your ${qty === 1 ? 'drum' : 'drums'}*\n\nWhat ${qty === 1 ? 'does it' : 'do they'} look like? (color, markings, anything that helps the driver spot ${qty === 1 ? 'it' : 'them'})\n\n_e.g. ${qty > 1 ? '"3 blue plastic drums with red lids"' : '"blue plastic drum with red lid"'}_`
+        );
+      }
+      if (choice === '2') {
+        bookingData.purchaseDrums = true;
+        await updateUserSession(phoneNumber, { bookingData, step: 'PURCHASE_DRUM_TYPE' });
+        const settings = await getBotSettings();
+        return sendMessage(sock, phoneNumber,
+          `➡️ *Which type would you like?*\n\n1️⃣ 🛢️ Metal Drum — ${formatMoney(getPurchaseDrumPrice('metal', settings))} each\n2️⃣ 🛢️ Plastic Barrel — ${formatMoney(getPurchaseDrumPrice('plastic', settings))} each`
+        );
+      }
+      return sendMessage(sock, phoneNumber, '❌ Please reply *1* (I have my own) or *2* (supply from you).');
+    }
+
+    case 'PURCHASE_DRUM_TYPE': {
+      if (text.trim() === '1') bookingData.purchaseDrumType = 'metal';
+      else if (text.trim() === '2') bookingData.purchaseDrumType = 'plastic';
+      else return sendMessage(sock, phoneNumber, '❌ Please reply *1* (metal) or *2* (plastic).');
+
+      bookingData.purchaseDrumQuantity = bookingData.drumQuantity;
+      const settings = await getBotSettings();
+      const drumUnit = getPurchaseDrumPrice(bookingData.purchaseDrumType, settings);
+      const shipUnit = getDrumPrice(bookingData.drumQuantity, settings);
+      const qty = bookingData.drumQuantity;
+      const drumLabel = bookingData.purchaseDrumType === 'metal' ? 'metal drum' : 'plastic barrel';
+      await sendMessage(sock, phoneNumber,
+        `✅ ${qty} × ${drumLabel} @ ${formatMoney(drumUnit)} = *${formatMoney(qty * drumUnit)}*\n` +
+        `   + shipping ${qty} × ${formatMoney(shipUnit)} = *${formatMoney(qty * shipUnit)}*\n\n` +
+        `*Drums total: ${formatMoney(qty * drumUnit + qty * shipUnit)}*`
+      );
+      return proceedToSummaryOrNotes(sock, phoneNumber, bookingData);
     }
 
     case 'DRUMS_DESCRIPTION': {
       const v = text.trim();
       if (v.length < 3) return sendMessage(sock, phoneNumber, '❌ Please give a short description so the driver can identify your drums.');
       bookingData.drumsDescription = v;
-      await updateUserSession(phoneNumber, { bookingData, step: 'ASK_TRUNKS' });
-      return askTrunks(sock, phoneNumber);
-    }
-
-    case 'ASK_TRUNKS': {
-      if (isYes(text)) {
-        bookingData.includeTrunks = true;
-        await updateUserSession(phoneNumber, { bookingData, step: 'TRUNK_QUANTITY' });
-        const settings = await getBotSettings();
-        return sendMessage(sock, phoneNumber,
-          `➡️ *How many trunks / storage boxes?*\n\n_Pricing per trunk:_\n• 1 trunk: ${formatMoney(getTrunkPrice(1, settings))}\n• 2–4 trunks: ${formatMoney(getTrunkPrice(2, settings))} each\n• 5+ trunks: ${formatMoney(getTrunkPrice(5, settings))} each (best value!)`
-        );
-      }
-      if (isNo(text)) {
-        bookingData.includeTrunks = false;
-        bookingData.trunkQuantity = 0;
-        await updateUserSession(phoneNumber, { bookingData, step: 'ASK_OTHER_ITEMS' });
-        return askOtherItems(sock, phoneNumber);
-      }
-      return sendMessage(sock, phoneNumber, '❌ Please reply *1* (yes) or *2* (no).');
-    }
-
-    case 'TRUNK_QUANTITY': {
-      const qty = parseInt(text, 10);
-      if (isNaN(qty) || qty < 1) return sendMessage(sock, phoneNumber, '❌ Please enter a number (1 or more).');
-      bookingData.trunkQuantity = qty;
-      await updateUserSession(phoneNumber, { bookingData, step: 'TRUNKS_DESCRIPTION' });
-      const settings = await getBotSettings();
-      const unit = getTrunkPrice(qty, settings);
-      await sendMessage(sock, phoneNumber, `✅ ${qty} × trunk @ ${formatMoney(unit)} each = *${formatMoney(qty * unit)}*`);
-      return sendMessage(sock, phoneNumber,
-        `📝 *Describe your ${qty === 1 ? 'trunk' : 'trunks'}*\n\nWhat ${qty === 1 ? 'does it' : 'do they'} look like? (color, size, markings, anything that helps the driver spot ${qty === 1 ? 'it' : 'them'})\n\n_e.g. ${qty > 1 ? '"2 large black storage trunks"' : '"medium grey storage box"'}_`
-      );
-    }
-
-    case 'TRUNKS_DESCRIPTION': {
-      const v = text.trim();
-      if (v.length < 3) return sendMessage(sock, phoneNumber, '❌ Please give a short description so the driver can identify your trunks.');
-      bookingData.trunksDescription = v;
-      await updateUserSession(phoneNumber, { bookingData, step: 'ASK_OTHER_ITEMS' });
-      return askOtherItems(sock, phoneNumber);
-    }
-
-    case 'ASK_OTHER_ITEMS': {
-      if (isYes(text)) {
-        bookingData.includeBoxes = true;
-        await updateUserSession(phoneNumber, { bookingData, step: 'OTHER_ITEMS_DESC' });
-        return sendMessage(sock, phoneNumber,
-          '➡️ *What are you shipping?*\n\n_e.g. 3 boxes of clothes, 1 suitcase, small furniture, electronics..._\n\nOur agent will contact you with a personalised quote within 24 hours.'
-        );
-      }
-      if (isNo(text)) {
-        bookingData.includeBoxes = false;
-        bookingData.boxesDescription = null;
-        return afterItemsSelected(sock, phoneNumber, bookingData);
-      }
-      return sendMessage(sock, phoneNumber, '❌ Please reply *1* (yes) or *2* (no).');
+      return proceedToSummaryOrNotes(sock, phoneNumber, bookingData);
     }
 
     case 'OTHER_ITEMS_DESC': {
       const v = text.trim();
       if (v.length < 3) return sendMessage(sock, phoneNumber, '❌ Please give a short description of what you\'re shipping.');
       bookingData.boxesDescription = v;
-      return afterItemsSelected(sock, phoneNumber, bookingData);
-    }
-
-    case 'ASK_METAL_SEAL': {
-      if (isYes(text)) {
-        bookingData.wantMetalSeal = true;
-      } else if (isNo(text)) {
-        bookingData.wantMetalSeal = false;
-      } else {
-        return sendMessage(sock, phoneNumber, '❌ Please reply *1* (yes) or *2* (no).');
-      }
       return proceedToSummaryOrNotes(sock, phoneNumber, bookingData);
     }
 
@@ -434,12 +395,10 @@ export async function handleBookingFlow(sock, phoneNumber, text, _session) {
     }
 
     case 'REVIEW_SUMMARY': {
-      // 1 = continue to payment, 2 = start over
       if (text.trim() === '1' || lowerText === 'continue') {
-        // If only "other items" (no priced items), skip payment selection — agent quotes.
         const hasPricedItems =
           (bookingData.includeDrums && bookingData.drumQuantity > 0) ||
-          (bookingData.includeTrunks && bookingData.trunkQuantity > 0);
+          (bookingData.purchaseDrums && bookingData.purchaseDrumQuantity > 0);
         if (!hasPricedItems) {
           bookingData.paymentMethod = 'agentQuote';
           await updateUserSession(phoneNumber, { bookingData, step: 'CONFIRM_BOOKING' });
@@ -476,11 +435,8 @@ export async function handleBookingFlow(sock, phoneNumber, text, _session) {
 
       let msg = `✅ Selected: *${label}*\n\n`;
       msg += `*Total to pay: ${formatMoney(pricing.finalTotal)}*\n`;
-      if (pricing.cashDiscount > 0) {
-        msg += `_(Cash discount of ${formatMoney(pricing.cashDiscount)} applied)_\n`;
-      } else if (pricing.payOnArrivalPremium > 0) {
-        msg += `_(20% premium of ${formatMoney(pricing.payOnArrivalPremium)} added)_\n`;
-      }
+      if (pricing.cashDiscount > 0) msg += `_(Cash discount of ${formatMoney(pricing.cashDiscount)} applied)_\n`;
+      else if (pricing.payOnArrivalPremium > 0) msg += `_(20% premium of ${formatMoney(pricing.payOnArrivalPremium)} added)_\n`;
       msg += `\n*Step 5 of 5 — Confirm*\n\n1️⃣ ✅ Submit booking\n2️⃣ ✏️ Start over`;
       return sendMessage(sock, phoneNumber, msg);
     }
@@ -497,18 +453,16 @@ export async function handleBookingFlow(sock, phoneNumber, text, _session) {
     }
 
     default:
-      // Unknown step — recover by restarting.
       await updateUserSession(phoneNumber, { state: 'BOOKING_FLOW', bookingData: {}, step: 'START' });
       return handleBookingFlow(sock, phoneNumber, '', await getUserSession(phoneNumber));
   }
 }
 
-// --- Step helpers --- //
+// ── Step helpers ─────────────────────────────────────────────────────────────
 
 async function startBooking(sock, phoneNumber, session) {
   const intro = `📦 *Book your shipment* — 5 quick steps\n\nYou can type *cancel* anytime to return to the main menu.\n\n*Step 1 of 5 — Your Details*`;
 
-  // Offer saved details if both name and email are present.
   const hasSaved = session.userFirstName && session.userEmail;
   if (hasSaved) {
     await updateUserSession(phoneNumber, { step: 'USE_SAVED_OR_NEW' });
@@ -524,7 +478,7 @@ async function startBooking(sock, phoneNumber, session) {
   }
 
   await updateUserSession(phoneNumber, { step: 'SENDER_FIRST_NAME', bookingData: {} });
-  return sendMessage(sock, phoneNumber, `${intro}\n\nWhere should we collect from?\n\n➡️ *What\'s your first name?*`);
+  return sendMessage(sock, phoneNumber, `${intro}\n\n➡️ *What\'s your first name?*`);
 }
 
 async function useSavedOrNew(sock, phoneNumber, text, session) {
@@ -540,7 +494,6 @@ async function useSavedOrNew(sock, phoneNumber, text, session) {
       senderPostcode: 'N/A',
     };
 
-    // Fill any gap in the saved info before continuing.
     if (!bookingData.senderPhone) {
       await updateUserSession(phoneNumber, { bookingData, step: 'SENDER_PHONE' });
       return sendMessage(sock, phoneNumber, '➡️ *What\'s your phone number?*\n\n_Include country code, e.g. +353 87 123 4567_');
@@ -554,7 +507,6 @@ async function useSavedOrNew(sock, phoneNumber, text, session) {
       return sendMessage(sock, phoneNumber, '➡️ *Which city or town are you in?*');
     }
 
-    // Re-derive route + pickup date from the saved city.
     const cityKey = (bookingData.senderCity || '').toUpperCase();
     const cityMap = getCityToRouteMap();
     if (cityMap[cityKey]) {
@@ -562,16 +514,22 @@ async function useSavedOrNew(sock, phoneNumber, text, session) {
       bookingData.collectionDate = await lookupPickupDate(bookingData.collectionRoute) || 'To be confirmed';
     }
 
+    const dateLine = bookingData.collectionDate && bookingData.collectionDate !== 'To be confirmed'
+      ? `Next collection: *${bookingData.collectionDate}*`
+      : `Collection date: *to be confirmed*`;
+
     if (session.receiverName && session.receiverPhone) {
       await updateUserSession(phoneNumber, { bookingData, step: 'USE_SAVED_RECEIVER' });
       return sendMessage(sock, phoneNumber,
-        `*Step 2 of 5 — Receiver*\n\nI have a saved receiver in Zimbabwe:\n\n` +
+        `${dateLine}\n\n*Step 2 of 5 — Receiver*\n\nI have a saved receiver in Zimbabwe:\n\n` +
         `👤 ${session.receiverName}\n📱 ${session.receiverPhone}\n🏠 ${session.receiverAddress}\n🏙️ ${session.receiverCity}\n\n` +
         `Use this receiver?\n\n1️⃣ Yes, same receiver\n2️⃣ No, enter a new one`
       );
     }
     await updateUserSession(phoneNumber, { bookingData, step: 'RECEIVER_NAME' });
-    return sendMessage(sock, phoneNumber, '*Step 2 of 5 — Receiver Details*\n\n➡️ *Receiver\'s full name?*');
+    return sendMessage(sock, phoneNumber,
+      `${dateLine}\n\n*Step 2 of 5 — Receiver Details*\n\nWho will receive the shipment in Zimbabwe?\n\n➡️ *Receiver\'s full name?*`
+    );
   }
   if (text.trim() === '2' || isNo(text)) {
     await updateUserSession(phoneNumber, { bookingData: {}, step: 'SENDER_FIRST_NAME' });
@@ -580,68 +538,10 @@ async function useSavedOrNew(sock, phoneNumber, text, session) {
   return sendMessage(sock, phoneNumber, '❌ Please reply *1* (yes) or *2* (no).');
 }
 
-async function askDrums(sock, phoneNumber, opts = {}) {
-  if (!opts.skipIntro) {
-    const settings = await getBotSettings();
-    const intro =
-      `*Step 3 of 5 — What are you shipping today?* 📦\n` +
-      `_60% complete_\n\n` +
-      `Select all that apply (we'll ask about each):\n\n` +
-      `🥁 *Drums (200–220 L)*\n` +
-      `   • 5+ drums: ${formatMoney(settings.drum_price_5_plus)} each _(Best value!)_\n` +
-      `   • 2–4 drums: ${formatMoney(settings.drum_price_2_4)} each\n` +
-      `   • 1 drum: ${formatMoney(settings.drum_price_1)}\n\n` +
-      `📦 *Trunks / Storage Boxes*\n` +
-      `   • 5+ trunks: ${formatMoney(settings.box_price_5_plus)} each _(Best value!)_\n` +
-      `   • 2–4 trunks: ${formatMoney(settings.box_price_2_4)} each\n` +
-      `   • 1 trunk: ${formatMoney(settings.box_price_1)}\n\n` +
-      `🎁 *Other Items*\n` +
-      `   Shipping something else? Tell us what you're sending and our agent will contact you with a personalised quote.\n\n` +
-      `_💡 Multiple drop-off addresses? No problem — just tell the driver during collection._`;
-    await sendMessage(sock, phoneNumber, intro);
-  }
+async function askDrums(sock, phoneNumber) {
   return sendMessage(sock, phoneNumber,
-    '🥁 *Are you shipping drums (200–220 L)?*\n\n1️⃣ Yes\n2️⃣ No'
+    '*Step 3 of 5 — What are you shipping?*\n\n1️⃣ 🥁 Drums (200–220L)\n2️⃣ 🎁 Other items'
   );
-}
-
-async function askTrunks(sock, phoneNumber) {
-  return sendMessage(sock, phoneNumber,
-    '📦 *Trunks or storage boxes?*\n\n1️⃣ Yes\n2️⃣ No'
-  );
-}
-
-async function askOtherItems(sock, phoneNumber) {
-  return sendMessage(sock, phoneNumber,
-    '🎁 *Anything else?* (clothes, suitcases, small furniture, electronics...)\n\nOur agent will quote these separately.\n\n1️⃣ Yes\n2️⃣ No'
-  );
-}
-
-async function afterItemsSelected(sock, phoneNumber, bookingData) {
-  // Must select at least one
-  if (!bookingData.includeDrums && !bookingData.includeTrunks && !bookingData.includeBoxes) {
-    bookingData.includeDrums = undefined;
-    bookingData.includeTrunks = undefined;
-    bookingData.includeBoxes = undefined;
-    await updateUserSession(phoneNumber, { bookingData, step: 'ASK_DRUMS' });
-    await sendMessage(sock, phoneNumber, '❌ You haven\'t selected anything to ship. Let\'s try again.');
-    return askDrums(sock, phoneNumber, { skipIntro: true });
-  }
-
-  // Metal seal only relevant if drums or trunks present.
-  const hasSealable = bookingData.includeDrums || bookingData.includeTrunks;
-  if (hasSealable) {
-    await updateUserSession(phoneNumber, { bookingData, step: 'ASK_METAL_SEAL' });
-    const settings = await getBotSettings();
-    const sealUnit = getSealPrice(settings);
-    return sendMessage(sock, phoneNumber,
-      `🔒 *Add metal coded seals?*\n\nSecure coded seals for extra peace of mind — *${formatMoney(sealUnit)} per item*.\n\n1️⃣ Yes, add seals\n2️⃣ No thanks`
-    );
-  }
-
-  // Only "other items" — no seal needed
-  bookingData.wantMetalSeal = false;
-  return proceedToSummaryOrNotes(sock, phoneNumber, bookingData);
 }
 
 async function proceedToSummaryOrNotes(sock, phoneNumber, bookingData) {
@@ -669,16 +569,14 @@ async function showSummary(sock, phoneNumber, bookingData) {
   msg += `${bookingData.senderEmail}\n`;
   msg += `${bookingData.senderAddress}, ${bookingData.senderCity}\n`;
   if (bookingData.collectionRoute) msg += `🚚 Route: ${bookingData.collectionRoute}\n`;
-  if (bookingData.collectionDate) msg += `📅 Next collection: ${bookingData.collectionDate}\n`;
+  if (bookingData.collectionDate) msg += `Next collection: ${bookingData.collectionDate}\n`;
   msg += `\n`;
 
   msg += `*🇿🇼 Delivery*\n`;
   msg += `${bookingData.receiverName}\n`;
   msg += `${bookingData.receiverPhone}${bookingData.receiverPhone2 ? ' / ' + bookingData.receiverPhone2 : ''}\n`;
   msg += `${bookingData.receiverAddress}, ${bookingData.receiverCity}, Zimbabwe\n`;
-  if (bookingData.deliveryNote) {
-    msg += `📝 Note: _${bookingData.deliveryNote}_\n`;
-  }
+  if (bookingData.deliveryNote) msg += `📝 Note: _${bookingData.deliveryNote}_\n`;
   msg += `\n`;
 
   msg += `*📦 Items*\n`;
@@ -686,23 +584,18 @@ async function showSummary(sock, phoneNumber, bookingData) {
     msg += `🥁 ${pricing.drumQty} × drum @ ${formatMoney(pricing.drumUnit)} = *${formatMoney(pricing.drumTotal)}*\n`;
     if (bookingData.drumsDescription) msg += `   _${bookingData.drumsDescription}_\n`;
   }
-  if (pricing.trunkQty > 0) {
-    msg += `📦 ${pricing.trunkQty} × trunk @ ${formatMoney(pricing.trunkUnit)} = *${formatMoney(pricing.trunkTotal)}*\n`;
-    if (bookingData.trunksDescription) msg += `   _${bookingData.trunksDescription}_\n`;
+  if (pricing.purchaseDrumQty > 0) {
+    const label = pricing.purchaseDrumType === 'metal' ? 'Metal Drum' : 'Plastic Barrel';
+    msg += `🛢️ ${pricing.purchaseDrumQty} × ${label} @ ${formatMoney(pricing.purchaseDrumUnit)} = *${formatMoney(pricing.purchaseDrumTotal)}*\n`;
   }
   if (bookingData.includeBoxes) {
     msg += `🎁 Other items: ${bookingData.boxesDescription}\n   _(agent will quote separately)_\n`;
-  }
-  if (pricing.sealQty > 0) {
-    msg += `🔒 Metal seals × ${pricing.sealQty} = *${formatMoney(pricing.sealCost)}*\n`;
   }
   msg += `\n`;
 
   if (pricing.baseTotal > 0) {
     msg += `*Subtotal: ${formatMoney(pricing.baseTotal)}*\n`;
-    if (bookingData.includeBoxes) {
-      msg += `_(other items quoted separately)_\n`;
-    }
+    if (bookingData.includeBoxes) msg += `_(other items quoted separately)_\n`;
   } else {
     msg += `*Subtotal: agent will quote*\n`;
   }
@@ -735,21 +628,15 @@ async function submitBooking(sock, phoneNumber, bookingData) {
   try {
     const settings = await getBotSettings();
     const pricing = calculatePricing(bookingData, settings);
+    const { trackingNumber, receiptNumber } = await createBookingRecords(phoneNumber, bookingData, pricing);
 
-    const { trackingNumber, receiptNumber } = await createBookingRecords(
-      phoneNumber,
-      bookingData,
-      pricing,
-    );
-
-    // Append to history and persist receiver for re-use.
     const current = await getUserSession(phoneNumber);
     const history = [...(current.bookingHistory || []), {
       trackingNumber,
       receiptNumber,
       date: new Date().toISOString(),
       drums: bookingData.drumQuantity || 0,
-      trunks: bookingData.trunkQuantity || 0,
+      purchasedDrums: bookingData.purchaseDrumQuantity || 0,
     }];
 
     await updateUserSession(phoneNumber, {

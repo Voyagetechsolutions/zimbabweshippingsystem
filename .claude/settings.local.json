@@ -52,7 +52,10 @@
       "Bash(node --check /c/Users/Mthokozisi.DESKTOP-DPOBCC1/Documents/zimbabwe-shipping-nexus/ireland-whatsapp-bot/utils/sessions.js)",
       "Bash(node --check /c/Users/Mthokozisi.DESKTOP-DPOBCC1/Documents/zimbabwe-shipping-nexus/uk-whatsapp-bot/bot.js)",
       "Bash(node --check /c/Users/Mthokozisi.DESKTOP-DPOBCC1/Documents/zimbabwe-shipping-nexus/uk-whatsapp-bot/utils/sessions.js)",
-      "Bash(node --check /c/Users/Mthokozisi.DESKTOP-DPOBCC1/Documents/zimbabwe-shipping-nexus/ireland-whatsapp-bot/bot.js)"
+      "Bash(node --check /c/Users/Mthokozisi.DESKTOP-DPOBCC1/Documents/zimbabwe-shipping-nexus/ireland-whatsapp-bot/bot.js)",
+      "Bash(node --check /c/Users/Mthokozisi.DESKTOP-DPOBCC1/Documents/zimbabwe-shipping-nexus/ireland-whatsapp-bot/utils/pricing.js)",
+      "Bash(node --check /c/Users/Mthokozisi.DESKTOP-DPOBCC1/Documents/zimbabwe-shipping-nexus/ireland-whatsapp-bot/utils/database.js)",
+      "Bash(node --check /c/Users/Mthokozisi.DESKTOP-DPOBCC1/Documents/zimbabwe-shipping-nexus/ireland-whatsapp-bot/flows/booking.js)"
     ]
   }
 }
