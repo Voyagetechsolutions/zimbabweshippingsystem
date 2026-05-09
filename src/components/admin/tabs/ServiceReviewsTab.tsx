@@ -2,10 +2,24 @@ import React, { useState, useEffect } from 'react';
 import TabHeader from '../TabHeader';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog';
 import {
     Star,
     Search,
@@ -22,6 +36,8 @@ import {
     AlertTriangle,
     Mail,
     Phone,
+    Trash,
+    Loader2,
 } from 'lucide-react';
 import CustomQuestionsManager from './CustomQuestionsManager';
 
@@ -81,12 +97,15 @@ const ServiceReviewsTab: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [view, setView] = useState<'reviews' | 'questions' | 'attention'>('reviews');
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [reviewToHide, setReviewToHide] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const fetchData = async () => {
         setLoading(true);
         try {
             const [reviewsRes, questionsRes] = await Promise.all([
-                (supabase.from('service_reviews' as any).select('*').order('created_at', { ascending: false }) as any),
+                (supabase.from('service_reviews' as any).select('*').is('hidden_at', null).order('created_at', { ascending: false }) as any),
                 (supabase.from('feedback_custom_questions' as any).select('id, question_text') as any),
             ]);
             if (reviewsRes.error) throw reviewsRes.error;
@@ -100,6 +119,38 @@ const ServiceReviewsTab: React.FC = () => {
     };
 
     useEffect(() => { fetchData(); }, []);
+
+    const handleHideReview = async (reviewId: string) => {
+        setIsDeleting(true);
+        try {
+            const { error } = await supabase
+                .from('service_reviews' as any)
+                .update({ hidden_at: new Date().toISOString() })
+                .eq('id', reviewId);
+
+            if (error) throw error;
+
+            toast({
+                title: 'Review Hidden',
+                description: 'Review has been removed from the dashboard (data preserved in database)',
+            });
+
+            // Remove from local state
+            setReviews(reviews.filter(r => r.id !== reviewId));
+            setShowDeleteConfirm(false);
+            setReviewToHide(null);
+            setExpandedId(null);
+        } catch (error: any) {
+            console.error('Error hiding review:', error);
+            toast({
+                title: 'Error',
+                description: `Failed to hide review: ${error.message}`,
+                variant: 'destructive',
+            });
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     const filtered = reviews.filter((r) => {
         if (!searchQuery) return true;
@@ -391,7 +442,22 @@ const ServiceReviewsTab: React.FC = () => {
                                                     </div>
                                                 )}
 
-                                                <p className="text-xs text-gray-400">Submitted: {new Date(r.created_at).toLocaleString()}</p>
+                                                <div className="flex items-center justify-between pt-3 border-t">
+                                                    <p className="text-xs text-gray-400">Submitted: {new Date(r.created_at).toLocaleString()}</p>
+                                                    <Button
+                                                        variant="destructive"
+                                                        size="sm"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setReviewToHide(r.id);
+                                                            setShowDeleteConfirm(true);
+                                                        }}
+                                                        className="h-8 text-xs"
+                                                    >
+                                                        <Trash className="h-3 w-3 mr-1" />
+                                                        Hide Review
+                                                    </Button>
+                                                </div>
                                             </div>
                                         )}
                                     </Card>
@@ -401,6 +467,48 @@ const ServiceReviewsTab: React.FC = () => {
                     )}
                 </>
             )}
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Hide Review</DialogTitle>
+                        <DialogDescription>
+                            This will remove the review from the dashboard. The data will be preserved in the database for record-keeping.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <p className="text-sm text-muted-foreground">
+                            Are you sure you want to hide this review? This action will remove it from the dashboard but keep all data in the database.
+                        </p>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => {
+                            setShowDeleteConfirm(false);
+                            setReviewToHide(null);
+                        }}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => reviewToHide && handleHideReview(reviewToHide)}
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Hiding...
+                                </>
+                            ) : (
+                                <>
+                                    <Trash className="h-4 w-4 mr-2" />
+                                    Hide Review
+                                </>
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };

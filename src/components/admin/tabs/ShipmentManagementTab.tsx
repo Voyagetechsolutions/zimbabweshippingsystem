@@ -119,6 +119,8 @@ const ShipmentManagementTab = () => {
   const [showBulkUpdate, setShowBulkUpdate] = useState(false);
   const [bulkStatus, setBulkStatus] = useState('');
   const [collectionPeriods, setCollectionPeriods] = useState<any[]>([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [shipmentToDelete, setShipmentToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     fetchShipments();
@@ -145,6 +147,7 @@ const ShipmentManagementTab = () => {
       const { data, error } = await supabase
         .from('shipments')
         .select('*')
+        .is('deleted_at', null) // Only fetch non-deleted shipments
         .order(sortField, { ascending: sortDirection === 'asc' });
 
       if (error) throw error;
@@ -300,6 +303,40 @@ const ShipmentManagementTab = () => {
       toast({
         title: 'Error',
         description: `Failed to bulk update: ${error.message}`,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleSoftDelete = async (shipmentId: string) => {
+    setIsUpdating(true);
+    try {
+      const { error } = await supabase
+        .from('shipments')
+        .update({
+          deleted_at: new Date().toISOString()
+        })
+        .eq('id', shipmentId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Shipment Deleted',
+        description: 'Shipment has been removed from the dashboard (data preserved in database)',
+      });
+
+      // Remove from local state
+      setShipments(shipments.filter(s => s.id !== shipmentId));
+      setViewingShipment(null);
+      setShowDeleteConfirm(false);
+      setShipmentToDelete(null);
+    } catch (error: any) {
+      console.error('Error deleting shipment:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to delete shipment: ${error.message}`,
         variant: 'destructive',
       });
     } finally {
@@ -1100,17 +1137,31 @@ const ShipmentManagementTab = () => {
                       <p className="text-xs text-muted-foreground">Status Management</p>
                       <p className="text-sm font-medium">{viewingShipment.status}</p>
                     </div>
-                    {viewingShipment.status !== 'Delivered' && viewingShipment.status !== 'Cancelled' && (
+                    <div className="flex gap-2">
+                      {viewingShipment.status !== 'Delivered' && viewingShipment.status !== 'Cancelled' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setEditingStatus(true)}
+                          className="h-8 text-xs"
+                        >
+                          <Edit className="h-3 w-3 mr-1" />
+                          Update Status
+                        </Button>
+                      )}
                       <Button
                         size="sm"
-                        variant="outline"
-                        onClick={() => setEditingStatus(true)}
+                        variant="destructive"
+                        onClick={() => {
+                          setShipmentToDelete(viewingShipment.id);
+                          setShowDeleteConfirm(true);
+                        }}
                         className="h-8 text-xs"
                       >
-                        <Edit className="h-3 w-3 mr-1" />
-                        Update Status
+                        <Trash className="h-3 w-3 mr-1" />
+                        Delete
                       </Button>
-                    )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1161,6 +1212,48 @@ const ShipmentManagementTab = () => {
                 </>
               ) : (
                 'Update All'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Shipment</DialogTitle>
+            <DialogDescription>
+              This will remove the shipment from the dashboard. The data will be preserved in the database for record-keeping.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete this shipment? This action will hide it from the dashboard but keep all data in the database.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowDeleteConfirm(false);
+              setShipmentToDelete(null);
+            }}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => shipmentToDelete && handleSoftDelete(shipmentToDelete)}
+              disabled={isUpdating}
+            >
+              {isUpdating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash className="h-4 w-4 mr-2" />
+                  Delete Shipment
+                </>
               )}
             </Button>
           </DialogFooter>

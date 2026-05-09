@@ -36,19 +36,13 @@ import PickupZonesManagementTab from '@/components/admin/tabs/PickupZonesManagem
 import DeliveryManagementTab from '@/components/admin/tabs/DeliveryManagementTab';
 import PaymentsInvoicingTab from '@/components/admin/tabs/PaymentsInvoicingTab';
 import ReportsAnalyticsTab from '@/components/admin/tabs/ReportsAnalyticsTab';
-import NotificationsAlertsTab from '@/components/admin/tabs/NotificationsAlertsTab';
-import CollectionScheduleManagementEnhanced from '@/components/admin/tabs/CollectionScheduleManagementEnhanced';
 import CollectionScheduleCalendarTab from '@/components/admin/tabs/CollectionScheduleCalendarTab';
 import RouteManagementTab from '@/components/admin/tabs/RouteManagementTab';
-import UserManagementTab from '@/components/admin/tabs/UserManagementTab';
-import SystemSettingsTab from '@/components/admin/tabs/SystemSettingsTab';
 import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
-import SupportTickets from '@/components/admin/SupportTickets';
 import ContentManagement from '@/components/admin/ContentManagement';
 import PaymentScheduleManagement from '@/components/admin/PaymentScheduleManagement';
 import ServiceReviewsTab from '@/components/admin/tabs/ServiceReviewsTab';
 import ManualBookingTab from '@/components/admin/tabs/ManualBookingTab';
-import WhatsAppBotSettingsTab from '@/components/admin/tabs/WhatsAppBotSettingsTab';
 import DeliveryNotesTab from '@/components/admin/tabs/DeliveryNotesTab';
 import InvoicesTab from '@/components/admin/tabs/InvoicesTab';
 
@@ -175,8 +169,6 @@ const AdminDashboardInner = () => {
       key: 'communications',
       label: 'Communications',
       items: [
-        { value: 'notifications', label: 'Notifications', icon: Bell },
-        { value: 'supportTickets', label: 'Support Tickets', icon: MessageSquare },
         { value: 'feedback', label: 'Feedback', icon: Star },
       ],
     },
@@ -184,10 +176,7 @@ const AdminDashboardInner = () => {
       key: 'system',
       label: 'System',
       items: [
-        { value: 'users', label: 'Users', icon: Users },
         { value: 'contentManagement', label: 'Content', icon: ImageIcon },
-        { value: 'whatsappBot', label: 'WhatsApp Bot', icon: MessageSquare },
-        { value: 'settings', label: 'Settings', icon: Settings },
       ],
     },
   ], [stats.pendingShipments, stats.pendingQuotes]);
@@ -493,17 +482,12 @@ const AdminDashboardInner = () => {
       case 'payments': return <PaymentsInvoicingTab />;
       case 'paymentSchedule': return <PaymentScheduleManagement />;
       case 'reports': return <ReportsAnalyticsTab />;
-      case 'notifications': return <NotificationsAlertsTab />;
       case 'schedule': return <CollectionScheduleCalendarTab />;
       case 'routes': return <RouteManagementTab />;
-      case 'users': return <UserManagementTab />;
-      case 'supportTickets': return <SupportTickets />;
       case 'contentManagement': return <ContentManagement />;
       case 'feedback': return <ServiceReviewsTab />;
       case 'deliveryNotes': return <DeliveryNotesTab />;
       case 'invoices': return <InvoicesTab />;
-      case 'whatsappBot': return <WhatsAppBotSettingsTab />;
-      case 'settings': return <SystemSettingsTab />;
       default: return null;
     }
   };
