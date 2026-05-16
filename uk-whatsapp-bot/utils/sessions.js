@@ -29,6 +29,9 @@ function newSession(phoneNumber, now) {
     hasBeenGreeted: false,
     needsGreeting: true,
     bookingHistory: [],
+    humanTakeover: false,  // NEW: Human agent control flag
+    takenOverBy: null,     // NEW: Agent identifier
+    takenOverAt: null,     // NEW: Timestamp of takeover
     createdAt: now.toISOString(),
     lastActivity: now.toISOString(),
   };
@@ -138,4 +141,40 @@ export async function clearUserSession(phoneNumber) {
 export function getAllSessions() {
   const keys = sessionCache.keys();
   return keys.map(key => sessionCache.get(key));
+}
+
+// NEW: Human takeover functions
+export async function enableHumanTakeover(phoneNumber, agentName = 'Agent') {
+  const session = await getUserSession(phoneNumber);
+  const updated = {
+    ...session,
+    humanTakeover: true,
+    takenOverBy: agentName,
+    takenOverAt: new Date().toISOString(),
+    lastActivity: new Date().toISOString(),
+  };
+  sessionCache.set(phoneNumber, updated);
+  saveToDBAsync(phoneNumber, updated);
+  console.log(`🧑‍💼 Human takeover enabled for ${phoneNumber} by ${agentName}`);
+  return updated;
+}
+
+export async function disableHumanTakeover(phoneNumber) {
+  const session = await getUserSession(phoneNumber);
+  const updated = {
+    ...session,
+    humanTakeover: false,
+    takenOverBy: null,
+    takenOverAt: null,
+    lastActivity: new Date().toISOString(),
+  };
+  sessionCache.set(phoneNumber, updated);
+  saveToDBAsync(phoneNumber, updated);
+  console.log(`🤖 Bot control restored for ${phoneNumber}`);
+  return updated;
+}
+
+export async function isHumanTakeover(phoneNumber) {
+  const session = await getUserSession(phoneNumber);
+  return session.humanTakeover === true;
 }

@@ -13,7 +13,7 @@ import pino from 'pino';
 import readline from 'readline';
 import { initDatabase, getCollectionSchedules } from './utils/database.js';
 import { getPricingMessage } from './utils/pricing.js';
-import { getUserSession, updateUserSession } from './utils/sessions.js';
+import { getUserSession, updateUserSession, enableHumanTakeover, disableHumanTakeover, isHumanTakeover } from './utils/sessions.js';
 import { handleBookingFlow } from './flows/booking.js';
 import { handleTrackingFlow } from './flows/tracking.js';
 import { startQrServer, setQr, setConnected, setDisconnected } from './qr-server.js';
@@ -138,10 +138,6 @@ async function handleMessage(sock, msg) {
 
     console.log(`➡️  handleMessage: from=${from} fromMe=${fromMe} isGroup=${isGroup}`);
 
-    if (fromMe) {
-      console.log('   ⏭️  skip — fromMe');
-      return;
-    }
     if (isGroup) {
       console.log('   ⏭️  skip — group chat');
       return;
@@ -164,12 +160,100 @@ async function handleMessage(sock, msg) {
       ''
     ).trim();
     
+    // 🆕 AGENT COMMANDS VIA WHATSAPP (from bot's own number)
+    // Check if message is from the bot's own number (agent using bot's phone)
+    // This MUST be checked BEFORE the fromMe skip logic
+    const botNumber = sock.user?.id?.split(':')[0]?.split('@')[0]; // Extract bot's number (remove :12 suffix and @s.whatsapp.net)
+    const senderNumber = from.split('@')[0]; // Extract sender's number
+    
+    console.log(`🔍 Debug: botNumber="${botNumber}" senderNumber="${senderNumber}" match=${botNumber === senderNumber} fromMe=${fromMe}`);
+    
+    if (fromMe && botNumber && senderNumber === botNumber && text) {
+      // This is the agent sending commands from the bot's phone
+      console.log(`🧑‍💼 Agent command detected from bot's own number: "${text}"`);
+      
+      // Parse agent commands
+      const takeoverMatch = text.match(/\/takeover\s+(\d+)/i);
+      const releaseMatch = text.match(/\/release\s+(\d+)/i);
+      const statusMatch = text.match(/\/status\s+(\d+)/i);
+      
+      // Process takeover command
+      if (takeoverMatch) {
+        const targetNumber = `${takeoverMatch[1]}@s.whatsapp.net`;
+        await enableHumanTakeover(targetNumber, 'Agent');
+        await sock.sendMessage(targetNumber, { 
+          text: '🧑‍💼 *An agent has joined the conversation*\n\nYou are now chatting with a human agent. The bot is paused.' 
+        });
+        await sock.sendMessage(from, { text: `✅ Takeover enabled for ${takeoverMatch[1]}` });
+        console.log(`✅ Takeover enabled for ${targetNumber} via WhatsApp command`);
+      }
+      
+      // Process release command
+      if (releaseMatch) {
+        const targetNumber = `${releaseMatch[1]}@s.whatsapp.net`;
+        await disableHumanTakeover(targetNumber);
+        await sock.sendMessage(targetNumber, { 
+          text: '🤖 *Agent has left the conversation*\n\nYou are now chatting with the automated bot again. Type *menu* to see options.' 
+        });
+        await sock.sendMessage(from, { text: `✅ Bot control restored for ${releaseMatch[1]}` });
+        console.log(`✅ Bot control restored for ${targetNumber} via WhatsApp command`);
+      }
+      
+      // Process status command
+      if (statusMatch) {
+        const targetNumber = `${statusMatch[1]}@s.whatsapp.net`;
+        const isTakenOver = await isHumanTakeover(targetNumber);
+        const targetSession = await getUserSession(targetNumber);
+        let statusMsg = `📊 *Status for ${statusMatch[1]}*\n\n`;
+        statusMsg += `Human Takeover: ${isTakenOver ? '✅ YES' : '❌ NO'}\n`;
+        if (isTakenOver) {
+          statusMsg += `Taken over by: ${targetSession.takenOverBy || 'Unknown'}\n`;
+          statusMsg += `Taken over at: ${targetSession.takenOverAt || 'Unknown'}\n`;
+        }
+        statusMsg += `Current state: ${targetSession.state}\n`;
+        statusMsg += `Current step: ${targetSession.step || 'None'}`;
+        await sock.sendMessage(from, { text: statusMsg });
+        console.log(`📊 Status sent for ${targetNumber}`);
+      }
+      
+      // Show help if agent sends /help or unknown command starting with /
+      if (text.startsWith('/') && !takeoverMatch && !releaseMatch && !statusMatch) {
+        const helpMsg = `🧑‍💼 *Agent Commands*\n\n` +
+          `*/takeover 447123456789* - Take control\n` +
+          `*/release 447123456789* - Give back to bot\n` +
+          `*/status 447123456789* - Check status\n\n` +
+          `*Note:* Use digits only, no + or spaces!\n` +
+          `*Example:* /takeover 447123456789`;
+        await sock.sendMessage(from, { text: helpMsg });
+        console.log('📖 Help message sent to agent');
+      }
+      
+      // If any command was processed, return early
+      if (takeoverMatch || releaseMatch || statusMatch || text.startsWith('/')) {
+        return;
+      }
+    }
+    
+    // NOW skip other fromMe messages (not agent commands)
+    if (fromMe) {
+      console.log('   ⏭️  skip — fromMe (not an agent command)');
+      return;
+    }
+    
     const lowerText = text.toLowerCase();
     
     console.log(`📨 Message from ${from}: "${text}"`);
     
     // Get user session to check state
     const session = await getUserSession(from);
+    
+    // 🆕 CHECK FOR HUMAN TAKEOVER MODE
+    if (session.humanTakeover) {
+      console.log(`🧑‍💼 Human takeover active for ${from} - bot is paused`);
+      // Bot is silent when human agent is in control
+      // Agent can still see messages and respond manually
+      return;
+    }
     
     // If user is in booking flow, handle it there
     if (session.state === 'BOOKING_FLOW') {
