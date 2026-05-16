@@ -172,18 +172,21 @@ async function handleMessage(sock, msg) {
     
     // 🆕 AGENT COMMANDS VIA WHATSAPP (from bot's own number)
     // Check if message is from the bot's own number (agent using bot's phone)
-    const botNumber = sock.user?.id?.split(':')[0]; // Extract bot's number
+    const botNumber = sock.user?.id?.split(':')[0]?.split('@')[0]; // Extract bot's number (remove :12 suffix and @s.whatsapp.net)
     const senderNumber = from.split('@')[0]; // Extract sender's number
+    
+    console.log(`🔍 Debug: botNumber="${botNumber}" senderNumber="${senderNumber}" match=${botNumber === senderNumber}`);
     
     if (botNumber && senderNumber === botNumber) {
       // This is the agent sending commands from the bot's phone
-      console.log('🧑‍💼 Agent command detected');
+      console.log('🧑‍💼 Agent command detected from bot\'s own number');
       
-      // Parse agent commands
-      const takeoverMatch = text.match(/^\/takeover\s+(\d+)$/i);
-      const releaseMatch = text.match(/^\/release\s+(\d+)$/i);
-      const statusMatch = text.match(/^\/status\s+(\d+)$/i);
+      // Parse agent commands (allow multiple commands on same line)
+      const takeoverMatch = text.match(/\/takeover\s+(\d+)/i);
+      const releaseMatch = text.match(/\/release\s+(\d+)/i);
+      const statusMatch = text.match(/\/status\s+(\d+)/i);
       
+      // Process takeover command
       if (takeoverMatch) {
         const targetNumber = `${takeoverMatch[1]}@s.whatsapp.net`;
         await enableHumanTakeover(targetNumber, 'Agent');
@@ -192,9 +195,9 @@ async function handleMessage(sock, msg) {
         });
         await sock.sendMessage(from, { text: `✅ Takeover enabled for ${takeoverMatch[1]}` });
         console.log(`✅ Takeover enabled for ${targetNumber} via WhatsApp command`);
-        return;
       }
       
+      // Process release command
       if (releaseMatch) {
         const targetNumber = `${releaseMatch[1]}@s.whatsapp.net`;
         await disableHumanTakeover(targetNumber);
@@ -203,9 +206,9 @@ async function handleMessage(sock, msg) {
         });
         await sock.sendMessage(from, { text: `✅ Bot control restored for ${releaseMatch[1]}` });
         console.log(`✅ Bot control restored for ${targetNumber} via WhatsApp command`);
-        return;
       }
       
+      // Process status command
       if (statusMatch) {
         const targetNumber = `${statusMatch[1]}@s.whatsapp.net`;
         const isTakenOver = await isHumanTakeover(targetNumber);
@@ -219,6 +222,10 @@ async function handleMessage(sock, msg) {
         statusMsg += `Current state: ${targetSession.state}\n`;
         statusMsg += `Current step: ${targetSession.step || 'None'}`;
         await sock.sendMessage(from, { text: statusMsg });
+      }
+      
+      // If any command was processed, return early
+      if (takeoverMatch || releaseMatch || statusMatch) {
         return;
       }
       

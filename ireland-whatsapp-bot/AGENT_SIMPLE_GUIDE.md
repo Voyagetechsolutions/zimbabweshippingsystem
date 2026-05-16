@@ -152,11 +152,29 @@ When done, send to **yourself** again:
 ## 🚨 Important Notes
 
 ### **Number Format:**
-- ✅ **Correct:** `/takeover 353871234567`
-- ❌ **Wrong:** `/takeover +353 87 123 4567`
-- ❌ **Wrong:** `/takeover 353-87-123-4567`
+- ✅ **Correct:** `/takeover 353871234567` (Ireland)
+- ✅ **Correct:** `/takeover 27615321107` (Zimbabwe)
+- ❌ **Wrong:** `/takeover +353 87 123 4567` (has + and spaces)
+- ❌ **Wrong:** `/takeover 0871234567` (missing country code)
+- ❌ **Wrong:** `/takeover 353-87-123-4567` (has dashes)
 
-**Use digits only, no + or spaces!**
+**Use digits only, no + or spaces!**  
+**Always include country code:**
+- Zimbabwe: `27` (e.g., `27615321107`)
+- Ireland: `353` (e.g., `353871234567`)
+- UK: `44` (e.g., `447123456789`)
+
+### **One Command Per Message:**
+- ✅ **Correct:** Send one command, wait for confirmation
+  ```
+  /takeover 27615321107
+  ```
+  (wait for "✅ Takeover enabled")
+
+- ❌ **Wrong:** Multiple commands in one message
+  ```
+  /takeover 27615321107 /release 27615321107
+  ```
 
 ### **Where to Send Commands:**
 Send commands to **yourself** (the bot's own chat)
