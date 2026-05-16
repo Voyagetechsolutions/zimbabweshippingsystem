@@ -4,6 +4,8 @@ import QRCode from 'qrcode';
 let currentQr = null;
 let connectedUser = null;
 let lastUpdated = Date.now();
+let connectionStartTime = null;
+let totalUptime = 0;
 
 export function setQr(qr) {
   currentQr = qr;
@@ -14,13 +16,35 @@ export function setQr(qr) {
 export function setConnected(user) {
   currentQr = null;
   connectedUser = user;
+  connectionStartTime = Date.now();
   lastUpdated = Date.now();
 }
 
 export function setDisconnected() {
+  if (connectionStartTime) {
+    totalUptime += Date.now() - connectionStartTime;
+  }
   currentQr = null;
   connectedUser = null;
+  connectionStartTime = null;
   lastUpdated = Date.now();
+}
+
+function getConnectionUptime() {
+  if (!connectionStartTime) return totalUptime;
+  return totalUptime + (Date.now() - connectionStartTime);
+}
+
+function formatUptime(ms) {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  
+  if (days > 0) return `${days}d ${hours % 24}h`;
+  if (hours > 0) return `${hours}h ${minutes % 60}m`;
+  if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+  return `${seconds}s`;
 }
 
 function renderPage(body) {
@@ -57,13 +81,18 @@ async function handleRequest(req, res) {
   // Health check - always respond even if bot isn't ready
   if (req.url === '/health') {
     const status = connectedUser ? 'connected' : currentQr ? 'awaiting_scan' : 'starting';
+    const connectionUptime = getConnectionUptime();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       status, 
       updated: lastUpdated,
       hasQr: !!currentQr,
       connected: !!connectedUser,
-      uptime: process.uptime()
+      connectedUser: connectedUser || null,
+      processUptime: Math.floor(process.uptime()),
+      connectionUptime: Math.floor(connectionUptime / 1000),
+      connectionUptimeFormatted: formatUptime(connectionUptime),
+      timestamp: Date.now()
     }));
     return;
   }
@@ -90,10 +119,12 @@ async function handleRequest(req, res) {
   // Main page
   let body = '';
   if (connectedUser) {
+    const uptime = formatUptime(getConnectionUptime());
     body = `
       <p class="ok">✅ Bot is connected and ready</p>
       <p>Phone: <code>${connectedUser}</code></p>
-      <p>You can close this page. The bot is now answering messages.</p>
+      <p>Connected for: <strong>${uptime}</strong></p>
+      <p style="font-size:12px; color:#94a3b8; margin-top:12px;">The bot is now answering messages. You can close this page.</p>
     `;
   } else if (currentQr) {
     body = `

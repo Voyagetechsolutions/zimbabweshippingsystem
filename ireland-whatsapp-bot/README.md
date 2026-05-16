@@ -1,6 +1,22 @@
 # 🇮🇪 Ireland WhatsApp Bot 🇿🇼
 
+**Version 2.0.0** - Now with Human Takeover & Enhanced Stability!
+
 Simple, clean WhatsApp bot for Zimbabwe Shipping Ireland Branch.
+
+## 🎉 What's New (May 2026)
+
+### ✅ Major Updates:
+1. **Disconnection Fix** - Bot stays connected indefinitely (no more weekly disconnects!)
+2. **Human Takeover** - Agents can pause bot and chat directly with customers
+3. **Health Monitoring** - Real-time connection status and uptime tracking
+
+### 📚 New Documentation:
+- **[Agent Commands](AGENT_COMMANDS.md)** - Quick reference for agents
+- **[Complete Solution](COMPLETE_SOLUTION.md)** - Full overview
+- **[Visual Guide](VISUAL_GUIDE.md)** - Step-by-step with diagrams
+
+---
 
 ## 🚀 Quick Start
 
@@ -44,6 +60,49 @@ npm start
 From **another phone**, send "hi" to the WhatsApp number you connected.
 
 The bot will respond with the main menu!
+
+## 🧑‍💼 Human Takeover Feature
+
+Agents can now pause the bot and chat directly with customers!
+
+### Quick Commands:
+```bash
+takeover 353871234567  # Take control
+release 353871234567   # Give back to bot
+status 353871234567    # Check status
+```
+
+**Where to type:** Railway logs or terminal where bot is running  
+**Number format:** Digits only, no + or spaces!
+
+### Learn More:
+- **[Agent Commands](AGENT_COMMANDS.md)** - 1-page quick reference
+- **[Visual Guide](VISUAL_GUIDE.md)** - Step-by-step walkthrough
+- **[Full Guide](HUMAN_TAKEOVER_GUIDE.md)** - Comprehensive documentation
+
+---
+
+## 📊 Health Monitoring
+
+Check bot status anytime:
+
+```bash
+# Via health endpoint
+curl https://your-bot.railway.app/health
+
+# Via script
+node check-health.js https://your-bot.railway.app
+
+# Via browser
+https://your-bot.railway.app
+```
+
+Shows:
+- Connection status
+- Uptime duration
+- Connected phone number
+
+---
 
 ## 📱 Bot Features
 

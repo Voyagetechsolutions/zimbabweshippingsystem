@@ -5,7 +5,9 @@
   "main": "bot.js",
   "type": "module",
   "scripts": {
-    "start": "node bot.js"
+    "start": "node bot.js",
+    "health": "node check-health.js",
+    "health:prod": "node check-health.js https://your-bot.railway.app"
   },
   "keywords": [
     "whatsapp",

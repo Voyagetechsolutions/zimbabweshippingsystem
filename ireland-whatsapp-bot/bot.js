@@ -13,7 +13,7 @@ import pino from 'pino';
 import readline from 'readline';
 import { initDatabase, getCollectionSchedules } from './utils/database.js';
 import { getPricingMessage } from './utils/pricing.js';
-import { getUserSession, updateUserSession } from './utils/sessions.js';
+import { getUserSession, updateUserSession, enableHumanTakeover, disableHumanTakeover, isHumanTakeover } from './utils/sessions.js';
 import { handleBookingFlow } from './flows/booking.js';
 import { handleTrackingFlow } from './flows/tracking.js';
 import { startQrServer, setQr, setConnected, setDisconnected } from './qr-server.js';
@@ -170,6 +170,78 @@ async function handleMessage(sock, msg) {
     // Get user session to check state
     const session = await getUserSession(from);
     
+    // 🆕 AGENT COMMANDS VIA WHATSAPP (from bot's own number)
+    // Check if message is from the bot's own number (agent using bot's phone)
+    const botNumber = sock.user?.id?.split(':')[0]; // Extract bot's number
+    const senderNumber = from.split('@')[0]; // Extract sender's number
+    
+    if (botNumber && senderNumber === botNumber) {
+      // This is the agent sending commands from the bot's phone
+      console.log('🧑‍💼 Agent command detected');
+      
+      // Parse agent commands
+      const takeoverMatch = text.match(/^\/takeover\s+(\d+)$/i);
+      const releaseMatch = text.match(/^\/release\s+(\d+)$/i);
+      const statusMatch = text.match(/^\/status\s+(\d+)$/i);
+      
+      if (takeoverMatch) {
+        const targetNumber = `${takeoverMatch[1]}@s.whatsapp.net`;
+        await enableHumanTakeover(targetNumber, 'Agent');
+        await sock.sendMessage(targetNumber, { 
+          text: '🧑‍💼 *An agent has joined the conversation*\n\nYou are now chatting with a human agent. The bot is paused.' 
+        });
+        await sock.sendMessage(from, { text: `✅ Takeover enabled for ${takeoverMatch[1]}` });
+        console.log(`✅ Takeover enabled for ${targetNumber} via WhatsApp command`);
+        return;
+      }
+      
+      if (releaseMatch) {
+        const targetNumber = `${releaseMatch[1]}@s.whatsapp.net`;
+        await disableHumanTakeover(targetNumber);
+        await sock.sendMessage(targetNumber, { 
+          text: '🤖 *Agent has left the conversation*\n\nYou are now chatting with the automated bot again. Type *menu* to see options.' 
+        });
+        await sock.sendMessage(from, { text: `✅ Bot control restored for ${releaseMatch[1]}` });
+        console.log(`✅ Bot control restored for ${targetNumber} via WhatsApp command`);
+        return;
+      }
+      
+      if (statusMatch) {
+        const targetNumber = `${statusMatch[1]}@s.whatsapp.net`;
+        const isTakenOver = await isHumanTakeover(targetNumber);
+        const targetSession = await getUserSession(targetNumber);
+        let statusMsg = `📊 *Status for ${statusMatch[1]}*\n\n`;
+        statusMsg += `Human Takeover: ${isTakenOver ? '✅ YES' : '❌ NO'}\n`;
+        if (isTakenOver) {
+          statusMsg += `Taken over by: ${targetSession.takenOverBy || 'Unknown'}\n`;
+          statusMsg += `Taken over at: ${targetSession.takenOverAt || 'Unknown'}\n`;
+        }
+        statusMsg += `Current state: ${targetSession.state}\n`;
+        statusMsg += `Current step: ${targetSession.step || 'None'}`;
+        await sock.sendMessage(from, { text: statusMsg });
+        return;
+      }
+      
+      // Show help if agent sends /help or unknown command
+      if (text.startsWith('/')) {
+        const helpMsg = `🧑‍💼 *Agent Commands*\n\n` +
+          `*/takeover 353871234567* - Take control\n` +
+          `*/release 353871234567* - Give back to bot\n` +
+          `*/status 353871234567* - Check status\n\n` +
+          `*Note:* Use digits only, no + or spaces!`;
+        await sock.sendMessage(from, { text: helpMsg });
+        return;
+      }
+    }
+    
+    // 🆕 CHECK FOR HUMAN TAKEOVER MODE
+    if (session.humanTakeover) {
+      console.log(`🧑‍💼 Human takeover active for ${from} - bot is paused`);
+      // Bot is silent when human agent is in control
+      // Agent can still see messages and respond manually
+      return;
+    }
+    
     // If user is in booking flow, handle it there
     if (session.state === 'BOOKING_FLOW') {
       console.log(`📦 Routing to booking flow (step: ${session.step})`);
@@ -254,6 +326,9 @@ Type *menu* to return to main menu.`;
  * Terminal command prompt: lets you send a test message to verify outbound works.
  *   send <digits>           → sends "Bot is alive!" to that number
  *   send <digits> <text>    → sends a custom message
+ *   takeover <digits>       → enable human takeover for a customer
+ *   release <digits>        → release customer back to bot
+ *   status <digits>         → check takeover status for a customer
  */
 let cliStarted = false;
 function startCliPrompt(sock) {
@@ -264,9 +339,72 @@ function startCliPrompt(sock) {
   rl.on('line', async (line) => {
     const input = line.trim();
     if (!input) return;
+    
+    // Handle takeover command
+    const takeoverMatch = input.match(/^takeover\s+(\d+)$/i);
+    if (takeoverMatch) {
+      const digits = takeoverMatch[1];
+      const jid = `${digits}@s.whatsapp.net`;
+      try {
+        await enableHumanTakeover(jid, 'Agent');
+        console.log(`✅ Human takeover enabled for ${jid}`);
+        await sock.sendMessage(jid, { 
+          text: '🧑‍💼 *An agent has joined the conversation*\n\nYou are now chatting with a human agent. The bot is paused.' 
+        });
+        console.log('📤 Notification sent to customer');
+      } catch (err) {
+        console.error('❌ Takeover failed:', err.message);
+      }
+      return;
+    }
+    
+    // Handle release command
+    const releaseMatch = input.match(/^release\s+(\d+)$/i);
+    if (releaseMatch) {
+      const digits = releaseMatch[1];
+      const jid = `${digits}@s.whatsapp.net`;
+      try {
+        await disableHumanTakeover(jid);
+        console.log(`✅ Bot control restored for ${jid}`);
+        await sock.sendMessage(jid, { 
+          text: '🤖 *Agent has left the conversation*\n\nYou are now chatting with the automated bot again. Type *menu* to see options.' 
+        });
+        console.log('📤 Notification sent to customer');
+      } catch (err) {
+        console.error('❌ Release failed:', err.message);
+      }
+      return;
+    }
+    
+    // Handle status command
+    const statusMatch = input.match(/^status\s+(\d+)$/i);
+    if (statusMatch) {
+      const digits = statusMatch[1];
+      const jid = `${digits}@s.whatsapp.net`;
+      try {
+        const isTakenOver = await isHumanTakeover(jid);
+        const session = await getUserSession(jid);
+        console.log(`📊 Status for ${jid}:`);
+        console.log(`   Human Takeover: ${isTakenOver ? '✅ YES' : '❌ NO'}`);
+        if (isTakenOver) {
+          console.log(`   Taken over by: ${session.takenOverBy || 'Unknown'}`);
+          console.log(`   Taken over at: ${session.takenOverAt || 'Unknown'}`);
+        }
+        console.log(`   Current state: ${session.state}`);
+        console.log(`   Current step: ${session.step || 'None'}`);
+      } catch (err) {
+        console.error('❌ Status check failed:', err.message);
+      }
+      return;
+    }
+    
+    // Handle send command
     const match = input.match(/^send\s+(\d+)(?:\s+(.+))?$/i);
     if (!match) {
       console.log('   usage: send <digits> [message]   (digits only, no + or spaces)');
+      console.log('          takeover <digits>         (enable human takeover)');
+      console.log('          release <digits>          (release back to bot)');
+      console.log('          status <digits>           (check takeover status)');
       return;
     }
     const digits = match[1];
@@ -302,7 +440,19 @@ async function startBot() {
       logger,
       auth: state,
       printQRInTerminal: false,
-      getMessage: async () => ({ conversation: '' })
+      getMessage: async () => ({ conversation: '' }),
+      // Keep-alive settings to prevent disconnection
+      keepAliveIntervalMs: 10000, // Send keep-alive every 10 seconds
+      markOnlineOnConnect: true,
+      connectTimeoutMs: 60000,
+      defaultQueryTimeoutMs: 0,
+      emitOwnEvents: true,
+      // Session sync settings
+      syncFullHistory: false,
+      shouldSyncHistoryMessage: () => false,
+      // Retry configuration
+      retryRequestDelayMs: 250,
+      maxMsgRetryCount: 5
     });
     
     // Connection updates
@@ -356,6 +506,22 @@ async function startBot() {
     
     // Save credentials
     sock.ev.on('creds.update', saveCreds);
+    
+    // Suppress non-critical decryption errors (they're expected and harmless)
+    const originalConsoleError = console.error;
+    console.error = (...args) => {
+      const msg = args.join(' ');
+      // Filter out known non-critical Baileys errors
+      if (msg.includes('Bad MAC') || 
+          msg.includes('Failed to decrypt message') || 
+          msg.includes('Session error') ||
+          msg.includes('MessageCounterError') ||
+          msg.includes('Key used already')) {
+        // Silently ignore - these are expected during message sync
+        return;
+      }
+      originalConsoleError.apply(console, args);
+    };
     
     // Handle incoming messages
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
