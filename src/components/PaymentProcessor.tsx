@@ -50,13 +50,10 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
   const [userId, setUserId] = useState<string | null>(null);
 
   const drumQuantity = bookingData?.shipmentDetails?.type === 'drum' ? bookingData.shipmentDetails.quantity : 0;
-  const specialDealDiscount = bookingData?.shipmentDetails?.type === 'drum' ? drumQuantity * 20 : 0;
   const payOnArrivalPremium = bookingData?.shipmentDetails?.type === 'drum' ? totalAmount * 0.2 : 0;
 
   let finalAmount = totalAmount;
-  if (isSpecialDeal && bookingData?.shipmentDetails?.type === 'drum') {
-    finalAmount -= specialDealDiscount;
-  } else if (isPayOnArrival && bookingData?.shipmentDetails?.type === 'drum') {
+  if (isPayOnArrival && bookingData?.shipmentDetails?.type === 'drum') {
     finalAmount += payOnArrivalPremium;
   }
 
@@ -230,35 +227,19 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
           >
             {bookingData?.shipmentDetails?.type === 'drum' && (
               <>
-                <div className={`flex items-start space-x-3 border-2 rounded-md p-4 ${selectedPaymentMethod === 'cashOnCollection' ? 'bg-green-50 border-green-400' : 'border-dashed border-yellow-400'}`}>
+                <div className={`flex items-start space-x-3 border-2 rounded-md p-4 ${selectedPaymentMethod === 'cashOnCollection' ? 'bg-green-50 border-green-400' : 'border-dashed border-gray-300'}`}>
                   <RadioGroupItem value="cashOnCollection" id="cashOnCollection" />
                   <div className="space-y-2 w-full">
                     <div className="flex justify-between items-center">
                       <Label htmlFor="cashOnCollection" className="flex items-center text-lg font-medium">
                         <Tag className="h-5 w-5 mr-2 text-green-600" />
-                        Special Deal: Cash on Collection12
+                        Cash on Collection
                       </Label>
-                      <span className="bg-yellow-400 text-yellow-800 text-xs font-bold px-2 py-1 rounded-full">SAVE £{specialDealDiscount}</span>
+                      <span className="font-semibold">£{totalAmount.toFixed(2)}</span>
                     </div>
                     <p className="text-sm text-gray-600">
-                      Pay cash when we collect your drums and receive a £20 discount on each drum from your shipment.
+                      Pay cash when we collect your items.
                     </p>
-                    {selectedPaymentMethod === 'cashOnCollection' && (
-                      <div className="mt-3 p-3 bg-green-100 rounded-md">
-                        <h4 className="font-medium flex items-center text-green-800">
-                          <PoundSterling className="h-4 w-4 mr-1" /> 
-                          Your Discount
-                        </h4>
-                        <div className="grid grid-cols-2 gap-1 mt-2 text-sm">
-                          <span className="text-green-700">Original Price:</span>
-                          <span className="text-right font-medium">£{totalAmount.toFixed(2)}</span>
-                          <span className="text-green-700">Cash Discount:</span>
-                          <span className="text-right font-medium">-£{specialDealDiscount.toFixed(2)}</span>
-                          <span className="text-green-800 font-medium pt-1 border-t border-green-200">Final Total:</span>
-                          <span className="text-right font-bold pt-1 border-t border-green-200">£{(totalAmount - specialDealDiscount).toFixed(2)}</span>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
                 <div className={`flex items-start space-x-3 border-2 rounded-md p-4 ${selectedPaymentMethod === 'payOnArrival' ? 'bg-blue-50 border-blue-400' : 'border-dashed border-blue-300'}`}>
@@ -392,12 +373,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
               <span className="font-medium">Subtotal</span>
               <span>£{totalAmount.toFixed(2)}</span>
             </div>
-            {isSpecialDeal && bookingData?.shipmentDetails?.type === 'drum' && (
-              <div className="flex justify-between">
-                <span className="text-green-600">Cash on Collection Discount</span>
-                <span className="text-green-600">-£{specialDealDiscount.toFixed(2)}</span>
-              </div>
-            )}
+
             {isPayOnArrival && bookingData?.shipmentDetails?.type === 'drum' && (
               <div className="flex justify-between">
                 <span className="text-blue-700">Pay on Arrival Premium</span>

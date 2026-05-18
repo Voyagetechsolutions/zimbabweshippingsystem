@@ -119,7 +119,7 @@ const PaymentSuccess = () => {
       case 'goods_arriving':
         return 'Pay on Goods Arriving in Zimbabwe';
       case 'cashOnCollection':
-        return 'Cash on Collection (Special Deal)';
+        return 'Cash on Collection';
       case 'cash':
         return 'Cash Payment (30-day terms)';
       case 'bank_transfer':
@@ -187,7 +187,7 @@ const PaymentSuccess = () => {
                     )}
                     {receiptData.payment_method === 'cash_on_collection' && (
                       <p className="mt-2 text-sm text-blue-700 dark:text-blue-300">
-                        Please have cash ready when we collect your items. £20 discount applied on each drum!
+                        Please have cash ready when we collect your items.
                       </p>
                     )}
                   </div>

@@ -8,11 +8,10 @@ const PricingSection = () => {
   const [selectedRegion, setSelectedRegion] = useState<'uk' | 'ireland'>('uk');
 
   const ukPrices = {
-    fivePlus: { cash: '£240', standard: '£260' },
-    twoToFour: { cash: '£250', standard: '£270' },
-    one: { cash: '£260', standard: '£280' },
+    fivePlus: { standard: '£260' },
+    twoToFour: { standard: '£270' },
+    one: { standard: '£280' },
     currency: '£',
-    cashDiscount: '£20',
   };
 
   const irelandPrices = {
@@ -91,7 +90,7 @@ const PricingSection = () => {
                       <span className="text-sm text-gray-500 ml-2">Best value</span>
                     </div>
                     <span className={`text-2xl font-bold ${selectedRegion === 'uk' ? 'text-zim-green' : 'text-emerald-600'}`}>
-                      {selectedRegion === 'uk' ? ukPrices.fivePlus.cash : irelandPrices.fivePlus.standard}
+                      {selectedRegion === 'uk' ? ukPrices.fivePlus.standard : irelandPrices.fivePlus.standard}
                       <span className="text-sm font-normal text-gray-500">/each</span>
                     </span>
                   </div>
@@ -99,7 +98,7 @@ const PricingSection = () => {
                   <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
                     <span className="font-semibold text-gray-900 dark:text-white">2-4 drums</span>
                     <span className="text-2xl font-bold text-gray-700 dark:text-gray-300">
-                      {selectedRegion === 'uk' ? ukPrices.twoToFour.cash : irelandPrices.twoToFour.standard}
+                      {selectedRegion === 'uk' ? ukPrices.twoToFour.standard : irelandPrices.twoToFour.standard}
                       <span className="text-sm font-normal text-gray-500">/each</span>
                     </span>
                   </div>
@@ -107,21 +106,12 @@ const PricingSection = () => {
                   <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
                     <span className="font-semibold text-gray-900 dark:text-white">1 drum</span>
                     <span className="text-2xl font-bold text-gray-700 dark:text-gray-300">
-                      {selectedRegion === 'uk' ? ukPrices.one.cash : irelandPrices.one.standard}
+                      {selectedRegion === 'uk' ? ukPrices.one.standard : irelandPrices.one.standard}
                     </span>
                   </div>
                 </div>
 
-                {/* Cash discount callout - UK only */}
-                {selectedRegion === 'uk' && (
-                  <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg mb-6">
-                    <Banknote className="h-5 w-5 text-amber-600 flex-shrink-0" />
-                    <div>
-                      <span className="font-semibold text-amber-800 dark:text-amber-200">Cash prices shown.</span>
-                      <span className="text-amber-700 dark:text-amber-300 ml-1">Card adds £20/drum</span>
-                    </div>
-                  </div>
-                )}
+
 
                 {/* What's included */}
                 <div className="space-y-3 mb-6">

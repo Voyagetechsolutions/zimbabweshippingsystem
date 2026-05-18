@@ -68,8 +68,8 @@ const FAQ = () => {
           answer: 'We accept cash payment, PayPal, bank transfers, payment in Zimbabwe, and mobile payment options. All payment methods are secure and encrypted for your protection.'
         },
         {
-          question: 'Is there a discount for cash payments?',
-          answer: 'Yes! For UK shipments, paying by cash saves you £20 per drum. Cash prices are: £240 (5+ drums), £250 (2-4 drums), £260 (1 drum). Card payments add £20 per drum.'
+          question: 'What are the UK drum prices?',
+          answer: 'UK drum shipping prices are: £260 per drum for 5+ drums, £270 per drum for 2-4 drums, and £280 for a single drum. These prices are the same regardless of payment method — cash, card, or bank transfer.'
         },
         {
           question: 'When do I need to pay for my shipment?',

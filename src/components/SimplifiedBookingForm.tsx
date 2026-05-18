@@ -596,10 +596,6 @@ export const SimplifiedBookingForm = () => {
     const baseTotal = calculateBaseTotal();
 
     // Apply payment method adjustments
-    if (formData.paymentMethod === 'cashOnCollection' && formData.includeDrums) {
-      // Cash discount: £20/drum for UK, €20/drum for Ireland
-      return baseTotal - (formData.drumQuantity * 20);
-    }
     if (formData.paymentMethod === 'payOnArrival') {
       return baseTotal * 1.20; // 20% premium
     }
@@ -625,7 +621,7 @@ export const SimplifiedBookingForm = () => {
       // Build notes with add-ons and custom items
       let notes = [];
       if (formData.wantMetalSeal) notes.push('Metal Coded Seal requested');
-      if (formData.paymentMethod === 'cashOnCollection') notes.push('Cash payment (discount applied)');
+      if (formData.paymentMethod === 'cashOnCollection') notes.push('Cash payment on collection');
       if (formData.includeBoxes) notes.push(`Other Items (agent quote): ${formData.boxesDescription}`);
       if (formData.includeTrunks && formData.trunkQuantity > 0) notes.push(`${formData.trunkQuantity} x Trunk/Storage Box`);
       if (formData.purchaseDrums && formData.purchaseDrumType && formData.purchaseDrumQuantity > 0) {
@@ -1643,8 +1639,6 @@ export const SimplifiedBookingForm = () => {
 
   const renderStep5 = () => {
     const baseTotal = calculateBaseTotal();
-    const cashDiscount = formData.includeDrums ? formData.drumQuantity * 20 : 0;
-    const cashTotal = baseTotal - cashDiscount;
     const premiumTotal = baseTotal * 1.20;
     const cs = currencySymbol; // shorthand for currency symbol
 
@@ -1712,7 +1706,7 @@ export const SimplifiedBookingForm = () => {
               )}
             </div>
 
-            {/* Cash on Collection - With Discount */}
+            {/* Cash on Collection */}
             <div className={`border-2 rounded-lg p-4 transition-all ${formData.paymentMethod === 'cashOnCollection' ? 'border-zim-green bg-green-50 dark:bg-green-900/20 dark:border-green-600' : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'}`}>
               <label htmlFor="cashOnCollection" className="flex items-start gap-3 cursor-pointer">
                 <RadioGroupItem value="cashOnCollection" id="cashOnCollection" className="mt-1" />
@@ -1722,28 +1716,9 @@ export const SimplifiedBookingForm = () => {
                       <Wallet className="h-5 w-5" />
                       Pay Cash on Collection
                     </span>
-                    <div className="text-right">
-                      {formData.includeDrums && cashDiscount > 0 ? (
-                        <>
-                          <span className="text-sm text-gray-500 dark:text-gray-400 line-through mr-2">{cs}{baseTotal.toFixed(2)}</span>
-                          <span className="text-xl font-bold text-green-600 dark:text-green-400">{cs}{cashTotal.toFixed(2)}</span>
-                        </>
-                      ) : (
-                        <span className="text-xl font-bold text-zim-green">{cs}{baseTotal.toFixed(2)}</span>
-                      )}
-                    </div>
+                    <span className="text-xl font-bold text-zim-green">{cs}{baseTotal.toFixed(2)}</span>
                   </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Pay with cash when your items are collected</p>
-                  
-                  {formData.includeDrums && cashDiscount > 0 && (
-                    <div className="flex items-start rounded-md bg-green-100 dark:bg-green-900/30 p-3 text-sm mt-2">
-                      <CheckCircle2 className="mr-2 h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
-                      <div>
-                        <span className="font-semibold text-green-800 dark:text-green-300">Save {cs}{cashDiscount}!</span>
-                        <p className="text-green-700 dark:text-green-400">Get {cs}20 discount per drum when you pay cash</p>
-                      </div>
-                    </div>
-                  )}
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Pay with cash when your items are collected</p>
                 </div>
               </label>
             </div>
@@ -1782,12 +1757,7 @@ export const SimplifiedBookingForm = () => {
                 <span>{cs}{baseTotal.toFixed(2)}</span>
               </div>
 
-              {formData.paymentMethod === 'cashOnCollection' && cashDiscount > 0 && (
-                <div className="flex justify-between text-green-600 dark:text-green-400 font-medium">
-                  <span>Cash Discount:</span>
-                  <span>-{cs}{cashDiscount.toFixed(2)}</span>
-                </div>
-              )}
+
 
               {formData.paymentMethod === 'payOnArrival' && (
                 <div className="flex justify-between text-orange-600 dark:text-orange-400 font-medium">

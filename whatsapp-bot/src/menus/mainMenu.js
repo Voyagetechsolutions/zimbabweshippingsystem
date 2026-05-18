@@ -43,7 +43,7 @@ export function getPricingMenu() {
 
 *PAYMENT OPTIONS:*
 💳 Standard payment (card / bank transfer)
-💵 Cash on Collection (save €20 per drum)
+💵 Cash on Collection
 ⏳ Pay on Arrival (+20% premium)
 
 Type *book* to start booking or *menu* for main menu.`;

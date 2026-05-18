@@ -151,7 +151,7 @@ export async function createBookingRecords(phoneNumber, bookingData, pricing) {
   };
 
   const notes = [];
-  if (bookingData.paymentMethod === 'cashOnCollection') notes.push('Cash payment (discount applied)');
+  if (bookingData.paymentMethod === 'cashOnCollection') notes.push('Cash payment on collection');
   if (bookingData.includeBoxes) notes.push(`Other Items (agent quote): ${bookingData.boxesDescription}`);
   if (bookingData.purchaseDrums && bookingData.purchaseDrumQuantity > 0) {
     const label = bookingData.purchaseDrumType === 'metal' ? 'Metal Drum' : 'Plastic Barrel';

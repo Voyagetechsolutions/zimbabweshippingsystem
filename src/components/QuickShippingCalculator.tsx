@@ -13,15 +13,13 @@ const QuickShippingCalculator = () => {
 
   const calculateShippingCost = () => {
     const drumCount = parseInt(drums);
-    let pricePerDrum = 240; // Default to single drum price
+    let pricePerDrum = 280; // Default to single drum price
     
-    // Enhanced volume discounts
-    if (drumCount >= 10) {
-      pricePerDrum = 200;
-    } else if (drumCount >= 5) {
-      pricePerDrum = 220;
+    // Volume discounts
+    if (drumCount >= 5) {
+      pricePerDrum = 260;
     } else if (drumCount >= 2) {
-      pricePerDrum = 230;
+      pricePerDrum = 270;
     }
     
     const totalPrice = drumCount * pricePerDrum;
@@ -60,10 +58,9 @@ const QuickShippingCalculator = () => {
           <div className="bg-gray-50 p-3 rounded-md text-sm space-y-2">
             <p className="font-medium">Volume Discounts:</p>
             <ul className="list-disc pl-5 space-y-1">
-              <li>1 Drum: £260 each</li>
-              <li>2-4 Drums: £250 each</li>
-              <li>5-9 Drums: £240 each</li>
-              
+              <li>1 Drum: £280 each</li>
+              <li>2-4 Drums: £270 each</li>
+              <li>5+ Drums: £260 each</li>
             </ul>
           </div>
           

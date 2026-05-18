@@ -207,9 +207,6 @@ const ManualBookingTab: React.FC = () => {
   const calculateFinalTotal = () => {
     const baseTotal = calculateBaseTotal();
 
-    if (formData.paymentMethod === 'cashOnCollection') {
-      return baseTotal - (formData.drumQuantity * 20);
-    }
     if (formData.paymentMethod === 'payOnArrival') {
       return baseTotal * 1.20;
     }
@@ -750,7 +747,7 @@ const ManualBookingTab: React.FC = () => {
                   <RadioGroupItem value="cashOnCollection" id="cash" />
                   <Label htmlFor="cash" className="flex-1 cursor-pointer">
                     <div className="font-medium">Cash on Collection</div>
-                    <div className="text-sm text-green-600">£20 discount per drum</div>
+                    <div className="text-sm text-gray-500">Pay cash when items are collected</div>
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2 p-3 rounded-lg border hover:bg-gray-50">
@@ -774,12 +771,7 @@ const ManualBookingTab: React.FC = () => {
                     <span>£{(formData.drumQuantity * 5).toFixed(2)}</span>
                   </div>
                 )}
-                {formData.paymentMethod === 'cashOnCollection' && (
-                  <div className="flex justify-between text-sm text-green-600">
-                    <span>Cash Discount</span>
-                    <span>-£{(formData.drumQuantity * 20).toFixed(2)}</span>
-                  </div>
-                )}
+
                 {formData.paymentMethod === 'payOnArrival' && (
                   <div className="flex justify-between text-sm text-orange-600">
                     <span>Pay on Arrival Premium (20%)</span>

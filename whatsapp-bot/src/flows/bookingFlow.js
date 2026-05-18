@@ -10,7 +10,6 @@ import {
   calculatePricing,
   formatMoney,
   CURRENCY_SYMBOL,
-  CASH_DISCOUNT_PER_DRUM,
   PAY_ON_ARRIVAL_MULTIPLIER,
 } from '../utils/pricingUtils.js';
 
@@ -410,9 +409,7 @@ export async function handleBookingFlow(sock, phoneNumber, text, _session) {
 
       let msg = `✅ Selected: *${label}*\n\n`;
       msg += `*Total to pay: ${formatMoney(pricing.finalTotal)}*\n`;
-      if (pricing.cashDiscount > 0) {
-        msg += `_(Cash discount of ${formatMoney(pricing.cashDiscount)} applied)_\n`;
-      } else if (pricing.payOnArrivalPremium > 0) {
+      if (pricing.payOnArrivalPremium > 0) {
         msg += `_(20% premium of ${formatMoney(pricing.payOnArrivalPremium)} added)_\n`;
       }
       msg += `\n*Step 5 of 5 — Confirm*\n\n1️⃣ ✅ Submit booking\n2️⃣ ✏️ Start over`;
@@ -631,11 +628,7 @@ async function showPaymentOptions(sock, phoneNumber, bookingData) {
 
   let msg = `*Step 5 of 5 — Payment Method*\n\nHow would you like to pay?\n\n`;
   msg += `1️⃣ 💳 *Standard Payment* — ${formatMoney(standard.finalTotal)}\n   _Pay by card or bank transfer_\n\n`;
-  if (bookingData.includeDrums && bookingData.drumQuantity > 0) {
-    msg += `2️⃣ 💵 *Cash on Collection* — ${formatMoney(cash.finalTotal)}\n   _Save ${CURRENCY_SYMBOL}${CASH_DISCOUNT_PER_DRUM}/drum (${formatMoney(cash.cashDiscount)} off)_\n\n`;
-  } else {
-    msg += `2️⃣ 💵 *Cash on Collection* — ${formatMoney(cash.finalTotal)}\n   _Pay cash when we collect_\n\n`;
-  }
+  msg += `2️⃣ 💵 *Cash on Collection* — ${formatMoney(cash.finalTotal)}\n   _Pay cash when we collect_\n\n`;
   msg += `3️⃣ ⏳ *Pay on Arrival* — ${formatMoney(arrival.finalTotal)}\n   _Pay when shipment reaches Zimbabwe (+20% premium)_\n\nReply with *1*, *2*, or *3*.`;
 
   return sendMessage(sock, phoneNumber, msg);

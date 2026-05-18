@@ -144,7 +144,7 @@ export async function createBookingRecords(phoneNumber, bookingData, pricing) {
 
   const notes = [];
   if (bookingData.wantMetalSeal) notes.push('Metal Coded Seal requested');
-  if (bookingData.paymentMethod === 'cashOnCollection') notes.push('Cash payment (discount applied)');
+  if (bookingData.paymentMethod === 'cashOnCollection') notes.push('Cash payment on collection');
   if (bookingData.includeBoxes) notes.push(`Other Items (agent quote): ${bookingData.boxesDescription}`);
   if (bookingData.includeTrunks && bookingData.trunkQuantity > 0) {
     notes.push(`${bookingData.trunkQuantity} x Trunk/Storage Box`);

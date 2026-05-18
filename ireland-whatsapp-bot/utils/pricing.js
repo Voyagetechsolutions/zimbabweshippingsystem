@@ -14,7 +14,7 @@ const IRELAND_PRICING = {
 export const CURRENCY = 'EUR';
 export const CURRENCY_SYMBOL = '€';
 export const COUNTRY = 'Ireland';
-export const CASH_DISCOUNT_PER_DRUM = 20;
+export const CASH_DISCOUNT_PER_DRUM = 0;
 export const PAY_ON_ARRIVAL_MULTIPLIER = 1.20;
 
 let cachedSettings = null;
@@ -80,10 +80,7 @@ export function calculatePricing(bookingData, settings = DEFAULTS) {
   let cashDiscount = 0;
   let payOnArrivalPremium = 0;
 
-  if (bookingData.paymentMethod === 'cashOnCollection' && drumQty > 0) {
-    cashDiscount = drumQty * CASH_DISCOUNT_PER_DRUM;
-    finalTotal = baseTotal - cashDiscount;
-  } else if (bookingData.paymentMethod === 'payOnArrival') {
+  if (bookingData.paymentMethod === 'payOnArrival') {
     finalTotal = baseTotal * PAY_ON_ARRIVAL_MULTIPLIER;
     payOnArrivalPremium = finalTotal - baseTotal;
   }
@@ -124,7 +121,7 @@ export async function getPricingMessage() {
 
 *PAYMENT OPTIONS:*
 💳 Standard payment (card / bank transfer)
-💵 Cash on Collection (save ${CURRENCY_SYMBOL}${CASH_DISCOUNT_PER_DRUM} per drum)
+💵 Cash on Collection
 ⏳ Pay on Arrival (+20% premium)
 
 Type *book* to start booking or *menu* for main menu.`;

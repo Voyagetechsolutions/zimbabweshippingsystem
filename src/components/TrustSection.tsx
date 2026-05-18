@@ -34,7 +34,7 @@ const TrustSection: React.FC = () => {
     {
       icon: CreditCard,
       title: 'Flexible Payment',
-      description: '30-day payment terms available. Pay on arrival option. Cash discounts for immediate savings.',
+      description: '30-day payment terms available. Pay on arrival option. Multiple payment methods accepted.',
       color: 'zim-green',
     },
     {

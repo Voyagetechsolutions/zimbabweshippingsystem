@@ -44,14 +44,11 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
   
   const isSpecialDeal = selectedPaymentMethod === 'cashOnCollection';
   const drumQuantity = bookingData?.shipmentDetails?.type === 'drum' ? (bookingData?.shipmentDetails?.quantity || 1) : 0;
-  const specialDealDiscount = isSpecialDeal ? (20 * drumQuantity) : 0;
   
   const isPayOnArrival = selectedPaymentMethod === 'payOnArrival';
-  const baseAmount = totalAmount - specialDealDiscount;
-  const payOnArrivalPremium = isPayOnArrival ? (baseAmount * 0.20) : 0;
+  const payOnArrivalPremium = isPayOnArrival ? (totalAmount * 0.20) : 0;
   
-  const finalAmount = isSpecialDeal ? (totalAmount - specialDealDiscount) : 
-                      isPayOnArrival ? (totalAmount + payOnArrivalPremium) : 
+  const finalAmount = isPayOnArrival ? (totalAmount + payOnArrivalPremium) : 
                       totalAmount;
 
   const getRemainingAmount = () => {
@@ -130,7 +127,7 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
         isSpecialDeal,
         isPayOnArrival,
         originalAmount: totalAmount,
-        discount: isSpecialDeal ? specialDealDiscount : 0,
+        discount: 0,
         premium: isPayOnArrival ? payOnArrivalPremium : 0,
         status: 'pending',
         date: new Date().toISOString(),
@@ -347,27 +344,11 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
               <label htmlFor="cashOnCollection" className="font-medium flex items-center justify-between">
                 <span className="flex items-center">
                   <Wallet className="mr-2 h-4 w-4" />
-                  Pay Full on Collection
+                  Pay Cash on Collection
                 </span>
-                {isSpecialDeal && drumQuantity > 0 ? (
-                  <div className="text-right">
-                    <span className="text-gray-500 dark:text-gray-400 line-through mr-2">£{totalAmount.toFixed(2)}</span>
-                    <span className="text-zim-green dark:text-green-400 font-semibold">£{(totalAmount - specialDealDiscount).toFixed(2)}</span>
-                  </div>
-                ) : (
-                  <span className="text-zim-green dark:text-green-400 font-semibold">£{totalAmount.toFixed(2)}</span>
-                )}
+                <span className="text-zim-green dark:text-green-400 font-semibold">£{totalAmount.toFixed(2)}</span>
               </label>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Pay with cash when your items are collected</p>
-              
-              {isSpecialDeal && drumQuantity > 0 && (
-                <div className="mt-3 flex items-start rounded-md bg-green-100 dark:bg-green-900/30 p-2 text-sm">
-                  <CheckCircle2 className="mr-2 h-4 w-4 text-green-600 dark:text-green-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-green-700 dark:text-green-400">
-                    Special deal: £20 discount per drum for cash payments!
-                  </span>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -406,12 +387,7 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
             <span>£{totalAmount.toFixed(2)}</span>
           </div>
           
-          {isSpecialDeal && (
-            <div className="flex justify-between mb-2 text-green-600 dark:text-green-400">
-              <span>Cash discount:</span>
-              <span>-£{specialDealDiscount.toFixed(2)}</span>
-            </div>
-          )}
+
           
           {isPayOnArrival && (
             <div className="flex justify-between mb-2 text-amber-600 dark:text-amber-400">

@@ -245,7 +245,7 @@ async function sendPricingMessage(sock, phoneNumber) {
     `✅ Professional handling\n\n` +
     `*PAYMENT OPTIONS:*\n` +
     `💳 Standard payment (card / bank transfer)\n` +
-    `💵 Cash on Collection (save €20 per drum)\n` +
+    `💵 Cash on Collection\n` +
     `⏳ Pay on Arrival (+20% premium)\n\n` +
     `Type *book* to start booking or *menu* for main menu.`;
   await sendMessage(sock, phoneNumber, msg);

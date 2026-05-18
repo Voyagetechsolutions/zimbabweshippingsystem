@@ -3,7 +3,7 @@
 export const CURRENCY = 'GBP';
 export const CURRENCY_SYMBOL = '£';
 export const COUNTRY = 'England';
-export const CASH_DISCOUNT_PER_DRUM = 20;
+export const CASH_DISCOUNT_PER_DRUM = 0;
 export const PAY_ON_ARRIVAL_MULTIPLIER = 1.20;
 export const METAL_SEAL_PRICE = 5;
 
@@ -52,10 +52,7 @@ export function calculatePricing(bookingData) {
   let cashDiscount = 0;
   let payOnArrivalPremium = 0;
 
-  if (bookingData.paymentMethod === 'cashOnCollection' && drumQty > 0) {
-    cashDiscount = drumQty * CASH_DISCOUNT_PER_DRUM;
-    finalTotal = baseTotal - cashDiscount;
-  } else if (bookingData.paymentMethod === 'payOnArrival') {
+  if (bookingData.paymentMethod === 'payOnArrival') {
     finalTotal = baseTotal * PAY_ON_ARRIVAL_MULTIPLIER;
     payOnArrivalPremium = finalTotal - baseTotal;
   }

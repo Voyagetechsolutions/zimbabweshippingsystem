@@ -35,7 +35,7 @@ const Pricing = () => {
               Simple, Transparent Pricing
             </h1>
             <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-              No hidden fees. Volume discounts available. Pay with cash and save even more.
+              No hidden fees. Volume discounts available.
             </p>
           </div>
         </section>
@@ -56,14 +56,14 @@ const Pricing = () => {
                   </div>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-8">
-                  {/* Cash Price */}
+                <div className="grid md:grid-cols-1 gap-8 max-w-lg mx-auto">
+                  {/* UK Drum Pricing */}
                   <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-zim-green rounded-2xl p-8">
                     <div className="flex items-center gap-2 mb-4">
                       <Banknote className="h-5 w-5 text-zim-green" />
-                      <span className="text-sm font-semibold text-zim-green uppercase tracking-wide">Cash Payment</span>
+                      <span className="text-sm font-semibold text-zim-green uppercase tracking-wide">UK Drum Pricing</span>
                     </div>
-                    <p className="text-sm text-gray-600 mb-6">Pay cash on collection and save £20 per drum</p>
+                    <p className="text-sm text-gray-600 mb-6">Per drum, including free collection across England</p>
 
                     <div className="space-y-4 mb-8">
                       <div className="flex justify-between items-center p-4 bg-white rounded-xl shadow-sm">
@@ -71,37 +71,7 @@ const Pricing = () => {
                           <span className="font-semibold text-lg">5+ drums</span>
                           <span className="ml-2 text-xs text-zim-green font-medium">BEST VALUE</span>
                         </div>
-                        <span className="text-3xl font-bold text-zim-green">£240</span>
-                      </div>
-                      <div className="flex justify-between items-center p-4 bg-white rounded-xl shadow-sm">
-                        <span className="font-semibold text-lg">2-4 drums</span>
-                        <span className="text-2xl font-bold text-gray-700">£250</span>
-                      </div>
-                      <div className="flex justify-between items-center p-4 bg-white rounded-xl shadow-sm">
-                        <span className="font-semibold text-lg">1 drum</span>
-                        <span className="text-2xl font-bold text-gray-700">£260</span>
-                      </div>
-                    </div>
-
-                    <Link to="/book">
-                      <Button className="w-full bg-zim-green hover:bg-zim-green/90 h-12 text-lg">
-                        Book with Cash Price
-                        <ArrowRight className="ml-2 h-5 w-5" />
-                      </Button>
-                    </Link>
-                  </div>
-
-                  {/* Standard Price */}
-                  <div className="bg-gray-50 border-2 border-gray-200 rounded-2xl p-8">
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Standard Payment</span>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-6">Card payment or 30-day terms available</p>
-
-                    <div className="space-y-4 mb-8">
-                      <div className="flex justify-between items-center p-4 bg-white rounded-xl shadow-sm">
-                        <span className="font-semibold text-lg">5+ drums</span>
-                        <span className="text-2xl font-bold text-gray-700">£260</span>
+                        <span className="text-3xl font-bold text-zim-green">£260</span>
                       </div>
                       <div className="flex justify-between items-center p-4 bg-white rounded-xl shadow-sm">
                         <span className="font-semibold text-lg">2-4 drums</span>
@@ -114,8 +84,8 @@ const Pricing = () => {
                     </div>
 
                     <Link to="/book">
-                      <Button variant="outline" className="w-full h-12 text-lg border-2">
-                        Book Standard
+                      <Button className="w-full bg-zim-green hover:bg-zim-green/90 h-12 text-lg">
+                        Book Now
                         <ArrowRight className="ml-2 h-5 w-5" />
                       </Button>
                     </Link>
