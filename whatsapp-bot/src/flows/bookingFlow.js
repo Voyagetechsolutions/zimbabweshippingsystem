@@ -259,7 +259,7 @@ export async function handleBookingFlow(sock, phoneNumber, text, _session) {
         await updateUserSession(phoneNumber, { bookingData, step: 'DRUM_QUANTITY' });
         const settings = await getBotSettings();
         return sendMessage(sock, phoneNumber,
-          `➡️ *How many drums?*\n\n_Pricing per drum:_\n• 1 drum: ${formatMoney(getDrumPrice(1, settings))}\n• 2–4 drums: ${formatMoney(getDrumPrice(2, settings))} each\n• 5+ drums: ${formatMoney(getDrumPrice(5, settings))} each (best value!)`
+          `➡️ *How many drums?*\n\n_Pricing: ${formatMoney(getDrumPrice(1, settings))} per drum_`
         );
       }
       if (isNo(text)) {
@@ -298,7 +298,7 @@ export async function handleBookingFlow(sock, phoneNumber, text, _session) {
         await updateUserSession(phoneNumber, { bookingData, step: 'TRUNK_QUANTITY' });
         const settings = await getBotSettings();
         return sendMessage(sock, phoneNumber,
-          `➡️ *How many trunks / storage boxes?*\n\n_Pricing per trunk:_\n• 1 trunk: ${formatMoney(getTrunkPrice(1, settings))}\n• 2–4 trunks: ${formatMoney(getTrunkPrice(2, settings))} each\n• 5+ trunks: ${formatMoney(getTrunkPrice(5, settings))} each (best value!)`
+          `➡️ *How many trunks / storage boxes?*\n\n_Pricing: ${formatMoney(getTrunkPrice(1, settings))} per trunk_`
         );
       }
       if (isNo(text)) {

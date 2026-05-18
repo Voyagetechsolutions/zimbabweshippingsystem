@@ -122,7 +122,7 @@ export async function sendMainMenuList(sock, phoneNumber, userName = null) {
   const bodyText = `${greeting}\n\n🇬🇧 *Zimbabwe Shipping — UK*\n\n` +
     `🚚 FREE collection across England\n` +
     `📦 Full tracking end-to-end\n` +
-    `💰 Competitive pricing with volume discounts\n\n` +
+    `💰 Competitive flat-rate pricing\n\n` +
     `Tap the button below to choose an option.`;
 
   await sendListMessage(sock, phoneNumber, bodyText,

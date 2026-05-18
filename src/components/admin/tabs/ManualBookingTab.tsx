@@ -64,8 +64,6 @@ interface FormData {
 }
 
 const getDrumPrice = (quantity: number): number => {
-  if (quantity >= 5) return 260;
-  if (quantity >= 2) return 270;
   return 280;
 };
 

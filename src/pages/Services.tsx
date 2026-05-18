@@ -23,7 +23,7 @@ const Services = () => {
       title: 'Drum Shipping',
       description: 'Our most popular service. Ship your goods in secure 200-220L drums.',
       features: [
-        'UK: From £260 | Ireland: From €340',
+        'UK: £280/drum | Ireland: €360/drum',
         'Free collection across UK & Ireland',
         'Metal coded seal included',
         'Full insurance & tracking',
@@ -65,7 +65,7 @@ const Services = () => {
       title: 'Commercial',
       description: 'Specialized shipping solutions for businesses in UK & Ireland.',
       features: [
-        'Volume discounts',
+        'Competitive rates',
         'Regular shipping schedules',
         'Commercial invoicing',
         'Dedicated account support',

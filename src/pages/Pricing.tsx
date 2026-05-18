@@ -12,18 +12,18 @@ const Pricing = () => {
     <>
       <Helmet>
         <title>Pricing | Zimbabwe Shipping - UK & Ireland Rates</title>
-        <meta name="description" content="Transparent pricing for UK & Ireland to Zimbabwe shipping. Drums and trunks with volume discounts. Free collection included. No hidden fees." />
+        <meta name="description" content="Transparent pricing for UK & Ireland to Zimbabwe shipping. Drums and trunks with simple flat-rate pricing. Free collection included. No hidden fees." />
         <meta name="keywords" content="Zimbabwe shipping prices, drum shipping cost, trunk shipping Ireland, UK to Zimbabwe rates, Ireland to Zimbabwe pricing" />
 
         {/* Open Graph */}
         <meta property="og:title" content="Pricing | Zimbabwe Shipping" />
-        <meta property="og:description" content="Transparent pricing for UK & Ireland to Zimbabwe shipping. Volume discounts available." />
+        <meta property="og:description" content="Transparent pricing for UK & Ireland to Zimbabwe shipping. Simple flat-rate pricing." />
         <meta property="og:type" content="website" />
 
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary" />
         <meta name="twitter:title" content="Pricing | Zimbabwe Shipping" />
-        <meta name="twitter:description" content="Transparent pricing for UK & Ireland to Zimbabwe shipping. Volume discounts available." />
+        <meta name="twitter:description" content="Transparent pricing for UK & Ireland to Zimbabwe shipping. Simple flat-rate pricing." />
       </Helmet>
 
       <Navbar />
@@ -35,7 +35,7 @@ const Pricing = () => {
               Simple, Transparent Pricing
             </h1>
             <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-              No hidden fees. Volume discounts available.
+              No hidden fees. Simple flat-rate pricing.
             </p>
           </div>
         </section>
@@ -68,18 +68,10 @@ const Pricing = () => {
                     <div className="space-y-4 mb-8">
                       <div className="flex justify-between items-center p-4 bg-white rounded-xl shadow-sm">
                         <div>
-                          <span className="font-semibold text-lg">5+ drums</span>
-                          <span className="ml-2 text-xs text-zim-green font-medium">BEST VALUE</span>
+                          <span className="font-semibold text-lg">1+ drums</span>
+                          <span className="ml-2 text-xs text-zim-green font-medium">PER DRUM</span>
                         </div>
-                        <span className="text-3xl font-bold text-zim-green">£260</span>
-                      </div>
-                      <div className="flex justify-between items-center p-4 bg-white rounded-xl shadow-sm">
-                        <span className="font-semibold text-lg">2-4 drums</span>
-                        <span className="text-2xl font-bold text-gray-700">£270</span>
-                      </div>
-                      <div className="flex justify-between items-center p-4 bg-white rounded-xl shadow-sm">
-                        <span className="font-semibold text-lg">1 drum</span>
-                        <span className="text-2xl font-bold text-gray-700">£280</span>
+                        <span className="text-3xl font-bold text-zim-green">£280</span>
                       </div>
                     </div>
 
@@ -120,21 +112,13 @@ const Pricing = () => {
                 </div>
 
                 <div className="bg-gradient-to-br from-emerald-50 to-green-50 border-2 border-emerald-500 rounded-2xl p-8">
-                  <div className="grid md:grid-cols-3 gap-4">
-                    <div className="flex justify-between items-center p-4 bg-white rounded-xl shadow-sm">
+                  <div className="flex justify-center">
+                    <div className="flex justify-between items-center p-4 bg-white rounded-xl shadow-sm w-full max-w-md">
                       <div>
-                        <span className="font-semibold text-lg">5+ drums</span>
-                        <span className="ml-2 text-xs text-emerald-600 font-medium">BEST VALUE</span>
+                        <span className="font-semibold text-lg">1+ drums</span>
+                        <span className="ml-2 text-xs text-emerald-600 font-medium">PER DRUM</span>
                       </div>
-                      <span className="text-2xl font-bold text-emerald-600">€340</span>
-                    </div>
-                    <div className="flex justify-between items-center p-4 bg-white rounded-xl shadow-sm">
-                      <span className="font-semibold text-lg">2-4 drums</span>
-                      <span className="text-2xl font-bold text-gray-700">€350</span>
-                    </div>
-                    <div className="flex justify-between items-center p-4 bg-white rounded-xl shadow-sm">
-                      <span className="font-semibold text-lg">1 drum</span>
-                      <span className="text-2xl font-bold text-gray-700">€360</span>
+                      <span className="text-3xl font-bold text-emerald-600">€360</span>
                     </div>
                   </div>
                   <p className="text-sm text-emerald-700 mt-4 text-center">

@@ -255,17 +255,13 @@ const WhatsAppBotSettingsTab = () => {
                     <div>
                       <p className="font-medium mb-1.5">🥁 Drums</p>
                       <ul className="space-y-0.5 text-muted-foreground text-xs">
-                        <li>1 drum — €{settings['drum_price_1']?.value ?? '—'}/drum</li>
-                        <li>2–4 drums — €{settings['drum_price_2_4']?.value ?? '—'}/drum</li>
-                        <li>5+ drums — €{settings['drum_price_5_plus']?.value ?? '—'}/drum</li>
+                        <li>€{settings['drum_price_1']?.value ?? '—'} per drum (flat rate)</li>
                       </ul>
                     </div>
                     <div>
                       <p className="font-medium mb-1.5">📦 Boxes</p>
                       <ul className="space-y-0.5 text-muted-foreground text-xs">
-                        <li>1 box — €{settings['box_price_1']?.value ?? '—'}/box</li>
-                        <li>2–4 boxes — €{settings['box_price_2_4']?.value ?? '—'}/box</li>
-                        <li>5+ boxes — €{settings['box_price_5_plus']?.value ?? '—'}/box</li>
+                        <li>€{settings['box_price_1']?.value ?? '—'} per box (flat rate)</li>
                       </ul>
                     </div>
                     <div>

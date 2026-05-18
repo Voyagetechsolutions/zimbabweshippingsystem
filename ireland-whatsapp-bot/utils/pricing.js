@@ -5,8 +5,8 @@ import { getSupabase } from './database.js';
 // Only feature toggles like `delivery_notes_enabled` are read from the DB.
 const IRELAND_PRICING = {
   drum_price_1: 360,
-  drum_price_2_4: 350,
-  drum_price_5_plus: 340,
+  drum_price_2_4: 360,
+  drum_price_5_plus: 360,
   purchase_drum_metal: 50,
   purchase_drum_plastic: 60,
 };
@@ -49,8 +49,6 @@ export async function getBotSettings() {
 const DEFAULTS = IRELAND_PRICING;
 
 export function getDrumPrice(quantity, settings = DEFAULTS) {
-  if (quantity >= 5) return settings.drum_price_5_plus;
-  if (quantity >= 2) return settings.drum_price_2_4;
   return settings.drum_price_1;
 }
 
@@ -103,9 +101,7 @@ export async function getPricingMessage() {
   return `💰 *Ireland Pricing (EUR)*
 
 *DRUMS (200–220L):*
-🥁 1 drum: ${formatMoney(s.drum_price_1)}
-🥁 2–4 drums: ${formatMoney(s.drum_price_2_4)} each
-🥁 5+ drums: ${formatMoney(s.drum_price_5_plus)} each (best value!)
+🥁 ${formatMoney(s.drum_price_1)} per drum
 
 *NEED TO PURCHASE A DRUM?*
 🛢️ Metal Drum: ${formatMoney(s.purchase_drum_metal)} each

@@ -229,13 +229,9 @@ async function sendPricingMessage(sock, phoneNumber) {
   const settings = await getBotSettings();
   const msg = `💰 *Ireland Pricing (EUR)*\n\n` +
     `*DRUM SHIPPING (200-220L):*\n` +
-    `🥁 5+ drums: €${settings.drum_price_5_plus} per drum\n` +
-    `🥁 2-4 drums: €${settings.drum_price_2_4} per drum\n` +
-    `🥁 1 drum: €${settings.drum_price_1} per drum\n\n` +
+    `🥁 €${settings.drum_price_1} per drum\n\n` +
     `*TRUNK/STORAGE BOX SHIPPING:*\n` +
-    `📦 5+ items: €${settings.box_price_5_plus} per item\n` +
-    `📦 2-4 items: €${settings.box_price_2_4} per item\n` +
-    `📦 1 item: €${settings.box_price_1} per item\n\n` +
+    `📦 €${settings.box_price_1} per trunk/storage box\n\n` +
     `*ADDITIONAL SERVICES:*\n` +
     `🔒 Metal Coded Seal: €${settings.seal_price} per item\n\n` +
     `*WHAT'S INCLUDED:*\n` +

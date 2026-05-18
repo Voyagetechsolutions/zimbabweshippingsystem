@@ -244,7 +244,7 @@ export async function handleBookingFlow(sock, phoneNumber, text, _session) {
         bookingData.includeDrums = true;
         await updateUserSession(phoneNumber, { bookingData, step: 'DRUM_QUANTITY' });
         return sendMessage(sock, phoneNumber,
-          `➡️ *How many drums?*\n\n_Pricing per drum:_\n• 1 drum: ${formatMoney(getDrumPrice(1))}\n• 2–4 drums: ${formatMoney(getDrumPrice(2))} each\n• 5+ drums: ${formatMoney(getDrumPrice(5))} each (best value!)`
+          `➡️ *How many drums?*\n\n_Pricing: ${formatMoney(getDrumPrice(1))} per drum_`
         );
       }
       if (isNo(text)) {

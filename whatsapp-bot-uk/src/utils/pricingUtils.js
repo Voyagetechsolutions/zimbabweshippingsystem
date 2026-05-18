@@ -8,8 +8,6 @@ export const PAY_ON_ARRIVAL_MULTIPLIER = 1.20;
 export const METAL_SEAL_PRICE = 5;
 
 export function getDrumPrice(quantity) {
-  if (quantity >= 5) return 260;
-  if (quantity >= 2) return 270;
   return 280;
 }
 

@@ -8,22 +8,16 @@ const PricingSection = () => {
   const [selectedRegion, setSelectedRegion] = useState<'uk' | 'ireland'>('uk');
 
   const ukPrices = {
-    fivePlus: { standard: '£260' },
-    twoToFour: { standard: '£270' },
     one: { standard: '£280' },
     currency: '£',
   };
 
   const irelandPrices = {
-    fivePlus: { standard: '€340' },
-    twoToFour: { standard: '€350' },
     one: { standard: '€360' },
     currency: '€',
   };
 
   const trunkPrices = {
-    fivePlus: '€200',
-    twoToFour: '€210',
     one: '€220',
   };
 
@@ -37,7 +31,7 @@ const PricingSection = () => {
             Simple, Transparent Pricing
           </h2>
           <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            No hidden fees. Volume discounts available. Shipping from UK & Ireland.
+            No hidden fees. Simple flat-rate pricing. Shipping from UK & Ireland.
           </p>
         </div>
 
@@ -82,31 +76,16 @@ const PricingSection = () => {
                   </button>
                 </div>
 
-                {/* Pricing tiers */}
+                {/* Pricing */}
                 <div className="space-y-4 mb-6">
                   <div className="flex justify-between items-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                     <div>
-                      <span className="font-semibold text-gray-900 dark:text-white">5+ drums</span>
-                      <span className="text-sm text-gray-500 ml-2">Best value</span>
+                      <span className="font-semibold text-gray-900 dark:text-white">1+ drums</span>
+                      <span className="text-sm text-gray-500 ml-2">Per drum</span>
                     </div>
-                    <span className={`text-2xl font-bold ${selectedRegion === 'uk' ? 'text-zim-green' : 'text-emerald-600'}`}>
-                      {selectedRegion === 'uk' ? ukPrices.fivePlus.standard : irelandPrices.fivePlus.standard}
-                      <span className="text-sm font-normal text-gray-500">/each</span>
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <span className="font-semibold text-gray-900 dark:text-white">2-4 drums</span>
-                    <span className="text-2xl font-bold text-gray-700 dark:text-gray-300">
-                      {selectedRegion === 'uk' ? ukPrices.twoToFour.standard : irelandPrices.twoToFour.standard}
-                      <span className="text-sm font-normal text-gray-500">/each</span>
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <span className="font-semibold text-gray-900 dark:text-white">1 drum</span>
-                    <span className="text-2xl font-bold text-gray-700 dark:text-gray-300">
+                    <span className={`text-3xl font-bold ${selectedRegion === 'uk' ? 'text-zim-green' : 'text-emerald-600'}`}>
                       {selectedRegion === 'uk' ? ukPrices.one.standard : irelandPrices.one.standard}
+                      <span className="text-sm font-normal text-gray-500">/each</span>
                     </span>
                   </div>
                 </div>
@@ -168,31 +147,16 @@ const PricingSection = () => {
                   Perfect for clothes, household items, and personal belongings. Secure and affordable.
                 </p>
 
-                {/* Pricing tiers */}
+                {/* Pricing */}
                 <div className="space-y-4 mb-6">
                   <div className="flex justify-between items-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                     <div>
-                      <span className="font-semibold text-gray-900 dark:text-white">5+ trunks</span>
-                      <span className="text-sm text-gray-500 ml-2">Best value</span>
+                      <span className="font-semibold text-gray-900 dark:text-white">1+ trunks</span>
+                      <span className="text-sm text-gray-500 ml-2">Per trunk</span>
                     </div>
-                    <span className="text-2xl font-bold text-purple-600">
-                      {trunkPrices.fivePlus}
-                      <span className="text-sm font-normal text-gray-500">/each</span>
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <span className="font-semibold text-gray-900 dark:text-white">2-4 trunks</span>
-                    <span className="text-2xl font-bold text-gray-700 dark:text-gray-300">
-                      {trunkPrices.twoToFour}
-                      <span className="text-sm font-normal text-gray-500">/each</span>
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <span className="font-semibold text-gray-900 dark:text-white">1 trunk</span>
-                    <span className="text-2xl font-bold text-gray-700 dark:text-gray-300">
+                    <span className="text-3xl font-bold text-purple-600">
                       {trunkPrices.one}
+                      <span className="text-sm font-normal text-gray-500">/each</span>
                     </span>
                   </div>
                 </div>

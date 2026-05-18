@@ -203,22 +203,10 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
         
         if (values.paymentOption === 'standard') {
           // Standard payment prices
-          if (qty >= 5) {
-            basePrice = qty * 260;
-          } else if (qty >= 2) {
-            basePrice = qty * 270;
-          } else {
-            basePrice = 280;
-          }
+          basePrice = qty * 280;
         } else {
           // Pay later prices
-          if (qty >= 5) {
-            basePrice = qty * 260;
-          } else if (qty >= 2) {
-            basePrice = qty * 270;
-          } else {
-            basePrice = 280;
-          }
+          basePrice = qty * 280;
         }
       }
       
@@ -318,21 +306,9 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
     if (values.includeDrums) {
       const qty = parseInt(values.drumQuantity || '1');
       if (values.paymentOption === 'standard') {
-        if (qty >= 5) {
-          total += qty * 260;
-        } else if (qty >= 2) {
-          total += qty * 270;
-        } else {
-          total += 280;
-        }
+        total += qty * 280;
       } else {
-        if (qty >= 5) {
-          total += qty * 260;
-        } else if (qty >= 2) {
-          total += qty * 270;
-        } else {
-          total += 280;
-        }
+        total += qty * 280;
       }
       
       // Add metal seal cost
@@ -873,16 +849,8 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
                   {form.watch('includeDrums') && (
                     <div className="space-y-2">
                       <div className="flex justify-between">
-                        <span>Drums ({form.watch('drumQuantity') || '1'} × {
-                          parseInt(form.watch('drumQuantity') || '1') >= 5 ? '£260' : 
-                          parseInt(form.watch('drumQuantity') || '1') >= 2 ? '£270' : '£280'
-                        })</span>
-                        <span>£{
-                          parseInt(form.watch('drumQuantity') || '1') >= 5 ? 
-                            parseInt(form.watch('drumQuantity') || '1') * 260 : 
-                          parseInt(form.watch('drumQuantity') || '1') >= 2 ? 
-                            parseInt(form.watch('drumQuantity') || '1') * 270 : 280
-                        }</span>
+                        <span>Drums ({form.watch('drumQuantity') || '1'} × £280)</span>
+                        <span>£{parseInt(form.watch('drumQuantity') || '1') * 280}</span>
                       </div>
                       
                       {form.watch('wantMetalSeal') && (

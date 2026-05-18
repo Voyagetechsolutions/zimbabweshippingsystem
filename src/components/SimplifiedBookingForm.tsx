@@ -66,24 +66,18 @@ interface PaymentInstallment {
   paid: boolean;
 }
 
-// UK drum prices (GBP)
+// UK drum prices (GBP) — flat rate
 const getDrumPrice = (quantity: number): number => {
-  if (quantity >= 5) return 260;
-  if (quantity >= 2) return 270;
   return 280;
 };
 
-// Ireland drum prices (EUR)
+// Ireland drum prices (EUR) — flat rate
 const getIrelandDrumPrice = (quantity: number): number => {
-  if (quantity >= 5) return 340;
-  if (quantity >= 2) return 350;
   return 360;
 };
 
-// Ireland trunk/storage box prices (EUR)
+// Ireland trunk/storage box prices (EUR) — flat rate
 const getTrunkPrice = (quantity: number): number => {
-  if (quantity >= 5) return 200;
-  if (quantity >= 2) return 210;
   return 220;
 };
 
@@ -1202,15 +1196,11 @@ export const SimplifiedBookingForm = () => {
                 {/* Show country-specific pricing */}
                 {isIrelandBooking ? (
                   <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 space-y-1">
-                    <div className="text-green-600 dark:text-green-400 font-medium">• 5+ drums: €340 each (Best value!)</div>
-                    <div>• 2-4 drums: €350 each</div>
-                    <div>• 1 drum: €360</div>
+                    <div className="text-green-600 dark:text-green-400 font-medium">• €360 per drum</div>
                   </div>
                 ) : (
                   <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 space-y-1">
-                    <div>• 5+ drums: £260 each</div>
-                    <div>• 2-4 drums: £270 each</div>
-                    <div>• 1 drum: £280</div>
+                    <div>• £280 per drum</div>
                   </div>
                 )}
 
@@ -1299,9 +1289,7 @@ export const SimplifiedBookingForm = () => {
                 <div className="flex-1">
                   <div className="font-semibold text-lg">Trunks / Storage Boxes</div>
                   <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 space-y-1">
-                    <div className="text-purple-600 dark:text-purple-400 font-medium">• 5+ trunks: €200 each (Best value!)</div>
-                    <div>• 2-4 trunks: €210 each</div>
-                    <div>• 1 trunk: €220</div>
+                    <div className="text-purple-600 dark:text-purple-400 font-medium">• €220 per trunk</div>
                   </div>
 
                   {formData.includeTrunks && (

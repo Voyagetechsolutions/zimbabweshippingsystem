@@ -34,22 +34,10 @@ const ShippingCalculator: React.FC = () => {
       
       if (paymentType === "standard") {
         // Standard payment prices
-        if (qty >= 5) {
-          basePrice = qty * 240;
-        } else if (qty >= 2) {
-          basePrice = qty * 250;
-        } else {
-          basePrice = 260;
-        }
+        basePrice = qty * 260;
       } else {
         // Pay later prices (30-day terms)
-        if (qty >= 5) {
-          basePrice = qty * 250;
-        } else if (qty >= 2) {
-          basePrice = qty * 270;
-        } else {
-          basePrice = 280;
-        }
+        basePrice = qty * 280;
       }
     } else {
       // For parcels, calculate based on volume (cubic meters)
@@ -139,15 +127,11 @@ const ShippingCalculator: React.FC = () => {
                     <div className="font-medium mb-2 dark:text-white">Pricing Tiers:</div>
                     {paymentType === "standard" ? (
                       <ul className="space-y-1 list-disc pl-5 dark:text-gray-200">
-                        <li>1 Drum: {formatPrice(260)} each</li>
-                        <li>2-4 Drums: {formatPrice(250)} each</li>
-                        <li>5+ Drums: {formatPrice(240)} each</li>
+                        <li>£260 per drum (Discount Deal)</li>
                       </ul>
                     ) : (
                       <ul className="space-y-1 list-disc pl-5 dark:text-gray-200">
-                        <li>1 Drum: {formatPrice(280)} each</li>
-                        <li>2-4 Drums: {formatPrice(270)} each</li>
-                        <li>5+ Drums: {formatPrice(260)} each</li>
+                        <li>£280 per drum</li>
                       </ul>
                     )}
                     <p className="mt-2 text-gray-500 dark:text-gray-300">Each drum has a capacity of 200L-220L</p>

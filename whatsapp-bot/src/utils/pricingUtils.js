@@ -5,11 +5,11 @@ dotenv.config();
 // Defaults match the website (SimplifiedBookingForm) for Ireland.
 const DEFAULTS = {
   drum_price_1: 360,
-  drum_price_2_4: 350,
-  drum_price_5_plus: 340,
+  drum_price_2_4: 360,
+  drum_price_5_plus: 360,
   box_price_1: 220,        // trunk / storage box
-  box_price_2_4: 210,
-  box_price_5_plus: 200,
+  box_price_2_4: 220,
+  box_price_5_plus: 220,
   seal_price: 7,
   door_to_door_price: 25,
 };
@@ -52,14 +52,10 @@ export async function getBotSettings() {
 }
 
 export function getDrumPrice(quantity, settings = DEFAULTS) {
-  if (quantity >= 5) return settings.drum_price_5_plus;
-  if (quantity >= 2) return settings.drum_price_2_4;
   return settings.drum_price_1;
 }
 
 export function getTrunkPrice(quantity, settings = DEFAULTS) {
-  if (quantity >= 5) return settings.box_price_5_plus;
-  if (quantity >= 2) return settings.box_price_2_4;
   return settings.box_price_1;
 }
 

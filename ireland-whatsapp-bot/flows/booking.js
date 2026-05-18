@@ -297,7 +297,7 @@ export async function handleBookingFlow(sock, phoneNumber, text, _session) {
         await updateUserSession(phoneNumber, { bookingData, step: 'DRUM_QUANTITY' });
         const settings = await getBotSettings();
         return sendMessage(sock, phoneNumber,
-          `➡️ *How many drums?*\n\n_Shipping per drum:_\n• 1 drum: ${formatMoney(getDrumPrice(1, settings))}\n• 2–4 drums: ${formatMoney(getDrumPrice(2, settings))} each\n• 5+ drums: ${formatMoney(getDrumPrice(5, settings))} each (best value!)`
+          `➡️ *How many drums?*\n\n_Shipping: ${formatMoney(getDrumPrice(1, settings))} per drum_`
         );
       }
       if (choice === '2') {

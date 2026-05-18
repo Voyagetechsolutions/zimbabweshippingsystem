@@ -41,7 +41,7 @@ const FAQ = () => {
         },
         {
           question: 'Do you ship from Ireland as well?',
-          answer: 'Yes! We now offer shipping from Ireland to Zimbabwe. Drum shipping from Ireland starts at €340 for 5+ drums, €350 for 2-4 drums, and €360 for a single drum. Collection is available across Ireland.'
+          answer: 'Yes! We now offer shipping from Ireland to Zimbabwe. Drum shipping from Ireland is €360 per drum. Collection is available across Ireland.'
         },
         {
           question: 'What items can I ship to Zimbabwe?',
@@ -69,19 +69,18 @@ const FAQ = () => {
         },
         {
           question: 'What are the UK drum prices?',
-          answer: 'UK drum shipping prices are: £260 per drum for 5+ drums, £270 per drum for 2-4 drums, and £280 for a single drum. These prices are the same regardless of payment method — cash, card, or bank transfer.'
+          answer: 'UK drum shipping is £280 per drum, regardless of quantity. These prices are the same regardless of payment method — cash, card, or bank transfer.'
         },
         {
           question: 'When do I need to pay for my shipment?',
           answer: 'Payment is required at the time of booking your shipment. For business accounts with regular shipping needs, we offer payment terms and invoicing options.'
         },
         {
-          question: 'Do you offer volume discounts?',
-          answer: 'Yes, we offer volume discounts for multiple drums or large parcel shipments. The more drums you ship, the lower the per-drum price. 5+ drums get the best rate.'
+          answer: 'We offer competitive flat-rate pricing. Contact us for bulk shipment arrangements.'
         },
         {
           question: 'Can I pay in Euros for Ireland shipments?',
-          answer: 'Yes! All Ireland shipments are priced in Euros (EUR). Our Ireland pricing is: €340 (5+ drums), €350 (2-4 drums), €360 (1 drum).'
+          answer: 'Yes! All Ireland shipments are priced in Euros (EUR). Drum shipping from Ireland is €360 per drum.'
         }
       ]
     },

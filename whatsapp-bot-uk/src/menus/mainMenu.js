@@ -19,9 +19,7 @@ export function getPricingMenu() {
   return `💰 *Our Pricing - UK to Zimbabwe*
 
 *DRUMS (200-220L):*
-🥁 1 drum: £280
-🥁 2-4 drums: £270 each
-🥁 5+ drums: £260 each
+🥁 £280 per drum
 
 *NEED TO PURCHASE A DRUM?*
 🛢️ Metal Drum: £40 each

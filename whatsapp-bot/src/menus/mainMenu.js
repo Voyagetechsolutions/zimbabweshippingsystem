@@ -22,14 +22,10 @@ export function getPricingMenu() {
   return `💰 *Ireland Pricing (EUR)*
 
 *DRUM SHIPPING (200-220L):*
-🥁 5+ drums: €340 per drum
-🥁 2-4 drums: €350 per drum
-🥁 1 drum: €360 per drum
+🥁 €360 per drum
 
 *TRUNK/STORAGE BOX SHIPPING:*
-📦 5+ items: €200 per item
-📦 2-4 items: €210 per item
-📦 1 item: €220 per item
+📦 €220 per trunk/storage box
 
 *ADDITIONAL SERVICES:*
 🔒 Metal Coded Seal: €7 per item

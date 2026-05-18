@@ -5,8 +5,8 @@ import { getSupabase } from './database.js';
 // Only `delivery_notes_enabled` is read from the shared bot_settings table.
 const UK_PRICING = {
   drum_price_1: 280,
-  drum_price_2_4: 270,
-  drum_price_5_plus: 260,
+  drum_price_2_4: 280,
+  drum_price_5_plus: 280,
   purchase_drum_metal: 40,
   purchase_drum_plastic: 50,
 };
@@ -51,8 +51,6 @@ export async function getBotSettings() {
 const DEFAULTS = UK_PRICING;
 
 export function getDrumPrice(quantity, settings = DEFAULTS) {
-  if (quantity >= 5) return settings.drum_price_5_plus;
-  if (quantity >= 2) return settings.drum_price_2_4;
   return settings.drum_price_1;
 }
 
@@ -105,9 +103,7 @@ export async function getPricingMessage() {
   return `💰 *UK Pricing (GBP)*
 
 *DRUMS (200–220L):*
-🥁 1 drum: ${formatMoney(s.drum_price_1)}
-🥁 2–4 drums: ${formatMoney(s.drum_price_2_4)} each
-🥁 5+ drums: ${formatMoney(s.drum_price_5_plus)} each (best value!)
+🥁 £${formatMoney(s.drum_price_1)} per drum
 
 *NEED TO PURCHASE A DRUM?*
 🛢️ Metal Drum: ${formatMoney(s.purchase_drum_metal)} each

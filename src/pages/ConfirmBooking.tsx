@@ -108,13 +108,7 @@ const ConfirmBooking = () => {
     
     const drumQuantity = parseInt(data.shipmentDetails?.quantity || data.drumQuantity || '1');
     
-    if (drumQuantity >= 5) {
-      return drumQuantity * 260;
-    } else if (drumQuantity >= 2) {
-      return drumQuantity * 270;
-    } else {
-      return 280; // 1 drum
-    }
+    return drumQuantity * 280;
   }
 
   // Payment method information

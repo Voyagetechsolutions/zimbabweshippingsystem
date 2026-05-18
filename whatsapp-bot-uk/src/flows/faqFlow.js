@@ -81,14 +81,14 @@ function getPricingFAQs() {
 
 *Q: What are your prices?*
 A:
-• Drums: £280 (1), £270 (2-4), £260 (5+)
+• Drums: £280 per drum
 • Other items: quoted individually by our agent
 
 *Q: Can I buy drums from you?*
 A: Yes — Metal Drum £40 each, Plastic Barrel £50 each.
 
 *Q: Are there volume discounts?*
-A: Yes! The more drums you ship, the lower the price per drum.
+A: We offer competitive flat-rate pricing. Contact us for bulk shipment arrangements.
 
 *Q: What's included in the price?*
 A: FREE collection in England, full tracking, and delivery to our Zimbabwe depot.
