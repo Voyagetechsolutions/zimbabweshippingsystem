@@ -194,17 +194,27 @@ export async function disableHumanTakeover(phoneNumber) {
 }
 
 export async function isHumanTakeover(jid) {
-  const session = await getUserSession(jid);
-  if (session.humanTakeover === true) return true;
+  const check = async (j) => {
+    const s = await getUserSession(j);
+    if (!s.humanTakeover) return false;
+    // Auto-expire after 30 minutes
+    const takenAt = s.takenOverAt ? new Date(s.takenOverAt).getTime() : 0;
+    if (Date.now() - takenAt > TAKEOVER_TIMEOUT_MS) {
+      await disableHumanTakeover(j);
+      console.log(`⏰ Takeover auto-expired for ${j} (30 min timeout)`);
+      return false;
+    }
+    return true;
+  };
 
+  if (await check(jid)) return true;
+
+  // If this is a LID, also check the phone-number session
   if (jid.endsWith('@lid')) {
     const phoneJid = getPhoneForLid(jid);
-    if (phoneJid) {
-      const phoneSession = await getUserSession(phoneJid);
-      if (phoneSession.humanTakeover === true) {
-        await enableHumanTakeover(jid, phoneSession.takenOverBy || 'Agent');
-        return true;
-      }
+    if (phoneJid && await check(phoneJid)) {
+      await enableHumanTakeover(jid, (await getUserSession(phoneJid)).takenOverBy || 'Agent');
+      return true;
     }
   }
 

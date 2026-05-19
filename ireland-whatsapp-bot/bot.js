@@ -177,39 +177,51 @@ async function handleMessage(sock, msg) {
     if (fromMe && text && text.startsWith('/')) {
       console.log(`🧑‍💼 Agent command detected: "${text}"`);
       
-      const takeoverMatch = text.match(/\/takeover\s+(\d+)/i);
-      const releaseMatch = text.match(/\/release\s+(\d+)/i);
-      const statusMatch = text.match(/\/status\s+(\d+)/i);
+      const takeoverMatch = text.match(/\/takeover\s*(\d+)/i);
+      const releaseMatch = text.match(/\/release\s*(\d+)/i);
+      const statusMatch = text.match(/\/status\s*(\d+)/i);
       
       if (takeoverMatch) {
         const digits = takeoverMatch[1];
         const targetWA = `${digits}@s.whatsapp.net`;
-        const targetLID = `${digits}@lid`;
+        // Resolve the real JID (including LID) via WhatsApp
+        let resolvedLID = getLidForDigits(digits);
+        if (!resolvedLID) {
+          try {
+            const [result] = await sock.onWhatsApp(targetWA);
+            if (result?.jid) {
+              resolvedLID = result.jid;
+              registerJidAlias(targetWA, resolvedLID);
+              console.log(`🔍 Resolved ${digits} → ${resolvedLID}`);
+            }
+          } catch (e) { /* onWhatsApp may fail, continue anyway */ }
+        }
         await enableHumanTakeover(targetWA, 'Agent');
-        await enableHumanTakeover(targetLID, 'Agent');
-        // Also set on the real LID we've seen for this customer (if any)
-        const realLID = getLidForDigits(digits);
-        if (realLID && realLID !== targetLID) await enableHumanTakeover(realLID, 'Agent');
+        if (resolvedLID && resolvedLID !== targetWA) await enableHumanTakeover(resolvedLID, 'Agent');
         try { await sock.sendMessage(targetWA, { 
-          text: '🧑‍💼 *An agent has joined the conversation*\n\nYou are now chatting with a human agent. The bot is paused.' 
+          text: '🧑💼 *An agent has joined the conversation*\n\nYou are now chatting with a human agent. The bot is paused for up to 30 minutes.' 
         }); } catch (e) { /* target may not exist in this format */ }
-        await sock.sendMessage(from, { text: `✅ Takeover enabled for ${digits}\n(phone: ${targetWA}${realLID ? `\nreal LID: ${realLID}` : '\nLID not yet seen — will auto-pause when they next message'})` });
-        console.log(`✅ Takeover enabled for ${digits} (both ${targetWA} and ${targetLID}${realLID ? ` and real LID ${realLID}` : ''})`);
+        await sock.sendMessage(from, { text: `✅ Takeover enabled for ${digits}\n(${resolvedLID ? `LID: ${resolvedLID}` : 'LID not resolved — will auto-pause when they next message'})\n\n⏰ Auto-releases in 30 min, or use /release ${digits}` });
+        console.log(`✅ Takeover enabled for ${digits}${resolvedLID ? ` and ${resolvedLID}` : ''}`);
         return;
       }
       if (releaseMatch) {
         const digits = releaseMatch[1];
         const targetWA = `${digits}@s.whatsapp.net`;
-        const targetLID = `${digits}@lid`;
+        let resolvedLID = getLidForDigits(digits);
+        if (!resolvedLID) {
+          try {
+            const [result] = await sock.onWhatsApp(targetWA);
+            if (result?.jid) { resolvedLID = result.jid; registerJidAlias(targetWA, resolvedLID); }
+          } catch (e) {}
+        }
         await disableHumanTakeover(targetWA);
-        await disableHumanTakeover(targetLID);
-        const realLID = getLidForDigits(digits);
-        if (realLID && realLID !== targetLID) await disableHumanTakeover(realLID);
+        if (resolvedLID && resolvedLID !== targetWA) await disableHumanTakeover(resolvedLID);
         try { await sock.sendMessage(targetWA, { 
           text: '🤖 *Agent has left the conversation*\n\nYou are now chatting with the automated bot again. Type *menu* to see options.' 
         }); } catch (e) { /* target may not exist in this format */ }
         await sock.sendMessage(from, { text: `✅ Bot control restored for ${digits}` });
-        console.log(`✅ Bot control restored for ${digits} (both ${targetWA} and ${targetLID}${realLID ? ` and real LID ${realLID}` : ''})`);
+        console.log(`✅ Bot control restored for ${digits}${resolvedLID ? ` and ${resolvedLID}` : ''}`);
         return;
       }
       if (statusMatch) {
@@ -267,11 +279,9 @@ async function handleMessage(sock, msg) {
     // Get user session to check state
     const session = await getUserSession(from);
     
-    // 🆕 CHECK FOR HUMAN TAKEOVER MODE
-    if (session.humanTakeover) {
-      console.log(`🧑‍💼 Human takeover active for ${from} - bot is paused`);
-      // Bot is silent when human agent is in control
-      // Agent can still see messages and respond manually
+    // CHECK FOR HUMAN TAKEOVER MODE
+    if (await isHumanTakeover(from)) {
+      console.log(`🧑💼 Human takeover active for ${from} - bot is paused`);
       return;
     }
     
