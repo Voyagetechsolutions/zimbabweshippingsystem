@@ -77,7 +77,9 @@ async function connectToWhatsApp() {
           console.log('  LID message verifiedBizName:', message.verifiedBizName);
           console.log('  LID message pushName:', message.pushName);
         }
-        if (!fromMe && message.message) {
+        // Pass ALL messages (including fromMe) to the handler —
+        // the handler will check for agent commands before skipping fromMe.
+        if (message.message) {
           await handleMessage(sock, message);
         }
       }

@@ -1,4 +1,4 @@
-import { getUserSession, updateUserSession } from '../services/userSession.js';
+import { getUserSession, updateUserSession, enableHumanTakeover, disableHumanTakeover, isHumanTakeover } from '../services/userSession.js';
 import { getMainMenu } from '../menus/mainMenu.js';
 import { handleBookingFlow } from '../flows/bookingFlow.js';
 import { handleTrackingFlow } from '../flows/trackingFlow.js';
@@ -9,6 +9,7 @@ import { sendMessage, sendListMessage } from '../utils/messageUtils.js';
 export async function handleMessage(sock, message) {
   try {
     const rawJid = message.key.remoteJid;
+    const fromMe = message.key.fromMe;
 
     // Ignore group messages
     if (rawJid.endsWith('@g.us')) {
@@ -45,6 +46,63 @@ export async function handleMessage(sock, message) {
     
     if (!messageText) return;
 
+    // ── 🧑‍💼 AGENT COMMANDS VIA WHATSAPP ──────────────────────────────
+    // Detect /takeover, /release, /status sent from the bot's own number
+    if (fromMe && messageText.startsWith('/')) {
+      const takeoverMatch = messageText.match(/\/takeover\s+(\d+)/i);
+      const releaseMatch = messageText.match(/\/release\s+(\d+)/i);
+      const statusMatch = messageText.match(/\/status\s+(\d+)/i);
+
+      if (takeoverMatch) {
+        const targetNumber = `${takeoverMatch[1]}@s.whatsapp.net`;
+        await enableHumanTakeover(targetNumber, 'Agent');
+        await sendMessage(sock, targetNumber,
+          '🧑‍💼 *An agent has joined the conversation*\n\nYou are now chatting with a human agent. The bot is paused.');
+        await sendMessage(sock, phoneNumber, `✅ Takeover enabled for ${takeoverMatch[1]}`);
+        console.log(`✅ Takeover enabled for ${targetNumber} via WhatsApp command`);
+        return;
+      }
+      if (releaseMatch) {
+        const targetNumber = `${releaseMatch[1]}@s.whatsapp.net`;
+        await disableHumanTakeover(targetNumber);
+        await sendMessage(sock, targetNumber,
+          '🤖 *Agent has left the conversation*\n\nYou are now chatting with the automated bot again. Type *menu* to see options.');
+        await sendMessage(sock, phoneNumber, `✅ Bot control restored for ${releaseMatch[1]}`);
+        console.log(`✅ Bot control restored for ${targetNumber} via WhatsApp command`);
+        return;
+      }
+      if (statusMatch) {
+        const targetNumber = `${statusMatch[1]}@s.whatsapp.net`;
+        const isTakenOver = await isHumanTakeover(targetNumber);
+        const targetSession = await getUserSession(targetNumber);
+        let statusMsg = `📊 *Status for ${statusMatch[1]}*\n\n`;
+        statusMsg += `Human Takeover: ${isTakenOver ? '✅ YES' : '❌ NO'}\n`;
+        if (isTakenOver) {
+          statusMsg += `Taken over by: ${targetSession.takenOverBy || 'Unknown'}\n`;
+          statusMsg += `Taken over at: ${targetSession.takenOverAt || 'Unknown'}\n`;
+        }
+        statusMsg += `Current state: ${targetSession.state}\n`;
+        statusMsg += `Current step: ${targetSession.step || 'None'}`;
+        await sendMessage(sock, phoneNumber, statusMsg);
+        console.log(`📊 Status sent for ${targetNumber}`);
+        return;
+      }
+      // Unknown / command — show help
+      const helpMsg = `🧑‍💼 *Agent Commands*\n\n` +
+        `*/takeover 447123456789* — Pause bot, talk to customer\n` +
+        `*/release 447123456789* — Give control back to bot\n` +
+        `*/status 447123456789* — Check takeover status\n\n` +
+        `*Note:* Use digits only, no + or spaces!`;
+      await sendMessage(sock, phoneNumber, helpMsg);
+      return;
+    }
+
+    // Skip other fromMe messages (not agent commands)
+    if (fromMe) {
+      console.log('⏭️  Skipping fromMe message (not an agent command)');
+      return;
+    }
+
     // Get or create user session
     const session = await getUserSession(phoneNumber);
     
@@ -53,6 +111,12 @@ export async function handleMessage(sock, message) {
       hasBeenGreeted: session.hasBeenGreeted,
       needsGreeting: session.needsGreeting 
     });
+
+    // 🧑‍💼 CHECK FOR HUMAN TAKEOVER MODE — bot stays silent
+    if (session.humanTakeover) {
+      console.log(`🧑‍💼 Human takeover active for ${phoneNumber} — bot is paused`);
+      return;
+    }
 
     // Check if user needs greeting (new session or expired session)
     if (session.needsGreeting || !session.hasBeenGreeted) {

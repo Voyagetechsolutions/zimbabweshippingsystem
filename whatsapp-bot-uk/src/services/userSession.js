@@ -129,6 +129,28 @@ export async function clearUserSession(phoneNumber) {
   }
 }
 
+// ── Human Takeover helpers ──────────────────────────────────────
+export async function enableHumanTakeover(phoneNumber, agentName = 'Agent') {
+  return updateUserSession(phoneNumber, {
+    humanTakeover: true,
+    takenOverBy: agentName,
+    takenOverAt: new Date().toISOString(),
+  });
+}
+
+export async function disableHumanTakeover(phoneNumber) {
+  return updateUserSession(phoneNumber, {
+    humanTakeover: false,
+    takenOverBy: null,
+    takenOverAt: null,
+  });
+}
+
+export async function isHumanTakeover(phoneNumber) {
+  const session = await getUserSession(phoneNumber);
+  return !!session.humanTakeover;
+}
+
 export function getAllSessions() {
   return sessionCache.keys().map(key => sessionCache.get(key));
 }

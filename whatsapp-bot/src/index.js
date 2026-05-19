@@ -316,8 +316,10 @@ async function connectToWhatsApp() {
       for (const message of messages) {
         console.log(`📨 Processing message - fromMe: ${message.key.fromMe}, hasMessage: ${!!message.message}, jid: ${message.key.remoteJid}`);
         
-        if (message.key.fromMe || !message.message) {
-          console.log(`⏭️  Skipping message (fromMe: ${message.key.fromMe}, hasMessage: ${!!message.message})`);
+        // Pass ALL messages (including fromMe) to the handler —
+        // the handler will check for agent commands before skipping fromMe.
+        if (!message.message) {
+          console.log(`⏭️  Skipping message (no message content)`);
           continue;
         }
         const jid = message.key.remoteJid;
