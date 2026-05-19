@@ -13,7 +13,7 @@ import pino from 'pino';
 import readline from 'readline';
 import { initDatabase, getCollectionSchedules } from './utils/database.js';
 import { getPricingMessage } from './utils/pricing.js';
-import { getUserSession, updateUserSession, enableHumanTakeover, disableHumanTakeover, isHumanTakeover } from './utils/sessions.js';
+import { getUserSession, updateUserSession, enableHumanTakeover, disableHumanTakeover, isHumanTakeover, registerJidAlias, getLidForDigits } from './utils/sessions.js';
 import { handleBookingFlow } from './flows/booking.js';
 import { handleTrackingFlow } from './flows/tracking.js';
 import { startQrServer, setQr, setConnected, setDisconnected } from './qr-server.js';
@@ -128,6 +128,7 @@ Type *menu* to return to main menu.`;
 }
 
 /**
+/**
  * Handle incoming messages
  */
 async function handleMessage(sock, msg) {
@@ -135,11 +136,12 @@ async function handleMessage(sock, msg) {
     const from = msg.key.remoteJid;
     const fromMe = msg.key.fromMe;
     const isGroup = from?.endsWith('@g.us');
+    const isNewsletter = from?.endsWith('@newsletter');
 
     console.log(`➡️  handleMessage: from=${from} fromMe=${fromMe} isGroup=${isGroup}`);
 
-    if (isGroup) {
-      console.log('   ⏭️  skip — group chat');
+    if (isGroup || isNewsletter) {
+      console.log(`   ⏭️  skip — ${isGroup ? 'group' : 'newsletter'} chat`);
       return;
     }
     if (!msg.message) {
@@ -147,7 +149,6 @@ async function handleMessage(sock, msg) {
       return;
     }
 
-    // Extract message text from any of the supported message types
     const m = msg.message;
     const text = (
       m.conversation ||
@@ -159,127 +160,93 @@ async function handleMessage(sock, msg) {
       m.templateButtonReplyMessage?.selectedDisplayText ||
       ''
     ).trim();
-    
-    // 🆕 AGENT COMMANDS VIA WHATSAPP (from bot's own number)
-    // Check if message is from the bot's own number (agent using bot's phone)
-    // This MUST be checked BEFORE the fromMe skip logic
-    const botNumber = sock.user?.id?.split(':')[0]?.split('@')[0]; // Extract bot's number (remove :12 suffix and @s.whatsapp.net)
-    const senderNumber = from.split('@')[0]; // Extract sender's number
-    
-    console.log(`🔍 Debug: botNumber="${botNumber}" senderNumber="${senderNumber}" match=${botNumber === senderNumber} fromMe=${fromMe}`);
-    
-    if (fromMe && botNumber && senderNumber === botNumber && text) {
-      // This is the agent sending commands from the bot's phone
-      console.log(`🧑‍💼 Agent command detected from bot's own number: "${text}"`);
-      
-      // Parse agent commands
+
+    // Build phone<->LID alias map
+    if (msg.participant && from.endsWith('@lid')) registerJidAlias(msg.participant, from);
+    if (msg.key?.participant && from.endsWith('@lid')) registerJidAlias(msg.key.participant, from);
+
+    // -- AGENT COMMANDS (any fromMe message starting with /) --
+    if (fromMe && text && text.startsWith('/')) {
+      console.log(`🧑💼 Agent command detected: "${text}"`);
       const takeoverMatch = text.match(/\/takeover\s+(\d+)/i);
       const releaseMatch = text.match(/\/release\s+(\d+)/i);
       const statusMatch = text.match(/\/status\s+(\d+)/i);
-      
-      // Process takeover command
+
       if (takeoverMatch) {
-        const targetNumber = `${takeoverMatch[1]}@s.whatsapp.net`;
-        await enableHumanTakeover(targetNumber, 'Agent');
-        await sock.sendMessage(targetNumber, { 
-          text: '🧑‍💼 *An agent has joined the conversation*\n\nYou are now chatting with a human agent. The bot is paused.' 
-        });
-        await sock.sendMessage(from, { text: `✅ Takeover enabled for ${takeoverMatch[1]}` });
-        console.log(`✅ Takeover enabled for ${targetNumber} via WhatsApp command`);
-      }
-      
-      // Process release command
-      if (releaseMatch) {
-        const targetNumber = `${releaseMatch[1]}@s.whatsapp.net`;
-        await disableHumanTakeover(targetNumber);
-        await sock.sendMessage(targetNumber, { 
-          text: '🤖 *Agent has left the conversation*\n\nYou are now chatting with the automated bot again. Type *menu* to see options.' 
-        });
-        await sock.sendMessage(from, { text: `✅ Bot control restored for ${releaseMatch[1]}` });
-        console.log(`✅ Bot control restored for ${targetNumber} via WhatsApp command`);
-      }
-      
-      // Process status command
-      if (statusMatch) {
-        const targetNumber = `${statusMatch[1]}@s.whatsapp.net`;
-        const isTakenOver = await isHumanTakeover(targetNumber);
-        const targetSession = await getUserSession(targetNumber);
-        let statusMsg = `📊 *Status for ${statusMatch[1]}*\n\n`;
-        statusMsg += `Human Takeover: ${isTakenOver ? '✅ YES' : '❌ NO'}\n`;
-        if (isTakenOver) {
-          statusMsg += `Taken over by: ${targetSession.takenOverBy || 'Unknown'}\n`;
-          statusMsg += `Taken over at: ${targetSession.takenOverAt || 'Unknown'}\n`;
-        }
-        statusMsg += `Current state: ${targetSession.state}\n`;
-        statusMsg += `Current step: ${targetSession.step || 'None'}`;
-        await sock.sendMessage(from, { text: statusMsg });
-        console.log(`📊 Status sent for ${targetNumber}`);
-      }
-      
-      // Show help if agent sends /help or unknown command starting with /
-      if (text.startsWith('/') && !takeoverMatch && !releaseMatch && !statusMatch) {
-        const helpMsg = `🧑‍💼 *Agent Commands*\n\n` +
-          `*/takeover 447123456789* - Take control\n` +
-          `*/release 447123456789* - Give back to bot\n` +
-          `*/status 447123456789* - Check status\n\n` +
-          `*Note:* Use digits only, no + or spaces!\n` +
-          `*Example:* /takeover 447123456789`;
-        await sock.sendMessage(from, { text: helpMsg });
-        console.log('📖 Help message sent to agent');
-      }
-      
-      // If any command was processed, return early
-      if (takeoverMatch || releaseMatch || statusMatch || text.startsWith('/')) {
+        const digits = takeoverMatch[1];
+        const targetWA = `${digits}@s.whatsapp.net`;
+        const targetLID = `${digits}@lid`;
+        await enableHumanTakeover(targetWA, 'Agent');
+        await enableHumanTakeover(targetLID, 'Agent');
+        const realLID = getLidForDigits(digits);
+        if (realLID && realLID !== targetLID) await enableHumanTakeover(realLID, 'Agent');
+        try { await sock.sendMessage(targetWA, { text: '🧑💼 *An agent has joined the conversation*\n\nYou are now chatting with a human agent. The bot is paused.' }); } catch (e) {}
+        await sock.sendMessage(from, { text: `✅ Takeover enabled for ${digits}\n(phone: ${targetWA}${realLID ? `\nreal LID: ${realLID}` : '\nLID not yet seen - will auto-pause when they next message'})` });
+        console.log(`✅ Takeover enabled for ${digits}`);
         return;
       }
+      if (releaseMatch) {
+        const digits = releaseMatch[1];
+        const targetWA = `${digits}@s.whatsapp.net`;
+        const targetLID = `${digits}@lid`;
+        await disableHumanTakeover(targetWA);
+        await disableHumanTakeover(targetLID);
+        const realLID = getLidForDigits(digits);
+        if (realLID && realLID !== targetLID) await disableHumanTakeover(realLID);
+        try { await sock.sendMessage(targetWA, { text: '🤖 *Agent has left the conversation*\n\nYou are now chatting with the automated bot again. Type *menu* to see options.' }); } catch (e) {}
+        await sock.sendMessage(from, { text: `✅ Bot control restored for ${digits}` });
+        console.log(`✅ Bot control restored for ${digits}`);
+        return;
+      }
+      if (statusMatch) {
+        const digits = statusMatch[1];
+        const targetWA = `${digits}@s.whatsapp.net`;
+        const targetLID = `${digits}@lid`;
+        const isTakenOverWA = await isHumanTakeover(targetWA);
+        const isTakenOverLID = await isHumanTakeover(targetLID);
+        const isTakenOver = isTakenOverWA || isTakenOverLID;
+        const targetSession = isTakenOverWA ? await getUserSession(targetWA) : await getUserSession(targetLID);
+        let statusMsg = `📊 *Status for ${digits}*\n\nHuman Takeover: ${isTakenOver ? '✅ YES' : '❌ NO'}\n`;
+        if (isTakenOver) statusMsg += `Taken over by: ${targetSession.takenOverBy || 'Unknown'}\n`;
+        statusMsg += `State: ${targetSession.state}\nStep: ${targetSession.step || 'None'}`;
+        await sock.sendMessage(from, { text: statusMsg });
+        return;
+      }
+      await sock.sendMessage(from, { text: '🧑💼 *Agent Commands*\n\n*/takeover 447123456789* - Pause bot\n*/release 447123456789* - Resume bot\n*/status 447123456789* - Check status\n\nDigits only, no + or spaces!' });
+      return;
     }
-    
-    // NOW skip other fromMe messages (not agent commands)
+
     if (fromMe) {
       console.log('   ⏭️  skip — fromMe (not an agent command)');
       return;
     }
-    
+
     const lowerText = text.toLowerCase();
-    
     console.log(`📨 Message from ${from}: "${text}"`);
-    
-    // Get user session to check state
+
     const session = await getUserSession(from);
-    
-    // 🆕 CHECK FOR HUMAN TAKEOVER MODE
-    if (session.humanTakeover) {
-      console.log(`🧑‍💼 Human takeover active for ${from} - bot is paused`);
-      // Bot is silent when human agent is in control
-      // Agent can still see messages and respond manually
+
+    if (await isHumanTakeover(from)) {
+      console.log(`🧑💼 Human takeover active for ${from} - bot is paused`);
       return;
     }
-    
-    // If user is in booking flow, handle it there
+
     if (session.state === 'BOOKING_FLOW') {
       console.log(`📦 Routing to booking flow (step: ${session.step})`);
       return await handleBookingFlow(sock, from, text, session);
     }
-
-    // If user is in tracking flow, handle it there
     if (session.state === 'TRACKING') {
       console.log('🔍 Routing to tracking flow');
       return await handleTrackingFlow(sock, from, text);
     }
-    
+
     let response = '';
-    
-    // Route messages - Bot responds to ANY message (not just greetings)
-    // This is important for Facebook users who may not know to say "hi"
     if (!text) {
-      return; // Empty message
+      return;
     } else if (['hi', 'hello', 'hey', 'start', 'menu', 'main'].includes(lowerText)) {
-      // Explicit menu request - reset to main menu
       await updateUserSession(from, { state: 'MAIN_MENU', step: null, bookingData: {} });
       response = getMainMenu();
     } else if (['1', 'book', 'booking'].includes(lowerText)) {
-      // Start booking flow
-      console.log(`🚀 Starting booking flow for ${from}`);
       await updateUserSession(from, { state: 'BOOKING_FLOW', step: 'START', bookingData: {} });
       return await handleBookingFlow(sock, from, '', session);
     } else if (['2', 'price', 'pricing', 'prices'].includes(lowerText)) {
@@ -310,7 +277,7 @@ Q: What can I ship?
 A: Drums, boxes, household items, electronics
 
 Q: Can I buy a drum from you?
-A: Yes — metal drums and plastic barrels available at collection.
+A: Yes - metal drums and plastic barrels available at collection.
 
 Q: How do I pay?
 A: Card, bank transfer, or cash on collection
@@ -322,17 +289,14 @@ Type *menu* to return to main menu.`;
     } else if (['6', 'contact', 'agent'].includes(lowerText)) {
       response = getContact();
     } else {
-      // Default response for ANY other message
-      // This ensures bot responds even if user doesn't say "hi"
       response = getMainMenu();
     }
-    
-    // Send response
+
     if (response) {
       await sock.sendMessage(from, { text: response });
       console.log(`✅ Response sent to ${from}`);
     }
-    
+
   } catch (error) {
     console.error('❌ Error handling message:', error.message);
   }
@@ -448,6 +412,18 @@ async function startBot() {
     
     // Save credentials
     sock.ev.on('creds.update', saveCreds);
+
+    // Build LID<->phone alias map from WhatsApp contact sync
+    sock.ev.on('contacts.upsert', (contacts) => {
+      for (const c of contacts) {
+        if (c.id && c.lid) registerJidAlias(c.id, c.lid);
+      }
+    });
+    sock.ev.on('contacts.update', (updates) => {
+      for (const c of updates) {
+        if (c.id && c.lid) registerJidAlias(c.id, c.lid);
+      }
+    });
     
     // Handle incoming messages
     sock.ev.on('messages.upsert', async ({ messages, type }) => {

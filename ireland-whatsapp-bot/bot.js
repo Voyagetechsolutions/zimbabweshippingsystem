@@ -13,7 +13,7 @@ import pino from 'pino';
 import readline from 'readline';
 import { initDatabase, getCollectionSchedules } from './utils/database.js';
 import { getPricingMessage } from './utils/pricing.js';
-import { getUserSession, updateUserSession, enableHumanTakeover, disableHumanTakeover, isHumanTakeover } from './utils/sessions.js';
+import { getUserSession, updateUserSession, enableHumanTakeover, disableHumanTakeover, isHumanTakeover, registerJidAlias, getLidForDigits } from './utils/sessions.js';
 import { handleBookingFlow } from './flows/booking.js';
 import { handleTrackingFlow } from './flows/tracking.js';
 import { startQrServer, setQr, setConnected, setDisconnected } from './qr-server.js';
@@ -148,6 +148,17 @@ async function handleMessage(sock, msg) {
 
     // Extract message text from any of the supported message types
     const m = msg.message;
+
+    // Build phone↔LID alias map from participant info so /takeover <phone> works
+    // even when the customer's messages arrive from a @lid address.
+    if (msg.participant && from.endsWith('@lid')) {
+      registerJidAlias(msg.participant, from);
+    }
+    // Also try verifiedBizName / pushName path — Baileys sometimes puts the
+    // phone JID in key.participant for non-group 1:1 LID messages.
+    if (msg.key?.participant && from.endsWith('@lid')) {
+      registerJidAlias(msg.key.participant, from);
+    }
     const text = (
       m.conversation ||
       m.extendedTextMessage?.text ||
@@ -172,17 +183,18 @@ async function handleMessage(sock, msg) {
       
       if (takeoverMatch) {
         const digits = takeoverMatch[1];
-        // Set takeover on BOTH JID formats — customers may message
-        // from either @s.whatsapp.net or @lid depending on WhatsApp version
         const targetWA = `${digits}@s.whatsapp.net`;
         const targetLID = `${digits}@lid`;
         await enableHumanTakeover(targetWA, 'Agent');
         await enableHumanTakeover(targetLID, 'Agent');
+        // Also set on the real LID we've seen for this customer (if any)
+        const realLID = getLidForDigits(digits);
+        if (realLID && realLID !== targetLID) await enableHumanTakeover(realLID, 'Agent');
         try { await sock.sendMessage(targetWA, { 
           text: '🧑‍💼 *An agent has joined the conversation*\n\nYou are now chatting with a human agent. The bot is paused.' 
         }); } catch (e) { /* target may not exist in this format */ }
-        await sock.sendMessage(from, { text: `✅ Takeover enabled for ${digits}\n(both phone & LID formats)` });
-        console.log(`✅ Takeover enabled for ${digits} (both ${targetWA} and ${targetLID})`);
+        await sock.sendMessage(from, { text: `✅ Takeover enabled for ${digits}\n(phone: ${targetWA}${realLID ? `\nreal LID: ${realLID}` : '\nLID not yet seen — will auto-pause when they next message'})` });
+        console.log(`✅ Takeover enabled for ${digits} (both ${targetWA} and ${targetLID}${realLID ? ` and real LID ${realLID}` : ''})`);
         return;
       }
       if (releaseMatch) {
@@ -191,11 +203,13 @@ async function handleMessage(sock, msg) {
         const targetLID = `${digits}@lid`;
         await disableHumanTakeover(targetWA);
         await disableHumanTakeover(targetLID);
+        const realLID = getLidForDigits(digits);
+        if (realLID && realLID !== targetLID) await disableHumanTakeover(realLID);
         try { await sock.sendMessage(targetWA, { 
           text: '🤖 *Agent has left the conversation*\n\nYou are now chatting with the automated bot again. Type *menu* to see options.' 
         }); } catch (e) { /* target may not exist in this format */ }
         await sock.sendMessage(from, { text: `✅ Bot control restored for ${digits}` });
-        console.log(`✅ Bot control restored for ${digits} (both ${targetWA} and ${targetLID})`);
+        console.log(`✅ Bot control restored for ${digits} (both ${targetWA} and ${targetLID}${realLID ? ` and real LID ${realLID}` : ''})`);
         return;
       }
       if (statusMatch) {
@@ -525,6 +539,21 @@ async function startBot() {
     
     // Save credentials
     sock.ev.on('creds.update', saveCreds);
+
+    // Build LID↔phone alias map from WhatsApp contact sync
+    sock.ev.on('contacts.upsert', (contacts) => {
+      for (const c of contacts) {
+        if (c.id && c.lid) registerJidAlias(c.id, c.lid);
+        else if (c.id && c.id.endsWith('@lid') && c.notify) {
+          // some versions put the phone in notify field
+        }
+      }
+    });
+    sock.ev.on('contacts.update', (updates) => {
+      for (const c of updates) {
+        if (c.id && c.lid) registerJidAlias(c.id, c.lid);
+      }
+    });
     
     // Suppress non-critical decryption errors (they're expected and harmless)
     const originalConsoleError = console.error;

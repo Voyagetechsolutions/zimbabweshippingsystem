@@ -4,6 +4,25 @@ import { getSupabase } from './database.js';
 // L1: in-memory (fast, 24h TTL). L2: bot_sessions table (survives restarts).
 const sessionCache = new NodeCache({ stdTTL: 86400, checkperiod: 3600 });
 
+// Maps phone digits → real LID JID and vice-versa so /takeover <phone> works
+// even when the customer's messages arrive from a @lid address.
+const jidAliasMap = new Map();
+
+export function registerJidAlias(phoneJid, lidJid) {
+  if (!phoneJid || !lidJid) return;
+  const digits = phoneJid.replace('@s.whatsapp.net', '');
+  jidAliasMap.set(digits, lidJid);
+  jidAliasMap.set(lidJid, `${digits}@s.whatsapp.net`);
+}
+
+export function getLidForDigits(digits) {
+  return jidAliasMap.get(digits) || null;
+}
+
+export function getPhoneForLid(lidJid) {
+  return jidAliasMap.get(lidJid) || null;
+}
+
 const BOT_SOURCE = 'whatsapp-bot-uk';
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 
@@ -174,7 +193,20 @@ export async function disableHumanTakeover(phoneNumber) {
   return updated;
 }
 
-export async function isHumanTakeover(phoneNumber) {
-  const session = await getUserSession(phoneNumber);
-  return session.humanTakeover === true;
+export async function isHumanTakeover(jid) {
+  const session = await getUserSession(jid);
+  if (session.humanTakeover === true) return true;
+
+  if (jid.endsWith('@lid')) {
+    const phoneJid = getPhoneForLid(jid);
+    if (phoneJid) {
+      const phoneSession = await getUserSession(phoneJid);
+      if (phoneSession.humanTakeover === true) {
+        await enableHumanTakeover(jid, phoneSession.takenOverBy || 'Agent');
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
