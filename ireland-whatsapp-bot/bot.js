@@ -159,24 +159,17 @@ async function handleMessage(sock, msg) {
       ''
     ).trim();
     
-    // 🆕 AGENT COMMANDS VIA WHATSAPP (from bot's own number)
-    // Check if message is from the bot's own number (agent using bot's phone)
-    // This MUST be checked BEFORE the fromMe skip logic
-    const botNumber = sock.user?.id?.split(':')[0]?.split('@')[0]; // Extract bot's number (remove :12 suffix and @s.whatsapp.net)
-    const senderNumber = from.split('@')[0]; // Extract sender's number
-    
-    console.log(`🔍 Debug: botNumber="${botNumber}" senderNumber="${senderNumber}" match=${botNumber === senderNumber} fromMe=${fromMe}`);
-    
-    if (fromMe && botNumber && senderNumber === botNumber && text) {
-      // This is the agent sending commands from the bot's phone
-      console.log(`🧑‍💼 Agent command detected from bot's own number: "${text}"`);
+    // ── 🧑‍💼 AGENT COMMANDS VIA WHATSAPP ──────────────────────────────
+    // Detect /takeover, /release, /status sent from the bot's linked devices.
+    // We rely on fromMe (set by Baileys) instead of number matching because
+    // LID addresses (e.g. 198448997527559@lid) don't match the bot's phone number.
+    if (fromMe && text && text.startsWith('/')) {
+      console.log(`🧑‍💼 Agent command detected: "${text}"`);
       
-      // Parse agent commands (allow multiple commands on same line)
       const takeoverMatch = text.match(/\/takeover\s+(\d+)/i);
       const releaseMatch = text.match(/\/release\s+(\d+)/i);
       const statusMatch = text.match(/\/status\s+(\d+)/i);
       
-      // Process takeover command
       if (takeoverMatch) {
         const targetNumber = `${takeoverMatch[1]}@s.whatsapp.net`;
         await enableHumanTakeover(targetNumber, 'Agent');
@@ -185,9 +178,8 @@ async function handleMessage(sock, msg) {
         });
         await sock.sendMessage(from, { text: `✅ Takeover enabled for ${takeoverMatch[1]}` });
         console.log(`✅ Takeover enabled for ${targetNumber} via WhatsApp command`);
+        return;
       }
-      
-      // Process release command
       if (releaseMatch) {
         const targetNumber = `${releaseMatch[1]}@s.whatsapp.net`;
         await disableHumanTakeover(targetNumber);
@@ -196,9 +188,8 @@ async function handleMessage(sock, msg) {
         });
         await sock.sendMessage(from, { text: `✅ Bot control restored for ${releaseMatch[1]}` });
         console.log(`✅ Bot control restored for ${targetNumber} via WhatsApp command`);
+        return;
       }
-      
-      // Process status command
       if (statusMatch) {
         const targetNumber = `${statusMatch[1]}@s.whatsapp.net`;
         const isTakenOver = await isHumanTakeover(targetNumber);
@@ -213,29 +204,33 @@ async function handleMessage(sock, msg) {
         statusMsg += `Current step: ${targetSession.step || 'None'}`;
         await sock.sendMessage(from, { text: statusMsg });
         console.log(`📊 Status sent for ${targetNumber}`);
-      }
-      
-      // Show help if agent sends /help or unknown command starting with /
-      if (text.startsWith('/') && !takeoverMatch && !releaseMatch && !statusMatch) {
-        const helpMsg = `🧑‍💼 *Agent Commands*\n\n` +
-          `*/takeover 27615321107* - Take control\n` +
-          `*/release 27615321107* - Give back to bot\n` +
-          `*/status 27615321107* - Check status\n\n` +
-          `*Note:* Use digits only, no + or spaces!\n` +
-          `*Example:* /takeover 27615321107`;
-        await sock.sendMessage(from, { text: helpMsg });
-        console.log('📖 Help message sent to agent');
-      }
-      
-      // If any command was processed, return early
-      if (takeoverMatch || releaseMatch || statusMatch || text.startsWith('/')) {
         return;
       }
+      // Unknown / command — show help
+      const helpMsg = `🧑‍💼 *Agent Commands*\n\n` +
+        `*/takeover 353871234567* — Pause bot, talk to customer\n` +
+        `*/release 353871234567* — Give control back to bot\n` +
+        `*/status 353871234567* — Check takeover status\n\n` +
+        `*Note:* Use digits only, no + or spaces!`;
+      await sock.sendMessage(from, { text: helpMsg });
+      return;
     }
     
-    // NOW skip other fromMe messages (not agent commands)
+    // Skip ALL other fromMe messages (not agent commands)
     if (fromMe) {
       console.log('   ⏭️  skip — fromMe (not an agent command)');
+      return;
+    }
+    
+    // 🛡️ ECHO DETECTION — prevent infinite loop
+    // The bot's own outgoing messages sometimes echo back as fromMe=false via LID.
+    // Detect them by checking if the text matches known bot output patterns.
+    if (text.startsWith('Hello! 👋') && text.includes('*Main Menu:*')) {
+      console.log(`   🔁 skip — echo of bot's own menu message from ${from}`);
+      return;
+    }
+    if (text.startsWith('🧑‍💼 *An agent') || text.startsWith('🤖 *Agent has left') || text.startsWith('✅ Takeover') || text.startsWith('✅ Bot control')) {
+      console.log(`   🔁 skip — echo of bot's own system message from ${from}`);
       return;
     }
     
