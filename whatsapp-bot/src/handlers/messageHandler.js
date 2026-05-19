@@ -54,33 +54,48 @@ export async function handleMessage(sock, message) {
     // ── 🧑‍💼 AGENT COMMANDS VIA WHATSAPP ──────────────────────────────
     // Detect /takeover, /release, /status sent from the bot's own number
     if (fromMe && messageText.startsWith('/')) {
-      const takeoverMatch = messageText.match(/\/takeover\s+(\d+)/i);
-      const releaseMatch = messageText.match(/\/release\s+(\d+)/i);
-      const statusMatch = messageText.match(/\/status\s+(\d+)/i);
+      const takeoverMatch = messageText.match(/\/takeover(?:\s+(\d+))?/i);
+      const releaseMatch = messageText.match(/\/release(?:\s+(\d+))?/i);
+      const statusMatch = messageText.match(/\/status(?:\s+(\d+))?/i);
 
       if (takeoverMatch) {
-        const targetNumber = `${takeoverMatch[1]}@s.whatsapp.net`;
+        // If a number is provided, use it. Otherwise, target the chat where the command was sent.
+        const targetNumber = takeoverMatch[1] ? `${takeoverMatch[1]}@s.whatsapp.net` : rawJid;
+        
         await enableHumanTakeover(targetNumber, 'Agent');
-        await sendMessage(sock, targetNumber,
-          '🧑‍💼 *An agent has joined the conversation*\n\nYou are now chatting with a human agent. The bot is paused.');
-        await sendMessage(sock, phoneNumber, `✅ Takeover enabled for ${takeoverMatch[1]}`);
+        try { await sendMessage(sock, targetNumber,
+          '🧑‍💼 *An agent has joined the conversation*\n\nYou are now chatting with a human agent. The bot is paused for up to 30 minutes.');
+        } catch (e) { /* target may not exist */ }
+        
+        // If sent from the bot's own "Notes to Self" chat to target someone else, confirm back to the agent
+        if (takeoverMatch[1] && !rawJid.includes(takeoverMatch[1])) {
+          await sendMessage(sock, rawJid, `✅ Takeover enabled for ${takeoverMatch[1]}\n\n⏰ Auto-releases in 30 min, or use /release ${takeoverMatch[1]}`);
+        }
         console.log(`✅ Takeover enabled for ${targetNumber} via WhatsApp command`);
         return;
       }
+      
       if (releaseMatch) {
-        const targetNumber = `${releaseMatch[1]}@s.whatsapp.net`;
+        const targetNumber = releaseMatch[1] ? `${releaseMatch[1]}@s.whatsapp.net` : rawJid;
         await disableHumanTakeover(targetNumber);
-        await sendMessage(sock, targetNumber,
+        
+        try { await sendMessage(sock, targetNumber,
           '🤖 *Agent has left the conversation*\n\nYou are now chatting with the automated bot again. Type *menu* to see options.');
-        await sendMessage(sock, phoneNumber, `✅ Bot control restored for ${releaseMatch[1]}`);
+        } catch (e) { /* target may not exist */ }
+        
+        if (releaseMatch[1] && !rawJid.includes(releaseMatch[1])) {
+          await sendMessage(sock, rawJid, `✅ Bot control restored for ${releaseMatch[1]}`);
+        }
         console.log(`✅ Bot control restored for ${targetNumber} via WhatsApp command`);
         return;
       }
+      
       if (statusMatch) {
-        const targetNumber = `${statusMatch[1]}@s.whatsapp.net`;
+        const targetNumber = statusMatch[1] ? `${statusMatch[1]}@s.whatsapp.net` : rawJid;
         const isTakenOver = await isHumanTakeover(targetNumber);
         const targetSession = await getUserSession(targetNumber);
-        let statusMsg = `📊 *Status for ${statusMatch[1]}*\n\n`;
+        
+        let statusMsg = `📊 *Status for ${statusMatch[1] || 'this chat'}*\n\n`;
         statusMsg += `Human Takeover: ${isTakenOver ? '✅ YES' : '❌ NO'}\n`;
         if (isTakenOver) {
           statusMsg += `Taken over by: ${targetSession.takenOverBy || 'Unknown'}\n`;
@@ -88,17 +103,21 @@ export async function handleMessage(sock, message) {
         }
         statusMsg += `Current state: ${targetSession.state}\n`;
         statusMsg += `Current step: ${targetSession.step || 'None'}`;
-        await sendMessage(sock, phoneNumber, statusMsg);
+        await sendMessage(sock, rawJid, statusMsg);
         console.log(`📊 Status sent for ${targetNumber}`);
         return;
       }
+      
       // Unknown / command — show help
       const helpMsg = `🧑‍💼 *Agent Commands*\n\n` +
-        `*/takeover 353871234567* — Pause bot, talk to customer\n` +
-        `*/release 353871234567* — Give control back to bot\n` +
-        `*/status 353871234567* — Check takeover status\n\n` +
-        `*Note:* Use digits only, no + or spaces!`;
-      await sendMessage(sock, phoneNumber, helpMsg);
+        `*Directly in a customer's chat:*\n` +
+        `*/takeover* — Pause bot for this customer\n` +
+        `*/release* — Resume bot for this customer\n` +
+        `*/status* — Check bot status\n\n` +
+        `*From your own chat (requires number):*\n` +
+        `*/takeover 353871234567*\n` +
+        `*/release 353871234567*`;
+      await sendMessage(sock, rawJid, helpMsg);
       return;
     }
 
