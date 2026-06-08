@@ -24,6 +24,7 @@ interface DeliveryNoteOverrides {
   date?: string;          // header "Date" (yyyy-MM-dd)
   deliveryDate?: string;  // optional separate delivery date (yyyy-MM-dd)
   itemDescriptions?: Record<string, string>; // line-item index → description
+  doorToDoor?: boolean;   // override the delivery-method (door-to-door vs depot)
 }
 
 function getOverrides(s: Shipment): DeliveryNoteOverrides {
@@ -269,7 +270,7 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
       description: overrides.itemDescriptions?.[i] ?? row.description,
     }));
     const itemsSummary = buildItemsSummary(shipment);
-    const doorToDoor = getDoorToDoor(shipment);
+    const doorToDoor = overrides.doorToDoor ?? getDoorToDoor(shipment);
 
     return (
       <div
@@ -412,6 +413,7 @@ interface EditDraft {
   date: string;
   deliveryDate: string;
   itemDescriptions: string[];
+  doorToDoor: boolean;
 }
 
 const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, onClose, shipment, onSaved }) => {
@@ -431,6 +433,7 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
       date: ov.date || format(new Date(shipment.created_at), 'yyyy-MM-dd'),
       deliveryDate: ov.deliveryDate || '',
       itemDescriptions: items.map((row, i) => ov.itemDescriptions?.[i] ?? row.description),
+      doorToDoor: ov.doorToDoor ?? getDoorToDoor(shipment),
     });
     setIsEditing(true);
   };
@@ -450,6 +453,7 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
           acc[i] = d;
           return acc;
         }, {}),
+        doorToDoor: draft.doorToDoor,
       }
     : undefined;
 
@@ -467,6 +471,7 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
       date: draft.date || undefined,
       deliveryDate: draft.deliveryDate.trim() || undefined,
       itemDescriptions,
+      doorToDoor: draft.doorToDoor,
     };
 
     const newMetadata = { ...(shipment.metadata || {}), deliveryNoteOverrides: overrides };
@@ -593,6 +598,22 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
                   </Button>
                 )}
               </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Delivery method</label>
+              <label className="flex items-center gap-2 cursor-pointer rounded-md border p-3 bg-background">
+                <input
+                  type="checkbox"
+                  checked={draft.doorToDoor}
+                  onChange={(e) => setDraft({ ...draft, doorToDoor: e.target.checked })}
+                  className="h-4 w-4"
+                />
+                <span className="text-sm">
+                  Door-to-Door Delivery
+                  <span className="text-muted-foreground"> — {draft.doorToDoor ? 'deliver to recipient address' : 'depot collection (off)'}</span>
+                </span>
+              </label>
             </div>
 
             <div className="space-y-2">
