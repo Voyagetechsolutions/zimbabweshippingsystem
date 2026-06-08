@@ -30,6 +30,8 @@ interface FormData {
   receiverPhone2?: string;
   deliveryAddress: string;
   deliveryCity: string;
+  // Extra drop-off addresses (door-to-door is charged per address)
+  deliveryAddresses: DeliveryAddress[];
 
   // Shipment Items
   includeDrums: boolean;
@@ -68,6 +70,13 @@ interface PaymentInstallment {
   amount: number;
   date: string; // ISO date string
   paid: boolean;
+}
+
+interface DeliveryAddress {
+  name: string;
+  phone: string;
+  address: string;
+  city: string;
 }
 
 // UK drum prices (GBP) — flat rate
@@ -333,6 +342,7 @@ export const SimplifiedBookingForm = () => {
     receiverPhone2: '',
     deliveryAddress: '',
     deliveryCity: '',
+    deliveryAddresses: [],
     includeDrums: false,
     drumQuantity: 0,
     drumsDescription: '',
@@ -588,9 +598,10 @@ export const SimplifiedBookingForm = () => {
       total += formData.purchaseDrumQuantity * drumPurchasePrice;
     }
 
-    // Door-to-door delivery (flat fee per address)
+    // Door-to-door delivery — charged per delivery address (primary + extras)
     if (formData.doorToDoor) {
-      total += DOOR_TO_DOOR_PRICE;
+      const addressCount = 1 + formData.deliveryAddresses.length;
+      total += addressCount * DOOR_TO_DOOR_PRICE;
     }
 
     return total;
@@ -626,6 +637,13 @@ export const SimplifiedBookingForm = () => {
       const cleanedSealCodes = formData.sealCodes.map(c => c.trim()).filter(Boolean);
       const sealSuppliedQty = formData.sealOption === 'need' ? formData.sealQuantity : cleanedSealCodes.length;
 
+      // Extra delivery addresses with any content
+      const cleanedDeliveryAddresses = formData.deliveryAddresses
+        .map(a => ({ name: a.name.trim(), phone: a.phone.trim(), address: a.address.trim(), city: a.city.trim() }))
+        .filter(a => a.address || a.city);
+      const addressCount = 1 + cleanedDeliveryAddresses.length;
+      const doorToDoorTotal = formData.doorToDoor ? addressCount * DOOR_TO_DOOR_PRICE : 0;
+
       let notes = [];
       if (formData.wantMetalSeal) {
         notes.push(
@@ -634,7 +652,10 @@ export const SimplifiedBookingForm = () => {
             : `Metal Coded Seal x${formData.sealQuantity} (supplied)`,
         );
       }
-      if (formData.doorToDoor) notes.push('Door-to-door delivery requested');
+      if (formData.doorToDoor) notes.push(`Door-to-door delivery requested (${addressCount} address${addressCount > 1 ? 'es' : ''})`);
+      if (cleanedDeliveryAddresses.length > 0) {
+        notes.push(`Extra delivery addresses: ${cleanedDeliveryAddresses.map(a => `${a.address}${a.city ? ', ' + a.city : ''}`).join(' | ')}`);
+      }
       if (formData.paymentMethod === 'cashOnCollection') notes.push('Cash payment on collection');
       if (formData.includeBoxes) notes.push(`Other Items (agent quote): ${formData.boxesDescription}`);
       if (formData.includeTrunks && formData.trunkQuantity > 0) notes.push(`${formData.trunkQuantity} x Trunk/Storage Box`);
@@ -661,7 +682,8 @@ export const SimplifiedBookingForm = () => {
           phone2: formData.receiverPhone2,
           address: formData.deliveryAddress,
           city: formData.deliveryCity,
-          country: 'Zimbabwe'
+          country: 'Zimbabwe',
+          additionalAddresses: cleanedDeliveryAddresses
         },
         items: {
           drums: formData.includeDrums ? {
@@ -688,7 +710,8 @@ export const SimplifiedBookingForm = () => {
             metalSealQuantity: formData.wantMetalSeal ? sealSuppliedQty : 0,
             metalSealPrice: getMetalSealPrice(formData.pickupCountry),
             doorToDoor: formData.doorToDoor,
-            doorToDoorPrice: formData.doorToDoor ? DOOR_TO_DOOR_PRICE : 0
+            doorToDoorPrice: doorToDoorTotal,
+            doorToDoorAddressCount: addressCount
           },
           purchasedDrums: formData.purchaseDrums ? {
             type: formData.purchaseDrumType,
@@ -1193,28 +1216,101 @@ export const SimplifiedBookingForm = () => {
           </p>
         </div>
 
-        {/* Door-to-Door Delivery Option */}
-        <div className={`border-2 rounded-lg p-5 transition-all ${formData.doorToDoor ? 'border-zim-green bg-green-50 dark:bg-green-900/20 dark:border-green-600' : 'border-gray-200 hover:border-zim-green dark:border-gray-700 dark:hover:border-green-600'}`}>
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={formData.doorToDoor}
-              onChange={(e) => updateField('doorToDoor', e.target.checked)}
-              className="mt-1 h-4 w-4"
-            />
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <Truck className="h-5 w-5 text-zim-green" />
-                <span className="font-semibold text-lg">Door-to-Door Delivery</span>
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                We deliver the shipment directly to the receiver's address in Zimbabwe and contact them about the delivery day.
-                Without this, the receiver collects from our local depot.
-              </div>
-              <div className="text-sm font-semibold text-zim-green mt-2">+{currencySymbol}{DOOR_TO_DOOR_PRICE} per address</div>
+        {/* Additional delivery addresses */}
+        {formData.deliveryAddresses.map((addr, i) => (
+          <div key={i} className="rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-sm">Additional Delivery Address #{i + 1}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-red-500 hover:text-red-700"
+                onClick={() => updateField('deliveryAddresses', formData.deliveryAddresses.filter((_, j) => j !== i))}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
-          </label>
-        </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Input
+                placeholder="Receiver name (optional)"
+                value={addr.name}
+                onChange={(e) => {
+                  const next = [...formData.deliveryAddresses];
+                  next[i] = { ...next[i], name: e.target.value };
+                  updateField('deliveryAddresses', next);
+                }}
+              />
+              <Input
+                placeholder="Phone (optional)"
+                value={addr.phone}
+                onChange={(e) => {
+                  const next = [...formData.deliveryAddresses];
+                  next[i] = { ...next[i], phone: e.target.value };
+                  updateField('deliveryAddresses', next);
+                }}
+              />
+            </div>
+            <Input
+              placeholder="Delivery address"
+              value={addr.address}
+              onChange={(e) => {
+                const next = [...formData.deliveryAddresses];
+                next[i] = { ...next[i], address: e.target.value };
+                updateField('deliveryAddresses', next);
+              }}
+            />
+            <Input
+              placeholder="City (Harare, Bulawayo, etc.)"
+              value={addr.city}
+              onChange={(e) => {
+                const next = [...formData.deliveryAddresses];
+                next[i] = { ...next[i], city: e.target.value };
+                updateField('deliveryAddresses', next);
+              }}
+            />
+          </div>
+        ))}
+
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={() => updateField('deliveryAddresses', [...formData.deliveryAddresses, { name: '', phone: '', address: '', city: '' }])}
+        >
+          <Plus className="h-4 w-4 mr-2" /> Add another delivery address
+        </Button>
+
+        {/* Door-to-Door Delivery Option */}
+        {(() => {
+          const addressCount = 1 + formData.deliveryAddresses.length;
+          return (
+            <div className={`border-2 rounded-lg p-5 transition-all ${formData.doorToDoor ? 'border-zim-green bg-green-50 dark:bg-green-900/20 dark:border-green-600' : 'border-gray-200 hover:border-zim-green dark:border-gray-700 dark:hover:border-green-600'}`}>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.doorToDoor}
+                  onChange={(e) => updateField('doorToDoor', e.target.checked)}
+                  className="mt-1 h-4 w-4"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <Truck className="h-5 w-5 text-zim-green" />
+                    <span className="font-semibold text-lg">Door-to-Door Delivery</span>
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    We deliver directly to {addressCount === 1 ? 'the receiver address' : `each of the ${addressCount} delivery addresses`} in Zimbabwe and contact them about the delivery day.
+                    Without this, the receiver collects from our local depot.
+                  </div>
+                  <div className="text-sm font-semibold text-zim-green mt-2">
+                    +{currencySymbol}{DOOR_TO_DOOR_PRICE} per address
+                    {formData.doorToDoor && addressCount > 1 && ` × ${addressCount} = ${currencySymbol}${addressCount * DOOR_TO_DOOR_PRICE}`}
+                  </div>
+                </div>
+              </label>
+            </div>
+          );
+        })()}
       </CardContent>
     </Card>
   );
@@ -1628,10 +1724,25 @@ export const SimplifiedBookingForm = () => {
             <p><strong>{formData.receiverName}</strong></p>
             <p>{formData.receiverPhone}</p>
             <p className="text-gray-600 dark:text-gray-400">{formData.deliveryAddress}, {formData.deliveryCity}, Zimbabwe</p>
-            <div className="flex justify-between border-t pt-2 mt-2">
-              <span>{formData.doorToDoor ? 'Door-to-Door Delivery' : 'Depot collection in Zimbabwe'}</span>
-              {formData.doorToDoor && <span className="font-medium">+{currencySymbol}{DOOR_TO_DOOR_PRICE}</span>}
-            </div>
+            {formData.deliveryAddresses.filter(a => a.address || a.city).map((a, i) => (
+              <p key={i} className="text-gray-600 dark:text-gray-400 border-t pt-1 mt-1">
+                <span className="text-xs font-medium text-gray-500">Address #{i + 2}: </span>
+                {[a.name, a.phone].filter(Boolean).join(' · ')}{(a.name || a.phone) ? ' — ' : ''}{a.address}{a.city ? ', ' + a.city : ''}, Zimbabwe
+              </p>
+            ))}
+            {(() => {
+              const addressCount = 1 + formData.deliveryAddresses.filter(a => a.address || a.city).length;
+              return (
+                <div className="flex justify-between border-t pt-2 mt-2">
+                  <span>
+                    {formData.doorToDoor
+                      ? `Door-to-Door Delivery${addressCount > 1 ? ` (${addressCount} addresses)` : ''}`
+                      : 'Depot collection in Zimbabwe'}
+                  </span>
+                  {formData.doorToDoor && <span className="font-medium">+{currencySymbol}{addressCount * DOOR_TO_DOOR_PRICE}</span>}
+                </div>
+              );
+            })()}
           </div>
         </div>
 

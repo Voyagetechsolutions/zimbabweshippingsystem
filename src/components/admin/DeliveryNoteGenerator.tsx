@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Download, Loader2, Printer, Pencil, Save, X, CalendarPlus } from 'lucide-react';
+import { Download, Loader2, Printer, Pencil, Save, X, CalendarPlus, Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Shipment } from '@/types/shipment';
@@ -37,6 +37,7 @@ interface DeliveryNoteOverrides {
   recipientPhone?: string;
   recipientPhone2?: string;
   recipientAddress?: string; // newline-separated lines
+  deliveryAddresses?: Array<{ name: string; phone: string; address: string; city: string }>; // extra delivery addresses
   itemsSummary?: string;
   tracking?: string;
 }
@@ -125,6 +126,13 @@ function getRecipientAddress(s: Shipment) {
   if (src.city) parts.push(src.city);
   if (src.country) parts.push(src.country);
   return parts.length ? parts : [s.destination || 'Zimbabwe'];
+}
+
+// Additional delivery addresses for door-to-door service (charged per address)
+function getDeliveryAddresses(s: Shipment): Array<{ name: string; phone: string; address: string; city: string }> {
+  const m = s.metadata || {};
+  const recipient = m.recipient || m.recipientDetails || {};
+  return recipient.additionalAddresses || [];
 }
 
 // Whether the customer paid for door-to-door delivery in Zimbabwe (vs depot
@@ -300,6 +308,7 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
       item: overrides.itemNames?.[i] ?? row.item,
       description: overrides.itemDescriptions?.[i] ?? row.description,
     }));
+    const deliveryAddresses = overrides.deliveryAddresses ?? getDeliveryAddresses(shipment);
     const itemsSummary = overrides.itemsSummary ?? buildItemsSummary(shipment);
     const tracking = overrides.tracking ?? shipment.tracking_number;
     const doorToDoor = overrides.doorToDoor ?? getDoorToDoor(shipment);
@@ -378,6 +387,26 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
           </div>
         </div>
 
+        {/* Additional Delivery Addresses */}
+        {deliveryAddresses.length > 0 && (
+          <div style={{ marginBottom: '24px' }}>
+            <div style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#2563eb' }}>
+              ADDITIONAL DELIVERY ADDRESSES:
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+              {deliveryAddresses.map((addr, i) => (
+                <div key={i} style={{ padding: '12px', border: '1px solid #e2e8f0', borderRadius: '6px', backgroundColor: '#f8fafc', lineHeight: '1.6', fontSize: '12px' }}>
+                  <div style={{ fontWeight: '600', marginBottom: '4px', color: '#2563eb' }}>Address #{i + 2}</div>
+                  {addr.name && <div style={{ fontWeight: '500' }}>{addr.name}</div>}
+                  {addr.phone && <div>{withDialCode(addr.phone, 'Zimbabwe')}</div>}
+                  {addr.address && <div>{addr.address}</div>}
+                  {addr.city && <div>{addr.city}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ── Delivery method ── */}
         <div style={{
           marginBottom: '20px',
@@ -392,7 +421,7 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
           </strong>
           <div style={{ color: '#444', marginTop: '2px' }}>
             {doorToDoor
-              ? 'Deliver directly to the recipient address above. Contact the recipient to arrange the delivery day.'
+              ? `Deliver to ${1 + deliveryAddresses.length} address${1 + deliveryAddresses.length > 1 ? 'es' : ''} listed above. Contact recipient(s) to arrange delivery.`
               : 'Recipient collects from the local depot. No door delivery included.'}
           </div>
         </div>
@@ -483,6 +512,7 @@ interface EditDraft {
   recipientPhone: string;
   recipientPhone2: string;
   recipientAddress: string;
+  deliveryAddresses: Array<{ name: string; phone: string; address: string; city: string }>;
   itemsSummary: string;
   tracking: string;
 }
@@ -517,6 +547,7 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
       recipientPhone: ov.recipientPhone ?? withDialCode(getRecipientPhone(shipment), 'Zimbabwe'),
       recipientPhone2: ov.recipientPhone2 ?? withDialCode(getRecipientPhone2(shipment), 'Zimbabwe'),
       recipientAddress: ov.recipientAddress ?? getRecipientAddress(shipment).join('\n'),
+      deliveryAddresses: ov.deliveryAddresses ?? getDeliveryAddresses(shipment),
       itemsSummary: ov.itemsSummary ?? buildItemsSummary(shipment),
       tracking: ov.tracking ?? shipment.tracking_number,
     });
@@ -553,6 +584,7 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
         recipientPhone: draft.recipientPhone,
         recipientPhone2: draft.recipientPhone2,
         recipientAddress: draft.recipientAddress,
+        deliveryAddresses: draft.deliveryAddresses,
         itemsSummary: draft.itemsSummary,
         tracking: draft.tracking,
       }
@@ -588,6 +620,7 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
       recipientPhone: draft.recipientPhone,
       recipientPhone2: draft.recipientPhone2,
       recipientAddress: draft.recipientAddress,
+      deliveryAddresses: draft.deliveryAddresses,
       itemsSummary: draft.itemsSummary,
       tracking: draft.tracking,
     };
@@ -735,6 +768,71 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
                 <Input placeholder="Phone 2 (optional)" value={draft.recipientPhone2} onChange={(e) => setDraft({ ...draft, recipientPhone2: e.target.value })} />
                 <Textarea rows={3} placeholder="Address (one line per row)" value={draft.recipientAddress} onChange={(e) => setDraft({ ...draft, recipientAddress: e.target.value })} />
               </div>
+            </div>
+
+            {/* Additional Delivery Addresses */}
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">Additional Delivery Addresses</label>
+              {draft.deliveryAddresses.map((addr, i) => (
+                <div key={i} className="rounded-md border-2 border-dashed p-3 bg-background space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-blue-600">Address #{i + 2}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500 hover:text-red-700"
+                      onClick={() => setDraft({ ...draft, deliveryAddresses: draft.deliveryAddresses.filter((_, j) => j !== i) })}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Input
+                    placeholder="Recipient name"
+                    value={addr.name}
+                    onChange={(e) => {
+                      const next = [...draft.deliveryAddresses];
+                      next[i] = { ...next[i], name: e.target.value };
+                      setDraft({ ...draft, deliveryAddresses: next });
+                    }}
+                  />
+                  <Input
+                    placeholder="Phone"
+                    value={addr.phone}
+                    onChange={(e) => {
+                      const next = [...draft.deliveryAddresses];
+                      next[i] = { ...next[i], phone: e.target.value };
+                      setDraft({ ...draft, deliveryAddresses: next });
+                    }}
+                  />
+                  <Input
+                    placeholder="Street address"
+                    value={addr.address}
+                    onChange={(e) => {
+                      const next = [...draft.deliveryAddresses];
+                      next[i] = { ...next[i], address: e.target.value };
+                      setDraft({ ...draft, deliveryAddresses: next });
+                    }}
+                  />
+                  <Input
+                    placeholder="City"
+                    value={addr.city}
+                    onChange={(e) => {
+                      const next = [...draft.deliveryAddresses];
+                      next[i] = { ...next[i], city: e.target.value };
+                      setDraft({ ...draft, deliveryAddresses: next });
+                    }}
+                  />
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => setDraft({ ...draft, deliveryAddresses: [...draft.deliveryAddresses, { name: '', phone: '', address: '', city: '' }] })}
+              >
+                <Plus className="h-4 w-4 mr-2" /> Add another delivery address
+              </Button>
             </div>
 
             <div className="space-y-1">
