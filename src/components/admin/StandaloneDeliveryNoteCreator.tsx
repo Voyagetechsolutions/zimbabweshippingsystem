@@ -4,12 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Download, Loader2, Printer, Plus, Trash2, X, CalendarPlus } from 'lucide-react';
+import { Download, Loader2, Printer, Plus, Trash2, X, CalendarPlus, ScanLine, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { parseInvoiceText } from '@/components/admin/DeliveryNoteGenerator';
 
 interface StandaloneDeliveryNoteCreatorProps {
   isOpen: boolean;
   onClose: () => void;
+  // Called after a new note is saved to the Delivery Notes list.
+  onCreated?: () => void;
 }
 
 interface DeliveryAddress {
@@ -49,9 +53,13 @@ function withDialCode(phone: string): string {
   return `+263 ${local}`;
 }
 
-const StandaloneDeliveryNoteCreator: React.FC<StandaloneDeliveryNoteCreatorProps> = ({ isOpen, onClose }) => {
+const StandaloneDeliveryNoteCreator: React.FC<StandaloneDeliveryNoteCreatorProps> = ({ isOpen, onClose, onCreated }) => {
   const noteRef = useRef<HTMLDivElement>(null);
+  const scanInputRef = useRef<HTMLInputElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [scanText, setScanText] = useState('');
   const { toast } = useToast();
 
   const [formData, setFormData] = useState<FormData>({
@@ -143,6 +151,7 @@ const StandaloneDeliveryNoteCreator: React.FC<StandaloneDeliveryNoteCreatorProps
   };
 
   const handleReset = () => {
+    setScanText('');
     setFormData({
       refNumber: `EXT-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
       date: format(new Date(), 'yyyy-MM-dd'),
@@ -165,6 +174,106 @@ const StandaloneDeliveryNoteCreator: React.FC<StandaloneDeliveryNoteCreatorProps
     });
   };
 
+  // Scan an external invoice photo on-device (OCR) and pre-fill the form.
+  const handleScanFile = async (file: File | undefined) => {
+    if (!file) return;
+    setIsScanning(true);
+    setScanText('');
+    try {
+      const Tesseract = (await import('tesseract.js')).default;
+      const { data } = await Tesseract.recognize(file, 'eng');
+      const text = (data.text || '').trim();
+      setScanText(text);
+      const p = parseInvoiceText(text);
+      const count = Object.keys(p).length;
+      setFormData(prev => ({
+        ...prev,
+        refNumber: p.refNumber || prev.refNumber,
+        date: p.date || prev.date,
+        senderName: p.senderName ?? prev.senderName,
+        senderPhone: p.senderPhone ?? prev.senderPhone,
+        senderAddress: p.senderAddress ?? prev.senderAddress,
+        recipientName: p.recipientName ?? prev.recipientName,
+        recipientPhone: p.recipientPhone ?? prev.recipientPhone,
+        recipientAddress: p.recipientAddress ?? prev.recipientAddress,
+      }));
+      toast({
+        title: count ? 'Scan complete' : 'Scan finished',
+        description: count
+          ? `Pre-filled ${count} field(s) — please review and complete the items.`
+          : 'No fields detected — use the scanned text below to fill the form.',
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not read the image.';
+      toast({ title: 'Scan failed', description: msg, variant: 'destructive' });
+    } finally {
+      setIsScanning(false);
+      if (scanInputRef.current) scanInputRef.current.value = '';
+    }
+  };
+
+  // Persist the note as a shipment so it appears in the Delivery Notes list.
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const overrides = {
+        refNumber: formData.refNumber,
+        date: formData.date,
+        deliveryDate: formData.deliveryDate || undefined,
+        senderName: formData.senderName,
+        senderPhone: formData.senderPhone,
+        senderPhone2: formData.senderPhone2,
+        senderAddress: formData.senderAddress,
+        recipientName: formData.recipientName,
+        recipientPhone: formData.recipientPhone,
+        recipientPhone2: formData.recipientPhone2,
+        recipientAddress: formData.recipientAddress,
+        deliveryAddresses: formData.deliveryAddresses,
+        doorToDoor: formData.doorToDoor,
+        sealed: formData.sealed,
+        sealCodes: formData.sealCodes,
+        itemsSummary: formData.itemsSummary,
+        items: formData.items.map(it => ({ item: it.name, description: it.description })),
+        tracking: formData.tracking,
+      };
+      const metadata = {
+        source: 'external-scan',
+        sender: { name: formData.senderName, phone: formData.senderPhone, address: formData.senderAddress },
+        recipient: {
+          name: formData.recipientName,
+          phone: formData.recipientPhone,
+          address: formData.recipientAddress,
+          country: 'Zimbabwe',
+          additionalAddresses: formData.deliveryAddresses,
+        },
+        deliveryNoteOverrides: overrides,
+      };
+
+      const { error } = await supabase.from('shipments').insert({
+        tracking_number: formData.tracking || `EXT-${Date.now()}`,
+        user_id: null,
+        origin: 'External Invoice',
+        destination: formData.recipientName || 'Zimbabwe',
+        status: 'pending',
+        metadata: metadata as never,
+        can_modify: true,
+        can_cancel: true,
+      });
+
+      if (error) throw error;
+
+      toast({ title: 'Delivery note created', description: `${formData.refNumber} added to the list.` });
+      onCreated?.();
+      handleReset();
+      onClose();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not save the delivery note.';
+      toast({ title: 'Save failed', description: msg, variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
@@ -177,6 +286,35 @@ const StandaloneDeliveryNoteCreator: React.FC<StandaloneDeliveryNoteCreatorProps
 
         {/* Form */}
         <div className="border rounded-lg p-4 bg-muted/40 space-y-4">
+          {/* Scan-to-fill */}
+          <div className="rounded-md border bg-background p-3 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm">
+                <div className="font-medium flex items-center gap-1.5"><ScanLine className="h-4 w-4" /> Scan an external invoice to auto-fill</div>
+                <div className="text-xs text-muted-foreground">Photograph or upload the invoice. Detected fields pre-fill below — review, complete the items, then Save.</div>
+              </div>
+              <Button type="button" variant="outline" size="sm" disabled={isScanning} onClick={() => scanInputRef.current?.click()}>
+                {isScanning
+                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Reading…</>
+                  : <><ScanLine className="h-4 w-4 mr-2" />Scan invoice</>}
+              </Button>
+              <input
+                ref={scanInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => handleScanFile(e.target.files?.[0])}
+              />
+            </div>
+            {scanText && (
+              <details className="text-xs">
+                <summary className="cursor-pointer text-muted-foreground">View scanned text (copy anything not auto-filled)</summary>
+                <Textarea readOnly rows={6} value={scanText} className="mt-2 font-mono text-xs" />
+              </details>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Ref #</label>
@@ -529,10 +667,16 @@ const StandaloneDeliveryNoteCreator: React.FC<StandaloneDeliveryNoteCreatorProps
           <Button variant="outline" onClick={handlePrint}>
             <Printer className="h-4 w-4 mr-2" /> Print
           </Button>
-          <Button onClick={handleDownload} disabled={isGenerating} className="bg-green-600 hover:bg-green-700">
+          <Button variant="outline" onClick={handleDownload} disabled={isGenerating}>
             {isGenerating
               ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating…</>
               : <><Download className="h-4 w-4 mr-2" />Download PDF</>
+            }
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving} className="bg-green-600 hover:bg-green-700">
+            {isSaving
+              ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</>
+              : <><Save className="h-4 w-4 mr-2" />Save to list</>
             }
           </Button>
         </div>

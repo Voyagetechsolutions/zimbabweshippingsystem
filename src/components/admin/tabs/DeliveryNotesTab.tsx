@@ -500,6 +500,7 @@ const DeliveryNotesTab = () => {
       <StandaloneDeliveryNoteCreator
         isOpen={showStandaloneCreator}
         onClose={() => setShowStandaloneCreator(false)}
+        onCreated={fetchShipments}
       />
     </div>
   );

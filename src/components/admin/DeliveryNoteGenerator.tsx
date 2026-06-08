@@ -23,8 +23,9 @@ interface DeliveryNoteOverrides {
   refNumber?: string;
   date?: string;          // header "Date" (yyyy-MM-dd)
   deliveryDate?: string;  // optional separate delivery date (yyyy-MM-dd)
-  itemDescriptions?: Record<string, string>; // line-item index → description
-  itemNames?: Record<string, string>;        // line-item index → item label
+  itemDescriptions?: Record<string, string>; // line-item index → description (legacy)
+  itemNames?: Record<string, string>;        // line-item index → item label (legacy)
+  items?: Array<{ item: string; description: string }>; // full item list (supports add/remove)
   doorToDoor?: boolean;   // override the delivery-method (door-to-door vs depot)
   sealed?: boolean;       // override whether a metal coded seal applies
   sealCodes?: string;     // editable seal code(s), comma/newline separated
@@ -304,10 +305,12 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
       : getRecipientAddress(shipment);
     const recipientPhone = overrides.recipientPhone ?? withDialCode(getRecipientPhone(shipment), 'Zimbabwe');
     const recipientPhone2 = overrides.recipientPhone2 ?? withDialCode(getRecipientPhone2(shipment), 'Zimbabwe');
-    const lineItems = buildLineItems(shipment).map((row, i) => ({
-      item: overrides.itemNames?.[i] ?? row.item,
-      description: overrides.itemDescriptions?.[i] ?? row.description,
-    }));
+    const lineItems = (overrides.items && overrides.items.length)
+      ? overrides.items
+      : buildLineItems(shipment).map((row, i) => ({
+          item: overrides.itemNames?.[i] ?? row.item,
+          description: overrides.itemDescriptions?.[i] ?? row.description,
+        }));
     const deliveryAddresses = overrides.deliveryAddresses ?? getDeliveryAddresses(shipment);
     const itemsSummary = overrides.itemsSummary ?? buildItemsSummary(shipment);
     const tracking = overrides.tracking ?? shipment.tracking_number;
@@ -536,11 +539,22 @@ function extractBlock(lines: string[], keywords: string[]): { name?: string; pho
   return { name, phone, address: addressLines.join('\n') || undefined };
 }
 
+export interface ParsedInvoiceFields {
+  refNumber?: string;
+  date?: string;
+  senderName?: string;
+  senderPhone?: string;
+  senderAddress?: string;
+  recipientName?: string;
+  recipientPhone?: string;
+  recipientAddress?: string;
+}
+
 // Returns only the fields we could confidently detect from the scanned text.
-function parseInvoiceText(text: string): Partial<EditDraft> {
+export function parseInvoiceText(text: string): ParsedInvoiceFields {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const joined = lines.join('\n');
-  const out: Partial<EditDraft> = {};
+  const out: ParsedInvoiceFields = {};
 
   const refM = joined.match(/\b(?:invoice|inv|ref(?:erence)?|order)\s*(?:no\.?|number|#)?\s*[:#\-]?\s*([A-Z0-9][A-Z0-9\-/]{2,})/i);
   if (refM) out.refNumber = refM[1].toUpperCase();
@@ -575,8 +589,7 @@ interface EditDraft {
   refNumber: string;
   date: string;
   deliveryDate: string;
-  itemNames: string[];
-  itemDescriptions: string[];
+  items: Array<{ item: string; description: string }>;
   doorToDoor: boolean;
   sealed: boolean;
   sealCodes: string;
@@ -635,14 +648,16 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
   // Build the editable draft from saved overrides + auto-generated defaults.
   const startEditing = () => {
     const ov = getOverrides(shipment);
-    const items = buildLineItems(shipment);
+    const baseItems = buildLineItems(shipment).map((row, i) => ({
+      item: ov.itemNames?.[i] ?? row.item,
+      description: ov.itemDescriptions?.[i] ?? row.description,
+    }));
     const senderCountry = (shipment.metadata?.sender?.country || shipment.metadata?.senderDetails?.country) as string | undefined;
     setDraft({
       refNumber: buildRefNumber(shipment),
       date: ov.date || format(new Date(shipment.created_at), 'yyyy-MM-dd'),
       deliveryDate: ov.deliveryDate || '',
-      itemNames: items.map((row, i) => ov.itemNames?.[i] ?? row.item),
-      itemDescriptions: items.map((row, i) => ov.itemDescriptions?.[i] ?? row.description),
+      items: (ov.items && ov.items.length) ? ov.items.map(it => ({ ...it })) : baseItems,
       doorToDoor: ov.doorToDoor ?? getDoorToDoor(shipment),
       sealed: ov.sealed ?? getSealInfo(shipment).sealed,
       sealCodes: ov.sealCodes ?? getSealInfo(shipment).codes.join(', '),
@@ -679,14 +694,7 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
         refNumber: draft.refNumber.trim() || undefined,
         date: draft.date || undefined,
         deliveryDate: draft.deliveryDate.trim() || undefined,
-        itemNames: draft.itemNames.reduce<Record<string, string>>((acc, d, i) => {
-          acc[i] = d;
-          return acc;
-        }, {}),
-        itemDescriptions: draft.itemDescriptions.reduce<Record<string, string>>((acc, d, i) => {
-          acc[i] = d;
-          return acc;
-        }, {}),
+        items: draft.items,
         doorToDoor: draft.doorToDoor,
         sealed: draft.sealed,
         sealCodes: draft.sealCodes,
@@ -708,21 +716,11 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
     if (!draft) return;
     setIsSaving(true);
 
-    const itemDescriptions = draft.itemDescriptions.reduce<Record<string, string>>((acc, d, i) => {
-      acc[String(i)] = d;
-      return acc;
-    }, {});
-    const itemNames = draft.itemNames.reduce<Record<string, string>>((acc, d, i) => {
-      acc[String(i)] = d;
-      return acc;
-    }, {});
-
     const overrides: DeliveryNoteOverrides = {
       refNumber: draft.refNumber.trim() || undefined,
       date: draft.date || undefined,
       deliveryDate: draft.deliveryDate.trim() || undefined,
-      itemNames,
-      itemDescriptions,
+      items: draft.items,
       doorToDoor: draft.doorToDoor,
       sealed: draft.sealed,
       sealCodes: draft.sealCodes.trim(),
@@ -1026,29 +1024,48 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
 
             <div className="space-y-2">
               <label className="text-xs font-medium text-muted-foreground">Items (name & description)</label>
-              {draft.itemDescriptions.map((desc, i) => (
+              {draft.items.map((it, i) => (
                 <div key={i} className="space-y-1 rounded-md border p-2 bg-background">
-                  <Input
-                    placeholder={`Item ${i + 1} name`}
-                    value={draft.itemNames[i] ?? ''}
-                    onChange={(e) => {
-                      const next = [...draft.itemNames];
-                      next[i] = e.target.value;
-                      setDraft({ ...draft, itemNames: next });
-                    }}
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder={`Item ${i + 1} name`}
+                      value={it.item}
+                      onChange={(e) => {
+                        const next = draft.items.map((x, j) => j === i ? { ...x, item: e.target.value } : x);
+                        setDraft({ ...draft, items: next });
+                      }}
+                    />
+                    {draft.items.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setDraft({ ...draft, items: draft.items.filter((_, j) => j !== i) })}
+                        title="Remove item"
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    )}
+                  </div>
                   <Textarea
                     rows={2}
                     placeholder="Description / item details"
-                    value={desc}
+                    value={it.description}
                     onChange={(e) => {
-                      const next = [...draft.itemDescriptions];
-                      next[i] = e.target.value;
-                      setDraft({ ...draft, itemDescriptions: next });
+                      const next = draft.items.map((x, j) => j === i ? { ...x, description: e.target.value } : x);
+                      setDraft({ ...draft, items: next });
                     }}
                   />
                 </div>
               ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setDraft({ ...draft, items: [...draft.items, { item: `Item ${draft.items.length + 1}`, description: '' }] })}
+              >
+                <Plus className="h-4 w-4 mr-1" /> Add item
+              </Button>
             </div>
           </div>
         )}
