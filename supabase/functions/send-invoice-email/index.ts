@@ -18,8 +18,14 @@ interface EmailRequest {
   to: string;
   customerName: string;
   invoiceNumber: string;
-  amount: string;
   pdfBase64: string;
+  // Legacy: a single "amount paid" string (treated as a paid receipt).
+  amount?: string;
+  // Invoice2go-style fields for sending an invoice that may still be owed.
+  status?: "paid" | "partial" | "unpaid";
+  total?: string;       // formatted, e.g. "€120.00"
+  amountDue?: string;   // formatted balance owed
+  dueDate?: string;     // e.g. "2026-06-22"
 }
 
 serve(async (req: Request) => {
@@ -29,7 +35,10 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { to, customerName, invoiceNumber, amount, pdfBase64 }: EmailRequest = await req.json();
+    const body: EmailRequest = await req.json();
+    const { to, customerName, invoiceNumber, pdfBase64, amount, total, amountDue, dueDate } = body;
+    // Default to "paid" when no status is given, preserving the legacy receipt behaviour.
+    const status = body.status || "paid";
 
     // Validate required fields
     if (!to || !customerName || !invoiceNumber || !pdfBase64) {
@@ -48,6 +57,43 @@ serve(async (req: Request) => {
       );
     }
 
+    // Header gradient + wording adapt to whether the invoice is paid or still owed.
+    const isPaid = status === "paid";
+    const headerGradient = isPaid
+      ? "linear-gradient(135deg, #16a34a 0%, #15803d 100%)"
+      : "linear-gradient(135deg, #2563eb 0%, #1e40af 100%)";
+    const intro = isPaid
+      ? "Thank you for your payment! Please find your receipt attached for your records."
+      : "Thank you for your business. Please find your invoice attached. We'd be grateful if you could arrange payment using the details on the invoice.";
+
+    const statusPill = isPaid
+      ? `<span style="background:#dcfce7;color:#166534;padding:4px 12px;border-radius:20px;font-size:14px;font-weight:500;">✓ Paid</span>`
+      : status === "partial"
+        ? `<span style="background:#fef3c7;color:#92400e;padding:4px 12px;border-radius:20px;font-size:14px;font-weight:500;">Part Paid</span>`
+        : `<span style="background:#fee2e2;color:#991b1b;padding:4px 12px;border-radius:20px;font-size:14px;font-weight:500;">Unpaid</span>`;
+
+    // Build the summary rows depending on what was supplied.
+    const rows: string[] = [
+      `<tr><td style="padding:8px 0;color:#6b7280;">Invoice Number:</td><td style="padding:8px 0;text-align:right;font-weight:bold;color:#111827;">${invoiceNumber}</td></tr>`,
+    ];
+    if (total) {
+      rows.push(`<tr><td style="padding:8px 0;color:#6b7280;">Invoice Total:</td><td style="padding:8px 0;text-align:right;font-weight:bold;color:#111827;">${total}</td></tr>`);
+    }
+    if (isPaid && amount) {
+      rows.push(`<tr><td style="padding:8px 0;color:#6b7280;">Amount Paid:</td><td style="padding:8px 0;text-align:right;font-weight:bold;color:#16a34a;font-size:18px;">${amount}</td></tr>`);
+    }
+    if (!isPaid && amountDue) {
+      rows.push(`<tr><td style="padding:8px 0;color:#6b7280;">Amount Due:</td><td style="padding:8px 0;text-align:right;font-weight:bold;color:#b91c1c;font-size:18px;">${amountDue}</td></tr>`);
+    }
+    if (!isPaid && dueDate) {
+      rows.push(`<tr><td style="padding:8px 0;color:#6b7280;">Due Date:</td><td style="padding:8px 0;text-align:right;font-weight:bold;color:#111827;">${dueDate}</td></tr>`);
+    }
+    rows.push(`<tr><td style="padding:8px 0;color:#6b7280;">Status:</td><td style="padding:8px 0;text-align:right;">${statusPill}</td></tr>`);
+
+    const subject = isPaid
+      ? `Receipt ${invoiceNumber} - Zimbabwe Shipping`
+      : `Invoice ${invoiceNumber} - Zimbabwe Shipping`;
+
     // Create email HTML content
     const emailHtml = `
       <!DOCTYPE html>
@@ -58,54 +104,33 @@ serve(async (req: Request) => {
           <title>Invoice from Zimbabwe Shipping</title>
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <div style="background: ${headerGradient}; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
             <h1 style="color: white; margin: 0; font-size: 28px;">Zimbabwe Shipping</h1>
             <p style="color: rgba(255,255,255,0.9); margin: 5px 0 0 0;">Nexus Logistics</p>
           </div>
-          
+
           <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; border-top: none;">
             <h2 style="color: #111827; margin-top: 0;">Dear ${customerName},</h2>
-            
-            <p style="font-size: 16px; color: #4b5563;">
-              Thank you for your continuous support! We truly appreciate your business.
-            </p>
-            
-            <p style="font-size: 16px; color: #4b5563;">
-              Please find your invoice attached below for your records.
-            </p>
-            
+
+            <p style="font-size: 16px; color: #4b5563;">${intro}</p>
+
             <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 25px 0;">
               <table style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td style="padding: 8px 0; color: #6b7280;">Invoice Number:</td>
-                  <td style="padding: 8px 0; text-align: right; font-weight: bold; color: #111827;">${invoiceNumber}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; color: #6b7280;">Amount Paid:</td>
-                  <td style="padding: 8px 0; text-align: right; font-weight: bold; color: #16a34a; font-size: 18px;">${amount}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; color: #6b7280;">Status:</td>
-                  <td style="padding: 8px 0; text-align: right;">
-                    <span style="background: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 20px; font-size: 14px; font-weight: 500;">
-                      ✓ Paid
-                    </span>
-                  </td>
-                </tr>
+                ${rows.join("\n")}
               </table>
             </div>
-            
+
             <p style="font-size: 14px; color: #6b7280;">
-              📎 Your invoice is attached as a PDF document.
+              Your ${isPaid ? "receipt" : "invoice"} is attached as a PDF document.
             </p>
-            
+
             <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
               <p style="font-size: 14px; color: #6b7280; margin: 0;">
-                If you have any questions about this invoice, please don't hesitate to contact us.
+                If you have any questions about this ${isPaid ? "receipt" : "invoice"}, please don't hesitate to contact us.
               </p>
             </div>
           </div>
-          
+
           <div style="background: #111827; padding: 20px; text-align: center; border-radius: 0 0 10px 10px;">
             <p style="color: #9ca3af; margin: 0; font-size: 14px;">
               Zimbabwe Shipping Nexus
@@ -138,11 +163,11 @@ serve(async (req: Request) => {
     await client.send({
       from: `${FROM_NAME} <${FROM_EMAIL}>`,
       to: to,
-      subject: `Invoice ${invoiceNumber} - Zimbabwe Shipping`,
+      subject,
       html: emailHtml,
       attachments: [
         {
-          filename: `Invoice-${invoiceNumber}.pdf`,
+          filename: `${isPaid ? "Receipt" : "Invoice"}-${invoiceNumber}.pdf`,
           content: pdfBytes,
           contentType: "application/pdf",
         },

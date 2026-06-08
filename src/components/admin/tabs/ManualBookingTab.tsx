@@ -54,6 +54,7 @@ interface FormData {
   drumQuantity: number;
   boxesDescription: string;
   wantMetalSeal: boolean;
+  doorToDoor: boolean;
 
   // Payment
   paymentMethod: 'standard' | 'cashOnCollection' | 'payOnArrival';
@@ -66,6 +67,9 @@ interface FormData {
 const getDrumPrice = (quantity: number): number => {
   return 280;
 };
+
+// Door-to-door delivery in Zimbabwe — flat fee per address.
+const DOOR_TO_DOOR_PRICE = 25;
 
 const ManualBookingTab: React.FC = () => {
   const { toast } = useToast();
@@ -199,6 +203,9 @@ const ManualBookingTab: React.FC = () => {
         total += formData.drumQuantity * 5;
       }
     }
+    if (formData.doorToDoor) {
+      total += DOOR_TO_DOOR_PRICE;
+    }
     return total;
   };
 
@@ -229,6 +236,7 @@ const ManualBookingTab: React.FC = () => {
       drumQuantity: 1,
       boxesDescription: '',
       wantMetalSeal: false,
+      doorToDoor: false,
       paymentMethod: 'standard',
       adminNotes: '',
       bookingSource: 'WhatsApp',
@@ -315,7 +323,9 @@ const ManualBookingTab: React.FC = () => {
             description: formData.boxesDescription
           } : null,
           addOns: {
-            metalSeal: formData.wantMetalSeal
+            metalSeal: formData.wantMetalSeal,
+            doorToDoor: formData.doorToDoor,
+            doorToDoorPrice: formData.doorToDoor ? DOOR_TO_DOOR_PRICE : 0
           }
         },
         pricing: {
@@ -718,6 +728,19 @@ const ManualBookingTab: React.FC = () => {
                   Metal Coded Seal (+£5 per drum)
                 </Label>
               </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="doorToDoor"
+                  checked={formData.doorToDoor}
+                  onChange={(e) => updateField('doorToDoor', e.target.checked)}
+                  className="h-4 w-4"
+                />
+                <Label htmlFor="doorToDoor" className="text-sm">
+                  Door-to-Door Delivery in Zimbabwe (+£{DOOR_TO_DOOR_PRICE})
+                </Label>
+              </div>
             </CardContent>
           </Card>
 
@@ -767,6 +790,12 @@ const ManualBookingTab: React.FC = () => {
                   <div className="flex justify-between text-sm">
                     <span>Metal Seal ({formData.drumQuantity} x £5)</span>
                     <span>£{(formData.drumQuantity * 5).toFixed(2)}</span>
+                  </div>
+                )}
+                {formData.doorToDoor && (
+                  <div className="flex justify-between text-sm">
+                    <span>Door-to-Door Delivery</span>
+                    <span>£{DOOR_TO_DOOR_PRICE.toFixed(2)}</span>
                   </div>
                 )}
 

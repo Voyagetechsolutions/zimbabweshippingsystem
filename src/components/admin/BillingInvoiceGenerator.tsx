@@ -13,6 +13,17 @@ export interface InvoiceLineItem {
   unitPrice: number;
 }
 
+// A single offline payment recorded against an invoice (bank transfer, cash, etc.).
+// Supports partial payments — several entries can add up to the invoice total.
+export interface PaymentEntry {
+  id: string;
+  date: string;        // yyyy-MM-dd
+  amount: number;
+  method: string;      // 'cash' | 'bank_transfer' | 'card' | 'cheque' | 'other'
+  reference?: string;  // bank ref, receipt #, etc.
+  note?: string;
+}
+
 export interface InvoiceData {
   invoiceNumber: string;
   issueDate: string;
@@ -23,8 +34,20 @@ export interface InvoiceData {
   paymentTerms: string;
   notes: string;
   currency: string;
-  paid: boolean;
+  paid: boolean;             // kept for backwards-compat; derived from balance on save
+  payments: PaymentEntry[];  // offline payments recorded against this invoice
+  sentAt: string | null;     // ISO timestamp when the invoice was marked as sent
 }
+
+export type InvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid' | 'overdue';
+
+export const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  cash: 'Cash',
+  bank_transfer: 'Bank Transfer',
+  card: 'Card',
+  cheque: 'Cheque',
+  other: 'Other',
+};
 
 const CURRENCY_SYMBOL: Record<string, string> = { EUR: '€', GBP: '£', USD: '$' };
 
@@ -149,6 +172,8 @@ export function buildDefaultInvoice(s: Shipment): InvoiceData {
     notes: '',
     currency: pricing.currency || inferCurrency(s),
     paid: false,
+    payments: [],
+    sentAt: null,
   };
 }
 
@@ -156,6 +181,7 @@ export function getInvoiceData(s: Shipment): InvoiceData {
   const stored = (s.metadata as Record<string, unknown> | undefined)?.invoice as Partial<InvoiceData> | undefined;
   const defaults = buildDefaultInvoice(s);
   if (!stored) return defaults;
+  const payments = Array.isArray(stored.payments) ? (stored.payments as PaymentEntry[]) : defaults.payments;
   return {
     invoiceNumber: stored.invoiceNumber || defaults.invoiceNumber,
     issueDate: stored.issueDate || defaults.issueDate,
@@ -167,6 +193,8 @@ export function getInvoiceData(s: Shipment): InvoiceData {
     notes: stored.notes ?? defaults.notes,
     currency: stored.currency || defaults.currency,
     paid: Boolean(stored.paid),
+    payments,
+    sentAt: stored.sentAt ?? defaults.sentAt,
   };
 }
 
@@ -179,6 +207,26 @@ export function calculateTotals(invoice: InvoiceData) {
   return { subtotal, discount, tax, total };
 }
 
+// Sum of recorded offline payments and the remaining balance.
+export function getPaymentSummary(invoice: InvoiceData) {
+  const { total } = calculateTotals(invoice);
+  const paidAmount = (invoice.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const balance = Math.max(0, total - paidAmount);
+  return { total, paidAmount, balance };
+}
+
+// Invoice2go-style lifecycle status, derived from payments + due date.
+export function getInvoiceStatus(invoice: InvoiceData): InvoiceStatus {
+  const { total, paidAmount, balance } = getPaymentSummary(invoice);
+  // Treat an explicit "paid" flag as fully paid for legacy invoices with no payment entries.
+  if ((total > 0 && balance <= 0.005) || (invoice.paid && paidAmount === 0)) return 'paid';
+  if (paidAmount > 0) return 'partial';
+  const overdue = !!invoice.dueDate && new Date(invoice.dueDate) < new Date(new Date().toDateString());
+  if (overdue) return 'overdue';
+  if (invoice.sentAt) return 'sent';
+  return 'draft';
+}
+
 function fmtMoney(amount: number, currency: string) {
   const sym = CURRENCY_SYMBOL[currency] || currency + ' ';
   return `${sym}${(Number(amount) || 0).toFixed(2)}`;
@@ -187,6 +235,8 @@ function fmtMoney(amount: number, currency: string) {
 export const BillingInvoiceTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipment; invoice: InvoiceData }>(
   ({ shipment, invoice }, ref) => {
     const totals = calculateTotals(invoice);
+    const { paidAmount, balance } = getPaymentSummary(invoice);
+    const status = getInvoiceStatus(invoice);
     const customerName = getSenderName(shipment);
     const customerEmail = getSenderEmail(shipment);
     const customerPhone = getSenderPhone(shipment);
@@ -208,12 +258,19 @@ export const BillingInvoiceTemplate = React.forwardRef<HTMLDivElement, { shipmen
           position: 'relative',
         }}
       >
-        {invoice.paid && (
+        {status === 'paid' && (
           <div style={{
             position: 'absolute', top: '120px', right: '60px', transform: 'rotate(-12deg)',
             border: '4px solid #16a34a', color: '#16a34a', padding: '6px 18px',
             fontSize: '32px', fontWeight: 'bold', letterSpacing: '2px', opacity: 0.8,
           }}>PAID</div>
+        )}
+        {status === 'partial' && (
+          <div style={{
+            position: 'absolute', top: '120px', right: '60px', transform: 'rotate(-12deg)',
+            border: '4px solid #d97706', color: '#d97706', padding: '6px 18px',
+            fontSize: '28px', fontWeight: 'bold', letterSpacing: '2px', opacity: 0.8,
+          }}>PART PAID</div>
         )}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
@@ -290,9 +347,39 @@ export const BillingInvoiceTemplate = React.forwardRef<HTMLDivElement, { shipmen
                 <td style={{ padding: '8px 16px', textAlign: 'right' }}>Total</td>
                 <td style={{ padding: '8px 0', textAlign: 'right' }}>{fmtMoney(totals.total, invoice.currency)}</td>
               </tr>
+              {paidAmount > 0 && (
+                <tr style={{ color: '#16a34a' }}>
+                  <td style={{ padding: '4px 16px', textAlign: 'right' }}>Amount Paid</td>
+                  <td style={{ padding: '4px 0', textAlign: 'right' }}>− {fmtMoney(paidAmount, invoice.currency)}</td>
+                </tr>
+              )}
+              {paidAmount > 0 && (
+                <tr style={{ fontWeight: 'bold', fontSize: '15px', color: balance <= 0.005 ? '#16a34a' : '#b91c1c' }}>
+                  <td style={{ padding: '8px 16px', textAlign: 'right' }}>Balance Due</td>
+                  <td style={{ padding: '8px 0', textAlign: 'right' }}>{fmtMoney(balance, invoice.currency)}</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+
+        {invoice.payments && invoice.payments.length > 0 && (
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#666', marginBottom: '6px' }}>Payments Received</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', color: '#333' }}>
+              <tbody>
+                {invoice.payments.map((p) => (
+                  <tr key={p.id} style={{ borderBottom: '1px solid #eee' }}>
+                    <td style={{ padding: '4px 8px' }}>{p.date}</td>
+                    <td style={{ padding: '4px 8px' }}>{PAYMENT_METHOD_LABELS[p.method] || p.method}</td>
+                    <td style={{ padding: '4px 8px', color: '#666' }}>{p.reference || ''}</td>
+                    <td style={{ padding: '4px 8px', textAlign: 'right' }}>{fmtMoney(Number(p.amount) || 0, invoice.currency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {invoice.paymentTerms && (
           <div style={{ marginBottom: '12px' }}>

@@ -131,3 +131,6 @@ verify_jwt = true
 
 [functions.send-quote-email]
 verify_jwt = true
+
+[functions.send-invoice-whatsapp]
+verify_jwt = true

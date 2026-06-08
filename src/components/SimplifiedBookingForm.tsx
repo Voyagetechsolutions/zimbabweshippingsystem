@@ -45,6 +45,7 @@ interface FormData {
 
   // Add-ons
   wantMetalSeal: boolean;
+  doorToDoor: boolean;
 
   // Purchase Drums (England only)
   purchaseDrums: boolean;
@@ -85,6 +86,9 @@ const getTrunkPrice = (quantity: number): number => {
 const getMetalSealPrice = (country: string): number => {
   return country === 'Ireland' || country === 'Northern Ireland' ? 7 : 5;
 };
+
+// Door-to-door delivery in Zimbabwe — flat fee per address (£25 / €25).
+const DOOR_TO_DOOR_PRICE = 25;
 
 // Payment Schedule Builder Component
 interface PaymentScheduleBuilderProps {
@@ -335,6 +339,7 @@ export const SimplifiedBookingForm = () => {
     trunkQuantity: 0,
     trunksDescription: '',
     wantMetalSeal: false,
+    doorToDoor: false,
     purchaseDrums: false,
     purchaseDrumType: null,
     purchaseDrumQuantity: 0,
@@ -583,6 +588,11 @@ export const SimplifiedBookingForm = () => {
       total += formData.purchaseDrumQuantity * drumPurchasePrice;
     }
 
+    // Door-to-door delivery (flat fee per address)
+    if (formData.doorToDoor) {
+      total += DOOR_TO_DOOR_PRICE;
+    }
+
     return total;
   };
 
@@ -615,6 +625,7 @@ export const SimplifiedBookingForm = () => {
       // Build notes with add-ons and custom items
       let notes = [];
       if (formData.wantMetalSeal) notes.push('Metal Coded Seal requested');
+      if (formData.doorToDoor) notes.push('Door-to-door delivery requested');
       if (formData.paymentMethod === 'cashOnCollection') notes.push('Cash payment on collection');
       if (formData.includeBoxes) notes.push(`Other Items (agent quote): ${formData.boxesDescription}`);
       if (formData.includeTrunks && formData.trunkQuantity > 0) notes.push(`${formData.trunkQuantity} x Trunk/Storage Box`);
@@ -663,7 +674,9 @@ export const SimplifiedBookingForm = () => {
           } : null,
           addOns: {
             metalSeal: formData.wantMetalSeal,
-            metalSealPrice: getMetalSealPrice(formData.pickupCountry)
+            metalSealPrice: getMetalSealPrice(formData.pickupCountry),
+            doorToDoor: formData.doorToDoor,
+            doorToDoorPrice: formData.doorToDoor ? DOOR_TO_DOOR_PRICE : 0
           },
           purchasedDrums: formData.purchaseDrums ? {
             type: formData.purchaseDrumType,
@@ -710,6 +723,7 @@ export const SimplifiedBookingForm = () => {
           trunksDescription: formData.trunksDescription || null,
           includeOtherItems: formData.includeBoxes,
           wantMetalSeal: formData.wantMetalSeal,
+          doorToDoor: formData.doorToDoor,
           category: formData.boxesDescription
         },
         notes: notes.length > 0 ? notes.join(' | ') : null
@@ -1163,6 +1177,29 @@ export const SimplifiedBookingForm = () => {
             We deliver to main towns and major cities only
           </p>
         </div>
+
+        {/* Door-to-Door Delivery Option */}
+        <div className={`border-2 rounded-lg p-5 transition-all ${formData.doorToDoor ? 'border-zim-green bg-green-50 dark:bg-green-900/20 dark:border-green-600' : 'border-gray-200 hover:border-zim-green dark:border-gray-700 dark:hover:border-green-600'}`}>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formData.doorToDoor}
+              onChange={(e) => updateField('doorToDoor', e.target.checked)}
+              className="mt-1 h-4 w-4"
+            />
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <Truck className="h-5 w-5 text-zim-green" />
+                <span className="font-semibold text-lg">Door-to-Door Delivery</span>
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                We deliver the shipment directly to the receiver's address in Zimbabwe and contact them about the delivery day.
+                Without this, the receiver collects from our local depot.
+              </div>
+              <div className="text-sm font-semibold text-zim-green mt-2">+{currencySymbol}{DOOR_TO_DOOR_PRICE} per address</div>
+            </div>
+          </label>
+        </div>
       </CardContent>
     </Card>
   );
@@ -1516,6 +1553,10 @@ export const SimplifiedBookingForm = () => {
             <p><strong>{formData.receiverName}</strong></p>
             <p>{formData.receiverPhone}</p>
             <p className="text-gray-600 dark:text-gray-400">{formData.deliveryAddress}, {formData.deliveryCity}, Zimbabwe</p>
+            <div className="flex justify-between border-t pt-2 mt-2">
+              <span>{formData.doorToDoor ? 'Door-to-Door Delivery' : 'Depot collection in Zimbabwe'}</span>
+              {formData.doorToDoor && <span className="font-medium">+{currencySymbol}{DOOR_TO_DOOR_PRICE}</span>}
+            </div>
           </div>
         </div>
 

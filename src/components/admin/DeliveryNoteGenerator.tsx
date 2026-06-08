@@ -112,6 +112,19 @@ function getRecipientAddress(s: Shipment) {
   return parts.length ? parts : [s.destination || 'Zimbabwe'];
 }
 
+// Whether the customer paid for door-to-door delivery in Zimbabwe (vs depot
+// collection). Checked across the various places booking/manual flows store it.
+function getDoorToDoor(s: Shipment): boolean {
+  const m = s.metadata || {};
+  const ship = m.shipment || m.shipmentDetails || {};
+  return !!(
+    ship.doorToDoor ||
+    m.items?.addOns?.doorToDoor ||
+    m.delivery?.doorToDoor ||
+    m.doorToDoor
+  );
+}
+
 // Builds one row per physical item. Description is taken from the customer's
 // booking ("blue plastic drum with red lid", etc.) so the driver can identify
 // each item without guessing.
@@ -256,6 +269,7 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
       description: overrides.itemDescriptions?.[i] ?? row.description,
     }));
     const itemsSummary = buildItemsSummary(shipment);
+    const doorToDoor = getDoorToDoor(shipment);
 
     return (
       <div
@@ -325,6 +339,25 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
                 <div key={i}>{line}</div>
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* ── Delivery method ── */}
+        <div style={{
+          marginBottom: '20px',
+          padding: '10px 14px',
+          borderRadius: '4px',
+          border: `2px solid ${doorToDoor ? '#16a34a' : '#94a3b8'}`,
+          backgroundColor: doorToDoor ? '#f0fdf4' : '#f8fafc',
+          fontSize: '13px',
+        }}>
+          <strong style={{ textTransform: 'uppercase', letterSpacing: '0.5px', color: doorToDoor ? '#15803d' : '#475569' }}>
+            Delivery Method: {doorToDoor ? 'Door-to-Door' : 'Depot Collection'}
+          </strong>
+          <div style={{ color: '#444', marginTop: '2px' }}>
+            {doorToDoor
+              ? 'Deliver directly to the recipient address above. Contact the recipient to arrange the delivery day.'
+              : 'Recipient collects from the local depot. No door delivery included.'}
           </div>
         </div>
 
