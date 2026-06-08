@@ -1,15 +1,33 @@
 import React, { useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Download, Loader2, Printer } from 'lucide-react';
+import { Download, Loader2, Printer, Pencil, Save, X, CalendarPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { Shipment } from '@/types/shipment';
 
 interface DeliveryNoteGeneratorProps {
   isOpen: boolean;
   onClose: () => void;
   shipment: Shipment;
+  // Called after edits are persisted, so the parent list can refresh in place.
+  onSaved?: (updated: Shipment) => void;
+}
+
+// Manual edits to the auto-generated note, stored on the shipment's metadata.
+// Any field left undefined falls back to the auto-generated value.
+interface DeliveryNoteOverrides {
+  refNumber?: string;
+  date?: string;          // header "Date" (yyyy-MM-dd)
+  deliveryDate?: string;  // optional separate delivery date (yyyy-MM-dd)
+  itemDescriptions?: Record<string, string>; // line-item index → description
+}
+
+function getOverrides(s: Shipment): DeliveryNoteOverrides {
+  return (s.metadata?.deliveryNoteOverrides as DeliveryNoteOverrides) || {};
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -201,6 +219,8 @@ function buildItemsSummary(s: Shipment) {
 // Ref # = first 3 letters of sender name + last 4 digits of their phone.
 // Example: John Smith / +353 87 123 4567 → JOH-4567
 function buildRefNumber(s: Shipment) {
+  const override = getOverrides(s).refNumber;
+  if (override && override.trim()) return override.trim();
   const name = getSenderName(s);
   const phone = getSenderPhone(s);
   const letters = name.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 3);
@@ -215,10 +235,13 @@ function buildRefNumber(s: Shipment) {
 
 // ── Delivery Note print template ─────────────────────────────────────────────
 
-const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipment }>(
-  ({ shipment }, ref) => {
+const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipment; overrides?: DeliveryNoteOverrides }>(
+  ({ shipment, overrides: overridesProp }, ref) => {
+    // Live edits (overridesProp) take priority; otherwise fall back to what's saved.
+    const overrides = overridesProp ?? getOverrides(shipment);
     const refNumber = buildRefNumber(shipment);
-    const deliveryDate = format(new Date(shipment.created_at), 'yyyy-MM-dd');
+    const docDate = overrides.date || format(new Date(shipment.created_at), 'yyyy-MM-dd');
+    const deliveryDate = (overrides.deliveryDate || '').trim();
     const senderName = getSenderName(shipment);
     const senderAddress = getSenderAddress(shipment);
     const senderCountry = (shipment.metadata?.sender?.country || shipment.metadata?.senderDetails?.country) as string | undefined;
@@ -228,7 +251,10 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
     const recipientAddress = getRecipientAddress(shipment);
     const recipientPhone = withDialCode(getRecipientPhone(shipment), 'Zimbabwe');
     const recipientPhone2 = withDialCode(getRecipientPhone2(shipment), 'Zimbabwe');
-    const lineItems = buildLineItems(shipment);
+    const lineItems = buildLineItems(shipment).map((row, i) => ({
+      ...row,
+      description: overrides.itemDescriptions?.[i] ?? row.description,
+    }));
     const itemsSummary = buildItemsSummary(shipment);
 
     return (
@@ -261,7 +287,8 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
             </div>
             <div style={{ fontSize: '12px', color: '#444', lineHeight: '1.6' }}>
               <div>Ref #: <strong style={{ fontSize: '16px', color: '#111' }}>{refNumber}</strong></div>
-              <div>Delivery Date: <strong>{deliveryDate}</strong></div>
+              <div>Date: <strong>{docDate}</strong></div>
+              {deliveryDate && <div>Delivery Date: <strong>{deliveryDate}</strong></div>}
             </div>
           </div>
         </div>
@@ -278,8 +305,8 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
             </div>
             <div style={{ lineHeight: '1.7', color: '#222' }}>
               <div style={{ fontWeight: '600' }}>{senderName}</div>
-              {senderPhone && <div>📞 {senderPhone}</div>}
-              {senderPhone2 && <div>📞 {senderPhone2}</div>}
+              {senderPhone && <div>{senderPhone}</div>}
+              {senderPhone2 && <div>{senderPhone2}</div>}
               {senderAddress.map((line, i) => (
                 <div key={i}>{line}</div>
               ))}
@@ -292,8 +319,8 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
             </div>
             <div style={{ lineHeight: '1.7', color: '#222' }}>
               <div style={{ fontWeight: '600' }}>{recipientName}</div>
-              {recipientPhone && <div>📞 {recipientPhone}</div>}
-              {recipientPhone2 && <div>📞 {recipientPhone2}</div>}
+              {recipientPhone && <div>{recipientPhone}</div>}
+              {recipientPhone2 && <div>{recipientPhone2}</div>}
               {recipientAddress.map((line, i) => (
                 <div key={i}>{line}</div>
               ))}
@@ -347,10 +374,87 @@ DeliveryNoteTemplate.displayName = 'DeliveryNoteTemplate';
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, onClose, shipment }) => {
+interface EditDraft {
+  refNumber: string;
+  date: string;
+  deliveryDate: string;
+  itemDescriptions: string[];
+}
+
+const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, onClose, shipment, onSaved }) => {
   const noteRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [draft, setDraft] = useState<EditDraft | null>(null);
   const { toast } = useToast();
+
+  // Build the editable draft from saved overrides + auto-generated defaults.
+  const startEditing = () => {
+    const ov = getOverrides(shipment);
+    const items = buildLineItems(shipment);
+    setDraft({
+      refNumber: buildRefNumber(shipment),
+      date: ov.date || format(new Date(shipment.created_at), 'yyyy-MM-dd'),
+      deliveryDate: ov.deliveryDate || '',
+      itemDescriptions: items.map((row, i) => ov.itemDescriptions?.[i] ?? row.description),
+    });
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setDraft(null);
+  };
+
+  // Live preview while editing: feed the draft to the template as overrides.
+  const previewOverrides: DeliveryNoteOverrides | undefined = isEditing && draft
+    ? {
+        refNumber: draft.refNumber.trim() || undefined,
+        date: draft.date || undefined,
+        deliveryDate: draft.deliveryDate.trim() || undefined,
+        itemDescriptions: draft.itemDescriptions.reduce<Record<string, string>>((acc, d, i) => {
+          acc[i] = d;
+          return acc;
+        }, {}),
+      }
+    : undefined;
+
+  const handleSave = async () => {
+    if (!draft) return;
+    setIsSaving(true);
+
+    const itemDescriptions = draft.itemDescriptions.reduce<Record<string, string>>((acc, d, i) => {
+      acc[String(i)] = d;
+      return acc;
+    }, {});
+
+    const overrides: DeliveryNoteOverrides = {
+      refNumber: draft.refNumber.trim() || undefined,
+      date: draft.date || undefined,
+      deliveryDate: draft.deliveryDate.trim() || undefined,
+      itemDescriptions,
+    };
+
+    const newMetadata = { ...(shipment.metadata || {}), deliveryNoteOverrides: overrides };
+
+    const { error } = await supabase
+      .from('shipments')
+      .update({ metadata: newMetadata })
+      .eq('id', shipment.id);
+
+    setIsSaving(false);
+
+    if (error) {
+      toast({ title: 'Could not save', description: error.message, variant: 'destructive' });
+      return;
+    }
+
+    onSaved?.({ ...shipment, metadata: newMetadata });
+    toast({ title: 'Saved', description: 'Delivery note updated.' });
+    setIsEditing(false);
+    setDraft(null);
+  };
 
   const handleDownload = async () => {
     setIsGenerating(true);
@@ -407,23 +511,111 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
           </DialogDescription>
         </DialogHeader>
 
+        {/* Edit form */}
+        {isEditing && draft && (
+          <div className="border rounded-lg p-4 bg-muted/40 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Ref #</label>
+                <Input
+                  value={draft.refNumber}
+                  onChange={(e) => setDraft({ ...draft, refNumber: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Date</label>
+                <Input
+                  type="date"
+                  value={draft.date}
+                  onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Delivery Date (optional)</label>
+                {draft.deliveryDate ? (
+                  <div className="flex gap-2">
+                    <Input
+                      type="date"
+                      value={draft.deliveryDate}
+                      onChange={(e) => setDraft({ ...draft, deliveryDate: e.target.value })}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setDraft({ ...draft, deliveryDate: '' })}
+                      title="Remove delivery date"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => setDraft({ ...draft, deliveryDate: format(new Date(), 'yyyy-MM-dd') })}
+                  >
+                    <CalendarPlus className="h-4 w-4 mr-2" /> Add delivery date
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">Item descriptions</label>
+              {draft.itemDescriptions.map((desc, i) => (
+                <Textarea
+                  key={i}
+                  rows={2}
+                  value={desc}
+                  onChange={(e) => {
+                    const next = [...draft.itemDescriptions];
+                    next[i] = e.target.value;
+                    setDraft({ ...draft, itemDescriptions: next });
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Preview */}
         <div className="border rounded-lg overflow-auto bg-white">
-          <DeliveryNoteTemplate ref={noteRef} shipment={shipment} />
+          <DeliveryNoteTemplate ref={noteRef} shipment={shipment} overrides={previewOverrides} />
         </div>
 
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-2">
-          <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button variant="outline" onClick={handlePrint}>
-            <Printer className="h-4 w-4 mr-2" /> Print
-          </Button>
-          <Button onClick={handleDownload} disabled={isGenerating} className="bg-green-600 hover:bg-green-700">
-            {isGenerating
-              ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating…</>
-              : <><Download className="h-4 w-4 mr-2" />Download PDF</>
-            }
-          </Button>
+          {isEditing ? (
+            <>
+              <Button variant="outline" onClick={cancelEditing} disabled={isSaving}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={isSaving} className="bg-green-600 hover:bg-green-700">
+                {isSaving
+                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</>
+                  : <><Save className="h-4 w-4 mr-2" />Save</>
+                }
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={onClose}>Close</Button>
+              <Button variant="outline" onClick={startEditing}>
+                <Pencil className="h-4 w-4 mr-2" /> Edit
+              </Button>
+              <Button variant="outline" onClick={handlePrint}>
+                <Printer className="h-4 w-4 mr-2" /> Print
+              </Button>
+              <Button onClick={handleDownload} disabled={isGenerating} className="bg-green-600 hover:bg-green-700">
+                {isGenerating
+                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating…</>
+                  : <><Download className="h-4 w-4 mr-2" />Download PDF</>
+                }
+              </Button>
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>

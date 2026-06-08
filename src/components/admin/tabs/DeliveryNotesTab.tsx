@@ -442,6 +442,10 @@ const DeliveryNotesTab = () => {
           isOpen={!!previewShipment}
           onClose={() => setPreviewShipment(null)}
           shipment={previewShipment}
+          onSaved={(updated) => {
+            setShipments(prev => prev.map(s => s.id === updated.id ? updated : s));
+            setPreviewShipment(updated);
+          }}
         />
       )}
 
