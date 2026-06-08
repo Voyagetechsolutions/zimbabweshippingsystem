@@ -9,11 +9,12 @@ export const getContentSecurityPolicy = () => {
   return {
     'Content-Security-Policy': [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://storage.googleapis.com",
+      "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob: https://storage.googleapis.com https://cdn.jsdelivr.net",
+      "worker-src 'self' blob:",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://api.ipify.org https://*.supabase.co https://oncsaunsqtekwwbzvvyh.supabase.co",
       "font-src 'self'",
-      "connect-src 'self' https://api.ipify.org https://*.supabase.co https://oncsaunsqtekwwbzvvyh.supabase.co",
+      "connect-src 'self' blob: https://api.ipify.org https://*.supabase.co https://oncsaunsqtekwwbzvvyh.supabase.co https://cdn.jsdelivr.net https://tessdata.projectnaptha.com",
       "frame-src 'self' https://www.google.com https://maps.google.com",
       "object-src 'none'",
       "base-uri 'self'",
@@ -43,11 +44,12 @@ export const configureSecurityHeaders = () => {
     // Apply CSP via meta tag (excluding frame-ancestors which requires HTTP headers)
     const cspDirectives = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://storage.googleapis.com",
+      "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob: https://storage.googleapis.com https://cdn.jsdelivr.net",
+      "worker-src 'self' blob:",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://api.ipify.org https://*.supabase.co https://oncsaunsqtekwwbzvvyh.supabase.co",
       "font-src 'self'",
-      "connect-src 'self' https://api.ipify.org https://*.supabase.co https://oncsaunsqtekwwbzvvyh.supabase.co",
+      "connect-src 'self' blob: https://api.ipify.org https://*.supabase.co https://oncsaunsqtekwwbzvvyh.supabase.co https://cdn.jsdelivr.net https://tessdata.projectnaptha.com",
       "frame-src 'self' https://www.google.com https://maps.google.com",
       "object-src 'none'",
       "base-uri 'self'",
