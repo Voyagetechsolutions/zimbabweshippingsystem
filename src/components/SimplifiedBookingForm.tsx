@@ -44,7 +44,10 @@ interface FormData {
   trunksDescription: string;
 
   // Add-ons
-  wantMetalSeal: boolean;
+  wantMetalSeal: boolean;            // metal coded seal add-on (whole shipment)
+  sealOption: 'have' | 'need';       // customer has own seal(s) or needs us to supply
+  sealCodes: string[];               // seal code(s) when the customer has their own
+  sealQuantity: number;              // how many seals to supply when they don't have any
   doorToDoor: boolean;
 
   // Purchase Drums (England only)
@@ -339,6 +342,9 @@ export const SimplifiedBookingForm = () => {
     trunkQuantity: 0,
     trunksDescription: '',
     wantMetalSeal: false,
+    sealOption: 'need',
+    sealCodes: [''],
+    sealQuantity: 1,
     doorToDoor: false,
     purchaseDrums: false,
     purchaseDrumType: null,
@@ -564,22 +570,16 @@ export const SimplifiedBookingForm = () => {
       total += formData.drumQuantity * drumPrice;
     }
 
-    // Metal seal cost (different for UK vs Ireland)
-    if (formData.wantMetalSeal && formData.includeDrums && formData.drumQuantity > 0) {
-      const sealPrice = getMetalSealPrice(formData.pickupCountry);
-      total += formData.drumQuantity * sealPrice;
+    // Metal coded seal — only charged when we supply the seals (not if the
+    // customer brings their own). Applies to the whole shipment, any item type.
+    if (formData.wantMetalSeal && formData.sealOption === 'need' && formData.sealQuantity > 0) {
+      total += formData.sealQuantity * getMetalSealPrice(formData.pickupCountry);
     }
 
     // Trunks/Storage boxes (Ireland only)
     if (formData.includeTrunks && formData.trunkQuantity > 0) {
       const trunkPrice = getTrunkPrice(formData.trunkQuantity);
       total += formData.trunkQuantity * trunkPrice;
-
-      // Metal seal for trunks (if selected)
-      if (formData.wantMetalSeal) {
-        const sealPrice = getMetalSealPrice(formData.pickupCountry);
-        total += formData.trunkQuantity * sealPrice;
-      }
     }
 
     // Add purchased drums cost (England only)
@@ -623,8 +623,17 @@ export const SimplifiedBookingForm = () => {
       const finalAmount = calculateFinalTotal();
       
       // Build notes with add-ons and custom items
+      const cleanedSealCodes = formData.sealCodes.map(c => c.trim()).filter(Boolean);
+      const sealSuppliedQty = formData.sealOption === 'need' ? formData.sealQuantity : cleanedSealCodes.length;
+
       let notes = [];
-      if (formData.wantMetalSeal) notes.push('Metal Coded Seal requested');
+      if (formData.wantMetalSeal) {
+        notes.push(
+          formData.sealOption === 'have'
+            ? `Metal Coded Seal (customer's own): ${cleanedSealCodes.join(', ') || 'codes to confirm'}`
+            : `Metal Coded Seal x${formData.sealQuantity} (supplied)`,
+        );
+      }
       if (formData.doorToDoor) notes.push('Door-to-door delivery requested');
       if (formData.paymentMethod === 'cashOnCollection') notes.push('Cash payment on collection');
       if (formData.includeBoxes) notes.push(`Other Items (agent quote): ${formData.boxesDescription}`);
@@ -674,6 +683,9 @@ export const SimplifiedBookingForm = () => {
           } : null,
           addOns: {
             metalSeal: formData.wantMetalSeal,
+            metalSealOption: formData.wantMetalSeal ? formData.sealOption : null,
+            metalSealCodes: formData.wantMetalSeal && formData.sealOption === 'have' ? cleanedSealCodes : [],
+            metalSealQuantity: formData.wantMetalSeal ? sealSuppliedQty : 0,
             metalSealPrice: getMetalSealPrice(formData.pickupCountry),
             doorToDoor: formData.doorToDoor,
             doorToDoorPrice: formData.doorToDoor ? DOOR_TO_DOOR_PRICE : 0
@@ -723,6 +735,9 @@ export const SimplifiedBookingForm = () => {
           trunksDescription: formData.trunksDescription || null,
           includeOtherItems: formData.includeBoxes,
           wantMetalSeal: formData.wantMetalSeal,
+          metalSealOption: formData.wantMetalSeal ? formData.sealOption : null,
+          metalSealCodes: formData.wantMetalSeal && formData.sealOption === 'have' ? cleanedSealCodes : [],
+          metalSealQuantity: formData.wantMetalSeal ? sealSuppliedQty : 0,
           doorToDoor: formData.doorToDoor,
           category: formData.boxesDescription
         },
@@ -1279,32 +1294,12 @@ export const SimplifiedBookingForm = () => {
                       </p>
                     </div>
 
-                    {/* Add-on Services */}
-                    <div className="border-t pt-4 space-y-3">
-                      <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300">Add-on Services</h4>
-
-                      {/* Metal Seal */}
-                      <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg hover:bg-white dark:hover:bg-gray-700 transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={formData.wantMetalSeal}
-                          onChange={(e) => updateField('wantMetalSeal', e.target.checked)}
-                          className="mt-0.5 h-4 w-4"
-                        />
-                        <div className="flex-1">
-                          <div className="font-medium text-sm">Metal Coded Seal</div>
-                          <div className="text-xs text-gray-600 dark:text-gray-400">Secure coded seals for drums</div>
-                          <div className="text-sm font-semibold text-zim-green mt-1">+{currencySymbol}{metalSealPrice}/drum</div>
-                        </div>
-                      </label>
-
-                      {/* Included Services */}
-                      <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">✓ Included Services</div>
-                        <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
-                          <div>• Full insurance coverage</div>
-                          <div>• Real-time tracking & updates</div>
-                        </div>
+                    {/* Included Services */}
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                      <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">✓ Included Services</div>
+                      <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
+                        <div>• Full insurance coverage</div>
+                        <div>• Real-time tracking & updates</div>
                       </div>
                     </div>
                   </div>
@@ -1365,23 +1360,6 @@ export const SimplifiedBookingForm = () => {
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           Color, size, markings — anything that helps the driver spot {formData.trunkQuantity === 1 ? 'it' : 'them'}.
                         </p>
-                      </div>
-
-                      {/* Optional Metal Seal for Trunks */}
-                      <div className="border-t pt-4">
-                        <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg hover:bg-white dark:hover:bg-gray-700 transition-colors">
-                          <input
-                            type="checkbox"
-                            checked={formData.wantMetalSeal}
-                            onChange={(e) => updateField('wantMetalSeal', e.target.checked)}
-                            className="mt-0.5 h-4 w-4"
-                          />
-                          <div className="flex-1">
-                            <div className="font-medium text-sm">Metal Coded Seal (Optional)</div>
-                            <div className="text-xs text-gray-600 dark:text-gray-400">Secure coded seals for trunks</div>
-                            <div className="text-sm font-semibold text-purple-600 mt-1">+€{metalSealPrice}/trunk</div>
-                          </div>
-                        </label>
                       </div>
                     </div>
                   )}
@@ -1514,6 +1492,103 @@ export const SimplifiedBookingForm = () => {
             </label>
           </div>
 
+          {/* Metal Coded Seal - applies to the whole shipment */}
+          <div className={`border-2 rounded-lg p-5 transition-all ${formData.wantMetalSeal ? 'border-zim-green bg-green-50 dark:bg-green-900/20 dark:border-green-600' : 'border-gray-200 hover:border-zim-green dark:border-gray-700 dark:hover:border-green-600'}`}>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.wantMetalSeal}
+                onChange={(e) => updateField('wantMetalSeal', e.target.checked)}
+                className="mt-1 h-4 w-4"
+              />
+              <div className="flex-1">
+                <div className="font-semibold text-lg">Metal Coded Seal</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Tamper-evident coded seals to secure your items. Optional — for any item in your shipment.
+                </div>
+              </div>
+            </label>
+
+            {formData.wantMetalSeal && (
+              <div className="mt-4 space-y-4 pl-7">
+                <RadioGroup
+                  value={formData.sealOption}
+                  onValueChange={(value) => updateField('sealOption', value as 'have' | 'need')}
+                  className="space-y-2"
+                >
+                  <label htmlFor="sealHave" className="flex items-start gap-3 cursor-pointer rounded-lg border p-3 bg-white dark:bg-gray-800">
+                    <RadioGroupItem value="have" id="sealHave" className="mt-0.5" />
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">I already have my own seal(s)</div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400">Enter the seal code(s) — no extra charge.</div>
+                    </div>
+                  </label>
+                  <label htmlFor="sealNeed" className="flex items-start gap-3 cursor-pointer rounded-lg border p-3 bg-white dark:bg-gray-800">
+                    <RadioGroupItem value="need" id="sealNeed" className="mt-0.5" />
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">I need seals supplied</div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400">+{currencySymbol}{metalSealPrice} per seal</div>
+                    </div>
+                  </label>
+                </RadioGroup>
+
+                {formData.sealOption === 'have' ? (
+                  <div className="space-y-2">
+                    <Label className="text-sm">Seal code(s)</Label>
+                    {formData.sealCodes.map((code, i) => (
+                      <div key={i} className="flex gap-2">
+                        <Input
+                          placeholder={`Seal code #${i + 1}`}
+                          value={code}
+                          onChange={(e) => {
+                            const next = [...formData.sealCodes];
+                            next[i] = e.target.value;
+                            updateField('sealCodes', next);
+                          }}
+                        />
+                        {formData.sealCodes.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => updateField('sealCodes', formData.sealCodes.filter((_, j) => j !== i))}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => updateField('sealCodes', [...formData.sealCodes, ''])}
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Add another seal code
+                    </Button>
+                  </div>
+                ) : (
+                  <div>
+                    <Label htmlFor="sealQty" className="text-sm">How many seals do you need?</Label>
+                    <Input
+                      id="sealQty"
+                      type="number"
+                      min="1"
+                      value={formData.sealQuantity || ''}
+                      onChange={(e) => updateField('sealQuantity', parseInt(e.target.value) || 0)}
+                      className="max-w-xs mt-1"
+                    />
+                    {formData.sealQuantity > 0 && (
+                      <p className="text-sm text-zim-green font-medium mt-2">
+                        {formData.sealQuantity} × {currencySymbol}{metalSealPrice} = {currencySymbol}{formData.sealQuantity * metalSealPrice}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Multiple Drop-off Note */}
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <p className="text-sm text-blue-900 dark:text-blue-300">
@@ -1579,14 +1654,6 @@ export const SimplifiedBookingForm = () => {
                   </div>
                 )}
 
-                {/* Add-ons - Metal Seal for drums */}
-                {formData.wantMetalSeal && (
-                  <div className="flex justify-between text-gray-700 dark:text-gray-300 border-t pt-2">
-                    <span>Metal Coded Seal ({formData.drumQuantity} x {currencySymbol}{getMetalSealPrice(formData.pickupCountry)})</span>
-                    <span>+{currencySymbol}{formData.drumQuantity * getMetalSealPrice(formData.pickupCountry)}</span>
-                  </div>
-                )}
-
                 {/* Purchased Drums - UK only */}
                 {formData.purchaseDrums && formData.purchaseDrumType && formData.purchaseDrumQuantity > 0 && (
                   <div className="flex justify-between text-gray-700 dark:text-gray-300 border-t pt-2">
@@ -1622,13 +1689,6 @@ export const SimplifiedBookingForm = () => {
                     </div>
                   )}
 
-                  {/* Metal seal for trunks */}
-                  {formData.wantMetalSeal && !formData.includeDrums && (
-                    <div className="flex justify-between text-gray-700 dark:text-gray-300 border-t pt-2">
-                      <span>Metal Coded Seal ({formData.trunkQuantity} x €{getMetalSealPrice(formData.pickupCountry)})</span>
-                      <span>+€{formData.trunkQuantity * getMetalSealPrice(formData.pickupCountry)}</span>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -1638,6 +1698,23 @@ export const SimplifiedBookingForm = () => {
                 <p className="font-medium text-gray-700 dark:text-gray-300">Other Items:</p>
                 <p className="text-gray-600 dark:text-gray-400 mt-1">{formData.boxesDescription}</p>
                 <p className="text-xs italic mt-2 text-blue-600 dark:text-blue-400">Our agent will contact you with a quote</p>
+              </div>
+            )}
+
+            {/* Metal Coded Seal (whole shipment) */}
+            {formData.wantMetalSeal && (
+              <div className="border-t pt-3">
+                {formData.sealOption === 'have' ? (
+                  <div className="flex justify-between text-gray-700 dark:text-gray-300">
+                    <span>Metal Coded Seal (your own): {formData.sealCodes.map(c => c.trim()).filter(Boolean).join(', ') || 'codes to confirm'}</span>
+                    <span className="text-gray-500">No charge</span>
+                  </div>
+                ) : (
+                  <div className="flex justify-between text-gray-700 dark:text-gray-300">
+                    <span>Metal Coded Seal ({formData.sealQuantity} × {currencySymbol}{getMetalSealPrice(formData.pickupCountry)})</span>
+                    <span>+{currencySymbol}{formData.sealQuantity * getMetalSealPrice(formData.pickupCountry)}</span>
+                  </div>
+                )}
               </div>
             )}
           </div>

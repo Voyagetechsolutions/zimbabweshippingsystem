@@ -26,6 +26,8 @@ import {
   Phone,
   Mail,
   Loader2,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -54,6 +56,9 @@ interface FormData {
   drumQuantity: number;
   boxesDescription: string;
   wantMetalSeal: boolean;
+  sealOption: 'have' | 'need';
+  sealCodes: string[];
+  sealQuantity: number;
   doorToDoor: boolean;
 
   // Payment
@@ -198,10 +203,10 @@ const ManualBookingTab: React.FC = () => {
     if (formData.drumQuantity > 0) {
       const drumPrice = getDrumPrice(formData.drumQuantity);
       total = formData.drumQuantity * drumPrice;
-
-      if (formData.wantMetalSeal) {
-        total += formData.drumQuantity * 5;
-      }
+    }
+    // Metal coded seal — charged only when we supply seals (not customer's own)
+    if (formData.wantMetalSeal && formData.sealOption === 'need' && formData.sealQuantity > 0) {
+      total += formData.sealQuantity * 5;
     }
     if (formData.doorToDoor) {
       total += DOOR_TO_DOOR_PRICE;
@@ -236,6 +241,9 @@ const ManualBookingTab: React.FC = () => {
       drumQuantity: 1,
       boxesDescription: '',
       wantMetalSeal: false,
+      sealOption: 'need',
+      sealCodes: [''],
+      sealQuantity: 1,
       doorToDoor: false,
       paymentMethod: 'standard',
       adminNotes: '',
@@ -324,6 +332,12 @@ const ManualBookingTab: React.FC = () => {
           } : null,
           addOns: {
             metalSeal: formData.wantMetalSeal,
+            metalSealOption: formData.wantMetalSeal ? formData.sealOption : null,
+            metalSealCodes: formData.wantMetalSeal && formData.sealOption === 'have'
+              ? formData.sealCodes.map(c => c.trim()).filter(Boolean) : [],
+            metalSealQuantity: formData.wantMetalSeal
+              ? (formData.sealOption === 'need' ? formData.sealQuantity : formData.sealCodes.map(c => c.trim()).filter(Boolean).length)
+              : 0,
             doorToDoor: formData.doorToDoor,
             doorToDoorPrice: formData.doorToDoor ? DOOR_TO_DOOR_PRICE : 0
           }
@@ -716,17 +730,80 @@ const ManualBookingTab: React.FC = () => {
                 />
               </div>
 
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="metalSeal"
-                  checked={formData.wantMetalSeal}
-                  onChange={(e) => updateField('wantMetalSeal', e.target.checked)}
-                  className="h-4 w-4"
-                />
-                <Label htmlFor="metalSeal" className="text-sm">
-                  Metal Coded Seal (+£5 per drum)
-                </Label>
+              <div className="space-y-3 rounded-lg border p-3">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="metalSeal"
+                    checked={formData.wantMetalSeal}
+                    onChange={(e) => updateField('wantMetalSeal', e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  <Label htmlFor="metalSeal" className="text-sm font-medium">
+                    Metal Coded Seal (whole shipment)
+                  </Label>
+                </div>
+
+                {formData.wantMetalSeal && (
+                  <div className="space-y-3 pl-6">
+                    <RadioGroup
+                      value={formData.sealOption}
+                      onValueChange={(value) => updateField('sealOption', value)}
+                      className="flex gap-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="have" id="mb-sealHave" />
+                        <Label htmlFor="mb-sealHave" className="text-sm cursor-pointer">Customer has own seal(s)</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="need" id="mb-sealNeed" />
+                        <Label htmlFor="mb-sealNeed" className="text-sm cursor-pointer">Supply seals (+£5 each)</Label>
+                      </div>
+                    </RadioGroup>
+
+                    {formData.sealOption === 'have' ? (
+                      <div className="space-y-2">
+                        {formData.sealCodes.map((code, i) => (
+                          <div key={i} className="flex gap-2">
+                            <Input
+                              placeholder={`Seal code #${i + 1}`}
+                              value={code}
+                              onChange={(e) => {
+                                const next = [...formData.sealCodes];
+                                next[i] = e.target.value;
+                                updateField('sealCodes', next);
+                              }}
+                            />
+                            {formData.sealCodes.length > 1 && (
+                              <Button
+                                type="button" variant="ghost" size="icon"
+                                onClick={() => updateField('sealCodes', formData.sealCodes.filter((_, j) => j !== i))}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                        <Button
+                          type="button" variant="outline" size="sm"
+                          onClick={() => updateField('sealCodes', [...formData.sealCodes, ''])}
+                        >
+                          <Plus className="h-4 w-4 mr-1" /> Add seal code
+                        </Button>
+                      </div>
+                    ) : (
+                      <div>
+                        <Label htmlFor="mb-sealQty" className="text-sm">How many seals?</Label>
+                        <Input
+                          id="mb-sealQty" type="number" min="1"
+                          value={formData.sealQuantity || ''}
+                          onChange={(e) => updateField('sealQuantity', parseInt(e.target.value) || 0)}
+                          className="max-w-[140px] mt-1"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center space-x-2">
@@ -786,10 +863,16 @@ const ManualBookingTab: React.FC = () => {
                   <span>Drums ({formData.drumQuantity} x £{getDrumPrice(formData.drumQuantity)})</span>
                   <span>£{(formData.drumQuantity * getDrumPrice(formData.drumQuantity)).toFixed(2)}</span>
                 </div>
-                {formData.wantMetalSeal && formData.drumQuantity > 0 && (
+                {formData.wantMetalSeal && formData.sealOption === 'need' && formData.sealQuantity > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span>Metal Seal ({formData.drumQuantity} x £5)</span>
-                    <span>£{(formData.drumQuantity * 5).toFixed(2)}</span>
+                    <span>Metal Seal ({formData.sealQuantity} x £5)</span>
+                    <span>£{(formData.sealQuantity * 5).toFixed(2)}</span>
+                  </div>
+                )}
+                {formData.wantMetalSeal && formData.sealOption === 'have' && (
+                  <div className="flex justify-between text-sm text-gray-500">
+                    <span>Metal Seal (customer's own)</span>
+                    <span>No charge</span>
                   </div>
                 )}
                 {formData.doorToDoor && (

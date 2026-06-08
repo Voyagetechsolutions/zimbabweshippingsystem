@@ -125,14 +125,22 @@ export function buildDefaultInvoice(s: Shipment): InvoiceData {
     });
   }
 
-  const addOns = (itemsMeta.addOns as { metalSeal?: boolean; metalSealPrice?: number } | undefined) || {};
+  const addOns = (itemsMeta.addOns as {
+    metalSeal?: boolean; metalSealPrice?: number; metalSealQuantity?: number;
+    metalSealOption?: string; metalSealCodes?: string[];
+  } | undefined) || {};
   if (ship.wantMetalSeal || ship.metalSeal || addOns.metalSeal) {
-    const sealQty = drumQty + trunkQty;
+    // Shipment-wide seal: customer's own = no charge (record codes), supplied = priced.
+    const option = (addOns.metalSealOption || (ship.metalSealOption as string) || 'need');
+    const codes = (addOns.metalSealCodes || (ship.metalSealCodes as string[]) || []) as string[];
+    const sealQty = Number(addOns.metalSealQuantity ?? ship.metalSealQuantity ?? (drumQty + trunkQty)) || 0;
     if (sealQty > 0) {
       items.push({
-        description: 'Metal Coded Seal',
+        description: option === 'have'
+          ? `Metal Coded Seal (customer's own)${codes.length ? ` — ${codes.join(', ')}` : ''}`
+          : 'Metal Coded Seal',
         quantity: sealQty,
-        unitPrice: Number(addOns.metalSealPrice ?? 0),
+        unitPrice: option === 'have' ? 0 : Number(addOns.metalSealPrice ?? 0),
       });
     }
   }

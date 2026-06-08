@@ -25,6 +25,8 @@ interface DeliveryNoteOverrides {
   deliveryDate?: string;  // optional separate delivery date (yyyy-MM-dd)
   itemDescriptions?: Record<string, string>; // line-item index → description
   doorToDoor?: boolean;   // override the delivery-method (door-to-door vs depot)
+  sealed?: boolean;       // override whether a metal coded seal applies
+  sealCodes?: string;     // editable seal code(s), comma/newline separated
 }
 
 function getOverrides(s: Shipment): DeliveryNoteOverrides {
@@ -124,6 +126,18 @@ function getDoorToDoor(s: Shipment): boolean {
     m.delivery?.doorToDoor ||
     m.doorToDoor
   );
+}
+
+// Metal coded seal info for the shipment (sealed?, the code(s), how many supplied).
+function getSealInfo(s: Shipment): { sealed: boolean; codes: string[]; quantity: number } {
+  const m = s.metadata || {};
+  const ship = m.shipment || m.shipmentDetails || {};
+  const addOns = (m.items && m.items.addOns) || {};
+  const sealed = !!(ship.wantMetalSeal || ship.metalSeal || addOns.metalSeal);
+  const rawCodes = ship.metalSealCodes || addOns.metalSealCodes || [];
+  const codes = Array.isArray(rawCodes) ? rawCodes.map((c: string) => String(c).trim()).filter(Boolean) : [];
+  const quantity = Number(ship.metalSealQuantity ?? addOns.metalSealQuantity ?? 0);
+  return { sealed, codes, quantity };
 }
 
 // Builds one row per physical item. Description is taken from the customer's
@@ -271,6 +285,9 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
     }));
     const itemsSummary = buildItemsSummary(shipment);
     const doorToDoor = overrides.doorToDoor ?? getDoorToDoor(shipment);
+    const sealInfoBase = getSealInfo(shipment);
+    const sealed = overrides.sealed ?? sealInfoBase.sealed;
+    const sealCodesText = (overrides.sealCodes ?? sealInfoBase.codes.join(', ')).trim();
 
     return (
       <div
@@ -362,6 +379,29 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
           </div>
         </div>
 
+        {/* ── Metal coded seal ── */}
+        <div style={{
+          marginBottom: '20px',
+          padding: '10px 14px',
+          borderRadius: '4px',
+          border: `2px solid ${sealed ? '#2563eb' : '#94a3b8'}`,
+          backgroundColor: sealed ? '#eff6ff' : '#f8fafc',
+          fontSize: '13px',
+        }}>
+          <strong style={{ textTransform: 'uppercase', letterSpacing: '0.5px', color: sealed ? '#1d4ed8' : '#475569' }}>
+            Metal Coded Seal: {sealed ? 'Yes' : 'None'}
+          </strong>
+          {sealed && (
+            <div style={{ color: '#444', marginTop: '2px' }}>
+              {sealCodesText
+                ? <>Seal code(s): <strong style={{ color: '#111' }}>{sealCodesText}</strong></>
+                : (sealInfoBase.quantity > 0
+                    ? `${sealInfoBase.quantity} seal(s) to be supplied — codes to be recorded on sealing.`
+                    : 'Codes to be recorded on sealing.')}
+            </div>
+          )}
+        </div>
+
         {/* ── Items summary ── */}
         <div style={{ marginBottom: '12px', fontSize: '12px', color: '#444' }}>
           <strong>Items in this shipment:</strong> {itemsSummary}
@@ -414,6 +454,8 @@ interface EditDraft {
   deliveryDate: string;
   itemDescriptions: string[];
   doorToDoor: boolean;
+  sealed: boolean;
+  sealCodes: string;
 }
 
 const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, onClose, shipment, onSaved }) => {
@@ -434,6 +476,8 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
       deliveryDate: ov.deliveryDate || '',
       itemDescriptions: items.map((row, i) => ov.itemDescriptions?.[i] ?? row.description),
       doorToDoor: ov.doorToDoor ?? getDoorToDoor(shipment),
+      sealed: ov.sealed ?? getSealInfo(shipment).sealed,
+      sealCodes: ov.sealCodes ?? getSealInfo(shipment).codes.join(', '),
     });
     setIsEditing(true);
   };
@@ -454,6 +498,8 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
           return acc;
         }, {}),
         doorToDoor: draft.doorToDoor,
+        sealed: draft.sealed,
+        sealCodes: draft.sealCodes,
       }
     : undefined;
 
@@ -472,6 +518,8 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
       deliveryDate: draft.deliveryDate.trim() || undefined,
       itemDescriptions,
       doorToDoor: draft.doorToDoor,
+      sealed: draft.sealed,
+      sealCodes: draft.sealCodes.trim(),
     };
 
     const newMetadata = { ...(shipment.metadata || {}), deliveryNoteOverrides: overrides };
@@ -614,6 +662,26 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
                   <span className="text-muted-foreground"> — {draft.doorToDoor ? 'deliver to recipient address' : 'depot collection (off)'}</span>
                 </span>
               </label>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Metal coded seal</label>
+              <label className="flex items-center gap-2 cursor-pointer rounded-md border p-3 bg-background">
+                <input
+                  type="checkbox"
+                  checked={draft.sealed}
+                  onChange={(e) => setDraft({ ...draft, sealed: e.target.checked })}
+                  className="h-4 w-4"
+                />
+                <span className="text-sm">Shipment has a metal coded seal</span>
+              </label>
+              {draft.sealed && (
+                <Input
+                  placeholder="Seal code(s) — comma separated, e.g. ABC123, DEF456"
+                  value={draft.sealCodes}
+                  onChange={(e) => setDraft({ ...draft, sealCodes: e.target.value })}
+                />
+              )}
             </div>
 
             <div className="space-y-2">
