@@ -661,6 +661,13 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
     setIsEditing(true);
   };
 
+  // Enter edit mode and immediately open the camera / file picker to scan.
+  const startScanning = () => {
+    startEditing();
+    // Wait for the edit form (and hidden file input) to mount before clicking it.
+    setTimeout(() => scanInputRef.current?.click(), 50);
+  };
+
   const cancelEditing = () => {
     setIsEditing(false);
     setDraft(null);
@@ -1068,6 +1075,9 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
           ) : (
             <>
               <Button variant="outline" onClick={onClose}>Close</Button>
+              <Button variant="outline" onClick={startScanning}>
+                <ScanLine className="h-4 w-4 mr-2" /> Scan invoice
+              </Button>
               <Button variant="outline" onClick={startEditing}>
                 <Pencil className="h-4 w-4 mr-2" /> Edit
               </Button>
