@@ -24,9 +24,21 @@ interface DeliveryNoteOverrides {
   date?: string;          // header "Date" (yyyy-MM-dd)
   deliveryDate?: string;  // optional separate delivery date (yyyy-MM-dd)
   itemDescriptions?: Record<string, string>; // line-item index → description
+  itemNames?: Record<string, string>;        // line-item index → item label
   doorToDoor?: boolean;   // override the delivery-method (door-to-door vs depot)
   sealed?: boolean;       // override whether a metal coded seal applies
   sealCodes?: string;     // editable seal code(s), comma/newline separated
+  // Shipper / recipient (any field can be corrected on the note)
+  senderName?: string;
+  senderPhone?: string;
+  senderPhone2?: string;
+  senderAddress?: string;    // newline-separated lines
+  recipientName?: string;
+  recipientPhone?: string;
+  recipientPhone2?: string;
+  recipientAddress?: string; // newline-separated lines
+  itemsSummary?: string;
+  tracking?: string;
 }
 
 function getOverrides(s: Shipment): DeliveryNoteOverrides {
@@ -270,20 +282,26 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
     const refNumber = buildRefNumber(shipment);
     const docDate = overrides.date || format(new Date(shipment.created_at), 'yyyy-MM-dd');
     const deliveryDate = (overrides.deliveryDate || '').trim();
-    const senderName = getSenderName(shipment);
-    const senderAddress = getSenderAddress(shipment);
     const senderCountry = (shipment.metadata?.sender?.country || shipment.metadata?.senderDetails?.country) as string | undefined;
-    const senderPhone = withDialCode(getSenderPhone(shipment), senderCountry);
-    const senderPhone2 = withDialCode(getSenderPhone2(shipment), senderCountry);
-    const recipientName = getRecipientName(shipment);
-    const recipientAddress = getRecipientAddress(shipment);
-    const recipientPhone = withDialCode(getRecipientPhone(shipment), 'Zimbabwe');
-    const recipientPhone2 = withDialCode(getRecipientPhone2(shipment), 'Zimbabwe');
+    // Each field uses its override when present (incl. empty string to clear), else the auto value.
+    const senderName = overrides.senderName ?? getSenderName(shipment);
+    const senderAddress = overrides.senderAddress !== undefined
+      ? overrides.senderAddress.split('\n').map(l => l.trim()).filter(Boolean)
+      : getSenderAddress(shipment);
+    const senderPhone = overrides.senderPhone ?? withDialCode(getSenderPhone(shipment), senderCountry);
+    const senderPhone2 = overrides.senderPhone2 ?? withDialCode(getSenderPhone2(shipment), senderCountry);
+    const recipientName = overrides.recipientName ?? getRecipientName(shipment);
+    const recipientAddress = overrides.recipientAddress !== undefined
+      ? overrides.recipientAddress.split('\n').map(l => l.trim()).filter(Boolean)
+      : getRecipientAddress(shipment);
+    const recipientPhone = overrides.recipientPhone ?? withDialCode(getRecipientPhone(shipment), 'Zimbabwe');
+    const recipientPhone2 = overrides.recipientPhone2 ?? withDialCode(getRecipientPhone2(shipment), 'Zimbabwe');
     const lineItems = buildLineItems(shipment).map((row, i) => ({
-      ...row,
+      item: overrides.itemNames?.[i] ?? row.item,
       description: overrides.itemDescriptions?.[i] ?? row.description,
     }));
-    const itemsSummary = buildItemsSummary(shipment);
+    const itemsSummary = overrides.itemsSummary ?? buildItemsSummary(shipment);
+    const tracking = overrides.tracking ?? shipment.tracking_number;
     const doorToDoor = overrides.doorToDoor ?? getDoorToDoor(shipment);
     const sealInfoBase = getSealInfo(shipment);
     const sealed = overrides.sealed ?? sealInfoBase.sealed;
@@ -437,7 +455,7 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
         {/* ── Footer ── */}
         <div style={{ marginTop: '48px', borderTop: '1px solid #ddd', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#888' }}>
           <span>Zimbabwe Shipping — Ireland Branch</span>
-          <span>Tracking: {shipment.tracking_number}</span>
+          <span>Tracking: {tracking}</span>
           <span>Generated: {format(new Date(), 'dd/MM/yyyy HH:mm')}</span>
         </div>
       </div>
@@ -452,10 +470,21 @@ interface EditDraft {
   refNumber: string;
   date: string;
   deliveryDate: string;
+  itemNames: string[];
   itemDescriptions: string[];
   doorToDoor: boolean;
   sealed: boolean;
   sealCodes: string;
+  senderName: string;
+  senderPhone: string;
+  senderPhone2: string;
+  senderAddress: string;
+  recipientName: string;
+  recipientPhone: string;
+  recipientPhone2: string;
+  recipientAddress: string;
+  itemsSummary: string;
+  tracking: string;
 }
 
 const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, onClose, shipment, onSaved }) => {
@@ -470,14 +499,26 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
   const startEditing = () => {
     const ov = getOverrides(shipment);
     const items = buildLineItems(shipment);
+    const senderCountry = (shipment.metadata?.sender?.country || shipment.metadata?.senderDetails?.country) as string | undefined;
     setDraft({
       refNumber: buildRefNumber(shipment),
       date: ov.date || format(new Date(shipment.created_at), 'yyyy-MM-dd'),
       deliveryDate: ov.deliveryDate || '',
+      itemNames: items.map((row, i) => ov.itemNames?.[i] ?? row.item),
       itemDescriptions: items.map((row, i) => ov.itemDescriptions?.[i] ?? row.description),
       doorToDoor: ov.doorToDoor ?? getDoorToDoor(shipment),
       sealed: ov.sealed ?? getSealInfo(shipment).sealed,
       sealCodes: ov.sealCodes ?? getSealInfo(shipment).codes.join(', '),
+      senderName: ov.senderName ?? getSenderName(shipment),
+      senderPhone: ov.senderPhone ?? withDialCode(getSenderPhone(shipment), senderCountry),
+      senderPhone2: ov.senderPhone2 ?? withDialCode(getSenderPhone2(shipment), senderCountry),
+      senderAddress: ov.senderAddress ?? getSenderAddress(shipment).join('\n'),
+      recipientName: ov.recipientName ?? getRecipientName(shipment),
+      recipientPhone: ov.recipientPhone ?? withDialCode(getRecipientPhone(shipment), 'Zimbabwe'),
+      recipientPhone2: ov.recipientPhone2 ?? withDialCode(getRecipientPhone2(shipment), 'Zimbabwe'),
+      recipientAddress: ov.recipientAddress ?? getRecipientAddress(shipment).join('\n'),
+      itemsSummary: ov.itemsSummary ?? buildItemsSummary(shipment),
+      tracking: ov.tracking ?? shipment.tracking_number,
     });
     setIsEditing(true);
   };
@@ -493,6 +534,10 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
         refNumber: draft.refNumber.trim() || undefined,
         date: draft.date || undefined,
         deliveryDate: draft.deliveryDate.trim() || undefined,
+        itemNames: draft.itemNames.reduce<Record<string, string>>((acc, d, i) => {
+          acc[i] = d;
+          return acc;
+        }, {}),
         itemDescriptions: draft.itemDescriptions.reduce<Record<string, string>>((acc, d, i) => {
           acc[i] = d;
           return acc;
@@ -500,6 +545,16 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
         doorToDoor: draft.doorToDoor,
         sealed: draft.sealed,
         sealCodes: draft.sealCodes,
+        senderName: draft.senderName,
+        senderPhone: draft.senderPhone,
+        senderPhone2: draft.senderPhone2,
+        senderAddress: draft.senderAddress,
+        recipientName: draft.recipientName,
+        recipientPhone: draft.recipientPhone,
+        recipientPhone2: draft.recipientPhone2,
+        recipientAddress: draft.recipientAddress,
+        itemsSummary: draft.itemsSummary,
+        tracking: draft.tracking,
       }
     : undefined;
 
@@ -511,15 +566,30 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
       acc[String(i)] = d;
       return acc;
     }, {});
+    const itemNames = draft.itemNames.reduce<Record<string, string>>((acc, d, i) => {
+      acc[String(i)] = d;
+      return acc;
+    }, {});
 
     const overrides: DeliveryNoteOverrides = {
       refNumber: draft.refNumber.trim() || undefined,
       date: draft.date || undefined,
       deliveryDate: draft.deliveryDate.trim() || undefined,
+      itemNames,
       itemDescriptions,
       doorToDoor: draft.doorToDoor,
       sealed: draft.sealed,
       sealCodes: draft.sealCodes.trim(),
+      senderName: draft.senderName,
+      senderPhone: draft.senderPhone,
+      senderPhone2: draft.senderPhone2,
+      senderAddress: draft.senderAddress,
+      recipientName: draft.recipientName,
+      recipientPhone: draft.recipientPhone,
+      recipientPhone2: draft.recipientPhone2,
+      recipientAddress: draft.recipientAddress,
+      itemsSummary: draft.itemsSummary,
+      tracking: draft.tracking,
     };
 
     const newMetadata = { ...(shipment.metadata || {}), deliveryNoteOverrides: overrides };
@@ -648,6 +718,30 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
               </div>
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Shipper */}
+              <div className="space-y-2 rounded-md border p-3 bg-background">
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Shipper</div>
+                <Input placeholder="Name" value={draft.senderName} onChange={(e) => setDraft({ ...draft, senderName: e.target.value })} />
+                <Input placeholder="Phone" value={draft.senderPhone} onChange={(e) => setDraft({ ...draft, senderPhone: e.target.value })} />
+                <Input placeholder="Phone 2 (optional)" value={draft.senderPhone2} onChange={(e) => setDraft({ ...draft, senderPhone2: e.target.value })} />
+                <Textarea rows={3} placeholder="Address (one line per row)" value={draft.senderAddress} onChange={(e) => setDraft({ ...draft, senderAddress: e.target.value })} />
+              </div>
+              {/* Recipient */}
+              <div className="space-y-2 rounded-md border p-3 bg-background">
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recipient</div>
+                <Input placeholder="Name" value={draft.recipientName} onChange={(e) => setDraft({ ...draft, recipientName: e.target.value })} />
+                <Input placeholder="Phone" value={draft.recipientPhone} onChange={(e) => setDraft({ ...draft, recipientPhone: e.target.value })} />
+                <Input placeholder="Phone 2 (optional)" value={draft.recipientPhone2} onChange={(e) => setDraft({ ...draft, recipientPhone2: e.target.value })} />
+                <Textarea rows={3} placeholder="Address (one line per row)" value={draft.recipientAddress} onChange={(e) => setDraft({ ...draft, recipientAddress: e.target.value })} />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Tracking #</label>
+              <Input value={draft.tracking} onChange={(e) => setDraft({ ...draft, tracking: e.target.value })} />
+            </div>
+
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Delivery method</label>
               <label className="flex items-center gap-2 cursor-pointer rounded-md border p-3 bg-background">
@@ -684,19 +778,35 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
               )}
             </div>
 
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Items summary line</label>
+              <Input value={draft.itemsSummary} onChange={(e) => setDraft({ ...draft, itemsSummary: e.target.value })} />
+            </div>
+
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground">Item descriptions</label>
+              <label className="text-xs font-medium text-muted-foreground">Items (name & description)</label>
               {draft.itemDescriptions.map((desc, i) => (
-                <Textarea
-                  key={i}
-                  rows={2}
-                  value={desc}
-                  onChange={(e) => {
-                    const next = [...draft.itemDescriptions];
-                    next[i] = e.target.value;
-                    setDraft({ ...draft, itemDescriptions: next });
-                  }}
-                />
+                <div key={i} className="space-y-1 rounded-md border p-2 bg-background">
+                  <Input
+                    placeholder={`Item ${i + 1} name`}
+                    value={draft.itemNames[i] ?? ''}
+                    onChange={(e) => {
+                      const next = [...draft.itemNames];
+                      next[i] = e.target.value;
+                      setDraft({ ...draft, itemNames: next });
+                    }}
+                  />
+                  <Textarea
+                    rows={2}
+                    placeholder="Description / item details"
+                    value={desc}
+                    onChange={(e) => {
+                      const next = [...draft.itemDescriptions];
+                      next[i] = e.target.value;
+                      setDraft({ ...draft, itemDescriptions: next });
+                    }}
+                  />
+                </div>
               ))}
             </div>
           </div>
