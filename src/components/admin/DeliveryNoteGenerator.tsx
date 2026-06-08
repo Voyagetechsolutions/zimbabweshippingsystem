@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Download, Loader2, Printer, Pencil, Save, X, CalendarPlus, Plus, Trash2 } from 'lucide-react';
+import { Download, Loader2, Printer, Pencil, Save, X, CalendarPlus, Plus, Trash2, ScanLine } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Shipment } from '@/types/shipment';
@@ -495,6 +495,82 @@ DeliveryNoteTemplate.displayName = 'DeliveryNoteTemplate';
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+// ── Invoice scan parsing (best-effort, from on-device OCR text) ──────────────
+
+// Normalise a loosely-formatted date to yyyy-MM-dd. Returns null if unparseable.
+function toIsoDate(raw: string): string | null {
+  const s = (raw || '').trim();
+  const m = s.match(/^(\d{1,4})[/\-.](\d{1,2})[/\-.](\d{1,4})$/);
+  if (!m) return null;
+  let [, a, b, c] = m;
+  let year: string, month: string, day: string;
+  if (a.length === 4) { year = a; month = b; day = c; }   // yyyy-mm-dd
+  else { day = a; month = b; year = c; }                   // dd-mm-yyyy (assume day first)
+  if (year.length === 2) year = '20' + year;
+  const mm = month.padStart(2, '0');
+  const dd = day.padStart(2, '0');
+  if (Number(mm) < 1 || Number(mm) > 12 || Number(dd) < 1 || Number(dd) > 31) return null;
+  return `${year}-${mm}-${dd}`;
+}
+
+// Pull a labelled block (e.g. "Ship To") and the few lines that follow it.
+function extractBlock(lines: string[], keywords: string[]): { name?: string; phone?: string; address?: string } | null {
+  const labelRe = new RegExp(`(?:${keywords.join('|')})\\s*:?`, 'i');
+  const stopRe = /^(bill\s*to|ship\s*to|deliver\s*to|sold\s*to|sender|shipper|recipient|consignee|from|to|invoice|date|total|amount|qty|quantity|description|item|sub\s*total|tax)\b/i;
+  const idx = lines.findIndex(l => labelRe.test(l));
+  if (idx === -1) return null;
+
+  const block: string[] = [];
+  const sameLine = lines[idx].replace(new RegExp(`^.*?(?:${keywords.join('|')})\\s*:?`, 'i'), '').trim();
+  if (sameLine) block.push(sameLine);
+  for (let i = idx + 1; i < Math.min(lines.length, idx + 6); i++) {
+    if (stopRe.test(lines[i])) break;
+    block.push(lines[i]);
+  }
+  if (block.length === 0) return null;
+
+  const phoneIdx = block.findIndex(l => /(\+?\d[\d\s().\-]{7,}\d)/.test(l));
+  const phone = phoneIdx >= 0 ? (block[phoneIdx].match(/(\+?\d[\d\s().\-]{7,}\d)/)?.[1].trim()) : undefined;
+  const name = block[0];
+  const addressLines = block.slice(1).filter((_, i) => i + 1 !== phoneIdx);
+  return { name, phone, address: addressLines.join('\n') || undefined };
+}
+
+// Returns only the fields we could confidently detect from the scanned text.
+function parseInvoiceText(text: string): Partial<EditDraft> {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const joined = lines.join('\n');
+  const out: Partial<EditDraft> = {};
+
+  const refM = joined.match(/\b(?:invoice|inv|ref(?:erence)?|order)\s*(?:no\.?|number|#)?\s*[:#\-]?\s*([A-Z0-9][A-Z0-9\-/]{2,})/i);
+  if (refM) out.refNumber = refM[1].toUpperCase();
+
+  const labelledDate = joined.match(/\b(?:date|issued|invoice date)\b\s*[:#\-]?\s*([0-9]{1,4}[/\-.][0-9]{1,2}[/\-.][0-9]{2,4})/i);
+  const anyDate = joined.match(/\b([0-9]{1,4}[/\-.][0-9]{1,2}[/\-.][0-9]{2,4})\b/);
+  const iso = toIsoDate(labelledDate?.[1] || anyDate?.[1] || '');
+  if (iso) out.date = iso;
+
+  const recipient = extractBlock(lines, ['ship to', 'deliver to', 'consignee', 'recipient']);
+  if (recipient) {
+    if (recipient.name) out.recipientName = recipient.name;
+    if (recipient.phone) out.recipientPhone = recipient.phone;
+    if (recipient.address) out.recipientAddress = recipient.address;
+  }
+  const sender = extractBlock(lines, ['bill to', 'sold to', 'shipper', 'sender', 'from']);
+  if (sender) {
+    if (sender.name) out.senderName = sender.name;
+    if (sender.phone) out.senderPhone = sender.phone;
+    if (sender.address) out.senderAddress = sender.address;
+  }
+
+  // Fall back to global phone detection if a block didn't yield one.
+  const phones = [...new Set(Array.from(joined.matchAll(/(\+?\d[\d\s().\-]{7,}\d)/g)).map(m => m[1].replace(/\s{2,}/g, ' ').trim()))];
+  if (!out.senderPhone && phones[0]) out.senderPhone = phones[0];
+  if (!out.recipientPhone && phones[1]) out.recipientPhone = phones[1];
+
+  return out;
+}
+
 interface EditDraft {
   refNumber: string;
   date: string;
@@ -519,11 +595,42 @@ interface EditDraft {
 
 const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, onClose, shipment, onSaved }) => {
   const noteRef = useRef<HTMLDivElement>(null);
+  const scanInputRef = useRef<HTMLInputElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanText, setScanText] = useState('');
   const [draft, setDraft] = useState<EditDraft | null>(null);
   const { toast } = useToast();
+
+  // Read an invoice photo on-device (Tesseract OCR) and pre-fill what we can.
+  const handleScanFile = async (file: File | undefined) => {
+    if (!file || !draft) return;
+    setIsScanning(true);
+    setScanText('');
+    try {
+      const Tesseract = (await import('tesseract.js')).default;
+      const { data } = await Tesseract.recognize(file, 'eng');
+      const text = (data.text || '').trim();
+      setScanText(text);
+      const parsed = parseInvoiceText(text);
+      const count = Object.keys(parsed).length;
+      setDraft(prev => (prev ? { ...prev, ...parsed } : prev));
+      toast({
+        title: count ? 'Scan complete' : 'Scan finished',
+        description: count
+          ? `Pre-filled ${count} field(s) — please review before saving.`
+          : 'No fields detected automatically — use the scanned text below.',
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not read the image.';
+      toast({ title: 'Scan failed', description: msg, variant: 'destructive' });
+    } finally {
+      setIsScanning(false);
+      if (scanInputRef.current) scanInputRef.current.value = '';
+    }
+  };
 
   // Build the editable draft from saved overrides + auto-generated defaults.
   const startEditing = () => {
@@ -703,6 +810,35 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
         {/* Edit form */}
         {isEditing && draft && (
           <div className="border rounded-lg p-4 bg-muted/40 space-y-4">
+            {/* Scan-to-fill */}
+            <div className="rounded-md border bg-background p-3 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm">
+                  <div className="font-medium flex items-center gap-1.5"><ScanLine className="h-4 w-4" /> Scan an invoice to auto-fill</div>
+                  <div className="text-xs text-muted-foreground">Photograph or upload the external invoice. Detected fields pre-fill below for review — nothing is saved until you click Save.</div>
+                </div>
+                <Button type="button" variant="outline" size="sm" disabled={isScanning} onClick={() => scanInputRef.current?.click()}>
+                  {isScanning
+                    ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Reading…</>
+                    : <><ScanLine className="h-4 w-4 mr-2" />Scan invoice</>}
+                </Button>
+                <input
+                  ref={scanInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => handleScanFile(e.target.files?.[0])}
+                />
+              </div>
+              {scanText && (
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-muted-foreground">View scanned text (copy anything not auto-filled)</summary>
+                  <Textarea readOnly rows={6} value={scanText} className="mt-2 font-mono text-xs" />
+                </details>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Ref #</label>
