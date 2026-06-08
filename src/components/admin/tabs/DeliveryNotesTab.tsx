@@ -20,9 +20,10 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  Search, Download, RefreshCw, FileText, Loader2, Eye, Pencil,
+  Search, Download, RefreshCw, FileText, Loader2, Eye, Pencil, Plus,
 } from 'lucide-react';
 import DeliveryNoteGenerator, { buildRefNumber, DeliveryNoteTemplate } from '@/components/admin/DeliveryNoteGenerator';
+import StandaloneDeliveryNoteCreator from '@/components/admin/StandaloneDeliveryNoteCreator';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -55,6 +56,7 @@ const DeliveryNotesTab = () => {
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
   const [editNoteText, setEditNoteText] = useState('');
   const [savingNote, setSavingNote] = useState(false);
+  const [showStandaloneCreator, setShowStandaloneCreator] = useState(false);
 
   useEffect(() => { fetchShipments(); }, []);
 
@@ -259,6 +261,14 @@ const DeliveryNotesTab = () => {
         description="Auto-generated office copies for every booking. Not for customer distribution."
         actions={
           <>
+            <Button
+              variant="default"
+              size="sm"
+              className="h-8 text-xs bg-blue-600 hover:bg-blue-700"
+              onClick={() => setShowStandaloneCreator(true)}
+            >
+              <Plus className="h-3.5 w-3.5 mr-1.5" /> Create New
+            </Button>
             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={fetchShipments} disabled={loading}>
               <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh
             </Button>
@@ -485,6 +495,12 @@ const DeliveryNotesTab = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Standalone delivery note creator */}
+      <StandaloneDeliveryNoteCreator
+        isOpen={showStandaloneCreator}
+        onClose={() => setShowStandaloneCreator(false)}
+      />
     </div>
   );
 };
