@@ -24,14 +24,16 @@ const PricingSection = () => {
   const prices = selectedRegion === 'uk' ? ukPrices : irelandPrices;
 
   return (
-    <section className="py-16 md:py-20 bg-gray-50 dark:bg-gray-800">
+    <section className="py-20 md:py-28 bg-white dark:bg-gray-900">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900 dark:text-white">
-            Simple, Transparent Pricing
+        <div className="text-center mb-12 max-w-2xl mx-auto">
+          <span className="eyebrow">Pricing</span>
+          <h2 className="mt-3 font-display text-3xl md:text-4xl font-bold text-ink dark:text-white">
+            Simple, honest pricing
           </h2>
-          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            No hidden fees. Simple flat-rate pricing. Shipping from UK & Ireland.
+          <p className="mt-4 text-lg text-gray-600 dark:text-gray-400">
+            No hidden fees, no surprises. Flat-rate shipping from the UK &amp; Ireland —
+            free collection and insurance included.
           </p>
         </div>
 
@@ -129,14 +131,14 @@ const PricingSection = () => {
             </div>
 
             {/* Trunk/Storage Box Card - Ireland Exclusive */}
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl overflow-hidden border-2 border-purple-500">
-              <div className="bg-purple-600 px-6 py-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl overflow-hidden border-2 border-amber-400">
+              <div className="bg-zim-yellow px-6 py-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Box className="h-6 w-6 text-white" />
-                    <h3 className="text-xl font-bold text-white">Trunks / Storage Boxes</h3>
+                    <Box className="h-6 w-6 text-ink" />
+                    <h3 className="text-xl font-bold text-ink">Trunks / Storage Boxes</h3>
                   </div>
-                  <span className="bg-white/20 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                  <span className="bg-ink/15 text-ink text-xs font-semibold px-3 py-1 rounded-full">
                     Ireland Exclusive
                   </span>
                 </div>
@@ -149,12 +151,12 @@ const PricingSection = () => {
 
                 {/* Pricing */}
                 <div className="space-y-4 mb-6">
-                  <div className="flex justify-between items-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                  <div className="flex justify-between items-center p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
                     <div>
                       <span className="font-semibold text-gray-900 dark:text-white">1+ trunks</span>
                       <span className="text-sm text-gray-500 ml-2">Per trunk</span>
                     </div>
-                    <span className="text-3xl font-bold text-purple-600">
+                    <span className="text-3xl font-bold text-amber-600">
                       {trunkPrices.one}
                       <span className="text-sm font-normal text-gray-500">/each</span>
                     </span>
@@ -166,28 +168,28 @@ const PricingSection = () => {
                   <div>
                     <span className="font-medium text-gray-700 dark:text-gray-300">Metal Coded Seal</span>
                     <span className="text-gray-500 ml-1">(optional)</span>
-                    <span className="ml-2 font-semibold text-purple-600">+€7/trunk</span>
+                    <span className="ml-2 font-semibold text-amber-600">+€7/trunk</span>
                   </div>
                 </div>
 
                 {/* What's included */}
                 <div className="space-y-3 mb-6">
                   <div className="flex items-center gap-3">
-                    <Check className="h-5 w-5 text-purple-500 flex-shrink-0" />
+                    <Check className="h-5 w-5 text-amber-500 flex-shrink-0" />
                     <span className="text-gray-600 dark:text-gray-400">Free Ireland collection</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Check className="h-5 w-5 text-purple-500 flex-shrink-0" />
+                    <Check className="h-5 w-5 text-amber-500 flex-shrink-0" />
                     <span className="text-gray-600 dark:text-gray-400">Insurance included</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Check className="h-5 w-5 text-purple-500 flex-shrink-0" />
+                    <Check className="h-5 w-5 text-amber-500 flex-shrink-0" />
                     <span className="text-gray-600 dark:text-gray-400">Full tracking</span>
                   </div>
                 </div>
 
                 <Button
-                  className="w-full text-lg py-6 h-auto bg-purple-600 hover:bg-purple-700"
+                  className="w-full text-lg py-6 h-auto bg-zim-yellow text-ink hover:bg-amber-400"
                   onClick={() => navigate('/book')}
                 >
                   Book Trunk Shipping

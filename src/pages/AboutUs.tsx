@@ -6,6 +6,7 @@ import WhatsAppButton from '@/components/WhatsAppButton';
 import { Button } from '@/components/ui/button';
 import { Truck, Shield, Users, MapPin, Calendar, ArrowRight, Phone } from 'lucide-react';
 import { Helmet } from 'react-helmet';
+import { photos } from '@/data/sitePhotos';
 
 const AboutUs = () => {
   return (
@@ -32,29 +33,42 @@ const AboutUs = () => {
       <Navbar />
       <main className="min-h-screen">
         {/* Hero Section */}
-        <section className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white py-20">
-          <div className="container mx-auto px-4">
-            <div className="max-w-4xl mx-auto text-center">
-              <h1 className="text-4xl md:text-5xl font-bold mb-6">
-                A Family Business That <span className="text-zim-green">Cares</span>
+        <section className="relative isolate overflow-hidden bg-ink py-24 text-white md:py-32">
+          <img
+            src={photos.warehouseMarked.src}
+            alt={photos.warehouseMarked.alt}
+            className="absolute inset-0 h-full w-full object-cover opacity-30"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/85 to-ink/60" />
+          <div className="absolute top-0 left-0 right-0 flex h-1">
+            <div className="w-1/3 bg-zim-green" />
+            <div className="w-1/3 bg-zim-yellow" />
+            <div className="w-1/3 bg-zim-red" />
+          </div>
+          <div className="container relative z-10 mx-auto px-4">
+            <div className="mx-auto max-w-4xl text-center">
+              <span className="eyebrow !text-zim-yellow">Our story</span>
+              <h1 className="mt-4 font-display text-4xl font-extrabold md:text-5xl lg:text-6xl">
+                A family business that <span className="text-zim-green">cares</span>
               </h1>
-              <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-                Since 2011, we've been the trusted choice for shipping from the UK to Zimbabwe.
-                We're not a faceless corporation - we're a family who understands how important your shipments are.
+              <p className="mx-auto mt-6 max-w-2xl text-xl text-gray-300">
+                Since 2011, we've been the trusted choice for shipping from the UK to
+                Zimbabwe. We're not a faceless corporation — we're a family who
+                understands how much your shipments mean.
               </p>
 
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-6 max-w-lg mx-auto">
+              <div className="mx-auto mt-10 grid max-w-lg grid-cols-3 gap-6">
                 <div>
-                  <div className="text-3xl font-bold text-zim-green">14+</div>
+                  <div className="font-display text-3xl font-bold text-zim-green">14+</div>
                   <div className="text-sm text-gray-400">Years</div>
                 </div>
                 <div>
-                  <div className="text-3xl font-bold text-zim-yellow">1000+</div>
+                  <div className="font-display text-3xl font-bold text-zim-yellow">1000+</div>
                   <div className="text-sm text-gray-400">Customers</div>
                 </div>
                 <div>
-                  <div className="text-3xl font-bold text-zim-red">All</div>
+                  <div className="font-display text-3xl font-bold text-zim-red">All</div>
                   <div className="text-sm text-gray-400">ZW Cities</div>
                 </div>
               </div>

@@ -15,6 +15,7 @@ import {
   Calendar,
   Phone
 } from 'lucide-react';
+import { photos } from '@/data/sitePhotos';
 
 const Services = () => {
   const services = [
@@ -31,6 +32,7 @@ const Services = () => {
       cta: 'Book Drums',
       link: '/book',
       color: 'zim-green',
+      photo: photos.drumWarehouse,
     },
     {
       icon: Truck,
@@ -45,6 +47,7 @@ const Services = () => {
       cta: 'Get Quote',
       link: '/custom-quote-request',
       color: 'zim-yellow',
+      photo: photos.applianceCollection,
     },
     {
       icon: Home,
@@ -59,6 +62,7 @@ const Services = () => {
       cta: 'Book Now',
       link: '/book',
       color: 'zim-red',
+      photo: photos.vanPacked,
     },
     {
       icon: Building2,
@@ -73,6 +77,7 @@ const Services = () => {
       cta: 'Contact Us',
       link: '/contact',
       color: 'gray',
+      photo: photos.machineryLoading,
     },
   ];
 
@@ -100,16 +105,32 @@ const Services = () => {
       <Navbar />
       <main className="min-h-screen">
         {/* Hero */}
-        <section className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white py-16">
-          <div className="container mx-auto px-4 text-center">
-            <div className="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-400 px-4 py-2 rounded-full text-sm font-medium mb-6">
-              Now serving UK & Ireland
+        <section className="relative isolate overflow-hidden bg-ink py-20 text-white md:py-28">
+          <img
+            src={photos.containerLoading.src}
+            alt={photos.containerLoading.alt}
+            className="absolute inset-0 h-full w-full object-cover opacity-30"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/85 to-ink/55" />
+          <div className="absolute top-0 left-0 right-0 flex h-1">
+            <div className="w-1/3 bg-zim-green" />
+            <div className="w-1/3 bg-zim-yellow" />
+            <div className="w-1/3 bg-zim-red" />
+          </div>
+          <div className="container relative z-10 mx-auto px-4 text-center">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium backdrop-blur-sm">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-zim-green opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-zim-green" />
+              </span>
+              Now serving UK &amp; Ireland
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              Our Services
+            <h1 className="font-display text-4xl font-extrabold md:text-5xl lg:text-6xl">
+              Everything we ship home
             </h1>
-            <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-              From drums to furniture, personal items to commercial cargo - we ship it all from UK & Ireland to Zimbabwe.
+            <p className="mx-auto mt-5 max-w-2xl text-xl text-gray-300">
+              From a single drum to a container of furniture, personal gifts to
+              commercial cargo — we ship it all from the UK &amp; Ireland to Zimbabwe.
             </p>
           </div>
         </section>
@@ -122,24 +143,29 @@ const Services = () => {
                 {services.map((service, index) => (
                   <div
                     key={index}
-                    className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-8 hover:shadow-lg transition-shadow"
+                    className="overflow-hidden rounded-2xl border border-gray-100 bg-paper transition-shadow hover:shadow-xl dark:border-gray-800 dark:bg-gray-800"
                   >
-                    <div className={`
-                      inline-flex p-4 rounded-xl mb-6
-                      ${service.color === 'zim-green' ? 'bg-zim-green/10' : ''}
-                      ${service.color === 'zim-yellow' ? 'bg-zim-yellow/10' : ''}
-                      ${service.color === 'zim-red' ? 'bg-zim-red/10' : ''}
-                      ${service.color === 'gray' ? 'bg-gray-200' : ''}
-                    `}>
-                      <service.icon className={`
-                        h-8 w-8
-                        ${service.color === 'zim-green' ? 'text-zim-green' : ''}
-                        ${service.color === 'zim-yellow' ? 'text-zim-yellow' : ''}
-                        ${service.color === 'zim-red' ? 'text-zim-red' : ''}
-                        ${service.color === 'gray' ? 'text-gray-600' : ''}
-                      `} />
+                    {/* Real photo */}
+                    <div className="relative aspect-[16/9] overflow-hidden">
+                      <img
+                        src={service.photo.src}
+                        alt={service.photo.alt}
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-ink/60 to-transparent" />
+                      <div className={`
+                        absolute bottom-4 left-4 inline-flex h-12 w-12 items-center justify-center rounded-xl shadow-lg
+                        ${service.color === 'zim-green' ? 'bg-zim-green' : ''}
+                        ${service.color === 'zim-yellow' ? 'bg-zim-yellow' : ''}
+                        ${service.color === 'zim-red' ? 'bg-zim-red' : ''}
+                        ${service.color === 'gray' ? 'bg-ink' : ''}
+                      `}>
+                        <service.icon className={`h-6 w-6 ${service.color === 'zim-yellow' ? 'text-ink' : 'text-white'}`} />
+                      </div>
                     </div>
 
+                    <div className="p-8">
                     <h3 className="text-2xl font-bold mb-3 text-gray-900 dark:text-white">{service.title}</h3>
                     <p className="text-gray-600 dark:text-gray-400 mb-6">{service.description}</p>
 
@@ -164,6 +190,7 @@ const Services = () => {
                         <ArrowRight className="ml-2 h-5 w-5" />
                       </Button>
                     </Link>
+                    </div>
                   </div>
                 ))}
               </div>

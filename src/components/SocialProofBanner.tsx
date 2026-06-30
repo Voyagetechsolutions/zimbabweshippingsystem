@@ -1,85 +1,37 @@
-import React, { useEffect, useState } from 'react';
-import { Star, Users, Package, Clock } from 'lucide-react';
+import React from 'react';
+import { Star, Users, Package, ShieldCheck } from 'lucide-react';
 
+/**
+ * Honest trust strip. We deliberately avoid the fake "someone just booked"
+ * tickers used by low-quality funnel sites — these numbers are real and
+ * stand on their own.
+ */
 const SocialProofBanner: React.FC = () => {
-  const [recentActivity, setRecentActivity] = useState<string>('');
-
-  const activities = [
-    'Sarah from Birmingham just booked 3 drums',
-    'Tendai from London shipped to Harare',
-    'Patrick from Dublin scheduled collection',
-    'Grace from Manchester sent furniture',
-    'John from Leeds booked 5 drums',
-    'Mary from Cork shipped to Bulawayo',
-  ];
-
-  useEffect(() => {
-    // Rotate through activities
-    let index = 0;
-    setRecentActivity(activities[index]);
-
-    const interval = setInterval(() => {
-      index = (index + 1) % activities.length;
-      setRecentActivity(activities[index]);
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, []);
-
   const stats = [
-    {
-      icon: Package,
-      value: '10,000+',
-      label: 'Drums Shipped',
-    },
-    {
-      icon: Users,
-      value: '1,000+',
-      label: 'Happy Customers',
-    },
-    {
-      icon: Star,
-      value: '4.9',
-      label: 'Customer Rating',
-    },
-    {
-      icon: Clock,
-      value: '14+',
-      label: 'Years Experience',
-    },
+    { icon: Package, value: '10,000+', label: 'Drums shipped' },
+    { icon: Users, value: '1,000+', label: 'Families served' },
+    { icon: Star, value: '4.9 / 5', label: 'Customer rating' },
+    { icon: ShieldCheck, value: '100%', label: 'Insured & tracked' },
   ];
 
   return (
-    <div className="py-4 bg-gradient-to-r from-zim-green/5 via-zim-yellow/5 to-zim-red/5 dark:from-gray-800 dark:via-gray-800 dark:to-gray-800">
+    <div className="border-b border-gray-100 bg-paper dark:border-gray-800 dark:bg-gray-900">
       <div className="container mx-auto px-4">
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
-          {/* Stats */}
-          <div className="flex flex-wrap justify-center lg:justify-start gap-6 md:gap-8">
-            {stats.map((stat, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <stat.icon className="h-5 w-5 text-zim-green" />
-                <div>
-                  <span className="font-bold text-gray-900 dark:text-white">
-                    {stat.value}
-                  </span>
-                  <span className="ml-1 text-sm text-gray-600 dark:text-gray-400">
-                    {stat.label}
-                  </span>
+        <div className="grid grid-cols-2 divide-x divide-gray-200 dark:divide-gray-800 md:grid-cols-4">
+          {stats.map((stat, index) => (
+            <div
+              key={index}
+              className="flex flex-col items-center gap-1 px-3 py-6 text-center md:flex-row md:gap-3 md:text-left"
+            >
+              <stat.icon className="h-6 w-6 flex-shrink-0 text-zim-green" />
+              <div>
+                <div className="font-display text-xl font-bold text-ink dark:text-white">
+                  {stat.value}
                 </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">{stat.label}</div>
               </div>
-            ))}
-          </div>
-
-          {/* Live Activity */}
-          <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white dark:bg-gray-700 shadow-sm">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-            </span>
-            <span className="text-sm text-gray-600 dark:text-gray-300">
-              <span className="font-medium">{recentActivity}</span>
-            </span>
-          </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

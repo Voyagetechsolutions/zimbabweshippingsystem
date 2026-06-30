@@ -6,6 +6,7 @@ import Footer from '@/components/Footer';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import { Button } from '@/components/ui/button';
 import { Check, Banknote, Package, ArrowRight, Phone, Truck, Shield } from 'lucide-react';
+import { photos } from '@/data/sitePhotos';
 
 const Pricing = () => {
   return (
@@ -29,13 +30,26 @@ const Pricing = () => {
       <Navbar />
       <main className="min-h-screen">
         {/* Hero */}
-        <section className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white py-16">
-          <div className="container mx-auto px-4 text-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              Simple, Transparent Pricing
+        <section className="relative isolate overflow-hidden bg-ink py-20 text-white md:py-24">
+          <img
+            src={photos.drumWarehouse.src}
+            alt={photos.drumWarehouse.alt}
+            className="absolute inset-0 h-full w-full object-cover opacity-25"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/85 to-ink/55" />
+          <div className="absolute top-0 left-0 right-0 flex h-1">
+            <div className="w-1/3 bg-zim-green" />
+            <div className="w-1/3 bg-zim-yellow" />
+            <div className="w-1/3 bg-zim-red" />
+          </div>
+          <div className="container relative z-10 mx-auto px-4 text-center">
+            <span className="eyebrow !text-zim-yellow">Pricing</span>
+            <h1 className="mt-4 font-display text-4xl font-extrabold md:text-5xl lg:text-6xl">
+              Simple, honest pricing
             </h1>
-            <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-              No hidden fees. Simple flat-rate pricing.
+            <p className="mx-auto mt-5 max-w-2xl text-xl text-gray-300">
+              Flat-rate drums, free collection and insurance included. No hidden fees,
+              no surprises when your goods arrive.
             </p>
           </div>
         </section>

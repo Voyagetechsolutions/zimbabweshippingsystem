@@ -126,10 +126,10 @@ const Footer = () => {
               &copy; {currentYear} Zimbabwe Shipping. All rights reserved.
             </p>
             <div className="flex gap-6 text-sm">
-              <Link to="/terms" className="text-gray-500 hover:text-white transition-colors">
+              <Link to="/terms-and-conditions" className="text-gray-500 hover:text-white transition-colors">
                 Terms
               </Link>
-              <Link to="/privacy" className="text-gray-500 hover:text-white transition-colors">
+              <Link to="/privacy-policy" className="text-gray-500 hover:text-white transition-colors">
                 Privacy
               </Link>
             </div>

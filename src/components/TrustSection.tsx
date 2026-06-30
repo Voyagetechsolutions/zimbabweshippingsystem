@@ -1,109 +1,87 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Users,
-  Truck,
-  Shield,
-  CreditCard,
-  MapPin,
-  Clock,
-  ArrowRight
-} from 'lucide-react';
+import { Users, Truck, ShieldCheck, CreditCard, MapPin, Clock, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { photos } from '@/data/sitePhotos';
 
 const TrustSection: React.FC = () => {
   const features = [
-    {
-      icon: Users,
-      title: 'Family Business',
-      description: 'Run by a family who understands the importance of your shipments. Personal service, not corporate red tape.',
-      color: 'zim-green',
-    },
-    {
-      icon: Truck,
-      title: 'Own Trucks in Zimbabwe',
-      description: 'We control the entire journey. Our own fleet in Zimbabwe means reliable, on-time deliveries.',
-      color: 'zim-yellow',
-    },
-    {
-      icon: Shield,
-      title: 'Secure & Insured',
-      description: 'Every shipment is fully insured. Metal coded seals protect your drums throughout transit.',
-      color: 'zim-red',
-    },
-    {
-      icon: CreditCard,
-      title: 'Flexible Payment',
-      description: '30-day payment terms available. Pay on arrival option. Multiple payment methods accepted.',
-      color: 'zim-green',
-    },
-    {
-      icon: MapPin,
-      title: 'All Zimbabwe Cities',
-      description: 'From Harare to Bulawayo, Mutare to Victoria Falls. We deliver everywhere in Zimbabwe.',
-      color: 'zim-yellow',
-    },
-    {
-      icon: Clock,
-      title: '14+ Years Experience',
-      description: 'Since 2011, we\'ve been the trusted choice for UK to Zimbabwe shipping. We know what we\'re doing.',
-      color: 'zim-red',
-    },
+    { icon: Users, title: 'A family, not a call centre', description: 'You deal with the people who handle your goods — no tickets, no runaround.' },
+    { icon: Truck, title: 'Our own fleet in Zimbabwe', description: 'We control the whole journey, so deliveries are reliable and on time.' },
+    { icon: ShieldCheck, title: 'Insured & metal-sealed', description: 'Every drum is sealed with a coded metal seal and fully insured in transit.' },
+    { icon: CreditCard, title: 'Pay on flexible terms', description: '30-day payment terms from collection. Pay-on-arrival options available.' },
+    { icon: MapPin, title: 'Every city in Zimbabwe', description: 'Harare, Bulawayo, Mutare, Vic Falls and everywhere in between.' },
+    { icon: Clock, title: '14+ years doing this', description: 'Trusted by the diaspora since 2011. We know exactly what we\'re doing.' },
   ];
 
   return (
-    <section className="py-16 md:py-20 bg-white dark:bg-gray-900">
+    <section className="bg-paper py-20 md:py-28 dark:bg-gray-950">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900 dark:text-white">
-            Why Choose Zimbabwe Shipping?
-          </h2>
-          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            We're not just another shipping company. We're a family business that treats your shipment like our own.
-          </p>
-        </div>
-
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((feature, index) => (
-              <div
-                key={index}
-                className="p-6 rounded-xl bg-gray-50 dark:bg-gray-800 hover:shadow-lg transition-shadow"
-              >
-                <div className={`
-                  inline-flex p-3 rounded-lg mb-4
-                  ${feature.color === 'zim-green' ? 'bg-zim-green/10' : ''}
-                  ${feature.color === 'zim-yellow' ? 'bg-zim-yellow/10' : ''}
-                  ${feature.color === 'zim-red' ? 'bg-zim-red/10' : ''}
-                `}>
-                  <feature.icon className={`
-                    h-6 w-6
-                    ${feature.color === 'zim-green' ? 'text-zim-green' : ''}
-                    ${feature.color === 'zim-yellow' ? 'text-zim-yellow' : ''}
-                    ${feature.color === 'zim-red' ? 'text-zim-red' : ''}
-                  `} />
+        <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
+          {/* Photo collage — real operations */}
+          <div className="relative">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
+                <div className="overflow-hidden rounded-2xl shadow-lg">
+                  <img src={photos.drumWarehouse.src} alt={photos.drumWarehouse.alt} loading="lazy" className="aspect-[3/4] w-full object-cover" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">
-                  {feature.title}
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
-                  {feature.description}
-                </p>
+                <div className="overflow-hidden rounded-2xl shadow-lg">
+                  <img src={photos.vanLoaded.src} alt={photos.vanLoaded.alt} loading="lazy" className="aspect-square w-full object-cover" />
+                </div>
               </div>
-            ))}
+              <div className="space-y-4 pt-8">
+                <div className="overflow-hidden rounded-2xl shadow-lg">
+                  <img src={photos.warehouseMarked.src} alt={photos.warehouseMarked.alt} loading="lazy" className="aspect-square w-full object-cover" />
+                </div>
+                <div className="overflow-hidden rounded-2xl shadow-lg">
+                  <img src={photos.machineryLoading.src} alt={photos.machineryLoading.alt} loading="lazy" className="aspect-[3/4] w-full object-cover" />
+                </div>
+              </div>
+            </div>
+            {/* Floating credential badge */}
+            <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 rounded-2xl bg-ink px-6 py-4 text-center shadow-xl">
+              <div className="font-display text-2xl font-extrabold text-zim-yellow">Since 2011</div>
+              <div className="text-xs uppercase tracking-wider text-gray-300">Real photos. Real shipments.</div>
+            </div>
           </div>
 
-          {/* CTA */}
-          <div className="mt-12 text-center">
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Want to learn more about our story?
+          {/* Story + features */}
+          <div>
+            <span className="eyebrow">Why families trust us</span>
+            <h2 className="mt-3 font-display text-3xl font-bold text-ink md:text-4xl dark:text-white">
+              We treat your shipment like it's our own
+            </h2>
+            <p className="mt-4 leading-relaxed text-gray-600 dark:text-gray-300">
+              Our director started out as a FedEx driver and went on to build Telk Removals
+              in the UK. That background — careful hands, real accountability — is exactly how
+              we ship to Zimbabwe today. From a single drum to a container of machinery, your
+              goods are handled by people who understand what's inside them.
             </p>
-            <Link to="/about-us">
-              <Button variant="outline" className="gap-2">
-                Read Our Story
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
+
+            <div className="mt-8 grid gap-x-6 gap-y-6 sm:grid-cols-2">
+              {features.map((feature, index) => (
+                <div key={index} className="flex gap-3">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-zim-green/10">
+                    <feature.icon className="h-5 w-5 text-zim-green" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-ink dark:text-white">{feature.title}</h3>
+                    <p className="mt-0.5 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+                      {feature.description}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-9">
+              <Link to="/about-us">
+                <Button variant="outline" className="gap-2 border-2">
+                  Read our full story
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </div>

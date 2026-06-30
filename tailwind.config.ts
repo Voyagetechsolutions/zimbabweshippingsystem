@@ -19,15 +19,24 @@ export default {
 			}
 		},
 		extend: {
+			fontFamily: {
+				sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+				display: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'],
+			},
 			colors: {
 				// Zimbabwe flag colors
 				zim: {
 					green: '#008C45',
+					'green-dark': '#06622F',
 					yellow: '#FFCB05',
 					red: '#DE3831',
 					black: '#000000',
 					white: '#FFFFFF',
 				},
+				// Warm, premium neutrals (avoids the pure-white "AI template" look)
+				paper: '#FAF8F4',
+				ink: '#10130F',
+				'ink-soft': '#2A2F29',
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',

@@ -1,93 +1,92 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Calendar, Truck, Home, ArrowRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { photos } from '@/data/sitePhotos';
 
 const HowItWorks: React.FC = () => {
   const steps = [
     {
       icon: Calendar,
-      number: '1',
-      title: 'Book Online',
-      description: 'Choose your service, select a collection date, and enter your details. Takes less than 5 minutes.',
-      color: 'zim-green',
+      number: '01',
+      title: 'Book in minutes',
+      description:
+        'Pick your service and a collection date, then tell us where to come. The whole thing takes under five minutes — no account needed to start.',
+      photo: photos.vanPacked,
     },
     {
       icon: Truck,
-      number: '2',
-      title: 'We Collect',
-      description: 'We pick up your items from anywhere in the UK. Free collection included.',
-      color: 'zim-yellow',
+      number: '02',
+      title: 'We collect — free',
+      description:
+        'A member of our team comes to your door anywhere in the UK or Ireland, wraps and seals your goods, and takes them to our warehouse.',
+      photo: photos.applianceCollection,
     },
     {
       icon: Home,
-      number: '3',
-      title: 'Delivered',
-      description: 'Your shipment arrives safely at any address in Zimbabwe. Track every step.',
-      color: 'zim-red',
+      number: '03',
+      title: 'Delivered in Zimbabwe',
+      description:
+        'Our own fleet delivers door-to-door, from Harare to Bulawayo and everywhere between. You track every step until it arrives.',
+      photo: photos.containerLoading,
     },
   ];
 
   return (
-    <section className="py-16 md:py-20 bg-white dark:bg-gray-900">
+    <section className="bg-white py-20 md:py-28 dark:bg-gray-900">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900 dark:text-white">
-            How It Works
+        <div className="mx-auto mb-14 max-w-2xl text-center">
+          <span className="eyebrow">How it works</span>
+          <h2 className="mt-3 font-display text-3xl font-bold text-ink md:text-4xl dark:text-white">
+            Three steps from your door to theirs
           </h2>
-          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            Shipping to Zimbabwe has never been easier. Three simple steps to get your items home.
+          <p className="mt-4 text-lg text-gray-600 dark:text-gray-400">
+            We handle the heavy lifting — literally. Here's how your shipment gets home.
           </p>
         </div>
 
-        <div className="max-w-5xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
-            {/* Connection line (desktop only) */}
-            <div className="hidden md:block absolute top-16 left-1/6 right-1/6 h-0.5 bg-gradient-to-r from-zim-green via-zim-yellow to-zim-red" />
-
-            {steps.map((step, index) => (
-              <div key={index} className="relative">
-                <div className="flex flex-col items-center text-center">
-                  {/* Step number circle */}
-                  <div className={`
-                    relative z-10 w-32 h-32 rounded-full flex items-center justify-center mb-6
-                    ${step.color === 'zim-green' ? 'bg-zim-green/10' : ''}
-                    ${step.color === 'zim-yellow' ? 'bg-zim-yellow/10' : ''}
-                    ${step.color === 'zim-red' ? 'bg-zim-red/10' : ''}
-                  `}>
-                    <div className={`
-                      w-20 h-20 rounded-full flex items-center justify-center
-                      ${step.color === 'zim-green' ? 'bg-zim-green' : ''}
-                      ${step.color === 'zim-yellow' ? 'bg-zim-yellow' : ''}
-                      ${step.color === 'zim-red' ? 'bg-zim-red' : ''}
-                    `}>
-                      <step.icon className="h-10 w-10 text-white" />
-                    </div>
-                    <span className={`
-                      absolute -top-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm
-                      ${step.color === 'zim-green' ? 'bg-zim-green' : ''}
-                      ${step.color === 'zim-yellow' ? 'bg-zim-yellow' : ''}
-                      ${step.color === 'zim-red' ? 'bg-zim-red' : ''}
-                    `}>
-                      {step.number}
-                    </span>
-                  </div>
-
-                  <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-white">
-                    {step.title}
-                  </h3>
-                  <p className="text-gray-600 dark:text-gray-400 max-w-xs">
-                    {step.description}
-                  </p>
+        <div className="mx-auto grid max-w-6xl gap-8 md:grid-cols-3">
+          {steps.map((step, index) => (
+            <div
+              key={index}
+              className="group overflow-hidden rounded-2xl border border-gray-100 bg-paper shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-gray-800 dark:bg-gray-800"
+            >
+              {/* Real photo */}
+              <div className="relative aspect-[4/3] overflow-hidden">
+                <img
+                  src={step.photo.src}
+                  alt={step.photo.alt}
+                  loading="lazy"
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-ink/70 to-transparent" />
+                <span className="absolute left-4 top-4 font-display text-5xl font-extrabold text-white/90">
+                  {step.number}
+                </span>
+                <div className="absolute bottom-4 left-4 flex h-11 w-11 items-center justify-center rounded-xl bg-zim-green text-white shadow-lg">
+                  <step.icon className="h-5 w-5" />
                 </div>
-
-                {/* Arrow between steps (mobile only) */}
-                {index < steps.length - 1 && (
-                  <div className="md:hidden flex justify-center my-4">
-                    <ArrowRight className="h-6 w-6 text-gray-300 rotate-90" />
-                  </div>
-                )}
               </div>
-            ))}
-          </div>
+
+              <div className="p-6">
+                <h3 className="font-display text-xl font-bold text-ink dark:text-white">
+                  {step.title}
+                </h3>
+                <p className="mt-2 leading-relaxed text-gray-600 dark:text-gray-400">
+                  {step.description}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-12 text-center">
+          <Link to="/book">
+            <Button size="lg" className="h-auto bg-zim-green px-8 py-6 text-lg font-semibold hover:bg-zim-green-dark">
+              Start your booking
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+          </Link>
         </div>
       </div>
     </section>
