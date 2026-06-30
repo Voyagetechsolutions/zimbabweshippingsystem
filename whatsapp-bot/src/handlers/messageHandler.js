@@ -5,6 +5,7 @@ import { handleFAQFlow } from '../flows/faqFlow.js';
 import { sendMessage, sendListMessage } from '../utils/messageUtils.js';
 import { getBotMessage } from '../services/botMessages.js';
 import { getBotSettings } from '../utils/pricingUtils.js';
+import { runAgent, aiEnabled } from '../ai/agent.js';
 
 export async function handleMessage(sock, message) {
   try {
@@ -142,6 +143,14 @@ export async function handleMessage(sock, message) {
     // 🧑‍💼 CHECK FOR HUMAN TAKEOVER MODE — bot stays silent
     if (session.humanTakeover) {
       console.log(`🧑‍💼 Human takeover active for ${phoneNumber} — bot is paused`);
+      return;
+    }
+
+    // 🤖 AI MODE — when an OpenAI key is configured, the AI agent handles the
+    // whole conversation (greeting, questions, bookings). The rigid menu flow
+    // below is the fallback used only when no key is set.
+    if (aiEnabled()) {
+      await runAgent(sock, phoneNumber, messageText, session);
       return;
     }
 
