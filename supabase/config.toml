@@ -23,7 +23,7 @@ max_client_conn = 100
 
 [realtime]
 enabled = true
-ip_version = "IPV6"
+ip_version = "IPv6"
 
 [studio]
 enabled = true
@@ -57,19 +57,19 @@ double_confirm_changes = true
 enable_confirmations = false
 
 [auth.external.github]
-enabled = true
+enabled = false
 client_id = ""
 secret = ""
 redirect_uri = "http://localhost:8000/auth/v1/callback"
 
 [auth.external.google]
-enabled = true
+enabled = false
 client_id = ""
 secret = ""
 redirect_uri = "http://localhost:8000/auth/v1/callback"
 
 [auth.external.facebook]
-enabled = true
+enabled = false
 client_id = ""
 secret = ""
 redirect_uri = "http://localhost:8000/auth/v1/callback"
