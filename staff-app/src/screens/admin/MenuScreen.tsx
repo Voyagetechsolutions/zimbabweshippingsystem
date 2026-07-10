@@ -38,7 +38,7 @@ const SECTIONS: { title: string; data: Item[] }[] = [
     title: 'Operations',
     data: [
       { label: 'Pickup Zones', icon: 'location-outline', placeholder: true },
-      { label: 'Delivery', icon: 'car-outline', placeholder: true },
+      { label: 'Delivery', icon: 'car-outline', to: 'Delivery' },
       { label: 'Delivery Notes', icon: 'document-text-outline', placeholder: true },
       { label: 'Schedule', icon: 'calendar-outline', to: 'Schedule' },
       { label: 'Routes', icon: 'map-outline', placeholder: true },
@@ -47,7 +47,7 @@ const SECTIONS: { title: string; data: Item[] }[] = [
   {
     title: 'Finance',
     data: [
-      { label: 'Invoices', icon: 'receipt-outline', placeholder: true },
+      { label: 'Invoices', icon: 'receipt-outline', to: 'Invoices' },
       { label: 'Payments', icon: 'card-outline', to: 'Payments' },
       { label: '30-Day Payments', icon: 'time-outline', placeholder: true },
       { label: 'Reports', icon: 'stats-chart-outline', to: 'Reports' },

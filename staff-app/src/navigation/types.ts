@@ -12,7 +12,9 @@ export type MenuStackParams = {
   Customers: undefined;
   CustomQuotes: undefined;
   Schedule: undefined;
+  Delivery: undefined;
   Payments: undefined;
+  Invoices: undefined;
   Reports: undefined;
   Feedback: undefined;
   Placeholder: { title: string };
