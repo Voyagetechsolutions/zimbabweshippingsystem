@@ -53,8 +53,11 @@ let qrCodeTimestamp = null;
 const QR_CODE_TIMEOUT = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
 let currentQRCodePath = null;
 
-// Use persistent session path
-const SESSION_PATH = process.env.SESSION_PATH || '/app/data/whatsapp-session';
+// Railway mounts persistent storage at /app/data. Use a local folder elsewhere
+// so the same command can be tested on a developer machine.
+const DATA_PATH = process.env.DATA_PATH ||
+  (process.env.RAILWAY_ENVIRONMENT ? '/app/data' : './data');
+const SESSION_PATH = process.env.SESSION_PATH || `${DATA_PATH}/whatsapp-session`;
 
 // Helper function to reset QR code generation (for manual override)
 function resetQRCodeGeneration() {
@@ -140,7 +143,7 @@ async function connectToWhatsApp() {
           // Save QR code as image file
           try {
             const QRCode = await import('qrcode');
-            const qrFileName = `/app/data/qr-code-${Date.now()}.png`;
+            const qrFileName = `${DATA_PATH}/qr-code-${Date.now()}.png`;
             await QRCode.toFile(qrFileName, qr, {
               width: 400,
               margin: 2
@@ -168,7 +171,7 @@ async function connectToWhatsApp() {
           // Still save the latest QR code even if within timeout
           try {
             const QRCode = await import('qrcode');
-            const qrFileName = `/app/data/qr-code-latest.png`;
+            const qrFileName = `${DATA_PATH}/qr-code-latest.png`;
             await QRCode.toFile(qrFileName, qr, {
               width: 400,
               margin: 2
@@ -255,7 +258,7 @@ async function connectToWhatsApp() {
         try {
           const fs = await import('fs');
           const path = await import('path');
-          const dataPath = '/app/data';
+          const dataPath = DATA_PATH;
           
           if (fs.existsSync(dataPath)) {
             const files = fs.readdirSync(dataPath);

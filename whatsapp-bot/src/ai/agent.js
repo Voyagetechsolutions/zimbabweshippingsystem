@@ -62,8 +62,8 @@ export async function runAgent(sock, phoneNumber, userText, session) {
   if (isSimpleGreeting(userText)) {
     const firstName = firstNameFromSession(session);
     const reply = firstName
-      ? `Hi ${firstName}! How can I help you today?`
-      : 'Hi! Welcome to Zimbabwe Shipping. How can I help you today?';
+      ? `Hi ${firstName}! I'm Zimmy. How can I help you today?`
+      : "Hi! I'm Zimmy, the Zimbabwe Shipping assistant. How can I help you today?";
 
     await sendMessage(sock, phoneNumber, reply);
     await updateUserSession(phoneNumber, {

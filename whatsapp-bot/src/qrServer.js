@@ -4,7 +4,8 @@ import path from 'path';
 
 const app = express();
 const PORT = process.env.QR_PORT || 3000;
-const QR_DATA_PATH = '/app/data';
+const QR_DATA_PATH = process.env.DATA_PATH ||
+  (process.env.RAILWAY_ENVIRONMENT ? '/app/data' : './data');
 
 function resolveLatestQRPath() {
   const latestPath = path.join(QR_DATA_PATH, 'qr-code-latest.png');
@@ -57,7 +58,7 @@ app.get('/', (req, res) => {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Scan WhatsApp QR — Zimbabwe Shipping Bot</title>
+  <title>Connect Zimmy to WhatsApp</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0b141a; color: #e9edef; margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
     .card { background: #111b21; border-radius: 16px; padding: 24px; max-width: 480px; width: 100%; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.4); }
@@ -73,7 +74,7 @@ app.get('/', (req, res) => {
 </head>
 <body>
   <div class="card">
-    <h1>Scan this QR with WhatsApp</h1>
+    <h1>Connect Zimmy to WhatsApp</h1>
     <p>Auto-refreshes every 3 seconds. Keep this tab open.</p>
     <div class="qr-wrap">
       <img id="qr" src="/qr-code.png?t=${Date.now()}" alt="WhatsApp QR Code" />
