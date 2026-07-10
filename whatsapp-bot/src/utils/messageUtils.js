@@ -7,10 +7,6 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function isDirectWhatsAppJid(jid) {
-  return jid?.endsWith('@s.whatsapp.net') || jid?.endsWith('@lid');
-}
-
 export async function sendMessage(sock, phoneNumber, text) {
   console.log(`📤 Attempting to send message to: ${phoneNumber}`);
   console.log(`📝 Message preview: ${text.substring(0, 100)}...`);
@@ -18,10 +14,7 @@ export async function sendMessage(sock, phoneNumber, text) {
   let lastError = null;
   for (let attempt = 0; attempt <= SEND_RETRIES; attempt++) {
     try {
-      if (attempt === 0 && isDirectWhatsAppJid(phoneNumber) && typeof sock.assertSessions === 'function') {
-        console.log(`ðŸ” Refreshing encryption session for: ${phoneNumber}`);
-        await sock.assertSessions([phoneNumber], true);
-      }
+      // sendMessage manages WhatsApp's Signal session automatically.
       const result = await sock.sendMessage(phoneNumber, { text });
       console.log(`✅ Message sent successfully to: ${phoneNumber}`);
       console.log(`📊 Send result:`, JSON.stringify(result?.key || result, null, 2));
