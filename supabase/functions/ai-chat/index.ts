@@ -13,7 +13,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const SYSTEM_PROMPT = `You are Tariro, the friendly website assistant for Zimbabwe Shipping.
+const SYSTEM_PROMPT = `You are Zimmy, the friendly website assistant for Zimbabwe Shipping.
 
 You help visitors with shipping from the UK and Ireland to Zimbabwe.
 
@@ -222,7 +222,7 @@ async function saveLead(lead: LeadDetails) {
       recipient_details: {
         destination: lead.destination,
       },
-      admin_notes: "Captured by the website AI assistant. A representative should contact the customer to confirm collection, pricing, and next steps.",
+      admin_notes: "Captured by Zimmy, the website AI assistant. A representative should contact the customer to confirm collection, pricing, and next steps.",
     })
     .select("id")
     .single();
@@ -272,7 +272,7 @@ serve(async (req) => {
 
     if (!history.length) {
       return new Response(JSON.stringify({
-        reply: "Hi! I'm the Zimbabwe Shipping assistant. How can I help you today?",
+        reply: "Hi! I'm Zimmy, the Zimbabwe Shipping assistant. How can I help you today?",
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

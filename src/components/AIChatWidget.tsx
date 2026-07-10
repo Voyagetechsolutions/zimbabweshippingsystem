@@ -9,10 +9,10 @@ interface ChatMessage {
 
 const GREETING: ChatMessage = {
   role: 'assistant',
-  content: "Hi! I'm the Zimbabwe Shipping assistant. How can I help you today?",
+  content: "Hi! I'm Zimmy, the Zimbabwe Shipping assistant. How can I help you today?",
 };
 
-const STORAGE_KEY = 'zimship-ai-chat';
+const STORAGE_KEY = 'zimmy-ai-chat';
 
 const quickPrompts = [
   'How much is a drum?',
@@ -114,7 +114,7 @@ const AIChatWidget: React.FC = () => {
         <button
           onClick={() => setOpen(true)}
           className="fixed bottom-6 right-6 z-[60] flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary/50"
-          aria-label="Open chat assistant"
+          aria-label="Open Zimmy chat assistant"
         >
           <MessageSquare className="h-6 w-6" />
         </button>
@@ -126,8 +126,8 @@ const AIChatWidget: React.FC = () => {
             <div className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5" />
               <div>
-                <p className="text-sm font-semibold leading-tight">Zimbabwe Shipping</p>
-                <p className="text-[11px] leading-tight opacity-80">AI assistant</p>
+                <p className="text-sm font-semibold leading-tight">Zimmy</p>
+                <p className="text-[11px] leading-tight opacity-80">Zimbabwe Shipping AI assistant</p>
               </div>
             </div>
             <div className="flex items-center gap-1">
