@@ -32,7 +32,7 @@ api_url = "http://localhost"
 
 # Email testing server. Emails sent with the local dev setup are not actually sent - the
 # server will log the email message and you can view the emails in the server logs.
-[inbucket]
+[local_smtp]
 enabled = true
 port = 54324
 smtp_port = 54325
@@ -112,6 +112,9 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.get-collection-schedules]
+verify_jwt = true
+
+[functions.ai-chat]
 verify_jwt = true
 
 [functions.send-announcement-notification]

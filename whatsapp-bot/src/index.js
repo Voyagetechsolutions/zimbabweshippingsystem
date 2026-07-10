@@ -7,7 +7,7 @@ import makeWASocket, {
 import qrcode from 'qrcode-terminal';
 import pino from 'pino';
 import dotenv from 'dotenv';
-import { handleMessage } from './handlers/messageHandler.js';
+import { handleMessage, rememberPhoneAlias } from './handlers/messageHandler.js';
 import { initializeDatabase } from './services/database.js';
 import { startQRServer } from './qrServer.js';
 
@@ -17,7 +17,7 @@ dotenv.config();
 let logger;
 try {
   logger = pino({ 
-    level: process.env.LOG_LEVEL || 'info',
+    level: process.env.LOG_LEVEL || 'fatal',
     transport: {
       target: 'pino-pretty',
       options: {
@@ -31,7 +31,7 @@ try {
   // Fallback to basic pino logger if pino-pretty fails
   console.log('⚠️  pino-pretty not available, using basic logger');
   logger = pino({ 
-    level: process.env.LOG_LEVEL || 'info'
+    level: process.env.LOG_LEVEL || 'fatal'
   });
 }
 
@@ -93,7 +93,7 @@ async function connectToWhatsApp() {
       // Enhanced session options to reduce sync errors
       syncFullHistory: false,
       shouldSyncHistoryMessage: () => false,
-      shouldIgnoreJid: () => false,
+      shouldIgnoreJid: (jid) => jid?.endsWith('@g.us') || jid === 'status@broadcast',
       // Retry configuration
       retryRequestDelayMs: 250,
       maxMsgRetryCount: 5,
@@ -274,6 +274,10 @@ async function connectToWhatsApp() {
     });
 
     sock.ev.on('creds.update', saveCreds);
+
+    sock.ev.on('chats.phoneNumberShare', ({ lid, jid }) => {
+      rememberPhoneAlias(lid, jid);
+    });
 
     // Handle sync errors gracefully (common with Baileys, usually non-critical)
     sock.ev.on('messaging-history.set', ({ chats, contacts, messages, isLatest }) => {

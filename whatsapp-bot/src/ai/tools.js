@@ -9,6 +9,7 @@ import {
   getMetalSealPrice,
   formatMoney,
 } from '../utils/pricingUtils.js';
+import { getCatalogueText } from './catalogue.js';
 
 // ── helpers ────────────────────────────────────────────────────────
 async function lookupPickupDate(route) {
@@ -137,6 +138,14 @@ export const TOOL_SCHEMAS = [
   {
     type: 'function',
     function: {
+      name: 'read_catalogue',
+      description: "Read the company's product/service catalogue to answer questions about what we offer, items, or prices listed there. Call this whenever the customer asks about the catalogue or a specific product.",
+      parameters: { type: 'object', properties: {}, additionalProperties: false },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'request_human_agent',
       description: 'Hand the conversation to a human agent when the customer asks for a person, is unhappy, or needs something you cannot do.',
       parameters: {
@@ -241,6 +250,14 @@ export async function executeTool(name, args, ctx) {
 
       case 'create_booking':
         return createBookingFromArgs(phoneNumber, args);
+
+      case 'read_catalogue': {
+        const catalogue = await getCatalogueText();
+        if (!catalogue) {
+          return { available: false, message: 'The catalogue is not set up yet. Offer to have the team share product details, or answer from what you already know about our drum/trunk shipping.' };
+        }
+        return { available: true, catalogue };
+      }
 
       case 'request_human_agent': {
         await enableHumanTakeover(phoneNumber, 'Pending human');

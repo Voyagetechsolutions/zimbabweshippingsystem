@@ -8,6 +8,7 @@ import { updateUserSession } from '../services/userSession.js';
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const MAX_TOOL_ROUNDS = 6;   // safety cap so a tool loop can't run forever
 const MAX_HISTORY = 40;      // messages kept per customer (tokens stay bounded)
+const SIMPLE_GREETINGS = new Set(['hi', 'hello', 'hey', 'hie', 'start']);
 
 let _client = null;
 function client() {
@@ -29,22 +30,60 @@ function toWhatsApp(text) {
     .replace(/^\s*[-*]\s+/gm, '• ');     // - / * bullets -> •
 }
 
-// Keep the stored history valid for the OpenAI API: cap length and never
-// let it start with an orphaned tool result (whose assistant turn was cut).
-function trimHistory(history) {
-  let h = history.length > MAX_HISTORY ? history.slice(history.length - MAX_HISTORY) : history;
-  while (h.length && h[0].role === 'tool') h = h.slice(1);
-  return h;
+function normaliseInput(text) {
+  return (text || '').toLowerCase().trim().replace(/[.!?]+$/g, '');
+}
+
+function isSimpleGreeting(text) {
+  return SIMPLE_GREETINGS.has(normaliseInput(text));
+}
+
+function firstNameFromSession(session) {
+  return session.userFirstName || session.userName || null;
+}
+
+function sanitiseHistory(history = []) {
+  const clean = history
+    .filter(msg => ['user', 'assistant'].includes(msg?.role))
+    .map(msg => ({
+      role: msg.role,
+      content: typeof msg.content === 'string' ? msg.content.trim() : '',
+    }))
+    .filter(msg => msg.content);
+
+  return clean.length > MAX_HISTORY ? clean.slice(clean.length - MAX_HISTORY) : clean;
 }
 
 export async function runAgent(sock, phoneNumber, userText, session) {
   const settings = await getBotSettings();
   const system = buildSystemPrompt(settings);
+  const isFreshConversation = session.needsGreeting || !session.hasBeenGreeted;
 
-  const history = Array.isArray(session.aiMessages) ? [...session.aiMessages] : [];
+  if (isSimpleGreeting(userText)) {
+    const firstName = firstNameFromSession(session);
+    const reply = firstName
+      ? `Hi ${firstName}! How can I help you today?`
+      : 'Hi! Welcome to Zimbabwe Shipping. How can I help you today?';
+
+    await sendMessage(sock, phoneNumber, reply);
+    await updateUserSession(phoneNumber, {
+      hasBeenGreeted: true,
+      needsGreeting: false,
+      state: 'MAIN_MENU',
+      step: null,
+      aiMessages: sanitiseHistory([
+        { role: 'user', content: userText },
+        { role: 'assistant', content: reply },
+      ]),
+    });
+    return;
+  }
+
+  const history = isFreshConversation ? [] : sanitiseHistory(session.aiMessages);
   history.push({ role: 'user', content: userText });
 
   const messages = [{ role: 'system', content: system }, ...history];
+  let replied = false;
 
   try {
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
@@ -71,8 +110,16 @@ export async function runAgent(sock, phoneNumber, userText, session) {
 
       // Final assistant reply — send it to the customer.
       const reply = (msg.content || '').trim();
-      if (reply) await sendMessage(sock, phoneNumber, toWhatsApp(reply));
+      if (reply) {
+        await sendMessage(sock, phoneNumber, toWhatsApp(reply));
+        replied = true;
+      }
       break;
+    }
+
+    if (!replied) {
+      await sendMessage(sock, phoneNumber,
+        'I can help with bookings, prices, collection areas, or tracking. What would you like to do today?');
     }
   } catch (err) {
     console.error('AI agent error:', err?.message || err);
@@ -82,5 +129,11 @@ export async function runAgent(sock, phoneNumber, userText, session) {
   }
 
   // Persist the conversation (minus the system prompt) for next time.
-  await updateUserSession(phoneNumber, { aiMessages: trimHistory(messages.slice(1)) });
+  await updateUserSession(phoneNumber, {
+    hasBeenGreeted: true,
+    needsGreeting: false,
+    state: 'MAIN_MENU',
+    step: null,
+    aiMessages: sanitiseHistory(messages.slice(1)),
+  });
 }

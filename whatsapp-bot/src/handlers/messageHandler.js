@@ -7,6 +7,15 @@ import { getBotMessage } from '../services/botMessages.js';
 import { getBotSettings } from '../utils/pricingUtils.js';
 import { runAgent, aiEnabled } from '../ai/agent.js';
 
+const lidToPhoneJid = new Map();
+
+export function rememberPhoneAlias(lid, jid) {
+  if (lid?.endsWith('@lid') && jid?.endsWith('@s.whatsapp.net')) {
+    lidToPhoneJid.set(lid, jid);
+    console.log(`Cached LID phone alias: ${lid} -> ${jid}`);
+  }
+}
+
 export async function handleMessage(sock, message) {
   try {
     const rawJid = message.key.remoteJid;
@@ -36,12 +45,23 @@ export async function handleMessage(sock, message) {
           phoneNumber = match;
         } else {
           // Try direct conversion — LID numbers sometimes map directly
-          phoneNumber = lidNumber + '@s.whatsapp.net';
+          phoneNumber = rawJid;
         }
       } catch {
-        phoneNumber = lidNumber + '@s.whatsapp.net';
+        phoneNumber = rawJid;
       }
       console.log(`🔄 LID resolved: ${rawJid} → ${phoneNumber}`);
+    }
+
+    const cachedPhoneAlias = rawJid.endsWith('@lid') ? lidToPhoneJid.get(rawJid) : null;
+    if (rawJid.endsWith('@lid') && (message.key.senderPn || cachedPhoneAlias)) {
+      phoneNumber = message.key.senderPn || cachedPhoneAlias;
+      lidToPhoneJid.set(rawJid, phoneNumber);
+      console.log(`Using sender phone alias for delivery: ${phoneNumber}`);
+    } else if (rawJid.endsWith('@lid') && message.key.participantPn) {
+      phoneNumber = message.key.participantPn;
+      lidToPhoneJid.set(rawJid, phoneNumber);
+      console.log(`Using participant phone alias for delivery: ${phoneNumber}`);
     }
 
     const messageText = extractMessageText(message);

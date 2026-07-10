@@ -1,0 +1,21 @@
+{
+  "name": "zimbabwe-shipping-whatsapp-ai-bot",
+  "version": "1.0.0",
+  "description": "Official WhatsApp Cloud API AI chat bot for Zimbabwe Shipping",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "send:test": "node scripts/send-test-template.js",
+    "check": "node --check src/server.js && node --check src/ai.js && node --check src/whatsapp.js && node --check src/sessionStore.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "openai": "^4.104.0"
+  }
+}
