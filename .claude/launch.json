@@ -8,6 +8,12 @@
       "port": 8080
     },
     {
+      "name": "preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "preview", "--", "--port", "4173"],
+      "port": 4173
+    },
+    {
       "name": "staff-app-web",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "staff-app", "run", "web", "--", "--port", "8082"],
