@@ -20,6 +20,11 @@ export async function handleMessage(sock, message) {
   try {
     const rawJid = message.key.remoteJid;
     const fromMe = message.key.fromMe;
+
+    if (!rawJid) {
+      console.log('Skipping message without a remote JID');
+      return;
+    }
     
     console.log('📨 Received message from:', rawJid, 'fromMe:', fromMe);
 
@@ -54,14 +59,18 @@ export async function handleMessage(sock, message) {
     }
 
     const cachedPhoneAlias = rawJid.endsWith('@lid') ? lidToPhoneJid.get(rawJid) : null;
-    if (rawJid.endsWith('@lid') && (message.key.senderPn || cachedPhoneAlias)) {
-      phoneNumber = message.key.senderPn || cachedPhoneAlias;
+    const phoneAlias = [
+      message.key.remoteJidAlt,
+      message.key.senderPn,
+      message.key.participantAlt,
+      message.key.participantPn,
+      cachedPhoneAlias
+    ].find(jid => jid?.endsWith('@s.whatsapp.net'));
+
+    if (rawJid.endsWith('@lid') && phoneAlias) {
+      phoneNumber = phoneAlias;
       lidToPhoneJid.set(rawJid, phoneNumber);
       console.log(`Using sender phone alias for delivery: ${phoneNumber}`);
-    } else if (rawJid.endsWith('@lid') && message.key.participantPn) {
-      phoneNumber = message.key.participantPn;
-      lidToPhoneJid.set(rawJid, phoneNumber);
-      console.log(`Using participant phone alias for delivery: ${phoneNumber}`);
     }
 
     const messageText = extractMessageText(message);
@@ -151,6 +160,13 @@ export async function handleMessage(sock, message) {
       
       console.log('⏭️  Skipping fromMe message (not an agent command)');
       return;
+    }
+
+    // Make it clear to the customer that Zimmy has received their message.
+    try {
+      await sock.readMessages([message.key]);
+    } catch (error) {
+      console.log('Could not send read receipt:', error?.message || error);
     }
 
     const session = await getUserSession(phoneNumber);
@@ -243,7 +259,18 @@ async function sendWelcomeMessage(sock, phoneNumber) {
 }
 
 function extractMessageText(message) {
-  const msg = message.message;
+  let msg = message.message;
+  // WhatsApp commonly wraps messages sent from newer clients.
+  for (let i = 0; i < 5; i++) {
+    const wrapped =
+      msg?.ephemeralMessage?.message ||
+      msg?.viewOnceMessage?.message ||
+      msg?.viewOnceMessageV2?.message ||
+      msg?.viewOnceMessageV2Extension?.message ||
+      msg?.documentWithCaptionMessage?.message;
+    if (!wrapped) break;
+    msg = wrapped;
+  }
   // Interactive button/list response (nativeFlowResponseMessage)
   if (msg?.interactiveResponseMessage) {
     try {
