@@ -20,26 +20,15 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    // Optimize bundle size
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          // Vendor chunks for better caching
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-vendor': [
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-select',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-toast',
-          ],
-          'form-vendor': ['react-hook-form', 'zod', '@hookform/resolvers'],
-          'supabase-vendor': ['@supabase/supabase-js', '@supabase/ssr'],
-          'chart-vendor': ['recharts'],
-          'utils': ['date-fns', 'clsx', 'tailwind-merge'],
-        },
-      },
-    },
+    // NOTE: Manual chunk splitting was intentionally removed.
+    // The previous object-form `manualChunks` force-split interdependent
+    // packages (e.g. clsx/tailwind-merge used by the Button component's cn())
+    // into separate chunks, which created circular chunk dependencies. Rollup
+    // then emitted broken re-exports that failed at runtime as
+    // "Export 'Button' is not defined in module" — a white screen on Vercel
+    // (but not always locally, since the bug is build-environment dependent).
+    // Letting Rollup handle chunking is cycle-safe; per-route code splitting
+    // from React.lazy() still produces separate page chunks.
     // Chunk size warnings
     chunkSizeWarningLimit: 1000,
     // Source maps for production debugging (optional)
