@@ -10,6 +10,7 @@ import {
   formatMoney,
 } from '../utils/pricingUtils.js';
 import { getCatalogueText } from './catalogue.js';
+import { notifyRepresentative } from '../services/representativeAlerts.js';
 
 // ── helpers ────────────────────────────────────────────────────────
 async function lookupPickupDate(route) {
@@ -160,7 +161,7 @@ export const TOOL_SCHEMAS = [
 
 // ── tool executor (what actually runs) ─────────────────────────────
 export async function executeTool(name, args, ctx) {
-  const { phoneNumber } = ctx;
+  const { phoneNumber, sock } = ctx;
   try {
     switch (name) {
       case 'get_pricing': {
@@ -249,7 +250,7 @@ export async function executeTool(name, args, ctx) {
       }
 
       case 'create_booking':
-        return createBookingFromArgs(phoneNumber, args);
+        return createBookingFromArgs(sock, phoneNumber, args);
 
       case 'read_catalogue': {
         const catalogue = await getCatalogueText();
@@ -261,6 +262,11 @@ export async function executeTool(name, args, ctx) {
 
       case 'request_human_agent': {
         await enableHumanTakeover(phoneNumber, 'Pending human');
+        await notifyRepresentative(sock, {
+          type: 'Human assistance requested',
+          customerJid: phoneNumber,
+          reason: args.reason,
+        });
         return { ok: true, message: 'A human agent has been notified and will take over. Tell the customer warmly that someone from the team will be with them shortly.' };
       }
 
@@ -273,7 +279,7 @@ export async function executeTool(name, args, ctx) {
   }
 }
 
-async function createBookingFromArgs(phoneNumber, args) {
+async function createBookingFromArgs(sock, phoneNumber, args) {
   const drumQty = args.drumQuantity || 0;
   const trunkQty = args.trunkQuantity || 0;
   const hasOther = !!(args.otherItemsDescription && args.otherItemsDescription.trim());
@@ -319,6 +325,16 @@ async function createBookingFromArgs(phoneNumber, args) {
   const settings = await getBotSettings();
   const pricing = calculatePricing(bookingData, settings);
   const { trackingNumber, receiptNumber } = await createBookingRecords(phoneNumber, bookingData, pricing);
+
+  await notifyRepresentative(sock, {
+    type: hasOther ? 'Booking and custom quote request' : 'New WhatsApp booking',
+    customerJid: phoneNumber,
+    customerName: `${bookingData.senderFirstName} ${bookingData.senderLastName}`.trim(),
+    trackingNumber,
+    summary: hasOther
+      ? bookingData.boxesDescription
+      : `${drumQty} drum(s), ${trunkQty} trunk(s) — ${bookingData.senderCity}`,
+  });
 
   // Save details for re-use next time, and record in history.
   const current = await getUserSession(phoneNumber);

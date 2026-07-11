@@ -102,7 +102,7 @@ export async function runAgent(sock, phoneNumber, userText, session) {
         for (const tc of msg.tool_calls) {
           let args = {};
           try { args = JSON.parse(tc.function.arguments || '{}'); } catch { /* malformed */ }
-          const result = await executeTool(tc.function.name, args, { phoneNumber, session });
+          const result = await executeTool(tc.function.name, args, { phoneNumber, session, sock });
           messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
         }
         continue; // let the model read the tool results and respond

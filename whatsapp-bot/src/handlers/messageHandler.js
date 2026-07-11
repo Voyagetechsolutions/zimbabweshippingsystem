@@ -6,6 +6,7 @@ import { sendMessage, sendListMessage } from '../utils/messageUtils.js';
 import { getBotMessage } from '../services/botMessages.js';
 import { getBotSettings } from '../utils/pricingUtils.js';
 import { runAgent, aiEnabled } from '../ai/agent.js';
+import { notifyRepresentative } from '../services/representativeAlerts.js';
 
 const lidToPhoneJid = new Map();
 
@@ -339,6 +340,12 @@ async function handleMainMenu(sock, phoneNumber, text, session) {
     case 'contact':
     case 'agent':
     case 'speak':
+      await notifyRepresentative(sock, {
+        type: 'Human assistance requested',
+        customerJid: phoneNumber,
+        customerName: session.userName,
+        reason: 'Customer selected Speak to an Agent',
+      });
       await sendMessage(sock, phoneNumber, await getBotMessage('contact'));
       break;
 

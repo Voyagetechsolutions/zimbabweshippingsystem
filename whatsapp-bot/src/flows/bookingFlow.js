@@ -2,6 +2,7 @@ import { updateUserSession, getUserSession } from '../services/userSession.js';
 import { sendMessage } from '../utils/messageUtils.js';
 import { getIrelandCities, getCityToRouteMap } from '../menus/mainMenu.js';
 import { createBookingRecords, getSupabase } from '../services/database.js';
+import { notifyRepresentative } from '../services/representativeAlerts.js';
 import {
   getBotSettings,
   getDrumPrice,
@@ -640,6 +641,16 @@ async function submitBooking(sock, phoneNumber, bookingData) {
     const settings = await getBotSettings();
     const pricing = calculatePricing(bookingData, settings);
     const { trackingNumber, receiptNumber } = await createBookingRecords(phoneNumber, bookingData, pricing);
+
+    await notifyRepresentative(sock, {
+      type: bookingData.includeBoxes ? 'Booking and custom quote request' : 'New WhatsApp booking',
+      customerJid: phoneNumber,
+      customerName: `${bookingData.senderFirstName} ${bookingData.senderLastName}`.trim(),
+      trackingNumber,
+      summary: bookingData.includeBoxes
+        ? bookingData.boxesDescription
+        : `${bookingData.drumQuantity || 0} drum(s), ${bookingData.trunkQuantity || 0} trunk(s) — ${bookingData.senderCity}`,
+    });
 
     // Append to history and persist receiver for re-use.
     const current = await getUserSession(phoneNumber);
