@@ -44,7 +44,7 @@ const HeroSection: React.FC = () => {
 
   return (
     <section className="relative isolate overflow-hidden bg-ink">
-      {/* Real photograph of our team loading a container in the UK */}
+      {/* Branded operations image showing the team loading a container */}
       <img
         src={photos.containerLoading.src}
         alt={photos.containerLoading.alt}

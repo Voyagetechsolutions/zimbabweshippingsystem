@@ -1,10 +1,9 @@
 /**
- * Curated, real photographs of Zimbabwe Shipping operations.
- * These are genuine photos of our team, vans, warehouse and containers —
- * not stock or AI imagery. Referenced by meaningful names so the marketing
- * pages stay readable and we always place the right shot in the right spot.
+ * Curated imagery used across the public marketing pages.
  *
- * Files live in /public/lovable-uploads and are served from the site root.
+ * Keep the file names descriptive so each page can select an image that
+ * matches the service being described. The five featured operations images
+ * live in /public/images/operations and are optimised JPEGs for fast loading.
  */
 
 export interface SitePhoto {
@@ -13,67 +12,71 @@ export interface SitePhoto {
   caption: string;
 }
 
-const u = (id: string) => `/lovable-uploads/${id}.png`;
+const operation = (fileName: string) => `/images/operations/${fileName}`;
+const legacy = (id: string) => `/lovable-uploads/${id}.png`;
 
 export const photos = {
-  /** Our team loading a 40ft container with a forklift in the UK — the hero shot. */
+  /** Warehouse team loading drums into a shipping container. */
   containerLoading: {
-    src: u('0ec045d2-2876-4b1c-8d50-24a1d290bc35'),
-    alt: 'Zimbabwe Shipping team loading a 40ft container by forklift in the UK',
-    caption: 'Loading a 40ft container for Zimbabwe — our own team, our own hands.',
+    src: operation('warehouse-container-loading.jpg'),
+    alt: 'Zimbabwe Shipping team loading sealed drums into a container',
+    caption: 'Careful container loading by our warehouse team.',
   },
-  /** Warehouse stacked with colour-coded shipping drums and wrapped pallets. */
+  /** Team moving a sealed shipping drum through the warehouse. */
   drumWarehouse: {
-    src: u('4f20ce47-cd85-486a-9872-1b0448390358'),
-    alt: 'Shipping drums and wrapped pallets ready to ship in our UK warehouse',
-    caption: 'Drums sealed, labelled and ready in our warehouse.',
+    src: operation('drum-loading-team.jpg'),
+    alt: 'Zimbabwe Shipping warehouse team moving a sealed blue drum',
+    caption: 'Drums handled carefully from our warehouse to the container.',
   },
-  /** Beko appliances collected from a UK address, ready for the van. */
+  /** Customer collection details being checked before loading. */
   applianceCollection: {
-    src: u('003989bd-8fb2-4a3f-bee1-97723875dd54'),
-    alt: 'New appliances collected from a UK address for shipping to Zimbabwe',
-    caption: 'Appliances collected from a customer doorstep in the UK.',
+    src: operation('customer-collection-check-in.jpg'),
+    alt: 'Zimbabwe Shipping team confirming a customer collection',
+    caption: 'Every collection is checked and recorded before shipping.',
   },
-  /** Van fully packed with shrink-wrapped goods for collection. */
+  /** Team loading drums safely over a container ramp. */
   vanPacked: {
-    src: u('0027003d-7b3b-482d-82a2-9cc4877b58b6'),
-    alt: 'Collection van packed with shrink-wrapped goods bound for Zimbabwe',
-    caption: 'Free collection — packed and secured at your door.',
+    src: operation('container-ramp-loading.jpg'),
+    alt: 'Zimbabwe Shipping team loading drums safely into a container',
+    caption: 'Safe loading procedures protect your shipment throughout its journey.',
   },
-  /** Van loaded with boxes and a red drum, including a branded bag. */
+  /** Commercial customer handover at the warehouse. */
   vanLoaded: {
-    src: u('288d0f20-90b3-401c-be86-ac3405522ca9'),
-    alt: 'Boxes, a barrel and bags loaded into a collection van',
-    caption: 'Boxes, barrels and bags — we ship it all.',
+    src: operation('customer-commercial-handover.jpg'),
+    alt: 'Zimbabwe Shipping team completing a commercial customer handover',
+    caption: 'A clear, professional handover for every customer.',
   },
-  /** Warehouse drums wrapped and chalk-marked with Bulawayo destinations. */
+  /** Customer shipment check-in beside sealed drums. */
   warehouseMarked: {
-    src: u('19918789-af89-4bda-ada9-84f82ee92d06'),
-    alt: 'Wrapped consignments chalk-marked with Zimbabwe destinations in our warehouse',
-    caption: 'Every consignment marked for its final city.',
+    src: operation('customer-collection-check-in.jpg'),
+    alt: 'Customer shipment being checked in beside sealed shipping drums',
+    caption: 'Collection details confirmed before goods enter our network.',
   },
-  /** Heavy machinery being loaded into a container. */
+  /** Container loading for commercial and specialist goods. */
   machineryLoading: {
-    src: u('1603c7ce-5777-4673-9c75-28f97df83aeb'),
-    alt: 'Industrial machinery being loaded into a shipping container',
-    caption: 'From a single drum to heavy machinery.',
+    src: operation('warehouse-container-loading.jpg'),
+    alt: 'Warehouse team loading commercial goods for Zimbabwe',
+    caption: 'From single drums to commercial consignments, we load with care.',
   },
   /** Bicycles prepared for shipping. */
   bikes: {
-    src: u('14353843-5722-4925-ae94-9139b2b90e3b'),
+    src: legacy('14353843-5722-4925-ae94-9139b2b90e3b'),
     alt: 'Bicycles prepared for shipping to Zimbabwe',
-    caption: 'Bikes, prepped and ready to travel.',
+    caption: 'Bikes, prepared and ready to travel.',
   },
 } satisfies Record<string, SitePhoto>;
 
-/** A hand-picked reel for galleries / collages. */
-export const photoReel: SitePhoto[] = [
+/** The five new operations images, in the order used by the homepage gallery. */
+export const featuredOperations: SitePhoto[] = [
   photos.containerLoading,
   photos.drumWarehouse,
-  photos.applianceCollection,
   photos.vanPacked,
-  photos.warehouseMarked,
   photos.vanLoaded,
-  photos.machineryLoading,
+  photos.applianceCollection,
+];
+
+/** A broader hand-picked reel for other galleries and collages. */
+export const photoReel: SitePhoto[] = [
+  ...featuredOperations,
   photos.bikes,
 ];

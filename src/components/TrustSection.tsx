@@ -18,7 +18,7 @@ const TrustSection: React.FC = () => {
     <section className="bg-paper py-20 md:py-28 dark:bg-gray-950">
       <div className="container mx-auto px-4">
         <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-          {/* Photo collage — real operations */}
+          {/* Photo collage showing our collection and loading process */}
           <div className="relative">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-4">
@@ -41,7 +41,7 @@ const TrustSection: React.FC = () => {
             {/* Floating credential badge */}
             <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 rounded-2xl bg-ink px-6 py-4 text-center shadow-xl">
               <div className="font-display text-2xl font-extrabold text-zim-yellow">Since 2011</div>
-              <div className="text-xs uppercase tracking-wider text-gray-300">Real photos. Real shipments.</div>
+              <div className="text-xs uppercase tracking-wider text-gray-300">Careful handling. Every shipment.</div>
             </div>
           </div>
 

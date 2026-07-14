@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Loader2, ImageOff, Play, Pause, X, ZoomIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import { featuredOperations } from '@/data/sitePhotos';
 
 interface GalleryImage {
   id: string;
@@ -10,6 +11,14 @@ interface GalleryImage {
   caption: string;
   category: string;
 }
+
+const featuredImages: GalleryImage[] = featuredOperations.map((image, index) => ({
+  id: `featured-operation-${index + 1}`,
+  src: image.src,
+  alt: image.alt,
+  caption: image.caption,
+  category: index < 3 ? 'Shipping operations' : 'Customer service',
+}));
 
 const ShippingGallerySlideshow: React.FC = () => {
   const [images, setImages] = useState<GalleryImage[]>([]);
@@ -31,11 +40,17 @@ const ShippingGallerySlideshow: React.FC = () => {
         if (error) {
           console.error('Error fetching gallery images:', error.message);
         } else {
-          setImages(data || []);
+          const databaseImages = (data || []) as GalleryImage[];
+          const featuredSources = new Set(featuredImages.map((image) => image.src));
+          setImages([
+            ...featuredImages,
+            ...databaseImages.filter((image) => !featuredSources.has(image.src)),
+          ]);
         }
       } catch (err) {
         console.error('Error fetching gallery images:', err);
       } finally {
+        setImages((current) => current.length > 0 ? current : featuredImages);
         setLoading(false);
       }
     };
