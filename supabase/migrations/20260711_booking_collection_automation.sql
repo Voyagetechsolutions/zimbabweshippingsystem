@@ -69,8 +69,17 @@ create policy "Admins manage shipment events" on public.shipment_events
   using (exists (select 1 from public.profiles where id = auth.uid() and is_admin = true))
   with check (exists (select 1 from public.profiles where id = auth.uid() and is_admin = true));
 
-alter publication supabase_realtime add table public.customer_requests;
-alter publication supabase_realtime add table public.shipment_events;
+do $$
+begin
+  alter publication supabase_realtime add table public.customer_requests;
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.shipment_events;
+exception when duplicate_object then null;
+end $$;
 
 create or replace function public.process_collection_scan(
   p_qr_token text,

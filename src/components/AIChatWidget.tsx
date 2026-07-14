@@ -13,13 +13,22 @@ const GREETING: ChatMessage = {
 };
 
 const STORAGE_KEY = 'zimmy-ai-chat';
+const CONVERSATION_KEY = 'zimmy-conversation-id';
 
 const quickPrompts = [
   'How much is a drum?',
-  'Where do you collect?',
-  'I want to book',
+  'When is the next collection?',
+  'Book my shipment',
   'Track a shipment',
 ];
+
+function loadConversationId() {
+  const existing = sessionStorage.getItem(CONVERSATION_KEY);
+  if (existing) return existing;
+  const created = crypto.randomUUID();
+  sessionStorage.setItem(CONVERSATION_KEY, created);
+  return created;
+}
 
 function loadSavedMessages(): ChatMessage[] {
   try {
@@ -46,6 +55,7 @@ const AIChatWidget: React.FC = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const conversationId = useRef(loadConversationId()).current;
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-30)));
@@ -83,6 +93,7 @@ const AIChatWidget: React.FC = () => {
       const payload = next.filter((_, index) => index !== 0).slice(-20);
       const { data, error } = await supabase.functions.invoke('ai-chat', {
         body: {
+          conversationId,
           messages: payload.map((message) => ({
             role: message.role,
             content: message.content,

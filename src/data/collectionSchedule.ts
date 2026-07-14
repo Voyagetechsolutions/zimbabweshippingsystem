@@ -139,12 +139,17 @@ type CollectionSchedule = {
 // Sync collection schedules with Supabase
 export async function syncSchedulesWithDatabase() {
   try {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    if (!supabaseUrl || !publishableKey) throw new Error('Supabase is not configured');
+
     // Call the edge function to get collection schedules
-    const response = await fetch('https://oncsaunsqtekwwbzvvyh.supabase.co/functions/v1/get-collection-schedules', {
+    const response = await fetch(`${supabaseUrl}/functions/v1/get-collection-schedules`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9uY3NhdW5zcXRla3d3Ynp2dnloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM2MjY4NDEsImV4cCI6MjA1OTIwMjg0MX0.pzj7yFjXaCgAETrVauXF3JgtAI_-N9DPP-sF1i1QfAA'
+        apikey: publishableKey,
+        Authorization: `Bearer ${publishableKey}`,
       }
     });
     

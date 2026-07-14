@@ -47,6 +47,7 @@ import DeliveryNotesTab from '@/components/admin/tabs/DeliveryNotesTab';
 import InvoicesTab from '@/components/admin/tabs/InvoicesTab';
 import CustomerRequestsTab from '@/components/admin/tabs/CustomerRequestsTab';
 import CollectionScannerTab from '@/components/admin/tabs/CollectionScannerTab';
+import ZimmyAdminTab from '@/components/admin/tabs/ZimmyAdminTab';
 
 // Icons
 import {
@@ -76,6 +77,7 @@ import {
   AlertCircle,
   CheckCircle2,
   ScanLine,
+  Bot,
 } from 'lucide-react';
 
 interface NavItem {
@@ -136,6 +138,7 @@ const AdminDashboardInner = () => {
       label: 'Overview',
       items: [
         { value: 'overview', label: 'Dashboard', icon: LayoutDashboard },
+        { value: 'zimmy', label: 'Zimmy AI', icon: Bot },
         { value: 'manualBooking', label: 'Manual Booking', icon: PlusCircle },
       ],
     },
@@ -492,6 +495,7 @@ const AdminDashboardInner = () => {
   const renderTabContent = (tabValue: string) => {
     switch (tabValue) {
       case 'overview': return renderOverview();
+      case 'zimmy': return <ZimmyAdminTab />;
       case 'manualBooking': return <ManualBookingTab />;
       case 'shipments': return <ShipmentManagementTab />;
       case 'customQuotes': return <CustomQuoteManagement />;
