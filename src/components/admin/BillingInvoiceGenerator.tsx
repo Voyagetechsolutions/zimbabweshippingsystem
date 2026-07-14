@@ -163,7 +163,7 @@ export function buildDefaultInvoice(s: Shipment): InvoiceData {
   due.setDate(due.getDate() + 14);
   const dueDate = format(due, 'yyyy-MM-dd');
 
-  const refTail = (s.tracking_number || '').replace(/[^0-9A-Z]/gi, '').slice(-6) || 'XXXXXX';
+  const refTail = s.customer_reference || (s.tracking_number || '').replace(/[^0-9A-Z]/gi, '').slice(-6) || 'XXXXXX';
 
   return {
     invoiceNumber: `INV-${refTail}`,

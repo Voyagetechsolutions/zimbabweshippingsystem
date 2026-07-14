@@ -80,6 +80,19 @@ serve(async (req) => {
     
     const destination = shipmentData.destination || 
       `${formattedRecipient.address}, ${formattedRecipient.city}, Zimbabwe`;
+
+    const letters = `${formattedSender.firstName || ''}${formattedSender.lastName || ''}`.replace(/[^a-z]/gi, '').toUpperCase();
+    const prefix = (letters || 'CUS').slice(0, 3).padEnd(3, 'X');
+    const phoneTail = String(formattedSender.phone || '').replace(/\D/g, '').slice(-4).padStart(4, '0');
+    const requestedDate = shipmentData.collectionDetails?.date || shipmentData.metadata?.collection?.date;
+    const parsedDate = new Date(requestedDate || Date.now());
+    const shipmentDate = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+    const mmyy = `${String(shipmentDate.getMonth() + 1).padStart(2, '0')}${String(shipmentDate.getFullYear()).slice(-2)}`;
+    const referenceBase = `${prefix}-${mmyy}-${phoneTail}`;
+    const { count: referenceCount } = await supabaseClient.from('shipments')
+      .select('id', { count: 'exact', head: true }).like('customer_reference', `${referenceBase}%`);
+    const customerReference = referenceCount ? `${referenceBase}-${String(referenceCount + 1).padStart(2, '0')}` : referenceBase;
+    const qrToken = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
     
     // Prepare shipment record with properly formatted metadata
     const shipment = {
@@ -89,6 +102,10 @@ serve(async (req) => {
       origin: origin,
       destination: destination,
       user_id: user?.id || shipmentData.userId || null,
+      customer_reference: customerReference,
+      qr_token: qrToken,
+      collection_status: 'Awaiting Collection',
+      delivery_note_status: 'Draft',
       metadata: {
         ...shipmentData.metadata,
         sender: formattedSender,
@@ -97,7 +114,10 @@ serve(async (req) => {
         recipientDetails: formattedRecipient,
         shipmentDetails: shipmentData.shipmentDetails || shipmentData.metadata?.shipmentDetails,
         shipment: shipmentData.shipmentDetails || shipmentData.metadata?.shipmentDetails,
-        collection: shipmentData.collectionDetails || shipmentData.metadata?.collection || {}
+        collection: shipmentData.collectionDetails || shipmentData.metadata?.collection || {},
+        customerReference,
+        qrToken,
+        deliveryNote: { status: 'Draft', number: `DN-${customerReference}` },
       }
     };
     
@@ -109,6 +129,36 @@ serve(async (req) => {
       .single();
     
     if (error) throw error;
+
+    await supabaseClient.from('customer_requests').insert({
+      shipment_id: data.id,
+      customer_name: formattedSender.name || `${formattedSender.firstName || ''} ${formattedSender.lastName || ''}`.trim(),
+      whatsapp_number: formattedSender.phone,
+      request_type: 'New Booking',
+      message: shipmentData.shipmentDetails?.description || shipmentData.metadata?.shipmentDetails?.description || null,
+      customer_reference: customerReference,
+      status: 'New',
+      unread: true,
+      source: 'website',
+    });
+
+    const botUrl = Deno.env.get('WHATSAPP_BOT_URL');
+    const botKey = Deno.env.get('WHATSAPP_BOT_API_KEY');
+    if (botUrl && botKey && formattedSender.phone) {
+      fetch(`${botUrl.replace(/\/$/, '')}/send-booking-confirmation`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-api-key': botKey },
+        body: JSON.stringify({
+          phone_number: formattedSender.phone,
+          customer_reference: customerReference,
+          tracking_number: trackingNumber,
+          qr_token: qrToken,
+          collection_date: requestedDate || 'To be confirmed',
+          collection_address: origin,
+          payment_method: shipmentData.paymentMethod || shipmentData.metadata?.pricing?.paymentMethod || 'To be confirmed',
+        }),
+      }).catch((notifyError) => console.error('WhatsApp booking confirmation failed:', notifyError));
+    }
     
     // Return response
     return new Response(
@@ -116,7 +166,9 @@ serve(async (req) => {
         success: true,
         shipment: data,
         shipmentId: data.id,
-        trackingNumber: data.tracking_number
+        trackingNumber: data.tracking_number,
+        customerReference,
+        qrToken,
       }),
       { 
         headers: { 

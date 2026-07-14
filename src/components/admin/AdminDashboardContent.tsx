@@ -45,6 +45,8 @@ import ServiceReviewsTab from '@/components/admin/tabs/ServiceReviewsTab';
 import ManualBookingTab from '@/components/admin/tabs/ManualBookingTab';
 import DeliveryNotesTab from '@/components/admin/tabs/DeliveryNotesTab';
 import InvoicesTab from '@/components/admin/tabs/InvoicesTab';
+import CustomerRequestsTab from '@/components/admin/tabs/CustomerRequestsTab';
+import CollectionScannerTab from '@/components/admin/tabs/CollectionScannerTab';
 
 // Icons
 import {
@@ -73,6 +75,7 @@ import {
   ArrowRight,
   AlertCircle,
   CheckCircle2,
+  ScanLine,
 } from 'lucide-react';
 
 interface NavItem {
@@ -115,6 +118,7 @@ const AdminDashboardInner = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [navQuery, setNavQuery] = useState('');
+  const [customerRequestUnread, setCustomerRequestUnread] = useState(0);
 
   const [stats, setStats] = useState({
     totalShipments: 0,
@@ -150,6 +154,7 @@ const AdminDashboardInner = () => {
       items: [
         { value: 'pickupZones', label: 'Pickup Zones', icon: MapPin },
         { value: 'delivery', label: 'Delivery', icon: Truck },
+        { value: 'collectionScanner', label: 'Scan Collection', icon: ScanLine },
         { value: 'deliveryNotes', label: 'Delivery Notes', icon: FileText },
         { value: 'schedule', label: 'Schedule', icon: Calendar },
         { value: 'routes', label: 'Routes', icon: Route },
@@ -169,6 +174,7 @@ const AdminDashboardInner = () => {
       key: 'communications',
       label: 'Communications',
       items: [
+        { value: 'customerRequests', label: 'Customer Requests', icon: MessageSquare, badge: customerRequestUnread || undefined },
         { value: 'feedback', label: 'Feedback', icon: Star },
       ],
     },
@@ -179,7 +185,7 @@ const AdminDashboardInner = () => {
         { value: 'contentManagement', label: 'Content', icon: ImageIcon },
       ],
     },
-  ], [stats.pendingShipments, stats.pendingQuotes]);
+  ], [stats.pendingShipments, stats.pendingQuotes, customerRequestUnread]);
 
   const filteredNavGroups = useMemo(() => {
     const q = navQuery.trim().toLowerCase();
@@ -196,6 +202,19 @@ const AdminDashboardInner = () => {
     fetchDashboardStats();
     fetchNotifications();
     fetchRecentShipments();
+  }, []);
+
+  useEffect(() => {
+    const db = supabase as any;
+    const refreshUnread = async () => {
+      const { count } = await db.from('customer_requests').select('id', { count: 'exact', head: true }).eq('unread', true);
+      setCustomerRequestUnread(count || 0);
+    };
+    refreshUnread();
+    const channel = db.channel('customer-request-badge')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'customer_requests' }, refreshUnread)
+      .subscribe();
+    return () => { db.removeChannel(channel); };
   }, []);
 
   const fetchDashboardStats = async () => {
@@ -488,6 +507,8 @@ const AdminDashboardInner = () => {
       case 'feedback': return <ServiceReviewsTab />;
       case 'deliveryNotes': return <DeliveryNotesTab />;
       case 'invoices': return <InvoicesTab />;
+      case 'customerRequests': return <CustomerRequestsTab onUnreadChange={setCustomerRequestUnread} />;
+      case 'collectionScanner': return <CollectionScannerTab />;
       default: return null;
     }
   };

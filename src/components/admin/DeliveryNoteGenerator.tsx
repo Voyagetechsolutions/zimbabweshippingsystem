@@ -1,4 +1,5 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import QRCode from 'qrcode';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -270,6 +271,8 @@ function buildItemsSummary(s: Shipment) {
 function buildRefNumber(s: Shipment) {
   const override = getOverrides(s).refNumber;
   if (override && override.trim()) return override.trim();
+  if (s.customer_reference) return s.customer_reference;
+  if (s.metadata?.customerReference) return s.metadata.customerReference;
   const name = getSenderName(s);
   const phone = getSenderPhone(s);
   const letters = name.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 3);
@@ -286,6 +289,12 @@ function buildRefNumber(s: Shipment) {
 
 const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipment; overrides?: DeliveryNoteOverrides }>(
   ({ shipment, overrides: overridesProp }, ref) => {
+    const [qrDataUrl, setQrDataUrl] = useState('');
+    useEffect(() => {
+      const token = shipment.qr_token || shipment.metadata?.qrToken;
+      if (!token) return setQrDataUrl('');
+      QRCode.toDataURL(token, { width: 180, margin: 1 }).then(setQrDataUrl).catch(() => setQrDataUrl(''));
+    }, [shipment.qr_token, shipment.metadata?.qrToken]);
     // Live edits (overridesProp) take priority; otherwise fall back to what's saved.
     const overrides = overridesProp ?? getOverrides(shipment);
     const refNumber = buildRefNumber(shipment);
@@ -352,6 +361,7 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
               <div>Date: <strong>{docDate}</strong></div>
               {deliveryDate && <div>Delivery Date: <strong>{deliveryDate}</strong></div>}
             </div>
+            {qrDataUrl && <img src={qrDataUrl} alt={`Collection QR ${refNumber}`} style={{ width: '104px', height: '104px', marginTop: '8px', marginLeft: 'auto' }} />}
           </div>
         </div>
 

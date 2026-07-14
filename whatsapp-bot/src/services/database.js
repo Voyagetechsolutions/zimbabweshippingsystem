@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import { randomBytes } from 'node:crypto';
 import { CURRENCY, COUNTRY } from '../utils/pricingUtils.js';
 
 dotenv.config();
@@ -33,6 +34,44 @@ function generateReceiptNumber(timestamp) {
 
 function generateTransactionId(timestamp) {
   return `TX-${String(timestamp).slice(-12)}`;
+}
+
+function referenceBase(firstName, lastName, phone, shipmentDate) {
+  const letters = `${firstName || ''}${lastName || ''}`.replace(/[^a-z]/gi, '').toUpperCase();
+  const prefix = (letters || 'CUS').slice(0, 3).padEnd(3, 'X');
+  const phoneDigits = String(phone || '').replace(/\D/g, '');
+  const phoneTail = phoneDigits.slice(-4).padStart(4, '0');
+  const parsed = new Date(shipmentDate);
+  const date = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  return `${prefix}-${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getFullYear()).slice(-2)}-${phoneTail}`;
+}
+
+async function generateCustomerReference(bookingData) {
+  const base = referenceBase(bookingData.senderFirstName, bookingData.senderLastName, bookingData.senderPhone, bookingData.collectionDate);
+  if (!supabase) return base;
+  const { data } = await supabase.from('shipments').select('customer_reference').like('customer_reference', `${base}%`);
+  const count = data?.length || 0;
+  return count === 0 ? base : `${base}-${String(count + 1).padStart(2, '0')}`;
+}
+
+export async function createCustomerRequest({ shipmentId = null, customerName = null, whatsappNumber, requestType, message = null, customerReference = null }) {
+  if (!supabase || !whatsappNumber) return null;
+  const { data, error } = await supabase.from('customer_requests').insert({
+    shipment_id: shipmentId,
+    customer_name: customerName,
+    whatsapp_number: whatsappNumber,
+    request_type: requestType,
+    message,
+    customer_reference: customerReference,
+    status: 'New',
+    unread: true,
+    source: 'whatsapp-bot',
+  }).select().single();
+  if (error) {
+    console.warn('Customer request could not be saved:', error.message);
+    return null;
+  }
+  return data;
 }
 
 async function findCollectionScheduleId(route, date) {
@@ -86,6 +125,8 @@ export async function createBookingRecords(phoneNumber, bookingData, pricing) {
   const timestamp = Date.now();
   const receiptNumber = generateReceiptNumber(timestamp);
   const transactionId = generateTransactionId(timestamp);
+  const customerReference = await generateCustomerReference(bookingData);
+  const qrToken = randomBytes(24).toString('base64url');
 
   const isOtherItemsOnly =
     bookingData.includeBoxes &&
@@ -185,6 +226,9 @@ export async function createBookingRecords(phoneNumber, bookingData, pricing) {
     notes: notes.length ? notes.join(' | ') : null,
     bookingSource: 'whatsapp-bot-ireland',
     whatsappNumber: phoneNumber,
+    customerReference,
+    qrToken,
+    deliveryNote: { status: 'Draft', number: `DN-${customerReference}` },
     createdAt: new Date(timestamp).toISOString(),
   };
 
@@ -202,6 +246,10 @@ export async function createBookingRecords(phoneNumber, bookingData, pricing) {
       origin: `${bookingData.senderCity}, ${COUNTRY}`,
       destination: `${bookingData.receiverCity}, Zimbabwe`,
       status: isOtherItemsOnly ? 'Awaiting Quote' : 'pending',
+      customer_reference: customerReference,
+      qr_token: qrToken,
+      collection_status: 'Awaiting Collection',
+      delivery_note_status: 'Draft',
       metadata: shipmentMetadata,
       collection_schedule_id: collectionScheduleId,
       can_modify: true,
@@ -276,8 +324,19 @@ export async function createBookingRecords(phoneNumber, bookingData, pricing) {
   const fullName = `${bookingData.senderFirstName || ''} ${bookingData.senderLastName || ''}`.trim();
   await ensureProfileFor(bookingData.senderEmail, fullName, shipmentRow.id);
 
+  await createCustomerRequest({
+    shipmentId: shipmentRow.id,
+    customerName: fullName,
+    whatsappNumber: phoneNumber,
+    requestType: isOtherItemsOnly ? 'Custom Quote' : 'New Booking',
+    message: isOtherItemsOnly
+      ? bookingData.boxesDescription
+      : `${bookingData.drumQuantity || 0} drum(s), ${bookingData.trunkQuantity || 0} trunk(s)`,
+    customerReference,
+  });
+
   console.log('✅ Booking created:', trackingNumber, '/', receiptNumber);
-  return { trackingNumber, receiptNumber };
+  return { trackingNumber, receiptNumber, customerReference, qrToken, shipmentId: shipmentRow.id };
 }
 
 export async function getShipmentByTracking(trackingNumber) {

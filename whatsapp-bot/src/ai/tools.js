@@ -1,4 +1,4 @@
-import { getSupabase, createBookingRecords, getShipmentByTracking } from '../services/database.js';
+import { getSupabase, createBookingRecords, getShipmentByTracking, createCustomerRequest } from '../services/database.js';
 import { getCityToRouteMap } from '../menus/mainMenu.js';
 import { updateUserSession, getUserSession, enableHumanTakeover } from '../services/userSession.js';
 import {
@@ -11,6 +11,7 @@ import {
 } from '../utils/pricingUtils.js';
 import { getCatalogueText } from './catalogue.js';
 import { notifyRepresentative } from '../services/representativeAlerts.js';
+import { sendBookingConfirmation } from '../services/bookingNotifications.js';
 
 // ── helpers ────────────────────────────────────────────────────────
 async function lookupPickupDate(route) {
@@ -262,6 +263,7 @@ export async function executeTool(name, args, ctx) {
 
       case 'request_human_agent': {
         await enableHumanTakeover(phoneNumber, 'Pending human');
+        await createCustomerRequest({ whatsappNumber: phoneNumber, requestType: 'Human Assistance', message: args.reason });
         await notifyRepresentative(sock, {
           type: 'Human assistance requested',
           customerJid: phoneNumber,
@@ -324,13 +326,16 @@ async function createBookingFromArgs(sock, phoneNumber, args) {
 
   const settings = await getBotSettings();
   const pricing = calculatePricing(bookingData, settings);
-  const { trackingNumber, receiptNumber } = await createBookingRecords(phoneNumber, bookingData, pricing);
+  const booking = await createBookingRecords(phoneNumber, bookingData, pricing);
+  const { trackingNumber, receiptNumber, customerReference } = booking;
+  await sendBookingConfirmation(sock, phoneNumber, booking, bookingData);
 
   await notifyRepresentative(sock, {
     type: hasOther ? 'Booking and custom quote request' : 'New WhatsApp booking',
     customerJid: phoneNumber,
     customerName: `${bookingData.senderFirstName} ${bookingData.senderLastName}`.trim(),
     trackingNumber,
+    customerReference,
     summary: hasOther
       ? bookingData.boxesDescription
       : `${drumQty} drum(s), ${trunkQty} trunk(s) — ${bookingData.senderCity}`,

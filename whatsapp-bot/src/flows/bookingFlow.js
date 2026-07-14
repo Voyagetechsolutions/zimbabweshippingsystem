@@ -3,6 +3,7 @@ import { sendMessage } from '../utils/messageUtils.js';
 import { getIrelandCities, getCityToRouteMap } from '../menus/mainMenu.js';
 import { createBookingRecords, getSupabase } from '../services/database.js';
 import { notifyRepresentative } from '../services/representativeAlerts.js';
+import { sendBookingConfirmation } from '../services/bookingNotifications.js';
 import {
   getBotSettings,
   getDrumPrice,
@@ -640,7 +641,9 @@ async function submitBooking(sock, phoneNumber, bookingData) {
   try {
     const settings = await getBotSettings();
     const pricing = calculatePricing(bookingData, settings);
-    const { trackingNumber, receiptNumber } = await createBookingRecords(phoneNumber, bookingData, pricing);
+    const booking = await createBookingRecords(phoneNumber, bookingData, pricing);
+    const { trackingNumber, receiptNumber, customerReference } = booking;
+    await sendBookingConfirmation(sock, phoneNumber, booking, bookingData);
 
     await notifyRepresentative(sock, {
       type: bookingData.includeBoxes ? 'Booking and custom quote request' : 'New WhatsApp booking',
@@ -676,6 +679,7 @@ async function submitBooking(sock, phoneNumber, bookingData) {
 
     let msg = `🎉 *Booking confirmed!*\n\n`;
     msg += `📦 Tracking: *${trackingNumber}*\n`;
+    msg += `Customer reference: *${customerReference}*\n`;
     if (receiptNumber) msg += `🧾 Receipt: *${receiptNumber}*\n`;
     if (pricing.finalTotal > 0) msg += `💰 Amount: *${formatMoney(pricing.finalTotal)}*\n`;
     msg += `\n📞 We'll be in touch within 24 hours to confirm your collection.\n\n`;

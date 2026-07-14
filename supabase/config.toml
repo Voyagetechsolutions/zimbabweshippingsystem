@@ -79,13 +79,6 @@ enabled = false
 port = 54327
 vector_port = 54328
 backend = "postgres"
-[analytics.options]
-endpoint = "http://localhost:54327"
-
-# Configure one of the supported drivers (postgres, clickhouse or bigquery)
-[experimental.analytics.postgres]
-enabled = true
-connection_string = "postgres://supabase:supabase@localhost:54322/postgres"
 
 [functions.send-email]
 verify_jwt = true
@@ -136,4 +129,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.send-invoice-whatsapp]
+verify_jwt = true
+
+[functions.collection-notification]
 verify_jwt = true

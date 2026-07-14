@@ -49,6 +49,16 @@ export async function sendImage(sock, phoneNumber, imageUrl, caption = '') {
   }
 }
 
+export async function sendImageBuffer(sock, phoneNumber, image, caption = '') {
+  try {
+    await sock.sendMessage(phoneNumber, { image, caption });
+    return true;
+  } catch (error) {
+    console.error('Error sending image buffer:', error);
+    return false;
+  }
+}
+
 export async function sendDocument(sock, phoneNumber, documentUrl, fileName, caption = '') {
   try {
     await sock.sendMessage(phoneNumber, { document: { url: documentUrl }, fileName, caption });

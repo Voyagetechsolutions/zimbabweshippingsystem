@@ -11,6 +11,11 @@ export interface Shipment {
   metadata: ShipmentMetadata;
   can_cancel: boolean;
   can_modify: boolean;
+  customer_reference?: string;
+  qr_token?: string;
+  collection_status?: string;
+  delivery_note_status?: string;
+  collected_at?: string | null;
   // Additional optional fields
   carrier?: string;
   weight?: number | string;

@@ -121,7 +121,7 @@ export function startQRServer() {
   // Internal endpoint — called by Supabase Edge Function to push a WhatsApp message
   app.post('/send-message', async (req, res) => {
     const apiKey = process.env.BOT_API_KEY;
-    if (apiKey && req.headers['x-api-key'] !== apiKey) {
+    if (!apiKey || req.headers['x-api-key'] !== apiKey) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
@@ -140,6 +140,26 @@ export function startQRServer() {
       res.json({ success: true });
     } catch (err) {
       console.error('send-message error:', err);
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  app.post('/send-booking-confirmation', async (req, res) => {
+    const apiKey = process.env.BOT_API_KEY;
+    if (!apiKey || req.headers['x-api-key'] !== apiKey) return res.status(401).json({ error: 'Unauthorized' });
+    const { phone_number, customer_reference, tracking_number, qr_token, collection_date, collection_address, payment_method } = req.body;
+    if (!phone_number || !customer_reference || !tracking_number || !qr_token) return res.status(400).json({ error: 'Missing booking confirmation fields' });
+    try {
+      const [{ getActiveSock }, QRCode] = await Promise.all([import('./index.js'), import('qrcode')]);
+      const sock = getActiveSock();
+      if (!sock) return res.status(503).json({ error: 'Bot not connected' });
+      const jid = phone_number.includes('@') ? phone_number : `${String(phone_number).replace(/\D/g, '')}@s.whatsapp.net`;
+      const image = await QRCode.default.toBuffer(qr_token, { type: 'png', width: 640, margin: 2 });
+      const caption = `✅ *Booking confirmed*\n\nCustomer reference: *${customer_reference}*\nTracking number: *${tracking_number}*\nCollection date: ${collection_date}\nCollection address: ${collection_address}\nPayment method: ${payment_method}\n\nShow this QR code to the driver when your goods are collected.`;
+      await sock.sendMessage(jid, { image, caption });
+      res.json({ success: true });
+    } catch (err) {
+      console.error('send-booking-confirmation error:', err);
       res.status(500).json({ error: String(err) });
     }
   });
