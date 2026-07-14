@@ -55,6 +55,21 @@ const AIChatWidget: React.FC = () => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, open]);
 
+  useEffect(() => {
+    const openFromAnnouncement = () => {
+      setOpen(true);
+      window.dispatchEvent(new Event('zimmy:opened'));
+    };
+
+    window.addEventListener('zimmy:open', openFromAnnouncement);
+    return () => window.removeEventListener('zimmy:open', openFromAnnouncement);
+  }, []);
+
+  const openChat = () => {
+    setOpen(true);
+    window.dispatchEvent(new Event('zimmy:opened'));
+  };
+
   const send = async (overrideText?: string) => {
     const text = (overrideText ?? input).trim();
     if (!text || loading) return;
@@ -112,7 +127,7 @@ const AIChatWidget: React.FC = () => {
     <>
       {!open && (
         <button
-          onClick={() => setOpen(true)}
+          onClick={openChat}
           className="fixed bottom-6 right-6 z-[60] flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary/50"
           aria-label="Open Zimmy chat assistant"
         >

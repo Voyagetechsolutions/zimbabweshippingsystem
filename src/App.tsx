@@ -14,6 +14,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import ScrollToTop from '@/components/ScrollToTop';
 import ScrollToTopButton from '@/components/ScrollToTopButton';
 import AIChatWidget from '@/components/AIChatWidget';
+import ZimmyAnnouncement from '@/components/ZimmyAnnouncement';
 
 // Lazy load pages for code splitting and better performance
 const Index = lazy(() => import('@/pages/Index'));
@@ -145,6 +146,7 @@ function App() {
             </RoleProvider>
           </AuthProvider>
           <ScrollToTopButton />
+          <ZimmyAnnouncement />
           <AIChatWidget />
           <Toaster />
         </div>
