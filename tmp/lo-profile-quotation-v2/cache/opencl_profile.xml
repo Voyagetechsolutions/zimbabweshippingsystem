@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<profile>
+ <version>LibreOffice v1</version>
+ <device>
+  <type>opencl</type>
+  <name>NVIDIA GeForce GTX 1650</name>
+  <driver>596.21</driver>
+  <time>50797</time>
+  <errors>false</errors>
+ </device>
+ <device>
+  <type>opencl</type>
+  <name>gfx902</name>
+  <driver>3075.13 (PAL,HSAIL)</driver>
+  <time>76039</time>
+  <errors>false</errors>
+ </device>
+ <device>
+  <type>native</type>
+  <time>2959872</time>
+  <errors>false</errors>
+ </device>
+</profile>

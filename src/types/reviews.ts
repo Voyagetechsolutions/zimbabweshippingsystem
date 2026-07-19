@@ -8,6 +8,7 @@ export interface Review {
   createdAt: string;
   userName: string;
   userEmail: string;
+  moderationStatus?: 'pending' | 'published' | 'flagged' | 'hidden' | string;
 }
 
 export interface ReviewFormData {

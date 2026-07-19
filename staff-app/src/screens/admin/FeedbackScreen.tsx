@@ -11,6 +11,7 @@ interface Review {
   overall_experience: number;
   overall_customer_service: number;
   additional_comments: string | null;
+  goods_rating?:number|null;driver_rating?:number|null;needs_attention?:boolean;
 }
 
 export default function FeedbackScreen() {
@@ -19,11 +20,9 @@ export default function FeedbackScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('service_reviews')
-      .select('id, created_at, full_name, customer_reference_number, overall_experience, overall_customer_service, additional_comments')
-      .order('created_at', { ascending: false });
-    if (!error) setReviews((data as Review[]) || []);
+    const[service,customer]=await Promise.all([supabase.from('service_reviews').select('id, created_at, full_name, customer_reference_number, overall_experience, overall_customer_service, additional_comments').order('created_at',{ascending:false}),supabase.from('customer_feedback').select('id,created_at,service_rating,driver_rating,goods_rating,comments,needs_attention,shipment:shipments(customer_reference,tracking_number,metadata)').order('created_at',{ascending:false})]);
+    const mapped=((customer.data as any[])||[]).map((row:any)=>({id:row.id,created_at:row.created_at,full_name:row.shipment?.metadata?.sender?.name||'App customer',customer_reference_number:row.shipment?.customer_reference||row.shipment?.tracking_number||'Shipment',overall_experience:row.service_rating,overall_customer_service:row.driver_rating||row.service_rating,additional_comments:row.comments,goods_rating:row.goods_rating,driver_rating:row.driver_rating,needs_attention:row.needs_attention}));
+    setReviews([...(mapped as Review[]),...((service.data as Review[])||[])].sort((a,b)=>b.created_at.localeCompare(a.created_at)));
   }, []);
 
   useEffect(() => { (async () => { setLoading(true); await load(); setLoading(false); })(); }, [load]);
@@ -48,6 +47,8 @@ export default function FeedbackScreen() {
           </View>
           <Text style={styles.ref}>{item.customer_reference_number}</Text>
           <Text style={styles.meta}>Customer service: {item.overall_customer_service}/5</Text>
+          {item.driver_rating?<Text style={styles.meta}>Driver: {item.driver_rating}/5 · Goods: {item.goods_rating}/5</Text>:null}
+          {item.needs_attention?<Text style={styles.attention}>Needs attention</Text>:null}
           {item.additional_comments ? <Text style={styles.comment}>{item.additional_comments}</Text> : null}
           <Text style={styles.date}>{new Date(item.created_at).toLocaleDateString()}</Text>
         </View>
@@ -69,4 +70,5 @@ const styles = StyleSheet.create({
   comment: { fontSize: 13, color: colors.text, marginTop: 4 },
   date: { fontSize: 11, color: colors.textFaint, marginTop: 4 },
   empty: { textAlign: 'center', color: colors.textMuted, paddingVertical: 40 },
+  attention:{fontSize:11,fontWeight:'800',color:colors.danger,marginTop:3},
 });

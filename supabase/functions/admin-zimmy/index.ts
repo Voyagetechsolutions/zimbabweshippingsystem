@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { enforceAiRateLimit } from "../_shared/rateLimit.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
@@ -511,6 +512,9 @@ serve(async (req) => {
     if (!profile || (!profile.is_admin && !["admin", "staff"].includes(profile.role))) {
       return jsonResponse({ error: "Admin access required" }, 403);
     }
+
+    const limited = await enforceAiRateLimit(req, "admin-zimmy", corsHeaders);
+    if (limited) return limited;
 
     const body = await req.json();
     const conversationId = cleanString(body?.conversationId, 120) || crypto.randomUUID();

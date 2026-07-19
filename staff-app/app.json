@@ -11,6 +11,24 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Zimbabwe Shipping Staff to scan shipment QR codes.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow Zimbabwe Shipping Staff to photograph goods as collection and delivery proof.",
+          "photosPermission": "Allow Zimbabwe Shipping Staff to access proof photographs.",
+          "microphonePermission": false
+        }
+      ]
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.zimbabweshipping.staff"

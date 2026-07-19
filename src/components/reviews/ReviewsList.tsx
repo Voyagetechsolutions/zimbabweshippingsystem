@@ -86,7 +86,14 @@ const ReviewsList: React.FC<ReviewsListProps> = ({
                   </div>
                 </div>
               </div>
-              {renderStarRating(review.rating)}
+              <div className="flex items-center gap-2">
+                {canManageReview(review.userId) && review.moderationStatus && review.moderationStatus !== 'published' && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                    {review.moderationStatus === 'pending' ? 'Being checked' : 'With our team'}
+                  </span>
+                )}
+                {renderStarRating(review.rating)}
+              </div>
             </div>
           </CardHeader>
           <CardContent>

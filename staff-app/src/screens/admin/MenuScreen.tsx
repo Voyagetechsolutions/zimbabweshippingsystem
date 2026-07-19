@@ -3,6 +3,7 @@ import { View, Text, SectionList, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useViewRole } from '../../context/ViewRoleContext';
 import { colors, radius, spacing } from '../../theme';
 import type { MenuStackParams } from '../../navigation/types';
 
@@ -17,31 +18,24 @@ type Item = {
   placeholder?: boolean;
 };
 
-// Same groups and labels as the website admin sidebar.
+// Enterprise-style categories: Operations / Sales / Finance / Administration.
 const SECTIONS: { title: string; data: Item[] }[] = [
-  {
-    title: 'Overview',
-    data: [
-      { label: 'Dashboard', icon: 'grid-outline', tab: 'Home' },
-      { label: 'Manual Booking', icon: 'add-circle-outline', to: 'ManualBooking' },
-    ],
-  },
-  {
-    title: 'Shipments',
-    data: [
-      { label: 'All Shipments', icon: 'cube-outline', tab: 'Shipments' },
-      { label: 'Custom Quotes', icon: 'pricetag-outline', to: 'CustomQuotes' },
-      { label: 'Customers', icon: 'people-outline', to: 'Customers' },
-    ],
-  },
   {
     title: 'Operations',
     data: [
-      { label: 'Pickup Zones', icon: 'location-outline', placeholder: true },
-      { label: 'Delivery', icon: 'car-outline', to: 'Delivery' },
-      { label: 'Delivery Notes', icon: 'document-text-outline', placeholder: true },
-      { label: 'Schedule', icon: 'calendar-outline', to: 'Schedule' },
-      { label: 'Routes', icon: 'map-outline', placeholder: true },
+      { label: 'Bookings', icon: 'add-circle-outline', to: 'ManualBooking' },
+      { label: 'Shipments', icon: 'cube-outline', tab: 'Shipments' },
+      { label: 'Driver Runs', icon: 'car-outline', tab: 'Runs' },
+      { label: 'Delivery', icon: 'navigate-outline', to: 'Delivery' },
+      { label: 'Collection Schedule', icon: 'calendar-outline', to: 'Schedule' },
+    ],
+  },
+  {
+    title: 'Sales',
+    data: [
+      { label: 'Quotes', icon: 'pricetag-outline', to: 'CustomQuotes' },
+      { label: 'Customers', icon: 'people-outline', to: 'Customers' },
+      { label: 'Feedback', icon: 'star-outline', to: 'Feedback' },
     ],
   },
   {
@@ -49,21 +43,21 @@ const SECTIONS: { title: string; data: Item[] }[] = [
     data: [
       { label: 'Invoices', icon: 'receipt-outline', to: 'Invoices' },
       { label: 'Payments', icon: 'card-outline', to: 'Payments' },
-      { label: '30-Day Payments', icon: 'time-outline', placeholder: true },
-      { label: 'Reports', icon: 'stats-chart-outline', to: 'Reports' },
+      { label: 'Revenue Reports', icon: 'stats-chart-outline', to: 'Reports' },
     ],
   },
   {
-    title: 'Communications',
-    data: [{ label: 'Feedback', icon: 'star-outline', to: 'Feedback' }],
-  },
-  {
-    title: 'System',
-    data: [{ label: 'Content', icon: 'image-outline', placeholder: true }],
+    title: 'Administration',
+    data: [
+      { label: 'Staff Control Centre', icon: 'shield-checkmark-outline', to: 'StaffRecords' },
+      { label: 'Pickup Zones', icon: 'location-outline', placeholder: true },
+      { label: 'Account', icon: 'person-outline', to: 'Account' },
+    ],
   },
 ];
 
 export default function MenuScreen({ navigation }: Props) {
+  const { clearRole } = useViewRole();
   const open = (item: Item) => {
     if (item.tab) {
       // Jump to a bottom tab (Home / Shipments).
@@ -81,7 +75,7 @@ export default function MenuScreen({ navigation }: Props) {
         sections={SECTIONS}
         keyExtractor={(item) => item.label}
         contentContainerStyle={styles.content}
-        ListHeaderComponent={<Text style={styles.title}>Admin Sections</Text>}
+        ListHeaderComponent={<Text style={styles.title}>More</Text>}
         renderSectionHeader={({ section }) => (
           <Text style={styles.group}>{section.title}</Text>
         )}
@@ -93,6 +87,13 @@ export default function MenuScreen({ navigation }: Props) {
           </Pressable>
         )}
         stickySectionHeadersEnabled={false}
+        ListFooterComponent={(
+          <Pressable style={styles.switchRow} onPress={clearRole}>
+            <Ionicons name="swap-horizontal-outline" size={19} color={colors.primary} />
+            <Text style={styles.switchLabel}>Switch Dashboard</Text>
+            <Ionicons name="chevron-forward" size={17} color={colors.primary} />
+          </Pressable>
+        )}
       />
     </SafeAreaView>
   );
@@ -113,4 +114,6 @@ const styles = StyleSheet.create({
   },
   rowIcon: { marginRight: spacing.md },
   rowLabel: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text },
+  switchRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.lg, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.primary, borderRadius: radius.sm, backgroundColor: colors.surface },
+  switchLabel: { flex: 1, fontSize: 14, fontWeight: '800', color: colors.primary },
 });

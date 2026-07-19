@@ -47,6 +47,10 @@ export interface Tables {
     rating: number;
     comment: string | null;
     created_at: string;
+    moderation_status: string;
+    moderation_sentiment: string | null;
+    moderation_reason: string | null;
+    moderated_at: string | null;
   };
   
   // Add the gallery table we just created

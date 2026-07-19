@@ -182,11 +182,45 @@ const Pricing = () => {
                     <div className="flex items-center gap-4">
                       <Truck className="h-6 w-6 text-gray-600" />
                       <div>
-                        <p className="font-semibold">Door-to-Door Delivery</p>
-                        <p className="text-sm text-gray-600">Direct to recipient's address</p>
+                        <p className="font-semibold">Door-to-Door Collection</p>
+                        <p className="text-sm text-gray-600">We collect from your door — £25 in the UK, €25 in Ireland</p>
                       </div>
                     </div>
-                    <span className="text-xl font-bold">£25</span>
+                    <span className="text-xl font-bold">£25 / €25</span>
+                  </div>
+                  <div className="flex items-center justify-between p-6 bg-gray-50 rounded-xl md:col-span-2">
+                    <div className="flex items-center gap-4">
+                      <Truck className="h-6 w-6 text-gray-600" />
+                      <div>
+                        <p className="font-semibold">Delivery in Zimbabwe</p>
+                        <p className="text-sm text-gray-600">
+                          Direct to the recipient's address in all major cities and towns — £25 (UK shipments) or €25 (Ireland
+                          shipments) per delivery address. We don't deliver to rural areas or small villages; depot collection
+                          in Harare, Bulawayo or Mutare is free.
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xl font-bold whitespace-nowrap">£25 / €25</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Discounts */}
+              <div className="mb-16">
+                <h2 className="text-2xl font-bold mb-6">Discounts</h2>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="p-6 bg-green-50 border border-green-200 rounded-xl">
+                    <p className="font-semibold text-green-900">Referral Discount</p>
+                    <p className="text-sm text-green-800 mt-1">
+                      Refer someone who ships with us and get £20 (UK) or €20 (Ireland) off your next shipment.
+                    </p>
+                  </div>
+                  <div className="p-6 bg-green-50 border border-green-200 rounded-xl">
+                    <p className="font-semibold text-green-900">Returning Residents</p>
+                    <p className="text-sm text-green-800 mt-1">
+                      Moving back to Zimbabwe for good? Returning residents get a discount — mention it when booking
+                      and we'll also guide you through the returning-resident customs paperwork.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -197,7 +231,7 @@ const Pricing = () => {
                   <div>
                     <h2 className="text-2xl font-bold mb-2">Shipping Other Items?</h2>
                     <p className="text-gray-400">
-                      Furniture, appliances, electronics, commercial goods - get a custom quote
+                      Furniture, appliances, electronics, cars &amp; vehicles, commercial goods - get a custom quote
                     </p>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-4">

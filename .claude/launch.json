@@ -18,6 +18,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "staff-app", "run", "web", "--", "--port", "8082"],
       "port": 8082
+    },
+    {
+      "name": "customer-app-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "customer-app", "run", "web", "--", "--port", "8084"],
+      "port": 8084
     }
   ]
 }

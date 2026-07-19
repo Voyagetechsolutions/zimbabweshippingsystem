@@ -1,26 +1,48 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, TextInput, FlatList, Pressable, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { supabase } from '../lib/supabase';
-import { colors, radius, spacing } from '../theme';
+import { colors, radius, spacing, shadow, type as typeScale, stageTone } from '../theme';
+import { StageDots } from '../components/ui';
 import {
-  Shipment, STATUS_OPTIONS, statusStyle, senderName, senderPhone, receiverName, receiverPhone,
+  Shipment, senderName, senderPhone, receiverName, receiverPhone,
   customerRef, senderEmail,
 } from '../lib/shipment';
+import { getInvoice, getInvoiceStatus, hasInvoice, invoiceSymbol, calculateTotals } from '../lib/invoice';
 import type { ShipmentsStackParams } from '../navigation/types';
 
 type Props = NativeStackScreenProps<ShipmentsStackParams, 'ShipmentsList'>;
 
 const IN_TRANSIT = ['in transit', 'intransit', 'ontransit', 'zim warehouse', 'out for delivery'];
 
+// Time-and-stage chips instead of raw status values.
+const FILTERS = ['All', 'Today', 'This Week', 'Overdue', 'Ready', 'Transit', 'Delivered'];
+
+function matchesFilter(s: Shipment, filter: string): boolean {
+  const status = (s.status || '').toLowerCase();
+  const created = new Date(s.created_at).getTime();
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  switch (filter) {
+    case 'Today': return created >= startOfToday.getTime();
+    case 'This Week': return created >= startOfToday.getTime() - 6 * 864e5;
+    case 'Overdue': return hasInvoice(s) && getInvoiceStatus(getInvoice(s)) === 'overdue';
+    case 'Ready': return status.includes('confirm') || status.includes('ready') || status.includes('pending');
+    case 'Transit': return IN_TRANSIT.some((t) => status.includes(t));
+    case 'Delivered': return status === 'delivered';
+    default: return true;
+  }
+}
+
 export default function ShipmentsListScreen({ navigation }: Props) {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState('');
-  const [status, setStatus] = useState('all');
+  const [filter, setFilter] = useState('All');
 
   const load = useCallback(async () => {
     const { data, error } = await supabase
@@ -52,10 +74,9 @@ export default function ShipmentsListScreen({ navigation }: Props) {
         senderEmail(s).toLowerCase().includes(q) ||
         s.origin?.toLowerCase().includes(q) ||
         s.destination?.toLowerCase().includes(q);
-      const matchesStatus = status === 'all' || s.status?.toLowerCase() === status.toLowerCase();
-      return matchesSearch && matchesStatus;
+      return matchesSearch && matchesFilter(s, filter);
     });
-  }, [shipments, query, status]);
+  }, [shipments, query, filter]);
 
   const stats = useMemo(() => ({
     total: shipments.length,
@@ -65,28 +86,38 @@ export default function ShipmentsListScreen({ navigation }: Props) {
   }), [shipments]);
 
   const renderItem = ({ item }: { item: Shipment }) => {
-    const st = statusStyle(item.status);
+    const st = stageTone(item.status);
+    const originCity = (item.metadata as any)?.sender?.city || (item.origin || '').split(':').pop()?.split(',')[0]?.trim() || '—';
+    const destCity = (item.metadata as any)?.recipient?.city || (item.destination || '').split(',').pop()?.trim() || '—';
+    const invoice = hasInvoice(item) ? getInvoice(item) : null;
+    const invoiceStatus = invoice ? getInvoiceStatus(invoice) : null;
+    const total = invoice ? calculateTotals(invoice).total : 0;
     return (
       <Pressable style={styles.card} onPress={() => navigation.navigate('ShipmentDetail', { shipment: item })}>
         <View style={styles.cardTop}>
-          <Text style={styles.ref}>{customerRef(item)}</Text>
-          <View style={[styles.badge, { backgroundColor: st.bg }]}>
-            <Text style={[styles.badgeText, { color: st.fg }]}>{item.status}</Text>
-          </View>
-        </View>
-        <Text style={styles.tracking}>{item.tracking_number || '—'}</Text>
-        <View style={styles.people}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.pLabel}>Sender</Text>
+            <Text style={styles.ref}>{customerRef(item)}</Text>
             <Text style={styles.pName} numberOfLines={1}>{senderName(item)}</Text>
-            <Text style={styles.pSub} numberOfLines={1}>{senderPhone(item)}</Text>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.pLabel}>Receiver</Text>
-            <Text style={styles.pName} numberOfLines={1}>{receiverName(item)}</Text>
-            <Text style={styles.pSub} numberOfLines={1}>{receiverPhone(item)}</Text>
+          <View style={{ alignItems: 'flex-end', gap: 4 }}>
+            <View style={[styles.badge, { backgroundColor: st.bg }]}>
+              <Text style={[styles.badgeText, { color: st.fg }]}>{item.status}</Text>
+            </View>
+            {invoice && total > 0 ? (
+              <Text style={[styles.paid, { color: invoiceStatus === 'paid' ? colors.primaryDark : invoiceStatus === 'overdue' ? colors.danger : colors.textMuted }]}>
+                {invoiceSymbol(invoice.currency)}{total.toFixed(0)} {invoiceStatus === 'paid' ? 'Paid' : invoiceStatus === 'overdue' ? 'Overdue' : 'Due'}
+              </Text>
+            ) : null}
           </View>
         </View>
+        <View style={styles.routeRow}>
+          <Ionicons name="location" size={13} color={colors.orange} />
+          <Text style={styles.routeText} numberOfLines={1}>{originCity}</Text>
+          <Ionicons name="arrow-forward" size={12} color={colors.primary} />
+          <Text style={styles.routeText} numberOfLines={1}>{destCity}</Text>
+          <Text style={styles.pSub} numberOfLines={1}> · {receiverName(item)}</Text>
+        </View>
+        <StageDots status={item.status} />
       </Pressable>
     );
   };
@@ -106,11 +137,11 @@ export default function ShipmentsListScreen({ navigation }: Props) {
           />
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          {['all', ...STATUS_OPTIONS].map((s) => {
-            const active = status.toLowerCase() === s.toLowerCase();
+          {FILTERS.map((f) => {
+            const active = filter === f;
             return (
-              <Pressable key={s} onPress={() => setStatus(s)} style={[styles.chip, active && styles.chipActive]}>
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>{s === 'all' ? 'All' : s}</Text>
+              <Pressable key={f} onPress={() => setFilter(f)} style={[styles.chip, active && styles.chipActive]}>
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{f}</Text>
               </Pressable>
             );
           })}
@@ -153,7 +184,7 @@ function Stat({ label, value }: { label: string; value: number }) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   header: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, gap: spacing.sm },
-  title: { fontSize: 22, fontWeight: '700', color: colors.text },
+  title: { fontSize: typeScale.heading, fontWeight: '800', color: colors.text },
   searchWrap: {},
   search: {
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md,
@@ -169,7 +200,10 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 18, fontWeight: '700', color: colors.text },
   statLabel: { fontSize: 10, color: colors.textMuted, marginTop: 2 },
   list: { padding: spacing.lg, gap: spacing.md },
-  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: 6 },
+  card: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, gap: 6, ...shadow },
+  routeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  routeText: { fontSize: 13, fontWeight: '700', color: colors.text, flexShrink: 1 },
+  paid: { fontSize: 12, fontWeight: '800' },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   ref: { fontSize: 14, fontWeight: '700', color: colors.primary },
   badge: { borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 },

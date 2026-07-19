@@ -5,12 +5,15 @@ import {
   Bot,
   CalendarDays,
   CheckCircle2,
+  EyeOff,
   Loader2,
   MessageSquare,
   Package,
   RefreshCw,
   Send,
   Sparkles,
+  Star,
+  ThumbsUp,
   TrendingUp,
   Wallet,
 } from 'lucide-react';
@@ -95,6 +98,9 @@ const ZimmyAdminTab = () => {
   const [requests, setRequests] = useState<any[]>([]);
   const [chatEvents, setChatEvents] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [moderating, setModerating] = useState(false);
+  const [reviewActionId, setReviewActionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<AdminMessage[]>([{
     role: 'assistant',
     content: 'I’m Admin Zimmy. Ask me about business performance, collection schedules, pickup lists, tracking, invoices or delivery notes. I will always ask for confirmation before changing live data.',
@@ -110,12 +116,13 @@ const ZimmyAdminTab = () => {
     quiet ? setRefreshing(true) : setLoading(true);
     const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
     try {
-      const [shipmentResult, paymentResult, requestResult, chatResult, scheduleResult] = await Promise.all([
+      const [shipmentResult, paymentResult, requestResult, chatResult, scheduleResult, reviewResult] = await Promise.all([
         db.from('shipments').select('*').order('created_at', { ascending: false }).limit(1000),
         db.from('payments').select('*').order('created_at', { ascending: false }).limit(1000),
         db.from('customer_requests').select('*').order('created_at', { ascending: false }).limit(1000),
         db.from('zimmy_chat_events').select('*').gte('created_at', thirtyDaysAgo).order('created_at', { ascending: false }).limit(1000),
         db.from('collection_schedules').select('*').limit(200),
+        db.from('reviews').select('id, rating, comment, created_at, moderation_status, moderation_sentiment, moderation_reason, profiles(full_name)').order('created_at', { ascending: false }).limit(300),
       ]);
       const firstError = [shipmentResult, paymentResult, requestResult, chatResult, scheduleResult].find((result) => result.error)?.error;
       if (firstError) throw firstError;
@@ -123,6 +130,9 @@ const ZimmyAdminTab = () => {
       setPayments(paymentResult.data || []);
       setRequests(requestResult.data || []);
       setChatEvents(chatResult.data || []);
+      // Reviews moderation columns may not exist until the moderate-review
+      // function's setup has run; treat that as an empty list, not a failure.
+      setReviews(reviewResult.error ? [] : (reviewResult.data || []));
       const startOfToday = new Date();
       startOfToday.setHours(0, 0, 0, 0);
       setSchedules((scheduleResult.data || [])
@@ -148,6 +158,7 @@ const ZimmyAdminTab = () => {
     const channel = supabase.channel('admin-zimmy-analytics')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'zimmy_chat_events' }, () => fetchAnalytics(true))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'customer_requests' }, () => fetchAnalytics(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, () => fetchAnalytics(true))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchAnalytics]);
@@ -242,6 +253,62 @@ const ZimmyAdminTab = () => {
       });
     } finally {
       setConfirming(false);
+    }
+  };
+
+  const reviewStats = useMemo(() => ({
+    pending: reviews.filter((review) => (review.moderation_status || 'pending') === 'pending').length,
+    flagged: reviews.filter((review) => review.moderation_status === 'flagged'),
+    published: reviews.filter((review) => review.moderation_status === 'published').length,
+  }), [reviews]);
+
+  const runReviewModeration = async () => {
+    if (moderating) return;
+    setModerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('moderate-review', {
+        body: { action: 'moderate' },
+      });
+      if (error) throw error;
+      toast({
+        title: 'Zimmy moderation complete',
+        description: `${data?.moderated ?? 0} review(s) checked. Positive and okay reviews are now live; bad ones are flagged below.`,
+      });
+      fetchAnalytics(true);
+    } catch (error) {
+      toast({
+        title: 'Moderation failed',
+        description: error instanceof Error ? error.message : 'Zimmy could not moderate the reviews.',
+        variant: 'destructive',
+      });
+    } finally {
+      setModerating(false);
+    }
+  };
+
+  const updateFlaggedReview = async (reviewId: string, status: 'published' | 'hidden') => {
+    if (reviewActionId) return;
+    setReviewActionId(reviewId);
+    try {
+      const { error } = await supabase.functions.invoke('moderate-review', {
+        body: { action: 'admin_update', reviewId, status },
+      });
+      if (error) throw error;
+      toast({
+        title: status === 'published' ? 'Review published' : 'Review kept hidden',
+        description: status === 'published'
+          ? 'The review is now visible on the public reviews page.'
+          : 'The review stays off the public page.',
+      });
+      fetchAnalytics(true);
+    } catch (error) {
+      toast({
+        title: 'Action failed',
+        description: error instanceof Error ? error.message : 'The review could not be updated.',
+        variant: 'destructive',
+      });
+    } finally {
+      setReviewActionId(null);
     }
   };
 
@@ -376,6 +443,65 @@ const ZimmyAdminTab = () => {
           </Card>
         </div>
       </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-lg"><Star className="h-5 w-5 text-zim-green" /> Review moderation</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Zimmy publishes positive and okay reviews automatically. Bad reviews are held here for your decision.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex gap-2 text-xs">
+                <Badge variant="secondary">{reviewStats.published} live</Badge>
+                <Badge variant="outline">{reviewStats.pending} pending</Badge>
+                <Badge variant="destructive">{reviewStats.flagged.length} flagged</Badge>
+              </div>
+              <Button size="sm" variant="outline" onClick={runReviewModeration} disabled={moderating || !reviewStats.pending}>
+                {moderating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                Run Zimmy moderation
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {reviewStats.flagged.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No flagged reviews right now. {reviewStats.pending > 0 ? `${reviewStats.pending} review(s) are waiting for Zimmy — run moderation above.` : 'Zimmy is keeping the public page clean.'}
+            </p>
+          ) : reviewStats.flagged.map((review: any) => (
+            <div key={review.id} className="rounded-lg border border-red-200 bg-red-50/60 p-4 dark:border-red-900 dark:bg-red-950/20">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold">{review.profiles?.full_name || 'Anonymous'}</span>
+                    <span className="flex items-center gap-0.5 text-sm font-medium text-amber-600">
+                      <Star className="h-3.5 w-3.5 fill-current" /> {review.rating}/5
+                    </span>
+                    <span className="text-xs text-muted-foreground">{new Date(review.created_at).toLocaleDateString('en-GB')}</span>
+                  </div>
+                  <p className="mt-1 text-sm">{review.comment || '(no comment)'}</p>
+                  {review.moderation_reason && (
+                    <p className="mt-1 text-xs text-red-700 dark:text-red-400">Zimmy: {review.moderation_reason}</p>
+                  )}
+                </div>
+                <div className="flex flex-none gap-2">
+                  <Button size="sm" variant="outline" disabled={reviewActionId === review.id} onClick={() => updateFlaggedReview(review.id, 'published')}>
+                    {reviewActionId === review.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <ThumbsUp className="mr-1.5 h-3.5 w-3.5" />}
+                    Publish anyway
+                  </Button>
+                  <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" disabled={reviewActionId === review.id} onClick={() => updateFlaggedReview(review.id, 'hidden')}>
+                    <EyeOff className="mr-1.5 h-3.5 w-3.5" />
+                    Keep hidden
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

@@ -38,7 +38,15 @@ const FAQ = () => {
       questions: [
         {
           question: 'How long does shipping from the UK to Zimbabwe take?',
-          answer: 'Our standard shipping time from the UK to Zimbabwe is approximately 6 weeks. 10-14 days for parcel delivery. Transit times may vary slightly depending on customs clearance and local delivery conditions in Zimbabwe.'
+          answer: 'Our standard shipping time from the UK and Ireland to Zimbabwe is 6 to 8 weeks, and 10-14 days for parcel delivery. Transit times may vary slightly depending on customs clearance and local delivery conditions in Zimbabwe.'
+        },
+        {
+          question: 'Do you only ship drums?',
+          answer: 'No! Drums are popular, but we ship much more: trunks and boxes, suitcases, fridges, stoves, washing machines, sofas and other furniture, commercial goods, and even cars and vehicles. Listed items have fixed prices on our Pricing page; anything else gets a fast custom quote.'
+        },
+        {
+          question: 'Do you collect from Scotland?',
+          answer: 'Yes — our Scotland route runs whenever there is enough demand to fill a collection run, so there is no fixed schedule. If you are in Scotland, leave your details with us (or with Zimmy, our chat assistant) and we will add you to the next Scotland route and contact you as soon as a date is confirmed.'
         },
         {
           question: 'Do you ship from Ireland as well?',
@@ -77,6 +85,7 @@ const FAQ = () => {
           answer: 'Payment is required at the time of booking your shipment. For business accounts with regular shipping needs, we offer payment terms and invoicing options.'
         },
         {
+          question: 'Do you offer discounts for bulk shipments?',
           answer: 'We offer competitive flat-rate pricing. Contact us for bulk shipment arrangements.'
         },
         {
@@ -137,11 +146,11 @@ const FAQ = () => {
       questions: [
         {
           question: 'Do you deliver to all areas in Zimbabwe?',
-          answer: 'We deliver to all major cities and towns in Zimbabwe including Harare, Bulawayo, Mutare, Gweru, Kwekwe, Kadoma, Masvingo, and surrounding areas. For remote locations, delivery might take additional time or require collection from the nearest depot.'
+          answer: 'We deliver to all major cities and towns in Zimbabwe — Harare, Bulawayo, Chitungwiza, Mutare, Epworth, Gweru, Kwekwe, Kadoma, Masvingo, Chinhoyi, Victoria Falls, Hwange, Zvishavane, Bindura, Marondera, Chegutu, Beitbridge, Kariba, Chiredzi, Rusape, Plumtree, Ruwa, Norton, Redcliff, Gwanda, Lupane, Gokwe, Shurugwi, Mvuma, Chipinge, Karoi, Mashava, Triangle and Shamva. We do not deliver to rural areas, small villages, farms or growth points — recipients in those areas collect from our depot or an agreed point in the nearest covered town. Depot collection in Harare, Bulawayo or Mutare is free.'
         },
         {
           question: 'How does door-to-door delivery work in Zimbabwe?',
-          answer: 'Our door-to-door service delivers your shipment directly to your recipient\'s address in Zimbabwe. We contact the recipient to inform them about the delivery day. This service costs an additional £25 per address.'
+          answer: 'Our door-to-door service delivers your shipment directly to your recipient\'s address in Zimbabwe. We contact the recipient to inform them about the delivery day. This service costs an additional £25 (UK shipments) or €25 (Ireland shipments) per delivery address.'
         },
         {
           question: 'Is there a depot collection option in Zimbabwe?',
@@ -165,7 +174,11 @@ const FAQ = () => {
         },
         {
           question: 'How do you handle customs clearance?',
-          answer: 'We handle standard customs clearance procedures as part of our service. Our dedicated customs team in Zimbabwe processes documentation and works to ensure smooth clearance.'
+          answer: 'Customs, declarations and clearance are all handled by us and included in your shipping cost — there is nothing extra for you to arrange on a normal personal shipment. Our dedicated customs team in Zimbabwe processes the documentation and works to ensure smooth clearance.'
+        },
+        {
+          question: 'Is there anything special for returning residents?',
+          answer: 'Yes. Zimbabweans moving back home permanently qualify for a returning residents discount, and there is specific customs paperwork that can reduce duty on your household goods. Mention that you are a returning resident when booking (or tell Zimmy, our chat assistant) and our team will apply the discount and guide you through the process.'
         }
       ]
     },
@@ -206,6 +219,14 @@ const FAQ = () => {
         {
           question: 'What is the difference between drum shipping and other items?',
           answer: 'Drum shipping involves sending items in a large 200L - 220L drum, ideal for multiple items or bulky goods. Other items involve small parcels to palettes and are charged by volume/size/value. Drum shipping is more cost-effective for larger volumes.'
+        },
+        {
+          question: 'Do you have a referral discount?',
+          answer: 'Yes! Refer a friend or family member who ships with us and you get £20 (UK) or €20 (Ireland) off your next shipment. Just make sure they mention your name when they book.'
+        },
+        {
+          question: 'Who runs Zimbabwe Shipping?',
+          answer: 'Zimbabwe Shipping is a family-run business founded and directed by Mr Tshakalisa Moyo. He started out as a FedEx driver, built Telk Removals, and launched Zimbabwe Shipping Services in 2011. If you need to reach Mr Moyo or the office, leave your details with Zimmy (our chat assistant) or call +44 7584 100552.'
         },
         {
           question: 'Do you offer any assistance with packing?',

@@ -17,12 +17,26 @@ const ReviewsSection: React.FC = () => {
 
   useEffect(() => {
     fetchReviews();
-  }, []);
+  }, [user?.id]);
+
+  // Zimmy checks the review; positive/okay reviews publish automatically,
+  // bad ones are flagged for the admin team instead of going public.
+  const moderateReview = async (reviewId: string) => {
+    try {
+      await supabase.functions.invoke('moderate-review', {
+        body: { action: 'moderate', reviewId },
+      });
+    } catch (error) {
+      console.error('Review moderation failed (review stays pending):', error);
+    }
+  };
 
   const fetchReviews = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
+      // Show published reviews to everyone, plus the visitor's own reviews
+      // (so they can still see and edit one that is pending or flagged).
+      let query = supabase
         .from(tableFrom('reviews'))
         .select(`
           id,
@@ -31,9 +45,14 @@ const ReviewsSection: React.FC = () => {
           rating,
           comment,
           created_at,
+          moderation_status,
           profiles(id, full_name, email)
         `)
         .order('created_at', { ascending: false });
+      query = user
+        ? query.or(`moderation_status.eq.published,user_id.eq.${user.id}`)
+        : query.eq('moderation_status', 'published');
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -47,8 +66,9 @@ const ReviewsSection: React.FC = () => {
           createdAt: item.created_at,
           userName: item.profiles?.full_name || 'Anonymous',
           userEmail: item.profiles?.email || '',
+          moderationStatus: item.moderation_status || 'pending',
         }));
-        
+
         setReviews(formattedReviews);
       }
     } catch (error: any) {
@@ -74,22 +94,25 @@ const ReviewsSection: React.FC = () => {
     }
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from(tableFrom('reviews'))
         .insert({
           user_id: user.id,
           rating: formData.rating,
           comment: formData.comment,
           shipment_id: formData.shipmentId || null
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
 
       toast({
         title: 'Review Submitted',
-        description: 'Thank you for your feedback!',
+        description: 'Thank you for your feedback! Your review will appear once Zimmy has checked it.',
       });
-      
+
+      if (data?.id) await moderateReview(data.id);
       fetchReviews();
     } catch (error: any) {
       console.error('Error creating review:', error.message);
@@ -107,9 +130,11 @@ const ReviewsSection: React.FC = () => {
     try {
       const { error } = await supabase
         .from(tableFrom('reviews'))
-        .update({ 
-          rating: formData.rating, 
-          comment: formData.comment 
+        .update({
+          rating: formData.rating,
+          comment: formData.comment,
+          // An edited review goes back through Zimmy moderation.
+          moderation_status: 'pending'
         })
         .eq('id', selectedReview.id);
 
@@ -117,10 +142,12 @@ const ReviewsSection: React.FC = () => {
 
       toast({
         title: 'Review Updated',
-        description: 'Your review has been updated successfully',
+        description: 'Your updated review will appear once Zimmy has checked it.',
       });
-      
+
+      const updatedId = selectedReview.id;
       setSelectedReview(null);
+      await moderateReview(updatedId);
       fetchReviews();
     } catch (error: any) {
       console.error('Error updating review:', error.message);

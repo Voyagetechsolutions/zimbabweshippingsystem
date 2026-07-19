@@ -11,6 +11,8 @@ import InvoicesScreen from '../screens/admin/InvoicesScreen';
 import FeedbackScreen from '../screens/admin/FeedbackScreen';
 import PlaceholderScreen from '../screens/admin/PlaceholderScreen';
 import FinanceDashboardScreen from '../screens/FinanceDashboardScreen';
+import StaffRecordsScreen from '../screens/admin/StaffRecordsScreen';
+import AccountScreen from '../screens/AccountScreen';
 import type { MenuStackParams } from './types';
 import { colors } from '../theme';
 
@@ -35,6 +37,8 @@ export default function MenuStack() {
       <Stack.Screen name="Invoices" component={InvoicesScreen} options={{ title: 'Invoices' }} />
       <Stack.Screen name="Reports" component={FinanceDashboardScreen} options={{ title: 'Reports' }} />
       <Stack.Screen name="Feedback" component={FeedbackScreen} options={{ title: 'Feedback' }} />
+      <Stack.Screen name="StaffRecords" component={StaffRecordsScreen} options={{ title: 'Staff Control Centre' }} />
+      <Stack.Screen name="Account" component={AccountScreen} options={{ title: 'Account' }} />
       <Stack.Screen name="Placeholder" component={PlaceholderScreen} options={{ title: '' }} />
     </Stack.Navigator>
   );

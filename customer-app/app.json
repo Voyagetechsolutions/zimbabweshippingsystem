@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Zimbabwe Shipping",
+    "slug": "zimbabwe-shiipping",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/logo.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#10130F"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Zimbabwe Shipping to select proof-of-payment images.",
+          "cameraPermission": "Allow Zimbabwe Shipping to photograph payment proof.",
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.zimbabweshipping.customer"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/logo.png",
+        "backgroundColor": "#008C45"
+      },
+      "package": "com.zimbabweshipping.customer",
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "web": {
+      "favicon": "./assets/logo.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "6929c815-70fa-4c08-982a-267d84b0bcc9"
+      }
+    },
+    "owner": "vtsapps2026"
+  }
+}

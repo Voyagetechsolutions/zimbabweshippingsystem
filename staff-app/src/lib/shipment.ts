@@ -14,6 +14,14 @@ export interface Shipment {
   can_modify?: boolean;
   deleted_at?: string | null;
   collection_period_id?: string | null;
+  collection_schedule_id?: string | null;
+  customer_reference?: string | null;
+  driver_status?: string | null;
+  assigned_driver_id?: string | null;
+  user_id?: string | null;
+  goods_description?: string | null;
+  driver_description_correction?: string | null;
+  seals_requested?: number | null;
 }
 
 export const STATUS_OPTIONS = [

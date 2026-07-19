@@ -16,7 +16,7 @@ const STORAGE_KEY = 'zimmy-ai-chat';
 const CONVERSATION_KEY = 'zimmy-conversation-id';
 
 const quickPrompts = [
-  'How much is a drum?',
+  'What can I ship and what does it cost?',
   'When is the next collection?',
   'Book my shipment',
   'Track a shipment',

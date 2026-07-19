@@ -111,9 +111,14 @@ BEGIN
     END IF;
 END $$;
 
--- Create a view for admin dashboard to easily identify reviews needing attention
-CREATE OR REPLACE VIEW public.reviews_needing_attention AS
-SELECT 
+-- Create a view for admin dashboard to easily identify reviews needing attention.
+-- security_invoker makes the view enforce the querying user's RLS instead of the
+-- creator's (Supabase linter: security_definer_view). Never grant this view to
+-- anon: it exposes customer names and WhatsApp numbers.
+DROP VIEW IF EXISTS public.reviews_needing_attention;
+CREATE VIEW public.reviews_needing_attention
+WITH (security_invoker = on) AS
+SELECT
   id,
   created_at,
   first_name,
@@ -132,9 +137,9 @@ FROM public.service_reviews
 WHERE needs_admin_attention = true
 ORDER BY created_at DESC;
 
--- Grant access to the view
+-- Grant access to the view (authenticated only — never anon)
+REVOKE ALL ON public.reviews_needing_attention FROM anon, public;
 GRANT SELECT ON public.reviews_needing_attention TO authenticated;
-GRANT SELECT ON public.reviews_needing_attention TO anon;
 
 -- Update RLS policies to ensure new fields work properly
 -- The existing policies should work, but let's make sure inserts work with new fields

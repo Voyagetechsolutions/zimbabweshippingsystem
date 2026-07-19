@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, TextInput, SectionList, Pressable, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, SectionList, Pressable, StyleSheet, ActivityIndicator, Alert, RefreshControl } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { colors, radius, spacing } from '../../theme';
 
@@ -17,17 +18,30 @@ export default function ScheduleScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [dateValue, setDateValue] = useState('');
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    setError(null);
     const { data, error } = await supabase
       .from('collection_schedules')
       .select('id, route, pickup_date, country, areas')
       .order('country')
       .order('route');
-    if (!error) setRows((data as ScheduleRow[]) || []);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setRows((data as ScheduleRow[]) || []);
   }, []);
 
   useEffect(() => { (async () => { setLoading(true); await load(); setLoading(false); })(); }, [load]);
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
 
   const sections = useMemo(() => {
     const byCountry = new Map<string, ScheduleRow[]>();
@@ -64,6 +78,27 @@ export default function ScheduleScreen() {
       sections={sections}
       keyExtractor={(r) => r.id}
       contentContainerStyle={styles.list}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
+      ListHeaderComponent={
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.title}>Collection schedule</Text>
+            <Text style={styles.subtitle}>{rows.length} live route{rows.length === 1 ? '' : 's'} from the website schedule</Text>
+          </View>
+          <Pressable style={styles.refreshButton} onPress={refresh} disabled={refreshing}>
+            {refreshing ? <ActivityIndicator size="small" color={colors.primary} /> : <Ionicons name="refresh" size={18} color={colors.primary} />}
+          </Pressable>
+          {error ? (
+            <View style={styles.errorCard}>
+              <Ionicons name="alert-circle-outline" size={19} color={colors.danger} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.errorTitle}>Schedule could not load</Text>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            </View>
+          ) : null}
+        </View>
+      }
       renderSectionHeader={({ section }) => <Text style={styles.group}>{section.title}</Text>}
       ListEmptyComponent={<Text style={styles.empty}>No collection schedules</Text>}
       stickySectionHeadersEnabled={false}
@@ -109,6 +144,13 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
   list: { padding: spacing.lg, paddingBottom: 48 },
+  header: { marginBottom: spacing.md, gap: spacing.sm },
+  title: { fontSize: 22, fontWeight: '800', color: colors.text },
+  subtitle: { fontSize: 12.5, color: colors.textMuted, marginTop: 3 },
+  refreshButton: { position: 'absolute', right: 0, top: 0, width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft },
+  errorCard: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start', padding: spacing.md, borderWidth: 1, borderColor: '#fecaca', borderRadius: radius.md, backgroundColor: '#fff1f2' },
+  errorTitle: { fontSize: 13, fontWeight: '800', color: colors.danger },
+  errorText: { fontSize: 11.5, lineHeight: 16, color: '#991b1b', marginTop: 2 },
   group: {
     fontSize: 11, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase',
     letterSpacing: 0.5, marginTop: spacing.md, marginBottom: spacing.sm,

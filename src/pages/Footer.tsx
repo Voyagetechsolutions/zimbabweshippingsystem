@@ -126,6 +126,9 @@ const Footer = () => {
               <Link to="/terms-of-service" className="text-gray-400 text-sm hover:text-white transition-colors">
                 Terms of Service
               </Link>
+              <Link to="/delete-account" className="text-gray-400 text-sm hover:text-white transition-colors">
+                Delete Account
+              </Link>
             </div>
           </div>
         </div>

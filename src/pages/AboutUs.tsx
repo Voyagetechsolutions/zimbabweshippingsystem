@@ -84,7 +84,7 @@ const AboutUs = () => {
                 <div>
                   <h2 className="text-3xl font-bold mb-6 text-gray-900">Our Story</h2>
                   <p className="text-gray-600 mb-4 leading-relaxed">
-                    Zimbabwe Shipping Services started from hands-on logistics experience. Our founder began as a FedEx driver, learning the importance of careful handling and reliability firsthand.
+                    Zimbabwe Shipping Services started from hands-on logistics experience. Our founder and director, Mr Tshakalisa Moyo, began as a FedEx driver — learning the importance of careful handling and reliability firsthand — before building Telk Removals and launching Zimbabwe Shipping.
                   </p>
                   <p className="text-gray-600 mb-4 leading-relaxed">
                     In 2011, recognizing the need for trustworthy shipping between the UK and Zimbabwe, we launched our service. What started as Bulawayo Shipping Services has grown to cover all of Zimbabwe.
@@ -176,9 +176,9 @@ const AboutUs = () => {
                       <MapPin className="h-6 w-6 text-gray-700" />
                     </div>
                     <div>
-                      <h3 className="font-semibold mb-2">All Zimbabwe Cities</h3>
+                      <h3 className="font-semibold mb-2">All Major Cities &amp; Towns</h3>
                       <p className="text-sm text-gray-600">
-                        From Harare to Bulawayo, Mutare to Victoria Falls. We deliver everywhere in Zimbabwe.
+                        From Harare to Bulawayo, Mutare to Victoria Falls. We deliver to every major city and town in Zimbabwe.
                       </p>
                     </div>
                   </div>

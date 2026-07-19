@@ -2,37 +2,53 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { colors, radius, spacing } from '../../theme';
+import { money, shortDate } from '../../lib/format';
 
-interface Customer {
-  id: string;
-  email: string;
-  full_name: string | null;
-  role: string | null;
-  is_admin: boolean | null;
-  created_at: string;
+// Unified customer records from the admin_customer_records RPC: app + website
+// registrations, past bookings, quote requesters and manual bookings — deduped
+// by user id, then normalised email/phone.
+
+interface CustomerRecord {
+  key: string;
+  profileId: string | null;
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+  country: string | null;
+  customerReference: string | null;
+  pickupAddress: string | null;
+  shipmentCount: number;
+  quoteCount: number;
+  outstanding: number;
+  currency: string;
+  lastActivity: string | null;
 }
 
 export default function CustomersScreen() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<CustomerRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, email, full_name, role, is_admin, created_at')
-      .order('created_at', { ascending: false });
-    if (!error) setCustomers((data as Customer[]) || []);
+    const { data, error: rpcError } = await supabase.rpc('admin_customer_records');
+    if (rpcError) { setError(rpcError.message); return; }
+    setError(null);
+    setCustomers(((data || []) as CustomerRecord[]).filter((c) => c.fullName || c.email || c.phone));
   }, []);
 
   useEffect(() => { (async () => { setLoading(true); await load(); setLoading(false); })(); }, [load]);
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
   const filtered = useMemo(() => {
-    const q = query.toLowerCase();
+    const q = query.toLowerCase().trim();
     return customers.filter((c) =>
-      q === '' || c.email?.toLowerCase().includes(q) || c.full_name?.toLowerCase().includes(q),
+      q === ''
+      || c.fullName?.toLowerCase().includes(q)
+      || c.email?.toLowerCase().includes(q)
+      || c.phone?.includes(q.replace(/[^0-9]/g, '') || q)
+      || c.customerReference?.toLowerCase().includes(q),
     );
   }, [customers, query]);
 
@@ -42,32 +58,46 @@ export default function CustomersScreen() {
     <View style={styles.safe}>
       <View style={styles.header}>
         <TextInput
-          style={styles.search} placeholder="Search name or email" placeholderTextColor={colors.textFaint}
+          style={styles.search} placeholder="Search name, email, phone or reference" placeholderTextColor={colors.textFaint}
           value={query} onChangeText={setQuery} autoCapitalize="none"
         />
       </View>
+      {error ? <Text style={styles.error}>Could not load customers: {error}</Text> : null}
       <FlatList
         data={filtered}
-        keyExtractor={(c) => c.id}
+        keyExtractor={(c) => c.key}
         refreshing={refreshing}
         onRefresh={onRefresh}
         contentContainerStyle={styles.list}
         ListEmptyComponent={<Text style={styles.empty}>No customers found</Text>}
-        renderItem={({ item }) => {
-          const badge = item.is_admin ? 'admin' : (item.role || 'customer');
-          return (
-            <View style={styles.row}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{(item.full_name || item.email || '?').charAt(0).toUpperCase()}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.name} numberOfLines={1}>{item.full_name || 'No name'}</Text>
-                <Text style={styles.email} numberOfLines={1}>{item.email}</Text>
-              </View>
-              <View style={styles.badge}><Text style={styles.badgeText}>{badge}</Text></View>
+        renderItem={({ item }) => (
+          <View style={styles.row}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{(item.fullName || item.email || '?').charAt(0).toUpperCase()}</Text>
             </View>
-          );
-        }}
+            <View style={{ flex: 1 }}>
+              <View style={styles.nameRow}>
+                <Text style={styles.name} numberOfLines={1}>{item.fullName || 'Unknown customer'}</Text>
+                {item.customerReference ? <Text style={styles.ref}>{item.customerReference}</Text> : null}
+              </View>
+              {item.email ? <Text style={styles.detail} numberOfLines={1}>{item.email}</Text> : null}
+              {item.phone ? <Text style={styles.detail} numberOfLines={1}>{item.phone}</Text> : null}
+              {item.pickupAddress ? <Text style={styles.detail} numberOfLines={1}>{item.pickupAddress}{item.country ? ` · ${item.country}` : ''}</Text> : null}
+              <View style={styles.statRow}>
+                <Text style={styles.stat}>{item.shipmentCount} shipment{item.shipmentCount === 1 ? '' : 's'}</Text>
+                <Text style={styles.stat}>{item.quoteCount} quote{item.quoteCount === 1 ? '' : 's'}</Text>
+                {item.outstanding > 0 ? (
+                  <Text style={[styles.stat, { color: colors.danger, fontWeight: '800' }]}>
+                    {money(item.outstanding, item.currency === 'EUR' ? '€' : '£')} due
+                  </Text>
+                ) : (
+                  <Text style={[styles.stat, { color: colors.primary }]}>Settled</Text>
+                )}
+                {item.lastActivity ? <Text style={styles.stat}>Active {shortDate(item.lastActivity)}</Text> : null}
+              </View>
+            </View>
+          </View>
+        )}
         ListFooterComponent={<Text style={styles.footer}>{filtered.length} of {customers.length} customers</Text>}
       />
     </View>
@@ -82,17 +112,20 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md,
     paddingVertical: 9, fontSize: 14, color: colors.text, backgroundColor: colors.surface,
   },
+  error: { color: '#991b1b', fontSize: 12, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   list: { padding: spacing.lg, gap: spacing.sm },
   row: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface,
+    flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, backgroundColor: colors.surface,
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md,
   },
   avatar: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.primary, fontWeight: '700' },
-  name: { fontSize: 14, fontWeight: '600', color: colors.text },
-  email: { fontSize: 12, color: colors.textMuted },
-  badge: { borderRadius: radius.pill, backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 2 },
-  badgeText: { fontSize: 11, fontWeight: '600', color: '#475569', textTransform: 'capitalize' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  name: { fontSize: 14, fontWeight: '700', color: colors.text, flexShrink: 1 },
+  ref: { fontSize: 10.5, fontWeight: '800', color: colors.primary },
+  detail: { fontSize: 11.5, color: colors.textMuted, marginTop: 1 },
+  statRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: 6 },
+  stat: { fontSize: 11, color: colors.textMuted, fontWeight: '600' },
   empty: { textAlign: 'center', color: colors.textMuted, paddingVertical: 40 },
   footer: { textAlign: 'center', color: colors.textFaint, fontSize: 12, paddingVertical: spacing.md },
 });

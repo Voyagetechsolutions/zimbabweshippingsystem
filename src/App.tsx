@@ -50,6 +50,7 @@ const TaskManagement = lazy(() => import('@/pages/TaskManagement'));
 const CustomQuoteRequest = lazy(() => import('@/pages/CustomQuoteRequest'));
 const Links = lazy(() => import('@/pages/Links'));
 const Feedback = lazy(() => import('@/pages/Feedback'));
+const DeleteAccount = lazy(() => import('@/pages/DeleteAccount'));
 
 const queryClient = new QueryClient();
 
@@ -99,6 +100,7 @@ function App() {
                           <Route path="/custom-quote-request" element={<CustomQuoteRequest />} />
                           <Route path="/links" element={<Links />} />
                           <Route path="/feedback" element={<Feedback />} />
+                          <Route path="/delete-account" element={<DeleteAccount />} />
                           <Route path="/book" element={<SimpleBooking />} />
 
                           {/* Public booking route */}

@@ -1,98 +1,30 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
-import { colors, radius, spacing } from '../../theme';
-import { money } from '../../lib/format';
+import { moneyMap } from '../../lib/format';
+import { customerName } from '../../lib/format';
+import { colors, radius, shadow, spacing } from '../../theme';
 
-interface Payment {
-  id: string;
-  amount: number | null;
-  currency: string | null;
-  payment_method: string | null;
-  payment_status: string | null;
-  transaction_id: string | null;
-  created_at: string;
-}
-
-const COLLECTED = ['completed', 'paid', 'success', 'succeeded'];
-const methodLabel: Record<string, string> = {
-  standard: 'Card / Bank', cashOnCollection: 'Cash on Collection',
-  payOnArrival: 'Pay on Arrival', agentQuote: 'Agent Quote',
-};
+type Filter = 'all' | 'pending' | 'paid' | 'overdue';
+type Payment = { id: string; amount: number | null; currency: string | null; payment_method: string | null; payment_status: string | null; transaction_id: string | null; reconciled_at: string | null; created_at: string; shipment_id?: string | null; shipment?: { tracking_number?: string | null; customer_reference?: string | null; metadata?: any } | null };
+const paidStatuses = new Set(['completed', 'paid', 'success', 'succeeded']);
+const methods: Record<string, string> = { standard: 'Card / Bank', cashOnCollection: 'Cash on Collection', payOnArrival: 'Pay on Arrival', agentQuote: 'Agent Quote' };
 
 export default function PaymentsScreen() {
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const load = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('payments')
-      .select('id, amount, currency, payment_method, payment_status, transaction_id, created_at')
-      .order('created_at', { ascending: false });
-    if (!error) setPayments((data as Payment[]) || []);
-  }, []);
-
-  useEffect(() => { (async () => { setLoading(true); await load(); setLoading(false); })(); }, [load]);
-  const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
-
-  const total = useMemo(() => payments.reduce((s, p) => s + (Number(p.amount) || 0), 0), [payments]);
-
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
-
-  return (
-    <FlatList
-      style={styles.safe}
-      data={payments}
-      keyExtractor={(p) => p.id}
-      refreshing={refreshing}
-      onRefresh={onRefresh}
-      contentContainerStyle={styles.list}
-      ListHeaderComponent={
-        <View style={styles.summary}>
-          <Text style={styles.summaryLabel}>Total billed</Text>
-          <Text style={styles.summaryValue}>{money(total)}</Text>
-          <Text style={styles.summaryCount}>{payments.length} payments</Text>
-        </View>
-      }
-      ListEmptyComponent={<Text style={styles.empty}>No payments yet</Text>}
-      renderItem={({ item }) => {
-        const collected = COLLECTED.includes((item.payment_status || '').toLowerCase());
-        const sym = item.currency === 'EUR' ? '€' : '£';
-        return (
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.amount}>{money(Number(item.amount) || 0, sym)}</Text>
-              <Text style={styles.method}>{methodLabel[item.payment_method || ''] || item.payment_method || '—'}</Text>
-              {item.transaction_id ? <Text style={styles.tx}>{item.transaction_id}</Text> : null}
-            </View>
-            <View style={{ alignItems: 'flex-end', gap: 4 }}>
-              <View style={[styles.pill, { backgroundColor: collected ? '#d1fae5' : '#fef3c7' }]}>
-                <Text style={[styles.pillText, { color: collected ? '#047857' : '#b45309' }]}>{collected ? 'Collected' : 'Pending'}</Text>
-              </View>
-              <Text style={styles.date}>{new Date(item.created_at).toLocaleDateString()}</Text>
-            </View>
-          </View>
-        );
-      }}
-    />
-  );
+  const navigation = useNavigation<any>(); const [rows, setRows] = useState<Payment[]>([]); const [filter, setFilter] = useState<Filter>('all'); const [loading, setLoading] = useState(true); const [refreshing, setRefreshing] = useState(false);
+  const load = useCallback(async () => { const result = await supabase.from('payments').select('id,amount,currency,payment_method,payment_status,transaction_id,reconciled_at,created_at,shipment_id,shipment:shipments(tracking_number,customer_reference,metadata)').order('created_at', { ascending: false }); setRows((result.data as any[]) || []); setLoading(false); }, []);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+  const counts = useMemo(() => ({ all: rows.length, pending: rows.filter((r) => !paidStatuses.has((r.payment_status || '').toLowerCase()) && (r.payment_status || '').toLowerCase() !== 'overdue').length, paid: rows.filter((r) => paidStatuses.has((r.payment_status || '').toLowerCase())).length, overdue: rows.filter((r) => (r.payment_status || '').toLowerCase() === 'overdue').length }), [rows]);
+  const filtered = useMemo(() => rows.filter((row) => filter === 'all' || (filter === 'paid' ? paidStatuses.has((row.payment_status || '').toLowerCase()) : filter === 'overdue' ? (row.payment_status || '').toLowerCase() === 'overdue' : !paidStatuses.has((row.payment_status || '').toLowerCase()) && (row.payment_status || '').toLowerCase() !== 'overdue')), [rows, filter]);
+  if (loading) return <SafeAreaView style={styles.safe}><View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View></SafeAreaView>;
+  const refresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
+  return <SafeAreaView style={styles.safe} edges={['top']}><FlatList style={{ flex: 1 }} data={filtered} keyExtractor={(row) => row.id} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />} contentContainerStyle={styles.content} ListHeaderComponent={<><View style={styles.header}><View><Text style={styles.title}>Payments</Text><Text style={styles.subtitle}>Customer transactions</Text></View><Pressable style={styles.iconButton} onPress={() => navigation.navigate('Reconciliation')}><Ionicons name="git-compare-outline" size={20} color={colors.primary} /></Pressable></View><View style={styles.filters}>{(['all', 'pending', 'paid', 'overdue'] as Filter[]).map((key) => <Pressable key={key} onPress={() => setFilter(key)} style={[styles.filter, filter === key && styles.filterActive]}><Text style={[styles.filterText, filter === key && styles.filterTextActive]}>{key[0].toUpperCase() + key.slice(1)} {counts[key]}</Text></Pressable>)}</View></>} ListEmptyComponent={<Text style={styles.empty}>No {filter === 'all' ? '' : filter} payments found.</Text>} renderItem={({ item }) => {
+    const status = (item.payment_status || 'pending').toLowerCase(); const paid = paidStatuses.has(status); const name = item.shipment?.metadata ? customerName(item.shipment.metadata) : 'Customer';
+    return <Pressable style={styles.paymentRow} onPress={() => navigation.navigate('PaymentDetails', { paymentId: item.id })}><View style={{ flex: 1 }}><Text style={styles.amount}>{moneyMap({ [item.currency || 'GBP']: Number(item.amount) || 0 })}</Text><Text style={styles.method}>{methods[item.payment_method || ''] || item.payment_method || 'Payment'}</Text><Text style={styles.customer}>{name}</Text><Text style={styles.reference}>{item.transaction_id || item.shipment?.customer_reference || item.shipment?.tracking_number || 'No reference'}</Text></View><View style={styles.rowRight}><View style={[styles.status, { backgroundColor: paid ? colors.primarySoft : status === 'overdue' ? colors.redSoft : colors.amberSoft }]}><Text style={[styles.statusText, { color: paid ? colors.primaryDark : status === 'overdue' ? colors.danger : colors.amber }]}>{paid ? 'Paid' : status === 'overdue' ? 'Overdue' : 'Pending'}</Text></View><Text style={styles.date}>{new Date(item.created_at).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}</Text></View></Pressable>;
+  }} /></SafeAreaView>;
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
-  list: { padding: spacing.lg, gap: spacing.sm },
-  summary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.lg, marginBottom: spacing.sm },
-  summaryLabel: { fontSize: 12, color: colors.textMuted, fontWeight: '600' },
-  summaryValue: { fontSize: 26, fontWeight: '700', color: colors.text, marginTop: 2 },
-  summaryCount: { fontSize: 12, color: colors.textFaint, marginTop: 2 },
-  row: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
-  amount: { fontSize: 15, fontWeight: '700', color: colors.text },
-  method: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  tx: { fontSize: 10, color: colors.textFaint, marginTop: 1 },
-  pill: { borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 },
-  pillText: { fontSize: 11, fontWeight: '600' },
-  date: { fontSize: 11, color: colors.textFaint },
-  empty: { textAlign: 'center', color: colors.textMuted, paddingVertical: 40 },
-});
+const styles = StyleSheet.create({ safe: { flex: 1, backgroundColor: colors.bg }, center: { flex: 1, alignItems: 'center', justifyContent: 'center' }, content: { padding: spacing.lg, paddingBottom: 105 }, header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg }, title: { fontSize: 25, fontWeight: '800', color: colors.text }, subtitle: { fontSize: 12, color: colors.textMuted, marginTop: 2 }, iconButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }, filters: { flexDirection: 'row', gap: 6, marginBottom: spacing.md }, filter: { flex: 1, minWidth: 0, borderRadius: radius.pill, backgroundColor: '#F2F4F7', paddingVertical: 8, alignItems: 'center' }, filterActive: { backgroundColor: '#EEEAFF' }, filterText: { fontSize: 9.5, fontWeight: '700', color: colors.textMuted }, filterTextActive: { color: colors.purple }, paymentRow: { minHeight: 108, flexDirection: 'row', gap: spacing.sm, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, ...shadow }, amount: { fontSize: 16, fontWeight: '800', color: colors.text }, method: { fontSize: 11.5, color: colors.textMuted, marginTop: 3 }, customer: { fontSize: 12, fontWeight: '700', color: colors.text, marginTop: 5 }, reference: { fontSize: 9.5, color: colors.textFaint, marginTop: 2 }, rowRight: { alignItems: 'flex-end', justifyContent: 'space-between' }, status: { borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 4 }, statusText: { fontSize: 9.5, fontWeight: '800' }, date: { fontSize: 10.5, color: colors.textFaint }, empty: { textAlign: 'center', color: colors.textMuted, padding: 40 } });

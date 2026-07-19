@@ -110,6 +110,12 @@ verify_jwt = true
 [functions.ai-chat]
 verify_jwt = true
 
+[functions.moderate-review]
+verify_jwt = true
+
+[functions.staff-ops]
+verify_jwt = true
+
 [functions.send-announcement-notification]
 verify_jwt = true
 
@@ -136,3 +142,8 @@ verify_jwt = true
 
 [functions.admin-zimmy]
 verify_jwt = true
+
+# Called by pg_cron with a shared secret (checked against private.app_config),
+# so JWT verification is off for this function only.
+[functions.photo-retention]
+verify_jwt = false

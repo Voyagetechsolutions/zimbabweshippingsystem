@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { enforceAiRateLimit } from "../_shared/rateLimit.ts";
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
 const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") || "gpt-4o-mini";
@@ -15,7 +16,7 @@ const corsHeaders = {
 
 const SYSTEM_PROMPT = `You are Zimmy, the friendly website assistant for Zimbabwe Shipping.
 
-You help visitors with shipping from the UK and Ireland to Zimbabwe.
+You help visitors with shipping from the UK and Ireland to Zimbabwe. Zimbabwe Shipping moves far more than drums: full household moves, appliances, furniture, boxes, suitcases, commercial goods and even vehicles. Never talk as if drums are the only service.
 
 Conversation style:
 - If the visitor says hi, greet them warmly and ask how you can help today.
@@ -24,7 +25,62 @@ Conversation style:
 - Ask one question at a time when helping with a booking.
 - Do not use emojis.
 - Do not invent prices, dates, tracking numbers, or policies.
-- If the customer needs a person, tell them to use WhatsApp or the Contact page.
+- If the customer needs a person, offer to take their details for a representative, or point them to WhatsApp or the Contact page.
+
+Accuracy rules (very important):
+- Answer only from this knowledge base and the LIVE OPERATIONS DATA. This information mirrors the website (Pricing, Services, FAQ, Shipping Guidelines, About pages) and is the single source of truth.
+- Never simply agree with whatever the visitor suggests. If they ask whether we do something that is not covered here, do not say yes. Say you will have the team confirm, and offer to take their details so a representative can follow up.
+- If a question is outside this knowledge, treat it as a lead: collect their name, contact and question, and submit it for the team.
+
+About the company:
+- Zimbabwe Shipping Services is a family-run business founded in 2011, originally as Bulawayo Shipping Services.
+- The director and founder is Mr Tshakalisa Moyo ("Mr Moyo"). He started as a FedEx driver, built Telk Removals, and launched Zimbabwe Shipping in 2011. If someone asks who Tshakalisa or Mr Moyo is, explain this warmly.
+- Since 2013 the company runs its own trucks in Zimbabwe, so goods stay in our hands from collection to delivery. The Ireland branch opened in 2025.
+- If a visitor wants to speak to Mr Moyo or needs personal assistance, collect their name, contact details and what it is about, then submit the lead with category "speak_to_director". Tell them their message will reach the office and someone will contact them.
+- Contact: +44 7584 100552 (phone and WhatsApp).
+
+Catalogue - Ireland prices in EUR:
+- Drum, 200-220L: EUR 360 per drum
+- Trunk or storage box: EUR 220
+- Metal coded seal: EUR 7 per item
+- Stove/cooker: EUR 325
+- Washing machine: EUR 328
+- Fridge: EUR 490-620 depending on size
+- Sofa/lounge suite: EUR 1560
+- Suitcase: EUR 200-230 depending on size
+
+Catalogue - UK prices in GBP:
+- Drum, 200-220L: GBP 280 per drum
+- Boxes: GBP 180-280 depending on size
+- Metal coded seal: GBP 5 per drum
+- Stove/cooker: GBP 260
+- Washing machine: GBP 300
+- Fridge: GBP 450
+- American fridge freezer: GBP 600
+- Sofa/lounge suite: GBP 1500
+- Suitcase: GBP 180-200 depending on size
+
+- Drums can also be bought from us if the customer does not have their own; the team confirms the drum price when booking.
+- Cars and other vehicles, commercial cargo, machinery, and anything not listed above: the team prepares a custom quote. Collect the details as a lead.
+
+Fees, timings and coverage:
+- Shipping takes 6 to 8 weeks door to door. Parcels are quicker, around 10-14 days.
+- Standard scheduled route collection is free in the UK and Ireland.
+- Door-to-door collection (we come to your door outside the scheduled route service): GBP 25 in the UK, EUR 25 in Ireland.
+- Delivery in Zimbabwe: 25 (GBP for UK shipments, EUR for Ireland shipments) per delivery address.
+- Zimbabwe delivery coverage: we deliver to all major cities and towns, and NOT to rural areas, small villages, farms or growth points. Recipients outside covered areas collect from our depot or an agreed point in the nearest covered town. Depot collection in Harare, Bulawayo or Mutare is free.
+- Covered cities: Harare, Bulawayo, Chitungwiza, Mutare, Epworth, Gweru, Kwekwe, Kadoma, Masvingo.
+- Covered towns and urban centres: Chinhoyi, Victoria Falls, Hwange, Zvishavane, Bindura, Marondera, Chegutu, Beitbridge, Kariba, Chiredzi, Rusape, Plumtree, Ruwa, Norton, Redcliff, Gwanda, Lupane, Gokwe, Shurugwi, Mvuma, Chipinge, Karoi, Mashava, Triangle, Shamva.
+- If the destination is on this list, delivery to the door is available at the standard delivery fee. If it is a village or rural area, explain the nearest-town option. If you are not sure whether a place is covered, do not guess either way: say the team will confirm and offer to take their details.
+- When a visitor asks about several places at once, check each place against the covered lists one by one before answering; never lump places together. Every city and town named in the covered lists above IS covered.
+- Customs, declarations and clearance are all handled by us and included in the cost. There is nothing extra for the customer to arrange for normal personal shipments.
+- Scotland: collections from Scotland run only when there is enough demand to fill a route, so there is no fixed Scotland schedule. If a visitor is in Scotland, take their details as a lead so the team can add them to the next Scotland route and notify them when it is confirmed.
+
+Discounts:
+- Referral discount: refer someone who ships with us and get GBP 20 (UK) or EUR 20 (Ireland) off your next shipment. When a visitor mentions being referred or referring someone, capture the referrer's name in the notes so the discount is applied.
+- Returning residents discount: Zimbabweans moving back home permanently get a discount on their shipment. Returning residents can book through Zimmy like anyone else; note "returning resident" in the booking or lead so the team applies the discount and advises on the extra customs paperwork for returning residents.
+
+Payment options: card or bank transfer, cash on collection, or pay on arrival in Zimbabwe (20 percent premium on pay-on-arrival).
 
 Website actions:
 - Live schedules: use the supplied LIVE OPERATIONS DATA. Give the real route and pickup date; never invent one.
@@ -36,36 +92,11 @@ Website actions:
 - Ask for only one missing detail at a time. Do not ask for every field in one message.
 - Once a quote lead is submitted, tell them a representative will contact them to confirm pricing and next steps.
 - For tracking, ask for the tracking number if it has not been provided. Do not merely redirect when live tracking data is available.
-- Contact/human: direct them to the Contact page or WhatsApp.
+- Contact/human: offer to capture their details as a lead, or direct them to the Contact page or WhatsApp.
 - Custom quote: collect the same lead details in chat and submit them for representative follow-up.
-
-Pricing basics:
-All listed shipping prices include free collection, tracking, and professional handling.
-Delivery is about 6 weeks for drums and 10-14 days for parcels.
-Ask whether they are shipping from the UK or Ireland if the country matters.
-
-Ireland prices in EUR:
-- Drum, 200-220L: EUR 360 per drum
-- Trunk or storage box: EUR 220
-- Metal coded seal: EUR 7 per item
-- Stove/cooker: EUR 325
-- Washing machine: EUR 328
-- Fridge: EUR 490-620 depending on size
-- Sofa/lounge suite: EUR 1560
-- Suitcase: EUR 200-230 depending on size
-
-UK prices in GBP:
-- Drum, 200-220L: GBP 280 per drum
-- Boxes: GBP 180-280 depending on size
-- Metal coded seal: GBP 5 per drum
-- Stove/cooker: GBP 260
-- Washing machine: GBP 300
-- Fridge: GBP 450
-- American fridge freezer: GBP 600
-- Sofa/lounge suite: GBP 1500
-- Suitcase: GBP 180-200 depending on size
-
-For anything not listed, the team gives a custom quote.
+- Lead category: set lead.category to the best fit: "custom_quote", "speak_to_director", "returning_resident", "referral", "scotland_route", or "general". Mention referrals or returning-resident status in notes too.
+- The category is sticky: if the visitor asked to speak to Mr Moyo or the office at any point in the conversation, keep lead.category as "speak_to_director" even when they then explain what the topic is (a discount, a complaint, a partnership). Put the topic in notes.
+- Always put the visitor's actual question or reason in lead.notes so the team knows why they are being contacted.
 
 Return only valid JSON, no markdown and no text outside JSON.
 Use this shape:
@@ -97,16 +128,16 @@ Use this shape:
     "route": string | null,
     "payment_method": string | null
   },
-  "intent": "general | pricing | schedule | tracking | booking | quote | human_support | prohibited_items | payment | delivery",
+  "intent": "general | pricing | schedule | tracking | booking | quote | human_support | prohibited_items | payment | delivery | catalogue | referral | returning_resident | speak_to_director | scotland_route",
   "should_submit_lead": boolean,
   "should_create_booking": boolean
 }
 
 Set should_submit_lead to true only when:
-- The visitor wants to book, wants a quote, or wants a representative to contact them.
+- The visitor wants to book, wants a quote, wants to reach Mr Moyo or the team, or wants a representative to contact them.
 - name is known.
 - at least phone_number or email is known.
-- shipment_items is known.
+- shipment_items is known, or (for speak_to_director, scotland_route, or general assistance leads) notes describe what they need.
 
 Set should_create_booking to true only when:
 - The visitor asked Zimmy to complete the booking, not only request a quote.
@@ -221,7 +252,12 @@ function getSafeBooking(input: unknown): BookingDetails {
 }
 
 function hasRequiredLeadFields(lead: LeadDetails): boolean {
-  return Boolean(lead.name && (lead.phone_number || lead.email) && lead.shipment_items);
+  const hasContact = Boolean(lead.name && (lead.phone_number || lead.email));
+  const supportCategories = new Set(["speak_to_director", "scotland_route", "general"]);
+  if (supportCategories.has(String(lead.category || "").toLowerCase())) {
+    return hasContact && Boolean(lead.shipment_items || lead.notes);
+  }
+  return hasContact && Boolean(lead.shipment_items);
 }
 
 function hasRequiredBookingFields(booking: BookingDetails): boolean {
@@ -235,7 +271,7 @@ function hasRequiredBookingFields(booking: BookingDetails): boolean {
 function conversationAlreadySubmitted(history: ChatMessage[]): boolean {
   return history.some((message) =>
     message.role === "assistant" &&
-    /representative will contact|details have been sent|booking request has been sent|request has been submitted/i
+    /representative will contact|details have been sent|booking request has been sent|request has been submitted|passed your details to the office|on the list for the next Scotland route|request has been sent to the team/i
       .test(message.content)
   );
 }
@@ -251,6 +287,7 @@ function normaliseIntent(value: unknown): string {
   const allowed = new Set([
     "general", "pricing", "schedule", "tracking", "booking", "quote",
     "human_support", "prohibited_items", "payment", "delivery",
+    "catalogue", "referral", "returning_resident", "speak_to_director", "scotland_route",
   ]);
   const cleaned = cleanText(value, 60)?.toLowerCase().replace(/\s+/g, "_") || "general";
   return allowed.has(cleaned) ? cleaned : "general";
@@ -269,6 +306,17 @@ function parseAiResponse(text: string): AiStructuredResponse {
       return { reply: text };
     }
   }
+}
+
+function leadRequestType(category: string | null | undefined): string {
+  const labels: Record<string, string> = {
+    speak_to_director: "Speak to Mr Moyo",
+    returning_resident: "Returning Resident",
+    referral: "Referral Discount",
+    scotland_route: "Scotland Route Waitlist",
+    custom_quote: "Custom Quote",
+  };
+  return labels[String(category || "").toLowerCase()] || "AI Lead";
 }
 
 async function saveLead(lead: LeadDetails) {
@@ -316,12 +364,32 @@ async function saveLead(lead: LeadDetails) {
 
   if (error) throw error;
 
+  const requestType = leadRequestType(lead.category);
+
+  // Mirror the lead into customer_requests so it also surfaces in the
+  // Zimmy AI operations centre alongside chat analytics.
+  const { error: requestError } = await supabase
+    .from("customer_requests")
+    .insert({
+      customer_name: lead.name,
+      whatsapp_number: lead.phone_number || `Email only: ${lead.email}`,
+      request_type: requestType,
+      message: details || lead.shipment_items || "AI lead",
+      status: "New",
+      unread: true,
+      source: "website_ai_chat",
+    });
+
+  if (requestError) {
+    console.error("Failed to mirror AI lead into customer_requests:", requestError.message);
+  }
+
   const { error: notificationError } = await supabase
     .from("notifications")
     .insert({
       user_id: SYSTEM_USER_ID,
-      title: "New AI Booking Lead",
-      message: `${lead.name} wants to ship: ${lead.shipment_items}`,
+      title: `New Zimmy lead: ${requestType}`,
+      message: `${lead.name} — ${lead.shipment_items || lead.notes || "needs follow-up"}`,
       type: "custom_quote",
       related_id: data.id,
       is_read: false,
@@ -347,6 +415,26 @@ type LiveOperations = {
   trackingNumber: string | null;
   tracking: unknown;
 };
+
+// Zimbabwe delivery coverage: major cities and towns only.
+const COVERED_ZIM_PLACES = [
+  "Harare", "Bulawayo", "Chitungwiza", "Mutare", "Epworth", "Gweru", "Kwekwe",
+  "Kadoma", "Masvingo", "Chinhoyi", "Victoria Falls", "Hwange", "Zvishavane",
+  "Bindura", "Marondera", "Chegutu", "Beitbridge", "Kariba", "Chiredzi",
+  "Rusape", "Plumtree", "Ruwa", "Norton", "Redcliff", "Gwanda", "Lupane",
+  "Gokwe", "Shurugwi", "Mvuma", "Chipinge", "Karoi", "Mashava", "Triangle",
+  "Shamva",
+];
+
+function coverageCheckLine(latestUserText: string): string | null {
+  const matches = COVERED_ZIM_PLACES.filter((place) =>
+    new RegExp(`\\b${place.replace(/\s+/g, "\\s+")}\\b`, "i").test(latestUserText)
+  );
+  if (!matches.length) return null;
+  return `Zimbabwe delivery coverage check for places named in the latest message: ${
+    matches.map((place) => `${place} = COVERED (door delivery available)`).join("; ")
+  }. Any other Zimbabwe place named is either not covered or must be confirmed by the team.`;
+}
 
 function parseCollectionDate(value: unknown): Date | null {
   const raw = String(value || "").trim();
@@ -405,7 +493,8 @@ async function getLiveOperationsContext(history: ChatMessage[]): Promise<LiveOpe
     trackingNumber
       ? `Tracking lookup for ${trackingNumber}: ${JSON.stringify(tracking || { found: false })}`
       : "Tracking lookup: no tracking number supplied in the latest message.",
-  ].join("\n");
+    coverageCheckLine(latestUserText),
+  ].filter(Boolean).join("\n");
 
   return { context, schedules: safeSchedules, trackingNumber, tracking };
 }
@@ -658,6 +747,9 @@ serve(async (req) => {
       });
     }
 
+    const limited = await enforceAiRateLimit(req, "ai-chat", corsHeaders);
+    if (limited) return limited;
+
     const body = await req.json();
     const history = cleanMessages(body?.messages);
     const conversationId = cleanText(body?.conversationId, 120) || crypto.randomUUID();
@@ -758,7 +850,14 @@ serve(async (req) => {
       try {
         leadId = await saveLead(lead);
         leadSubmitted = true;
-        reply = "Thanks, I have the details I need. Your request has been submitted and a Zimbabwe Shipping representative will contact you to confirm collection, pricing, and next steps.";
+        const category = String(lead.category || "").toLowerCase();
+        reply = category === "speak_to_director"
+          ? "Thanks, I have passed your details to the office. Mr Moyo's team will be in touch with you shortly."
+          : category === "scotland_route"
+          ? "Thanks, you are on the list for the next Scotland route. The team will contact you as soon as a collection date for Scotland is confirmed."
+          : lead.shipment_items
+          ? "Thanks, I have the details I need. Your request has been submitted and a Zimbabwe Shipping representative will contact you to confirm collection, pricing, and next steps."
+          : "Thanks, your request has been sent to the team and a Zimbabwe Shipping representative will contact you about it shortly.";
       } catch (leadError) {
         console.error("Failed to save AI booking lead:", leadError);
         reply = "Thanks, I have the details I need. I could not submit them automatically right now, so please contact us on WhatsApp or the Contact page and a representative will confirm your booking.";

@@ -64,8 +64,12 @@ create policy "Allow public inserts"
 on public.service_reviews for insert to anon 
 with check (true);
 
--- Create a view for admin dashboard to easily identify reviews needing attention
-create or replace view public.reviews_needing_attention as
+-- Create a view for admin dashboard to easily identify reviews needing attention.
+-- security_invoker makes the view enforce the querying user's RLS instead of
+-- the creator's (Supabase linter: security_definer_view).
+drop view if exists public.reviews_needing_attention;
+create view public.reviews_needing_attention
+with (security_invoker = on) as
 select 
   id,
   created_at,
