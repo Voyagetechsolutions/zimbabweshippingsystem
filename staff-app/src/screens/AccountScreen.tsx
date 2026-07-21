@@ -25,6 +25,14 @@ const SUPPORT_WHATSAPP = '+27615321107';
 export default function AccountScreen() {
   const { session, profile, signOut, dashboardRole, canSwitchDashboards } = useAuth();
   const { clearRole } = useViewRole();
+  // Show the viewer's real role — this screen is also reached from the admin
+  // Menu → Settings, where a hardcoded "Finance" label is wrong.
+  const roleLabel = canSwitchDashboards
+    ? 'Admin'
+    : dashboardRole === 'driver' ? 'Driver'
+    : dashboardRole === 'admin' ? 'Admin'
+    : dashboardRole === 'finance' ? 'Finance'
+    : profile?.role ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1) : 'Staff';
   const [name, setName] = useState(profile?.full_name || '');
   const [phone, setPhone] = useState(String(session?.user.user_metadata?.phone || ''));
   const [notifications, setNotifications] = useState(true);
@@ -62,9 +70,9 @@ export default function AccountScreen() {
         <View style={styles.profileCard}>
           <View style={styles.avatar}><Text style={styles.avatarText}>{initial}</Text></View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.profileName}>{profile?.full_name || 'Finance team member'}</Text>
+            <Text style={styles.profileName}>{profile?.full_name || 'Staff member'}</Text>
             <Text style={styles.muted} numberOfLines={1}>{session?.user.email}</Text>
-            <Text style={styles.role}>Finance</Text>
+            <Text style={styles.role}>{roleLabel}</Text>
           </View>
         </View>
 

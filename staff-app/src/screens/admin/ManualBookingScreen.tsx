@@ -20,7 +20,7 @@ function trackingNumber() {
 }
 
 export default function ManualBookingScreen() {
-  const [country, setCountry] = useState<'England' | 'Ireland'>('Ireland');
+  const [country, setCountry] = useState<'England' | 'Ireland'>('England');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
