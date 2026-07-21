@@ -127,6 +127,24 @@ export function DriverReportIssueScreen({ route, navigation }: NativeStackScreen
   return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled"><Header title="Report Issue" subtitle={stop.customerName} /><Text style={styles.sectionTitle}>What’s the issue?</Text><View style={styles.listCard}>{reasons.map(([key, label]) => <Pressable key={key} style={styles.menuRow} onPress={() => setReason(key)}><Ionicons name={reason === key ? 'radio-button-on' : 'radio-button-off'} size={19} color={reason === key ? colors.primary : colors.textFaint} /><Text style={styles.menuLabel}>{label}</Text></Pressable>)}</View><Text style={styles.detailLabel}>ADDITIONAL NOTES</Text><TextInput style={styles.notesInput} value={notes} onChangeText={setNotes} placeholder="Tell dispatch more…" placeholderTextColor={colors.textFaint} multiline maxLength={250} /><Pressable style={styles.primaryButton} onPress={submit} disabled={busy}>{busy ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryText}>Submit report</Text>}</Pressable></ScrollView></SafeAreaView>;
 }
 
+// Friendly labels for raw shipment_event status codes. Anything already written
+// as a human status (e.g. "Booking Confirmed") is kept as-is; unknown codes are
+// title-cased so nothing renders as raw snake_case like "en_route".
+const STATUS_LABELS: Record<string, string> = {
+  en_route: 'En route', arrived: 'Arrived', planned: 'Planned',
+  completed: 'Completed', failed: 'Failed', collected: 'Collected', pending: 'Pending',
+};
+function eventTitle(event: { new_status?: string | null; event_type?: string | null }): string {
+  const s = event.new_status;
+  if (s) {
+    if (STATUS_LABELS[s]) return STATUS_LABELS[s];
+    if (/[A-Z ]/.test(s)) return s; // already a human label
+    return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+  const t = event.event_type;
+  return t ? t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Update';
+}
+
 export function DriverMessagesScreen() {
   const { session } = useAuth(); const [events, setEvents] = useState<any[]>([]); const [loading, setLoading] = useState(true);
   const load = useCallback(async () => {
@@ -141,7 +159,7 @@ export function DriverMessagesScreen() {
   useFocusEffect(useCallback(() => { (async () => { await load(); setLoading(false); })(); }, [load]));
   if (loading) return <Loading />;
   return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content}><Header title="Messages" subtitle="Dispatch and shipment updates" />
-    {!events.length ? <Empty icon="chatbubble-ellipses-outline" title="No updates yet" text="Dispatch and shipment activity for your assigned runs will appear here." /> : <View style={styles.listCard}>{events.map((event) => <View key={event.id} style={styles.messageRow}><View style={styles.messageIcon}><Ionicons name="notifications-outline" size={18} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={styles.stopName}>{event.new_status || String(event.event_type).replaceAll('_', ' ')}</Text><Text style={styles.stopSub}>{event.details?.message || 'Assigned shipment update'}</Text></View><Text style={styles.messageTime}>{new Date(event.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</Text></View>)}</View>}
+    {!events.length ? <Empty icon="chatbubble-ellipses-outline" title="No updates yet" text="Dispatch and shipment activity for your assigned runs will appear here." /> : <View style={styles.listCard}>{events.map((event) => <View key={event.id} style={styles.messageRow}><View style={styles.messageIcon}><Ionicons name="notifications-outline" size={18} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={styles.stopName}>{eventTitle(event)}</Text><Text style={styles.stopSub}>{event.details?.message || 'Assigned shipment update'}</Text></View><Text style={styles.messageTime}>{new Date(event.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</Text></View>)}</View>}
   </ScrollView></SafeAreaView>;
 }
 
