@@ -421,7 +421,14 @@ begin
     select s.id as shipment_id, s.user_id,
       lower(nullif(trim(coalesce(s.metadata->'sender'->>'email', '')), '')) as email,
       nullif(regexp_replace(coalesce(s.metadata->'sender'->>'phone', s.metadata->>'whatsappNumber', ''), '[^0-9]', '', 'g'), '') as phone,
-      coalesce(nullif(trim(s.metadata->'sender'->>'name'), ''), 'Unknown customer') as name,
+      -- Resolve the sender name the same way the app does: prefer sender.name,
+      -- then firstName + lastName. Leave NULL when truly absent so max() below
+      -- picks a real name from the group instead of a premature 'Unknown
+      -- customer' literal (which sorts high and would win the max()).
+      coalesce(
+        nullif(trim(s.metadata->'sender'->>'name'), ''),
+        nullif(trim(coalesce(s.metadata->'sender'->>'firstName', '') || ' ' || coalesce(s.metadata->'sender'->>'lastName', '')), '')
+      ) as name,
       s.customer_reference, s.created_at, s.tracking_number,
       coalesce((
         select sum(coalesce((i->>'quantity')::numeric, 0) * coalesce((i->>'unitPrice')::numeric, 0))
