@@ -11,5 +11,11 @@ export const ANDROID_APK_URL = '/downloads/zimbabwe-shipping.apk';
 
 export const PLAY_STORE_URL = '';
 
-// Shown next to the download so users know what they are getting.
+// APP_STORE_URL is the Apple App Store listing. iOS apps cannot be sideloaded
+// from a website, so there is no .ipa download — the UI shows an "App Store"
+// button instead, and only once this is set. Fill it in after the app is live,
+// e.g. 'https://apps.apple.com/app/idXXXXXXXXXX'.
+export const APP_STORE_URL = '';
+
+// Shown next to the Android download so users know what they are getting.
 export const ANDROID_APP_VERSION = '1.0.0';

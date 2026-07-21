@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Facebook, Instagram, Mail, Phone, MapPin, Download } from 'lucide-react';
-import { ANDROID_APK_URL, PLAY_STORE_URL } from '@/config/appDownload';
+import { ANDROID_APK_URL, PLAY_STORE_URL, APP_STORE_URL } from '@/config/appDownload';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -77,6 +77,16 @@ const Footer = () => {
                   className="block mt-2 text-gray-400 hover:text-white text-sm transition-colors"
                 >
                   Or get it on Google Play →
+                </a>
+              )}
+              {APP_STORE_URL && (
+                <a
+                  href={APP_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block mt-2 text-gray-400 hover:text-white text-sm transition-colors"
+                >
+                  Or download on the App Store →
                 </a>
               )}
             </div>

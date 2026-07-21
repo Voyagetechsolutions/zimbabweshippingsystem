@@ -1,6 +1,6 @@
 import React from 'react';
-import { Download, Smartphone } from 'lucide-react';
-import { ANDROID_APK_URL, PLAY_STORE_URL, ANDROID_APP_VERSION } from '@/config/appDownload';
+import { Apple, Download, Smartphone } from 'lucide-react';
+import { ANDROID_APK_URL, PLAY_STORE_URL, APP_STORE_URL, ANDROID_APP_VERSION } from '@/config/appDownload';
 
 interface AppDownloadProps {
   /** "footer" is compact for the site footer; "section" is a full CTA block. */
@@ -9,8 +9,9 @@ interface AppDownloadProps {
 }
 
 /**
- * Android app download call-to-action. Shows a direct APK button (sideload)
- * and, once PLAY_STORE_URL is set, a Google Play link too.
+ * Mobile app call-to-action. Android gets a direct APK download (sideload) plus
+ * an optional Google Play link; iOS gets an App Store link (no sideloading on
+ * iOS). Store buttons only appear once their URL is set.
  */
 const AppDownload: React.FC<AppDownloadProps> = ({ variant = 'footer', className = '' }) => {
   if (variant === 'section') {
@@ -21,7 +22,7 @@ const AppDownload: React.FC<AppDownloadProps> = ({ variant = 'footer', className
             <div className="text-center md:text-left">
               <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
                 <Smartphone className="h-6 w-6 text-zim-green" />
-                <h2 className="text-2xl font-bold text-foreground">Get the Android App</h2>
+                <h2 className="text-2xl font-bold text-foreground">Get the Mobile App</h2>
               </div>
               <p className="text-muted-foreground max-w-md">
                 Book collections, track shipments and chat with Zimmy — all from your phone.
@@ -44,6 +45,17 @@ const AppDownload: React.FC<AppDownloadProps> = ({ variant = 'footer', className
                   className="inline-flex items-center justify-center gap-2 rounded-md border border-input px-6 py-3 font-medium text-foreground hover:bg-accent transition-colors"
                 >
                   Get it on Google Play
+                </a>
+              )}
+              {APP_STORE_URL && (
+                <a
+                  href={APP_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 rounded-md bg-black px-6 py-3 font-medium text-white hover:bg-black/90 transition-colors"
+                >
+                  <Apple className="h-5 w-5" />
+                  Download on the App Store
                 </a>
               )}
             </div>
@@ -74,6 +86,16 @@ const AppDownload: React.FC<AppDownloadProps> = ({ variant = 'footer', className
           className="block mt-2 text-gray-400 hover:text-white text-sm transition-colors"
         >
           Or get it on Google Play →
+        </a>
+      )}
+      {APP_STORE_URL && (
+        <a
+          href={APP_STORE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block mt-2 text-gray-400 hover:text-white text-sm transition-colors"
+        >
+          Or download on the App Store →
         </a>
       )}
     </div>
