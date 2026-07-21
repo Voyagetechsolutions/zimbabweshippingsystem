@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { Trash2, AlertTriangle, Mail, Shield, Clock, ChevronRight } from 'lucide-react';
-import Navigation from '@/components/Navigation';
-import Footer from '@/pages/Footer';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -73,15 +72,11 @@ export default function DeleteAccount() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Navigation />
-      
+      <Navbar />
+
       <main className="flex-1 pt-20 pb-16">
         <div className="container max-w-4xl mx-auto px-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Header */}
             <div className="text-center mb-12">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-destructive/10 rounded-full mb-4">
@@ -300,7 +295,7 @@ export default function DeleteAccount() {
                 </a>
               </p>
             </div>
-          </motion.div>
+          </div>
         </div>
       </main>
 
