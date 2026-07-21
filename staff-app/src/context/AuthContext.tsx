@@ -19,6 +19,10 @@ interface AuthValue {
   loading: boolean;
   isStaff: boolean;
   dashboardRole: DashboardRole | null;
+  // Logistics staff share the admin dashboard but must not reach the finance
+  // screens, so operations access and finance access are tracked separately.
+  canAccessFinance: boolean;
+  canSwitchDashboards: boolean;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
 }
@@ -93,9 +97,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     dashboardRole = 'driver';
   }
   const isStaff = dashboardRole !== null;
+  // A true admin (is_admin() / profiles.is_admin / role 'admin') gets finance
+  // and can switch dashboards; a logistics user gets operations only.
+  const isFullAdmin = adminFlag || profile?.is_admin === true || role === 'admin';
+  const canAccessFinance = isFullAdmin || dashboardRole === 'finance';
+  const canSwitchDashboards = isFullAdmin;
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading, isStaff, dashboardRole, signIn, signOut }}>
+    <AuthContext.Provider value={{ session, profile, loading, isStaff, dashboardRole, canAccessFinance, canSwitchDashboards, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

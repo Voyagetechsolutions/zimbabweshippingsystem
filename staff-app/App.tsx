@@ -14,6 +14,7 @@ import LoginScreen from './src/screens/LoginScreen';
 import AdminDashboardScreen from './src/screens/AdminDashboardScreen';
 import QuickCreateScreen from './src/screens/QuickCreateScreen';
 import ShipmentsStack from './src/navigation/ShipmentsStack';
+import RunsStack from './src/navigation/RunsStack';
 import MenuStack from './src/navigation/MenuStack';
 import DriverStack from './src/navigation/DriverStack';
 import DriverRunStack from './src/navigation/DriverRunStack';
@@ -81,7 +82,7 @@ function AdminApp() {
           tabBarButton: (props) => <FabButton {...props} />,
         }}
       />
-      <Tab.Screen name="Runs" component={DriverRunsScreen} options={{ title: 'Runs', tabBarIcon: icon('car-outline') }} />
+      <Tab.Screen name="Runs" component={RunsStack} options={{ title: 'Runs', tabBarIcon: icon('car-outline') }} />
       <Tab.Screen name="Menu" component={MenuStack} options={{ title: 'More', tabBarIcon: icon('menu-outline') }} />
     </Tab.Navigator>
   );

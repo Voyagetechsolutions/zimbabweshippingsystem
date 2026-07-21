@@ -12,9 +12,23 @@ export type RunMapStop = {
   title: string;
   description: string;
   kind: 'collection' | 'delivery';
+  color?: string;
 };
 
-export default function RunMap(_props: { stops: RunMapStop[] }) {
+export type RunMapPolyline = {
+  id: string;
+  color: string;
+  coordinates: Array<{ latitude: number; longitude: number }>;
+};
+
+export type RunMapProps = {
+  stops: RunMapStop[];
+  polylines?: RunMapPolyline[];
+  onStopPress?: (stop: RunMapStop) => void;
+  height?: number;
+};
+
+export default function RunMap(_props: RunMapProps) {
   return (
     <View style={styles.fallback}>
       <Ionicons name="map-outline" size={24} color={colors.primary} />

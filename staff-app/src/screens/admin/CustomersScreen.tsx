@@ -1,14 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, TextInput, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, StyleSheet, Pressable } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { supabase } from '../../lib/supabase';
 import { colors, radius, spacing } from '../../theme';
 import { money, shortDate } from '../../lib/format';
+import { ScreenHeader, SearchBar, Segmented, Badge, BADGE, Avatar, SkeletonList, EmptyState, ErrorState } from '../../components/adminui';
+import type { MenuStackParams } from '../../navigation/types';
 
-// Unified customer records from the admin_customer_records RPC: app + website
+// Unified customer records from admin_customer_records: app + website
 // registrations, past bookings, quote requesters and manual bookings — deduped
 // by user id, then normalised email/phone.
 
-interface CustomerRecord {
+type Props = NativeStackScreenProps<MenuStackParams, 'Customers'>;
+
+export interface CustomerRecord {
   key: string;
   profileId: string | null;
   fullName: string;
@@ -19,17 +26,24 @@ interface CustomerRecord {
   pickupAddress: string | null;
   shipmentCount: number;
   quoteCount: number;
+  lifetimeValue: number;
   outstanding: number;
   currency: string;
+  lastBooking: string | null;
   lastActivity: string | null;
+  active: boolean;
 }
 
-export default function CustomersScreen() {
+const FILTERS = ['all', 'active', 'inactive'] as const;
+
+export default function CustomersScreen({ navigation }: Props) {
   const [customers, setCustomers] = useState<CustomerRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]>('all');
+  const [trackingMatches, setTrackingMatches] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     const { data, error: rpcError } = await supabase.rpc('admin_customer_records');
@@ -39,93 +53,113 @@ export default function CustomersScreen() {
   }, []);
 
   useEffect(() => { (async () => { setLoading(true); await load(); setLoading(false); })(); }, [load]);
-  const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
+
+  // Tracking-number search: resolve the shipment owner and surface that record.
+  useEffect(() => {
+    const q = query.trim().toUpperCase();
+    if (!/^Z[A-Z]*-?\d{3,}/.test(q) && !q.startsWith('ZIMSHIP')) { setTrackingMatches({}); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('shipments')
+        .select('user_id,customer_reference,tracking_number,metadata')
+        .ilike('tracking_number', `%${q}%`)
+        .limit(5);
+      if (cancelled) return;
+      const map: Record<string, string> = {};
+      for (const row of (data || []) as any[]) {
+        const key = row.user_id
+          || (row.metadata?.sender?.email || '').toLowerCase()
+          || String(row.metadata?.sender?.phone || '').replace(/[^0-9]/g, '');
+        if (key) map[key] = row.tracking_number;
+      }
+      setTrackingMatches(map);
+    })();
+    return () => { cancelled = true; };
+  }, [query]);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
-    return customers.filter((c) =>
-      q === ''
-      || c.fullName?.toLowerCase().includes(q)
-      || c.email?.toLowerCase().includes(q)
-      || c.phone?.includes(q.replace(/[^0-9]/g, '') || q)
-      || c.customerReference?.toLowerCase().includes(q),
-    );
-  }, [customers, query]);
-
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
+    const digits = q.replace(/[^0-9]/g, '');
+    return customers
+      .filter((c) => filter === 'all' || (filter === 'active' ? c.active : !c.active))
+      .filter((c) => {
+        if (q === '') return true;
+        if (c.fullName?.toLowerCase().includes(q)) return true;
+        if (c.email?.toLowerCase().includes(q)) return true;
+        if (c.customerReference?.toLowerCase().includes(q)) return true;
+        if (digits.length >= 4 && c.phone?.replace(/[^0-9]/g, '').includes(digits)) return true;
+        if (c.profileId && trackingMatches[c.profileId]) return true;
+        if (c.email && trackingMatches[c.email.toLowerCase()]) return true;
+        if (c.phone && trackingMatches[c.phone.replace(/[^0-9]/g, '')]) return true;
+        return false;
+      });
+  }, [customers, filter, query, trackingMatches]);
 
   return (
-    <View style={styles.safe}>
-      <View style={styles.header}>
-        <TextInput
-          style={styles.search} placeholder="Search name, email, phone or reference" placeholderTextColor={colors.textFaint}
-          value={query} onChangeText={setQuery} autoCapitalize="none"
-        />
+    <SafeAreaView style={styles.safe} edges={[]}>
+      <View style={styles.headerBlock}>
+        <ScreenHeader title="Customers" subtitle={`${customers.length} unified records`} />
+        <SearchBar value={query} onChange={setQuery} placeholder="Name, reference, email, phone or tracking number" />
+        <View style={{ marginTop: spacing.sm }}>
+          <Segmented options={FILTERS} value={filter} onChange={setFilter} labels={{ all: 'All', active: 'Active', inactive: 'Inactive' }} />
+        </View>
       </View>
-      {error ? <Text style={styles.error}>Could not load customers: {error}</Text> : null}
+
+      {error ? <View style={{ paddingHorizontal: spacing.lg }}><ErrorState message={error} onRetry={() => { setLoading(true); load().finally(() => setLoading(false)); }} /></View> : null}
+
       <FlatList
         data={filtered}
         keyExtractor={(c) => c.key}
         refreshing={refreshing}
-        onRefresh={onRefresh}
+        onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }}
         contentContainerStyle={styles.list}
-        ListEmptyComponent={<Text style={styles.empty}>No customers found</Text>}
+        ListEmptyComponent={loading
+          ? <SkeletonList rows={6} />
+          : error ? null
+          : <EmptyState icon="people-outline" title="No customers found" text="Adjust the search or filter to see more records." />}
         renderItem={({ item }) => (
-          <View style={styles.row}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{(item.fullName || item.email || '?').charAt(0).toUpperCase()}</Text>
-            </View>
+          <Pressable style={styles.row} onPress={() => navigation.navigate('CustomerDetail', { record: item })}>
+            <Avatar name={item.fullName || item.email} size={42} />
             <View style={{ flex: 1 }}>
               <View style={styles.nameRow}>
                 <Text style={styles.name} numberOfLines={1}>{item.fullName || 'Unknown customer'}</Text>
-                {item.customerReference ? <Text style={styles.ref}>{item.customerReference}</Text> : null}
+                <Badge text={item.active ? 'Active' : 'Inactive'} tone={item.active ? BADGE.green : BADGE.grey} />
               </View>
-              {item.email ? <Text style={styles.detail} numberOfLines={1}>{item.email}</Text> : null}
-              {item.phone ? <Text style={styles.detail} numberOfLines={1}>{item.phone}</Text> : null}
-              {item.pickupAddress ? <Text style={styles.detail} numberOfLines={1}>{item.pickupAddress}{item.country ? ` · ${item.country}` : ''}</Text> : null}
+              {item.customerReference ? <Text style={styles.reference}>{item.customerReference}</Text> : null}
+              <Text style={styles.detail} numberOfLines={1}>
+                {[item.phone, item.email].filter(Boolean).join(' · ') || 'No contact details'}
+              </Text>
               <View style={styles.statRow}>
                 <Text style={styles.stat}>{item.shipmentCount} shipment{item.shipmentCount === 1 ? '' : 's'}</Text>
-                <Text style={styles.stat}>{item.quoteCount} quote{item.quoteCount === 1 ? '' : 's'}</Text>
-                {item.outstanding > 0 ? (
-                  <Text style={[styles.stat, { color: colors.danger, fontWeight: '800' }]}>
-                    {money(item.outstanding, item.currency === 'EUR' ? '€' : '£')} due
-                  </Text>
-                ) : (
-                  <Text style={[styles.stat, { color: colors.primary }]}>Settled</Text>
-                )}
-                {item.lastActivity ? <Text style={styles.stat}>Active {shortDate(item.lastActivity)}</Text> : null}
+                <Text style={[styles.stat, { color: colors.primaryDark, fontWeight: '800' }]}>
+                  {money(item.lifetimeValue, item.currency === 'EUR' ? '€' : '£')} lifetime
+                </Text>
+                {item.lastBooking ? <Text style={styles.stat}>Last booked {shortDate(item.lastBooking)}</Text> : null}
               </View>
             </View>
-          </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+          </Pressable>
         )}
-        ListFooterComponent={<Text style={styles.footer}>{filtered.length} of {customers.length} customers</Text>}
+        ListFooterComponent={!loading && filtered.length ? <Text style={styles.footer}>{filtered.length} of {customers.length} customers</Text> : null}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
-  header: { padding: spacing.lg, paddingBottom: 0 },
-  search: {
-    borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md,
-    paddingVertical: 9, fontSize: 14, color: colors.text, backgroundColor: colors.surface,
-  },
-  error: { color: '#991b1b', fontSize: 12, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
-  list: { padding: spacing.lg, gap: spacing.sm },
+  headerBlock: { padding: spacing.lg, paddingBottom: spacing.sm },
+  list: { padding: spacing.lg, paddingTop: spacing.xs, gap: spacing.sm, flexGrow: 1 },
   row: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, backgroundColor: colors.surface,
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface,
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md,
   },
-  avatar: { width: 36, height: 36, borderRadius: radius.pill, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: colors.primary, fontWeight: '700' },
   nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  name: { fontSize: 14, fontWeight: '700', color: colors.text, flexShrink: 1 },
-  ref: { fontSize: 10.5, fontWeight: '800', color: colors.primary },
-  detail: { fontSize: 11.5, color: colors.textMuted, marginTop: 1 },
-  statRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: 6 },
-  stat: { fontSize: 11, color: colors.textMuted, fontWeight: '600' },
-  empty: { textAlign: 'center', color: colors.textMuted, paddingVertical: 40 },
+  name: { fontSize: 14, fontWeight: '800', color: colors.text, flexShrink: 1 },
+  reference: { fontSize: 10.5, fontWeight: '800', color: colors.primary, marginTop: 1 },
+  detail: { fontSize: 11.5, color: colors.textMuted, marginTop: 2 },
+  statRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: 5 },
+  stat: { fontSize: 10.5, color: colors.textMuted, fontWeight: '600' },
   footer: { textAlign: 'center', color: colors.textFaint, fontSize: 12, paddingVertical: spacing.md },
 });

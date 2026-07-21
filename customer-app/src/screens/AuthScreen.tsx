@@ -10,6 +10,18 @@ import { Field, Button } from '../components/ui';
 import { useAppTheme } from '../context/ThemeContext';
 import { IMG } from '../img';
 
+// Mirrors the Supabase project's password policy so new users are guided before
+// the request is sent. Returns a human message when the password falls short,
+// or null when it satisfies every rule.
+function passwordRequirement(pw: string): string | null {
+  if (pw.length < 8) return 'Use at least 8 characters.';
+  if (!/[a-z]/.test(pw)) return 'Add a lowercase letter (a–z).';
+  if (!/[A-Z]/.test(pw)) return 'Add an uppercase letter (A–Z).';
+  if (!/[0-9]/.test(pw)) return 'Add a number (0–9).';
+  if (!/[^A-Za-z0-9]/.test(pw)) return 'Add a symbol (e.g. ! ? @ #).';
+  return null;
+}
+
 export default function AuthScreen() {
   const navigation = useNavigation<any>();
   const { signIn, signUp } = useAuth();
@@ -25,9 +37,15 @@ export default function AuthScreen() {
       Alert.alert('Check your email', 'Enter a valid email address.');
       return;
     }
-    if (mode === 'signup' && password.length < 6) {
-      Alert.alert('Password too short', 'Use at least 6 characters.');
-      return;
+    if (mode === 'signup') {
+      // The Supabase project enforces a strong-password policy (lower + upper +
+      // number + symbol). Validate here so users get a friendly message up front
+      // instead of the raw backend error string.
+      const missing = passwordRequirement(password);
+      if (missing) {
+        Alert.alert('Choose a stronger password', missing);
+        return;
+      }
     }
     if (!password) return;
     setBusy(true);
@@ -93,6 +111,12 @@ export default function AuthScreen() {
           <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholder="you@example.com" />
           <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" placeholder="Password" />
 
+          {mode === 'signup' && (
+            <Text style={[styles.pwHint,{color:palette.textMuted}]}>
+              At least 8 characters with an uppercase letter, a number and a symbol.
+            </Text>
+          )}
+
           {mode === 'signin' && (
             <Pressable onPress={forgotPassword} style={styles.forgot} hitSlop={8}>
               <Text style={styles.forgotText}>Forgot Password?</Text>
@@ -128,6 +152,7 @@ const styles = StyleSheet.create({
   logo: { width: 110, height: 110, alignSelf: 'center', marginTop: spacing.md },
   title: { fontSize: 26, fontWeight: '900', textAlign: 'center', marginTop: spacing.md },
   sub: { fontSize: 14, textAlign: 'center', marginBottom: spacing.xl },
+  pwHint: { fontSize: 12, lineHeight: 16, marginTop: 4, marginBottom: spacing.sm },
   forgot: { alignSelf: 'flex-end', marginTop: -4, marginBottom: spacing.lg },
   forgotText: { color: colors.green, fontWeight: '700', fontSize: 13 },
   orRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginVertical: spacing.lg },

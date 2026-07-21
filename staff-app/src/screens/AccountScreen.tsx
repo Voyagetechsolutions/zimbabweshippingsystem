@@ -23,7 +23,7 @@ const SUPPORT_EMAIL = 'voyagetechsolutions@gmaail.com';
 const SUPPORT_WHATSAPP = '+27615321107';
 
 export default function AccountScreen() {
-  const { session, profile, signOut, dashboardRole } = useAuth();
+  const { session, profile, signOut, dashboardRole, canSwitchDashboards } = useAuth();
   const { clearRole } = useViewRole();
   const [name, setName] = useState(profile?.full_name || '');
   const [phone, setPhone] = useState(String(session?.user.user_metadata?.phone || ''));
@@ -114,7 +114,7 @@ export default function AccountScreen() {
           </Pressable>
         </View>
 
-        {dashboardRole === 'admin' ? (
+        {canSwitchDashboards ? (
           <Pressable style={styles.switchDashboard} onPress={clearRole}>
             <Ionicons name="swap-horizontal-outline" size={19} color={colors.primary} />
             <Text style={styles.switchText}>Switch dashboard</Text>

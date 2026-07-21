@@ -38,19 +38,32 @@ export type DriverMoreStackParams = {
   Performance: undefined;
 };
 
+// Admin Runs tab: dispatch board + run details.
+export type RunsStackParams = {
+  DriverRuns: undefined;
+  RunDetail: { runId: string };
+};
+
 // Sections menu — mirrors the website admin sidebar.
 export type MenuStackParams = {
   Menu: undefined;
   ManualBooking: undefined;
   Customers: undefined;
+  CustomerDetail: { record: any };
   CustomQuotes: undefined;
   Schedule: undefined;
   Delivery: undefined;
+  DeliveryNotes: undefined;
+  DeliveryNoteDetail: { noteId: string };
+  PickupZones: undefined;
   Payments: undefined;
   Invoices: undefined;
   Reports: undefined;
+  Analytics: undefined;
+  FinanceOverview: undefined;
   Feedback: undefined;
   StaffRecords: undefined;
+  Vehicles: undefined;
   Account: undefined;
   Placeholder: { title: string };
 };
