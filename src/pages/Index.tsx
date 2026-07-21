@@ -11,6 +11,7 @@ import CallToAction from '@/components/CallToAction';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import ShippingGallerySlideshow from '@/components/ShippingGallerySlideshow';
 import SocialProofBanner from '@/components/SocialProofBanner';
+import AppDownload from '@/components/AppDownload';
 import { Helmet } from 'react-helmet';
 
 const Index = () => {
@@ -61,6 +62,9 @@ const Index = () => {
 
         {/* Customer testimonials */}
         <TestimonialsSection />
+
+        {/* Download the mobile app */}
+        <AppDownload variant="section" />
 
         {/* Final CTA */}
         <CallToAction />
