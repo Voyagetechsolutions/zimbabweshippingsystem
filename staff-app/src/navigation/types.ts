@@ -62,7 +62,7 @@ export type MenuStackParams = {
   Analytics: undefined;
   FinanceOverview: undefined;
   Feedback: undefined;
-  StaffRecords: undefined;
+  StaffRecords: { filter?: 'all' | 'drivers' | 'dispatchers' | 'finance' | 'admins' } | undefined;
   Vehicles: undefined;
   Account: undefined;
   Placeholder: { title: string };

@@ -15,6 +15,7 @@ type Item = {
   icon: keyof typeof Ionicons.glyphMap;
   // Either a screen in this stack, a tab jump, or a placeholder.
   to?: keyof MenuStackParams;
+  params?: Record<string, unknown>;
   tab?: string;
   placeholder?: boolean;
   // Finance-only entries are hidden from logistics/operations staff.
@@ -57,7 +58,7 @@ const SECTIONS: { title: string; data: Item[] }[] = [
     title: 'Administration',
     data: [
       { label: 'Staff Control Centre', icon: 'shield-checkmark-outline', to: 'StaffRecords', adminOnly: true },
-      { label: 'Drivers', icon: 'people-circle-outline', to: 'StaffRecords', adminOnly: true },
+      { label: 'Drivers', icon: 'people-circle-outline', to: 'StaffRecords', params: { filter: 'drivers' }, adminOnly: true },
       { label: 'Vehicles', icon: 'bus-outline', to: 'Vehicles', adminOnly: true },
       { label: 'Settings', icon: 'settings-outline', to: 'Account' },
     ],
@@ -88,7 +89,7 @@ export default function MenuScreen({ navigation }: Props) {
     } else if (item.placeholder) {
       navigation.navigate('Placeholder', { title: item.label });
     } else if (item.to) {
-      navigation.navigate(item.to as any);
+      navigation.navigate(item.to as any, item.params as any);
     }
   };
 

@@ -6,6 +6,10 @@ import { supabase } from '../../lib/supabase';
 import { colors, radius, spacing } from '../../theme';
 import { shortDate } from '../../lib/format';
 import { ScreenHeader, StatCard, Segmented, Badge, BADGE, Avatar, SkeletonList, EmptyState, ErrorState, SectionLabel, Card } from '../../components/adminui';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { MenuStackParams } from '../../navigation/types';
+
+type Props = NativeStackScreenProps<MenuStackParams, 'StaffRecords'>;
 
 // Staff Control Centre: role-filtered staff directory with attendance,
 // performance, vehicle and leave management, plus admin-only invitations
@@ -39,12 +43,12 @@ function matchesRole(record: StaffRecord, filter: (typeof ROLE_FILTERS)[number])
   return record.isAdmin || record.role === 'admin';
 }
 
-export default function StaffRecordsScreen() {
+export default function StaffRecordsScreen({ route }: Props) {
   const [staff, setStaff] = useState<StaffRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<(typeof ROLE_FILTERS)[number]>('all');
+  const [filter, setFilter] = useState<(typeof ROLE_FILTERS)[number]>(route.params?.filter ?? 'all');
   const [detail, setDetail] = useState<StaffRecord | null>(null);
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
