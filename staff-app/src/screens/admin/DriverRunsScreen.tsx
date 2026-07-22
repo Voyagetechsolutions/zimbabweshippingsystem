@@ -161,8 +161,11 @@ export default function DriverRunsScreen({ navigation }: Props) {
 
   const activeRuns = runs.filter((r) => r.status === 'active');
   const completedRuns = runs.filter((r) => r.status === 'completed');
+  // "Available drivers" counts only real drivers (role = 'driver'), not admins
+  // who happen to be able to drive — so it matches the Vehicles/Staff headcount.
+  // Admins can still be assigned to runs; they're just not counted here.
   const availableDrivers = drivers.filter((d) =>
-    (d.role === 'driver' || d.driver_type) && d.staff_active !== false && !d.on_leave
+    d.role === 'driver' && d.staff_active !== false && !d.on_leave
     && !runs.some((r) => r.driver_id === d.id && ['planned', 'active'].includes(r.status)));
   const unassignedRoutes = groups.filter((g) => !g.run);
 
