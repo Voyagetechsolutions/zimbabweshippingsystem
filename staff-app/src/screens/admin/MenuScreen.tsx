@@ -8,7 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { colors, radius, spacing } from '../../theme';
 import type { MenuStackParams } from '../../navigation/types';
 
-type Props = NativeStackScreenProps<MenuStackParams, 'Menu'>;
+type Props = NativeStackScreenProps<MenuStackParams, 'MenuHome'>;
 
 type Item = {
   label: string;

@@ -46,7 +46,7 @@ export type RunsStackParams = {
 
 // Sections menu — mirrors the website admin sidebar.
 export type MenuStackParams = {
-  Menu: undefined;
+  MenuHome: undefined;
   ManualBooking: undefined;
   Customers: undefined;
   CustomerDetail: { record: any };

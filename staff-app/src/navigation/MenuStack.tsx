@@ -34,7 +34,7 @@ export default function MenuStack() {
         headerTitleStyle: { fontWeight: '700' },
       }}
     >
-      <Stack.Screen name="Menu" component={MenuScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="MenuHome" component={MenuScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ManualBooking" component={ManualBookingScreen} options={{ title: 'Manual Booking' }} />
       <Stack.Screen name="Customers" component={CustomersScreen} options={{ title: '' , headerShadowVisible: false }} />
       <Stack.Screen name="CustomerDetail" component={CustomerDetailScreen} options={{ title: 'Customer' }} />
