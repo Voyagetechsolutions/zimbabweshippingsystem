@@ -9,6 +9,7 @@ const fnPath = path.join(root, 'supabase/functions/staff-ops/index.ts');
 const sqlPaths = [
   path.join(root, 'supabase/migrations/20260719_operations_upgrade.sql'),
   path.join(root, 'supabase/migrations/20260721_admin_screens.sql'),
+  path.join(root, 'supabase/migrations/20260722_fix_schedule_typos.sql'),
 ];
 
 const src = fs.readFileSync(fnPath, 'utf8');
