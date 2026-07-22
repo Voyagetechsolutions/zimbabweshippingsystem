@@ -42,3 +42,10 @@ where route = 'NOTTINGHAM ROUTE' and areas @> ARRAY['LIECESTER']::text[];
 update public.collection_schedules
 set areas = ARRAY['Belfast','Bangor','Comber','Lisburn','Newry','Newtownards','Dunmurry','Lurgan','Portadown','Banbridge','Moy','Dungannon','Armagh']::text[]
 where route = 'BELFAST' and areas @> ARRAY['Newtownwards']::text[];
+
+-- CARDIFF ROUTE: remove the junk token "HIJJ". It maps to no real place and is
+-- absent from the curated source list (src/data/collectionSchedule.ts), so it is
+-- an accidental entry. Restore the route to its six real areas.
+update public.collection_schedules
+set areas = ARRAY['CARDIFF','GLOUCESTER','BRISTOL','SWINDON','BATH','SALISBURY']::text[]
+where route = 'CARDIFF ROUTE' and areas @> ARRAY['HIJJ']::text[];

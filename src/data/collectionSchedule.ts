@@ -79,7 +79,7 @@ export const collectionSchedules: RouteSchedule[] = [
   {
     route: "BELFAST ROUTE",
     date: "19th of April",
-    areas: ["BELFAST", "BANGOR", "COMBER", "LISBURN", "NEWRY", "NEWTOWNWARDS", "DUNMURRY", "LURGAN", "PORTADOWN", "BANBRIDGE", "MOY", "DUNGANNON", "ARMAGH"],
+    areas: ["BELFAST", "BANGOR", "COMBER", "LISBURN", "NEWRY", "NEWTOWNARDS", "DUNMURRY", "LURGAN", "PORTADOWN", "BANBRIDGE", "MOY", "DUNGANNON", "ARMAGH"],
     country: "Ireland"
   },
   {

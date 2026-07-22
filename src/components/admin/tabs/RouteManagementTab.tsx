@@ -178,7 +178,7 @@ const RouteManagementTab = () => {
     },
     {
       route: 'BELFAST',
-      cities: ['Belfast', 'Bangor', 'Comber', 'Lisburn', 'Newry', 'Newtownwards', 'Dunmurry', 'Lurgan', 'Portadown', 'Banbridge', 'Moy', 'Dungannon', 'Armagh']
+      cities: ['Belfast', 'Bangor', 'Comber', 'Lisburn', 'Newry', 'Newtownards', 'Dunmurry', 'Lurgan', 'Portadown', 'Banbridge', 'Moy', 'Dungannon', 'Armagh']
     },
     {
       route: 'CAVAN',
