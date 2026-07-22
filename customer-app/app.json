@@ -24,7 +24,10 @@
     ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.zimbabweshipping.customer"
+      "bundleIdentifier": "com.zimbabweshipping.customer",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
