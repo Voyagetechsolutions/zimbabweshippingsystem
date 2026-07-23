@@ -1,0 +1,28 @@
+# EAS Build reads this file INSTEAD of .gitignore when deciding which
+# files to upload. This repo is a monorepo, so by default EAS uploaded
+# the whole thing (~158 MB). We only build the Expo apps (customer-app,
+# staff-app), so exclude the heavy, unrelated parts of the repo.
+#
+# NOTE: because this replaces .gitignore, we must also re-exclude
+# node_modules and caches here, or they would get uploaded.
+
+# --- Reinstalled / regenerated on the build server ---
+**/node_modules/
+**/.expo/
+**/dist/
+**/web-build/
+.git/
+
+# --- Monorepo parts not needed to build the mobile apps ---
+/tmp/
+/public/
+/src/
+/supabase/
+/whatsapp-bot/
+/old whatsapp bots/
+/store-assets/
+/poster-output/
+/docs/
+/scripts/
+/tools/
+/.github/
