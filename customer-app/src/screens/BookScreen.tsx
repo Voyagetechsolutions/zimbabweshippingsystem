@@ -12,7 +12,11 @@ import { CATALOGUE, Country, currencyFor, priceFor, DELIVERY_FEE } from '../lib/
 import { BookingDraft, EMPTY_DRAFT, QuoteCarry, createBooking, draftLines, DESCRIPTION_GUIDANCE } from '../lib/booking';
 import { CustomerAddress, listAddresses, addressSummary } from '../lib/addresses';
 import { parseCollectionDate, longDate, money } from '../lib/format';
-import { scheduleMatchesPostcode } from '../lib/postcode';
+import {
+  scheduleMatchesPostcode, autocompletePostcode, searchAddresses, lookupUkPostcode,
+  coverageForUkPostcode, prettyPostcode, type Coverage,
+} from '../lib/postcode';
+import { SuggestField } from '../components/SuggestField';
 import { useAppTheme } from '../context/ThemeContext';
 
 const STEPS = ['Collection', 'Sender', 'Goods', 'Delivery', 'Extras', 'Date', 'Review'] as const;
@@ -32,6 +36,7 @@ const PAYMENT_METHODS: Array<{ value: string; icon: keyof typeof Ionicons.glyphM
 ];
 
 type ScheduleRow = { id: string; route: string; pickup_date: string; country?: string | null; areas?: any };
+type DepotRow = { id: string; name: string; city: string; address_line1: string; opening_hours: string | null };
 
 export default function BookScreen() {
   const navigation = useNavigation<any>();
@@ -43,6 +48,19 @@ export default function BookScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const { palette } = useAppTheme();
+
+  // Coordinates of the resolved collection postcode — biases address search to
+  // the customer's own area rather than the whole country.
+  const [postcodePoint, setPostcodePoint] = useState<{ latitude: number; longitude: number } | null>(null);
+  // Whether the town was filled in for the customer. An auto-filled town follows
+  // the postcode; one they typed themselves is left alone.
+  const [cityAutoFilled, setCityAutoFilled] = useState(false);
+
+  // Door delivery keeps its per-address fee; self-collection is free and the
+  // receiver picks the goods up from a depot.
+  const [deliveryMethod, setDeliveryMethod] = useState<'door' | 'self_collection'>('door');
+  const [depots, setDepots] = useState<DepotRow[]>([]);
+  const [depotId, setDepotId] = useState<string | null>(null);
 
   const routeParams = (useRoute<any>().params || {}) as { quote?: QuoteCarry; prefillItems?: Record<string, number>; prefillCountry?: Country };
 
@@ -90,6 +108,19 @@ export default function BookScreen() {
       .then(({ data }) => setSchedules((data as ScheduleRow[]) || []));
   }, []);
 
+  // Zimbabwe collection points for self-collection. Absent until the depot
+  // migration is applied, which the UI copes with.
+  useEffect(() => {
+    supabase.from('delivery_depots').select('id, name, city, address_line1, opening_hours')
+      .eq('active', true).order('sort_order', { ascending: true })
+      .then(({ data, error }) => {
+        if (error) return;
+        const rows = (data as DepotRow[]) || [];
+        setDepots(rows);
+        if (rows.length === 1) setDepotId((current) => current ?? rows[0].id);
+      });
+  }, []);
+
   const loadAddresses = useCallback(async () => {
     if (!session?.user.id) return;
     try { setAddresses(await listAddresses(session.user.id)); } catch { /* shown as empty */ }
@@ -114,12 +145,52 @@ export default function BookScreen() {
   const { lines, estimate, hasCustom, symbol } = draftLines(draft);
   const set = (patch: Partial<BookingDraft>) => setDraft((d) => ({ ...d, ...patch }));
 
-  const hasDelivery = draft.deliveryAddressIds.length > 0
-    || Boolean(draft.recipient.name.trim() && draft.recipient.phone.trim() && draft.recipient.address.trim() && draft.recipient.city.trim());
+  const isIrelandPickup = draft.country === 'Ireland';
+  // The postcode is the coverage decision, so it is evaluated on every keystroke
+  // and shown immediately. Ireland routes by city instead.
+  const coverage: Coverage = isIrelandPickup
+    ? { status: 'unknown', route: null, message: '' }
+    : coverageForUkPostcode(draft.collectionPostcode);
+
+  // Resolve the typed postcode to a town and coordinates (debounced).
+  useEffect(() => {
+    if (isIrelandPickup) { setPostcodePoint(null); return; }
+    if (draft.collectionPostcode.replace(/\s/g, '').length < 5) { setPostcodePoint(null); return; }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const place = await lookupUkPostcode(draft.collectionPostcode);
+      if (cancelled) return;
+      setPostcodePoint(place && place.latitude != null && place.longitude != null
+        ? { latitude: place.latitude, longitude: place.longitude }
+        : null);
+      if (place?.city) {
+        setDraft((d) => {
+          if (d.collectionCity && !cityAutoFilled) return d;
+          if (d.collectionCity === place.city) return d;
+          return { ...d, collectionCity: place.city };
+        });
+        setCityAutoFilled(true);
+      }
+    }, 450);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [draft.collectionPostcode, isIrelandPickup, cityAutoFilled]);
+
+  // Door delivery needs somewhere to drive to. Self-collection only needs to
+  // know who is collecting and from where — there is no street address.
+  const hasDelivery = deliveryMethod === 'self_collection'
+    ? Boolean(draft.recipient.name.trim() && draft.recipient.phone.trim())
+    : draft.deliveryAddressIds.length > 0
+      || Boolean(draft.recipient.name.trim() && draft.recipient.phone.trim() && draft.recipient.address.trim() && draft.recipient.city.trim());
 
   const stepValid = () => {
     switch (step) {
-      case 0: return draft.collectionAddress.trim().length > 3 && draft.collectionCity.trim().length > 1 && draft.collectionPostcode.replace(/\s/g, '').length >= 3;
+      case 0:
+        // A postcode we don't run a route to stops the booking here rather than
+        // six steps later.
+        if (coverage.status === 'not_covered') return false;
+        return draft.collectionAddress.trim().length > 3
+          && draft.collectionCity.trim().length > 1
+          && (isIrelandPickup || draft.collectionPostcode.replace(/\s/g, '').length >= 3);
       case 1: return Boolean(draft.sender.firstName.trim() && draft.sender.lastName.trim() && draft.sender.phone.trim());
       case 2: return draft.goodsDescription.trim().length >= 15;
       case 3: return hasDelivery;
@@ -132,6 +203,21 @@ export default function BookScreen() {
     setSubmitting(true);
     try {
       const created = await createBooking(draft, session?.user?.id ?? null);
+
+      // Record which delivery option was chosen. Pricing is already correct —
+      // self-collection selects no paid addresses — so this only annotates the
+      // shipment for the warehouse and driver. Best effort: a booking must not
+      // fail because the annotation did.
+      try {
+        await supabase.rpc('set_booking_delivery_method', {
+          p_shipment_id: created.id,
+          p_method: deliveryMethod,
+          p_depot_id: deliveryMethod === 'self_collection' ? depotId : null,
+        });
+      } catch (e) {
+        console.warn('Could not record the delivery method', e);
+      }
+
       await AsyncStorage.removeItem(DRAFT_KEY);
       navigation.replace('ShipmentDetail', { id: created.id, celebrate: true });
     } catch (e: any) {
@@ -204,9 +290,84 @@ export default function BookScreen() {
                   );
                 })}
               </View>
-              <Field label="Collection address" value={draft.collectionAddress} onChangeText={(v) => set({ collectionAddress: v })} placeholder="24 King Street" />
-              <Field label="Town / city" value={draft.collectionCity} onChangeText={(v) => set({ collectionCity: v })} placeholder={draft.country === 'Ireland' ? 'Dublin' : 'Luton'} />
-              <Field label={draft.country === 'Ireland' ? 'Eircode' : 'Postcode'} value={draft.collectionPostcode} onChangeText={(v) => set({ collectionPostcode: v })} autoCapitalize="none" />
+              <SuggestField
+                label="Collection address"
+                value={draft.collectionAddress}
+                onChangeText={(v) => set({ collectionAddress: v })}
+                placeholder="Start typing, e.g. 24 King Street"
+                hint="Search for your address, or type it in full."
+                fetcher={async (query) => {
+                  const results = await searchAddresses(query, postcodePoint);
+                  return results.map((r) => ({ key: r.label, primary: r.line1, secondary: [r.town, r.postcode].filter(Boolean).join(' · ') }));
+                }}
+                onPick={(suggestion) => {
+                  const [town, postcode] = String(suggestion.secondary || '').split(' · ');
+                  // An explicit pick is authoritative: take its town and
+                  // postcode too, so the three fields can't disagree.
+                  set({
+                    collectionAddress: suggestion.primary,
+                    ...(town ? { collectionCity: town } : {}),
+                    ...(postcode && !isIrelandPickup ? { collectionPostcode: postcode } : {}),
+                  });
+                  setCityAutoFilled(Boolean(town));
+                }}
+              />
+
+              <Field
+                label="Town / city"
+                value={draft.collectionCity}
+                onChangeText={(v) => { setCityAutoFilled(false); set({ collectionCity: v }); }}
+                placeholder={draft.country === 'Ireland' ? 'Dublin' : 'Luton'}
+              />
+
+              {isIrelandPickup ? (
+                <Field
+                  label="Eircode (optional)"
+                  value={draft.collectionPostcode}
+                  onChangeText={(v) => set({ collectionPostcode: v })}
+                  autoCapitalize="none"
+                />
+              ) : (
+                <>
+                  <SuggestField
+                    label="Postcode"
+                    icon="mail-outline"
+                    minChars={2}
+                    debounceMs={350}
+                    autoCapitalize="none"
+                    value={draft.collectionPostcode}
+                    onChangeText={(v) => set({ collectionPostcode: v.toUpperCase() })}
+                    placeholder="LU1 1AA"
+                    hint="Your postcode decides which collection route covers you."
+                    fetcher={async (query) => {
+                      const options = await autocompletePostcode(query);
+                      return options.map((option) => ({ key: option, primary: option }));
+                    }}
+                    onPick={(suggestion) => set({ collectionPostcode: prettyPostcode(suggestion.primary) })}
+                  />
+
+                  {coverage.status !== 'unknown' && (
+                    <View style={[
+                      styles.coverage,
+                      coverage.status === 'covered' && { backgroundColor: palette.greenSoft, borderColor: colors.green },
+                      coverage.status === 'not_covered' && { backgroundColor: '#fee2e2', borderColor: '#fca5a5' },
+                      coverage.status === 'needs_confirmation' && { backgroundColor: palette.yellowSoft, borderColor: colors.yellow },
+                    ]}>
+                      <Ionicons
+                        name={coverage.status === 'covered' ? 'checkmark-circle' : coverage.status === 'not_covered' ? 'alert-circle' : 'information-circle'}
+                        size={16}
+                        color={coverage.status === 'covered' ? palette.greenDark : coverage.status === 'not_covered' ? '#b91c1c' : '#8a6d00'}
+                      />
+                      <Text style={[
+                        styles.coverageText,
+                        { color: coverage.status === 'covered' ? palette.greenDark : coverage.status === 'not_covered' ? '#991b1b' : '#8a6d00' },
+                      ]}>
+                        {coverage.message}
+                      </Text>
+                    </View>
+                  )}
+                </>
+              )}
             </>
           )}
 
@@ -242,6 +403,68 @@ export default function BookScreen() {
 
           {step === 3 && (
             <>
+              <SectionTitle text="How should the receiver get the goods?" />
+              <View style={styles.methodRow}>
+                {([
+                  { value: 'door' as const, title: 'Door delivery', note: `${symbol}${DELIVERY_FEE} per address`, icon: 'car-outline' as const },
+                  { value: 'self_collection' as const, title: 'Self-collection', note: 'Free', icon: 'storefront-outline' as const },
+                ]).map((option) => {
+                  const active = deliveryMethod === option.value;
+                  return (
+                    <Pressable
+                      key={option.value}
+                      onPress={() => {
+                        setDeliveryMethod(option.value);
+                        // Switching to self-collection drops the paid door
+                        // addresses so the total can never carry both.
+                        if (option.value === 'self_collection') set({ deliveryAddressIds: [] });
+                      }}
+                      style={[
+                        styles.method,
+                        { backgroundColor: palette.surface, borderColor: palette.border },
+                        active && { borderColor: colors.green, backgroundColor: palette.greenSoft },
+                      ]}
+                    >
+                      <Ionicons name={option.icon} size={19} color={active ? palette.greenDark : palette.textFaint} />
+                      <Text style={[styles.methodTitle, { color: palette.text }]}>{option.title}</Text>
+                      <Text style={[styles.methodNote, { color: active ? palette.greenDark : palette.textMuted }]}>{option.note}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {deliveryMethod === 'self_collection' ? (
+                <>
+                  <Text style={[styles.hint, { color: palette.textMuted }]}>
+                    We hold the goods at a depot and call the receiver when they have cleared. No delivery fee.
+                  </Text>
+                  {depots.length > 0 ? depots.map((depot) => {
+                    const selected = depotId === depot.id;
+                    return (
+                      <Pressable key={depot.id} onPress={() => setDepotId(depot.id)}
+                        style={[styles.dateCard, { backgroundColor: palette.surface, borderColor: palette.border }, selected && { borderColor: palette.green, backgroundColor: palette.greenSoft }]}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.itemLabel, { color: palette.text }]}>{depot.name}</Text>
+                          <Text style={[styles.itemPrice, { color: palette.textMuted }]}>
+                            {[depot.address_line1, depot.city].filter(Boolean).join(', ')}
+                            {depot.opening_hours ? ` · ${depot.opening_hours}` : ''}
+                          </Text>
+                        </View>
+                        <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={22} color={selected ? colors.green : palette.textFaint} />
+                      </Pressable>
+                    );
+                  }) : (
+                    <Text style={[styles.hint, { color: palette.textMuted }]}>
+                      We'll confirm your nearest collection point after booking.
+                    </Text>
+                  )}
+                  <SectionTitle text="Who is collecting?" />
+                  <Field label="Full name" value={draft.recipient.name} onChangeText={(v) => set({ recipient: { ...draft.recipient, name: v } })} autoCapitalize="words" />
+                  <Field label="Phone number" value={draft.recipient.phone} onChangeText={(v) => set({ recipient: { ...draft.recipient, phone: v } })} keyboardType="phone-pad" placeholder="+263 7..." />
+                  <Field label="City / town" value={draft.recipient.city} onChangeText={(v) => set({ recipient: { ...draft.recipient, city: v } })} autoCapitalize="words" placeholder="Bulawayo" />
+                </>
+              ) : (
+              <>
               <SectionTitle text="Deliver to (Zimbabwe)" />
               <Text style={[styles.hint, { color: palette.textMuted }]}>
                 Select one or more saved delivery addresses — door delivery is {symbol}{DELIVERY_FEE} per address, added to your total.
@@ -271,6 +494,8 @@ export default function BookScreen() {
                 </>
               )}
               <Text style={[styles.hint, { color: palette.textMuted }]}>We deliver to all major cities and towns. For rural areas your receiver collects from the nearest covered town — free at our Harare, Bulawayo and Mutare depots.</Text>
+              </>
+              )}
             </>
           )}
 
@@ -403,7 +628,12 @@ export default function BookScreen() {
               <Card>
                 <Text style={[styles.reviewLine, { color: palette.text }]}><Text style={styles.reviewKey}>Collection: </Text>{draft.collectionAddress}, {draft.collectionCity} ({draft.country})</Text>
                 <Text style={[styles.reviewLine, { color: palette.text }]}><Text style={styles.reviewKey}>Sender: </Text>{draft.sender.firstName} {draft.sender.lastName} · {draft.sender.phone}</Text>
-                {draft.deliveryAddressIds.length > 0 ? (
+                {deliveryMethod === 'self_collection' ? (
+                  <Text style={[styles.reviewLine, { color: palette.text }]}>
+                    <Text style={styles.reviewKey}>Self-collection (free): </Text>
+                    {draft.recipient.name} collects from {depots.find((d) => d.id === depotId)?.name || 'a depot we will confirm'}
+                  </Text>
+                ) : draft.deliveryAddressIds.length > 0 ? (
                   addresses.filter((a) => draft.deliveryAddressIds.includes(a.id)).map((a) => (
                     <Text key={a.id} style={[styles.reviewLine, { color: palette.text }]}><Text style={styles.reviewKey}>Deliver to: </Text>{a.recipient_name} · {a.city}</Text>
                   ))
@@ -464,6 +694,28 @@ const styles = StyleSheet.create({
   toggleOn: { backgroundColor: colors.green },
   toggleText: { fontWeight: '700', color: colors.green, fontSize: 14 },
   hint: { fontSize: 12, color: colors.textMuted, marginTop: 4, marginBottom: spacing.sm, lineHeight: 17 },
+  coverage: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 7,
+    borderWidth: 1.5,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  coverageText: { flex: 1, fontSize: 12.5, lineHeight: 18, fontWeight: '600' },
+  methodRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  method: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1.5,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+  },
+  methodTitle: { fontSize: 13.5, fontWeight: '800', textAlign: 'center' },
+  methodNote: { fontSize: 11.5, fontWeight: '700' },
   guidance: { flexDirection: 'row', gap: 8, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, alignItems: 'flex-start' },
   guidanceText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '600' },
   quoteBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1.5, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md },

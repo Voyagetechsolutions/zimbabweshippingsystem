@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
@@ -203,6 +203,40 @@ export default function DriverDashboardScreen({ navigation }: Props) {
   );
 
   const nextStop = stops.find((stop) => stop.status !== 'completed' && stop.status !== 'failed');
+
+  // Stops whose coordinates were never filled in. Without these the map has
+  // nothing to draw, which is why it used to sit empty for whole runs.
+  const unmappedCount = stops.length - mappableStops.length;
+
+  // Resolve the missing coordinates server-side (postcodes.io for UK pickups,
+  // Nominatim for Zimbabwe drops), then reload so the pins appear. Runs once per
+  // run: `geocodeAttemptedRef` stops a run with genuinely ungeocodable addresses
+  // from re-requesting on every focus.
+  const geocodeAttemptedRef = useRef<string | null>(null);
+  const [geocoding, setGeocoding] = useState(false);
+
+  const fillMissingCoordinates = useCallback(async (runId: string, silent: boolean) => {
+    setGeocoding(true);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('geocode-stops', { body: { runId } });
+      if (fnError) throw fnError;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      if (Number((data as any)?.resolved) > 0) await load();
+      else if (!silent) Alert.alert('No coordinates found', 'None of the remaining addresses could be placed on the map. Navigate still works from each stop.');
+    } catch (e: any) {
+      // The map is an aid, not the job — never block the driver on it.
+      if (!silent) Alert.alert('Could not update the map', e?.message || 'Please try again.');
+    } finally {
+      setGeocoding(false);
+    }
+  }, [load]);
+
+  useEffect(() => {
+    if (!run || unmappedCount === 0) return;
+    if (geocodeAttemptedRef.current === run.id) return;
+    geocodeAttemptedRef.current = run.id;
+    fillMissingCoordinates(run.id, true);
+  }, [run, unmappedCount, fillMissingCoordinates]);
 
   const startRun = async () => {
     if (!run) return;
@@ -458,6 +492,63 @@ export default function DriverDashboardScreen({ navigation }: Props) {
           </View>
         ) : (
           <>
+            {/* Map first: the driver's day is a set of places, so the route is
+                the anchor of the screen and the lists sit beneath it. */}
+            {mappableStops.length > 0 ? (
+              <View style={{ marginBottom: spacing.md }}>
+                <RunMap
+                  height={300}
+                  focusStopId={nextStop?.id ?? null}
+                  onStopPress={(mapStop) => {
+                    const match = stops.find((stop) => stop.id === mapStop.id);
+                    if (match) navigateToStop(match);
+                  }}
+                  stops={mappableStops.map((stop) => ({
+                    id: stop.id,
+                    latitude: Number(stop.latitude),
+                    longitude: Number(stop.longitude),
+                    title: `${stop.stop_order}. ${stopName(stop)}`,
+                    description: stopAddress(stop),
+                    kind: stop.stop_type,
+                    order: stop.stop_order,
+                    done: stop.status === 'completed' || stop.status === 'failed',
+                  }))}
+                />
+                {unmappedCount > 0 ? (
+                  <Pressable
+                    style={styles.mapNotice}
+                    onPress={() => run && fillMissingCoordinates(run.id, false)}
+                    disabled={geocoding}
+                  >
+                    {geocoding
+                      ? <ActivityIndicator size="small" color={colors.primary} />
+                      : <Ionicons name="refresh-outline" size={15} color={colors.primary} />}
+                    <Text style={styles.mapNoticeText}>
+                      {geocoding
+                        ? 'Placing the remaining stops on the map…'
+                        : `${unmappedCount} stop${unmappedCount === 1 ? '' : 's'} not on the map yet — tap to retry`}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : (
+              <View style={styles.mapFallback}>
+                {geocoding
+                  ? <ActivityIndicator size="small" color={colors.primary} />
+                  : <Ionicons name="map-outline" size={24} color={colors.primary} />}
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.mapFallbackTitle}>
+                    {geocoding ? 'Building your route map…' : 'Route navigation ready'}
+                  </Text>
+                  <Text style={styles.mapFallbackText}>
+                    {geocoding
+                      ? 'Looking up the coordinates for today’s stops.'
+                      : 'These addresses could not be placed on a map. Use Navigate on each stop for turn-by-turn directions.'}
+                  </Text>
+                </View>
+              </View>
+            )}
+
             <View style={styles.summaryCard}>
               <View style={styles.summaryTop}>
                 <View>
@@ -489,26 +580,6 @@ export default function DriverDashboardScreen({ navigation }: Props) {
               </Pressable>
             </View>
 
-            {mappableStops.length > 0 ? (
-              <RunMap
-                stops={mappableStops.map((stop) => ({
-                  id: stop.id,
-                  latitude: Number(stop.latitude),
-                  longitude: Number(stop.longitude),
-                  title: `${stop.stop_order}. ${stopName(stop)}`,
-                  description: stopAddress(stop),
-                  kind: stop.stop_type,
-                }))}
-              />
-            ) : (
-              <View style={styles.mapFallback}>
-                <Ionicons name="map-outline" size={24} color={colors.primary} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.mapFallbackTitle}>Route navigation ready</Text>
-                  <Text style={styles.mapFallbackText}>Coordinates have not been saved for these stops yet. Use Navigate to open each address in Google Maps.</Text>
-                </View>
-              </View>
-            )}
 
             {run.status === 'active' && allStopsClosed ? (
               <View style={styles.endCard}>
@@ -734,8 +805,10 @@ const styles = StyleSheet.create({
   map: { height: 235 },
   mapLegend: { flexDirection: 'row', gap: spacing.lg, padding: spacing.sm, justifyContent: 'center' },
   legendText: { fontSize: 11, color: colors.textMuted, fontWeight: '600' },
-  mapFallback: { flexDirection: 'row', gap: spacing.md, alignItems: 'center', padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.primarySoft, borderWidth: 1, borderColor: '#a7f3d0' },
+  mapFallback: { flexDirection: 'row', gap: spacing.md, alignItems: 'center', padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.primarySoft, borderWidth: 1, borderColor: '#a7f3d0', marginBottom: spacing.md },
   mapFallbackTitle: { color: colors.text, fontWeight: '700', fontSize: 13 },
+  mapNotice: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 9, paddingHorizontal: spacing.md, marginTop: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.primarySoft },
+  mapNoticeText: { flex: 1, fontSize: 11.5, fontWeight: '700', color: colors.primaryDark },
   mapFallbackText: { color: colors.textMuted, fontSize: 12, lineHeight: 17, marginTop: 2 },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: spacing.sm },
   stopCard: { backgroundColor: colors.surface, borderWidth: 1, borderLeftWidth: 4, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm },

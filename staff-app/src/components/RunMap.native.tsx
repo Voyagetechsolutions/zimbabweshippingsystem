@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, spacing } from '../theme';
@@ -41,9 +41,8 @@ class MapErrorBoundary extends React.Component<{ fallback: React.ReactNode; chil
   render() { return this.state.failed ? this.props.fallback : this.props.children; }
 }
 
-export default function RunMap({ stops, polylines = [], onStopPress, height = 220 }: RunMapProps) {
-  if (!stops.length && !polylines.length) return <FallbackCard count={0} />;
-  if (!MapView) return <FallbackCard count={stops.length} />;
+export default function RunMap({ stops, polylines = [], onStopPress, height = 220, focusStopId }: RunMapProps) {
+  const mapRef = useRef<any>(null);
 
   const first = stops[0] || { latitude: polylines[0]?.coordinates[0]?.latitude ?? 52.5, longitude: polylines[0]?.coordinates[0]?.longitude ?? -1.5 };
   const lats = stops.map((s) => s.latitude);
@@ -51,10 +50,44 @@ export default function RunMap({ stops, polylines = [], onStopPress, height = 22
   const latDelta = lats.length > 1 ? Math.max(0.12, (Math.max(...lats) - Math.min(...lats)) * 1.6) : 0.35;
   const lngDelta = lngs.length > 1 ? Math.max(0.12, (Math.max(...lngs) - Math.min(...lngs)) * 1.6) : 0.35;
 
+  // Frame the whole run once the pins are known, then lean in on the next stop.
+  // A collection run and its Zimbabwe deliveries can be continents apart, so a
+  // fixed zoom is never right for both.
+  const focusStop = focusStopId ? stops.find((stop) => stop.id === focusStopId) : null;
+  useEffect(() => {
+    if (!mapRef.current || stops.length === 0) return;
+    const timer = setTimeout(() => {
+      try {
+        if (focusStop) {
+          mapRef.current?.animateToRegion?.({
+            latitude: focusStop.latitude,
+            longitude: focusStop.longitude,
+            latitudeDelta: 0.08,
+            longitudeDelta: 0.08,
+          }, 600);
+        } else if (stops.length > 1) {
+          mapRef.current?.fitToCoordinates?.(
+            stops.map((stop) => ({ latitude: stop.latitude, longitude: stop.longitude })),
+            { edgePadding: { top: 60, right: 60, bottom: 60, left: 60 }, animated: true },
+          );
+        }
+      } catch {
+        // Camera moves are cosmetic — a failure must not break the screen.
+      }
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [stops.length, focusStop?.id, focusStop?.latitude, focusStop?.longitude]);
+
+  if (!stops.length && !polylines.length) return <FallbackCard count={0} />;
+  if (!MapView) return <FallbackCard count={stops.length} />;
+
+  const remaining = stops.filter((stop) => !stop.done).length;
+
   return (
     <MapErrorBoundary fallback={<FallbackCard count={stops.length} />}>
       <View style={styles.mapCard}>
         <MapView
+          ref={mapRef}
           style={{ height, width: '100%' }}
           initialRegion={{
             latitude: (lats.length ? (Math.max(...lats) + Math.min(...lats)) / 2 : first.latitude),
@@ -66,21 +99,38 @@ export default function RunMap({ stops, polylines = [], onStopPress, height = 22
           {polylines.map((line) => (
             <Polyline key={line.id} coordinates={line.coordinates} strokeColor={line.color} strokeWidth={3} />
           ))}
-          {stops.map((stop: RunMapStop) => (
-            <Marker
-              key={stop.id}
-              coordinate={{ latitude: stop.latitude, longitude: stop.longitude }}
-              pinColor={stop.color || (stop.kind === 'collection' ? colors.primary : '#d97706')}
-              title={stop.title}
-              description={stop.description}
-              onCalloutPress={() => onStopPress?.(stop)}
-            />
-          ))}
+          {stops.map((stop: RunMapStop) => {
+            const isFocus = stop.id === focusStopId;
+            const tone = stop.color || (stop.kind === 'collection' ? colors.primary : '#d97706');
+            return (
+              <Marker
+                key={stop.id}
+                coordinate={{ latitude: stop.latitude, longitude: stop.longitude }}
+                title={stop.title}
+                description={stop.description}
+                onCalloutPress={() => onStopPress?.(stop)}
+                // A numbered pin is what makes a list of drops read as a route.
+                // zIndex keeps the next stop on top of any neighbours.
+                zIndex={isFocus ? 99 : undefined}
+              >
+                <View
+                  style={[
+                    styles.pin,
+                    { backgroundColor: tone, borderColor: isFocus ? colors.white : 'rgba(255,255,255,.75)' },
+                    stop.done && styles.pinDone,
+                    isFocus && styles.pinFocus,
+                  ]}
+                >
+                  <Text style={styles.pinText}>{stop.order ?? '•'}</Text>
+                </View>
+              </Marker>
+            );
+          })}
         </MapView>
         <View style={styles.mapLegend}>
           <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: colors.primary }]} /><Text style={styles.legendText}>Collection</Text></View>
           <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#d97706' }]} /><Text style={styles.legendText}>Delivery</Text></View>
-          {polylines.length ? <Text style={styles.legendText}>{polylines.length} route{polylines.length === 1 ? '' : 's'}</Text> : null}
+          <Text style={styles.legendText}>{remaining} to go</Text>
         </View>
       </View>
     </MapErrorBoundary>
@@ -96,4 +146,16 @@ const styles = StyleSheet.create({
   fallback: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   fallbackTitle: { fontSize: 14, fontWeight: '700', color: colors.text },
   fallbackText: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  pin: {
+    minWidth: 26,
+    height: 26,
+    paddingHorizontal: 5,
+    borderRadius: 13,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pinFocus: { minWidth: 34, height: 34, borderRadius: 17, borderWidth: 3 },
+  pinDone: { opacity: 0.45 },
+  pinText: { color: colors.white, fontSize: 12, fontWeight: '800' },
 });

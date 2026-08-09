@@ -6,10 +6,16 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 const fnPath = path.join(root, 'supabase/functions/staff-ops/index.ts');
+// NOTE: 20260808_restrict_public_shipment_reads.sql is deliberately NOT in this
+// list. It closes public SELECT on shipments/payments/receipts, which the
+// currently-deployed booking form still relies on, so it must be applied only
+// after the new frontend (which books via create_public_booking) is live. Run it
+// as its own step — see docs/ROLLOUT_BOOKING_ACCOUNTS_AND_SECURITY.md.
 const sqlPaths = [
   path.join(root, 'supabase/migrations/20260719_operations_upgrade.sql'),
   path.join(root, 'supabase/migrations/20260721_admin_screens.sql'),
   path.join(root, 'supabase/migrations/20260722_fix_schedule_typos.sql'),
+  path.join(root, 'supabase/migrations/20260808_booking_accounts_self_collection.sql'),
 ];
 
 const src = fs.readFileSync(fnPath, 'utf8');

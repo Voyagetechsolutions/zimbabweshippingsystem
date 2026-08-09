@@ -10,6 +10,10 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import BookingReceipt from '@/components/BookingReceipt';
 import { getRouteForPostalCode, getIrelandRouteForCity, irelandCities, initializeRouteCache } from '@/utils/postalCodeUtils';
+import { useAuth } from '@/contexts/AuthContext';
+import PostcodeField from '@/components/address/PostcodeField';
+import AddressSearchField from '@/components/address/AddressSearchField';
+import type { Coverage, PostcodeDetails } from '@/utils/addressLookup';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface FormData {
@@ -50,7 +54,12 @@ interface FormData {
   sealOption: 'have' | 'need';       // customer has own seal(s) or needs us to supply
   sealCodes: string[];               // seal code(s) when the customer has their own
   sealQuantity: number;              // how many seals to supply when they don't have any
-  doorToDoor: boolean;
+  doorToDoor: boolean;               // drives the per-address delivery fee
+  // How the goods reach the receiver in Zimbabwe. 'door' is door-to-door and
+  // carries the per-address fee; 'self_collection' is free and the receiver
+  // collects from one of our depots.
+  deliveryMethod: 'door' | 'self_collection';
+  selfCollectionDepotId: string | null;
 
   // Purchase Drums (England only)
   purchaseDrums: boolean;
@@ -77,6 +86,18 @@ interface DeliveryAddress {
   phone: string;
   address: string;
   city: string;
+}
+
+// A Zimbabwe collection point for self-collection. Rows come from
+// `delivery_depots`, which admins maintain.
+interface Depot {
+  id: string;
+  name: string;
+  city: string;
+  address_line1: string;
+  address_line2: string | null;
+  phone: string | null;
+  opening_hours: string | null;
 }
 
 // UK drum prices (GBP) — flat rate
@@ -326,7 +347,18 @@ export const SimplifiedBookingForm = () => {
   const [collectionDate, setCollectionDate] = useState<string | null>(null);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const { toast } = useToast();
-  
+  // Booking stays open to guests, but a signed-in customer's booking must be
+  // stamped with their user_id or it never appears on their dashboard.
+  const { user } = useAuth();
+  // Resolved pickup postcode: its coordinates bias address search, and its
+  // coverage verdict gates step 1.
+  const [postcodePlace, setPostcodePlace] = useState<PostcodeDetails | null>(null);
+  const [pickupCoverage, setPickupCoverage] = useState<Coverage>({ status: 'unknown', route: null, message: '' });
+  const [depots, setDepots] = useState<Depot[]>([]);
+  // Tracks whether the town was filled in for the customer rather than typed by
+  // them. An auto-filled town follows the postcode; a typed one is left alone.
+  const [cityAutoFilled, setCityAutoFilled] = useState(false);
+
   const [formData, setFormData] = useState<FormData>({
     senderFirstName: '',
     senderLastName: '',
@@ -356,6 +388,8 @@ export const SimplifiedBookingForm = () => {
     sealCodes: [''],
     sealQuantity: 1,
     doorToDoor: false,
+    deliveryMethod: 'self_collection',
+    selfCollectionDepotId: null,
     purchaseDrums: false,
     purchaseDrumType: null,
     purchaseDrumQuantity: 0,
@@ -372,6 +406,57 @@ export const SimplifiedBookingForm = () => {
   useEffect(() => {
     initializeRouteCache();
   }, []);
+
+  // Zimbabwe collection points for the self-collection option.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('delivery_depots' as any)
+        .select('id, name, city, address_line1, address_line2, phone, opening_hours')
+        .eq('active', true)
+        .order('sort_order', { ascending: true });
+      if (cancelled || error) return;
+      const rows = (data || []) as unknown as Depot[];
+      setDepots(rows);
+      // With a single depot there is nothing to choose — preselect it.
+      if (rows.length === 1) {
+        setFormData((prev) => (prev.selfCollectionDepotId ? prev : { ...prev, selfCollectionDepotId: rows[0].id }));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Prefill a signed-in customer's own details from their saved profile so they
+  // don't retype what we already hold. Anything they've already typed wins.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      // Cast: src/integrations/supabase/types.ts is generated and stale — it
+      // predates the onboarding columns (first_name, pickup_address, …) that the
+      // customer app already writes.
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name, first_name, last_name, email, phone_number, pickup_address, pickup_city, postal_code, country')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      const profile = data as unknown as Record<string, string | null> | null;
+      const nameParts = String(profile?.full_name || '').trim().split(/\s+/);
+      setFormData((prev) => ({
+        ...prev,
+        senderFirstName: prev.senderFirstName || profile?.first_name || nameParts[0] || '',
+        senderLastName: prev.senderLastName || profile?.last_name || nameParts.slice(1).join(' ') || '',
+        senderEmail: prev.senderEmail || profile?.email || user.email || '',
+        senderPhone: prev.senderPhone || profile?.phone_number || '',
+        pickupAddress: prev.pickupAddress || profile?.pickup_address || '',
+        pickupCity: prev.pickupCity || profile?.pickup_city || '',
+        pickupPostcode: prev.pickupPostcode || profile?.postal_code || '',
+      }));
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
 
   // Fetch collection schedule based on postal code or Ireland city
   const fetchCollectionSchedule = async (postcodeOrCity: string) => {
@@ -491,6 +576,17 @@ export const SimplifiedBookingForm = () => {
           toast({
             title: 'Invalid Email',
             description: 'Please enter a valid email address.',
+            variant: 'destructive',
+          });
+          return false;
+        }
+        // The postcode decides whether we run a collection to this address, so a
+        // postcode outside our routes stops the booking here rather than after
+        // the customer has filled in four more steps.
+        if (!isIreland && pickupCoverage.status === 'not_covered') {
+          toast({
+            title: 'We don\'t collect from this postcode',
+            description: 'Call us on +44 7584 100552 or send a custom quote request and we\'ll find the nearest area we cover.',
             variant: 'destructive',
           });
           return false;
@@ -652,7 +748,14 @@ export const SimplifiedBookingForm = () => {
             : `Metal Coded Seal x${formData.sealQuantity} (supplied)`,
         );
       }
-      if (formData.doorToDoor) notes.push(`Door-to-door delivery requested (${addressCount} address${addressCount > 1 ? 'es' : ''})`);
+      const selectedDepot = depots.find((depot) => depot.id === formData.selfCollectionDepotId) || null;
+      if (formData.doorToDoor) {
+        notes.push(`Door-to-door delivery requested (${addressCount} address${addressCount > 1 ? 'es' : ''})`);
+      } else {
+        notes.push(selectedDepot
+          ? `SELF-COLLECTION from ${selectedDepot.name}, ${selectedDepot.city} (no delivery fee)`
+          : 'SELF-COLLECTION — depot to be confirmed (no delivery fee)');
+      }
       if (cleanedDeliveryAddresses.length > 0) {
         notes.push(`Extra delivery addresses: ${cleanedDeliveryAddresses.map(a => `${a.address}${a.city ? ', ' + a.city : ''}`).join(' | ')}`);
       }
@@ -683,7 +786,19 @@ export const SimplifiedBookingForm = () => {
           address: formData.deliveryAddress,
           city: formData.deliveryCity,
           country: 'Zimbabwe',
-          additionalAddresses: cleanedDeliveryAddresses
+          additionalAddresses: cleanedDeliveryAddresses,
+          // 'door' carries the per-address fee; 'self_collection' is free and
+          // the receiver picks the goods up from the depot below.
+          deliveryMethod: formData.deliveryMethod,
+          selfCollection: formData.deliveryMethod === 'self_collection',
+          depot: selectedDepot ? {
+            id: selectedDepot.id,
+            name: selectedDepot.name,
+            city: selectedDepot.city,
+            address: [selectedDepot.address_line1, selectedDepot.address_line2].filter(Boolean).join(', '),
+            phone: selectedDepot.phone,
+            openingHours: selectedDepot.opening_hours,
+          } : null
         },
         items: {
           drums: formData.includeDrums ? {
@@ -711,7 +826,8 @@ export const SimplifiedBookingForm = () => {
             metalSealPrice: getMetalSealPrice(formData.pickupCountry),
             doorToDoor: formData.doorToDoor,
             doorToDoorPrice: doorToDoorTotal,
-            doorToDoorAddressCount: addressCount
+            doorToDoorAddressCount: addressCount,
+            deliveryMethod: formData.deliveryMethod
           },
           purchasedDrums: formData.purchaseDrums ? {
             type: formData.purchaseDrumType,
@@ -784,112 +900,149 @@ export const SimplifiedBookingForm = () => {
         console.warn('Could not link to collection schedule:', err);
       }
       
-      // Create shipment with proper schema
-      const { data: shipmentData, error: shipmentError } = await supabase
-        .from('shipments')
-        .insert({
-          tracking_number: trackingNumber,
-          user_id: null, // Guest booking
+      const transactionId = `TX-${timestamp.slice(-12)}`;
+      const schedulePayload = formData.usePaymentSchedule
+        ? JSON.parse(JSON.stringify(formData.paymentSchedule))
+        : null;
+
+      // The shipment, its payment and its receipt are created together by one
+      // server-side routine. Doing it in three client inserts required the
+      // browser to be able to read these tables straight back, which is what
+      // made them world-readable. `create_public_booking` returns just the ids
+      // the receipt screen needs, and stamps the caller's user_id when they are
+      // signed in.
+      const currency = isIrelandBooking ? 'EUR' : 'GBP';
+      const paymentInfo = {
+        paymentMethod: formData.paymentMethod,
+        baseAmount: calculateBaseTotal(),
+        finalAmount,
+        transactionId,
+        usePaymentSchedule: formData.usePaymentSchedule,
+        paymentSchedule: schedulePayload,
+      };
+      const collectionInfo = {
+        pickupAddress: `${formData.pickupAddress}, ${formData.pickupCity}, ${formData.pickupPostcode}`,
+        deliveryAddress: `${formData.deliveryAddress}, ${formData.deliveryCity}, Zimbabwe`,
+        route: collectionRoute,
+        collectionDate,
+      };
+
+      const { data: rpcBooking, error: bookingError } = await (supabase.rpc as any)('create_public_booking', {
+        p: {
+          trackingNumber,
+          receiptNumber,
+          transactionId,
           origin: `${formData.pickupCity}, ${formData.pickupCountry}`,
           destination: `${formData.deliveryCity}, Zimbabwe`,
-          status: 'pending',
+          amount: finalAmount,
+          currency,
+          paymentMethod: formData.paymentMethod,
+          collectionScheduleId,
           metadata: shipmentMetadata,
-          collection_schedule_id: collectionScheduleId,
-          can_modify: true,
-          can_cancel: true
-        })
-        .select()
-        .single();
+          paymentInfo,
+          collectionInfo,
+          paymentSchedule: schedulePayload,
+        },
+      });
 
-      if (shipmentError) throw shipmentError;
+      let booking = rpcBooking;
 
-      // Create payment record
-      const { data: paymentData, error: paymentError } = await supabase
-        .from('payments')
-        .insert({
-          user_id: null,
-          shipment_id: shipmentData.id,
-          amount: finalAmount,
-          currency: isIrelandBooking ? 'EUR' : 'GBP',
-          payment_method: formData.paymentMethod,
-          payment_status: 'pending',
-          transaction_id: `TX-${timestamp.slice(-12)}`
-        })
-        .select()
-        .single();
+      // The routine ships with a database migration. Until that migration has
+      // been applied the function does not exist, so fall back to the original
+      // direct inserts rather than failing the customer's booking. Remove this
+      // fallback once the migration is live everywhere.
+      const functionMissing =
+        bookingError &&
+        (bookingError.code === 'PGRST202' || /could not find the function|does not exist/i.test(bookingError.message || ''));
 
-      if (paymentError) throw paymentError;
+      if (functionMissing) {
+        console.warn('create_public_booking not deployed yet — using direct inserts.');
 
-      // Create receipt
-      const { data: receiptData, error: receiptError } = await supabase
-        .from('receipts')
-        .insert({
-          user_id: null,
-          shipment_id: shipmentData.id,
-          payment_id: paymentData.id,
-          receipt_number: receiptNumber,
-          amount: finalAmount,
-          currency: isIrelandBooking ? 'EUR' : 'GBP',
-          payment_method: formData.paymentMethod,
-          status: 'pending',
-          sender_details: shipmentMetadata.sender,
-          recipient_details: shipmentMetadata.recipient,
-          shipment_details: shipmentMetadata.items,
-          payment_info: {
-            paymentMethod: formData.paymentMethod,
-            baseAmount: calculateBaseTotal(),
-            finalAmount: finalAmount,
-            transactionId: paymentData.transaction_id,
-            usePaymentSchedule: formData.usePaymentSchedule,
-            paymentSchedule: formData.usePaymentSchedule ? JSON.parse(JSON.stringify(formData.paymentSchedule)) : null
-          },
-          collection_info: {
-            pickupAddress: `${formData.pickupAddress}, ${formData.pickupCity}, ${formData.pickupPostcode}`,
-            deliveryAddress: `${formData.deliveryAddress}, ${formData.deliveryCity}, Zimbabwe`,
-            route: collectionRoute,
-            collectionDate: collectionDate
-          },
-          payment_schedule: formData.usePaymentSchedule ? JSON.parse(JSON.stringify(formData.paymentSchedule)) : null
-        })
-        .select()
-        .single();
+        const { data: shipmentData, error: shipmentError } = await supabase
+          .from('shipments')
+          .insert({
+            tracking_number: trackingNumber,
+            user_id: user?.id ?? null,
+            origin: `${formData.pickupCity}, ${formData.pickupCountry}`,
+            destination: `${formData.deliveryCity}, Zimbabwe`,
+            status: 'pending',
+            metadata: shipmentMetadata,
+            collection_schedule_id: collectionScheduleId,
+            can_modify: true,
+            can_cancel: true,
+          })
+          .select()
+          .single();
+        if (shipmentError) throw shipmentError;
 
-      if (receiptError) throw receiptError;
+        const { data: paymentData, error: paymentError } = await supabase
+          .from('payments')
+          .insert({
+            user_id: user?.id ?? null,
+            shipment_id: shipmentData.id,
+            amount: finalAmount,
+            currency,
+            payment_method: formData.paymentMethod,
+            payment_status: 'pending',
+            transaction_id: transactionId,
+          })
+          .select()
+          .single();
+        if (paymentError) throw paymentError;
 
-      // Create or update customer profile
-      try {
-        const { data: existingProfile, error: checkError } = await supabase
-          .from('profiles')
-          .select('id, email')
-          .eq('email', formData.senderEmail)
-          .maybeSingle();
+        const { error: receiptError } = await supabase
+          .from('receipts')
+          .insert({
+            user_id: user?.id ?? null,
+            shipment_id: shipmentData.id,
+            payment_id: paymentData.id,
+            receipt_number: receiptNumber,
+            amount: finalAmount,
+            currency,
+            payment_method: formData.paymentMethod,
+            status: 'pending',
+            sender_details: shipmentMetadata.sender,
+            recipient_details: shipmentMetadata.recipient,
+            shipment_details: shipmentMetadata.items,
+            payment_info: paymentInfo,
+            collection_info: collectionInfo,
+            payment_schedule: schedulePayload,
+          });
+        if (receiptError) throw receiptError;
 
-        if (!existingProfile && !checkError) {
-          // Create new customer profile for guest booking
-          await supabase
-            .from('profiles')
-            .insert({
-              id: shipmentData.id, // Use shipment ID as temporary profile ID
-              email: formData.senderEmail,
-              full_name: `${formData.senderFirstName} ${formData.senderLastName}`,
-              role: 'customer',
-              is_admin: false
-            });
-        }
-      } catch (profileError) {
-        console.error('Error creating customer profile:', profileError);
-        // Don't throw - this is not critical
+        booking = {
+          shipmentId: shipmentData.id,
+          trackingNumber,
+          receiptNumber,
+          linkedToAccount: Boolean(user?.id),
+        };
+      } else if (bookingError) {
+        throw bookingError;
       }
+
+      // A guest booking deliberately creates no profile row. `profiles.id` is an
+      // auth.users id, so the old code here (which used the shipment id as a
+      // "temporary profile ID") could never satisfy the insert policy and always
+      // failed silently. Guest bookings are instead matched to an account by
+      // sender email when the customer signs up or signs in — see
+      // claim_guest_bookings().
+
+      // Trust what the database actually stored over what we proposed.
+      const savedTracking = (booking as any)?.trackingNumber || trackingNumber;
+      const savedReceiptNo = (booking as any)?.receiptNumber || receiptNumber;
+      const linkedToAccount = Boolean((booking as any)?.linkedToAccount);
 
       toast({
         title: 'Booking Submitted Successfully! 🎉',
-        description: `Receipt #${receiptNumber} | Tracking: ${trackingNumber}`,
+        description: linkedToAccount
+          ? `Saved to your account · Receipt #${savedReceiptNo} | Tracking: ${savedTracking}`
+          : `Receipt #${savedReceiptNo} | Tracking: ${savedTracking}`,
       });
 
       // Store receipt data for display
       setReceiptData({
-        receiptNumber,
-        trackingNumber,
+        receiptNumber: savedReceiptNo,
+        trackingNumber: savedTracking,
         amount: finalAmount,
         collectionRoute,
         collectionDate,
@@ -1026,15 +1179,28 @@ export const SimplifiedBookingForm = () => {
           </Select>
         </div>
 
-        <div>
-          <Label htmlFor="address">Pickup Address</Label>
-          <Input
-            id="address"
-            placeholder="123 Main Street"
-            value={formData.pickupAddress}
-            onChange={(e) => updateField('pickupAddress', e.target.value)}
-          />
-        </div>
+        <AddressSearchField
+          id="address"
+          label="Pickup Address"
+          value={formData.pickupAddress}
+          onChange={(line1) => updateField('pickupAddress', line1)}
+          near={postcodePlace ? { latitude: postcodePlace.latitude!, longitude: postcodePlace.longitude! } : null}
+          placeholder="Start typing, e.g. 24 King Street"
+          hint="Search for your address, or just type it in full."
+          onSelect={(suggestion) => {
+            // Picking a suggestion is an explicit choice of a specific address,
+            // so its town and postcode replace whatever was there. Leaving a
+            // previously auto-filled town in place would ship a booking whose
+            // town and postcode disagree.
+            const isIrelandPickup = formData.pickupCountry === 'Ireland' || formData.pickupCountry === 'Northern Ireland';
+            setFormData((prev) => ({
+              ...prev,
+              pickupCity: suggestion.town || prev.pickupCity,
+              pickupPostcode: suggestion.postcode && !isIrelandPickup ? suggestion.postcode : prev.pickupPostcode,
+            }));
+            if (suggestion.town) setCityAutoFilled(true);
+          }}
+        />
 
         {/* Conditional: City autocomplete for Ireland, or City + Postal code for UK */}
         {formData.pickupCountry === 'Ireland' || formData.pickupCountry === 'Northern Ireland' ? (
@@ -1078,19 +1244,37 @@ export const SimplifiedBookingForm = () => {
                 id="city"
                 placeholder="London"
                 value={formData.pickupCity}
-                onChange={(e) => updateField('pickupCity', e.target.value)}
+                onChange={(e) => {
+                  // Typing here takes ownership of the field: the postcode will
+                  // no longer overwrite it.
+                  setCityAutoFilled(false);
+                  updateField('pickupCity', e.target.value);
+                }}
               />
             </div>
-            <div>
-              <Label htmlFor="postcode">Postal Code</Label>
-              <Input
-                id="postcode"
-                placeholder="e.g., SW1, B1"
-                value={formData.pickupPostcode}
-                onChange={(e) => updateField('pickupPostcode', e.target.value)}
-              />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Just the area code is fine</p>
-            </div>
+            <PostcodeField
+              id="postcode"
+              label="Postal Code"
+              value={formData.pickupPostcode}
+              onChange={(postcode) => updateField('pickupPostcode', postcode)}
+              onResolved={(place) => {
+                setPostcodePlace(place && place.latitude != null && place.longitude != null ? place : null);
+                // Fill the town from the postcode so the customer doesn't have
+                // to. A town they typed themselves is never overwritten, but one
+                // we filled in follows the postcode — otherwise changing the
+                // postcode leaves the wrong town attached to the booking.
+                if (place?.town) {
+                  setFormData((prev) => {
+                    if (prev.pickupCity && !cityAutoFilled) return prev;
+                    if (prev.pickupCity === place.town) return prev;
+                    return { ...prev, pickupCity: place.town };
+                  });
+                  setCityAutoFilled(true);
+                }
+              }}
+              onCoverageChange={setPickupCoverage}
+              hint="Your postcode decides which collection route covers you"
+            />
           </div>
         )}
 
@@ -1281,33 +1465,110 @@ export const SimplifiedBookingForm = () => {
           <Plus className="h-4 w-4 mr-2" /> Add another delivery address
         </Button>
 
-        {/* Door-to-Door Delivery Option */}
+        {/* How the goods reach the receiver: door-to-door (paid) or the receiver
+            collects from one of our depots (free). */}
         {(() => {
           const addressCount = 1 + formData.deliveryAddresses.length;
+          const selectedDepot = depots.find((depot) => depot.id === formData.selfCollectionDepotId) || depots[0] || null;
+          const chooseDoor = () => setFormData((prev) => ({ ...prev, deliveryMethod: 'door', doorToDoor: true }));
+          const chooseSelf = () => setFormData((prev) => ({
+            ...prev,
+            deliveryMethod: 'self_collection',
+            doorToDoor: false,
+            selfCollectionDepotId: prev.selfCollectionDepotId || depots[0]?.id || null,
+          }));
+          const isDoor = formData.deliveryMethod === 'door';
+
           return (
-            <div className={`border-2 rounded-lg p-5 transition-all ${formData.doorToDoor ? 'border-zim-green bg-green-50 dark:bg-green-900/20 dark:border-green-600' : 'border-gray-200 hover:border-zim-green dark:border-gray-700 dark:hover:border-green-600'}`}>
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.doorToDoor}
-                  onChange={(e) => updateField('doorToDoor', e.target.checked)}
-                  className="mt-1 h-4 w-4"
-                />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <Truck className="h-5 w-5 text-zim-green" />
-                    <span className="font-semibold text-lg">Door-to-Door Delivery</span>
-                  </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    We deliver directly to {addressCount === 1 ? 'the receiver address' : `each of the ${addressCount} delivery addresses`} in Zimbabwe and contact them about the delivery day.
-                    Without this, the receiver collects from our local depot.
-                  </div>
-                  <div className="text-sm font-semibold text-zim-green mt-2">
-                    +{currencySymbol}{DOOR_TO_DOOR_PRICE} per address
-                    {formData.doorToDoor && addressCount > 1 && ` × ${addressCount} = ${currencySymbol}${addressCount * DOOR_TO_DOOR_PRICE}`}
+            <div className="space-y-3">
+              <Label className="text-base">How should the receiver get the goods?</Label>
+
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={chooseDoor}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); chooseDoor(); } }}
+                className={`border-2 rounded-lg p-5 transition-all cursor-pointer ${isDoor ? 'border-zim-green bg-green-50 dark:bg-green-900/20 dark:border-green-600' : 'border-gray-200 hover:border-zim-green dark:border-gray-700 dark:hover:border-green-600'}`}
+              >
+                <div className="flex items-start gap-3">
+                  <input type="radio" checked={isDoor} onChange={chooseDoor} className="mt-1 h-4 w-4" aria-label="Door-to-door delivery" />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <Truck className="h-5 w-5 text-zim-green" />
+                      <span className="font-semibold text-lg">Door-to-Door Delivery</span>
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      We deliver directly to {addressCount === 1 ? 'the receiver address' : `each of the ${addressCount} delivery addresses`} in
+                      Zimbabwe and contact them about the delivery day.
+                    </div>
+                    <div className="text-sm font-semibold text-zim-green mt-2">
+                      +{currencySymbol}{DOOR_TO_DOOR_PRICE} per address
+                      {isDoor && addressCount > 1 && ` × ${addressCount} = ${currencySymbol}${addressCount * DOOR_TO_DOOR_PRICE}`}
+                    </div>
                   </div>
                 </div>
-              </label>
+              </div>
+
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={chooseSelf}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); chooseSelf(); } }}
+                className={`border-2 rounded-lg p-5 transition-all cursor-pointer ${!isDoor ? 'border-zim-green bg-green-50 dark:bg-green-900/20 dark:border-green-600' : 'border-gray-200 hover:border-zim-green dark:border-gray-700 dark:hover:border-green-600'}`}
+              >
+                <div className="flex items-start gap-3">
+                  <input type="radio" checked={!isDoor} onChange={chooseSelf} className="mt-1 h-4 w-4" aria-label="Self-collection" />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-5 w-5 text-zim-green" />
+                      <span className="font-semibold text-lg">Self-Collection</span>
+                      <span className="text-xs font-bold uppercase tracking-wide bg-zim-green text-white rounded px-2 py-0.5">Free</span>
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      The receiver collects from our depot once the shipment has cleared. We call them when it's ready.
+                    </div>
+
+                    {depots.length > 1 && !isDoor && (
+                      <div className="mt-3">
+                        <Label htmlFor="depot" className="text-xs">Collection point</Label>
+                        <Select
+                          value={formData.selfCollectionDepotId || ''}
+                          onValueChange={(value) => updateField('selfCollectionDepotId', value)}
+                        >
+                          <SelectTrigger id="depot" className="mt-1">
+                            <SelectValue placeholder="Choose a depot" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {depots.map((depot) => (
+                              <SelectItem key={depot.id} value={depot.id}>{depot.name} — {depot.city}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    {selectedDepot && (
+                      <div className="text-sm mt-3 rounded-md bg-white dark:bg-gray-800 border border-green-100 dark:border-green-900 p-3">
+                        <p className="font-semibold">{selectedDepot.name}</p>
+                        <p className="text-gray-600 dark:text-gray-400">
+                          {[selectedDepot.address_line1, selectedDepot.address_line2, selectedDepot.city].filter(Boolean).join(', ')}
+                        </p>
+                        {selectedDepot.opening_hours && (
+                          <p className="text-gray-600 dark:text-gray-400">{selectedDepot.opening_hours}</p>
+                        )}
+                        {selectedDepot.phone && (
+                          <p className="text-gray-600 dark:text-gray-400">{selectedDepot.phone}</p>
+                        )}
+                      </div>
+                    )}
+                    {!selectedDepot && !isDoor && (
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-3">
+                        We'll confirm your nearest collection point after booking.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           );
         })()}
@@ -1732,14 +1993,26 @@ export const SimplifiedBookingForm = () => {
             ))}
             {(() => {
               const addressCount = 1 + formData.deliveryAddresses.filter(a => a.address || a.city).length;
+              const selectedDepot = depots.find((depot) => depot.id === formData.selfCollectionDepotId) || null;
               return (
-                <div className="flex justify-between border-t pt-2 mt-2">
-                  <span>
-                    {formData.doorToDoor
-                      ? `Door-to-Door Delivery${addressCount > 1 ? ` (${addressCount} addresses)` : ''}`
-                      : 'Depot collection in Zimbabwe'}
-                  </span>
-                  {formData.doorToDoor && <span className="font-medium">+{currencySymbol}{addressCount * DOOR_TO_DOOR_PRICE}</span>}
+                <div className="border-t pt-2 mt-2">
+                  <div className="flex justify-between">
+                    <span>
+                      {formData.doorToDoor
+                        ? `Door-to-Door Delivery${addressCount > 1 ? ` (${addressCount} addresses)` : ''}`
+                        : 'Self-collection in Zimbabwe'}
+                    </span>
+                    <span className="font-medium">
+                      {formData.doorToDoor ? `+${currencySymbol}${addressCount * DOOR_TO_DOOR_PRICE}` : 'Free'}
+                    </span>
+                  </div>
+                  {!formData.doorToDoor && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {selectedDepot
+                        ? `Collect from ${selectedDepot.name}, ${selectedDepot.city}`
+                        : 'Collection point to be confirmed'}
+                    </p>
+                  )}
                 </div>
               );
             })()}
@@ -2049,6 +2322,15 @@ export const SimplifiedBookingForm = () => {
             trunkQuantity: 0,
             trunksDescription: '',
             wantMetalSeal: false,
+            // These were missing, so "book another shipment" left the form in a
+            // partially-undefined state.
+            sealOption: 'need',
+            sealCodes: [''],
+            sealQuantity: 1,
+            deliveryAddresses: [],
+            doorToDoor: false,
+            deliveryMethod: 'self_collection',
+            selfCollectionDepotId: depots[0]?.id ?? null,
             purchaseDrums: false,
             purchaseDrumType: null,
             purchaseDrumQuantity: 0,
@@ -2063,6 +2345,27 @@ export const SimplifiedBookingForm = () => {
 
   return (
     <div className="max-w-2xl mx-auto">
+      {/* Account state. Booking never requires an account, but the customer has
+          to know whether this shipment will land on their dashboard. */}
+      {user ? (
+        <div className="mb-4 flex items-start gap-2 p-3 rounded-lg text-sm bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+          <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+          <p className="text-green-700 dark:text-green-300">
+            Signed in — this booking will be saved to your account and appear in your dashboard.
+          </p>
+        </div>
+      ) : (
+        <div className="mb-4 flex items-start gap-2 p-3 rounded-lg text-sm bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+          <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+          <p className="text-blue-700 dark:text-blue-300">
+            You can book without an account.{' '}
+            <a href="/auth" className="font-semibold underline">Sign in or create an account</a>{' '}
+            to track this shipment and see all your bookings in one place — if you sign up later with
+            the same email, we'll add this booking to your account automatically.
+          </p>
+        </div>
+      )}
+
       {renderProgressBar()}
 
       <div className="mb-6">

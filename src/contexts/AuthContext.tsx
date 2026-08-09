@@ -1,5 +1,5 @@
 
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useRef } from 'react';
 import { Session, User, AuthResponse } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -31,6 +31,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const claimedForRef = useRef<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -45,6 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (initialSession?.user) {
           checkAdminStatus(initialSession.user.id);
+          claimOnce(initialSession.user.id);
         }
       } catch (error) {
         logger.error("Error getting initial session:", error);
@@ -70,8 +72,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (newSession?.user) {
           checkAdminStatus(newSession.user.id);
+          claimOnce(newSession.user.id);
         } else {
           setIsAdmin(false);
+          claimedForRef.current = null;
         }
       }
     );
@@ -80,6 +84,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       authListener.subscription.unsubscribe();
     };
   }, [toast]);
+
+  // onAuthStateChange also fires on token refresh, so the claim is run at most
+  // once per signed-in user rather than on every event.
+  const claimOnce = (userId: string) => {
+    if (claimedForRef.current === userId) return;
+    claimedForRef.current = userId;
+    claimGuestBookings();
+  };
+
+  // Bookings made before the customer had an account (or while signed out)
+  // carry user_id = null. Matching them to this account by confirmed sender
+  // email is what makes them appear on the dashboard. Best effort: a failure
+  // here must never block signing in.
+  const claimGuestBookings = async () => {
+    try {
+      // Cast: the generated Database types are stale and don't list this RPC.
+      const { data, error } = await (supabase.rpc as any)('claim_guest_bookings');
+      if (error) {
+        logger.debug('Could not claim guest bookings:', error.message);
+        return;
+      }
+      const claimed = Number((data as any)?.claimed || 0);
+      if (claimed > 0) {
+        toast({
+          title: claimed === 1 ? 'Booking added to your account' : `${claimed} bookings added to your account`,
+          description: 'Earlier bookings made with this email address are now in your dashboard.',
+        });
+      }
+    } catch (error) {
+      logger.debug('Could not claim guest bookings:', error);
+    }
+  };
 
   const checkAdminStatus = async (userId: string) => {
     try {

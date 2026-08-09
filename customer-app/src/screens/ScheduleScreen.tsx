@@ -24,8 +24,13 @@ type Row = {
 type ScheduleRecord = Omit<Row, 'parsed' | 'isCustomerArea'>;
 type ScheduleSection = { title: string; data: Row[] };
 
-// Live collection schedules match the public website: all published routes stay
-// visible, while the customer's matching postcode/city is highlighted.
+// Collection schedules come straight from `collection_schedules`, the same table
+// the website admin edits, so a schedule change there shows up here immediately
+// (a realtime subscription below refreshes an open screen).
+//
+// By default the customer only sees the route covering their own postcode —
+// that is the only date they need. "Show all areas" opens up the full list for
+// anyone who wants to check another part of the country.
 export default function ScheduleScreen() {
   const navigation = useNavigation<any>();
   const [sections, setSections] = useState<ScheduleSection[]>([]);
@@ -33,6 +38,7 @@ export default function ScheduleScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [matchesArea, setMatchesArea] = useState(true);
+  const [showAllAreas, setShowAllAreas] = useState(false);
   const { profile } = useAuth();
   const { palette } = useAppTheme();
 
@@ -73,16 +79,23 @@ export default function ScheduleScreen() {
 
     // Do not filter out past records here. The website displays every published
     // route, and hiding stale dates was the reason the app rendered an empty page.
-    setMatchesArea(!hasAreaInfo || rows.some((schedule) => schedule.isCustomerArea));
+    const hasMatch = rows.some((schedule) => schedule.isCustomerArea);
+    setMatchesArea(!hasAreaInfo || hasMatch);
 
-    const uk = rows.filter((schedule) => !String(schedule.country || 'UK').toLowerCase().includes('ireland'));
-    const ireland = rows.filter((schedule) => String(schedule.country || '').toLowerCase().includes('ireland'));
+    // Only the customer's own area unless they ask for everything. Without a
+    // saved postcode, or when nothing matches it, fall back to the full list so
+    // the screen is never empty.
+    const scopeToOwnArea = hasAreaInfo && hasMatch && !showAllAreas;
+    const visible = scopeToOwnArea ? rows.filter((schedule) => schedule.isCustomerArea) : rows;
+
+    const uk = visible.filter((schedule) => !String(schedule.country || 'UK').toLowerCase().includes('ireland'));
+    const ireland = visible.filter((schedule) => String(schedule.country || '').toLowerCase().includes('ireland'));
     setSections([
       { title: 'United Kingdom', data: uk },
       { title: 'Ireland', data: ireland },
     ].filter((section) => section.data.length > 0));
     setLoading(false);
-  }, [profile?.postal_code, profile?.pickup_city, profile?.country]);
+  }, [profile?.postal_code, profile?.pickup_city, profile?.country, showAllAreas]);
 
   useFocusEffect(useCallback(() => {
     load();
@@ -99,6 +112,8 @@ export default function ScheduleScreen() {
 
   const routeCount = sections.reduce((total, section) => total + section.data.length, 0);
   const hasAreaInfo = Boolean(profile?.postal_code || profile?.pickup_city);
+  // The toggle is only meaningful once we have an area to narrow down to.
+  const canScope = hasAreaInfo && matchesArea;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: palette.bg }]} edges={['top']}>
@@ -117,9 +132,11 @@ export default function ScheduleScreen() {
           <View>
             <Text style={[styles.title, { color: palette.text }]}>Collection Schedule</Text>
             <Text style={styles.sub}>
-              {routeCount > 0
-                ? `${routeCount} published collection routes across the UK & Ireland. Tap a route to book.`
-                : 'Published collection routes across the UK & Ireland.'}
+              {canScope && !showAllAreas
+                ? 'Your collection area and its next pickup date. Tap to book.'
+                : routeCount > 0
+                  ? `${routeCount} published collection routes across the UK & Ireland. Tap a route to book.`
+                  : 'Published collection routes across the UK & Ireland.'}
             </Text>
 
             {!matchesArea && !loading && !error && (
@@ -131,13 +148,32 @@ export default function ScheduleScreen() {
               </View>
             )}
 
-            {matchesArea && hasAreaInfo && !loading && !error && (
+            {!hasAreaInfo && !loading && !error && (
               <View style={[styles.notice, { backgroundColor: palette.greenSoft }]}>
                 <Ionicons name="location-outline" size={16} color={palette.greenDark} />
                 <Text style={[styles.noticeText, { color: palette.greenDark }]}>
-                  Your collection area is highlighted. All published routes remain visible.
+                  Add your pickup postcode in your account and we'll show just your own collection date here.
                 </Text>
               </View>
+            )}
+
+            {canScope && !loading && !error && (
+              <Pressable
+                onPress={() => {
+                  setShowAllAreas((current) => !current);
+                  setLoading(true);
+                }}
+                style={[styles.toggle, { borderColor: palette.border, backgroundColor: palette.surface }]}
+              >
+                <Ionicons
+                  name={showAllAreas ? 'location' : 'earth-outline'}
+                  size={15}
+                  color={palette.greenDark}
+                />
+                <Text style={[styles.toggleText, { color: palette.greenDark }]}>
+                  {showAllAreas ? 'Show only my area' : 'Show all collection areas'}
+                </Text>
+              </Pressable>
             )}
 
             {error && (
@@ -222,6 +258,17 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   noticeText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '600' },
+  toggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingVertical: 11,
+    marginBottom: spacing.sm,
+  },
+  toggleText: { fontSize: 12.5, fontWeight: '700' },
   errorCard: {
     alignItems: 'center',
     gap: 8,

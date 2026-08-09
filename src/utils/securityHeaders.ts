@@ -14,7 +14,10 @@ export const getContentSecurityPolicy = () => {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://api.ipify.org https://*.supabase.co https://oncsaunsqtekwwbzvvyh.supabase.co",
       "font-src 'self'",
-      "connect-src 'self' blob: https://api.ipify.org https://*.supabase.co https://oncsaunsqtekwwbzvvyh.supabase.co https://cdn.jsdelivr.net https://tessdata.projectnaptha.com",
+      // api.postcodes.io validates UK postcodes and resolves their town/area;
+      // photon.komoot.io supplies address suggestions. Both are read-only
+      // address lookups used by the booking form.
+      "connect-src 'self' blob: https://api.ipify.org https://*.supabase.co https://oncsaunsqtekwwbzvvyh.supabase.co https://cdn.jsdelivr.net https://tessdata.projectnaptha.com https://api.postcodes.io https://photon.komoot.io",
       "frame-src 'self' https://www.google.com https://maps.google.com",
       "object-src 'none'",
       "base-uri 'self'",
@@ -49,7 +52,10 @@ export const configureSecurityHeaders = () => {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://api.ipify.org https://*.supabase.co https://oncsaunsqtekwwbzvvyh.supabase.co",
       "font-src 'self'",
-      "connect-src 'self' blob: https://api.ipify.org https://*.supabase.co https://oncsaunsqtekwwbzvvyh.supabase.co https://cdn.jsdelivr.net https://tessdata.projectnaptha.com",
+      // api.postcodes.io validates UK postcodes and resolves their town/area;
+      // photon.komoot.io supplies address suggestions. Both are read-only
+      // address lookups used by the booking form.
+      "connect-src 'self' blob: https://api.ipify.org https://*.supabase.co https://oncsaunsqtekwwbzvvyh.supabase.co https://cdn.jsdelivr.net https://tessdata.projectnaptha.com https://api.postcodes.io https://photon.komoot.io",
       "frame-src 'self' https://www.google.com https://maps.google.com",
       "object-src 'none'",
       "base-uri 'self'",

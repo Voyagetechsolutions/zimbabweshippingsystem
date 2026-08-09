@@ -13,6 +13,10 @@ export type RunMapStop = {
   description: string;
   kind: 'collection' | 'delivery';
   color?: string;
+  /** Position in the run — drawn inside the pin so the order is readable. */
+  order?: number;
+  /** Completed and failed stops are dimmed so the remaining work stands out. */
+  done?: boolean;
 };
 
 export type RunMapPolyline = {
@@ -26,6 +30,8 @@ export type RunMapProps = {
   polylines?: RunMapPolyline[];
   onStopPress?: (stop: RunMapStop) => void;
   height?: number;
+  /** The stop to centre on and call out — normally the driver's next one. */
+  focusStopId?: string | null;
 };
 
 export default function RunMap(_props: RunMapProps) {

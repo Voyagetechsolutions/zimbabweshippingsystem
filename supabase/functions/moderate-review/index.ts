@@ -202,6 +202,10 @@ serve(async (req) => {
     const action = String(body?.action || "moderate");
 
     if (action === "setup") {
+      // ensureSchema runs DDL, so it must not be reachable with only the
+      // publishable key. This file already had requireAdmin, but "setup"
+      // returned before it was ever consulted.
+      if (!(await requireAdmin(req))) return json({ error: "Admin access required" }, 403);
       await ensureSchema();
       return json({ ok: true, message: "Review moderation schema is ready." });
     }

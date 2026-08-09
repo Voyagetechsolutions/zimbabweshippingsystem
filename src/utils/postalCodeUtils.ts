@@ -422,18 +422,20 @@ export const getRouteForPostalCode = (postalCode: string): string | null => {
   // Format and clean the postal code
   const formattedCode = formatUKPostcode(postalCode);
 
-  // Check if it's a restricted postal code
-  for (const restrictedCode of restrictedPostalCodes) {
-    if (formattedCode.startsWith(restrictedCode)) {
-      return null;
-    }
-  }
-
-  // Extract the prefix (first 1-2 letters)
+  // Extract the postcode area — the leading letters only. A UK area is 1-2
+  // letters, so read them as a unit rather than a string prefix.
   const prefixMatch = formattedCode.match(/^[A-Z]{1,2}/i);
   if (!prefixMatch) return null;
 
   const prefix = prefixMatch[0].toUpperCase();
+
+  // Check if it's a restricted postal code. This compares whole areas: a
+  // `startsWith` test here made the single-letter restricted area "G" (Glasgow)
+  // also reject "GL" (Gloucester, Cardiff route) and "GU" (Guildford,
+  // Bournemouth route), so those postcodes could never find their route.
+  if (restrictedPostalCodes.includes(prefix)) {
+    return null;
+  }
 
   // First, check database cache for exact match
   if (cachedUKRoutes.length > 0) {

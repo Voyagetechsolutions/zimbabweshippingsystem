@@ -48,6 +48,8 @@ import InvoicesTab from '@/components/admin/tabs/InvoicesTab';
 import CustomerRequestsTab from '@/components/admin/tabs/CustomerRequestsTab';
 import CollectionScannerTab from '@/components/admin/tabs/CollectionScannerTab';
 import ZimmyAdminTab from '@/components/admin/tabs/ZimmyAdminTab';
+import StaffManagementTab from '@/components/admin/tabs/StaffManagementTab';
+import CollectionPointsTab from '@/components/admin/tabs/CollectionPointsTab';
 
 // Icons
 import {
@@ -78,6 +80,7 @@ import {
   CheckCircle2,
   ScanLine,
   Bot,
+  Store,
 } from 'lucide-react';
 
 interface NavItem {
@@ -161,6 +164,7 @@ const AdminDashboardInner = () => {
         { value: 'deliveryNotes', label: 'Delivery Notes', icon: FileText },
         { value: 'schedule', label: 'Schedule', icon: Calendar },
         { value: 'routes', label: 'Routes', icon: Route },
+        { value: 'collectionPoints', label: 'Collection Points', icon: Store },
       ],
     },
     {
@@ -179,6 +183,13 @@ const AdminDashboardInner = () => {
       items: [
         { value: 'customerRequests', label: 'Customer Requests', icon: MessageSquare, badge: customerRequestUnread || undefined },
         { value: 'feedback', label: 'Feedback', icon: Star },
+      ],
+    },
+    {
+      key: 'people',
+      label: 'People',
+      items: [
+        { value: 'staff', label: 'Staff', icon: Users },
       ],
     },
     {
@@ -513,6 +524,8 @@ const AdminDashboardInner = () => {
       case 'invoices': return <InvoicesTab />;
       case 'customerRequests': return <CustomerRequestsTab onUnreadChange={setCustomerRequestUnread} />;
       case 'collectionScanner': return <CollectionScannerTab />;
+      case 'staff': return <StaffManagementTab />;
+      case 'collectionPoints': return <CollectionPointsTab />;
       default: return null;
     }
   };
