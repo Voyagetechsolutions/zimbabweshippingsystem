@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import TabHeader from '../TabHeader';
+import ScheduleGenerateApprove from '../ScheduleGenerateApprove';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns';
@@ -733,6 +734,10 @@ const CollectionScheduleCalendarTab = () => {
 
   return (
     <div className="space-y-4">
+      {/* Generate the next round of dates and publish them on approval. Sits
+          above the existing manual tools rather than replacing them. */}
+      <ScheduleGenerateApprove onPublished={fetchData} />
+
       <TabHeader
         title="Collection Schedule"
         description="Manage collection schedules by region with calendar view"

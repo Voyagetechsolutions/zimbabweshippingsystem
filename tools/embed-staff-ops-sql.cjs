@@ -16,6 +16,7 @@ const sqlPaths = [
   path.join(root, 'supabase/migrations/20260721_admin_screens.sql'),
   path.join(root, 'supabase/migrations/20260722_fix_schedule_typos.sql'),
   path.join(root, 'supabase/migrations/20260808_booking_accounts_self_collection.sql'),
+  path.join(root, 'supabase/migrations/20260809_schedule_generate_approve.sql'),
 ];
 
 const src = fs.readFileSync(fnPath, 'utf8');
@@ -27,6 +28,15 @@ const out = src.replace(
   /const SETUP_SQL_V2 = ".*?";/s,
   () => 'const SETUP_SQL_V2 = ' + JSON.stringify(sql) + ';'
 );
-if (out === src) throw new Error('SETUP_SQL_V2 constant not found in staff-ops/index.ts');
+// Distinguish "the constant is missing" from "the SQL is already up to date" —
+// the old check treated an unchanged file as a failure, which looked alarming
+// when re-running the script was in fact a no-op.
+if (!/const SETUP_SQL_V2 = ".*?";/s.test(src)) {
+  throw new Error('SETUP_SQL_V2 constant not found in staff-ops/index.ts');
+}
+if (out === src) {
+  console.log('staff-ops SETUP_SQL_V2 already up to date,', sql.length, 'chars of SQL');
+  return;
+}
 fs.writeFileSync(fnPath, out);
 console.log('staff-ops SETUP_SQL_V2 regenerated,', sql.length, 'chars of SQL');

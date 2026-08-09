@@ -161,6 +161,42 @@ const CustomerDashboard: React.FC = () => {
     refetchInterval: 5000, // Refetch every 5 seconds to get updates
   });
 
+  // Invoices live on the shipment as metadata.invoice — the same shape the
+  // customer app reads — so they need no separate fetch. Totals are recomputed
+  // here rather than trusting a stored total, which can lag an edited invoice.
+  const invoiceRows = React.useMemo(() => {
+    const rows = (shipments || [])
+      .map((shipment) => {
+        const invoice = (shipment.metadata as any)?.invoice;
+        if (!invoice || !Array.isArray(invoice.items) || invoice.items.length === 0) return null;
+
+        const subtotal = invoice.items.reduce(
+          (sum: number, item: any) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
+          0,
+        );
+        const discount = Number(invoice.discount) || 0;
+        const taxable = Math.max(0, subtotal - discount);
+        const total = taxable + taxable * ((Number(invoice.taxRate) || 0) / 100);
+        const paidAmount = (Array.isArray(invoice.payments) ? invoice.payments : []).reduce(
+          (sum: number, payment: any) => sum + (Number(payment.amount) || 0),
+          0,
+        );
+
+        return { shipment, invoice, total, balance: Math.max(0, total - paidAmount) };
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null);
+
+    // Outstanding first, then most recent.
+    return rows.sort((a, b) => {
+      const aDue = a.balance > 0.005 ? 0 : 1;
+      const bDue = b.balance > 0.005 ? 0 : 1;
+      if (aDue !== bDue) return aDue - bDue;
+      return new Date(b.shipment.created_at).getTime() - new Date(a.shipment.created_at).getTime();
+    });
+  }, [shipments]);
+
+  const unpaidInvoiceCount = invoiceRows.filter((row) => row.balance > 0.005).length;
+
   // Helper function to generate receipt number
   const getReceiptNumber = (receipt: Receipt) => {
     if (receipt.receipt_number) return receipt.receipt_number;
@@ -349,6 +385,13 @@ const CustomerDashboard: React.FC = () => {
             <ReceiptIcon className="h-4 w-4" />
             <span>My Receipts</span>
           </TabsTrigger>
+          <TabsTrigger value="invoices" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            <span>My Invoices</span>
+            {unpaidInvoiceCount > 0 && (
+              <Badge className="ml-1 bg-amber-100 text-amber-800 hover:bg-amber-100">{unpaidInvoiceCount}</Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="customQuotes" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             <span>Custom Quotes</span>
@@ -480,6 +523,70 @@ const CustomerDashboard: React.FC = () => {
                     </Link>
                   }
                 />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Invoices come straight off shipment.metadata.invoice — the same field
+            the customer app's Billing screen reads and the admin writes when
+            publishing. Nothing is transmitted, so there is nothing to fail. */}
+        <TabsContent value="invoices" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>My Invoices</CardTitle>
+              <CardDescription>
+                Invoices for your bookings. Payment is arranged offline — contact us to settle one.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingShipments ? (
+                <div className="py-8 text-center text-gray-500">Loading invoices…</div>
+              ) : invoiceRows.length === 0 ? (
+                <EmptyState
+                  icon={<FileText className="h-12 w-12 text-gray-400" />}
+                  title="No invoices yet"
+                  description="Once our team raises an invoice for one of your bookings it appears here and in the mobile app."
+                />
+              ) : (
+                <div className="space-y-3">
+                  {invoiceRows.map(({ shipment, invoice, total, balance }) => (
+                    <div
+                      key={shipment.id}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border rounded-lg p-4 dark:border-gray-700"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold">{invoice.invoiceNumber || 'Invoice'}</span>
+                          {balance <= 0.005 && total > 0 ? (
+                            <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">Paid</Badge>
+                          ) : balance < total ? (
+                            <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Part paid</Badge>
+                          ) : (
+                            <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Payment due</Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                          {shipment.tracking_number || 'Booking'}
+                          {invoice.dueDate ? ` · due ${invoice.dueDate}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4 shrink-0">
+                        <div className="text-right">
+                          <p className="font-semibold">{formatCurrency(total, invoice.currency || 'GBP')}</p>
+                          {balance > 0.005 && (
+                            <p className="text-xs text-amber-700 dark:text-amber-400">
+                              {formatCurrency(balance, invoice.currency || 'GBP')} outstanding
+                            </p>
+                          )}
+                        </div>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link to={`/shipment/${shipment.id}`}>View</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>

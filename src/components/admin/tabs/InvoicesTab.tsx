@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   Search, Download, RefreshCw, Loader2, Eye, Pencil, Plus, Trash2, Receipt, Printer,
-  Wallet, Send, CircleDollarSign, AlertTriangle, CheckCircle2, MessageCircle, Mail,
+  Wallet, Send, CircleDollarSign, AlertTriangle, CheckCircle2, Smartphone, Mail,
 } from 'lucide-react';
 import { buildRefNumber } from '@/components/admin/DeliveryNoteGenerator';
 import BillingInvoiceGenerator, {
@@ -97,7 +97,7 @@ const InvoicesTab = () => {
   const [savingPayment, setSavingPayment] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
-  const [sendingWaId, setSendingWaId] = useState<string | null>(null);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkSending, setBulkSending] = useState(false);
   const [bulkDownloading, setBulkDownloading] = useState(false);
@@ -322,52 +322,64 @@ const InvoicesTab = () => {
     if (ok) toast({ title: 'Invoice sent', description: `Emailed to ${getSenderEmail(shipment)}` });
   };
 
-  // ── Send invoice to the customer's booking WhatsApp number ───────────────────
-  const sendInvoiceWhatsApp = async (shipment: Shipment) => {
+  // ── Publish the invoice to the customer's app + web dashboard ────────────────
+  // Replaces the old WhatsApp send, which depended on Twilio secrets on the
+  // send-invoice-whatsapp edge function and failed whenever they were absent.
+  //
+  // Nothing has to be transmitted: the customer app's Billing screen and the web
+  // dashboard both read `metadata.invoice` off the shipment, so persisting it
+  // *is* delivery. This marks it published and notifies the customer in-app.
+  //
+  // The one hard requirement is that the shipment belongs to an account —
+  // a shipment with user_id = null has no one to show it to.
+  const publishInvoiceToCustomer = async (shipment: Shipment) => {
     const invoice = getInvoiceData(shipment);
-    const phone = getSenderPhone(shipment);
-    if (!phone) {
-      toast({ title: 'No WhatsApp number', description: 'This booking has no sender phone on file.', variant: 'destructive' });
+
+    if (!shipment.user_id) {
+      toast({
+        title: 'Booking is not linked to an account',
+        description: 'This was booked as a guest, so there is no customer app to publish to. It links automatically when they sign in with the same email — until then, use Email.',
+        variant: 'destructive',
+      });
       return;
     }
-    setSendingWaId(shipment.id);
+
+    setPublishingId(shipment.id);
     try {
-      const { base64 } = await renderInvoicePdf(shipment, invoice);
+      const now = new Date().toISOString();
+      const ok = await persistInvoice(shipment, {
+        ...invoice,
+        sentAt: invoice.sentAt || now,
+        publishedToCustomerAt: now,
+      } as InvoiceData);
+      if (!ok) throw new Error('Could not save the invoice.');
+
       const { total, balance } = getPaymentSummary(invoice);
-      const status = getInvoiceStatus(invoice);
-      const sendStatus = status === 'paid' ? 'paid' : status === 'partial' ? 'partial' : 'unpaid';
+      const settled = balance <= 0.005 && total > 0;
 
-      const { error } = await supabase.functions.invoke('send-invoice-whatsapp', {
-        body: {
-          to: phone,
-          country: getSenderCountry(shipment),
-          customerName: getSenderName(shipment),
-          invoiceNumber: invoice.invoiceNumber,
-          pdfBase64: base64,
-          status: sendStatus,
-          total: fmtMoney(total, invoice.currency),
-          amountDue: fmtMoney(balance, invoice.currency),
-          dueDate: invoice.dueDate,
-        },
+      // Best effort: the invoice is already visible without this, so a failed
+      // notification must not read as a failed publish.
+      const { error: notifyError } = await supabase.from('notifications').insert({
+        user_id: shipment.user_id,
+        title: settled ? 'Invoice receipt available' : 'New invoice available',
+        message: `${invoice.invoiceNumber} for ${fmtMoney(total, invoice.currency)}${
+          settled ? ' is paid in full.' : ` — ${fmtMoney(balance, invoice.currency)} due by ${invoice.dueDate}.`
+        }`,
+        type: 'finance',
+        related_id: shipment.id,
+      } as never);
+
+      toast({
+        title: 'Published to the customer',
+        description: notifyError
+          ? 'Visible in their app and dashboard now (in-app alert could not be created).'
+          : 'It is in their app and web dashboard, and they have been notified.',
       });
-
-      if (error) {
-        let detail = error.message;
-        try {
-          const ctx = (error as { context?: Response }).context;
-          const j = ctx && typeof ctx.json === 'function' ? await ctx.json() : null;
-          if (j?.error) detail = j.error;
-        } catch { /* ignore */ }
-        throw new Error(detail);
-      }
-
-      await persistInvoice(shipment, { ...invoice, sentAt: new Date().toISOString() });
-      toast({ title: 'Sent on WhatsApp', description: `Invoice sent to ${phone}` });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Could not send the WhatsApp message.';
-      toast({ title: 'WhatsApp send failed', description: msg, variant: 'destructive' });
+      const msg = err instanceof Error ? err.message : 'Could not publish the invoice.';
+      toast({ title: 'Publish failed', description: msg, variant: 'destructive' });
     } finally {
-      setSendingWaId(null);
+      setPublishingId(null);
     }
   };
 
@@ -696,14 +708,16 @@ const InvoicesTab = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => sendInvoiceWhatsApp(shipment)}
-                              disabled={sendingWaId === shipment.id}
-                              className="h-8 px-2 text-green-700 hover:text-green-800 hover:bg-green-50"
-                              title="Send invoice on WhatsApp"
+                              onClick={() => publishInvoiceToCustomer(shipment)}
+                              disabled={publishingId === shipment.id}
+                              className="h-8 px-2 text-green-700 hover:text-green-800 hover:bg-green-50 disabled:opacity-60"
+                              title={shipment.user_id
+                                ? 'Publish to the customer’s app and web dashboard'
+                                : 'Guest booking — no account to publish to yet'}
                             >
-                              {sendingWaId === shipment.id
+                              {publishingId === shipment.id
                                 ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                : <MessageCircle className="h-4 w-4 mr-1" />} WhatsApp
+                                : <Smartphone className="h-4 w-4 mr-1" />} To app
                             </Button>
                             <Button
                               variant="ghost"

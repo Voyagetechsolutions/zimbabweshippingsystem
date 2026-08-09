@@ -37,6 +37,10 @@ export interface InvoiceData {
   paid: boolean;             // kept for backwards-compat; derived from balance on save
   payments: PaymentEntry[];  // offline payments recorded against this invoice
   sentAt: string | null;     // ISO timestamp when the invoice was marked as sent
+  // ISO timestamp when the invoice was published to the customer's app and web
+  // dashboard. Both read metadata.invoice directly, so persisting the invoice is
+  // the delivery — this records when the customer was told about it.
+  publishedToCustomerAt?: string | null;
 }
 
 export type InvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid' | 'overdue';
