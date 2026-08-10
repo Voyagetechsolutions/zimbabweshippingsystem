@@ -94,11 +94,11 @@ begin
       (route, areas, country, pickup_date, approved, generated_at, generated_from_id)
     values
       (v_route.route, v_route.areas, v_route.country,
-       to_char(v_next, 'DD Month YYYY'), false, now(), v_route.id);
+       to_char(v_next, 'DD FMMonth YYYY'), false, now(), v_route.id);
 
     v_created := v_created + 1;
     v_drafts := v_drafts || jsonb_build_array(jsonb_build_object(
-      'route', v_route.route, 'pickupDate', to_char(v_next, 'DD Month YYYY')));
+      'route', v_route.route, 'pickupDate', to_char(v_next, 'DD FMMonth YYYY')));
   end loop;
 
   insert into public.audit_logs (user_id, action, entity_type, entity_id, details)

@@ -6,6 +6,9 @@ import { Download, Loader2, Printer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Shipment } from '@/types/shipment';
 import { buildRefNumber } from '@/components/admin/DeliveryNoteGenerator';
+import {
+  calculateInvoiceTotals, getInvoicePaymentSummary, getInvoiceStatusValue,
+} from '@/utils/invoiceTotals';
 
 export interface InvoiceLineItem {
   description: string;
@@ -210,33 +213,21 @@ export function getInvoiceData(s: Shipment): InvoiceData {
   };
 }
 
+// The arithmetic lives in @/utils/invoiceTotals so the customer dashboard and
+// the mobile app share one implementation. These stay as the public API that
+// the admin screens already import.
 export function calculateTotals(invoice: InvoiceData) {
-  const subtotal = invoice.items.reduce((sum, it) => sum + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0), 0);
-  const discount = Number(invoice.discount) || 0;
-  const taxable = Math.max(0, subtotal - discount);
-  const tax = taxable * ((Number(invoice.taxRate) || 0) / 100);
-  const total = taxable + tax;
-  return { subtotal, discount, tax, total };
+  return calculateInvoiceTotals(invoice);
 }
 
 // Sum of recorded offline payments and the remaining balance.
 export function getPaymentSummary(invoice: InvoiceData) {
-  const { total } = calculateTotals(invoice);
-  const paidAmount = (invoice.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-  const balance = Math.max(0, total - paidAmount);
-  return { total, paidAmount, balance };
+  return getInvoicePaymentSummary(invoice);
 }
 
 // Invoice2go-style lifecycle status, derived from payments + due date.
 export function getInvoiceStatus(invoice: InvoiceData): InvoiceStatus {
-  const { total, paidAmount, balance } = getPaymentSummary(invoice);
-  // Treat an explicit "paid" flag as fully paid for legacy invoices with no payment entries.
-  if ((total > 0 && balance <= 0.005) || (invoice.paid && paidAmount === 0)) return 'paid';
-  if (paidAmount > 0) return 'partial';
-  const overdue = !!invoice.dueDate && new Date(invoice.dueDate) < new Date(new Date().toDateString());
-  if (overdue) return 'overdue';
-  if (invoice.sentAt) return 'sent';
-  return 'draft';
+  return getInvoiceStatusValue(invoice, Boolean(invoice.sentAt)) as InvoiceStatus;
 }
 
 function fmtMoney(amount: number, currency: string) {

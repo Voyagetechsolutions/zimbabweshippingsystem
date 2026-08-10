@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Shipment } from '@/types/shipment';
 import { Receipt } from '@/types/receipt';
 import { formatDate, formatCurrency } from '@/utils/formatters';
+import { getInvoicePaymentSummary, isInvoiceSettled } from '@/utils/invoiceTotals';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -169,33 +170,21 @@ const CustomerDashboard: React.FC = () => {
       .map((shipment) => {
         const invoice = (shipment.metadata as any)?.invoice;
         if (!invoice || !Array.isArray(invoice.items) || invoice.items.length === 0) return null;
-
-        const subtotal = invoice.items.reduce(
-          (sum: number, item: any) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
-          0,
-        );
-        const discount = Number(invoice.discount) || 0;
-        const taxable = Math.max(0, subtotal - discount);
-        const total = taxable + taxable * ((Number(invoice.taxRate) || 0) / 100);
-        const paidAmount = (Array.isArray(invoice.payments) ? invoice.payments : []).reduce(
-          (sum: number, payment: any) => sum + (Number(payment.amount) || 0),
-          0,
-        );
-
-        return { shipment, invoice, total, balance: Math.max(0, total - paidAmount) };
+        const { total, balance } = getInvoicePaymentSummary(invoice);
+        // `settled` is not just balance <= 0: legacy invoices carry a `paid`
+        // flag with no itemised payments, and must not read as outstanding.
+        return { shipment, invoice, total, balance, settled: isInvoiceSettled(invoice) };
       })
       .filter((row): row is NonNullable<typeof row> => row !== null);
 
     // Outstanding first, then most recent.
     return rows.sort((a, b) => {
-      const aDue = a.balance > 0.005 ? 0 : 1;
-      const bDue = b.balance > 0.005 ? 0 : 1;
-      if (aDue !== bDue) return aDue - bDue;
+      if (a.settled !== b.settled) return a.settled ? 1 : -1;
       return new Date(b.shipment.created_at).getTime() - new Date(a.shipment.created_at).getTime();
     });
   }, [shipments]);
 
-  const unpaidInvoiceCount = invoiceRows.filter((row) => row.balance > 0.005).length;
+  const unpaidInvoiceCount = invoiceRows.filter((row) => !row.settled).length;
 
   // Helper function to generate receipt number
   const getReceiptNumber = (receipt: Receipt) => {
@@ -550,7 +539,7 @@ const CustomerDashboard: React.FC = () => {
                 />
               ) : (
                 <div className="space-y-3">
-                  {invoiceRows.map(({ shipment, invoice, total, balance }) => (
+                  {invoiceRows.map(({ shipment, invoice, total, balance, settled }) => (
                     <div
                       key={shipment.id}
                       className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border rounded-lg p-4 dark:border-gray-700"
@@ -558,7 +547,7 @@ const CustomerDashboard: React.FC = () => {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold">{invoice.invoiceNumber || 'Invoice'}</span>
-                          {balance <= 0.005 && total > 0 ? (
+                          {settled ? (
                             <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">Paid</Badge>
                           ) : balance < total ? (
                             <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Part paid</Badge>
@@ -574,7 +563,7 @@ const CustomerDashboard: React.FC = () => {
                       <div className="flex items-center gap-4 shrink-0">
                         <div className="text-right">
                           <p className="font-semibold">{formatCurrency(total, invoice.currency || 'GBP')}</p>
-                          {balance > 0.005 && (
+                          {!settled && balance > 0.005 && (
                             <p className="text-xs text-amber-700 dark:text-amber-400">
                               {formatCurrency(balance, invoice.currency || 'GBP')} outstanding
                             </p>
