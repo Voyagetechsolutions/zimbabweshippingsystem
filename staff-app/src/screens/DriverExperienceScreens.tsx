@@ -12,6 +12,8 @@ import { useViewRole } from '../context/ViewRoleContext';
 import { todayLabel } from '../lib/format';
 import { customerRef, deliveryAddress, pickupAddress, receiverName, receiverPhone, senderName, senderPhone, type Shipment } from '../lib/shipment';
 import { colors, radius, shadow, spacing } from '../theme';
+import { loadRouteDay, sortByProximity, type RouteDay } from '../lib/collections';
+import { getDriverLocation, describeLocationStatus, type Point } from '../lib/driverLocation';
 import type { DriverMoreStackParams, DriverRunStackParams, DriverStopKind } from '../navigation/types';
 
 type RunProps = NativeStackScreenProps<DriverRunStackParams, 'MyRun'>;
@@ -22,6 +24,144 @@ type Stop = { id: string; shipment_id: string; stop_order: number; stop_type: Dr
 function todayIso() {
   const now = new Date();
   return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+/**
+ * Today's collection route, its map pins, and how many are left.
+ *
+ * Shared by the driver home screen and the Collections tab so the two can never
+ * disagree about what the day looks like. Collected stops come off the
+ * "left to collect" count.
+ */
+export function DriverCollectionsPanel({ compact = false }: { compact?: boolean }) {
+  const [day, setDay] = useState<RouteDay | null>(null);
+  const [point, setPoint] = useState<Point | null>(null);
+  const [note, setNote] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoadError(null);
+    try {
+      const [routeDay, location] = await Promise.all([loadRouteDay(), getDriverLocation()]);
+      setDay(routeDay);
+      setPoint(location.point);
+      setNote(describeLocationStatus(location.status));
+    } catch (e: any) {
+      // A failed load must never read as "no route today" — a driver would sit
+      // still believing there was nothing to collect.
+      setDay(null);
+      setLoadError(e?.message || 'Could not load today’s collections.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const stops = day ? sortByProximity(day.collections, point) : [];
+  const collected = stops.filter((c) => c.collectionStatus === 'Collected').length;
+  const remaining = stops.length - collected;
+  const mappable = stops.filter((c) => c.latitude != null && c.longitude != null);
+  const next = stops.find((c) => c.collectionStatus !== 'Collected') || null;
+
+  const navigateTo = (c: typeof stops[number]) => {
+    const destination = c.latitude != null && c.longitude != null
+      ? `${c.latitude},${c.longitude}`
+      : encodeURIComponent([c.address, c.city, c.postcode].filter(Boolean).join(', '));
+    Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`).catch(() => {
+      Alert.alert('Could not open maps', 'Check that a maps application or browser is available.');
+    });
+  };
+
+  if (loading) return <View style={styles.panelLoading}><ActivityIndicator color={colors.primary} /></View>;
+
+  if (loadError) {
+    return <View style={styles.panelError}>
+      <Ionicons name="cloud-offline-outline" size={34} color={colors.danger} />
+      <Text style={styles.panelErrorTitle}>Couldn’t load today’s collections</Text>
+      <Text style={styles.panelErrorText}>{loadError}</Text>
+      <Pressable style={styles.outlineButton} onPress={() => { setLoading(true); load(); }}>
+        <Ionicons name="refresh-outline" size={17} color={colors.primary} />
+        <Text style={styles.outlineText}>Try again</Text>
+      </Pressable>
+    </View>;
+  }
+
+  if (!day?.routes?.length) {
+    return <Empty icon="calendar-outline" title="No collection route today"
+      text="No route is scheduled for today. Admin publishes routes from the collection schedule." />;
+  }
+  if (stops.length === 0) {
+    return <Empty icon="checkmark-done-outline" title="Nothing to collect"
+      text="Today’s route has no bookings awaiting collection." />;
+  }
+
+  return <View>
+    <View style={styles.runHero}>
+      <Text style={styles.heroDate}>{day.routes.map((r) => r.route).join(', ')}</Text>
+      <View style={styles.runStats}>
+        <HeroStat value={remaining} label="Left to collect" />
+        <HeroStat value={collected} label="Collected" />
+        <HeroStat value={stops.length} label="On route" />
+      </View>
+      <View style={styles.progressTrack}>
+        <View style={[styles.progressFill, { width: `${stops.length ? (collected / stops.length) * 100 : 0}%` }]} />
+      </View>
+      <Text style={styles.heroMeta}>
+        {point ? 'Nearest collection first' : 'Distance sorting unavailable'}
+        {mappable.length < stops.length ? ` · ${stops.length - mappable.length} without a map location` : ''}
+      </Text>
+    </View>
+
+    {Boolean(note) && <Text style={styles.panelNote}>{note}</Text>}
+
+    {mappable.length > 0 ? (
+      <RunMap
+        height={compact ? 240 : 300}
+        focusStopId={next?.shipmentId ?? null}
+        stops={mappable.map((c, i) => ({
+          id: c.shipmentId,
+          latitude: Number(c.latitude),
+          longitude: Number(c.longitude),
+          title: `${i + 1}. ${c.customerName || 'Collection'}`,
+          description: [c.address, c.city, c.postcode].filter(Boolean).join(', '),
+          kind: 'collection' as const,
+          order: i + 1,
+          done: c.collectionStatus === 'Collected',
+        }))}
+        onStopPress={(s) => { const m = stops.find((c) => c.shipmentId === s.id); if (m) navigateTo(m); }}
+      />
+    ) : null}
+
+    <View style={styles.listCard}>
+      {stops.map((c, i) => {
+        const done = c.collectionStatus === 'Collected';
+        return <View key={c.shipmentId} style={styles.stopRow}>
+          <View style={[styles.order, { backgroundColor: done ? colors.primarySoft : '#F2F4F7' }]}>
+            <Text style={[styles.orderText, done && { color: colors.primaryDark }]}>{i + 1}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.stopName}>{c.customerName || 'Collection'}</Text>
+            <Text style={styles.stopSub} numberOfLines={2}>
+              {[c.address, c.city, c.postcode].filter(Boolean).join(', ') || 'Address not recorded'}
+              {c.distanceKm != null
+                ? ` · ${c.distanceKm < 1 ? `${Math.round(c.distanceKm * 1000)} m` : `${c.distanceKm.toFixed(1)} km`}`
+                : ''}
+            </Text>
+          </View>
+          <Pressable style={styles.rowAction} onPress={() => navigateTo(c)} hitSlop={8}>
+            <Ionicons name="navigate-outline" size={18} color={colors.primary} />
+          </Pressable>
+          {c.phone ? (
+            <Pressable style={styles.rowAction} onPress={() => Linking.openURL(`tel:${String(c.phone).replace(/\s/g, '')}`)} hitSlop={8}>
+              <Ionicons name="call-outline" size={18} color={colors.primary} />
+            </Pressable>
+          ) : null}
+        </View>;
+      })}
+    </View>
+  </View>;
 }
 function stopName(stop: Stop) { return stop.stop_type === 'collection' ? senderName(stop.shipment) : receiverName(stop.shipment); }
 function stopAddress(stop: Stop) { return stop.address || (stop.stop_type === 'collection' ? pickupAddress(stop.shipment) : deliveryAddress(stop.shipment)); }
@@ -60,8 +200,14 @@ export function DriverRunOverviewScreen({ navigation }: RunProps) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}>
-        <Header title="My Run" subtitle={todayLabel()} />
-        {!run ? <Empty icon="calendar-outline" title="No run assigned" text="Your route will appear here when dispatch assigns it." /> : <>
+        <Header title="Collections" subtitle={todayLabel()} />
+
+        {/* Today's collection route and its pins — shown to any clocked-in
+            driver, with no assignment needed. The assigned-run view below only
+            appears when dispatch happened to build one. */}
+        <DriverCollectionsPanel />
+
+        {!run ? null : <>
           <View style={styles.runHero}>
             <Text style={styles.heroDate}>{run.route_name || 'Today’s route'}</Text>
             <View style={styles.runStats}>
@@ -124,7 +270,7 @@ export function DriverReportIssueScreen({ route, navigation }: NativeStackScreen
   const { stop } = route.params; const [reason, setReason] = useState(''); const [notes, setNotes] = useState(''); const [busy, setBusy] = useState(false);
   const reasons = [['not_home', 'Customer not available'], ['wrong_address', 'Wrong address'], ['access_problem', 'Access problem'], ['damaged_goods', 'Damaged goods'], ['vehicle_problem', 'Vehicle problem'], ['other', 'Other']];
   const submit = async () => { if (!reason) { Alert.alert('Choose an issue', 'Select what stopped you completing this stop.'); return; } setBusy(true); const result = await supabase.rpc('fail_driver_stop', { p_stop_id: stop.id, p_reason: reason, p_note: notes.trim() || null }); setBusy(false); if (result.error) Alert.alert('Report failed', result.error.message); else Alert.alert('Issue reported', 'Dispatch can now replan this stop.', [{ text: 'Done', onPress: () => navigation.popToTop() }]); };
-  return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled"><Header title="Report Issue" subtitle={stop.customerName} /><Text style={styles.sectionTitle}>What’s the issue?</Text><View style={styles.listCard}>{reasons.map(([key, label]) => <Pressable key={key} style={styles.menuRow} onPress={() => setReason(key)}><Ionicons name={reason === key ? 'radio-button-on' : 'radio-button-off'} size={19} color={reason === key ? colors.primary : colors.textFaint} /><Text style={styles.menuLabel}>{label}</Text></Pressable>)}</View><Text style={styles.detailLabel}>ADDITIONAL NOTES</Text><TextInput style={styles.notesInput} value={notes} onChangeText={setNotes} placeholder="Tell dispatch more…" placeholderTextColor={colors.textFaint} multiline maxLength={250} /><Pressable style={styles.primaryButton} onPress={submit} disabled={busy}>{busy ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryText}>Submit report</Text>}</Pressable></ScrollView></SafeAreaView>;
+  return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets><Header title="Report Issue" subtitle={stop.customerName} /><Text style={styles.sectionTitle}>What’s the issue?</Text><View style={styles.listCard}>{reasons.map(([key, label]) => <Pressable key={key} style={styles.menuRow} onPress={() => setReason(key)}><Ionicons name={reason === key ? 'radio-button-on' : 'radio-button-off'} size={19} color={reason === key ? colors.primary : colors.textFaint} /><Text style={styles.menuLabel}>{label}</Text></Pressable>)}</View><Text style={styles.detailLabel}>ADDITIONAL NOTES</Text><TextInput style={styles.notesInput} value={notes} onChangeText={setNotes} placeholder="Tell dispatch more…" placeholderTextColor={colors.textFaint} multiline maxLength={250} /><Pressable style={styles.primaryButton} onPress={submit} disabled={busy}>{busy ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryText}>Submit report</Text>}</Pressable></ScrollView></SafeAreaView>;
 }
 
 // Friendly labels for raw shipment_event status codes. Anything already written
@@ -163,15 +309,62 @@ export function DriverMessagesScreen() {
   </ScrollView></SafeAreaView>;
 }
 
-export function DriverMoreScreen() {
-  const navigation = useNavigation<any>();
-  const { canSwitchDashboards } = useAuth();
-  const { clearRole } = useViewRole();
-  const items = [
-    ['person-outline', 'My Profile', 'Account'], ['document-text-outline', 'Documents', 'Documents'], ['car-outline', 'Vehicle', 'Vehicle'],
-    ['stats-chart-outline', 'Performance', 'Performance'], ['settings-outline', 'Settings', 'Settings'], ['help-circle-outline', 'Help & Support', 'Help'],
-  ] as const;
-  return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content}><Header title="More" subtitle="Driver account and tools" /><View style={styles.listCard}>{items.map(([icon, label, route]) => <Pressable key={label} style={styles.menuRow} onPress={() => route === 'Help' ? Linking.openURL('mailto:voyagetechsolutions@gmaail.com') : navigation.navigate(route)}><Ionicons name={icon} size={19} color={colors.textMuted} /><Text style={styles.menuLabel}>{label}</Text><Ionicons name="chevron-forward" size={17} color={colors.textFaint} /></Pressable>)}</View>{canSwitchDashboards ? <Pressable style={styles.switchDashboard} onPress={clearRole}><Ionicons name="swap-horizontal-outline" size={19} color={colors.primary} /><Text style={styles.switchDashboardText}>Switch Dashboard</Text><Ionicons name="chevron-forward" size={17} color={colors.primary} /></Pressable> : null}</ScrollView></SafeAreaView>;
+/**
+ * The driver's own record: who they are and the ID admin knows them by.
+ *
+ * The driver ID is the first eight characters of the profile id, which is
+ * created when an admin invites the driver. That is the same identifier the
+ * Staff Control Centre shows, so a driver reading it out over the phone and an
+ * admin searching for it are talking about the same thing.
+ */
+export function DriverProfileScreen() {
+  const { profile, session } = useAuth();
+  const [record, setRecord] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(useCallback(() => {
+    (async () => {
+      if (!session?.user.id) { setLoading(false); return; }
+      const result = await supabase
+        .from('profiles')
+        .select('id,full_name,first_name,last_name,email,phone_number,role,driver_type,vehicle_label,on_leave,staff_active,created_at')
+        .eq('id', session.user.id)
+        .maybeSingle();
+      setRecord(result.data);
+      setLoading(false);
+    })();
+  }, [session?.user.id]));
+
+  if (loading) return <Loading />;
+
+  const source = record || profile || {};
+  const parts = String(source.full_name || '').trim().split(/\s+/);
+  const firstName = source.first_name || parts[0] || '—';
+  const surname = source.last_name || (parts.length > 1 ? parts.slice(1).join(' ') : '—');
+  const driverId = session?.user.id ? session.user.id.slice(0, 8).toUpperCase() : '—';
+  const joined = source.created_at ? new Date(source.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+  const status = source.staff_active === false ? 'Inactive' : source.on_leave ? 'On leave' : 'Active driver';
+
+  return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content}>
+    <Header title="My Profile" subtitle="Your driver record" />
+    <View style={styles.listCard}>
+      <Period label="First name" value={firstName} />
+      <Period label="Surname" value={surname} />
+      <Period label="Driver ID" value={driverId} />
+      <Period label="Status" value={status} />
+    </View>
+    <View style={styles.listCard}>
+      <Period label="Email" value={source.email || session?.user.email || '—'} />
+      <Period label="Phone" value={source.phone_number || '—'} />
+      <Period label="Driver type" value={source.driver_type || 'Both pickups and deliveries'} />
+      <Period label="Vehicle" value={source.vehicle_label || 'Not assigned'} />
+      <Period label="Joined" value={joined} />
+    </View>
+    <Text style={styles.profileNote}>
+      Your name, driver type and vehicle are maintained by admin in the Staff Control Centre. Contact
+      dispatch if any of it is wrong.
+    </Text>
+  </ScrollView></SafeAreaView>;
 }
 
 export function DriverVehicleScreen() {
@@ -187,12 +380,12 @@ export function DriverAccountScreen() {
   const navigation = useNavigation<any>();
   const avatar = session?.user.user_metadata?.avatar_url;
   const initial = (profile?.full_name || session?.user.email || 'D').charAt(0).toUpperCase();
-  return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content}><Header title="Account" subtitle="Driver profile" /><View style={styles.driverProfileCard}>{avatar ? <Image source={{ uri: avatar }} style={styles.driverAvatar} /> : <View style={styles.driverAvatarFallback}><Text style={styles.driverAvatarText}>{initial}</Text></View>}<View style={{ flex: 1 }}><Text style={styles.stopName}>{profile?.full_name || 'Driver'}</Text><Text style={styles.activeDriver}>Active Driver</Text><Text style={styles.stopSub}>{session?.user.email}</Text></View></View><View style={styles.listCard}><MenuLink icon="person-outline" label="My Profile" onPress={() => Alert.alert('Driver profile', `${profile?.full_name || 'Driver'}\n${session?.user.email || ''}`)} /><MenuLink icon="document-text-outline" label="Documents" onPress={() => navigation.navigate('Documents')} /><MenuLink icon="car-outline" label="Vehicle" onPress={() => navigation.navigate('Vehicle')} /><MenuLink icon="stats-chart-outline" label="Performance" onPress={() => navigation.navigate('Performance')} /><MenuLink icon="settings-outline" label="Settings" onPress={() => navigation.navigate('Settings')} /><MenuLink icon="help-circle-outline" label="Help & Support" onPress={() => Linking.openURL('https://wa.me/27615321107')} /></View>{canSwitchDashboards ? <Pressable style={styles.switchDashboard} onPress={clearRole}><Ionicons name="swap-horizontal-outline" size={19} color={colors.primary} /><Text style={styles.switchDashboardText}>Switch Dashboard</Text><Ionicons name="chevron-forward" size={17} color={colors.primary} /></Pressable> : null}<Pressable style={styles.logoutButton} onPress={signOut}><Ionicons name="log-out-outline" size={18} color={colors.danger} /><Text style={styles.logoutText}>Logout</Text></Pressable></ScrollView></SafeAreaView>;
+  return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content}><Header title="Account" subtitle="Driver profile" /><View style={styles.driverProfileCard}>{avatar ? <Image source={{ uri: avatar }} style={styles.driverAvatar} /> : <View style={styles.driverAvatarFallback}><Text style={styles.driverAvatarText}>{initial}</Text></View>}<View style={{ flex: 1 }}><Text style={styles.stopName}>{profile?.full_name || 'Driver'}</Text><Text style={styles.activeDriver}>Active Driver</Text><Text style={styles.stopSub}>{session?.user.email}</Text></View></View><View style={styles.listCard}><MenuLink icon="person-outline" label="My Profile" onPress={() => navigation.navigate('Profile')} /><MenuLink icon="car-outline" label="Vehicle" onPress={() => navigation.navigate('Vehicle')} /><MenuLink icon="stats-chart-outline" label="Performance" onPress={() => navigation.navigate('Performance')} /><MenuLink icon="settings-outline" label="Settings" onPress={() => navigation.navigate('Settings')} /><MenuLink icon="help-circle-outline" label="Help & Support" onPress={() => Linking.openURL('https://wa.me/27615321107')} /></View>{canSwitchDashboards ? <Pressable style={styles.switchDashboard} onPress={clearRole}><Ionicons name="swap-horizontal-outline" size={19} color={colors.primary} /><Text style={styles.switchDashboardText}>Switch Dashboard</Text><Ionicons name="chevron-forward" size={17} color={colors.primary} /></Pressable> : null}<Pressable style={styles.logoutButton} onPress={signOut}><Ionicons name="log-out-outline" size={18} color={colors.danger} /><Text style={styles.logoutText}>Logout</Text></Pressable></ScrollView></SafeAreaView>;
 }
 
-export function DriverDocumentsScreen() {
-  return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content}><Header title="Documents" subtitle="Driver records" /><View style={styles.listCard}><DocumentRow title="Driver profile" status="Verified" /><DocumentRow title="Licence and identification" status="Managed by dispatch" /><DocumentRow title="Vehicle assignment" status="Available with active run" /></View></ScrollView></SafeAreaView>;
-}
+// DriverDocumentsScreen was removed. It listed three hardcoded rows ("Verified",
+// "Managed by dispatch") with no records behind them, so it told the driver
+// nothing true.
 
 export function DriverPerformanceScreen() {
   const { session } = useAuth(); const [runs, setRuns] = useState<any[]>([]); const [stops, setStops] = useState<any[]>([]); const [loading, setLoading] = useState(true);
@@ -225,6 +418,13 @@ const styles = StyleSheet.create({
   progressTrack: { height: 6, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,.25)', marginTop: spacing.md, overflow: 'hidden' }, progressFill: { height: 6, borderRadius: radius.pill, backgroundColor: colors.white },
   heroButtons: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }, heroButton: { flex: 1, minHeight: 38, borderWidth: 1, borderColor: 'rgba(255,255,255,.55)', borderRadius: radius.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }, heroButtonText: { color: colors.white, fontSize: 11, fontWeight: '800' },
   segment: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.border, paddingHorizontal: 4 }, segmentActive: { color: colors.primary, fontWeight: '800', fontSize: 13, borderBottomWidth: 2, borderBottomColor: colors.primary, paddingBottom: 9 }, segmentText: { color: colors.textMuted, fontSize: 11, paddingTop: 2 },
+  panelLoading: { paddingVertical: spacing.xl, alignItems: 'center' },
+  panelError: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xl, paddingHorizontal: spacing.lg },
+  panelErrorTitle: { fontSize: 15, fontWeight: '800', color: colors.text, textAlign: 'center' },
+  panelErrorText: { fontSize: 12.5, color: colors.textMuted, textAlign: 'center', lineHeight: 18 },
+  panelNote: { fontSize: 11.5, color: colors.amber, marginBottom: spacing.sm, lineHeight: 16 },
+  profileNote: { fontSize: 11.5, color: colors.textMuted, lineHeight: 17, marginTop: spacing.md },
+  rowAction: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft },
   listCard: { backgroundColor: colors.surface, borderRadius: radius.md, overflow: 'hidden', ...shadow }, stopRow: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, order: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, orderText: { color: colors.textMuted, fontSize: 12, fontWeight: '800' }, stopName: { fontSize: 13.5, fontWeight: '800', color: colors.text }, stopSub: { fontSize: 11.5, color: colors.textMuted, marginTop: 2 }, statusPill: { alignSelf: 'center', borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: colors.primarySoft }, statusText: { fontSize: 9.5, color: colors.primaryDark, fontWeight: '800', textTransform: 'capitalize' },
   earningsHero: { backgroundColor: colors.primary, borderRadius: radius.lg, padding: spacing.lg, minHeight: 112, justifyContent: 'center', ...shadow }, earningsValue: { color: colors.white, fontSize: 34, fontWeight: '800', marginTop: 6 }, periodCard: { backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.lg, ...shadow }, periodRow: { minHeight: 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, periodLabel: { fontSize: 13, color: colors.textMuted, fontWeight: '600' }, rowValue: { fontSize: 13.5, fontWeight: '800', color: colors.text }, summaryIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   messageRow: { minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, messageIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }, messageTime: { fontSize: 10.5, color: colors.textFaint },

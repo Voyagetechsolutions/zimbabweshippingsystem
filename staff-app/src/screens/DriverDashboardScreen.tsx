@@ -19,6 +19,7 @@ import { enqueue, flushQueue, isNetworkError, readQueue } from '../lib/offlineQu
 import type { DriverStackParams, DriverStopKind } from '../navigation/types';
 import { loadRouteDay, sortByProximity, type RouteDay } from '../lib/collections';
 import { getDriverLocation, describeLocationStatus, type Point } from '../lib/driverLocation';
+import { DriverCollectionsPanel } from './DriverExperienceScreens';
 
 type Props = NativeStackScreenProps<DriverStackParams, 'TodayRun'>;
 type StopStatus = 'planned' | 'en_route' | 'arrived' | 'completed' | 'failed';
@@ -217,47 +218,9 @@ export default function DriverDashboardScreen({ navigation }: Props) {
   const geocodeAttemptedRef = useRef<string | null>(null);
   const [geocoding, setGeocoding] = useState(false);
 
-  // Today's active collection route, shown to every clocked-in driver whether or
-  // not dispatch assigned them anything. One route runs per day, so the whole
-  // route is the driver's work list and the nearest address is theirs to take.
-  const [routeDay, setRouteDay] = useState<RouteDay | null>(null);
-  const [routeLoading, setRouteLoading] = useState(false);
-  const [driverPoint, setDriverPoint] = useState<Point | null>(null);
-  const [locationNote, setLocationNote] = useState('');
-
+  // On duty is the only gate: the collections panel below owns fetching the
+  // route, so this screen no longer duplicates that request.
   const onDuty = Boolean(attendance && !attendance.clocked_out_at);
-
-  const loadRoute = useCallback(async () => {
-    setRouteLoading(true);
-    try {
-      const [day, location] = await Promise.all([loadRouteDay(), getDriverLocation()]);
-      setRouteDay(day);
-      setDriverPoint(location.point);
-      setLocationNote(describeLocationStatus(location.status));
-    } catch (e: any) {
-      // The assigned-run view above is unaffected, so this stays a soft failure.
-      setRouteDay(null);
-      setLocationNote(e?.message || 'Could not load today’s collection route.');
-    } finally {
-      setRouteLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (onDuty) loadRoute();
-    else { setRouteDay(null); setDriverPoint(null); setLocationNote(''); }
-  }, [onDuty, loadRoute]);
-
-  // Nearest first, so the driver never has to work out where to go next.
-  const routeStops = useMemo(
-    () => (routeDay ? sortByProximity(routeDay.collections, driverPoint) : []),
-    [routeDay, driverPoint],
-  );
-  const routeMappable = useMemo(
-    () => routeStops.filter((c) => c.latitude != null && c.longitude != null),
-    [routeStops],
-  );
-  const nextNearest = routeStops.find((c) => c.collectionStatus !== 'Collected') || null;
 
   const fillMissingCoordinates = useCallback(async (runId: string, silent: boolean) => {
     setGeocoding(true);
@@ -427,19 +390,6 @@ export default function DriverDashboardScreen({ navigation }: Props) {
     ]);
   };
 
-  // Open turn-by-turn for a route collection. Prefers coordinates when we have
-  // them, because a postcode alone can drop the pin on the wrong side of a road.
-  const openMapsFor = async (c: { latitude: number | null; longitude: number | null; address: string | null; city: string; postcode: string }) => {
-    const destination = c.latitude != null && c.longitude != null
-      ? `${c.latitude},${c.longitude}`
-      : encodeURIComponent([c.address, c.city, c.postcode].filter(Boolean).join(', '));
-    try {
-      await Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`);
-    } catch {
-      Alert.alert('Could not open maps', 'Check that a maps application or browser is available.');
-    }
-  };
-
   const navigateToStop = async (stop: RunStop) => {
     const destination = encodeURIComponent(stopAddress(stop));
     const url = `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`;
@@ -541,122 +491,22 @@ export default function DriverDashboardScreen({ navigation }: Props) {
           </View>
         ) : null}
 
-        {/* Today's active collection route — visible to any clocked-in driver,
-            with or without an assigned run. */}
+        {/* Today's collection route. Rendered by the shared panel that the
+            Collections tab also uses, so the two views cannot disagree about
+            what is left to collect. */}
         {onDuty ? (
           <View style={{ marginBottom: spacing.md }}>
-            <View style={styles.routeHead}>
-              <Text style={styles.sectionTitle}>
-                {routeDay?.routes?.length
-                  ? `Today’s route · ${routeDay.routes.map((r) => r.route).join(', ')}`
-                  : 'Today’s collection route'}
-              </Text>
-              <Pressable onPress={loadRoute} disabled={routeLoading} hitSlop={8}>
-                {routeLoading
-                  ? <ActivityIndicator size="small" color={colors.primary} />
-                  : <Ionicons name="refresh-outline" size={18} color={colors.primary} />}
-              </Pressable>
-            </View>
-
-            {routeLoading && !routeDay ? (
-              <View style={styles.emptyCard}><ActivityIndicator color={colors.primary} /></View>
-            ) : !routeDay?.routes?.length ? (
-              <View style={styles.emptyCard}>
-                <Ionicons name="calendar-outline" size={40} color={colors.primary} />
-                <Text style={styles.emptyTitle}>No collection route today</Text>
-                <Text style={styles.emptyText}>
-                  No route is scheduled for today, so there are no collections to make. Admin publishes
-                  routes from the collection schedule.
-                </Text>
-              </View>
-            ) : routeStops.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <Ionicons name="checkmark-done-outline" size={40} color={colors.primary} />
-                <Text style={styles.emptyTitle}>Nothing to collect</Text>
-                <Text style={styles.emptyText}>Today’s route has no bookings awaiting collection.</Text>
-              </View>
-            ) : (
-              <>
-                {routeMappable.length > 0 ? (
-                  <RunMap
-                    height={280}
-                    focusStopId={nextNearest?.shipmentId ?? null}
-                    stops={routeMappable.map((c, index) => ({
-                      id: c.shipmentId,
-                      latitude: Number(c.latitude),
-                      longitude: Number(c.longitude),
-                      title: `${index + 1}. ${c.customerName || 'Collection'}`,
-                      description: [c.address, c.city, c.postcode].filter(Boolean).join(', '),
-                      kind: 'collection' as const,
-                      order: index + 1,
-                      done: c.collectionStatus === 'Collected',
-                    }))}
-                    onStopPress={(s) => {
-                      const match = routeStops.find((c) => c.shipmentId === s.id);
-                      if (match) openMapsFor(match);
-                    }}
-                  />
-                ) : null}
-
-                <View style={styles.routeSummary}>
-                  <Text style={styles.routeSummaryText}>
-                    {routeStops.length} collection{routeStops.length === 1 ? '' : 's'}
-                    {driverPoint ? ' · nearest first' : ''}
-                    {routeMappable.length < routeStops.length
-                      ? ` · ${routeStops.length - routeMappable.length} without a map location`
-                      : ''}
-                  </Text>
-                  {Boolean(locationNote) && <Text style={styles.routeNote}>{locationNote}</Text>}
-                </View>
-
-                {routeStops.map((c, index) => (
-                  <View key={c.shipmentId} style={styles.collectionCard}>
-                    <View style={styles.collectionTop}>
-                      <View style={styles.collectionIndex}><Text style={styles.collectionIndexText}>{index + 1}</Text></View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.collectionName}>{c.customerName || 'Collection'}</Text>
-                        <Text style={styles.collectionAddr}>
-                          {[c.address, c.city, c.postcode].filter(Boolean).join(', ') || 'Address not recorded'}
-                        </Text>
-                        <Text style={styles.collectionMeta}>
-                          {c.customerReference || c.trackingNumber || ''}
-                          {c.distanceKm != null ? ` · ${c.distanceKm < 1 ? `${Math.round(c.distanceKm * 1000)} m` : `${c.distanceKm.toFixed(1)} km`} away` : ''}
-                        </Text>
-                      </View>
-                    </View>
-                    {Boolean(c.goodsDescription) && (
-                      <Text style={styles.collectionGoods} numberOfLines={2}>{c.goodsDescription}</Text>
-                    )}
-                    <View style={styles.collectionActions}>
-                      <Pressable style={styles.collectionAction} onPress={() => openMapsFor(c)}>
-                        <Ionicons name="navigate-outline" size={15} color={colors.primaryDark} />
-                        <Text style={styles.collectionActionText}>Navigate</Text>
-                      </Pressable>
-                      {c.phone ? (
-                        <Pressable style={styles.collectionAction} onPress={() => Linking.openURL(`tel:${String(c.phone).replace(/\s/g, '')}`)}>
-                          <Ionicons name="call-outline" size={15} color={colors.primaryDark} />
-                          <Text style={styles.collectionActionText}>Call</Text>
-                        </Pressable>
-                      ) : null}
-                    </View>
-                  </View>
-                ))}
-              </>
-            )}
-          </View>
-        ) : null}
-
-        {!run ? (
-          <View style={styles.emptyCard}>
-            <Ionicons name="bus-outline" size={46} color={colors.primary} />
-            <Text style={styles.emptyTitle}>No assigned run</Text>
-            <Text style={styles.emptyText}>
-              {onDuty
-                ? 'Nothing has been assigned to you individually. Work today’s collection route above — the nearest stop is listed first.'
-                : 'Clock in to see today’s collection route.'}
-            </Text>
+            <DriverCollectionsPanel compact />
           </View>
         ) : (
+          <View style={styles.emptyCard}>
+            <Ionicons name="time-outline" size={44} color={colors.primary} />
+            <Text style={styles.emptyTitle}>Clock in to start</Text>
+            <Text style={styles.emptyText}>Once you are on duty, today's collection route and its map appear here.</Text>
+          </View>
+        )}
+
+        {!run ? null : (
           <>
             {/* Map first: the driver's day is a set of places, so the route is
                 the anchor of the screen and the lists sit beneath it. */}
@@ -975,21 +825,6 @@ const styles = StyleSheet.create({
   mapFallbackTitle: { color: colors.text, fontWeight: '700', fontSize: 13 },
   mapNotice: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 9, paddingHorizontal: spacing.md, marginTop: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.primarySoft },
   mapNoticeText: { flex: 1, fontSize: 11.5, fontWeight: '700', color: colors.primaryDark },
-  routeHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
-  routeSummary: { paddingVertical: spacing.sm },
-  routeSummaryText: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
-  routeNote: { fontSize: 11.5, color: colors.amber, marginTop: 3, lineHeight: 16 },
-  collectionCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm },
-  collectionTop: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
-  collectionIndex: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  collectionIndexText: { color: colors.white, fontWeight: '800', fontSize: 12 },
-  collectionName: { fontSize: 14.5, fontWeight: '800', color: colors.text },
-  collectionAddr: { fontSize: 12.5, color: colors.textMuted, marginTop: 2, lineHeight: 17 },
-  collectionMeta: { fontSize: 11, color: colors.textFaint, marginTop: 3 },
-  collectionGoods: { fontSize: 12, color: colors.textMuted, marginTop: spacing.sm, lineHeight: 17 },
-  collectionActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  collectionAction: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.primarySoft, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 8 },
-  collectionActionText: { fontSize: 11.5, fontWeight: '800', color: colors.primaryDark },
   mapFallbackText: { color: colors.textMuted, fontSize: 12, lineHeight: 17, marginTop: 2 },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: spacing.sm },
   stopCard: { backgroundColor: colors.surface, borderWidth: 1, borderLeftWidth: 4, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm },

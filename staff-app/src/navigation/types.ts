@@ -29,13 +29,14 @@ export type DriverRunStackParams = {
   StopWorkflow: { stop: DriverStopParam };
 };
 
+// Driver "My Account" tab. Account is the root; Documents and the old More
+// landing screen were removed.
 export type DriverMoreStackParams = {
-  More: undefined;
-  Vehicle: undefined;
-  Settings: undefined;
   Account: undefined;
-  Documents: undefined;
+  Profile: undefined;
+  Vehicle: undefined;
   Performance: undefined;
+  Settings: undefined;
 };
 
 // Admin Runs tab: dispatch board + run details.

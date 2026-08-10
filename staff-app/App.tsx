@@ -106,9 +106,11 @@ function DriverApp() {
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
       <Tab.Screen name="Home" component={DriverStack} options={{ tabBarIcon: icon('home-outline') }} />
-      <Tab.Screen name="My Run" component={DriverRunStack} options={{ tabBarIcon: icon('map-outline') }} />
+      {/* One collection route runs per day, so this is "Collections" — the day's
+          addresses and their map pins — not a per-driver assigned run. */}
+      <Tab.Screen name="Collections" component={DriverRunStack} options={{ tabBarIcon: icon('map-outline') }} />
       <Tab.Screen name="Messages" component={DriverMessagesScreen} options={{ tabBarIcon: icon('chatbubble-ellipses-outline') }} />
-      <Tab.Screen name="More" component={DriverMoreStack} options={{ tabBarIcon: icon('menu-outline') }} />
+      <Tab.Screen name="My Account" component={DriverMoreStack} options={{ title: 'My Account', tabBarIcon: icon('person-outline') }} />
     </Tab.Navigator>
   );
 }
