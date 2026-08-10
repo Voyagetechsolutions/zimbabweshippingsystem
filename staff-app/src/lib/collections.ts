@@ -93,12 +93,115 @@ export async function bulkLookupPostcodes(
   return found;
 }
 
+/** Strip the ordinal suffix live data uses ("August 5th, 2026") so it parses. */
+function parseScheduleDate(text: string | null | undefined): Date | null {
+  if (!text) return null;
+  const cleaned = String(text).replace(/(\d+)(st|nd|rd|th)/gi, '$1');
+  const parsed = new Date(cleaned);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+const sameDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+/** Route names are stored with and without the " ROUTE" suffix. */
+const routeKey = (name: string | null | undefined) =>
+  String(name || '').toUpperCase().replace(/\s+ROUTE$/, '').trim();
+
+/**
+ * Build the day from plain table reads.
+ *
+ * Used when `driver_route_collections` is not deployed. It needs no new
+ * database objects, so the feature works against the existing schema — the RPC
+ * is preferred when present because it applies the same rules server-side and
+ * returns less data over the wire.
+ */
+async function loadRouteDayDirect(date?: string): Promise<RouteDay> {
+  const target = date ? new Date(date) : new Date();
+
+  // `approved` only exists once the schedule migration is applied.
+  let scheduleRows: any[] = [];
+  const withApproved = await supabase
+    .from('collection_schedules')
+    .select('id, route, country, pickup_date, approved')
+    .limit(300);
+  if (withApproved.error) {
+    const fallback = await supabase
+      .from('collection_schedules')
+      .select('id, route, country, pickup_date')
+      .limit(300);
+    if (fallback.error) throw fallback.error;
+    scheduleRows = fallback.data || [];
+  } else {
+    scheduleRows = withApproved.data || [];
+  }
+
+  const routes: ActiveRoute[] = scheduleRows
+    .filter((r) => r.approved !== false)
+    .filter((r) => {
+      const parsed = parseScheduleDate(r.pickup_date);
+      return parsed != null && sameDay(parsed, target);
+    })
+    .map((r) => ({ scheduleId: r.id, route: r.route, country: r.country, pickupDate: r.pickup_date }));
+
+  if (routes.length === 0) return { date: target.toISOString().slice(0, 10), routes: [], collections: [] };
+
+  const scheduleIds = new Set(routes.map((r) => r.scheduleId));
+  const routeKeys = new Set(routes.map((r) => routeKey(r.route)));
+
+  const { data: shipmentRows, error } = await supabase
+    .from('shipments')
+    .select('id, tracking_number, customer_reference, metadata, collection_status, collection_schedule_id, goods_description')
+    .is('deleted_at', null)
+    .limit(1000);
+  if (error) throw error;
+
+  const collections: RouteCollection[] = (shipmentRows || [])
+    .filter((s: any) => (s.collection_status || 'Awaiting Collection') !== 'Collected')
+    .filter((s: any) =>
+      (s.collection_schedule_id && scheduleIds.has(s.collection_schedule_id)) ||
+      routeKeys.has(routeKey(s.metadata?.collection?.route)))
+    .map((s: any) => {
+      const sender = s.metadata?.sender || s.metadata?.senderDetails || {};
+      return {
+        shipmentId: s.id,
+        trackingNumber: s.tracking_number,
+        customerReference: s.customer_reference,
+        customerName: [sender.firstName, sender.lastName].filter(Boolean).join(' ').trim() || sender.name || '',
+        phone: sender.phone || null,
+        address: sender.address || null,
+        city: sender.city || '',
+        // Website bookings use `postcode`; the customer app writes `postalCode`.
+        postcode: sender.postcode || sender.postalCode || '',
+        route: s.metadata?.collection?.route || null,
+        goodsDescription: (s.goods_description || '').slice(0, 400) || null,
+        collectionStatus: s.collection_status,
+        latitude: null,
+        longitude: null,
+        stopId: null,
+      };
+    })
+    .sort((a, b) => a.customerName.localeCompare(b.customerName));
+
+  return { date: target.toISOString().slice(0, 10), routes, collections };
+}
+
 /** Load today's route, filling in and caching any missing coordinates. */
 export async function loadRouteDay(date?: string): Promise<RouteDay> {
   const { data, error } = await supabase.rpc('driver_route_collections', { p_date: date ?? null });
-  if (error) throw error;
 
-  const day = data as RouteDay;
+  // PGRST202 = the routine is not deployed yet. Fall back to table reads rather
+  // than telling a driver there is nothing to collect.
+  let day: RouteDay;
+  if (error) {
+    const missing = (error as any)?.code === 'PGRST202'
+      || /could not find the function/i.test(error.message || '');
+    if (!missing) throw error;
+    day = await loadRouteDayDirect(date);
+  } else {
+    day = data as RouteDay;
+  }
+
   const collections = (day?.collections || []).map((c) => ({ ...c }));
 
   const missing = collections.filter((c) => c.latitude == null || c.longitude == null);
