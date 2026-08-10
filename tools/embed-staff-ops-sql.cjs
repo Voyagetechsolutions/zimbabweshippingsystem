@@ -17,6 +17,7 @@ const sqlPaths = [
   path.join(root, 'supabase/migrations/20260722_fix_schedule_typos.sql'),
   path.join(root, 'supabase/migrations/20260808_booking_accounts_self_collection.sql'),
   path.join(root, 'supabase/migrations/20260809_schedule_generate_approve.sql'),
+  path.join(root, 'supabase/migrations/20260810_driver_route_collections.sql'),
 ];
 
 const src = fs.readFileSync(fnPath, 'utf8');
