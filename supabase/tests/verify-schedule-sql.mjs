@@ -85,14 +85,16 @@ for (const text of ['14 September 2026', '01 May 2026', '3 March 2026']) {
 // ── 3. Generation ───────────────────────────────────────────────────────────
 await db.exec(`
   insert into public.collection_schedules (route, areas, country, pickup_date) values
-    ('LONDON ROUTE',      '{"Central London","Croydon"}', 'England', '14 September 2026'),
-    ('BIRMINGHAM ROUTE',  '{"Birmingham"}',               'England', '01 May 2026'),
+    ('LONDON ROUTE',      '{"Central London","Croydon"}', 'England', 'August 1st, 2026'),
+    ('BIRMINGHAM ROUTE',  '{"Birmingham"}',               'England', 'August 5th, 2026'),
+    ('NORTHAMPTON ROUTE', '{"Luton"}',                    'England', 'July 31st, 2026'),
+    ('CORK',              '{"Cork"}',                     'Ireland', 'August 31st, 2026'),
     ('BROKEN ROUTE',      '{"Nowhere"}',                  'England', 'To be confirmed');
 `);
 
 const gen = await q(`select public.generate_collection_schedules(28, null) as r`);
 console.log('\n   generate ->', JSON.stringify(gen[0].r));
-check('proposed one date per route', gen[0].r.created, 3);
+check('proposed one date per route', gen[0].r.created, 5);
 check('nothing skipped on first run', gen[0].r.skipped, 0);
 
 const drafts = await q(`select route, pickup_date from public.collection_schedules
@@ -101,18 +103,22 @@ console.log('   drafts:', drafts.map(d => `${d.route} = "${d.pickup_date}"`).joi
 check('no double spaces in any generated date',
   drafts.every(d => !/\s{2}/.test(d.pickup_date)), true);
 check('a past anchor rolls forward past today',
-  drafts.every(d => new Date(d.pickup_date) >= new Date(new Date().toDateString())), true);
+  drafts.every(d => new Date(d.pickup_date.replace(/(\d+)(st|nd|rd|th)/i,'$1')) >= new Date(new Date().toDateString())), true);
 check('unparseable date still produced a draft',
   drafts.some(d => d.route === 'BROKEN ROUTE'), true);
+check('ordinal anchors did NOT all collapse to one date',
+  new Set(drafts.filter(d=>d.route!=='BROKEN ROUTE').map(d=>d.pickup_date)).size > 1, true);
+check('output keeps the live ordinal format',
+  drafts.every(d => /^[A-Z][a-z]+ \d+(st|nd|rd|th), \d{4}$/.test(d.pickup_date)), true);
 
 // ── 4. Re-running must not duplicate ────────────────────────────────────────
 const gen2 = await q(`select public.generate_collection_schedules(28, null) as r`);
 check('re-run creates nothing', gen2[0].r.created, 0);
-check('re-run skips every route', gen2[0].r.skipped, 3);
+check('re-run skips every route', gen2[0].r.skipped, 5);
 
 // ── 5. Drafts are invisible until approved ──────────────────────────────────
 const publicView = await q(`select count(*)::int as n from public.collection_schedules where approved = true`);
-check('published rows unchanged while drafts pend', publicView[0].n, 3);
+check('published rows unchanged while drafts pend', publicView[0].n, 5);
 
 // ── 6. Approval supersedes the old row ──────────────────────────────────────
 const londonDraft = await q(`select id from public.collection_schedules
@@ -129,11 +135,11 @@ check('old superseded date is gone', london[0].pickup_date !== '14 September 202
 
 // ── 7. Discard ──────────────────────────────────────────────────────────────
 const disc = await q(`select public.discard_collection_schedule_drafts(null) as r`);
-check('discarded the remaining drafts', disc[0].r.discarded, 2);
+check('discarded the remaining drafts', disc[0].r.discarded, 4);
 const left = await q(`select count(*)::int as n from public.collection_schedules where approved = false`);
 check('no drafts remain', left[0].n, 0);
 const survivors = await q(`select count(*)::int as n from public.collection_schedules`);
-check('published schedules survived the discard', survivors[0].n, 3);
+check('published schedules survived the discard', survivors[0].n, 5);
 
 console.log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : failures + ' CHECK(S) FAILED'}`);
 process.exit(failures ? 1 : 0);

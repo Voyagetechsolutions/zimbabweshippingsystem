@@ -76,10 +76,15 @@ begin
       continue;
     end if;
 
-    -- pickup_date is free text ("14 September 2026", "Not set", …), so parse
-    -- defensively and fall back to today when it cannot be read.
+    -- pickup_date is free text. Live data is written in ordinal form
+    -- ("August 5th, 2026"), which Postgres cannot cast — the "th" makes it
+    -- invalid input. Strip the ordinal suffix first, otherwise every route
+    -- falls through to the fallback and they all generate the same date.
     begin
-      v_base := coalesce(p_from_date, v_route.pickup_date::date);
+      v_base := coalesce(
+        p_from_date,
+        regexp_replace(v_route.pickup_date, '(\d+)(st|nd|rd|th)', '\1', 'gi')::date
+      );
     exception when others then
       v_base := coalesce(p_from_date, current_date);
     end;
@@ -94,11 +99,11 @@ begin
       (route, areas, country, pickup_date, approved, generated_at, generated_from_id)
     values
       (v_route.route, v_route.areas, v_route.country,
-       to_char(v_next, 'DD FMMonth YYYY'), false, now(), v_route.id);
+       to_char(v_next, 'FMMonth FMDDth, YYYY'), false, now(), v_route.id);
 
     v_created := v_created + 1;
     v_drafts := v_drafts || jsonb_build_array(jsonb_build_object(
-      'route', v_route.route, 'pickupDate', to_char(v_next, 'DD FMMonth YYYY')));
+      'route', v_route.route, 'pickupDate', to_char(v_next, 'FMMonth FMDDth, YYYY')));
   end loop;
 
   insert into public.audit_logs (user_id, action, entity_type, entity_id, details)
