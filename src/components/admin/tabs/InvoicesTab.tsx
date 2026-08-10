@@ -29,6 +29,7 @@ import BillingInvoiceGenerator, {
   InvoiceData, InvoiceLineItem, PaymentEntry, InvoiceStatus, PAYMENT_METHOD_LABELS,
   getInvoiceData, calculateTotals, getPaymentSummary, getInvoiceStatus, BillingInvoiceTemplate,
 } from '@/components/admin/BillingInvoiceGenerator';
+import { hasStoredInvoice } from '@/utils/invoiceTotals';
 
 const CURRENCY_SYMBOL: Record<string, string> = { EUR: '€', GBP: '£', USD: '$' };
 
@@ -130,17 +131,27 @@ const InvoicesTab = () => {
       getSenderName(s).toLowerCase().includes(q) ||
       getRecipientName(s).toLowerCase().includes(q) ||
       buildRefNumber(s).toLowerCase().includes(q);
-    const matchStatus = statusFilter === 'all' || getInvoiceStatus(inv) === statusFilter;
+    const raised = hasStoredInvoice(s);
+    const matchStatus =
+      statusFilter === 'all' ? true
+      : statusFilter === 'not_raised' ? !raised
+      : statusFilter === 'raised' ? raised
+      // A shipment with no invoice must not answer to a real invoice status.
+      : raised && getInvoiceStatus(inv) === statusFilter;
     return matchSearch && matchStatus;
   });
 
   // ── Top-of-page summary (Invoice2go-style) ──────────────────────────────────
-  // Computed across all invoices, grouped by the currency used most, so the
-  // figures are meaningful even with mixed currencies.
+  // Counts ONLY invoices that have actually been raised. getInvoiceData
+  // synthesises a draft for any shipment without one, so totalling every
+  // shipment reported money that was never billed — and called unissued drafts
+  // "overdue" once the booking date passed.
   const summary = (() => {
-    let outstanding = 0, overdue = 0, paid = 0;
+    let outstanding = 0, overdue = 0, paid = 0, raised = 0;
     const currencyCount: Record<string, number> = {};
     for (const s of shipments) {
+      if (!hasStoredInvoice(s)) continue;
+      raised++;
       const inv = getInvoiceData(s);
       const { paidAmount, balance } = getPaymentSummary(inv);
       const status = getInvoiceStatus(inv);
@@ -150,7 +161,7 @@ const InvoicesTab = () => {
       if (status === 'overdue') overdue += balance;
     }
     const currency = Object.entries(currencyCount).sort((a, b) => b[1] - a[1])[0]?.[0] || 'EUR';
-    return { outstanding, overdue, paid, currency };
+    return { outstanding, overdue, paid, currency, raised, notRaised: shipments.length - raised };
   })();
 
   // ── Selection (for bulk actions) ────────────────────────────────────────────
@@ -270,6 +281,16 @@ const InvoicesTab = () => {
   // `silent` suppresses per-invoice toasts (the bulk caller shows a summary).
   const emailInvoice = async (shipment: Shipment, silent = false): Promise<boolean> => {
     const invoice = getInvoiceData(shipment);
+    // Same guard as publishing: never email a figure that was only synthesised
+    // from the booking. Bulk send silently skips these rather than billing them.
+    if (!hasStoredInvoice(shipment)) {
+      if (!silent) toast({
+        title: 'No invoice raised yet',
+        description: 'Review and save the invoice for this booking before emailing it.',
+        variant: 'destructive',
+      });
+      return false;
+    }
     const email = getSenderEmail(shipment);
     if (!email) {
       if (!silent) toast({ title: 'No customer email', description: 'This shipment has no sender email on file.', variant: 'destructive' });
@@ -334,6 +355,17 @@ const InvoicesTab = () => {
   // a shipment with user_id = null has no one to show it to.
   const publishInvoiceToCustomer = async (shipment: Shipment) => {
     const invoice = getInvoiceData(shipment);
+
+    // Without a raised invoice this would publish a figure synthesised from the
+    // booking — the customer would receive a bill nobody agreed.
+    if (!hasStoredInvoice(shipment)) {
+      toast({
+        title: 'No invoice raised yet',
+        description: 'Open this booking, review the lines and save the invoice first. Only then can it be published to the customer.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     if (!shipment.user_id) {
       toast({
@@ -532,6 +564,10 @@ const InvoicesTab = () => {
 
   const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
     { value: 'all', label: 'All Invoices' },
+    // Bookings with no invoice raised yet. They are listed so an admin can
+    // raise one, but they are not counted as invoices anywhere.
+    { value: 'not_raised', label: 'Not raised yet' },
+    { value: 'raised', label: 'Raised' },
     { value: 'draft', label: 'Draft' },
     { value: 'sent', label: 'Sent' },
     { value: 'partial', label: 'Partial' },
@@ -608,7 +644,13 @@ const InvoicesTab = () => {
       </div>
 
       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-        <span><strong className="text-foreground">{filtered.length}</strong> invoice{filtered.length !== 1 ? 's' : ''}</span>
+        <span><strong className="text-foreground">{summary.raised}</strong> invoice{summary.raised !== 1 ? 's' : ''} raised</span>
+        {summary.notRaised > 0 && (
+          <span className="text-amber-700 dark:text-amber-500">
+            {summary.notRaised} booking{summary.notRaised !== 1 ? 's' : ''} with no invoice yet
+          </span>
+        )}
+        <span>· {filtered.length} shown</span>
         {selected.size > 0 && (
           <>
             <span className="text-emerald-700 font-medium">{selected.size} selected</span>
@@ -665,6 +707,7 @@ const InvoicesTab = () => {
                     const inv = getInvoiceData(shipment);
                     const { total, paidAmount, balance } = getPaymentSummary(inv);
                     const status = getInvoiceStatus(inv);
+                    const raised = hasStoredInvoice(shipment);
                     const rowBusy = busyId === shipment.id;
                     const isChecked = selected.has(shipment.id);
                     return (
@@ -685,12 +728,24 @@ const InvoicesTab = () => {
                           <div className="text-sm font-medium">{getSenderName(shipment)}</div>
                           <div className="text-xs text-muted-foreground">{shipment.origin}</div>
                         </TableCell>
-                        <TableCell className="text-right font-medium whitespace-nowrap">{fmtMoney(total, inv.currency)}</TableCell>
-                        <TableCell className="text-right text-emerald-700 whitespace-nowrap">{paidAmount > 0 ? fmtMoney(paidAmount, inv.currency) : '—'}</TableCell>
-                        <TableCell className={`text-right font-medium whitespace-nowrap ${balance > 0.005 ? 'text-red-700' : 'text-muted-foreground'}`}>
-                          {fmtMoney(balance, inv.currency)}
+                        {/* An unraised booking shows a proposed figure, not a
+                            billed one, so it must not be presented as money owed. */}
+                        <TableCell className="text-right font-medium whitespace-nowrap">
+                          {raised ? fmtMoney(total, inv.currency) : (
+                            <span className="text-muted-foreground font-normal" title="Proposed from the booking — not yet billed">
+                              ({fmtMoney(total, inv.currency)})
+                            </span>
+                          )}
                         </TableCell>
-                        <TableCell><StatusPill status={status} /></TableCell>
+                        <TableCell className="text-right text-emerald-700 whitespace-nowrap">{raised && paidAmount > 0 ? fmtMoney(paidAmount, inv.currency) : '—'}</TableCell>
+                        <TableCell className={`text-right font-medium whitespace-nowrap ${raised && balance > 0.005 ? 'text-red-700' : 'text-muted-foreground'}`}>
+                          {raised ? fmtMoney(balance, inv.currency) : '—'}
+                        </TableCell>
+                        <TableCell>
+                          {raised
+                            ? <StatusPill status={status} />
+                            : <Badge variant="outline" className="text-muted-foreground">Not raised</Badge>}
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
                             {status !== 'paid' && (

@@ -32,6 +32,26 @@ export interface InvoiceLike {
 
 export type InvoiceStatusValue = 'draft' | 'sent' | 'partial' | 'paid' | 'overdue';
 
+/**
+ * Whether an invoice has actually been raised against this shipment.
+ *
+ * `getInvoiceData` deliberately synthesises a draft from the booking whenever
+ * `metadata.invoice` is absent, so that the editor always has something to open.
+ * That is useful for editing and wrong for counting: treating every shipment as
+ * an invoice made the admin totals report money that was never billed, and an
+ * unissued draft cannot be "overdue".
+ *
+ * Anything that totals, chases or sends invoices must gate on this.
+ */
+export function hasStoredInvoice(shipment: { metadata?: unknown } | null | undefined): boolean {
+  const invoice = (shipment?.metadata as Record<string, unknown> | undefined)?.invoice as
+    | { items?: unknown[] }
+    | undefined;
+  if (!invoice) return false;
+  // A stored invoice with no line items has nothing to bill for.
+  return Array.isArray(invoice.items) && invoice.items.length > 0;
+}
+
 export function calculateInvoiceTotals(invoice: InvoiceLike) {
   const subtotal = (invoice.items || []).reduce(
     (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),

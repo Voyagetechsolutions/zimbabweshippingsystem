@@ -4,6 +4,7 @@ import {
   getInvoicePaymentSummary,
   isInvoiceSettled,
   getInvoiceStatusValue,
+  hasStoredInvoice,
 } from '@/utils/invoiceTotals';
 
 const items = [
@@ -72,6 +73,32 @@ describe('isInvoiceSettled', () => {
 
   it('is not settled when there is nothing to pay', () => {
     expect(isInvoiceSettled({ items: [], payments: [] })).toBe(false);
+  });
+});
+
+describe('hasStoredInvoice', () => {
+  // Regression: getInvoiceData synthesises a draft for any shipment without a
+  // stored invoice, so the admin tab counted all 192 bookings as invoices and
+  // reported ~£49k "outstanding" plus ~£44k "overdue" that had never been
+  // billed. Totals, chasing and sending must all gate on this.
+  it('is false when the shipment carries no invoice at all', () => {
+    expect(hasStoredInvoice({ metadata: {} })).toBe(false);
+    expect(hasStoredInvoice({ metadata: { pricing: { finalAmount: 560 } } })).toBe(false);
+  });
+
+  it('is false for a shipment with no metadata, null, or undefined', () => {
+    expect(hasStoredInvoice({})).toBe(false);
+    expect(hasStoredInvoice(null)).toBe(false);
+    expect(hasStoredInvoice(undefined)).toBe(false);
+  });
+
+  it('is false for a stored invoice with nothing to bill for', () => {
+    expect(hasStoredInvoice({ metadata: { invoice: {} } })).toBe(false);
+    expect(hasStoredInvoice({ metadata: { invoice: { items: [] } } })).toBe(false);
+  });
+
+  it('is true once the invoice has line items', () => {
+    expect(hasStoredInvoice({ metadata: { invoice: { items } } })).toBe(true);
   });
 });
 
