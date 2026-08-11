@@ -11,6 +11,7 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ViewRoleProvider, useViewRole } from './src/context/ViewRoleContext';
 import RoleSelectScreen from './src/screens/RoleSelectScreen';
 import LoginScreen from './src/screens/LoginScreen';
+import SetPasswordScreen from './src/screens/SetPasswordScreen';
 import AdminDashboardScreen from './src/screens/AdminDashboardScreen';
 import QuickCreateScreen from './src/screens/QuickCreateScreen';
 import ShipmentsStack from './src/navigation/ShipmentsStack';
@@ -31,6 +32,7 @@ import DriverRunsScreen from './src/screens/admin/DriverRunsScreen';
 import FinanceBooksScreen from './src/screens/FinanceBooksScreen';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { colors, spacing } from './src/theme';
+import MapPreviewScreen from './src/screens/MapPreviewScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -139,7 +141,14 @@ function Root() {
     return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
   }
   if (!session) return <LoginScreen />;
+  // Staff created by an admin start on a temporary password that was read out to
+  // them. This stands in front of everything — including the role check — until
+  // they have replaced it.
+  if (session.user?.user_metadata?.must_change_password) return <SetPasswordScreen />;
   if (!dashboardRole) return <NotAuthorized />;
+  const showMapPreview = __DEV__ && typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).has('mapPreview');
+  if (showMapPreview) return <MapPreviewScreen />;
 
   // Admins choose which dashboard to work in; everyone else goes straight
   // to the dashboard their role allows.

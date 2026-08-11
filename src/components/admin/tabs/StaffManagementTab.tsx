@@ -21,7 +21,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 
 import {
-  Users, UserPlus, RefreshCcw, Loader2, Truck, Calculator, ShieldCheck,
+  Users, UserPlus, RefreshCcw, Loader2, Truck, Calculator, ShieldCheck, Copy, Check,
   KeyRound, Plane, Ban, RotateCcw, AlertCircle,
 } from 'lucide-react';
 
@@ -32,11 +32,15 @@ import {
  * from a desktop. Both surfaces call the same server-side routines:
  *   - admin_staff_records()          read the directory (admin-gated)
  *   - admin_update_staff(id, patch)  change role / vehicle / leave / active
- *   - staff-ops { invite_staff }     create the account via a Supabase Auth
- *                                    email invite
+ *   - staff-ops { invite_staff }     create the account with a temporary password
  *
- * No password is ever entered or stored here: the invited person sets their own
- * from the email link.
+ * The temporary password is generated server-side and returned exactly once, for
+ * the admin to pass on. It is never stored in readable form and never written to
+ * the audit log. The account carries `must_change_password`, so the app forces a
+ * replacement before the new starter can do anything.
+ *
+ * Email invites were replaced because they depend on SMTP deliverability — a
+ * driver who never receives the mail cannot work.
  */
 
 interface StaffRecord {
@@ -96,6 +100,10 @@ const StaffManagementTab: React.FC = () => {
   const [newEmail, setNewEmail] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newRole, setNewRole] = useState<Role>('driver');
+
+  // Credentials for a just-created account, shown once.
+  const [created, setCreated] = useState<{ name: string; email: string; role: string; tempPassword: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // Detail dialog
   const [detail, setDetail] = useState<StaffRecord | null>(null);
@@ -193,10 +201,14 @@ const StaffManagementTab: React.FC = () => {
       if (fnError) throw fnError;
       if ((data as any)?.error) throw new Error((data as any).error);
 
-      toast({
-        title: 'Invitation sent',
-        description: `${newEmail.trim()} has been invited as ${newRole}. They set their own password from the email.`,
-      });
+      const tempPassword = (data as any)?.tempPassword as string | undefined;
+      if (tempPassword) {
+        // Shown once and never again — it is not stored in readable form.
+        setCreated({ name: newName.trim(), email: newEmail.trim(), role: newRole, tempPassword });
+      } else {
+        toast({ title: 'Staff member created', description: `${newEmail.trim()} can now sign in.` });
+      }
+
       setInviteOpen(false);
       setNewName('');
       setNewEmail('');
@@ -399,7 +411,7 @@ const StaffManagementTab: React.FC = () => {
           <DialogHeader>
             <DialogTitle>Add a staff member</DialogTitle>
             <DialogDescription>
-              They receive an email invitation and choose their own password. No password is stored here.
+              They get a temporary password to sign in with, and must choose a new one straight away.
             </DialogDescription>
           </DialogHeader>
 
@@ -438,7 +450,67 @@ const StaffManagementTab: React.FC = () => {
             <Button variant="outline" onClick={() => setInviteOpen(false)} disabled={busy}>Cancel</Button>
             <Button className="bg-zim-green hover:bg-zim-green/90" onClick={invite} disabled={busy}>
               {busy ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <UserPlus className="h-4 w-4 mr-1.5" />}
-              Send invitation
+              Create account
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* One-time credentials. This password exists nowhere else — once this
+          dialog closes it cannot be retrieved, only reset. */}
+      <Dialog open={Boolean(created)} onOpenChange={(open) => { if (!open) { setCreated(null); setCopied(false); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Account created — give them these details</DialogTitle>
+            <DialogDescription>
+              This is the only time the temporary password is shown. They must change it the first
+              time they sign in.
+            </DialogDescription>
+          </DialogHeader>
+
+          {created && (
+            <div className="space-y-3">
+              <div className="rounded-lg border p-3 dark:border-gray-700">
+                <p className="text-xs text-gray-500">Name</p>
+                <p className="font-medium">{created.name} <span className="text-xs text-gray-500 capitalize">· {created.role}</span></p>
+              </div>
+              <div className="rounded-lg border p-3 dark:border-gray-700">
+                <p className="text-xs text-gray-500">Email (their username)</p>
+                <p className="font-mono text-sm break-all">{created.email}</p>
+              </div>
+              <div className="rounded-lg border-2 border-zim-green p-3 bg-green-50 dark:bg-green-900/20">
+                <p className="text-xs text-gray-600 dark:text-gray-300">Temporary password</p>
+                <p className="font-mono text-lg font-semibold tracking-wide break-all">{created.tempPassword}</p>
+              </div>
+
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(
+                      `Zimbabwe Shipping staff login\nEmail: ${created.email}\nTemporary password: ${created.tempPassword}\n\nYou will be asked to choose a new password when you first sign in.`,
+                    );
+                    setCopied(true);
+                  } catch {
+                    toast({ title: 'Could not copy', description: 'Copy the password manually.', variant: 'destructive' });
+                  }
+                }}
+              >
+                {copied ? <Check className="h-4 w-4 mr-1.5" /> : <Copy className="h-4 w-4 mr-1.5" />}
+                {copied ? 'Copied' : 'Copy login details'}
+              </Button>
+
+              <p className="text-xs text-amber-700 dark:text-amber-500">
+                Send this over a channel you trust, and not by email if you can avoid it. If it gets
+                lost, use <strong>Reset access</strong> on their record rather than creating another account.
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button className="bg-zim-green hover:bg-zim-green/90" onClick={() => { setCreated(null); setCopied(false); }}>
+              I've saved these details
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -12,9 +12,14 @@ import { useViewRole } from '../context/ViewRoleContext';
 import { todayLabel } from '../lib/format';
 import { customerRef, deliveryAddress, pickupAddress, receiverName, receiverPhone, senderName, senderPhone, type Shipment } from '../lib/shipment';
 import { colors, radius, shadow, spacing } from '../theme';
-import { loadRouteDay, sortByProximity, type RouteDay } from '../lib/collections';
+import { claimRouteCollection, loadRouteDay, releaseRouteCollection, sortByProximity, type RouteCollection, type RouteDay } from '../lib/collections';
 import { getDriverLocation, describeLocationStatus, type Point } from '../lib/driverLocation';
-import type { DriverMoreStackParams, DriverRunStackParams, DriverStopKind } from '../navigation/types';
+import type { DriverRunStackParams, DriverStopKind } from '../navigation/types';
+import { COMPANY, COMPANY_WHATSAPP_URL } from '../config/company';
+
+// React Native bundles local images as numeric module references.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const deliveryVanImage = require('../../assets/driver/delivery-van.png');
 
 type RunProps = NativeStackScreenProps<DriverRunStackParams, 'MyRun'>;
 type StopStatus = 'planned' | 'en_route' | 'arrived' | 'completed' | 'failed';
@@ -34,11 +39,14 @@ function todayIso() {
  * "left to collect" count.
  */
 export function DriverCollectionsPanel({ compact = false }: { compact?: boolean }) {
+  const { session } = useAuth();
+  const navigation = useNavigation<any>();
   const [day, setDay] = useState<RouteDay | null>(null);
   const [point, setPoint] = useState<Point | null>(null);
   const [note, setNote] = useState('');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -47,6 +55,15 @@ export function DriverCollectionsPanel({ compact = false }: { compact?: boolean 
       setDay(routeDay);
       setPoint(location.point);
       setNote(describeLocationStatus(location.status));
+      if (location.point) {
+        // Store one replaceable point (not a location history) so dispatch can
+        // see where the driver last opened the collections map.
+        void supabase.rpc('update_driver_live_location', {
+          p_latitude: location.point.latitude,
+          p_longitude: location.point.longitude,
+          p_accuracy_m: location.point.accuracyM ?? null,
+        });
+      }
     } catch (e: any) {
       // A failed load must never read as "no route today" — a driver would sit
       // still believing there was nothing to collect.
@@ -58,6 +75,23 @@ export function DriverCollectionsPanel({ compact = false }: { compact?: boolean 
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+  // This panel renders on both the Home screen and the Collections tab, so two
+  // instances can be mounted at once. A channel name keyed only on the user id
+  // is therefore not unique: supabase.channel() hands back the *existing*
+  // channel, and postgres_changes handlers cannot be added to one that has
+  // already subscribed — which threw
+  // "cannot add postgres_changes callbacks ... after subscribe()".
+  // The suffix makes each mount its own channel, matching how the admin screens
+  // in this codebase already name theirs.
+  const channelIdRef = useRef(`${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  useEffect(() => {
+    const channel = supabase
+      .channel(`driver-route-${session?.user.id || 'anonymous'}-${channelIdRef.current}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'route_collection_claims' }, () => load())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shipments' }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [load, session?.user.id]);
 
   const stops = day ? sortByProximity(day.collections, point) : [];
   const collected = stops.filter((c) => c.collectionStatus === 'Collected').length;
@@ -72,6 +106,35 @@ export function DriverCollectionsPanel({ compact = false }: { compact?: boolean 
     Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`).catch(() => {
       Alert.alert('Could not open maps', 'Check that a maps application or browser is available.');
     });
+  };
+
+  const openCollection = async (collection: RouteCollection) => {
+    if (!session?.user.id) return;
+    if (collection.claimedBy && collection.claimedBy !== session.user.id
+      && ['claimed', 'en_route', 'arrived'].includes(collection.claimStatus)) {
+      Alert.alert('Already claimed', `${collection.claimedByName || 'Another driver'} is already working this collection.`);
+      return;
+    }
+    setClaimingId(collection.shipmentId);
+    try {
+      const result = collection.claimedBy === session.user.id && collection.stopId
+        ? { stopId: collection.stopId }
+        : await claimRouteCollection(collection.shipmentId);
+      navigation.navigate('StopDetails', { stop: {
+        id: result.stopId,
+        shipmentId: collection.shipmentId,
+        kind: 'collection',
+        customerName: collection.customerName || 'Collection',
+        trackingNumber: collection.trackingNumber || collection.customerReference || 'Collection',
+      } });
+      await load();
+    } catch (e: any) {
+      const setupMissing = e?.code === 'PGRST202' || /could not find the function/i.test(e?.message || '');
+      Alert.alert(setupMissing ? 'Collection setup required' : 'Could not claim collection',
+        setupMissing ? 'The new collection workflow has not been deployed to the database yet.' : (e?.message || 'Please refresh and try again.'));
+    } finally {
+      setClaimingId(null);
+    }
   };
 
   if (loading) return <View style={styles.panelLoading}><ActivityIndicator color={colors.primary} /></View>;
@@ -120,7 +183,17 @@ export function DriverCollectionsPanel({ compact = false }: { compact?: boolean 
       <RunMap
         height={compact ? 240 : 300}
         focusStopId={next?.shipmentId ?? null}
-        stops={mappable.map((c, i) => ({
+        stops={[
+          ...(point ? [{
+            id: 'current-driver-location',
+            latitude: point.latitude,
+            longitude: point.longitude,
+            title: 'You are here',
+            description: point.accuracyM ? `Current position · accurate to about ${Math.round(point.accuracyM)} m` : 'Current position',
+            kind: 'driver' as const,
+            order: 'D',
+          }] : []),
+          ...mappable.map((c, i) => ({
           id: c.shipmentId,
           latitude: Number(c.latitude),
           longitude: Number(c.longitude),
@@ -129,7 +202,8 @@ export function DriverCollectionsPanel({ compact = false }: { compact?: boolean 
           kind: 'collection' as const,
           order: i + 1,
           done: c.collectionStatus === 'Collected',
-        }))}
+          })),
+        ]}
         onStopPress={(s) => { const m = stops.find((c) => c.shipmentId === s.id); if (m) navigateTo(m); }}
       />
     ) : null}
@@ -137,6 +211,8 @@ export function DriverCollectionsPanel({ compact = false }: { compact?: boolean 
     <View style={styles.listCard}>
       {stops.map((c, i) => {
         const done = c.collectionStatus === 'Collected';
+        const mine = c.claimedBy === session?.user.id && ['claimed', 'en_route', 'arrived'].includes(c.claimStatus);
+        const taken = Boolean(c.claimedBy && c.claimedBy !== session?.user.id && ['claimed', 'en_route', 'arrived'].includes(c.claimStatus));
         return <View key={c.shipmentId} style={styles.stopRow}>
           <View style={[styles.order, { backgroundColor: done ? colors.primarySoft : '#F2F4F7' }]}>
             <Text style={[styles.orderText, done && { color: colors.primaryDark }]}>{i + 1}</Text>
@@ -149,6 +225,9 @@ export function DriverCollectionsPanel({ compact = false }: { compact?: boolean 
                 ? ` · ${c.distanceKm < 1 ? `${Math.round(c.distanceKm * 1000)} m` : `${c.distanceKm.toFixed(1)} km`}`
                 : ''}
             </Text>
+            <Text style={[styles.claimLabel, mine && styles.claimMine, taken && styles.claimTaken]}>
+              {mine ? `Your collection · ${c.claimStatus.replace('_', ' ')}` : taken ? `${c.claimedByName || 'Driver'} · ${c.claimStatus.replace('_', ' ')}` : 'Available'}
+            </Text>
           </View>
           <Pressable style={styles.rowAction} onPress={() => navigateTo(c)} hitSlop={8}>
             <Ionicons name="navigate-outline" size={18} color={colors.primary} />
@@ -158,6 +237,11 @@ export function DriverCollectionsPanel({ compact = false }: { compact?: boolean 
               <Ionicons name="call-outline" size={18} color={colors.primary} />
             </Pressable>
           ) : null}
+          {!done ? <Pressable style={[styles.claimButton, taken && styles.claimButtonDisabled]}
+            onPress={() => openCollection(c)} disabled={taken || claimingId === c.shipmentId}>
+            {claimingId === c.shipmentId ? <ActivityIndicator size="small" color={colors.white} />
+              : <Text style={styles.claimButtonText}>{mine ? 'Continue' : taken ? 'Claimed' : 'Claim'}</Text>}
+          </Pressable> : null}
         </View>;
       })}
     </View>
@@ -254,14 +338,30 @@ export function DriverRunSummaryScreen() {
 }
 
 export function DriverStopDetailsScreen({ route, navigation }: NativeStackScreenProps<DriverRunStackParams, 'StopDetails'>) {
-  const { stop } = route.params; const [row, setRow] = useState<any>(null); const [loading, setLoading] = useState(true);
-  useFocusEffect(useCallback(() => { (async () => { const result = await supabase.from('driver_run_stops').select('id,address,status,stop_type,shipment:shipments(*)').eq('id', stop.id).maybeSingle(); setRow(result.data); setLoading(false); })(); }, [stop.id]));
+  const { stop } = route.params; const [row, setRow] = useState<any>(null); const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false);
+  const loadStop = useCallback(async () => { const result = await supabase.from('driver_run_stops').select('id,address,status,stop_type,shipment:shipments(*)').eq('id', stop.id).maybeSingle(); setRow(result.data); setLoading(false); }, [stop.id]);
+  useFocusEffect(useCallback(() => { loadStop(); }, [loadStop]));
   if (loading) return <Loading />;
   const shipment = row?.shipment as Shipment | undefined; const phone = shipment ? (stop.kind === 'collection' ? senderPhone(shipment) : receiverPhone(shipment)) : ''; const address = row?.address || (shipment ? (stop.kind === 'collection' ? pickupAddress(shipment) : deliveryAddress(shipment)) : 'Address unavailable');
   const openMaps = () => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}&travelmode=driving`);
+  const advance = async () => {
+    if (row?.status === 'arrived') { navigation.navigate('StopWorkflow', { stop }); return; }
+    const nextStatus = row?.status === 'planned' ? 'en_route' : row?.status === 'en_route' ? 'arrived' : null;
+    if (!nextStatus) return;
+    setBusy(true);
+    const result = await supabase.rpc('transition_driver_stop', { p_stop_id: stop.id, p_next_status: nextStatus });
+    setBusy(false);
+    if (result.error) Alert.alert('Could not update collection', result.error.message); else await loadStop();
+  };
+  const release = () => Alert.alert('Release this collection?', 'It will return to the available route so another driver can claim it.', [
+    { text: 'Keep collection', style: 'cancel' },
+    { text: 'Release', style: 'destructive', onPress: async () => { setBusy(true); try { await releaseRouteCollection(stop.shipmentId, 'Released by driver'); navigation.popToTop(); } catch (e: any) { Alert.alert('Could not release collection', e?.message || 'Please try again.'); } finally { setBusy(false); } } },
+  ]);
+  const actionLabel = row?.status === 'planned' ? 'Start journey' : row?.status === 'en_route' ? 'Mark arrived' : row?.status === 'arrived' ? (stop.kind === 'collection' ? 'Complete collection' : 'Complete delivery') : 'Completed';
   return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content}><Header title="Stop Details" subtitle={`${stop.kind === 'collection' ? 'Collection' : 'Delivery'} · ${stop.trackingNumber}`} />
-    <View style={styles.detailCard}><View style={styles.detailTop}><View><Text style={styles.detailKind}>{stop.kind.toUpperCase()}</Text><Text style={styles.detailName}>{stop.customerName}</Text></View><View style={styles.contactRow}><Pressable style={styles.contactButton} onPress={() => phone && Linking.openURL(`tel:${phone}`)}><Ionicons name="call-outline" size={20} color={colors.primary} /></Pressable><Pressable style={styles.contactButton} onPress={() => phone && Linking.openURL(`https://wa.me/${phone.replace(/\D/g, '')}`)}><Ionicons name="logo-whatsapp" size={20} color={colors.primary} /></Pressable></View></View><View style={styles.detailDivider} /><Text style={styles.detailLabel}>ADDRESS</Text><Text style={styles.detailAddress}>{address}</Text><Pressable onPress={openMaps}><Text style={styles.mapLink}>View on map</Text></Pressable><View style={styles.detailDivider} /><Text style={styles.detailLabel}>REFERENCE</Text><Text style={styles.detailAddress}>{stop.trackingNumber}</Text></View>
-    <Pressable style={styles.primaryButton} onPress={() => navigation.navigate('StopWorkflow', { stop })}><Text style={styles.primaryText}>{stop.kind === 'collection' ? 'Complete collection' : 'Complete delivery'}</Text></Pressable>
+    <View style={styles.detailCard}><View style={styles.detailTop}><View><Text style={styles.detailKind}>{stop.kind.toUpperCase()} · {String(row?.status || 'planned').replace('_', ' ').toUpperCase()}</Text><Text style={styles.detailName}>{stop.customerName}</Text></View><View style={styles.contactRow}><Pressable style={styles.contactButton} onPress={() => phone && Linking.openURL(`tel:${phone}`)}><Ionicons name="call-outline" size={20} color={colors.primary} /></Pressable><Pressable style={styles.contactButton} onPress={() => phone && Linking.openURL(`https://wa.me/${phone.replace(/\D/g, '')}`)}><Ionicons name="logo-whatsapp" size={20} color={colors.primary} /></Pressable></View></View><View style={styles.detailDivider} /><Text style={styles.detailLabel}>ADDRESS</Text><Text style={styles.detailAddress}>{address}</Text><Pressable onPress={openMaps}><Text style={styles.mapLink}>View on map</Text></Pressable><View style={styles.detailDivider} /><Text style={styles.detailLabel}>REFERENCE</Text><Text style={styles.detailAddress}>{stop.trackingNumber}</Text></View>
+    <Pressable style={[styles.primaryButton, (busy || row?.status === 'completed') && { opacity: .55 }]} onPress={advance} disabled={busy || row?.status === 'completed'}>{busy ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryText}>{actionLabel}</Text>}</Pressable>
+    {['planned', 'en_route'].includes(row?.status) ? <Pressable style={styles.outlineButton} onPress={release} disabled={busy}><Ionicons name="return-down-back-outline" size={18} color={colors.textMuted} /><Text style={[styles.outlineText, { color: colors.textMuted }]}>Release collection</Text></Pressable> : null}
     <Pressable style={styles.outlineButton} onPress={() => navigation.navigate('ReportIssue', { stop })}><Ionicons name="warning-outline" size={18} color={colors.danger} /><Text style={[styles.outlineText, { color: colors.danger }]}>Report issue</Text></Pressable>
   </ScrollView></SafeAreaView>;
 }
@@ -292,9 +392,17 @@ function eventTitle(event: { new_status?: string | null; event_type?: string | n
 }
 
 export function DriverMessagesScreen() {
-  const { session } = useAuth(); const [events, setEvents] = useState<any[]>([]); const [loading, setLoading] = useState(true);
+  const { session } = useAuth(); const [events, setEvents] = useState<any[]>([]); const [loading, setLoading] = useState(true); const [draft, setDraft] = useState(''); const [sending, setSending] = useState(false); const [usingDispatch, setUsingDispatch] = useState(false);
   const load = useCallback(async () => {
     if (!session?.user.id) return;
+    const messages = await supabase.from('staff_messages').select('id,subject,body,priority,created_at,sender_id,recipient_id,shipment_id,read_at').order('created_at', { ascending: false }).limit(50);
+    if (!messages.error) {
+      setUsingDispatch(true);
+      setEvents((messages.data || []).map((message: any) => ({ ...message, _message: true })));
+      const unread = (messages.data || []).filter((message: any) => message.recipient_id === session.user.id && !message.read_at).map((message: any) => message.id);
+      if (unread.length) await supabase.from('staff_messages').update({ read_at: new Date().toISOString() }).in('id', unread);
+      return;
+    }
     const runs = await supabase.from('driver_runs').select('id').eq('driver_id', session.user.id).order('run_date', { ascending: false }).limit(5);
     const ids = (runs.data || []).map((row) => row.id); if (!ids.length) { setEvents([]); return; }
     const stops = await supabase.from('driver_run_stops').select('shipment_id').in('run_id', ids);
@@ -303,9 +411,23 @@ export function DriverMessagesScreen() {
     setEvents(result.data || []);
   }, [session?.user.id]);
   useFocusEffect(useCallback(() => { (async () => { await load(); setLoading(false); })(); }, [load]));
+  useEffect(() => {
+    if (!session?.user.id) return;
+    const channel = supabase.channel(`driver-messages-${session.user.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'staff_messages' }, () => load()).subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [load, session?.user.id]);
+  const send = async () => {
+    if (!draft.trim() || !session?.user.id) return;
+    setSending(true);
+    const result = await supabase.from('staff_messages').insert({ sender_id: session.user.id, recipient_id: null, audience_role: 'dispatch', subject: 'Driver message', body: draft.trim(), priority: 'normal' });
+    setSending(false);
+    if (result.error) Alert.alert('Could not send message', /staff_messages/i.test(result.error.message || '') ? 'Messaging is waiting for the database update to be deployed.' : result.error.message);
+    else { setDraft(''); await load(); }
+  };
   if (loading) return <Loading />;
   return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content}><Header title="Messages" subtitle="Dispatch and shipment updates" />
-    {!events.length ? <Empty icon="chatbubble-ellipses-outline" title="No updates yet" text="Dispatch and shipment activity for your assigned runs will appear here." /> : <View style={styles.listCard}>{events.map((event) => <View key={event.id} style={styles.messageRow}><View style={styles.messageIcon}><Ionicons name="notifications-outline" size={18} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={styles.stopName}>{eventTitle(event)}</Text><Text style={styles.stopSub}>{event.details?.message || 'Assigned shipment update'}</Text></View><Text style={styles.messageTime}>{new Date(event.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</Text></View>)}</View>}
+    {usingDispatch ? <View style={styles.messageComposer}><TextInput style={styles.messageInput} value={draft} onChangeText={setDraft} placeholder="Message dispatch…" placeholderTextColor={colors.textFaint} multiline maxLength={2000} /><Pressable style={[styles.sendButton, (!draft.trim() || sending) && { opacity: .5 }]} onPress={send} disabled={!draft.trim() || sending}>{sending ? <ActivityIndicator color={colors.white} /> : <Ionicons name="send" size={18} color={colors.white} />}</Pressable></View> : null}
+    {!events.length ? <Empty icon="chatbubble-ellipses-outline" title="No messages yet" text="Dispatch announcements and replies will appear here." /> : <View style={styles.listCard}>{events.map((event) => <View key={event.id} style={styles.messageRow}><View style={[styles.messageIcon, event.priority === 'urgent' && { backgroundColor: colors.redSoft }]}><Ionicons name={event._message ? 'chatbubble-ellipses-outline' : 'notifications-outline'} size={18} color={event.priority === 'urgent' ? colors.danger : colors.primary} /></View><View style={{ flex: 1 }}><Text style={styles.stopName}>{event._message ? (event.subject || (event.sender_id === session?.user.id ? 'You to dispatch' : 'Dispatch')) : eventTitle(event)}</Text><Text style={styles.stopSub}>{event._message ? event.body : (event.details?.message || 'Assigned shipment update')}</Text></View><Text style={styles.messageTime}>{new Date(event.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</Text></View>)}</View>}
   </ScrollView></SafeAreaView>;
 }
 
@@ -371,7 +493,7 @@ export function DriverVehicleScreen() {
   const { session } = useAuth(); const [run, setRun] = useState<Run | null>(null); const [loading, setLoading] = useState(true);
   useFocusEffect(useCallback(() => { (async () => { if (session?.user.id) { const result = await supabase.from('driver_runs').select('id,status,route_name,run_date,vehicle_label,run_type').eq('driver_id', session.user.id).order('run_date', { ascending: false }).limit(1).maybeSingle(); setRun(result.data as Run | null); } setLoading(false); })(); }, [session?.user.id]));
   if (loading) return <Loading />;
-  return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content}><Header title="Vehicle" subtitle="Current assignment" /><View style={styles.vehicleCard}><Image source={require('../../assets/driver/delivery-van.png')} style={styles.vehicleImage} resizeMode="cover" /><View style={styles.vehicleHeading}><View style={{ flex: 1 }}><Text style={styles.vehicleName}>{run?.vehicle_label || 'No vehicle assigned'}</Text><Text style={styles.vehicleMeta}>{run ? `${run.route_name || 'Route'} · ${run.run_date}` : 'Contact dispatch for an assignment'}</Text></View><View style={styles.statusPill}><Text style={styles.statusText}>{run?.status || 'unassigned'}</Text></View></View><View style={styles.vehicleFacts}><Period label="Assignment" value={run?.route_name || 'Not assigned'} /><Period label="Run type" value={run?.run_type || '—'} /><Period label="Run date" value={run?.run_date || '—'} /></View></View><Pressable style={styles.outlineButton} onPress={() => Linking.openURL('https://wa.me/27615321107')}><Ionicons name="alert-circle-outline" size={18} color={colors.primary} /><Text style={styles.outlineText}>Report Vehicle Issue</Text></Pressable></ScrollView></SafeAreaView>;
+  return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content}><Header title="Vehicle" subtitle="Current assignment" /><View style={styles.vehicleCard}><Image source={deliveryVanImage} style={styles.vehicleImage} resizeMode="cover" /><View style={styles.vehicleHeading}><View style={{ flex: 1 }}><Text style={styles.vehicleName}>{run?.vehicle_label || 'No vehicle assigned'}</Text><Text style={styles.vehicleMeta}>{run ? `${run.route_name || 'Route'} · ${run.run_date}` : 'Contact dispatch for an assignment'}</Text></View><View style={styles.statusPill}><Text style={styles.statusText}>{run?.status || 'unassigned'}</Text></View></View><View style={styles.vehicleFacts}><Period label="Assignment" value={run?.route_name || 'Not assigned'} /><Period label="Run type" value={run?.run_type || '—'} /><Period label="Run date" value={run?.run_date || '—'} /></View></View><Pressable style={styles.outlineButton} onPress={() => Linking.openURL(COMPANY_WHATSAPP_URL)}><Ionicons name="alert-circle-outline" size={18} color={colors.primary} /><Text style={styles.outlineText}>Report Vehicle Issue</Text></Pressable></ScrollView></SafeAreaView>;
 }
 
 export function DriverAccountScreen() {
@@ -380,7 +502,9 @@ export function DriverAccountScreen() {
   const navigation = useNavigation<any>();
   const avatar = session?.user.user_metadata?.avatar_url;
   const initial = (profile?.full_name || session?.user.email || 'D').charAt(0).toUpperCase();
-  return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content}><Header title="Account" subtitle="Driver profile" /><View style={styles.driverProfileCard}>{avatar ? <Image source={{ uri: avatar }} style={styles.driverAvatar} /> : <View style={styles.driverAvatarFallback}><Text style={styles.driverAvatarText}>{initial}</Text></View>}<View style={{ flex: 1 }}><Text style={styles.stopName}>{profile?.full_name || 'Driver'}</Text><Text style={styles.activeDriver}>Active Driver</Text><Text style={styles.stopSub}>{session?.user.email}</Text></View></View><View style={styles.listCard}><MenuLink icon="person-outline" label="My Profile" onPress={() => navigation.navigate('Profile')} /><MenuLink icon="car-outline" label="Vehicle" onPress={() => navigation.navigate('Vehicle')} /><MenuLink icon="stats-chart-outline" label="Performance" onPress={() => navigation.navigate('Performance')} /><MenuLink icon="settings-outline" label="Settings" onPress={() => navigation.navigate('Settings')} /><MenuLink icon="help-circle-outline" label="Help & Support" onPress={() => Linking.openURL('https://wa.me/27615321107')} /></View>{canSwitchDashboards ? <Pressable style={styles.switchDashboard} onPress={clearRole}><Ionicons name="swap-horizontal-outline" size={19} color={colors.primary} /><Text style={styles.switchDashboardText}>Switch Dashboard</Text><Ionicons name="chevron-forward" size={17} color={colors.primary} /></Pressable> : null}<Pressable style={styles.logoutButton} onPress={signOut}><Ionicons name="log-out-outline" size={18} color={colors.danger} /><Text style={styles.logoutText}>Logout</Text></Pressable></ScrollView></SafeAreaView>;
+  const profileRecord = profile as any;
+  const status = profileRecord?.staff_active === false ? 'Inactive' : profileRecord?.on_leave ? 'On leave' : 'Active driver';
+  return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content}><Header title="Account" subtitle="Driver profile" /><View style={styles.driverProfileCard}>{avatar ? <Image source={{ uri: avatar }} style={styles.driverAvatar} /> : <View style={styles.driverAvatarFallback}><Text style={styles.driverAvatarText}>{initial}</Text></View>}<View style={{ flex: 1 }}><Text style={styles.stopName}>{profile?.full_name || 'Driver'}</Text><Text style={styles.activeDriver}>{status}</Text><Text style={styles.stopSub}>{COMPANY.name} driver account</Text></View></View><View style={styles.listCard}><MenuLink icon="person-outline" label="My Profile" onPress={() => navigation.navigate('Profile')} /><MenuLink icon="car-outline" label="Vehicle" onPress={() => navigation.navigate('Vehicle')} /><MenuLink icon="stats-chart-outline" label="Performance" onPress={() => navigation.navigate('Performance')} /><MenuLink icon="settings-outline" label="Settings" onPress={() => navigation.navigate('Settings')} /><MenuLink icon="help-circle-outline" label="Help & Support" onPress={() => Linking.openURL(COMPANY_WHATSAPP_URL)} /></View>{canSwitchDashboards ? <Pressable style={styles.switchDashboard} onPress={clearRole}><Ionicons name="swap-horizontal-outline" size={19} color={colors.primary} /><Text style={styles.switchDashboardText}>Switch Dashboard</Text><Ionicons name="chevron-forward" size={17} color={colors.primary} /></Pressable> : null}<Pressable style={styles.logoutButton} onPress={signOut}><Ionicons name="log-out-outline" size={18} color={colors.danger} /><Text style={styles.logoutText}>Logout</Text></Pressable></ScrollView></SafeAreaView>;
 }
 
 // DriverDocumentsScreen was removed. It listed three hardcoded rows ("Verified",
@@ -388,10 +512,22 @@ export function DriverAccountScreen() {
 // nothing true.
 
 export function DriverPerformanceScreen() {
-  const { session } = useAuth(); const [runs, setRuns] = useState<any[]>([]); const [stops, setStops] = useState<any[]>([]); const [loading, setLoading] = useState(true);
-  useFocusEffect(useCallback(() => { (async () => { if (!session?.user.id) { setLoading(false); return; } const result = await supabase.from('driver_runs').select('id,status').eq('driver_id', session.user.id); const records = result.data || []; setRuns(records); if (records.length) { const stopResult = await supabase.from('driver_run_stops').select('id,status').in('run_id', records.map((row) => row.id)); setStops(stopResult.data || []); } setLoading(false); })(); }, [session?.user.id]));
-  if (loading) return <Loading />; const completed = stops.filter((row) => row.status === 'completed').length; const total = stops.length; const success = total ? Math.round(completed / total * 100) : 0;
-  return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content}><Header title="Performance" subtitle="Your delivery record" /><View style={styles.metricGrid}><MetricBox value={runs.length} label="Runs" /><MetricBox value={completed} label="Stops" /><MetricBox value={success} label="Success %" /></View><View style={styles.listCard}><Period label="Completed runs" value={String(runs.filter((row) => row.status === 'completed').length)} /><Period label="Completed stops" value={String(completed)} /><Period label="Issues" value={String(stops.filter((row) => row.status === 'failed').length)} /></View></ScrollView></SafeAreaView>;
+  const { session } = useAuth(); const [summary, setSummary] = useState<any>(null); const [loading, setLoading] = useState(true);
+  useFocusEffect(useCallback(() => { (async () => {
+    if (!session?.user.id) { setLoading(false); return; }
+    const result = await supabase.rpc('driver_performance_summary', { p_driver_id: null, p_days: 30 });
+    if (!result.error) setSummary(result.data);
+    else {
+      const runs = await supabase.from('driver_runs').select('id').eq('driver_id', session.user.id);
+      const ids = (runs.data || []).map((row) => row.id);
+      const stops = ids.length ? await supabase.from('driver_run_stops').select('status').in('run_id', ids) : { data: [] as any[] };
+      const rows = stops.data || []; const completed = rows.filter((row: any) => row.status === 'completed').length; const closed = rows.filter((row: any) => ['completed', 'failed'].includes(row.status)).length;
+      setSummary({ claimed: rows.length, completed, issues: rows.filter((row: any) => row.status === 'failed').length, active: rows.filter((row: any) => ['planned', 'en_route', 'arrived'].includes(row.status)).length, successRate: closed ? Math.round(completed / closed * 100) : 0, averageMinutes: 0, daysWorked: 0 });
+    }
+    setLoading(false);
+  })(); }, [session?.user.id]));
+  if (loading) return <Loading />; const data = summary || {};
+  return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content}><Header title="Performance" subtitle="Last 30 days" /><View style={styles.metricGrid}><MetricBox value={Number(data.completed || 0)} label="Collections" /><MetricBox value={Number(data.successRate || 0)} label="Success %" /><MetricBox value={Number(data.daysWorked || 0)} label="Days worked" /></View><View style={styles.listCard}><Period label="Collections claimed" value={String(data.claimed || 0)} /><Period label="Currently active" value={String(data.active || 0)} /><Period label="Issues reported" value={String(data.issues || 0)} /><Period label="Average collection time" value={Number(data.averageMinutes || 0) ? `${data.averageMinutes} min` : '—'} /></View><Text style={styles.profileNote}>Performance is calculated from the same collection activity visible to dispatch, so driver and admin totals stay aligned.</Text></ScrollView></SafeAreaView>;
 }
 
 export function DriverSettingsScreen() {
@@ -403,7 +539,6 @@ export function DriverSettingsScreen() {
 
 function Header({ title, subtitle }: { title: string; subtitle: string }) { const navigation = useNavigation<any>(); return <View>{navigation.canGoBack() ? <Pressable style={styles.backButton} onPress={() => navigation.goBack()}><Ionicons name="arrow-back" size={21} color={colors.text} /></Pressable> : null}<Text style={styles.title}>{title}</Text><Text style={styles.subtitle}>{subtitle}</Text></View>; }
 function MenuLink({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }) { return <Pressable style={styles.menuRow} onPress={onPress}><Ionicons name={icon} size={19} color={colors.textMuted} /><Text style={styles.menuLabel}>{label}</Text><Ionicons name="chevron-forward" size={17} color={colors.textFaint} /></Pressable>; }
-function DocumentRow({ title, status }: { title: string; status: string }) { return <View style={styles.menuRow}><Ionicons name="document-text-outline" size={19} color={colors.primary} /><View style={{ flex: 1 }}><Text style={styles.menuLabel}>{title}</Text><Text style={styles.stopSub}>{status}</Text></View><Ionicons name="checkmark-circle-outline" size={18} color={colors.primary} /></View>; }
 function Loading() { return <SafeAreaView style={styles.safe}><View style={styles.loading}><ActivityIndicator size="large" color={colors.primary} /></View></SafeAreaView>; }
 function HeroStat({ value, label }: { value: number; label: string }) { return <View style={{ flex: 1 }}><Text style={styles.heroStatValue}>{value}</Text><Text style={styles.heroStatLabel}>{label}</Text></View>; }
 function Period({ label, value }: { label: string; value: string }) { return <View style={styles.periodRow}><Text style={styles.periodLabel}>{label}</Text><Text style={styles.rowValue}>{value}</Text></View>; }
@@ -425,9 +560,18 @@ const styles = StyleSheet.create({
   panelNote: { fontSize: 11.5, color: colors.amber, marginBottom: spacing.sm, lineHeight: 16 },
   profileNote: { fontSize: 11.5, color: colors.textMuted, lineHeight: 17, marginTop: spacing.md },
   rowAction: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft },
+  claimLabel: { marginTop: 4, fontSize: 10, fontWeight: '800', color: colors.primary },
+  claimMine: { color: colors.blue },
+  claimTaken: { color: colors.amber },
+  claimButton: { minWidth: 62, minHeight: 34, paddingHorizontal: 9, borderRadius: radius.sm, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  claimButtonDisabled: { backgroundColor: colors.textFaint },
+  claimButtonText: { color: colors.white, fontSize: 10.5, fontWeight: '800' },
   listCard: { backgroundColor: colors.surface, borderRadius: radius.md, overflow: 'hidden', ...shadow }, stopRow: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, order: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, orderText: { color: colors.textMuted, fontSize: 12, fontWeight: '800' }, stopName: { fontSize: 13.5, fontWeight: '800', color: colors.text }, stopSub: { fontSize: 11.5, color: colors.textMuted, marginTop: 2 }, statusPill: { alignSelf: 'center', borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: colors.primarySoft }, statusText: { fontSize: 9.5, color: colors.primaryDark, fontWeight: '800', textTransform: 'capitalize' },
   earningsHero: { backgroundColor: colors.primary, borderRadius: radius.lg, padding: spacing.lg, minHeight: 112, justifyContent: 'center', ...shadow }, earningsValue: { color: colors.white, fontSize: 34, fontWeight: '800', marginTop: 6 }, periodCard: { backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.lg, ...shadow }, periodRow: { minHeight: 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, periodLabel: { fontSize: 13, color: colors.textMuted, fontWeight: '600' }, rowValue: { fontSize: 13.5, fontWeight: '800', color: colors.text }, summaryIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   messageRow: { minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, messageIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }, messageTime: { fontSize: 10.5, color: colors.textFaint },
+  messageComposer: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.sm, ...shadow },
+  messageInput: { flex: 1, minHeight: 44, maxHeight: 110, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 10, color: colors.text, textAlignVertical: 'top' },
+  sendButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   menuRow: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, menuLabel: { flex: 1, fontSize: 13.5, color: colors.text, fontWeight: '700' },
   vehicleCard: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, ...shadow }, vehicleImage: { width: '100%', height: 168, borderRadius: radius.md, backgroundColor: '#F4F2EF' }, vehicleHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, marginTop: spacing.md }, vehicleName: { fontSize: 19, fontWeight: '800', color: colors.text }, vehicleMeta: { fontSize: 12, color: colors.textMuted, marginTop: 4 }, vehicleFacts: { marginTop: spacing.sm }, outlineButton: { minHeight: 48, borderWidth: 1, borderColor: colors.primary, borderRadius: radius.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm }, outlineText: { color: colors.primary, fontWeight: '800', fontSize: 13 },
   driverProfileCard: { minHeight: 88, flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, ...shadow }, driverAvatar: { width: 56, height: 56, borderRadius: 28 }, driverAvatarFallback: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, driverAvatarText: { color: colors.white, fontSize: 21, fontWeight: '800' }, activeDriver: { color: colors.primary, fontSize: 11, fontWeight: '800', marginTop: 3 }, switchDashboard: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary, borderRadius: radius.sm }, switchDashboardText: { flex: 1, color: colors.primary, fontWeight: '800', fontSize: 13 }, logoutButton: { minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, borderWidth: 1, borderColor: colors.danger, borderRadius: radius.sm }, logoutText: { color: colors.danger, fontWeight: '800', fontSize: 13 },

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -36,6 +36,8 @@ interface StopRow {
 }
 interface Attendance { driver_id: string; clocked_in_at: string; clocked_out_at: string | null; }
 interface ScheduleRow { id: string; route: string; pickup_date: string; country?: string | null; }
+interface ClaimRow { id: string; shipment_id: string; driver_id: string | null; stop_id: string | null; status: string; claimed_at: string | null; issue_reason: string | null; }
+interface DriverLocationRow { driver_id: string; latitude: number; longitude: number; accuracy_m: number | null; recorded_at: string; }
 
 interface RouteGroup {
   route: string; date: string; shipments: Shipment[]; run: RunRow | null;
@@ -71,6 +73,10 @@ export default function DriverRunsScreen({ navigation }: Props) {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
+  const [claims, setClaims] = useState<ClaimRow[]>([]);
+  const [liveLocations, setLiveLocations] = useState<DriverLocationRow[]>([]);
+  const [announcement, setAnnouncement] = useState('');
+  const [sendingAnnouncement, setSendingAnnouncement] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,12 +88,15 @@ export default function DriverRunsScreen({ navigation }: Props) {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [driverResult, runResult, shipmentResult, scheduleResult, attendanceResult] = await Promise.all([
+      const [driverResult, runResult, shipmentResult, scheduleResult, attendanceResult, claimResult, locationResult] = await Promise.all([
         supabase.from('profiles').select('id,full_name,email,driver_type,role,is_admin,on_leave,staff_active,vehicle_label').or('role.eq.driver,role.eq.admin,role.eq.logistics,is_admin.eq.true').order('full_name'),
         supabase.from('driver_runs').select('id,driver_id,status,run_date,vehicle_label,route_name,run_type,scheduled_start,started_at').eq('run_date', date).order('created_at'),
-        supabase.from('shipments').select('id,tracking_number,customer_reference,status,driver_status,collection_schedule_id,created_at,updated_at,metadata').is('deleted_at', null).not('status', 'in', '(Delivered,Cancelled)').order('created_at', { ascending: false }).limit(400),
+        supabase.from('shipments').select('id,tracking_number,customer_reference,status,driver_status,collection_status,collection_schedule_id,created_at,updated_at,metadata').is('deleted_at', null).not('status', 'in', '(Delivered,Cancelled)').order('created_at', { ascending: false }).limit(400),
         supabase.from('collection_schedules').select('id,route,pickup_date,country').limit(200),
         supabase.from('driver_attendance').select('driver_id,clocked_in_at,clocked_out_at').eq('work_date', date),
+        supabase.from('route_collection_claims').select('id,shipment_id,driver_id,stop_id,status,claimed_at,issue_reason').eq('claim_date', date),
+        supabase.from('driver_live_locations').select('driver_id,latitude,longitude,accuracy_m,recorded_at')
+          .gte('recorded_at', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()),
       ]);
       for (const result of [driverResult, runResult, shipmentResult, scheduleResult, attendanceResult]) {
         if ((result as any).error) throw (result as any).error;
@@ -109,9 +118,11 @@ export default function DriverRunsScreen({ navigation }: Props) {
       setDrivers(loadedDrivers);
       setRuns(runRows);
       setStops(stopRows);
-      setShipments((shipmentResult.data as Shipment[]) || []);
+      setShipments((shipmentResult.data as unknown as Shipment[]) || []);
       setSchedules((scheduleResult.data as ScheduleRow[]) || []);
       setAttendance((attendanceResult.data as Attendance[]) || []);
+      setClaims(claimResult.error ? [] : ((claimResult.data as ClaimRow[]) || []));
+      setLiveLocations(locationResult.error ? [] : ((locationResult.data as DriverLocationRow[]) || []));
     } catch (e: any) {
       setError(e?.message || 'Could not load driver runs.');
     }
@@ -124,6 +135,8 @@ export default function DriverRunsScreen({ navigation }: Props) {
     const channel = supabase.channel(`runs-board-${date}-${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'driver_runs' }, () => load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'driver_run_stops' }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'route_collection_claims' }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'driver_live_locations' }, () => load())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [date, load]);
@@ -134,14 +147,38 @@ export default function DriverRunsScreen({ navigation }: Props) {
 
   const groups = useMemo(() => {
     const bucket = new Map<string, RouteGroup>();
+    // A route runs on the day its SCHEDULE says, not the day each booking
+    // happens to have stored. Most website bookings carry no collection date at
+    // all (or "To be confirmed"), so keying off the shipment dropped every one
+    // of them and the board read "No routes with bookings" while the drivers'
+    // Collections screen listed them. This mirrors driver_route_collections.
+    const routeKey = (name: unknown) =>
+      String(name || '').toUpperCase().replace(/\s+ROUTE$/, '').trim();
+
+    const routesToday = schedules.filter((s) => {
+      const parsed = parseCollectionDate(s.pickup_date);
+      if (!parsed) return false;
+      const iso = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+      return iso === date;
+    });
+    const todayByKey = new Map(routesToday.map((s) => [routeKey(s.route), s]));
+
     for (const shipment of shipments) {
       const schedule = shipment.collection_schedule_id ? scheduleById.get(shipment.collection_schedule_id) : undefined;
-      const route = schedule?.route || (shipment.metadata as any)?.collection?.route;
-      if (!route || route === 'To be assigned') continue;
-      const parsed = parseCollectionDate(schedule?.pickup_date || (shipment.metadata as any)?.collection?.date);
-      if (!parsed) continue;
-      const iso = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
-      if (iso !== date) continue;
+      const rawRoute = schedule?.route || (shipment.metadata as any)?.collection?.route;
+      if (!rawRoute || rawRoute === 'To be assigned') continue;
+
+      // Linked schedule wins; otherwise match the route name against the routes
+      // scheduled for this day, with and without the " ROUTE" suffix.
+      const scheduledToday = schedule
+        ? routesToday.some((s) => s.id === schedule.id)
+        : todayByKey.has(routeKey(rawRoute));
+      if (!scheduledToday) continue;
+
+      // Already-collected bookings are no longer work for this day.
+      if ((shipment as any).collection_status === 'Collected') continue;
+
+      const route = todayByKey.get(routeKey(rawRoute))?.route || rawRoute;
       const existing: RouteGroup = bucket.get(route) || { route, date, shipments: [], run: null, stopTotal: 0, stopDone: 0 };
       existing.shipments.push(shipment);
       bucket.set(route, existing);
@@ -157,7 +194,7 @@ export default function DriverRunsScreen({ navigation }: Props) {
       bucket.set(route, existing);
     }
     return [...bucket.values()].sort((a, b) => a.route.localeCompare(b.route));
-  }, [date, runs, scheduleById, shipments, stops]);
+  }, [date, runs, scheduleById, schedules, shipments, stops]);
 
   const activeRuns = runs.filter((r) => r.status === 'active');
   const completedRuns = runs.filter((r) => r.status === 'completed');
@@ -168,10 +205,22 @@ export default function DriverRunsScreen({ navigation }: Props) {
     d.role === 'driver' && d.staff_active !== false && !d.on_leave
     && !runs.some((r) => r.driver_id === d.id && ['planned', 'active'].includes(r.status)));
   const unassignedRoutes = groups.filter((g) => !g.run);
+  const activeClaims = claims.filter((c) => ['claimed', 'en_route', 'arrived'].includes(c.status));
+  const issueClaims = claims.filter((c) => c.status === 'failed');
 
-  const mapStops: RunMapStop[] = useMemo(() => stops
-    .filter((s) => Number.isFinite(Number(s.latitude)) && Number.isFinite(Number(s.longitude)))
-    .map((s) => {
+  const sendAnnouncement = async () => {
+    if (!announcement.trim() || !session?.user.id) return;
+    setSendingAnnouncement(true);
+    const result = await supabase.from('staff_messages').insert({ sender_id: session.user.id, recipient_id: null, audience_role: 'driver', subject: 'Dispatch announcement', body: announcement.trim(), priority: 'normal' });
+    setSendingAnnouncement(false);
+    if (result.error) Alert.alert('Could not send announcement', /staff_messages/i.test(result.error.message || '') ? 'Messaging is waiting for the database migration.' : result.error.message);
+    else { setAnnouncement(''); Alert.alert('Announcement sent', 'Every driver will see it in Messages.'); }
+  };
+
+  const mapStops: RunMapStop[] = useMemo(() => {
+    const stopPins = stops
+      .filter((s) => Number.isFinite(Number(s.latitude)) && Number.isFinite(Number(s.longitude)))
+      .map((s) => {
       const runIndex = runs.findIndex((r) => r.id === s.run_id);
       const shipment = shipments.find((sh) => sh.id === s.shipment_id);
       return {
@@ -182,7 +231,23 @@ export default function DriverRunsScreen({ navigation }: Props) {
         kind: (s.stop_type === 'delivery' ? 'delivery' : 'collection') as 'collection' | 'delivery',
         color: RUN_COLORS[Math.max(0, runIndex) % RUN_COLORS.length],
       };
-    }), [runs, shipments, stops]);
+      });
+    const driverPins: RunMapStop[] = liveLocations.map((location) => {
+      const driver = drivers.find((row) => row.id === location.driver_id);
+      const seen = new Date(location.recorded_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return {
+        id: `driver-${location.driver_id}`,
+        latitude: Number(location.latitude),
+        longitude: Number(location.longitude),
+        title: driver?.full_name || driver?.email || 'Driver',
+        description: `Driver position · last seen ${seen}${location.accuracy_m ? ` · ±${Math.round(location.accuracy_m)} m` : ''}`,
+        kind: 'driver',
+        color: '#2563eb',
+        order: 'D',
+      };
+    });
+    return [...stopPins, ...driverPins];
+  }, [drivers, liveLocations, runs, shipments, stops]);
 
   const polylines: RunMapPolyline[] = useMemo(() => runs.map((run, i) => ({
     id: run.id,
@@ -250,6 +315,11 @@ export default function DriverRunsScreen({ navigation }: Props) {
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
         <ScreenHeader title="Driver Runs" subtitle="Route-based dispatch" onBell={() => (navigation as any).getParent()?.navigate('Home')} />
 
+        <View style={styles.announcementCard}>
+          <View style={{ flex: 1 }}><Text style={styles.announcementTitle}>Message all drivers</Text><TextInput style={styles.announcementInput} value={announcement} onChangeText={setAnnouncement} placeholder="Route change, depot notice, urgent instruction…" placeholderTextColor={colors.textFaint} multiline maxLength={2000} /></View>
+          <Pressable style={[styles.announcementButton, (!announcement.trim() || sendingAnnouncement) && { opacity: .5 }]} disabled={!announcement.trim() || sendingAnnouncement} onPress={sendAnnouncement}><Ionicons name="send" size={17} color={colors.white} /></Pressable>
+        </View>
+
         {/* Date selector */}
         <View style={styles.dateRow}>
           {[todayIso(), todayIso(1), todayIso(2)].map((d) => (
@@ -272,8 +342,8 @@ export default function DriverRunsScreen({ navigation }: Props) {
               <StatCard label="Available drivers" value={availableDrivers.length} icon="people-outline" />
             </View>
             <View style={styles.statRow}>
-              <StatCard label="Completed" value={completedRuns.length} icon="checkmark-done-outline" />
-              <StatCard label="Unassigned routes" value={unassignedRoutes.length} icon="alert-circle-outline" tone={colors.orange} toneSoft={colors.orangeSoft} />
+              <StatCard label="Active collections" value={activeClaims.length} icon="navigate-outline" tone={colors.blue} toneSoft={colors.blueSoft} />
+              <StatCard label="Collection issues" value={issueClaims.length} icon="alert-circle-outline" tone={colors.orange} toneSoft={colors.orangeSoft} />
             </View>
 
             {/* Map */}
@@ -282,9 +352,9 @@ export default function DriverRunsScreen({ navigation }: Props) {
               stops={mapStops}
               polylines={polylines}
               onStopPress={(stop) => {
-                const row = stops.find((s) => s.id === stop.id);
-                const run = runs.find((r) => r.id === row?.run_id);
-                if (run) navigation.navigate('RunDetail', { runId: run.id });
+                const destination = encodeURIComponent(`${stop.latitude},${stop.longitude}`);
+                void Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`)
+                  .catch(() => Alert.alert('Could not open navigation', 'Check that a maps application or browser is available.'));
               }}
             />
 
@@ -388,6 +458,10 @@ export default function DriverRunsScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg, paddingBottom: 56, gap: spacing.sm },
+  announcementCard: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
+  announcementTitle: { fontSize: 12, fontWeight: '800', color: colors.text, marginBottom: 6 },
+  announcementInput: { minHeight: 42, maxHeight: 92, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 8, color: colors.text, textAlignVertical: 'top' },
+  announcementButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
   dateRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xs },
   dateChip: { borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, paddingHorizontal: 14, paddingVertical: 8 },
   dateChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
