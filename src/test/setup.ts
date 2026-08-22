@@ -1,9 +1,10 @@
-import { expect, afterEach, vi } from 'vitest';
+import { afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
-import * as matchers from '@testing-library/jest-dom/matchers';
-
-// Extend Vitest's expect with jest-dom matchers
-expect.extend(matchers);
+// Extends Vitest's expect with the jest-dom matchers AND their type
+// declarations. Importing the bare matchers module registers them at runtime
+// but leaves toBeInTheDocument() and friends untyped, so tsc rejects tests that
+// pass perfectly well.
+import '@testing-library/jest-dom/vitest';
 
 // Clean up after each test
 afterEach(() => {

@@ -23,7 +23,9 @@ import {
   Search, Download, RefreshCw, FileText, Loader2, Eye, Pencil, Plus,
 } from 'lucide-react';
 import DeliveryNoteGenerator, { buildRefNumber, DeliveryNoteTemplate } from '@/components/admin/DeliveryNoteGenerator';
-import StandaloneDeliveryNoteCreator from '@/components/admin/StandaloneDeliveryNoteCreator';
+import InvoiceNoteWizard from '@/components/admin/deliveryNote/InvoiceNoteWizard';
+import DeliveryNoteRegister from '@/components/admin/deliveryNote/DeliveryNoteRegister';
+import DeliveryVerificationQueue from '@/components/admin/DeliveryVerificationQueue';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -56,7 +58,9 @@ const DeliveryNotesTab = () => {
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
   const [editNoteText, setEditNoteText] = useState('');
   const [savingNote, setSavingNote] = useState(false);
-  const [showStandaloneCreator, setShowStandaloneCreator] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
+  // Bumped after a note is issued so the register below reloads in place.
+  const [registerVersion, setRegisterVersion] = useState(0);
 
   useEffect(() => { fetchShipments(); }, []);
 
@@ -265,9 +269,9 @@ const DeliveryNotesTab = () => {
               variant="default"
               size="sm"
               className="h-8 text-xs bg-blue-600 hover:bg-blue-700"
-              onClick={() => setShowStandaloneCreator(true)}
+              onClick={() => setShowWizard(true)}
             >
-              <Plus className="h-3.5 w-3.5 mr-1.5" /> Create New
+              <Plus className="h-3.5 w-3.5 mr-1.5" /> New from invoice
             </Button>
             <Button variant="outline" size="sm" className="h-8 text-xs" onClick={fetchShipments} disabled={loading}>
               <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh
@@ -286,6 +290,14 @@ const DeliveryNotesTab = () => {
           </>
         }
       />
+
+      {/* Delivery drivers are blocked until these are verified, so the queue
+          sits above the register rather than behind a filter. */}
+      <DeliveryVerificationQueue />
+
+      {/* Every note issued from a source invoice. This is the ledger the
+          generator checks before it writes a file. */}
+      <DeliveryNoteRegister refreshKey={registerVersion} />
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -496,11 +508,11 @@ const DeliveryNotesTab = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Standalone delivery note creator */}
-      <StandaloneDeliveryNoteCreator
-        isOpen={showStandaloneCreator}
-        onClose={() => setShowStandaloneCreator(false)}
-        onCreated={fetchShipments}
+      {/* Invoice -> delivery note, with the review gate in front of the PDF */}
+      <InvoiceNoteWizard
+        isOpen={showWizard}
+        onClose={() => setShowWizard(false)}
+        onIssued={() => setRegisterVersion((v) => v + 1)}
       />
     </div>
   );

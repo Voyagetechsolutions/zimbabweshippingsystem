@@ -9,6 +9,7 @@ import { Download, Loader2, Printer, Pencil, Save, X, CalendarPlus, Plus, Trash2
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Shipment } from '@/types/shipment';
+import InvoiceNoteWizard from '@/components/admin/deliveryNote/InvoiceNoteWizard';
 
 interface DeliveryNoteGeneratorProps {
   isOpen: boolean;
@@ -16,6 +17,15 @@ interface DeliveryNoteGeneratorProps {
   shipment: Shipment;
   // Called after edits are persisted, so the parent list can refresh in place.
   onSaved?: (updated: Shipment) => void;
+}
+
+// One printed row: a short UPPERCASE label, the detail, the physical count and
+// the unit. Legacy saved notes have no qty/uom, so both are optional.
+export interface NoteItem {
+  item: string;
+  description: string;
+  qty?: string;
+  uom?: string;
 }
 
 // Manual edits to the auto-generated note, stored on the shipment's metadata.
@@ -26,10 +36,9 @@ interface DeliveryNoteOverrides {
   deliveryDate?: string;  // optional separate delivery date (yyyy-MM-dd)
   itemDescriptions?: Record<string, string>; // line-item index → description (legacy)
   itemNames?: Record<string, string>;        // line-item index → item label (legacy)
-  items?: Array<{ item: string; description: string }>; // full item list (supports add/remove)
-  doorToDoor?: boolean;   // override the delivery-method (door-to-door vs depot)
-  sealed?: boolean;       // override whether a metal coded seal applies
-  sealCodes?: string;     // editable seal code(s), comma/newline separated
+  items?: NoteItem[];     // full item list (supports add/remove); seals and the
+                          // delivery row are rows here, not separate flags
+  paid?: boolean;         // red PAID stamp — only when the invoice is stamped and settled
   // Shipper / recipient (any field can be corrected on the note)
   senderName?: string;
   senderPhone?: string;
@@ -40,7 +49,6 @@ interface DeliveryNoteOverrides {
   recipientPhone2?: string;
   recipientAddress?: string; // newline-separated lines
   deliveryAddresses?: Array<{ name: string; phone: string; address: string; city: string }>; // extra delivery addresses
-  itemsSummary?: string;
   tracking?: string;
 }
 
@@ -162,108 +170,136 @@ function getSealInfo(s: Shipment): { sealed: boolean; codes: string[]; quantity:
   return { sealed, codes, quantity };
 }
 
-// Builds one row per physical item. Description is taken from the customer's
-// booking ("blue plastic drum with red lid", etc.) so the driver can identify
-// each item without guessing.
-function buildLineItems(s: Shipment) {
+// The destination city the goods are going to, for the closing delivery row.
+function getDestinationCity(s: Shipment): string {
+  const m = s.metadata || {};
+  const src = m.recipient || m.recipientDetails || {};
+  return (src.city || '').trim() || (s.destination || '').trim() || 'Zimbabwe';
+}
+
+// Free-text booking lines ("3x boxes of clothes") carry their own count, which is
+// the physical count the driver has to load — not the invoice's billed quantity.
+const ITEM_LABELS: Array<[RegExp, string, string]> = [
+  [/\bbarrel/i, 'DRUMS', 'drum'],
+  [/\bdrum/i, 'DRUMS', 'drum'],
+  [/\bsuitcase|\bcase\b/i, 'SUITCASE', 'suitcase'],
+  [/\btrunk/i, 'TRUNK', 'trunk'],
+  [/\bbox|\bcarton/i, 'BOXES', 'box'],
+  [/\bbag|\bsack/i, 'BAG', 'bag'],
+  [/\btub\b/i, 'TUB', 'tub'],
+  [/\bsofa|\bcouch|\blounge/i, 'SOFA', 'set'],
+  [/\bchair/i, 'CHAIRS', 'chair'],
+  [/\bmirror/i, 'MIRROR', 'item'],
+  [/\bbed\b|\bmattress/i, 'BED', 'item'],
+  [/\bfridge|\bfreezer/i, 'FRIDGE', 'item'],
+  [/\bstove|\bcooker/i, 'STOVE', 'item'],
+  [/\bwashing machine|\bwasher/i, 'WASHING MACHINE', 'item'],
+  [/\btv\b|\btelevision/i, 'TV', 'item'],
+];
+
+function classifyFreeText(text: string): { item: string; uom: string; qty: string; description: string } {
+  const leading = text.match(/^\s*(\d{1,3})\s*(?:x|×|\*)?\s+/i);
+  const qty = leading ? leading[1] : '1';
+  const rest = leading ? text.slice(leading[0].length).trim() : text.trim();
+  const match = ITEM_LABELS.find(([re]) => re.test(rest));
+  return {
+    item: match ? match[1] : 'GOODS',
+    uom: match ? match[2] : 'item',
+    qty,
+    description: rest || 'General goods',
+  };
+}
+
+// Builds the printed rows: one row per kind of physical item, a single
+// consolidated SEALS row, and the delivery (or self-collection) row last.
+// Descriptions come from the customer's booking ("blue plastic drum with red
+// lid") so the driver can identify each item without guessing.
+function buildLineItems(s: Shipment): NoteItem[] {
   const m = s.metadata || {};
   const ship = m.shipment || m.shipmentDetails || {};
   const itemsMeta = m.items || {};
-  const rows: { item: string; description: string }[] = [];
+  const rows: NoteItem[] = [];
 
-  const sealOn = !!(ship.metalSeal || ship.wantMetalSeal);
-  const sealNote = sealOn ? ' Sealed.' : '';
-
-  const drumsDescription =
-    ship.drumsDescription || itemsMeta.drums?.description || null;
-  const trunksDescription =
-    ship.trunksDescription || itemsMeta.trunks?.description || null;
+  const drumsDescription = ship.drumsDescription || itemsMeta.drums?.description || null;
+  const trunksDescription = ship.trunksDescription || itemsMeta.trunks?.description || null;
 
   const drumQty = Number(
     ship.drums ?? ship.drumQuantity ?? (ship.includeDrums ? ship.quantity : 0) ?? 0,
   );
-  for (let i = 1; i <= drumQty; i++) {
+  // Drums we supplied at collection are the same physical drums being carried —
+  // counted once, noted in the description rather than billed as a second row.
+  const purchased = itemsMeta.purchasedDrums;
+  const suppliedQty = Number(purchased?.quantity ?? 0);
+  const suppliedLabel = purchased?.type === 'metal' ? 'metal drum' : 'plastic barrel';
+  const totalDrums = drumQty > 0 ? drumQty : suppliedQty;
+  if (totalDrums > 0) {
+    const notes = [drumsDescription || '200–220L drum'];
+    if (suppliedQty > 0) notes.push(`${suppliedQty} × ${suppliedLabel} supplied at collection`);
     rows.push({
-      item: `Drum #${i}`,
-      description: `${drumsDescription || '200–220L drum'}.${sealNote}`,
+      item: 'DRUMS',
+      description: notes.join('. '),
+      qty: String(totalDrums),
+      uom: 'drum',
     });
   }
 
   const trunkQty = Number(ship.boxes ?? ship.trunkQuantity ?? 0);
-  for (let i = 1; i <= trunkQty; i++) {
+  if (trunkQty > 0) {
     rows.push({
-      item: `Trunk / Box #${i}`,
-      description: `${trunksDescription || 'Storage box / trunk'}.${sealNote}`,
+      item: trunkQty > 1 ? 'BOXES' : 'BOX',
+      description: trunksDescription || 'Storage box / trunk',
+      qty: String(trunkQty),
+      uom: 'box',
     });
   }
 
-  // Drums supplied by us at collection (UK only)
-  const purchased = itemsMeta.purchasedDrums;
-  if (purchased && purchased.quantity > 0) {
-    const label = purchased.type === 'metal' ? 'Metal Drum' : 'Plastic Barrel';
-    for (let i = 1; i <= purchased.quantity; i++) {
-      rows.push({
-        item: `${label} #${i} (supplied)`,
-        description: `${label} supplied at collection.`,
-      });
-    }
-  }
-
-  // Custom-quote items (free text from booking) — split into one row per item
-  // so the courier can tick each off. We split on newlines, semicolons, and " + "
-  // to respect natural list formatting; commas are left alone (they appear in
+  // Custom-quote items (free text from booking) — split into one row per item so
+  // the courier can tick each off. We split on newlines, semicolons and " + " to
+  // respect natural list formatting; commas are left alone (they appear in
   // sentences like "1 box of clothes, books and shoes").
   const otherDesc =
     ship.boxesDescription || ship.category || ship.description ||
     ship.otherItemDescription || itemsMeta.boxes?.description || null;
   if (ship.includeOtherItems || ship.includeBoxes || otherDesc) {
-    const splitOther = (otherDesc || 'General goods.')
+    (otherDesc || 'General goods')
       .split(/\n+|;|\s\+\s/g)
       .map((p) => p.trim())
-      .filter(Boolean);
-    if (splitOther.length <= 1) {
-      rows.push({ item: 'Other Items', description: splitOther[0] || 'General goods.' });
-    } else {
-      splitOther.forEach((piece, idx) => {
-        rows.push({ item: `Other Item #${idx + 1}`, description: piece });
-      });
-    }
+      .filter(Boolean)
+      .forEach((piece) => rows.push(classifyFreeText(piece)));
   }
 
   if (rows.length === 0) {
     rows.push({
-      item: 'Shipment',
-      description: m.shipmentType || 'General shipment.',
+      item: 'GOODS',
+      description: m.shipmentType || 'General shipment',
+      qty: '1',
+      uom: 'item',
     });
   }
 
+  // Exactly one seals row, carrying every code.
+  const seal = getSealInfo(s);
+  if (seal.sealed || seal.codes.length > 0) {
+    const count = seal.codes.length || seal.quantity;
+    rows.push({
+      item: 'SEALS',
+      description: seal.codes.length
+        ? seal.codes.join(', ')
+        : 'Codes to be recorded on sealing',
+      qty: count > 0 ? String(count) : '',
+      uom: 'seal',
+    });
+  }
+
+  // Every note closes with a delivery or self-collection row.
+  const city = getDestinationCity(s);
+  rows.push(
+    getDoorToDoor(s)
+      ? { item: 'DELIVERY', description: `Door to door delivery, ${city}`, qty: '', uom: 'trip' }
+      : { item: 'COLLECTION', description: `Self collection, ${city}`, qty: '', uom: '-' },
+  );
+
   return rows;
-}
-
-// Quick at-a-glance count above the per-item table.
-function buildItemsSummary(s: Shipment) {
-  const m = s.metadata || {};
-  const ship = m.shipment || m.shipmentDetails || {};
-  const itemsMeta = m.items || {};
-  const parts: string[] = [];
-
-  const drumQty = Number(ship.drums ?? ship.drumQuantity ?? 0);
-  if (drumQty > 0) parts.push(`${drumQty} × Drum`);
-
-  const trunkQty = Number(ship.boxes ?? ship.trunkQuantity ?? 0);
-  if (trunkQty > 0) parts.push(`${trunkQty} × Trunk`);
-
-  const purchasedQty = Number(itemsMeta.purchasedDrums?.quantity ?? 0);
-  if (purchasedQty > 0) {
-    const t = itemsMeta.purchasedDrums?.type === 'metal' ? 'Metal Drum' : 'Plastic Barrel';
-    parts.push(`${purchasedQty} × ${t} (supplied)`);
-  }
-
-  if (ship.includeOtherItems || ship.includeBoxes || itemsMeta.boxes) {
-    parts.push('plus other items');
-  }
-
-  return parts.length ? parts.join(', ') : 'See items below';
 }
 
 // Ref # = first 3 letters of sender name + last 4 digits of their phone.
@@ -314,19 +350,16 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
       : getRecipientAddress(shipment);
     const recipientPhone = overrides.recipientPhone ?? withDialCode(getRecipientPhone(shipment), 'Zimbabwe');
     const recipientPhone2 = overrides.recipientPhone2 ?? withDialCode(getRecipientPhone2(shipment), 'Zimbabwe');
-    const lineItems = (overrides.items && overrides.items.length)
+    const lineItems: NoteItem[] = (overrides.items && overrides.items.length)
       ? overrides.items
       : buildLineItems(shipment).map((row, i) => ({
+          ...row,
           item: overrides.itemNames?.[i] ?? row.item,
           description: overrides.itemDescriptions?.[i] ?? row.description,
         }));
     const deliveryAddresses = overrides.deliveryAddresses ?? getDeliveryAddresses(shipment);
-    const itemsSummary = overrides.itemsSummary ?? buildItemsSummary(shipment);
     const tracking = overrides.tracking ?? shipment.tracking_number;
-    const doorToDoor = overrides.doorToDoor ?? getDoorToDoor(shipment);
-    const sealInfoBase = getSealInfo(shipment);
-    const sealed = overrides.sealed ?? sealInfoBase.sealed;
-    const sealCodesText = (overrides.sealCodes ?? sealInfoBase.codes.join(', ')).trim();
+    const paid = overrides.paid === true;
 
     return (
       <div
@@ -338,7 +371,6 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
           backgroundColor: '#fff',
           padding: '40px 48px',
           width: '794px',       // A4 at 96dpi
-          minHeight: '600px',
           boxSizing: 'border-box',
         }}
       >
@@ -357,7 +389,7 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
               DELIVERY NOTE
             </div>
             <div style={{ fontSize: '12px', color: '#444', lineHeight: '1.6' }}>
-              <div>Ref #: <strong style={{ fontSize: '16px', color: '#111' }}>{refNumber}</strong></div>
+              <div>Delivery Note #: <strong style={{ fontSize: '16px', color: '#111' }}>{refNumber}</strong></div>
               <div>Date: <strong>{docDate}</strong></div>
               {deliveryDate && <div>Delivery Date: <strong>{deliveryDate}</strong></div>}
             </div>
@@ -420,61 +452,15 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
           </div>
         )}
 
-        {/* ── Delivery method ── */}
-        <div style={{
-          marginBottom: '20px',
-          padding: '10px 14px',
-          borderRadius: '4px',
-          border: `2px solid ${doorToDoor ? '#16a34a' : '#94a3b8'}`,
-          backgroundColor: doorToDoor ? '#f0fdf4' : '#f8fafc',
-          fontSize: '13px',
-        }}>
-          <strong style={{ textTransform: 'uppercase', letterSpacing: '0.5px', color: doorToDoor ? '#15803d' : '#475569' }}>
-            Delivery Method: {doorToDoor ? 'Door-to-Door' : 'Depot Collection'}
-          </strong>
-          <div style={{ color: '#444', marginTop: '2px' }}>
-            {doorToDoor
-              ? `Deliver to ${1 + deliveryAddresses.length} address${1 + deliveryAddresses.length > 1 ? 'es' : ''} listed above. Contact recipient(s) to arrange delivery.`
-              : 'Recipient collects from the local depot. No door delivery included.'}
-          </div>
-        </div>
-
-        {/* ── Metal coded seal ── */}
-        <div style={{
-          marginBottom: '20px',
-          padding: '10px 14px',
-          borderRadius: '4px',
-          border: `2px solid ${sealed ? '#2563eb' : '#94a3b8'}`,
-          backgroundColor: sealed ? '#eff6ff' : '#f8fafc',
-          fontSize: '13px',
-        }}>
-          <strong style={{ textTransform: 'uppercase', letterSpacing: '0.5px', color: sealed ? '#1d4ed8' : '#475569' }}>
-            Metal Coded Seal: {sealed ? 'Yes' : 'None'}
-          </strong>
-          {sealed && (
-            <div style={{ color: '#444', marginTop: '2px' }}>
-              {sealCodesText
-                ? <>Seal code(s): <strong style={{ color: '#111' }}>{sealCodesText}</strong></>
-                : (sealInfoBase.quantity > 0
-                    ? `${sealInfoBase.quantity} seal(s) to be supplied — codes to be recorded on sealing.`
-                    : 'Codes to be recorded on sealing.')}
-            </div>
-          )}
-        </div>
-
-        {/* ── Items summary ── */}
-        <div style={{ marginBottom: '12px', fontSize: '12px', color: '#444' }}>
-          <strong>Items in this shipment:</strong> {itemsSummary}
-        </div>
-
-        {/* ── Per-item Table — courier ticks each off and notes color/contents ── */}
+        {/* ── Items — no prices anywhere on a delivery note ── */}
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
           <thead>
             <tr style={{ backgroundColor: '#2563eb', color: '#fff' }}>
-              <th style={{ padding: '10px 12px', textAlign: 'center', width: '32px' }}>✓</th>
               <th style={{ padding: '10px 12px', textAlign: 'left', width: '40px' }}>#</th>
-              <th style={{ padding: '10px 12px', textAlign: 'left', width: '170px' }}>Item</th>
-              <th style={{ padding: '10px 12px', textAlign: 'left' }}>Description / Item Details</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left', width: '160px' }}>Item</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left' }}>Description</th>
+              <th style={{ padding: '10px 12px', textAlign: 'center', width: '56px' }}>Qty</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left', width: '72px' }}>UOM</th>
             </tr>
           </thead>
           <tbody>
@@ -483,19 +469,36 @@ const DeliveryNoteTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipme
                 key={i}
                 style={{ backgroundColor: i % 2 === 0 ? '#f8fafc' : '#fff', borderBottom: '1px solid #e2e8f0' }}
               >
-                <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: '14px' }}>☐</td>
                 <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>{i + 1}</td>
                 <td style={{ padding: '10px 12px', fontWeight: '600', verticalAlign: 'top' }}>{row.item}</td>
                 <td style={{ padding: '10px 12px', whiteSpace: 'pre-line', verticalAlign: 'top', lineHeight: '1.7' }}>
                   {row.description}
                 </td>
+                <td style={{ padding: '10px 12px', textAlign: 'center', verticalAlign: 'top' }}>{row.qty || ''}</td>
+                <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>{row.uom || ''}</td>
               </tr>
             ))}
           </tbody>
         </table>
 
-        {/* ── Footer ── */}
-        <div style={{ marginTop: '48px', borderTop: '1px solid #ddd', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#888' }}>
+        {/* ── Footer — the PAID stamp only when the invoice itself is stamped ── */}
+        <div style={{ marginTop: '40px', display: 'flex', alignItems: 'flex-end', minHeight: '64px' }}>
+          {paid && (
+            <div style={{
+              transform: 'rotate(-12deg)',
+              border: '3px solid #dc2626',
+              borderRadius: '6px',
+              color: '#dc2626',
+              fontSize: '26px',
+              fontWeight: 'bold',
+              letterSpacing: '3px',
+              padding: '4px 18px',
+            }}>
+              PAID
+            </div>
+          )}
+        </div>
+        <div style={{ marginTop: '16px', borderTop: '1px solid #ddd', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#888' }}>
           <span>Zimbabwe Shipping — Ireland Branch</span>
           <span>Tracking: {tracking}</span>
           <span>Generated: {format(new Date(), 'dd/MM/yyyy HH:mm')}</span>
@@ -508,101 +511,12 @@ DeliveryNoteTemplate.displayName = 'DeliveryNoteTemplate';
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-// ── Invoice scan parsing (best-effort, from on-device OCR text) ──────────────
-
-// Normalise a loosely-formatted date to yyyy-MM-dd. Returns null if unparseable.
-function toIsoDate(raw: string): string | null {
-  const s = (raw || '').trim();
-  const m = s.match(/^(\d{1,4})[/\-.](\d{1,2})[/\-.](\d{1,4})$/);
-  if (!m) return null;
-  let [, a, b, c] = m;
-  let year: string, month: string, day: string;
-  if (a.length === 4) { year = a; month = b; day = c; }   // yyyy-mm-dd
-  else { day = a; month = b; year = c; }                   // dd-mm-yyyy (assume day first)
-  if (year.length === 2) year = '20' + year;
-  const mm = month.padStart(2, '0');
-  const dd = day.padStart(2, '0');
-  if (Number(mm) < 1 || Number(mm) > 12 || Number(dd) < 1 || Number(dd) > 31) return null;
-  return `${year}-${mm}-${dd}`;
-}
-
-// Pull a labelled block (e.g. "Ship To") and the few lines that follow it.
-function extractBlock(lines: string[], keywords: string[]): { name?: string; phone?: string; address?: string } | null {
-  const labelRe = new RegExp(`(?:${keywords.join('|')})\\s*:?`, 'i');
-  const stopRe = /^(bill\s*to|ship\s*to|deliver\s*to|sold\s*to|sender|shipper|recipient|consignee|from|to|invoice|date|total|amount|qty|quantity|description|item|sub\s*total|tax)\b/i;
-  const idx = lines.findIndex(l => labelRe.test(l));
-  if (idx === -1) return null;
-
-  const block: string[] = [];
-  const sameLine = lines[idx].replace(new RegExp(`^.*?(?:${keywords.join('|')})\\s*:?`, 'i'), '').trim();
-  if (sameLine) block.push(sameLine);
-  for (let i = idx + 1; i < Math.min(lines.length, idx + 6); i++) {
-    if (stopRe.test(lines[i])) break;
-    block.push(lines[i]);
-  }
-  if (block.length === 0) return null;
-
-  const phoneIdx = block.findIndex(l => /(\+?\d[\d\s().\-]{7,}\d)/.test(l));
-  const phone = phoneIdx >= 0 ? (block[phoneIdx].match(/(\+?\d[\d\s().\-]{7,}\d)/)?.[1].trim()) : undefined;
-  const name = block[0];
-  const addressLines = block.slice(1).filter((_, i) => i + 1 !== phoneIdx);
-  return { name, phone, address: addressLines.join('\n') || undefined };
-}
-
-export interface ParsedInvoiceFields {
-  refNumber?: string;
-  date?: string;
-  senderName?: string;
-  senderPhone?: string;
-  senderAddress?: string;
-  recipientName?: string;
-  recipientPhone?: string;
-  recipientAddress?: string;
-}
-
-// Returns only the fields we could confidently detect from the scanned text.
-export function parseInvoiceText(text: string): ParsedInvoiceFields {
-  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-  const joined = lines.join('\n');
-  const out: ParsedInvoiceFields = {};
-
-  const refM = joined.match(/\b(?:invoice|inv|ref(?:erence)?|order)\s*(?:no\.?|number|#)?\s*[:#\-]?\s*([A-Z0-9][A-Z0-9\-/]{2,})/i);
-  if (refM) out.refNumber = refM[1].toUpperCase();
-
-  const labelledDate = joined.match(/\b(?:date|issued|invoice date)\b\s*[:#\-]?\s*([0-9]{1,4}[/\-.][0-9]{1,2}[/\-.][0-9]{2,4})/i);
-  const anyDate = joined.match(/\b([0-9]{1,4}[/\-.][0-9]{1,2}[/\-.][0-9]{2,4})\b/);
-  const iso = toIsoDate(labelledDate?.[1] || anyDate?.[1] || '');
-  if (iso) out.date = iso;
-
-  const recipient = extractBlock(lines, ['ship to', 'deliver to', 'consignee', 'recipient']);
-  if (recipient) {
-    if (recipient.name) out.recipientName = recipient.name;
-    if (recipient.phone) out.recipientPhone = recipient.phone;
-    if (recipient.address) out.recipientAddress = recipient.address;
-  }
-  const sender = extractBlock(lines, ['bill to', 'sold to', 'shipper', 'sender', 'from']);
-  if (sender) {
-    if (sender.name) out.senderName = sender.name;
-    if (sender.phone) out.senderPhone = sender.phone;
-    if (sender.address) out.senderAddress = sender.address;
-  }
-
-  // Fall back to global phone detection if a block didn't yield one.
-  const phones = [...new Set(Array.from(joined.matchAll(/(\+?\d[\d\s().\-]{7,}\d)/g)).map(m => m[1].replace(/\s{2,}/g, ' ').trim()))];
-  if (!out.senderPhone && phones[0]) out.senderPhone = phones[0];
-  if (!out.recipientPhone && phones[1]) out.recipientPhone = phones[1];
-
-  return out;
-}
-
 interface EditDraft {
   refNumber: string;
   date: string;
   deliveryDate: string;
-  items: Array<{ item: string; description: string }>;
-  doorToDoor: boolean;
-  sealed: boolean;
-  sealCodes: string;
+  items: NoteItem[];
+  paid: boolean;
   senderName: string;
   senderPhone: string;
   senderPhone2: string;
@@ -612,53 +526,23 @@ interface EditDraft {
   recipientPhone2: string;
   recipientAddress: string;
   deliveryAddresses: Array<{ name: string; phone: string; address: string; city: string }>;
-  itemsSummary: string;
   tracking: string;
 }
 
 const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, onClose, shipment, onSaved }) => {
   const noteRef = useRef<HTMLDivElement>(null);
-  const scanInputRef = useRef<HTMLInputElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanText, setScanText] = useState('');
+  const [showInvoiceWizard, setShowInvoiceWizard] = useState(false);
   const [draft, setDraft] = useState<EditDraft | null>(null);
   const { toast } = useToast();
-
-  // Read an invoice photo on-device (Tesseract OCR) and pre-fill what we can.
-  const handleScanFile = async (file: File | undefined) => {
-    if (!file || !draft) return;
-    setIsScanning(true);
-    setScanText('');
-    try {
-      const Tesseract = (await import('tesseract.js')).default;
-      const { data } = await Tesseract.recognize(file, 'eng');
-      const text = (data.text || '').trim();
-      setScanText(text);
-      const parsed = parseInvoiceText(text);
-      const count = Object.keys(parsed).length;
-      setDraft(prev => (prev ? { ...prev, ...parsed } : prev));
-      toast({
-        title: count ? 'Scan complete' : 'Scan finished',
-        description: count
-          ? `Pre-filled ${count} field(s) — please review before saving.`
-          : 'No fields detected automatically — use the scanned text below.',
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Could not read the image.';
-      toast({ title: 'Scan failed', description: msg, variant: 'destructive' });
-    } finally {
-      setIsScanning(false);
-      if (scanInputRef.current) scanInputRef.current.value = '';
-    }
-  };
 
   // Build the editable draft from saved overrides + auto-generated defaults.
   const startEditing = () => {
     const ov = getOverrides(shipment);
     const baseItems = buildLineItems(shipment).map((row, i) => ({
+      ...row,
       item: ov.itemNames?.[i] ?? row.item,
       description: ov.itemDescriptions?.[i] ?? row.description,
     }));
@@ -668,9 +552,7 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
       date: ov.date || format(new Date(shipment.created_at), 'yyyy-MM-dd'),
       deliveryDate: ov.deliveryDate || '',
       items: (ov.items && ov.items.length) ? ov.items.map(it => ({ ...it })) : baseItems,
-      doorToDoor: ov.doorToDoor ?? getDoorToDoor(shipment),
-      sealed: ov.sealed ?? getSealInfo(shipment).sealed,
-      sealCodes: ov.sealCodes ?? getSealInfo(shipment).codes.join(', '),
+      paid: ov.paid === true,
       senderName: ov.senderName ?? getSenderName(shipment),
       senderPhone: ov.senderPhone ?? withDialCode(getSenderPhone(shipment), senderCountry),
       senderPhone2: ov.senderPhone2 ?? withDialCode(getSenderPhone2(shipment), senderCountry),
@@ -680,17 +562,9 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
       recipientPhone2: ov.recipientPhone2 ?? withDialCode(getRecipientPhone2(shipment), 'Zimbabwe'),
       recipientAddress: ov.recipientAddress ?? getRecipientAddress(shipment).join('\n'),
       deliveryAddresses: ov.deliveryAddresses ?? getDeliveryAddresses(shipment),
-      itemsSummary: ov.itemsSummary ?? buildItemsSummary(shipment),
       tracking: ov.tracking ?? shipment.tracking_number,
     });
     setIsEditing(true);
-  };
-
-  // Enter edit mode and immediately open the camera / file picker to scan.
-  const startScanning = () => {
-    startEditing();
-    // Wait for the edit form (and hidden file input) to mount before clicking it.
-    setTimeout(() => scanInputRef.current?.click(), 50);
   };
 
   const cancelEditing = () => {
@@ -705,9 +579,7 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
         date: draft.date || undefined,
         deliveryDate: draft.deliveryDate.trim() || undefined,
         items: draft.items,
-        doorToDoor: draft.doorToDoor,
-        sealed: draft.sealed,
-        sealCodes: draft.sealCodes,
+        paid: draft.paid,
         senderName: draft.senderName,
         senderPhone: draft.senderPhone,
         senderPhone2: draft.senderPhone2,
@@ -717,7 +589,6 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
         recipientPhone2: draft.recipientPhone2,
         recipientAddress: draft.recipientAddress,
         deliveryAddresses: draft.deliveryAddresses,
-        itemsSummary: draft.itemsSummary,
         tracking: draft.tracking,
       }
     : undefined;
@@ -731,9 +602,7 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
       date: draft.date || undefined,
       deliveryDate: draft.deliveryDate.trim() || undefined,
       items: draft.items,
-      doorToDoor: draft.doorToDoor,
-      sealed: draft.sealed,
-      sealCodes: draft.sealCodes.trim(),
+      paid: draft.paid,
       senderName: draft.senderName,
       senderPhone: draft.senderPhone,
       senderPhone2: draft.senderPhone2,
@@ -743,7 +612,6 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
       recipientPhone2: draft.recipientPhone2,
       recipientAddress: draft.recipientAddress,
       deliveryAddresses: draft.deliveryAddresses,
-      itemsSummary: draft.itemsSummary,
       tracking: draft.tracking,
     };
 
@@ -825,35 +693,6 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
         {/* Edit form */}
         {isEditing && draft && (
           <div className="border rounded-lg p-4 bg-muted/40 space-y-4">
-            {/* Scan-to-fill */}
-            <div className="rounded-md border bg-background p-3 space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-sm">
-                  <div className="font-medium flex items-center gap-1.5"><ScanLine className="h-4 w-4" /> Scan an invoice to auto-fill</div>
-                  <div className="text-xs text-muted-foreground">Photograph or upload the external invoice. Detected fields pre-fill below for review — nothing is saved until you click Save.</div>
-                </div>
-                <Button type="button" variant="outline" size="sm" disabled={isScanning} onClick={() => scanInputRef.current?.click()}>
-                  {isScanning
-                    ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Reading…</>
-                    : <><ScanLine className="h-4 w-4 mr-2" />Scan invoice</>}
-                </Button>
-                <input
-                  ref={scanInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={(e) => handleScanFile(e.target.files?.[0])}
-                />
-              </div>
-              {scanText && (
-                <details className="text-xs">
-                  <summary className="cursor-pointer text-muted-foreground">View scanned text (copy anything not auto-filled)</summary>
-                  <Textarea readOnly rows={6} value={scanText} className="mt-2 font-mono text-xs" />
-                </details>
-              )}
-            </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Ref #</label>
@@ -992,56 +831,52 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Delivery method</label>
+              <label className="text-xs font-medium text-muted-foreground">Paid stamp</label>
               <label className="flex items-center gap-2 cursor-pointer rounded-md border p-3 bg-background">
                 <input
                   type="checkbox"
-                  checked={draft.doorToDoor}
-                  onChange={(e) => setDraft({ ...draft, doorToDoor: e.target.checked })}
+                  checked={draft.paid}
+                  onChange={(e) => setDraft({ ...draft, paid: e.target.checked })}
                   className="h-4 w-4"
                 />
                 <span className="text-sm">
-                  Door-to-Door Delivery
-                  <span className="text-muted-foreground"> — {draft.doorToDoor ? 'deliver to recipient address' : 'depot collection (off)'}</span>
+                  Invoice is stamped Paid
+                  <span className="text-muted-foreground"> — only when the invoice shows the red stamp and a zero balance</span>
                 </span>
               </label>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Metal coded seal</label>
-              <label className="flex items-center gap-2 cursor-pointer rounded-md border p-3 bg-background">
-                <input
-                  type="checkbox"
-                  checked={draft.sealed}
-                  onChange={(e) => setDraft({ ...draft, sealed: e.target.checked })}
-                  className="h-4 w-4"
-                />
-                <span className="text-sm">Shipment has a metal coded seal</span>
-              </label>
-              {draft.sealed && (
-                <Input
-                  placeholder="Seal code(s) — comma separated, e.g. ABC123, DEF456"
-                  value={draft.sealCodes}
-                  onChange={(e) => setDraft({ ...draft, sealCodes: e.target.value })}
-                />
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Items summary line</label>
-              <Input value={draft.itemsSummary} onChange={(e) => setDraft({ ...draft, itemsSummary: e.target.value })} />
-            </div>
-
             <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground">Items (name & description)</label>
+              <label className="text-xs font-medium text-muted-foreground">
+                Items — the last row is the delivery (or self-collection) row
+              </label>
               {draft.items.map((it, i) => (
                 <div key={i} className="space-y-1 rounded-md border p-2 bg-background">
                   <div className="flex gap-2">
                     <Input
-                      placeholder={`Item ${i + 1} name`}
+                      className="flex-1"
+                      placeholder={`Item ${i + 1} (e.g. DRUMS)`}
                       value={it.item}
                       onChange={(e) => {
                         const next = draft.items.map((x, j) => j === i ? { ...x, item: e.target.value } : x);
+                        setDraft({ ...draft, items: next });
+                      }}
+                    />
+                    <Input
+                      className="w-20"
+                      placeholder="Qty"
+                      value={it.qty ?? ''}
+                      onChange={(e) => {
+                        const next = draft.items.map((x, j) => j === i ? { ...x, qty: e.target.value } : x);
+                        setDraft({ ...draft, items: next });
+                      }}
+                    />
+                    <Input
+                      className="w-24"
+                      placeholder="UOM"
+                      value={it.uom ?? ''}
+                      onChange={(e) => {
+                        const next = draft.items.map((x, j) => j === i ? { ...x, uom: e.target.value } : x);
                         setDraft({ ...draft, items: next });
                       }}
                     />
@@ -1072,7 +907,7 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setDraft({ ...draft, items: [...draft.items, { item: `Item ${draft.items.length + 1}`, description: '' }] })}
+                onClick={() => setDraft({ ...draft, items: [...draft.items, { item: '', description: '', qty: '1', uom: 'item' }] })}
               >
                 <Plus className="h-4 w-4 mr-1" /> Add item
               </Button>
@@ -1102,8 +937,8 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
           ) : (
             <>
               <Button variant="outline" onClick={onClose}>Close</Button>
-              <Button variant="outline" onClick={startScanning}>
-                <ScanLine className="h-4 w-4 mr-2" /> Scan invoice
+              <Button variant="outline" onClick={() => setShowInvoiceWizard(true)}>
+                <ScanLine className="h-4 w-4 mr-2" /> Note from invoice
               </Button>
               <Button variant="outline" onClick={startEditing}>
                 <Pencil className="h-4 w-4 mr-2" /> Edit
@@ -1121,6 +956,21 @@ const DeliveryNoteGenerator: React.FC<DeliveryNoteGeneratorProps> = ({ isOpen, o
           )}
         </div>
       </DialogContent>
+
+      {/* A note raised from a source invoice goes through the reviewed
+          pipeline and lands in the register, linked back to this booking.
+          The booking's own recipient beats whatever the invoice says. */}
+      <InvoiceNoteWizard
+        isOpen={showInvoiceWizard}
+        onClose={() => setShowInvoiceWizard(false)}
+        shipmentId={shipment.id}
+        initialRecipient={{
+          name: getRecipientName(shipment),
+          phone: withDialCode(getRecipientPhone(shipment), 'Zimbabwe'),
+          address: getRecipientAddress(shipment).join('\n'),
+          city: getDestinationCity(shipment),
+        }}
+      />
     </Dialog>
   );
 };

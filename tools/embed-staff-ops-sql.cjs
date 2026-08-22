@@ -6,11 +6,9 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 const fnPath = path.join(root, 'supabase/functions/staff-ops/index.ts');
-// NOTE: 20260808_restrict_public_shipment_reads.sql is deliberately NOT in this
-// list. It closes public SELECT on shipments/payments/receipts, which the
-// currently-deployed booking form still relies on, so it must be applied only
-// after the new frontend (which books via create_public_booking) is live. Run it
-// as its own step — see docs/ROLLOUT_BOOKING_ACCOUNTS_AND_SECURITY.md.
+// The later pilot-hardening migration carries the final private read policies
+// together with staff-role and finance controls. Public booking uses
+// create_public_booking; public tracking uses get_shipment_tracking_info.
 const sqlPaths = [
   path.join(root, 'supabase/migrations/20260719_operations_upgrade.sql'),
   path.join(root, 'supabase/migrations/20260721_admin_screens.sql'),
@@ -18,6 +16,12 @@ const sqlPaths = [
   path.join(root, 'supabase/migrations/20260808_booking_accounts_self_collection.sql'),
   path.join(root, 'supabase/migrations/20260809_schedule_generate_approve.sql'),
   path.join(root, 'supabase/migrations/20260810_driver_route_collections.sql'),
+  path.join(root, 'supabase/migrations/20260810190000_driver_collection_operations.sql'),
+  path.join(root, 'supabase/migrations/20260810210000_pilot_security_hardening.sql'),
+  path.join(root, 'supabase/migrations/20260810230000_driver_collection_live_locations.sql'),
+  path.join(root, 'supabase/migrations/20260814120000_fix_custom_quote_notifications.sql'),
+  path.join(root, 'supabase/migrations/20260815090000_delivery_driver_operations.sql'),
+  path.join(root, 'supabase/migrations/20260822090000_delivery_note_register.sql'),
 ];
 
 const src = fs.readFileSync(fnPath, 'utf8');
