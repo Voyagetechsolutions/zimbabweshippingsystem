@@ -59,7 +59,7 @@ const CustomQuoteRequest = () => {
     setIsSubmitting(true);
 
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('custom_quotes')
         .insert({
           user_id: user?.id || null,
@@ -67,20 +67,9 @@ const CustomQuoteRequest = () => {
           description: values.itemDescription,
           category: values.itemCategory,
           status: 'pending',
-        })
-        .select()
-        .single();
+        });
 
       if (error) throw error;
-
-      await supabase.from('notifications').insert({
-        user_id: user?.id || '00000000-0000-0000-0000-000000000000',
-        title: 'New Custom Quote Request',
-        message: `A new custom quote request has been submitted for: ${values.itemCategory}`,
-        type: 'custom_quote',
-        related_id: data.id,
-        is_read: false
-      });
 
       toast({
         title: "Quote Request Submitted",

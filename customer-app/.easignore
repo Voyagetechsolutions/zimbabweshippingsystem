@@ -1,0 +1,25 @@
+# EAS reads this file from the app directory in a monorepo.
+**/node_modules/
+**/.expo/
+**/dist/
+**/dist-verify/
+**/dist-verify2/
+**/web-build/
+.git/
+
+# Unrelated monorepo projects and release material.
+/staff-app/
+/tmp/
+/public/
+/src/
+/supabase/
+/whatsapp-bot/
+/old whatsapp bots/
+/store-assets/
+/poster-output/
+/deliverables/
+/docs/
+/scripts/
+/tools/
+/.github/
+

@@ -17,6 +17,20 @@ export type DriverStopParam = {
 
 export type DriverStackParams = {
   TodayRun: undefined;
+  StopDetails: { stop: DriverStopParam };
+  ReportIssue: { stop: DriverStopParam };
+  StopWorkflow: { stop: DriverStopParam };
+};
+
+// Delivery drivers work the Zimbabwe half of the journey. They build the load
+// themselves at the depot, so "DeliveryLoad" sits alongside the run rather than
+// behind it, and "DeliveryNotes" is the driver's own copy of the paperwork.
+export type DeliveryStackParams = {
+  DeliveryHome: undefined;
+  DeliveryLoad: undefined;
+  DeliveryNotes: undefined;
+  StopDetails: { stop: DriverStopParam };
+  ReportIssue: { stop: DriverStopParam };
   StopWorkflow: { stop: DriverStopParam };
 };
 
@@ -58,6 +72,8 @@ export type MenuStackParams = {
   DeliveryNoteDetail: { noteId: string };
   PickupZones: undefined;
   Payments: undefined;
+  PaymentDetails: { paymentId: string };
+  Reconciliation: undefined;
   Invoices: undefined;
   Reports: undefined;
   Analytics: undefined;

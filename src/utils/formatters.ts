@@ -62,6 +62,46 @@ export function formatCurrency(value: number, currency = 'USD'): string {
   }).format(value);
 }
 
+export type CurrencyTotals = Record<string, number>;
+
+export function addCurrencyAmount(
+  totals: CurrencyTotals,
+  amount: number | null | undefined,
+  currency?: string | null,
+): CurrencyTotals {
+  const code = (currency || 'GBP').toUpperCase();
+  totals[code] = (totals[code] || 0) + (Number(amount) || 0);
+  return totals;
+}
+
+export function formatCurrencyTotals(totals: CurrencyTotals): string {
+  const entries = Object.entries(totals).filter(([, amount]) => amount !== 0);
+  if (!entries.length) return formatCurrency(0, 'GBP');
+
+  return entries
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([currency, amount]) => formatCurrency(amount, currency))
+    .join(' · ');
+}
+
+export function shipmentCustomerName(metadata: any): string {
+  const sender = metadata?.sender || {};
+  const senderDetails = metadata?.senderDetails || metadata?.sender_details || {};
+  const joinedName = (firstName?: string, lastName?: string) =>
+    [firstName, lastName].filter(Boolean).join(' ').trim();
+
+  return sender.name
+    || joinedName(sender.firstName, sender.lastName)
+    || senderDetails.name
+    || joinedName(senderDetails.firstName, senderDetails.lastName)
+    || joinedName(metadata?.firstName, metadata?.lastName)
+    || metadata?.sender_name
+    || metadata?.customer_name
+    || metadata?.recipient_name
+    || metadata?.recipient?.name
+    || '—';
+}
+
 /**
  * Format a file size in bytes to a human-readable string
  * 

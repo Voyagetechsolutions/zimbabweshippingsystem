@@ -11,7 +11,15 @@ import { supabase } from '../lib/supabase';
 //   customer / other  -> no access
 export type DashboardRole = 'admin' | 'finance' | 'driver';
 
-type Profile = { id: string; full_name?: string | null; role?: string | null; is_admin?: boolean | null };
+// Drivers are specialised. A pickup driver works the shared UK/Ireland
+// collection route; a delivery driver loads a vehicle at the Zimbabwe depot and
+// runs the drops. 'both' sees each side.
+export type DriverType = 'pickup' | 'delivery' | 'both';
+
+type Profile = {
+  id: string; full_name?: string | null; role?: string | null; is_admin?: boolean | null;
+  driver_type?: DriverType | null;
+};
 
 interface AuthValue {
   session: Session | null;
@@ -19,6 +27,8 @@ interface AuthValue {
   loading: boolean;
   isStaff: boolean;
   dashboardRole: DashboardRole | null;
+  /** Which half of the journey this driver works. Admins get 'both'. */
+  driverType: DriverType;
   // Logistics staff share the admin dashboard but must not reach the finance
   // screens, so operations access and finance access are tracked separately.
   canAccessFinance: boolean;
@@ -46,31 +56,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // 2. Profile for display + secondary role/is_admin signals.
-    let { data } = await supabase.from('profiles').select('id, full_name, role, is_admin').eq('id', userId).maybeSingle();
+    let { data } = await supabase.from('profiles').select('id, full_name, role, is_admin, driver_type').eq('id', userId).maybeSingle();
     if (!data && email) {
-      const byEmail = await supabase.from('profiles').select('id, full_name, role, is_admin').eq('email', email).maybeSingle();
+      const byEmail = await supabase.from('profiles').select('id, full_name, role, is_admin, driver_type').eq('email', email).maybeSingle();
       data = byEmail.data;
     }
     setProfile((data as Profile) ?? null);
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
-      setSession(data.session);
-      if (data.session?.user) await loadProfile(data.session.user.id, data.session.user.email ?? undefined);
-      setLoading(false);
-    });
+    let active = true;
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, s) => {
+    const hydrateSession = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        if (!active) return;
+        setSession(data.session);
+        if (data.session?.user) {
+          await loadProfile(data.session.user.id, data.session.user.email ?? undefined);
+        }
+      } catch (error) {
+        console.error('Unable to restore staff session', error);
+        if (active) {
+          setSession(null);
+          setProfile(null);
+          setAdminFlag(false);
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void hydrateSession();
+
+    // Supabase auth callbacks must finish synchronously. Calling another
+    // Supabase API from inside the callback can hold the auth lock and leave
+    // the app on its startup spinner indefinitely.
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+      if (!active) return;
       setSession(s);
+      setLoading(false);
+
+      setTimeout(() => {
+        if (!active) return;
       if (s?.user) {
-        await loadProfile(s.user.id, s.user.email ?? undefined);
+          void loadProfile(s.user.id, s.user.email ?? undefined);
       } else {
         setProfile(null);
         setAdminFlag(false);
       }
+      }, 0);
     });
-    return () => sub.subscription.unsubscribe();
+
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
   }, [loadProfile]);
 
   const signIn = useCallback(async (email: string, password: string) => {
@@ -102,9 +144,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isFullAdmin = adminFlag || profile?.is_admin === true || role === 'admin';
   const canAccessFinance = isFullAdmin || dashboardRole === 'finance';
   const canSwitchDashboards = isFullAdmin;
+  // An admin previewing the driver dashboard needs both halves; a driver gets
+  // the specialism admin set for them, defaulting to both when it is unset.
+  const savedDriverType = (profile?.driver_type || '').toLowerCase();
+  const driverType: DriverType = dashboardRole === 'admin' ? 'both'
+    : savedDriverType === 'pickup' || savedDriverType === 'delivery' ? savedDriverType : 'both';
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading, isStaff, dashboardRole, canAccessFinance, canSwitchDashboards, signIn, signOut }}>
+    <AuthContext.Provider value={{ session, profile, loading, isStaff, dashboardRole, driverType, canAccessFinance, canSwitchDashboards, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

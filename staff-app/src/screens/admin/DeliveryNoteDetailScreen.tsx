@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
@@ -10,6 +10,7 @@ import { senderName, senderPhone, receiverName, receiverPhone, pickupAddress, ty
 import { buildDeliveryNoteHtml, sharePdf } from '../../lib/documents';
 import { Badge, BADGE, Card, SectionLabel, Loading, ErrorState } from '../../components/adminui';
 import { noteBadge, type DeliveryNoteRow } from './DeliveryNotesScreen';
+import { sealStatusLabel, verifyDeliveryNote, type SealStatus } from '../../lib/deliveries';
 import type { MenuStackParams } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<MenuStackParams, 'DeliveryNoteDetail'>;
@@ -30,6 +31,9 @@ export default function DeliveryNoteDetailScreen({ route, navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [loadItem, setLoadItem] = useState<any>(null);
+  const [verificationNote, setVerificationNote] = useState('');
+  const [verifying, setVerifying] = useState<'verify' | 'reject' | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -59,6 +63,18 @@ export default function DeliveryNoteDetailScreen({ route, navigation }: Props) {
     setInvoice(invoiceResult.data || null);
     setRun((stopResult.data as any)?.run || null);
     setExceptions(exceptionResult.data || []);
+
+    // What the delivery driver typed when they put this on the vehicle. Absent
+    // for notes raised before the delivery-driver workflow, and on databases
+    // where it is not deployed yet.
+    if ((row as any).stop_id) {
+      const loadResult = await supabase.from('delivery_load_items')
+        .select('entered_reference,entered_seal_code,seal_status,recorded_seal_codes,discrepancy_note,created_at')
+        .eq('stop_id', (row as any).stop_id).maybeSingle();
+      setLoadItem(loadResult.error ? null : loadResult.data);
+    } else {
+      setLoadItem(null);
+    }
   }, [noteId]);
 
   useEffect(() => { (async () => { setLoading(true); await load(); setLoading(false); })(); }, [load]);
@@ -78,18 +94,35 @@ export default function DeliveryNoteDetailScreen({ route, navigation }: Props) {
     finally { setDownloading(false); }
   };
 
-  const markRejected = () => {
-    if (dashboardRole !== 'admin') { Alert.alert('Admin only', 'Only admins can reject a delivery note.'); return; }
-    Alert.alert('Mark rejected', 'Flag this delivery note for correction? The status becomes an exception.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Mark rejected', style: 'destructive', onPress: async () => {
-          const { error: updateError } = await supabase.from('delivery_notes')
-            .update({ status: 'exception', updated_at: new Date().toISOString() }).eq('id', noteId);
-          if (updateError) Alert.alert('Could not update', updateError.message); else await load();
+  // Verification is the gate on the whole delivery: until an admin approves the
+  // note, the driver cannot download it and the run will not start.
+  const decide = (approved: boolean) => {
+    if (dashboardRole !== 'admin') { Alert.alert('Admin only', 'Only admins can verify a delivery note.'); return; }
+    if (!approved && !verificationNote.trim()) {
+      Alert.alert('Say what is wrong', 'The driver sees this message, so tell them what to fix before re-presenting the goods.');
+      return;
+    }
+    Alert.alert(
+      approved ? 'Verify this delivery note?' : 'Reject this delivery note?',
+      approved
+        ? 'The driver can download it and this consignment is cleared to travel.'
+        : 'The driver is told immediately and must take this consignment off the vehicle.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: approved ? 'Verify' : 'Reject', style: approved ? 'default' : 'destructive',
+          onPress: async () => {
+            setVerifying(approved ? 'verify' : 'reject');
+            try {
+              await verifyDeliveryNote(noteId, approved, verificationNote);
+              setVerificationNote('');
+              await load();
+            } catch (e: any) { Alert.alert('Could not update the note', e?.message || 'Please try again.'); }
+            finally { setVerifying(null); }
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
   if (loading) return <Loading />;
@@ -104,6 +137,8 @@ export default function DeliveryNoteDetailScreen({ route, navigation }: Props) {
   const deletedPhotos = photos.filter((p) => p.deleted_at);
   const invoiceMeta = meta.invoice || {};
   const canSeePayment = dashboardRole === 'admin' || dashboardRole === 'finance';
+  const verification = (note.verification_status || 'pending') as 'pending' | 'verified' | 'rejected';
+  const verificationTone = verification === 'verified' ? BADGE.green : verification === 'rejected' ? BADGE.red : BADGE.orange;
 
   return (
     <ScrollView style={styles.safe} contentContainerStyle={styles.content}
@@ -120,6 +155,65 @@ export default function DeliveryNoteDetailScreen({ route, navigation }: Props) {
             <Text style={styles.primaryText}>{downloading ? 'Preparing…' : 'Download / share PDF'}</Text>
           </Pressable>
         </View>
+      </Card>
+
+      <SectionLabel text="Admin verification" />
+      <Card>
+        <View style={styles.rowTop}>
+          <Text style={styles.verificationTitle}>
+            {verification === 'verified' ? 'Verified — cleared to travel'
+              : verification === 'rejected' ? 'Rejected — must come off the vehicle'
+                : 'Waiting for verification'}
+          </Text>
+          <Badge text={verification} tone={verificationTone} />
+        </View>
+        <Text style={styles.verificationHelp}>
+          {verification === 'pending'
+            ? 'The driver cannot download this note or start their run until it is verified. Check the goods, the seal and the recipient against the booking below.'
+            : `${verification === 'verified' ? 'Verified' : 'Rejected'}${note.verified_at ? ` on ${new Date(note.verified_at).toLocaleString()}` : ''}.`}
+        </Text>
+        {note.verification_notes ? <Text style={styles.verificationNote}>“{note.verification_notes}”</Text> : null}
+
+        {loadItem ? (
+          <View style={styles.loadBlock}>
+            <Text style={styles.blockLabel}>WHAT THE DRIVER RECORDED AT LOADING</Text>
+            <Row k="Reference typed" v={loadItem.entered_reference || '—'} />
+            <Row k="Seal code read" v={loadItem.entered_seal_code || 'None entered'} />
+            <Row k="Seal check" v={sealStatusLabel((loadItem.seal_status || 'none_on_record') as SealStatus)} />
+            {(loadItem.recorded_seal_codes || []).length ? (
+              <Row k="Fitted at collection" v={(loadItem.recorded_seal_codes || []).join(', ')} />
+            ) : null}
+            {loadItem.discrepancy_note ? (
+              <Text style={[styles.exception, { color: colors.amber }]}>{loadItem.discrepancy_note}</Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        {dashboardRole === 'admin' ? (
+          <>
+            <Text style={styles.blockLabel}>NOTE TO THE DRIVER {verification === 'rejected' || verification === 'pending' ? '(REQUIRED TO REJECT)' : ''}</Text>
+            <TextInput style={styles.verificationInput} value={verificationNote} onChangeText={setVerificationNote}
+              multiline placeholder="e.g. Seal ZS-04600 accepted, matches the replacement logged by the depot."
+              placeholderTextColor={colors.textFaint} />
+            <View style={styles.decideRow}>
+              <Pressable style={[styles.verifyButton, verifying !== null && { opacity: 0.5 }]}
+                disabled={verifying !== null} onPress={() => decide(true)}>
+                {verifying === 'verify' ? <ActivityIndicator color={colors.white} size="small" /> : (
+                  <>
+                    <Ionicons name="shield-checkmark-outline" size={15} color={colors.white} />
+                    <Text style={styles.primaryText}>{verification === 'verified' ? 'Re-verify' : 'Verify note'}</Text>
+                  </>
+                )}
+              </Pressable>
+              <Pressable style={[styles.rejectButton, verifying !== null && { opacity: 0.5 }]}
+                disabled={verifying !== null} onPress={() => decide(false)}>
+                {verifying === 'reject' ? <ActivityIndicator color={colors.danger} size="small" /> : (
+                  <Text style={[styles.secondaryText, { color: colors.danger }]}>Reject</Text>
+                )}
+              </Pressable>
+            </View>
+          </>
+        ) : null}
       </Card>
 
       <SectionLabel text="Parties" />
@@ -197,17 +291,12 @@ export default function DeliveryNoteDetailScreen({ route, navigation }: Props) {
       ) : null}
 
       <View style={styles.secondaryRow}>
-        <Pressable style={styles.secondaryButton} onPress={() => shipment && (navigation as any).getParent()?.navigate('Shipments', { screen: 'ShipmentDetail', params: { shipment } })}>
+        {shipment ? <Pressable style={styles.secondaryButton} onPress={() => (navigation as any).getParent()?.navigate('Shipments', { screen: 'ShipmentDetail', params: { shipment } })}>
           <Text style={styles.secondaryText}>View shipment</Text>
-        </Pressable>
+        </Pressable> : null}
         <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('Customers')}>
           <Text style={styles.secondaryText}>View customer</Text>
         </Pressable>
-        {note.status !== 'exception' && dashboardRole === 'admin' ? (
-          <Pressable style={[styles.secondaryButton, { borderColor: colors.danger }]} onPress={markRejected}>
-            <Text style={[styles.secondaryText, { color: colors.danger }]}>Mark rejected</Text>
-          </Pressable>
-        ) : null}
       </View>
     </ScrollView>
   );
@@ -251,6 +340,14 @@ const styles = StyleSheet.create({
   exception: { fontSize: 12.5, color: colors.danger, fontWeight: '700', lineHeight: 18, paddingVertical: 2 },
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 6 },
   link: { fontSize: 12, fontWeight: '800', color: colors.primary },
+  verificationTitle: { fontSize: 14.5, fontWeight: '800', color: colors.text, flexShrink: 1 },
+  verificationHelp: { fontSize: 12, color: colors.textMuted, lineHeight: 17, marginTop: 4 },
+  verificationNote: { fontSize: 12.5, color: colors.text, fontStyle: 'italic', marginTop: 6, lineHeight: 18 },
+  loadBlock: { marginTop: spacing.md, backgroundColor: colors.bg, borderRadius: radius.sm, padding: spacing.md },
+  verificationInput: { minHeight: 64, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, backgroundColor: colors.bg, padding: spacing.md, color: colors.text, fontSize: 13, textAlignVertical: 'top', marginTop: 4 },
+  decideRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  verifyButton: { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: colors.primary, borderRadius: radius.sm, paddingVertical: 12 },
+  rejectButton: { flex: 1, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.danger, borderRadius: radius.sm, paddingVertical: 12 },
   secondaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   secondaryButton: { flexGrow: 1, borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.sm, paddingVertical: 11, alignItems: 'center' },
   secondaryText: { fontSize: 12.5, fontWeight: '800', color: colors.textMuted },

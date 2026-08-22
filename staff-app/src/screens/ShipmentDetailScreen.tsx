@@ -182,14 +182,14 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
           <Row k="Phone" v={senderPhone(shipment) || '—'} />
           <Row k="Receiver" v={receiverName(shipment)} />
           <Row k="Receiver phone" v={receiverPhone(shipment) || '—'} />
-          <View style={styles.contactRow}>
-            <Pressable style={styles.contactButton} onPress={() => phone && Linking.openURL(`tel:${phone}`)}>
+          {phone ? <View style={styles.contactRow}>
+            <Pressable style={styles.contactButton} onPress={() => Linking.openURL(`tel:${phone}`)}>
               <Text style={styles.contactText}>📞 Call</Text>
             </Pressable>
-            <Pressable style={[styles.contactButton, { backgroundColor: '#dcfce7' }]} onPress={() => phone && Linking.openURL(`https://wa.me/${phone.replace(/\D/g, '')}`)}>
+            <Pressable style={[styles.contactButton, { backgroundColor: '#dcfce7' }]} onPress={() => Linking.openURL(`https://wa.me/${phone.replace(/\D/g, '')}`)}>
               <Text style={[styles.contactText, { color: '#15803d' }]}>💬 WhatsApp</Text>
             </Pressable>
-          </View>
+          </View> : null}
         </View>
 
         {/* ── Collection information ── */}

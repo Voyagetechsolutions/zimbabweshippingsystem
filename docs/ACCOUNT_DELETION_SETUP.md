@@ -26,6 +26,7 @@ This document explains the account deletion feature created for Google Play Data
 - **Function**: `process-account-deletion`
 - **Location**: `supabase/functions/process-account-deletion/index.ts`
 - Admin-only function that:
+  - Revokes the user's Apple token, if they signed in with Apple (see item 5)
   - Deletes personal data (addresses, profile, credentials)
   - Anonymizes shipment and feedback data
   - Keeps financial records (legal requirement)
@@ -35,30 +36,48 @@ This document explains the account deletion feature created for Google Play Data
 - Added "Delete Account" link in website footer
 - Visible on all pages
 
+### 5. **Sign in with Apple token revocation**
+- **Function**: `apple-auth` (`supabase/functions/apple-auth/index.ts`)
+- **Shared helpers**: `supabase/functions/_shared/apple.ts`
+- Apple requires that deleting an account also revokes the user's Apple token
+  (App Store Review Guideline 5.1.1 (v)), not merely delete the row — and App
+  Review checks this path.
+- The native Apple flow gives Supabase only an identity token, so there is no
+  provider refresh token on `auth.identities` to revoke. `apple-auth` exchanges
+  Apple's one-shot authorization code at sign-in and stores the resulting
+  refresh token in `public.apple_auth_tokens` (service role only);
+  `process-account-deletion` revokes it at deletion time, before anything else
+  is touched.
+- Full rationale, the four `APPLE_*` secrets and the deploy steps are in
+  `docs/IOS_APP_STORE_SUBMISSION.md` → **Step 4b**.
+- Inert until those secrets are set. Until then deletion proceeds as normal and
+  the request notes record that no token was revoked.
+
 ---
 
 ## Deployment Steps
 
 ### Step 1: Deploy Database Migration
 
-Run this SQL in your Supabase SQL Editor or via CLI:
+> **Never run `supabase db push` on this project.** It replays the whole
+> migration history, including destructive migrations. Apply DDL by hand in the
+> SQL Editor, or through an edge function's `setup` action.
+
+Copy/paste the contents of
+`supabase/migrations/20260719_account_deletion_requests.sql` into the Supabase
+SQL Editor and run it.
+
+### Step 2: Deploy Edge Functions
 
 ```bash
-# Using Supabase CLI
-supabase db push
-
-# Or manually copy/paste the contents of:
-# supabase/migrations/20260719_account_deletion_requests.sql
+supabase functions deploy process-account-deletion apple-auth
 ```
 
-### Step 2: Deploy Edge Function
+Then create the Apple token table from an admin session (see Step 4b of
+`docs/IOS_APP_STORE_SUBMISSION.md`):
 
-```bash
-# Navigate to project root
-cd c:\Users\Mthokozisi.DESKTOP-DPOBCC1\Documents\zimbabwe-shipping-nexus
-
-# Deploy the edge function
-supabase functions deploy process-account-deletion
+```ts
+await supabase.functions.invoke('apple-auth', { body: { action: 'setup' } })
 ```
 
 ### Step 3: Deploy Website Changes

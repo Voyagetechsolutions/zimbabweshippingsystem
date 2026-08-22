@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { Linking, View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, spacing } from '../theme';
 import type { RunMapProps, RunMapStop } from './RunMap';
@@ -10,11 +10,13 @@ import type { RunMapProps, RunMapStop } from './RunMap';
 let MapView: any = null;
 let Marker: any = null;
 let Polyline: any = null;
+let Callout: any = null;
 try {
   const maps = require('react-native-maps');
   MapView = maps.default;
   Marker = maps.Marker;
   Polyline = maps.Polyline;
+  Callout = maps.Callout;
 } catch {
   MapView = null;
 }
@@ -81,7 +83,16 @@ export default function RunMap({ stops, polylines = [], onStopPress, height = 22
   if (!stops.length && !polylines.length) return <FallbackCard count={0} />;
   if (!MapView) return <FallbackCard count={stops.length} />;
 
-  const remaining = stops.filter((stop) => !stop.done).length;
+  const remaining = stops.filter((stop) => !stop.done && stop.kind !== 'driver').length;
+  const includesDrivers = stops.some((stop) => stop.kind === 'driver');
+  const openNavigation = (stop: RunMapStop) => {
+    if (onStopPress) {
+      onStopPress(stop);
+      return;
+    }
+    const destination = encodeURIComponent(`${stop.latitude},${stop.longitude}`);
+    void Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`);
+  };
 
   return (
     <MapErrorBoundary fallback={<FallbackCard count={stops.length} />}>
@@ -101,14 +112,11 @@ export default function RunMap({ stops, polylines = [], onStopPress, height = 22
           ))}
           {stops.map((stop: RunMapStop) => {
             const isFocus = stop.id === focusStopId;
-            const tone = stop.color || (stop.kind === 'collection' ? colors.primary : '#d97706');
+            const tone = stop.color || (stop.kind === 'driver' ? '#2563eb' : stop.kind === 'collection' ? colors.primary : '#d97706');
             return (
               <Marker
                 key={stop.id}
                 coordinate={{ latitude: stop.latitude, longitude: stop.longitude }}
-                title={stop.title}
-                description={stop.description}
-                onCalloutPress={() => onStopPress?.(stop)}
                 // A numbered pin is what makes a list of drops read as a route.
                 // zIndex keeps the next stop on top of any neighbours.
                 zIndex={isFocus ? 99 : undefined}
@@ -123,6 +131,15 @@ export default function RunMap({ stops, polylines = [], onStopPress, height = 22
                 >
                   <Text style={styles.pinText}>{stop.order ?? '•'}</Text>
                 </View>
+                {Callout ? (
+                  <Callout onPress={() => openNavigation(stop)}>
+                    <View style={styles.callout}>
+                      <Text style={styles.calloutTitle}>{stop.title}</Text>
+                      <Text style={styles.calloutAddress}>{stop.description}</Text>
+                      <Text style={styles.calloutAction}>{stop.kind === 'driver' ? 'Open driver location' : 'Open navigation'}</Text>
+                    </View>
+                  </Callout>
+                ) : null}
               </Marker>
             );
           })}
@@ -130,6 +147,7 @@ export default function RunMap({ stops, polylines = [], onStopPress, height = 22
         <View style={styles.mapLegend}>
           <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: colors.primary }]} /><Text style={styles.legendText}>Collection</Text></View>
           <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#d97706' }]} /><Text style={styles.legendText}>Delivery</Text></View>
+          {includesDrivers ? <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#2563eb' }]} /><Text style={styles.legendText}>Driver</Text></View> : null}
           <Text style={styles.legendText}>{remaining} to go</Text>
         </View>
       </View>
@@ -158,4 +176,8 @@ const styles = StyleSheet.create({
   pinFocus: { minWidth: 34, height: 34, borderRadius: 17, borderWidth: 3 },
   pinDone: { opacity: 0.45 },
   pinText: { color: colors.white, fontSize: 12, fontWeight: '800' },
+  callout: { width: 230, padding: 4 },
+  calloutTitle: { color: colors.text, fontSize: 14, fontWeight: '800' },
+  calloutAddress: { color: colors.textMuted, fontSize: 12, lineHeight: 17, marginTop: 4 },
+  calloutAction: { color: colors.primary, fontSize: 13, fontWeight: '800', marginTop: 9 },
 });

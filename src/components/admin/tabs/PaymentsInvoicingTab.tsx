@@ -195,19 +195,16 @@ const PaymentsInvoicingTab = () => {
 
   const handleMarkAsPaid = async (paymentId: string) => {
     try {
-      const { error } = await supabase
-        .from('payments')
-        .update({ 
-          payment_status: 'succeeded',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', paymentId);
+      const { error } = await supabase.rpc('mark_payment_received', {
+        p_payment_id: paymentId,
+        p_notes: null,
+      });
 
       if (error) throw error;
 
       toast({
         title: 'Payment Updated',
-        description: 'Payment has been marked as completed successfully.',
+        description: 'Receipt recorded. Reconcile it after matching the finance record.',
       });
 
       await fetchPayments();

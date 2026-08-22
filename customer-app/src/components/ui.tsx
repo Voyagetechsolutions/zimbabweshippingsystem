@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, ViewStyle } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, spacing, FLAG } from '../theme';
 import { useAppTheme } from '../context/ThemeContext';
 
@@ -52,20 +53,35 @@ export function Field({
   autoCapitalize?: 'none' | 'words' | 'sentences'; secureTextEntry?: boolean; multiline?: boolean;
 }) {
   const {palette}=useAppTheme();
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const isPassword = Boolean(secureTextEntry);
   return (
     <View style={{ marginBottom: spacing.md }}>
       <Text style={[styles.label,{color:palette.textMuted}]}>{label}</Text>
-      <TextInput
-        style={[styles.input,{backgroundColor:palette.surface,borderColor:palette.border,color:palette.text}, multiline && { minHeight: 72, textAlignVertical: 'top' }]}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={palette.textFaint}
-        keyboardType={keyboardType}
-        autoCapitalize={autoCapitalize}
-        secureTextEntry={secureTextEntry}
-        multiline={multiline}
-      />
+      <View>
+        <TextInput
+          style={[styles.input,{backgroundColor:palette.surface,borderColor:palette.border,color:palette.text}, isPassword && styles.passwordInput, multiline && { minHeight: 72, textAlignVertical: 'top' }]}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={palette.textFaint}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          secureTextEntry={isPassword && !passwordVisible}
+          multiline={multiline}
+        />
+        {isPassword && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={passwordVisible ? 'Hide password' : 'Show password'}
+            hitSlop={10}
+            onPress={() => setPasswordVisible((visible) => !visible)}
+            style={styles.passwordToggle}
+          >
+            <Ionicons name={passwordVisible ? 'eye-off-outline' : 'eye-outline'} size={21} color={palette.textMuted} />
+          </Pressable>
+        )}
+      </View>
     </View>
   );
 }
@@ -97,6 +113,8 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm,
     paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: colors.text, backgroundColor: colors.white,
   },
+  passwordInput: { paddingRight: 46 },
+  passwordToggle: { position: 'absolute', right: 13, top: 0, bottom: 0, justifyContent: 'center' },
   sectionTitle: {
     fontSize: 12, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase',
     letterSpacing: 0.5, marginTop: spacing.lg, marginBottom: spacing.sm,

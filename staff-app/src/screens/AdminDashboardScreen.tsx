@@ -36,6 +36,7 @@ function matchesQuery(shipment: Shipment, needle: string): boolean {
 
 const PENDING = ['Booking Confirmed', 'Ready for Pickup', 'pending'];
 const ACTIVE = ['Processing in UK Warehouse', 'Customs Clearance', 'Processing in ZW Warehouse', 'Out for Delivery'];
+const PAID_STATUSES = new Set(['completed', 'paid', 'success', 'succeeded']);
 
 const EVENT_LABELS: Record<string, { label: string; icon: keyof typeof Ionicons.glyphMap; color: string }> = {
   driver_en_route: { label: 'Driver en route', icon: 'car', color: colors.blue },
@@ -99,7 +100,7 @@ export default function AdminDashboardScreen() {
       startOfToday.setHours(0, 0, 0, 0);
       const [ship, pay, quotes, requests, reviews, failedStops, proofs, expenses, runs, eventRows] = await Promise.all([
         supabase.from('shipments').select('id, tracking_number, customer_reference, status, created_at, metadata').order('created_at', { ascending: false }),
-        supabase.from('payments').select('amount, currency, created_at, reconciled_at'),
+        supabase.from('payments').select('amount, currency, payment_status, created_at, reconciled_at'),
         supabase.from('custom_quotes').select('id, quoted_amount').eq('status', 'pending'),
         supabase.from('customer_requests').select('id', { count: 'exact', head: true }).eq('status', 'New'),
         supabase.from('reviews').select('id', { count: 'exact', head: true }).eq('moderation_status', 'flagged'),
@@ -112,8 +113,9 @@ export default function AdminDashboardScreen() {
       if (ship.error) throw ship.error;
       setShipments((ship.data as Shipment[]) || []);
       const payments = (pay.data || []) as any[];
-      setRevenue(payments.reduce((map: Record<string, number>, p: any) => addToMoneyMap(map, p.amount, p.currency), {}));
-      setRevenueToday(payments
+      const collectedPayments = payments.filter((p) => PAID_STATUSES.has(String(p.payment_status || '').toLowerCase()));
+      setRevenue(collectedPayments.reduce((map: Record<string, number>, p: any) => addToMoneyMap(map, p.amount, p.currency), {}));
+      setRevenueToday(collectedPayments
         .filter((p) => new Date(p.created_at).getTime() >= startOfToday.getTime())
         .reduce((map: Record<string, number>, p: any) => addToMoneyMap(map, p.amount, p.currency), {}));
       setPendingQuotes(quotes.data?.length || 0);
@@ -126,7 +128,7 @@ export default function AdminDashboardScreen() {
         failedStops: failedStops.count || 0,
         pendingProofs: proofs.count || 0,
         pendingExpenses: expenses.count || 0,
-        unreconciled: payments.filter((p) => !p.reconciled_at).length,
+        unreconciled: collectedPayments.filter((p) => !p.reconciled_at).length,
       });
     } catch (e: any) {
       console.error('Dashboard load failed:', e);
@@ -136,6 +138,20 @@ export default function AdminDashboardScreen() {
 
   useEffect(() => {
     (async () => { setLoading(true); await load(); setLoading(false); })();
+  }, [load]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('staff-admin-dashboard-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shipments' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_proofs' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'custom_quotes' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'customer_requests' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'finance_expenses' }, load)
+      .subscribe();
+
+    return () => { void supabase.removeChannel(channel); };
   }, [load]);
 
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
@@ -190,6 +206,8 @@ export default function AdminDashboardScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
         contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
         <View style={styles.topBar}>
@@ -299,9 +317,9 @@ export default function AdminDashboardScreen() {
 
         <Card style={styles.revenueCard}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.revenueKicker}>REVENUE TODAY</Text>
+            <Text style={styles.revenueKicker}>COLLECTED TODAY</Text>
             <Text style={styles.revenueValue}>{moneyMap(revenueToday)}</Text>
-            <Text style={styles.revenueTotal}>All time {moneyMap(revenue)}</Text>
+            <Text style={styles.revenueTotal}>Collected all time {moneyMap(revenue)}</Text>
           </View>
           <View style={styles.revenueIcon}><Ionicons name="trending-up" size={22} color={colors.primary} /></View>
         </Card>

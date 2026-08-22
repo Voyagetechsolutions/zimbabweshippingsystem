@@ -902,6 +902,10 @@ export type Database = {
         Returns: undefined
       }
       make_admin: { Args: { user_email: string }; Returns: boolean }
+      mark_payment_received: {
+        Args: { p_payment_id: string; p_notes?: string | null }
+        Returns: Json
+      }
       update_admin_password: {
         Args: { current_password: string; new_password: string }
         Returns: boolean

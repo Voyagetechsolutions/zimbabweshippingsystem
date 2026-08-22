@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Alert, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,12 +25,47 @@ function passwordRequirement(pw: string): string | null {
 
 export default function AuthScreen() {
   const navigation = useNavigation<any>();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, signInWithGoogle, signInWithApple } = useAuth();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
-  const {palette}=useAppTheme();
+  const [appleReady, setAppleReady] = useState(false);
+  const {dark,palette}=useAppTheme();
+
+  // Sign in with Apple needs iOS 13+, so ask rather than assume.
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    let alive = true;
+    AppleAuthentication.isAvailableAsync()
+      .then((ok) => { if (alive) setAppleReady(ok); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  const appleSignIn = async () => {
+    setBusy(true);
+    try {
+      const { error, cancelled } = await signInWithApple();
+      if (cancelled) return;
+      if (error) Alert.alert('Sign in with Apple failed', error);
+      else navigation.goBack();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const googleSignIn = async () => {
+    setBusy(true);
+    try {
+      const { error, cancelled } = await signInWithGoogle();
+      if (cancelled) return;
+      if (error) Alert.alert('Sign in with Google failed', error);
+      else navigation.goBack();
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const submit = async () => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -131,6 +167,37 @@ export default function AuthScreen() {
             <View style={[styles.orLine,{backgroundColor:palette.border}]} />
           </View>
 
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Continue with Google"
+            disabled={busy}
+            onPress={googleSignIn}
+            style={({ pressed }) => [styles.googleButton, { backgroundColor: palette.surface, borderColor: palette.border }, (pressed || busy) && { opacity: 0.65 }]}
+          >
+            <Ionicons name="logo-google" size={20} color="#4285F4" />
+            <Text style={[styles.googleButtonText, { color: palette.text }]}>Continue with Google</Text>
+          </Pressable>
+
+          {appleReady && (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={
+                mode === 'signin'
+                  ? AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+                  : AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP
+              }
+              // Apple's HIG requires their own button, and it must contrast with
+              // the surface it sits on.
+              buttonStyle={
+                dark
+                  ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                  : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+              }
+              cornerRadius={radius.md}
+              style={styles.appleButton}
+              onPress={appleSignIn}
+            />
+          )}
+
           <Button
             title={mode === 'signin' ? 'Create New Account' : 'I already have an account'}
             variant="outline"
@@ -158,6 +225,9 @@ const styles = StyleSheet.create({
   orRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginVertical: spacing.lg },
   orLine: { flex: 1, height: 1 },
   orText: { fontSize: 12, fontWeight: '700' },
+  googleButton: { height: 50, width: '100%', marginBottom: spacing.md, borderWidth: 1, borderRadius: radius.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  googleButtonText: { fontSize: 15, fontWeight: '700' },
+  appleButton: { height: 50, width: '100%', marginBottom: spacing.md },
   terms: { fontSize: 12, textAlign: 'center', marginTop: spacing.xl, lineHeight: 17 },
   termsLink: { color: colors.green, fontWeight: '700' },
 });

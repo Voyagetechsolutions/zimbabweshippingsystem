@@ -9,7 +9,7 @@ import * as Location from 'expo-location';
  * driver with a usable list of addresses. Every failure resolves to null.
  */
 
-export type Point = { latitude: number; longitude: number };
+export type Point = { latitude: number; longitude: number; accuracyM?: number | null };
 
 export type LocationOutcome =
   | { point: Point; status: 'ok' }
@@ -30,7 +30,11 @@ export async function getDriverLocation(): Promise<LocationOutcome> {
     });
 
     return {
-      point: { latitude: position.coords.latitude, longitude: position.coords.longitude },
+      point: {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracyM: position.coords.accuracy,
+      },
       status: 'ok',
     };
   } catch {

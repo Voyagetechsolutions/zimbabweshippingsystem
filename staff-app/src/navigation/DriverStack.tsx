@@ -2,6 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import DriverDashboardScreen from '../screens/DriverDashboardScreen';
 import CollectionScannerScreen from '../screens/CollectionScannerScreen';
+import { DriverReportIssueScreen, DriverStopDetailsScreen } from '../screens/DriverExperienceScreens';
 import type { DriverStackParams } from './types';
 import { colors } from '../theme';
 
@@ -17,6 +18,8 @@ export default function DriverStack() {
       }}
     >
       <Stack.Screen name="TodayRun" component={DriverDashboardScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="StopDetails" component={DriverStopDetailsScreen as any} options={{ headerShown: false }} />
+      <Stack.Screen name="ReportIssue" component={DriverReportIssueScreen as any} options={{ headerShown: false }} />
       <Stack.Screen name="StopWorkflow" component={CollectionScannerScreen} options={{ title: 'Proof of Collection' }} />
     </Stack.Navigator>
   );

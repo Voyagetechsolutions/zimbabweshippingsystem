@@ -4,6 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import {
+  addCurrencyAmount,
+  formatCurrencyTotals,
+  shipmentCustomerName,
+  type CurrencyTotals,
+} from '@/utils/formatters';
 import { AdminCountryProvider, useAdminCountry } from '@/contexts/AdminCountryContext';
 
 // UI Components
@@ -11,7 +17,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
@@ -50,6 +63,9 @@ import CollectionScannerTab from '@/components/admin/tabs/CollectionScannerTab';
 import ZimmyAdminTab from '@/components/admin/tabs/ZimmyAdminTab';
 import StaffManagementTab from '@/components/admin/tabs/StaffManagementTab';
 import CollectionPointsTab from '@/components/admin/tabs/CollectionPointsTab';
+import CollectionsMapTab from '@/components/admin/tabs/CollectionsMapTab';
+import StaffMessagesTab from '@/components/admin/tabs/StaffMessagesTab';
+import DriverPerformanceTab from '@/components/admin/tabs/DriverPerformanceTab';
 
 // Icons
 import {
@@ -130,7 +146,7 @@ const AdminDashboardInner = () => {
     pendingShipments: 0,
     activeShipments: 0,
     deliveredShipments: 0,
-    totalRevenue: 0,
+    collectedRevenue: {} as CurrencyTotals,
     pendingQuotes: 0,
   });
   const [recentShipments, setRecentShipments] = useState<RecentShipment[]>([]);
@@ -159,7 +175,9 @@ const AdminDashboardInner = () => {
       label: 'Operations',
       items: [
         { value: 'pickupZones', label: 'Pickup Zones', icon: MapPin },
+        { value: 'collectionsMap', label: 'Collections Map', icon: MapPin },
         { value: 'delivery', label: 'Delivery', icon: Truck },
+        { value: 'driverPerformance', label: 'Driver Performance', icon: BarChart3 },
         { value: 'collectionScanner', label: 'Scan Collection', icon: ScanLine },
         { value: 'deliveryNotes', label: 'Delivery Notes', icon: FileText },
         { value: 'schedule', label: 'Schedule', icon: Calendar },
@@ -181,6 +199,7 @@ const AdminDashboardInner = () => {
       key: 'communications',
       label: 'Communications',
       items: [
+        { value: 'staffMessages', label: 'Staff Messages', icon: MessageSquare },
         { value: 'customerRequests', label: 'Customer Requests', icon: MessageSquare, badge: customerRequestUnread || undefined },
         { value: 'feedback', label: 'Feedback', icon: Star },
       ],
@@ -241,7 +260,7 @@ const AdminDashboardInner = () => {
 
       const { data: payments, error: paymentError } = await supabase
         .from('payments')
-        .select('amount');
+        .select('amount, currency, payment_status');
       if (paymentError) throw paymentError;
 
       const { data: quotes, error: quotesError } = await supabase
@@ -262,14 +281,20 @@ const AdminDashboardInner = () => {
           s.status === 'Out for Delivery'
       ).length || 0;
       const deliveredShipments = shipments?.filter((s) => s.status === 'Delivered').length || 0;
-      const totalRevenue = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+      const paidStatuses = new Set(['completed', 'paid', 'success', 'succeeded']);
+      const collectedRevenue = (payments || [])
+        .filter((payment) => paidStatuses.has(String(payment.payment_status || '').toLowerCase()))
+        .reduce(
+          (totals, payment) => addCurrencyAmount(totals, payment.amount, payment.currency),
+          {} as CurrencyTotals,
+        );
 
       setStats({
         totalShipments,
         pendingShipments,
         activeShipments,
         deliveredShipments,
-        totalRevenue,
+        collectedRevenue,
         pendingQuotes: quotes?.length || 0,
       });
     } catch (error) {
@@ -317,6 +342,18 @@ const AdminDashboardInner = () => {
     fetchNotifications();
     fetchRecentShipments();
   };
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('web-admin-dashboard-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shipments' }, refreshDashboard)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, refreshDashboard)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, refreshDashboard)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'custom_quotes' }, refreshDashboard)
+      .subscribe();
+
+    return () => { void supabase.removeChannel(channel); };
+  }, []);
 
   const handleNavClick = (value: string) => {
     setActiveTab(value);
@@ -416,7 +453,7 @@ const AdminDashboardInner = () => {
           <StatCard icon={Package} label="Total shipments" value={stats.totalShipments.toLocaleString()} />
           <StatCard icon={Truck} label="In transit" value={stats.activeShipments.toLocaleString()} accent />
           <StatCard icon={CheckCircle2} label="Delivered" value={stats.deliveredShipments.toLocaleString()} />
-          <StatCard icon={CreditCard} label="Total revenue" value={`£${stats.totalRevenue.toFixed(2)}`} />
+          <StatCard icon={CreditCard} label="Collected revenue" value={formatCurrencyTotals(stats.collectedRevenue)} />
         </div>
       </section>
 
@@ -456,11 +493,7 @@ const AdminDashboardInner = () => {
                   </TableHeader>
                   <TableBody>
                     {recentShipments.map((s) => {
-                      const customer =
-                        s.metadata?.sender_name ||
-                        s.metadata?.customer_name ||
-                        s.metadata?.recipient_name ||
-                        '—';
+                      const customer = shipmentCustomerName(s.metadata);
                       const statusClass =
                         (s.status && STATUS_VARIANT[s.status]) ||
                         'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
@@ -512,7 +545,9 @@ const AdminDashboardInner = () => {
       case 'customQuotes': return <CustomQuoteManagement />;
       case 'customers': return <CustomerManagementTab />;
       case 'pickupZones': return <PickupZonesManagementTab />;
+      case 'collectionsMap': return <CollectionsMapTab />;
       case 'delivery': return <DeliveryManagementTab />;
+      case 'driverPerformance': return <DriverPerformanceTab />;
       case 'payments': return <PaymentsInvoicingTab />;
       case 'paymentSchedule': return <PaymentScheduleManagement />;
       case 'reports': return <ReportsAnalyticsTab />;
@@ -523,6 +558,7 @@ const AdminDashboardInner = () => {
       case 'deliveryNotes': return <DeliveryNotesTab />;
       case 'invoices': return <InvoicesTab />;
       case 'customerRequests': return <CustomerRequestsTab onUnreadChange={setCustomerRequestUnread} />;
+      case 'staffMessages': return <StaffMessagesTab />;
       case 'collectionScanner': return <CollectionScannerTab />;
       case 'staff': return <StaffManagementTab />;
       case 'collectionPoints': return <CollectionPointsTab />;
@@ -636,6 +672,12 @@ const AdminDashboardInner = () => {
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="p-0 w-64">
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>Admin navigation</SheetTitle>
+                    <SheetDescription>
+                      Navigate Zimbabwe Shipping administration sections.
+                    </SheetDescription>
+                  </SheetHeader>
                   {sidebar}
                 </SheetContent>
               </Sheet>

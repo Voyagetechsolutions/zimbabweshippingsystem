@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Toaster } from '@/components/ui/toaster';
-import { AuthProvider } from '@/contexts/AuthContext';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { RoleProvider } from '@/contexts/RoleContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ShippingProvider } from '@/contexts/ShippingContext';
@@ -51,8 +51,65 @@ const CustomQuoteRequest = lazy(() => import('@/pages/CustomQuoteRequest'));
 const Links = lazy(() => import('@/pages/Links'));
 const Feedback = lazy(() => import('@/pages/Feedback'));
 const DeleteAccount = lazy(() => import('@/pages/DeleteAccount'));
+const SetStaffPassword = lazy(() => import('@/pages/SetStaffPassword'));
 
 const queryClient = new QueryClient();
+
+function AppRoutes() {
+  const { loading, user } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  // Temporary-password staff must replace it before any website route renders.
+  // This mirrors the staff app and prevents finance/admin access through the web.
+  if (user?.user_metadata?.must_change_password) return <SetStaffPassword />;
+
+  return (
+    <Routes>
+      <Route path="/" element={<Index />} />
+      <Route path="/auth" element={<RedirectIfAuthenticated><Auth /></RedirectIfAuthenticated>} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/track" element={<Track />} />
+      <Route path="/pricing" element={<Pricing />} />
+      <Route path="/services" element={<Services />} />
+      <Route path="/contact" element={<Contact />} />
+      <Route path="/about" element={<AboutUs />} />
+      <Route path="/about-us" element={<AboutUs />} />
+      <Route path="/faq" element={<FAQ />} />
+      <Route path="/support" element={<Support />} />
+      <Route path="/reviews" element={<Reviews />} />
+      <Route path="/gallery" element={<Gallery />} />
+      <Route path="/collection-schedule" element={<CollectionSchedule />} />
+      <Route path="/shipping-guidelines" element={<ShippingGuidelines />} />
+      <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+      <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+      <Route path="/quote-submitted" element={<QuoteSubmitted />} />
+      <Route path="/payment-success" element={<PaymentSuccess />} />
+      <Route path="/custom-quote-request" element={<CustomQuoteRequest />} />
+      <Route path="/links" element={<Links />} />
+      <Route path="/feedback" element={<Feedback />} />
+      <Route path="/delete-account" element={<DeleteAccount />} />
+      <Route path="/book" element={<SimpleBooking />} />
+      <Route path="/book-shipment" element={<BookShipment />} />
+      <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
+      <Route path="/account" element={<RequireAuth><Account /></RequireAuth>} />
+      <Route path="/shipment/:id" element={<ShipmentDetails />} />
+      <Route path="/admin/gallery" element={<RequireAdmin><GalleryAdmin /></RequireAdmin>} />
+      <Route path="/address-book" element={<AddressBook />} />
+      <Route path="/confirm-booking" element={<ConfirmBooking />} />
+      <Route path="/receipt" element={<Receipt />} />
+      <Route path="/notifications" element={<RequireAuth><Notifications /></RequireAuth>} />
+      <Route path="/tasks" element={<RequireAuth><TaskManagement /></RequireAuth>} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+}
 
 function App() {
   return (
@@ -73,73 +130,7 @@ function App() {
                       }>
                         {/* Vercel Speed Insights - Monitors web vital metrics */}
                         <SpeedInsights />
-                        <Routes>
-                          <Route path="/" element={<Index />} />
-                          <Route path="/auth" element={
-                            <RedirectIfAuthenticated>
-                              <Auth />
-                            </RedirectIfAuthenticated>
-                          } />
-                          <Route path="/auth/callback" element={<AuthCallback />} />
-                          <Route path="/track" element={<Track />} />
-                          <Route path="/pricing" element={<Pricing />} />
-                          <Route path="/services" element={<Services />} />
-                          <Route path="/contact" element={<Contact />} />
-                          <Route path="/about" element={<AboutUs />} />
-                          <Route path="/about-us" element={<AboutUs />} />
-                          <Route path="/faq" element={<FAQ />} />
-                          <Route path="/support" element={<Support />} />
-                          <Route path="/reviews" element={<Reviews />} />
-                          <Route path="/gallery" element={<Gallery />} />
-                          <Route path="/collection-schedule" element={<CollectionSchedule />} />
-                          <Route path="/shipping-guidelines" element={<ShippingGuidelines />} />
-                          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-                          <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
-                          <Route path="/quote-submitted" element={<QuoteSubmitted />} />
-                          <Route path="/payment-success" element={<PaymentSuccess />} />
-                          <Route path="/custom-quote-request" element={<CustomQuoteRequest />} />
-                          <Route path="/links" element={<Links />} />
-                          <Route path="/feedback" element={<Feedback />} />
-                          <Route path="/delete-account" element={<DeleteAccount />} />
-                          <Route path="/book" element={<SimpleBooking />} />
-
-                          {/* Public booking route */}
-                          <Route path="/book-shipment" element={<BookShipment />} />
-
-                          {/* Protected routes */}
-                          <Route path="/dashboard" element={
-                            <RequireAuth>
-                              <Dashboard />
-                            </RequireAuth>
-                          } />
-                          <Route path="/account" element={
-                            <RequireAuth>
-                              <Account />
-                            </RequireAuth>
-                          } />
-                          <Route path="/shipment/:id" element={<ShipmentDetails />} />
-                          <Route path="/admin/gallery" element={
-                            <RequireAdmin>
-                              <GalleryAdmin />
-                            </RequireAdmin>
-                          } />
-                          <Route path="/address-book" element={<AddressBook />} />
-                          <Route path="/confirm-booking" element={<ConfirmBooking />} />
-                          <Route path="/receipt" element={<Receipt />} />
-                          <Route path="/notifications" element={
-                            <RequireAuth>
-                              <Notifications />
-                            </RequireAuth>
-                          } />
-                          <Route path="/tasks" element={
-                            <RequireAuth>
-                              <TaskManagement />
-                            </RequireAuth>
-                          } />
-
-                          {/* Catch all route */}
-                          <Route path="*" element={<NotFound />} />
-                        </Routes>
+                        <AppRoutes />
                       </Suspense>
                     </Router>
                   </TooltipProvider>

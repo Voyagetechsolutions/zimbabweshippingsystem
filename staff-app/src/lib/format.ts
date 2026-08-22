@@ -42,11 +42,21 @@ export function matchesCountry(metadata: any, filter: CountryFilter): boolean {
 
 // Customer name best-effort from varied metadata shapes.
 export function customerName(metadata: any): string {
-  return (
-    metadata?.sender?.firstName
-      ? `${metadata.sender.firstName} ${metadata?.sender?.lastName || ''}`.trim()
-      : metadata?.sender_name || metadata?.customer_name || metadata?.recipient_name || metadata?.recipient?.name || '—'
-  );
+  const sender = metadata?.sender || {};
+  const senderDetails = metadata?.senderDetails || metadata?.sender_details || {};
+  const joinedName = (firstName?: string, lastName?: string) =>
+    [firstName, lastName].filter(Boolean).join(' ').trim();
+
+  return sender.name
+    || joinedName(sender.firstName, sender.lastName)
+    || senderDetails.name
+    || joinedName(senderDetails.firstName, senderDetails.lastName)
+    || joinedName(metadata?.firstName, metadata?.lastName)
+    || metadata?.sender_name
+    || metadata?.customer_name
+    || metadata?.recipient_name
+    || metadata?.recipient?.name
+    || '—';
 }
 
 // Sum amounts per currency and render like "£1,200 · €340" — never add

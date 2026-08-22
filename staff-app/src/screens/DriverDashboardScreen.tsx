@@ -110,6 +110,7 @@ export default function DriverDashboardScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [attendance, setAttendance] = useState<Attendance | null>(null);
   const [pendingSync, setPendingSync] = useState(0);
+  const [clockNow, setClockNow] = useState(Date.now());
   const [checks, setChecks] = useState<Record<string, { qr: boolean; invoice: boolean; photos: number; total?: number; currency?: string }>>({});
 
   const load = useCallback(async () => {
@@ -186,6 +187,12 @@ export default function DriverDashboardScreen({ navigation }: Props) {
     return () => { active = false; };
   }, [load]));
 
+  useEffect(() => {
+    if (!attendance || attendance.clocked_out_at) return;
+    const timer = setInterval(() => setClockNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, [attendance]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await load();
@@ -261,6 +268,20 @@ export default function DriverDashboardScreen({ navigation }: Props) {
   };
 
   const clock = async (action: 'in' | 'out') => {
+    if (action === 'out') {
+      if (pendingSync > 0) {
+        Alert.alert('Sync before clocking out', `${pendingSync} update${pendingSync === 1 ? '' : 's'} still need a connection.`);
+        return;
+      }
+      if (session?.user.id) {
+        const activeClaims = await supabase.from('route_collection_claims').select('id', { count: 'exact', head: true })
+          .eq('driver_id', session.user.id).in('status', ['claimed', 'en_route', 'arrived']);
+        if (!activeClaims.error && (activeClaims.count || 0) > 0) {
+          Alert.alert('Finish active collections first', `You still have ${activeClaims.count} active collection${activeClaims.count === 1 ? '' : 's'}. Complete, report, or release them before clocking out.`);
+          return;
+        }
+      }
+    }
     setBusyId(`clock-${action}`);
     try {
       const { data, error: clockError } = await supabase.rpc('clock_driver', { p_action: action, p_note: null });
@@ -434,7 +455,7 @@ export default function DriverDashboardScreen({ navigation }: Props) {
             <Text style={styles.driverName}>{profile?.full_name || 'Driver'}</Text>
             <Text style={styles.sub}>{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
           </View>
-          <Pressable style={styles.profileButton} onPress={() => navigation.getParent<any>()?.navigate('More', { screen: 'Account' })}>
+          <Pressable style={styles.profileButton} onPress={() => navigation.getParent<any>()?.navigate('My Account', { screen: 'Account' })}>
             <Ionicons name="person-outline" size={19} color={colors.primaryDark} />
           </Pressable>
         </View>
@@ -458,7 +479,7 @@ export default function DriverDashboardScreen({ navigation }: Props) {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.dutyBig}>
-                  {(() => { const ms = Date.now() - new Date(attendance.clocked_in_at).getTime(); const h = Math.floor(ms / 36e5); const m = Math.floor((ms % 36e5) / 6e4); return `${h}h ${m}m`; })()}
+                  {(() => { const ms = clockNow - new Date(attendance.clocked_in_at).getTime(); const h = Math.floor(ms / 36e5); const m = Math.floor((ms % 36e5) / 6e4); return `${h}h ${m}m`; })()}
                 </Text>
                 <Text style={[styles.dutyText, { color: '#d1fae5' }]}>working</Text>
               </View>
@@ -590,7 +611,7 @@ export default function DriverDashboardScreen({ navigation }: Props) {
                   )}
                 </Pressable>
               ) : null}
-              <Pressable style={styles.viewRunButton} onPress={() => navigation.getParent<any>()?.navigate('My Run')}>
+              <Pressable style={styles.viewRunButton} onPress={() => navigation.getParent<any>()?.navigate('Collections')}>
                 <Ionicons name="map-outline" size={17} color={colors.primary} />
                 <Text style={styles.viewRunText}>View full run</Text>
               </Pressable>
@@ -696,6 +717,8 @@ function StopCard({
 }) {
   if (compact) return null;
   const status = statusColors(stop.status);
+  const contactPhone = stopPhone(stop).trim();
+  const destination = stopAddress(stop).trim();
   const nextAction = stop.status === 'planned' ? 'En route' : stop.status === 'en_route' ? 'Arrived' : stop.status === 'arrived' ? 'Complete handover' : null;
   return (
     <View style={[styles.stopCard, { borderLeftColor: stop.stop_type === 'collection' ? colors.primary : '#d97706' }]}>
@@ -722,21 +745,21 @@ function StopCard({
         </View>
       ) : null}
       <View style={styles.secondaryActions}>
-        <Pressable style={styles.secondaryButton} onPress={() => onNavigate(stop)}>
+        {destination ? <Pressable style={styles.secondaryButton} onPress={() => onNavigate(stop)}>
           <Ionicons name="navigate-outline" size={16} color={colors.primary} />
           <Text style={styles.secondaryText}>Navigate</Text>
-        </Pressable>
-        <Pressable style={styles.secondaryButton} onPress={() => onCall(stop)}>
+        </Pressable> : null}
+        {contactPhone ? <Pressable style={styles.secondaryButton} onPress={() => onCall(stop)}>
           <Ionicons name="call-outline" size={16} color={colors.primary} />
           <Text style={styles.secondaryText}>Call</Text>
-        </Pressable>
-        <Pressable style={styles.secondaryButton} onPress={() => {
-          const phone = stopPhone(stop).replace(/[^\d+]/g, '').replace(/^00/, '+').replace('+', '');
+        </Pressable> : null}
+        {contactPhone ? <Pressable style={styles.secondaryButton} onPress={() => {
+          const phone = contactPhone.replace(/[^\d+]/g, '').replace(/^00/, '+').replace('+', '');
           if (phone) Linking.openURL(`https://wa.me/${phone}`).catch(() => {});
         }}>
           <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
           <Text style={[styles.secondaryText, { color: '#128C7E' }]}>WhatsApp</Text>
-        </Pressable>
+        </Pressable> : null}
         {stop.status !== 'completed' ? <Pressable style={styles.secondaryButton} onPress={() => onScan(stop)}>
           <Ionicons name="camera-outline" size={16} color={colors.primary} />
           <Text style={styles.secondaryText}>Evidence</Text>

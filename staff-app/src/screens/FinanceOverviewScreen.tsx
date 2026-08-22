@@ -46,15 +46,37 @@ export default function FinanceOverviewScreen() {
   const [transaction, setTransaction] = useState<Overview['recentTransactions'][number] | null>(null);
   const [proofUri, setProofUri] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [driverInvoices, setDriverInvoices] = useState<{ count: number; byCurrency: Record<string, number> }>({ count: 0, byCurrency: {} });
 
   const load = useCallback(async () => {
     setError(null);
-    const { data, error: rpcError } = await supabase.rpc('admin_finance_overview');
+    const [{ data, error: rpcError }, invoiceResult] = await Promise.all([
+      supabase.rpc('admin_finance_overview'),
+      supabase.from('driver_invoices').select('total,currency,status,created_at').gte('created_at', new Date(Date.now() - 30 * 864e5).toISOString()).neq('status', 'void'),
+    ]);
     if (rpcError) { setError(rpcError.message); return; }
     setOverview(data as Overview);
+    if (!invoiceResult.error) {
+      const rows = invoiceResult.data || []; const byCurrency: Record<string, number> = {};
+      for (const row of rows) byCurrency[row.currency || 'GBP'] = (byCurrency[row.currency || 'GBP'] || 0) + (Number(row.total) || 0);
+      setDriverInvoices({ count: rows.length, byCurrency });
+    }
   }, []);
 
   useEffect(() => { (async () => { setLoading(true); await load(); setLoading(false); })(); }, [load]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('staff-finance-overview-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_proofs' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'finance_expenses' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shipments' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'driver_invoices' }, load)
+      .subscribe();
+
+    return () => { void supabase.removeChannel(channel); };
+  }, [load]);
 
   const cashflow = useMemo(() => (overview?.cashflow || []).slice(-period), [overview, period]);
   const netSeries = cashflow.map((d) => ({
@@ -163,6 +185,17 @@ export default function FinanceOverviewScreen() {
                 </View>
               </Card>
             ) : null}
+
+            <Card onPress={() => navigation.navigate('Invoices')}>
+              <View style={styles.pendingRow}>
+                <Ionicons name="car-outline" size={19} color={colors.primary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.pendingTitle}>Driver-confirmed collection invoices</Text>
+                  <Text style={styles.pendingText}>{driverInvoices.count} in the last 30 days · {currencyLine(driverInvoices.byCurrency)}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+              </View>
+            </Card>
 
             {/* Financial summary */}
             <SectionLabel text="Financial summary" />

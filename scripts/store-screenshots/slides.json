@@ -1,0 +1,47 @@
+{
+  "_comment": [
+    "Marketing copy + source screen for each App Store screenshot.",
+    "'screen' is a path relative to the repo root. Any resolution works — it is",
+    "cover-fitted into the device frame — but it should be at least 1206x2622",
+    "and have the same 1320:2868 aspect, or the top/bottom will be cropped.",
+    "Use \\n in 'headline' to force a line break.",
+    "Set 'screen' to null to render the frame with a placeholder."
+  ],
+  "output": "store-assets/ios",
+  "apps": {
+    "customer-app": [
+      {
+        "slug": "01-ship-with-confidence",
+        "headline": "Ship with\nconfidence",
+        "screen": "scripts/store-screenshots/screens/customer-app/home.png"
+      },
+      {
+        "slug": "02-track-every-step",
+        "headline": "Track\nevery step",
+        "screen": "scripts/store-screenshots/screens/customer-app/shipments.png"
+      },
+      {
+        "slug": "03-book-in-minutes",
+        "headline": "Book in\nminutes",
+        "screen": "scripts/store-screenshots/screens/customer-app/book.png"
+      }
+    ],
+    "staff-app": [
+      {
+        "slug": "01-run-operations-anywhere",
+        "headline": "Run operations\nanywhere",
+        "screen": "scripts/store-screenshots/screens/staff-app/dashboard.png"
+      },
+      {
+        "slug": "02-update-shipments-instantly",
+        "headline": "Update shipments\ninstantly",
+        "screen": "scripts/store-screenshots/screens/staff-app/shipments.png"
+      },
+      {
+        "slug": "03-stay-on-schedule",
+        "headline": "Stay on\nschedule",
+        "screen": "scripts/store-screenshots/screens/staff-app/schedule.png"
+      }
+    ]
+  }
+}

@@ -538,8 +538,11 @@ create or replace function public.notify_new_custom_quote() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
   insert into public.notifications(user_id, title, message, type, related_id, is_read)
-  values ('00000000-0000-0000-0000-000000000000', 'New quote request',
-          coalesce(left(new.description, 120), 'A customer') || ' — respond in Custom Quotes.', 'quote_request', new.id, false);
+  select p.id, 'New quote request',
+         coalesce(left(new.description, 120), 'A customer') || ' — respond in Custom Quotes.',
+         'quote_request', new.id, false
+  from public.profiles p
+  where p.is_admin = true or lower(coalesce(p.role, '')) = 'admin';
   if new.user_id is not null then
     insert into public.notifications(user_id, title, message, type, related_id)
     values (new.user_id, 'Quote request received',

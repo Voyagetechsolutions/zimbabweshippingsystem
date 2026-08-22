@@ -30,6 +30,11 @@ export type RouteCollection = {
   latitude: number | null;
   longitude: number | null;
   stopId: string | null;
+  claimId: string | null;
+  claimStatus: 'available' | 'claimed' | 'en_route' | 'arrived' | 'completed' | 'failed' | 'released';
+  claimedBy: string | null;
+  claimedByName: string | null;
+  claimedAt: string | null;
   /** Kilometres from the driver, once a location is known. */
   distanceKm?: number | null;
 };
@@ -151,13 +156,12 @@ async function loadRouteDayDirect(date?: string): Promise<RouteDay> {
 
   const { data: shipmentRows, error } = await supabase
     .from('shipments')
-    .select('id, tracking_number, customer_reference, metadata, collection_status, collection_schedule_id, goods_description')
+    .select('id, tracking_number, customer_reference, metadata, collection_status, collection_schedule_id, goods_description, assigned_driver_id, driver_status')
     .is('deleted_at', null)
     .limit(1000);
   if (error) throw error;
 
   const collections: RouteCollection[] = (shipmentRows || [])
-    .filter((s: any) => (s.collection_status || 'Awaiting Collection') !== 'Collected')
     .filter((s: any) =>
       (s.collection_schedule_id && scheduleIds.has(s.collection_schedule_id)) ||
       routeKeys.has(routeKey(s.metadata?.collection?.route)))
@@ -179,6 +183,13 @@ async function loadRouteDayDirect(date?: string): Promise<RouteDay> {
         latitude: null,
         longitude: null,
         stopId: null,
+        claimId: null,
+        claimStatus: ['claimed', 'en_route', 'arrived', 'failed'].includes(String(s.driver_status || ''))
+          ? s.driver_status
+          : 'available',
+        claimedBy: s.assigned_driver_id || null,
+        claimedByName: null,
+        claimedAt: null,
       };
     })
     .sort((a, b) => a.customerName.localeCompare(b.customerName));
@@ -226,6 +237,28 @@ export async function loadRouteDay(date?: string): Promise<RouteDay> {
   }
 
   return { date: day?.date, routes: day?.routes || [], collections };
+}
+
+export type CollectionClaimResult = {
+  claimId: string;
+  stopId: string;
+  shipmentId: string;
+  status: string;
+};
+
+/** Atomically reserve one shared-route collection and create its proof stop. */
+export async function claimRouteCollection(shipmentId: string): Promise<CollectionClaimResult> {
+  const { data, error } = await supabase.rpc('claim_route_collection', { p_shipment_id: shipmentId });
+  if (error) throw error;
+  return data as CollectionClaimResult;
+}
+
+export async function releaseRouteCollection(shipmentId: string, reason?: string): Promise<void> {
+  const { error } = await supabase.rpc('release_route_collection', {
+    p_shipment_id: shipmentId,
+    p_reason: reason?.trim() || null,
+  });
+  if (error) throw error;
 }
 
 /**

@@ -1,0 +1,316 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  /* Logical canvas is 660x1434 CSS px; render.mjs uses deviceScaleFactor 2
+     to emit the 1320x2868 the App Store demands. Every length below is
+     therefore "half" of the final pixel value. */
+  :root {
+    --w: 660px;
+    --h: 1434px;
+
+    --green: #1b7a3e;
+    --yellow: #ffd200;
+    --red: #de3831;
+    --black: #10130f;
+
+    --phone-w: 536px;      /* outer width of the device frame */
+    --phone-top: 320px;    /* distance from canvas top to the frame */
+    --bezel: 9px;
+    --screen-radius: 50px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: var(--w);
+    height: var(--h);
+    overflow: hidden;
+  }
+
+  body {
+    position: relative;
+    background: #04170d;
+    font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---- background layers ---- */
+
+  .bg-wash {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 90% 55% at 50% 18%, #12522c 0%, #0a3419 45%, #04170d 100%);
+  }
+
+  .bg-dots {
+    position: absolute; inset: 0;
+    background-image: radial-gradient(circle, rgba(255,255,255,.55) 1px, transparent 1.2px);
+    background-size: 22px 22px;
+    opacity: .07;
+  }
+
+  /* Zimbabwe flag bands sweeping in from the bottom corners, mirroring the
+     existing Play Store artwork. */
+  .flag {
+    position: absolute;
+    width: 560px;
+    height: 520px;
+    bottom: -130px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--green)  0px,  var(--green)  34px,
+      var(--yellow) 34px, var(--yellow) 68px,
+      var(--red)    68px, var(--red)    102px,
+      var(--black)  102px, var(--black)  136px
+    );
+    opacity: .8;
+    filter: blur(.4px);
+  }
+  .flag--left  { left: -320px;  transform: rotate(-26deg); transform-origin: bottom left; }
+  .flag--right { right: -320px; transform: rotate(26deg);  transform-origin: bottom right; }
+
+  /* Fade the bands out toward the centre so the phone stays readable, and kill
+     them entirely behind the headline. */
+  .flag-fade {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 54% 60% at 50% 46%, #06200f 22%, rgba(6,32,15,.9) 52%, rgba(6,32,15,0) 76%),
+      linear-gradient(to bottom, #062610 0%, rgba(6,38,16,.75) 16%, rgba(6,38,16,0) 30%);
+  }
+
+  .vignette {
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 100% 80% at 50% 40%, transparent 55%, rgba(0,0,0,.5) 100%);
+  }
+
+  /* ---- headline ---- */
+
+  .headline {
+    position: absolute;
+    top: 56px; left: 0; right: 0;
+    padding: 0 44px;
+    text-align: center;
+    color: #fff;
+    font-weight: 800;
+    font-size: 78px;
+    line-height: 1.02;
+    letter-spacing: -.02em;
+    text-shadow: 0 4px 24px rgba(0,0,0,.45);
+    white-space: pre-line;   /* "\n" in the config becomes a real line break */
+  }
+
+  .headline.is-long { font-size: 64px; }
+
+  .rule {
+    position: absolute;
+    left: 50%;
+    width: 178px; height: 9px;
+    border-radius: 5px;
+    transform: translateX(-50%);
+    background: linear-gradient(
+      to right,
+      var(--green) 0 33.3%,
+      var(--yellow) 33.3% 66.6%,
+      var(--red) 66.6% 100%
+    );
+  }
+
+  /* ---- device frame (iPhone-style: Apple rejects Android hardware in
+         iOS screenshots, and the current Play assets show a punch-hole
+         Android phone) ---- */
+
+  .phone {
+    position: absolute;
+    top: var(--phone-top);
+    left: 50%;
+    width: var(--phone-w);
+    transform: translateX(-50%);
+    padding: var(--bezel);
+    border-radius: calc(var(--screen-radius) + var(--bezel));
+    background: linear-gradient(160deg, #3a3d42 0%, #16181b 22%, #0c0d0f 60%, #303338 100%);
+    box-shadow:
+      0 2px 0 rgba(255,255,255,.14) inset,
+      0 40px 90px rgba(0,0,0,.55),
+      0 8px 26px rgba(0,0,0,.4);
+  }
+
+  .screen {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1320 / 2868;   /* exact 6.9" iPhone ratio */
+    border-radius: var(--screen-radius);
+    overflow: hidden;
+    background: #fff;
+  }
+
+  /* The slot must fill the screen box itself, otherwise an intrinsically-sized
+     child collapses to the top of the frame. */
+  #screenSlot { position: absolute; inset: 0; }
+
+  .screen img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    object-position: top center;
+    display: block;
+  }
+
+  .screen .placeholder {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 14px;
+    width: 100%; height: 100%;
+    white-space: pre-line;
+    background: repeating-linear-gradient(45deg, #eef2ee 0 18px, #e2e8e3 18px 36px);
+    color: #5b6b60;
+    font-size: 19px; font-weight: 700; text-align: center;
+    padding: 0 32px;
+  }
+
+  /* Dynamic Island — proportioned off the real 126x37pt island on a 440pt screen */
+  .island {
+    position: absolute;
+    top: 14px; left: 50%;
+    width: 148px; height: 44px;
+    transform: translateX(-50%);
+    background: #000;
+    border-radius: 22px;
+    z-index: 3;
+  }
+
+  /* iOS status bar, drawn over the strip capture.mjs reserved for it. */
+  .statusbar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 34px;
+    z-index: 2;
+    color: #000;                 /* flipped to #fff for dark headers */
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: .01em;
+  }
+  .statusbar.on-dark { color: #fff; }
+
+  .statusbar .glyphs {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .statusbar svg { display: block; fill: currentColor; }
+</style>
+</head>
+<body>
+  <div class="bg-wash"></div>
+  <div class="flag flag--left"></div>
+  <div class="flag flag--right"></div>
+  <div class="flag-fade"></div>
+  <div class="bg-dots"></div>
+  <div class="vignette"></div>
+
+  <div class="headline" id="headline"></div>
+  <div class="rule" id="rule"></div>
+
+  <div class="phone">
+    <div class="screen">
+      <div id="screenSlot"></div>
+      <div class="island"></div>
+      <div class="statusbar" id="statusbar">
+        <span>9:41</span>
+        <span class="glyphs">
+          <!-- cellular -->
+          <svg width="24" height="17" viewBox="0 0 24 17">
+            <rect x="0"  y="12" width="4" height="5"  rx="1"/>
+            <rect x="6"  y="9"  width="4" height="8"  rx="1"/>
+            <rect x="12" y="5"  width="4" height="12" rx="1"/>
+            <rect x="18" y="0"  width="4" height="17" rx="1"/>
+          </svg>
+          <!-- wifi -->
+          <svg width="22" height="16" viewBox="0 0 22 16">
+            <path d="M11 15.5 8.1 12a3.7 3.7 0 0 1 5.8 0zM11 8.4c-1.8 0-3.4.7-4.6 1.9L4.3 8A9.5 9.5 0 0 1 11 5.2c2.6 0 5 1.1 6.7 2.8l-2.1 2.3A6.4 6.4 0 0 0 11 8.4M11 1.6c-3.4 0-6.5 1.4-8.8 3.6L.1 3A14.9 14.9 0 0 1 11 0c4.3 0 8.2 1.8 10.9 4.7l-2.1 2.3A11.9 11.9 0 0 0 11 1.6"/>
+          </svg>
+          <!-- battery -->
+          <svg width="30" height="15" viewBox="0 0 30 15">
+            <rect x="0.6" y="0.6" width="25" height="13.8" rx="4" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".4"/>
+            <rect x="2.4" y="2.4" width="21.4" height="10.2" rx="2.6"/>
+            <path d="M27.4 5v5a2.7 2.7 0 0 0 0-5" opacity=".4"/>
+          </svg>
+        </span>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // Called by render.mjs via page.evaluate for each slide.
+  window.renderSlide = function (slide) {
+    var h = document.getElementById('headline');
+    h.textContent = slide.headline;
+
+    // Long headlines step down a size rather than wrapping into the phone.
+    var longest = slide.headline.split('\n').reduce(function (a, l) {
+      return Math.max(a, l.length);
+    }, 0);
+    h.classList.toggle('is-long', longest > 13);
+
+    // Sit the flag rule just under the last line of text, whatever its height.
+    var rule = document.getElementById('rule');
+    rule.style.top = (h.offsetTop + h.offsetHeight + 26) + 'px';
+
+    // capture.mjs sampled the app's header colour; put white glyphs on a dark
+    // header and black on a light one, the way iOS does.
+    var onDark = false;
+    if (slide.topColour) {
+      var rgb = slide.topColour.match(/[\d.]+/g);
+      if (rgb && rgb.length >= 3) {
+        var lum = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
+        onDark = lum < 0.55;
+      }
+    }
+    document.getElementById('statusbar').classList.toggle('on-dark', onDark);
+
+    var slot = document.getElementById('screenSlot');
+    if (slide.screenDataUri) {
+      slot.innerHTML = '<img alt="">';
+      slot.firstChild.src = slide.screenDataUri;
+      return new Promise(function (resolve) {
+        var img = slot.firstChild;
+        if (img.complete) return resolve();
+        img.onload = resolve;
+        img.onerror = resolve;
+      });
+    }
+
+    slot.innerHTML = '<div class="placeholder"></div>';
+    slot.firstChild.textContent = 'No source screen\n' + (slide.screen || '—');
+    return Promise.resolve();
+  };
+
+  // Browser-control fallback for environments where Puppeteer cannot launch.
+  // A local static server can render the exact same template by supplying a
+  // headline and a source image URL in the query string.
+  var previewParams = new URLSearchParams(window.location.search);
+  if (previewParams.has('compact')) {
+    var compactScale = 402 / 660;
+    document.documentElement.style.width = '402px';
+    document.documentElement.style.height = '874px';
+    document.body.style.transformOrigin = 'top left';
+    document.body.style.transform = 'scale(' + compactScale + ')';
+  }
+  if (previewParams.has('headline')) {
+    window.renderSlide({
+      headline: previewParams.get('headline') || '',
+      screen: previewParams.get('screen') || '',
+      screenDataUri: previewParams.get('screen') || '',
+      topColour: previewParams.get('topColour') || '#ffffff'
+    });
+  }
+</script>
+</body>
+</html>

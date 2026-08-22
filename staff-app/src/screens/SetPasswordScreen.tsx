@@ -75,7 +75,7 @@ export default function SetPasswordScreen() {
               placeholder="New password"
               placeholderTextColor={colors.textFaint}
             />
-            <Pressable onPress={() => setShow((v) => !v)} hitSlop={10}>
+            <Pressable accessibilityRole="button" accessibilityLabel={show ? 'Hide passwords' : 'Show passwords'} onPress={() => setShow((v) => !v)} hitSlop={10}>
               <Ionicons name={show ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.textMuted} />
             </Pressable>
           </View>
@@ -98,11 +98,11 @@ export default function SetPasswordScreen() {
           {mismatch && <Text style={styles.error}>Both entries must match.</Text>}
           {Boolean(error) && <Text style={styles.error}>{error}</Text>}
 
-          <Pressable style={[styles.button, (!ready || busy) && styles.buttonDisabled]} onPress={submit} disabled={!ready || busy}>
+          <Pressable accessibilityRole="button" style={[styles.button, (!ready || busy) && styles.buttonDisabled]} onPress={submit} disabled={!ready || busy}>
             {busy ? <ActivityIndicator color={colors.white} /> : <Text style={styles.buttonText}>Save and continue</Text>}
           </Pressable>
 
-          <Pressable style={styles.signOut} onPress={signOut}>
+          <Pressable accessibilityRole="button" style={styles.signOut} onPress={signOut}>
             <Text style={styles.signOutText}>Sign in as someone else</Text>
           </Pressable>
 

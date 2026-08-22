@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, RefreshControl, StyleSheet, ActivityIndicator, Pressable, Linking } from 'react-native';
+import { View, Text, ScrollView, RefreshControl, StyleSheet, ActivityIndicator, Pressable, Linking, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -149,10 +149,15 @@ export default function FinanceDashboardScreen() {
 
   const remind = (item: { name: string; phone: string; reference: string; balance: number; symbol: string }) => {
     const digits = item.phone.replace(/[^\d+]/g, '').replace(/^00/, '+');
+    if (!digits) {
+      Alert.alert('No phone number', 'Add a phone number to this customer before sending a payment reminder.');
+      return;
+    }
     const message = encodeURIComponent(
       `Hello ${item.name.split(' ')[0]}, this is Zimbabwe Shipping. A friendly reminder that ${item.symbol}${item.balance.toFixed(2)} is outstanding on shipment ${item.reference}. Please reply here or call us on +44 7584 100552 to arrange payment. Thank you!`,
     );
-    Linking.openURL(`https://wa.me/${digits.replace('+', '')}?text=${message}`).catch(() => {});
+    Linking.openURL(`https://wa.me/${digits.replace('+', '')}?text=${message}`)
+      .catch(() => Alert.alert('Could not open WhatsApp', 'Check that WhatsApp or a web browser is available.'));
   };
 
   // All totals are per-currency: adding GBP and EUR together produces a

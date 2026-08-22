@@ -4,26 +4,65 @@
     {
       "name": "dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 8080
     },
     {
       "name": "preview",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "preview", "--", "--port", "4173"],
+      "runtimeArgs": [
+        "run",
+        "preview",
+        "--",
+        "--port",
+        "4173"
+      ],
       "port": 4173
     },
     {
       "name": "staff-app-web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "staff-app", "run", "web", "--", "--port", "8082"],
-      "port": 8082
+      "runtimeArgs": [
+        "--prefix",
+        "staff-app",
+        "run",
+        "web",
+        "--",
+        "--port",
+        "8083"
+      ],
+      "autoPort": false,
+      "port": 8083
     },
     {
       "name": "customer-app-web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "customer-app", "run", "web", "--", "--port", "8084"],
+      "runtimeArgs": [
+        "--prefix",
+        "customer-app",
+        "run",
+        "web",
+        "--",
+        "--port",
+        "8084"
+      ],
       "port": 8084
+    },
+    {
+      "name": "staff-app-dist",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "--yes",
+        "serve",
+        "--single",
+        "--listen",
+        "8086",
+        "staff-app/dist"
+      ],
+      "port": 8086
     }
   ]
 }

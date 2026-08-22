@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import TabHeader from '../TabHeader';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -29,8 +29,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
-import { Truck, Package, UserCheck, RefreshCcw, Search, Filter, CheckCircle, XCircle, AlertCircle, UserX } from 'lucide-react';
-import { Shipment } from '@/types/shipment';
+import { Truck, Package, UserCheck, RefreshCcw, Search, Filter, AlertCircle, UserX } from 'lucide-react';
+import { loadDriverPerformance } from '@/lib/driverPerformance';
 
 // Define types for driver and delivery data
 interface Driver {
@@ -39,6 +39,10 @@ interface Driver {
   total_deliveries?: number;
   on_time_rate?: number;
   active: boolean;
+  completedCollections?: number;
+  activeCollections?: number;
+  collectionIssues?: number;
+  averageMinutes?: number;
 }
 
 // Update DeliveryRecord to use proper typing for metadata
@@ -56,6 +60,16 @@ interface DeliveryRecord {
   created_at: string;
   updated_at: string;
   metadata?: Record<string, any>; // Using Record for metadata to avoid type issues
+}
+interface CollectionClaim {
+  id: string;
+  shipment_id: string;
+  driver_id?: string;
+  status: string;
+  claimed_at?: string;
+  issue_reason?: string;
+  issue_note?: string;
+  shipment?: { tracking_number?: string; customer_reference?: string; metadata?: Record<string, any> };
 }
 
 // Type guard to check if a value is a valid object
@@ -84,12 +98,11 @@ const DeliveryManagementTab = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [collectionClaims, setCollectionClaims] = useState<CollectionClaim[]>([]);
+  const [selectedDelivery, setSelectedDelivery] = useState<DeliveryRecord | null>(null);
+  const [collectionDriverFilter, setCollectionDriverFilter] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, [timeFilter]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       // Fetch shipments that are in delivery states
@@ -166,13 +179,37 @@ const DeliveryManagementTab = () => {
         console.error('Error fetching drivers:', driverError);
         setDrivers([]);
       } else {
-        const formattedDrivers: Driver[] = (driverData || []).map(driver => ({
+        const formattedDrivers: Driver[] = (driverData || []).map((driver: any) => ({
           id: driver.id,
           name: driver.full_name || 'Unknown Driver',
-          active: true
+          active: driver.staff_active !== false && !driver.on_leave
         }));
-        setDrivers(formattedDrivers);
+        try {
+          const performance = await loadDriverPerformance(30);
+          const performanceById = new Map(performance.map((row) => [row.id, row]));
+          setDrivers(formattedDrivers.map((driver) => {
+            const row = performanceById.get(driver.id);
+            return {
+              ...driver,
+              on_time_rate: row?.successRate || 0,
+              completedCollections: row?.completed || 0,
+              activeCollections: row?.activeCollections || 0,
+              collectionIssues: row?.issues || 0,
+              averageMinutes: row?.averageMinutes || 0,
+            };
+          }));
+        } catch (performanceError) {
+          console.error('Error fetching shared driver performance:', performanceError);
+          setDrivers(formattedDrivers);
+        }
       }
+
+      const { data: claimData, error: claimError } = await (supabase as any)
+        .from('route_collection_claims')
+        .select('id,shipment_id,driver_id,status,claimed_at,issue_reason,issue_note,shipment:shipments(tracking_number,customer_reference,metadata)')
+        .order('updated_at', { ascending: false })
+        .limit(200);
+      setCollectionClaims(claimError ? [] : ((claimData || []) as unknown as CollectionClaim[]));
 
       setDeliveries(deliveryRecords);
     } catch (error: any) {
@@ -185,28 +222,19 @@ const DeliveryManagementTab = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
-  // Helper function to extract recipient name from shipment metadata
-  const getRecipientName = (shipment: any): string => {
-    const metadata = shipment.metadata || {};
-    
-    if (typeof metadata !== 'object') {
-      return 'No Name Provided';
-    }
-    
-    if (safeGet(metadata, ['recipientDetails', 'name'])) {
-      return metadata.recipientDetails.name;
-    } else if (safeGet(metadata, ['recipient', 'name'])) {
-      return metadata.recipient.name;
-    } else if (safeGet(metadata, ['recipient', 'firstName']) && safeGet(metadata, ['recipient', 'lastName'])) {
-      return `${metadata.recipient.firstName} ${metadata.recipient.lastName}`;
-    } else if (metadata.recipientName) {
-      return metadata.recipientName;
-    }
-    
-    return 'No Name Provided';
-  };
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData, timeFilter]);
+
+  useEffect(() => {
+    const channel = supabase.channel('website-driver-operations')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'route_collection_claims' }, fetchData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'driver_run_stops' }, fetchData)
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [fetchData]);
 
   // Determine timeliness based on shipment data
   const getTimeliness = (shipment: any): 'on-time' | 'late' | 'failed' => {
@@ -242,19 +270,6 @@ const DeliveryManagementTab = () => {
     }
   };
 
-  const getTimelinessIcon = (timeliness: string) => {
-    switch (timeliness) {
-      case 'on-time':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'late':
-        return <AlertCircle className="h-4 w-4 text-yellow-500" />;
-      case 'failed':
-        return <XCircle className="h-4 w-4 text-red-500" />;
-      default:
-        return null;
-    }
-  };
-
   const filteredDeliveries = deliveries.filter(delivery => {
     const matchesSearch = searchQuery === '' || 
       delivery.tracking_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -266,6 +281,12 @@ const DeliveryManagementTab = () => {
     
     return matchesSearch && matchesStatus;
   });
+
+  const visibleCollectionClaims = collectionDriverFilter
+    ? collectionClaims.filter(claim => claim.driver_id === collectionDriverFilter)
+    : collectionClaims;
+
+  const filteredDriver = drivers.find(driver => driver.id === collectionDriverFilter);
 
   const assignDriver = async (deliveryId: string, driverId: string) => {
     try {
@@ -336,7 +357,7 @@ const DeliveryManagementTab = () => {
         description="Monitor deliveries, track driver performance, and manage complaints"
       />
       <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-4 grid w-full grid-cols-2 md:grid-cols-3 h-9">
+        <TabsList className="mb-4 grid w-full grid-cols-2 md:grid-cols-4 h-9">
           <TabsTrigger value="monitor" className="flex items-center gap-2">
             <Truck className="h-4 w-4" />
             <span>Monitor Deliveries</span>
@@ -344,6 +365,10 @@ const DeliveryManagementTab = () => {
           <TabsTrigger value="drivers" className="flex items-center gap-2">
             <UserCheck className="h-4 w-4" />
             <span>Driver Performance</span>
+          </TabsTrigger>
+          <TabsTrigger value="collections" className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            <span>Live Collections</span>
           </TabsTrigger>
           <TabsTrigger value="issues" className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4" />
@@ -445,8 +470,8 @@ const DeliveryManagementTab = () => {
                           ? format(new Date(delivery.delivery_date), 'MMM d, yyyy')
                           : 'Not scheduled';
                             
-                        return (
-                          <TableRow key={delivery.id}>
+                        return [
+                          <TableRow key={`${delivery.id}-summary`}>
                             <TableCell className="font-mono">{delivery.tracking_number}</TableCell>
                             <TableCell>{delivery.recipient_name}</TableCell>
                             <TableCell>
@@ -483,10 +508,29 @@ const DeliveryManagementTab = () => {
                               {delivery.destination}
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button variant="ghost" size="sm">View Details</Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSelectedDelivery(selectedDelivery?.id === delivery.id ? null : delivery)}
+                              >
+                                {selectedDelivery?.id === delivery.id ? 'Hide Details' : 'View Details'}
+                              </Button>
                             </TableCell>
-                          </TableRow>
-                        );
+                          </TableRow>,
+                          selectedDelivery?.id === delivery.id ? (
+                            <TableRow key={`${delivery.id}-details`}>
+                              <TableCell colSpan={7} className="bg-muted/30">
+                                <div className="grid gap-3 py-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                                  <div><p className="text-muted-foreground">Recipient</p><p className="font-medium">{delivery.recipient_name}</p></div>
+                                  <div><p className="text-muted-foreground">Driver</p><p className="font-medium">{delivery.driver_name || 'Not assigned'}</p></div>
+                                  <div><p className="text-muted-foreground">Scheduled</p><p className="font-medium">{delivery.delivery_date ? format(new Date(delivery.delivery_date), 'MMM d, yyyy') : 'Not scheduled'}</p></div>
+                                  <div><p className="text-muted-foreground">Origin</p><p className="font-medium">{delivery.origin}</p></div>
+                                  <div className="sm:col-span-2"><p className="text-muted-foreground">Destination</p><p className="font-medium">{delivery.destination}</p></div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ) : null,
+                        ];
                       })}
                     </TableBody>
                   </Table>
@@ -517,22 +561,30 @@ const DeliveryManagementTab = () => {
                     <TableBody>
                       {drivers.map((driver) => {
                         // Count assigned deliveries for this driver
-                        const assignedDeliveries = deliveries.filter(d => {
-                          return d.driver_id === driver.id;
-                        }).length;
+                        const assignedDeliveries = deliveries.filter(d => d.driver_id === driver.id).length;
+                        const completedClaims = driver.completedCollections || 0;
+                        const successRate = driver.on_time_rate || 0;
                         
                         return (
                           <TableRow key={driver.id}>
                             <TableCell className="font-medium">{driver.name}</TableCell>
-                            <TableCell>{assignedDeliveries}</TableCell>
+                            <TableCell>{assignedDeliveries} deliveries · {completedClaims} collections · {successRate}% success</TableCell>
                             <TableCell>
-                              <Badge className="bg-green-100 text-green-800">
-                                Active
+                              <Badge className={driver.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}>
+                                {driver.active ? 'Active' : 'Unavailable'}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button variant="ghost" size="sm">View Details</Button>
-                              <Button variant="ghost" size="sm">Assign Tasks</Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setCollectionDriverFilter(driver.id);
+                                  setActiveTab('collections');
+                                }}
+                              >
+                                View activity
+                              </Button>
                             </TableCell>
                           </TableRow>
                         );
@@ -547,11 +599,31 @@ const DeliveryManagementTab = () => {
                   <p className="text-gray-500 mb-6">
                     There are currently no drivers in the system
                   </p>
-                  <Button variant="outline">
-                    Add New Driver
-                  </Button>
+                  <p className="text-sm text-gray-500">Add or reactivate drivers in Staff Control.</p>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="collections">
+          <Card>
+            <CardHeader className="flex flex-row items-start justify-between gap-4">
+              <div>
+                <CardTitle>Live Collection Operations</CardTitle>
+                <CardDescription>The same claims and progress shown in the driver app</CardDescription>
+              </div>
+              {collectionDriverFilter ? (
+                <Button variant="outline" size="sm" onClick={() => setCollectionDriverFilter(null)}>
+                  Clear {filteredDriver?.name || 'driver'} filter
+                </Button>
+              ) : null}
+            </CardHeader>
+            <CardContent>
+              {visibleCollectionClaims.length === 0 ? <div className="text-center py-12"><Package className="h-12 w-12 mx-auto text-gray-400 mb-4" /><h3 className="text-lg font-medium">No collection activity yet</h3></div> :
+                <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Booking</TableHead><TableHead>Customer</TableHead><TableHead>Driver</TableHead><TableHead>Status</TableHead><TableHead>Claimed</TableHead></TableRow></TableHeader><TableBody>
+                  {visibleCollectionClaims.map((claim) => { const sender = claim.shipment?.metadata?.sender || {}; const driver = drivers.find(d => d.id === claim.driver_id); return <TableRow key={claim.id}><TableCell className="font-mono">{claim.shipment?.tracking_number || claim.shipment?.customer_reference || claim.shipment_id.slice(0, 8)}</TableCell><TableCell>{[sender.firstName, sender.lastName].filter(Boolean).join(' ') || sender.name || 'Customer'}</TableCell><TableCell>{driver?.name || (claim.driver_id ? 'Assigned driver' : 'Available')}</TableCell><TableCell><Badge className={claim.status === 'completed' ? 'bg-green-100 text-green-800' : claim.status === 'failed' ? 'bg-red-100 text-red-800' : claim.status === 'arrived' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}>{claim.status.replace('_', ' ')}</Badge></TableCell><TableCell>{claim.claimed_at ? format(new Date(claim.claimed_at), 'MMM d, HH:mm') : '—'}</TableCell></TableRow>; })}
+                </TableBody></Table></div>}
             </CardContent>
           </Card>
         </TabsContent>
@@ -563,16 +635,13 @@ const DeliveryManagementTab = () => {
               <CardDescription>Track and resolve delivery-related issues</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-12">
+              {collectionClaims.filter(claim => claim.status === 'failed').length === 0 ? <div className="text-center py-12">
                 <AlertCircle className="h-12 w-12 mx-auto text-orange-500 mb-4" />
                 <h3 className="text-lg font-medium mb-2">No active issues</h3>
-                <p className="text-gray-500 mb-6">
+                <p className="text-gray-500">
                   There are currently no reported issues or complaints
                 </p>
-                <Button variant="outline">
-                  View Resolved Issues
-                </Button>
-              </div>
+              </div> : <div className="space-y-3">{collectionClaims.filter(claim => claim.status === 'failed').map(claim => <div key={claim.id} className="rounded-lg border border-orange-200 bg-orange-50 p-4"><div className="flex items-center justify-between gap-3"><div><p className="font-medium">{claim.shipment?.tracking_number || claim.shipment?.customer_reference || 'Collection issue'}</p><p className="text-sm text-gray-600">{String(claim.issue_reason || 'Collection failed').replace(/_/g, ' ')}{claim.issue_note ? ` · ${claim.issue_note}` : ''}</p></div><Badge className="bg-red-100 text-red-800">Needs dispatch</Badge></div></div>)}</div>}
             </CardContent>
           </Card>
         </TabsContent>

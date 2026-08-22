@@ -20,6 +20,7 @@ import PlaceholderScreen from '../screens/admin/PlaceholderScreen';
 import StaffRecordsScreen from '../screens/admin/StaffRecordsScreen';
 import VehiclesScreen from '../screens/admin/VehiclesScreen';
 import AccountScreen from '../screens/AccountScreen';
+import { PaymentDetailsScreen, ReconciliationScreen } from '../screens/FinanceExperienceScreens';
 import type { MenuStackParams } from './types';
 import { colors } from '../theme';
 
@@ -45,6 +46,8 @@ export default function MenuStack() {
       <Stack.Screen name="DeliveryNoteDetail" component={DeliveryNoteDetailScreen} options={{ title: 'Delivery Note' }} />
       <Stack.Screen name="PickupZones" component={PickupZonesScreen} options={{ title: '', headerShadowVisible: false }} />
       <Stack.Screen name="Payments" component={PaymentsScreen} options={{ title: 'Payments' }} />
+      <Stack.Screen name="PaymentDetails" component={PaymentDetailsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Reconciliation" component={ReconciliationScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Invoices" component={InvoicesScreen} options={{ title: 'Invoices' }} />
       <Stack.Screen name="Reports" component={ReportsScreen} options={{ title: '', headerShadowVisible: false }} />
       <Stack.Screen name="Analytics" component={AnalyticsScreen} options={{ title: '', headerShadowVisible: false }} />

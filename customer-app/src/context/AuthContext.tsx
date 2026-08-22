@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { Platform } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
@@ -14,12 +16,15 @@ interface AuthValue {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signUp: (email: string, password: string) => Promise<{ error?: string; needsConfirm?: boolean; existing?: boolean }>;
+  signInWithGoogle: () => Promise<{ error?: string; cancelled?: boolean }>;
   signInWithApple: () => Promise<{ error?: string; cancelled?: boolean }>;
   signOut: () => Promise<void>;
   refreshProfile:()=>Promise<void>;
 }
 
 const AuthContext = createContext<AuthValue | undefined>(undefined);
+
+WebBrowser.maybeCompleteAuthSession();
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -88,6 +93,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { existing: true };
     }
     return { needsConfirm: !data.session };
+  }, []);
+
+  const signInWithGoogle = useCallback(async () => {
+    try {
+      const redirectTo = AuthSession.makeRedirectUri({
+        scheme: 'zimbabweshipping',
+        path: 'auth/callback',
+      });
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo, skipBrowserRedirect: true },
+      });
+      if (error) return { error: error.message };
+      if (!data.url) return { error: 'Google did not return a sign-in URL. Please try again.' };
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+      if (result.type === 'cancel' || result.type === 'dismiss') return { cancelled: true };
+      if (result.type !== 'success') return { error: 'Google sign-in did not complete. Please try again.' };
+
+      const callback = new URL(result.url);
+      const code = callback.searchParams.get('code');
+      if (code) {
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        return exchangeError ? { error: exchangeError.message } : {};
+      }
+
+      const fragment = new URLSearchParams(callback.hash.replace(/^#/, ''));
+      const accessToken = callback.searchParams.get('access_token') ?? fragment.get('access_token');
+      const refreshToken = callback.searchParams.get('refresh_token') ?? fragment.get('refresh_token');
+      if (!accessToken || !refreshToken) return { error: 'Google returned an incomplete sign-in response.' };
+
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+      return sessionError ? { error: sessionError.message } : {};
+    } catch (e: any) {
+      return { error: e?.message ?? 'Sign in with Google failed.' };
+    }
   }, []);
 
   /**
@@ -177,7 +221,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshProfile=useCallback(async()=>{if(session?.user.id)await loadProfile(session.user.id);},[session?.user.id,loadProfile]);
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading, signIn, signUp, signInWithApple, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ session, profile, loading, signIn, signUp, signInWithGoogle, signInWithApple, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

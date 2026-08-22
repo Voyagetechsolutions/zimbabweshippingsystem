@@ -4,10 +4,15 @@ import * as ImagePicker from 'expo-image-picker';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { colors, radius, spacing } from '../theme';
 import type { DriverStackParams } from '../navigation/types';
+
+// React Native bundles local images as numeric module references.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const collectionBoxesImage = require('../../assets/driver/collection-boxes.png');
 
 type Props = NativeStackScreenProps<DriverStackParams, 'StopWorkflow'>;
 type ProofType = 'pickup_departure' | 'depot_arrival' | 'depot_departure' | 'delivery_arrival' | 'seal';
@@ -51,6 +56,8 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
   const [sealCondition, setSealCondition] = useState<(typeof SEAL_CONDITIONS)[number]>('intact');
   const [sealNotes, setSealNotes] = useState('');
   const [sealsSaved, setSealsSaved] = useState(false);
+  const [draftReady, setDraftReady] = useState(false);
+  const draftKey = `driver_handover_draft:${stop.id}`;
 
   useEffect(() => { navigation.setOptions({ title: pickup ? 'Proof of Collection' : 'Proof of Delivery' }); }, [navigation, pickup]);
 
@@ -107,7 +114,32 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
 
   const verifyQr=async(value:string)=>{if(!value.trim())return;setBusy('qr');try{const{error}=await supabase.rpc('verify_driver_stop_qr',{p_stop_id:stop.id,p_qr_token:qrToken(value)});if(error)throw error;setQrVerified(true);Alert.alert('Customer signature verified','The shipment QR matches this assigned stop.');}catch(e:any){Alert.alert('QR verification failed',e?.message||'Scan the customer shipment QR code again.');}finally{setBusy(null);}};
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { (async () => {
+    await load();
+    const saved = await AsyncStorage.getItem(draftKey);
+    if (saved) {
+      try {
+        const draft = JSON.parse(saved);
+        if (Array.isArray(draft.items) && draft.items.length) setItems(draft.items);
+        if (typeof draft.discount === 'string') setDiscount(draft.discount);
+        if (typeof draft.taxRate === 'string') setTaxRate(draft.taxRate);
+        if (typeof draft.currency === 'string') setCurrency(draft.currency);
+        if (typeof draft.notes === 'string') setNotes(draft.notes);
+        if (typeof draft.correction === 'string') setCorrection(draft.correction);
+        if (typeof draft.sealsUsed === 'boolean') setSealsUsed(draft.sealsUsed);
+        if (Array.isArray(draft.sealCodes)) setSealCodes(draft.sealCodes);
+        if (SEAL_CONDITIONS.includes(draft.sealCondition)) setSealCondition(draft.sealCondition);
+        if (typeof draft.sealNotes === 'string') setSealNotes(draft.sealNotes);
+      } catch { await AsyncStorage.removeItem(draftKey); }
+    }
+    setDraftReady(true);
+  })(); }, [draftKey, load]);
+
+  useEffect(() => {
+    if (!draftReady) return;
+    const timer = setTimeout(() => { AsyncStorage.setItem(draftKey, JSON.stringify({ items, discount, taxRate, currency, notes, correction, sealsUsed, sealCodes, sealCondition, sealNotes })); }, 350);
+    return () => clearTimeout(timer);
+  }, [correction, currency, discount, draftKey, draftReady, items, notes, sealCodes, sealCondition, sealNotes, sealsUsed, taxRate]);
 
   const saveCorrection = async () => {
     if (!correction.trim()) { Alert.alert('Nothing to save', 'Type the correction or collection note first.'); return; }
@@ -188,6 +220,7 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
     try {
       const { data, error } = await supabase.rpc('complete_driver_handover', { p_stop_id: stop.id, p_customer_code: code.trim(), p_notes: notes.trim() || null });
       if (error) throw error;
+      await AsyncStorage.removeItem(draftKey);
       Alert.alert(pickup ? 'Collection complete' : 'Delivery complete', `${stop.trackingNumber} is now ${(data as any)?.status || 'complete'}.`, [{ text: 'Done', onPress: () => navigation.goBack() }]);
     } catch (e: any) { Alert.alert('Could not complete stop', e?.message || 'Check the required invoice, photos and customer code.'); }
     finally { setBusy(null); }
@@ -200,8 +233,8 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
   const sealPhoto = proofs.find((p) => p.proof_type === 'seal');
 
   return (
-    <ScrollView style={styles.safe} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <View style={styles.hero}><Text style={styles.customer}>{stop.customerName}</Text><Text style={styles.ref}>{stop.trackingNumber}</Text></View>
+    <ScrollView style={styles.safe} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+      <View style={styles.hero}><Text style={styles.customer}>{stop.customerName}</Text><Text style={styles.ref}>{stop.trackingNumber}</Text><Text style={styles.draftNote}>Progress saves automatically on this device</Text></View>
 
       {pickup ? <View style={styles.card}>
         <View style={styles.sectionHead}><Ionicons name="document-text-outline" size={21} color={colors.primary}/><Text style={styles.sectionTitle}>Customer's goods description</Text></View>
@@ -284,7 +317,7 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
         <View style={styles.sectionHead}><Ionicons name="camera-outline" size={21} color={colors.primary} /><Text style={styles.sectionTitle}>Proof of goods</Text></View>
         <Text style={styles.help}>Photographs are timestamped, linked to this run and stop, visible to admins, and automatically deleted 48 hours after a verified delivery.</Text>
         <Pressable style={styles.proofPreview} onPress={() => takePhoto(photoButtons[0][0])}>
-          <Image source={proofs[0]?.signedUrl ? { uri: proofs[0].signedUrl } : require('../../assets/driver/collection-boxes.png')} style={styles.proofImage} />
+          <Image source={proofs[0]?.signedUrl ? { uri: proofs[0].signedUrl } : collectionBoxesImage} style={styles.proofImage} />
           <View style={styles.cameraBadge}><Ionicons name="camera" size={18} color={colors.white} /></View>
         </Pressable>
         <View style={styles.photoGrid}>{photoButtons.map(([type, label]) => {
@@ -309,7 +342,7 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
 
 function Label({ text }: { text: string }) { return <Text style={styles.label}>{text}</Text>; }
 const styles = StyleSheet.create({
-  safe:{flex:1,backgroundColor:colors.bg},content:{padding:spacing.lg,gap:spacing.md,paddingBottom:48},hero:{paddingBottom:spacing.sm},title:{fontSize:22,fontWeight:'800',color:colors.text},customer:{fontSize:16,fontWeight:'700',color:colors.text,marginTop:4},ref:{fontSize:12,fontWeight:'700',color:colors.primary,marginTop:2},card:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:radius.lg,padding:spacing.lg,gap:spacing.sm},sectionHead:{flexDirection:'row',alignItems:'center',gap:spacing.sm},sectionTitle:{fontSize:16,fontWeight:'800',color:colors.text},help:{fontSize:12,lineHeight:17,color:colors.textMuted,marginBottom:4},helpStrong:{fontSize:12,lineHeight:17,color:colors.amber,fontWeight:'800',marginBottom:4},label:{fontSize:11,fontWeight:'700',color:colors.textMuted,marginTop:4},input:{borderWidth:1,borderColor:colors.border,borderRadius:radius.sm,backgroundColor:colors.bg,paddingHorizontal:12,paddingVertical:10,color:colors.text,fontSize:14},row:{flexDirection:'row',gap:spacing.sm},flex:{flex:1},primary:{backgroundColor:colors.primary,borderRadius:radius.sm,paddingVertical:13,alignItems:'center',marginTop:4},primaryText:{color:colors.white,fontWeight:'800',fontSize:13},outline:{borderWidth:1.5,borderColor:colors.primary,borderRadius:radius.sm,paddingVertical:11,alignItems:'center',marginTop:4},outlineText:{color:colors.primary,fontWeight:'800',fontSize:13},saved:{textAlign:'center',color:colors.primary,fontWeight:'700',fontSize:12},proofPreview:{height:190,borderRadius:radius.md,overflow:'hidden',position:'relative'},proofImage:{width:'100%',height:'100%'},cameraBadge:{position:'absolute',right:10,bottom:10,width:38,height:38,borderRadius:19,backgroundColor:'rgba(15,23,42,.72)',alignItems:'center',justifyContent:'center'},photoGrid:{flexDirection:'row',gap:spacing.sm},photoButton:{flex:1,minHeight:120,borderWidth:1,borderStyle:'dashed',borderColor:colors.border,borderRadius:radius.md,alignItems:'center',justifyContent:'center',padding:spacing.sm,overflow:'hidden'},photoDone:{borderColor:colors.primary,backgroundColor:colors.primarySoft},thumbnail:{width:'100%',height:72,borderRadius:radius.sm,marginBottom:5},photoLabel:{fontSize:11,fontWeight:'700',color:colors.textMuted,textAlign:'center'},code:{fontSize:26,fontWeight:'800',letterSpacing:8,textAlign:'center'},notes:{minHeight:68,textAlignVertical:'top'},disabled:{opacity:.55},
+  safe:{flex:1,backgroundColor:colors.bg},content:{padding:spacing.lg,gap:spacing.md,paddingBottom:48},hero:{paddingBottom:spacing.sm},title:{fontSize:22,fontWeight:'800',color:colors.text},customer:{fontSize:16,fontWeight:'700',color:colors.text,marginTop:4},ref:{fontSize:12,fontWeight:'700',color:colors.primary,marginTop:2},draftNote:{fontSize:10.5,color:colors.textMuted,marginTop:5},card:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:radius.lg,padding:spacing.lg,gap:spacing.sm},sectionHead:{flexDirection:'row',alignItems:'center',gap:spacing.sm},sectionTitle:{fontSize:16,fontWeight:'800',color:colors.text},help:{fontSize:12,lineHeight:17,color:colors.textMuted,marginBottom:4},helpStrong:{fontSize:12,lineHeight:17,color:colors.amber,fontWeight:'800',marginBottom:4},label:{fontSize:11,fontWeight:'700',color:colors.textMuted,marginTop:4},input:{borderWidth:1,borderColor:colors.border,borderRadius:radius.sm,backgroundColor:colors.bg,paddingHorizontal:12,paddingVertical:10,color:colors.text,fontSize:14},row:{flexDirection:'row',gap:spacing.sm},flex:{flex:1},primary:{backgroundColor:colors.primary,borderRadius:radius.sm,paddingVertical:13,alignItems:'center',marginTop:4},primaryText:{color:colors.white,fontWeight:'800',fontSize:13},outline:{borderWidth:1.5,borderColor:colors.primary,borderRadius:radius.sm,paddingVertical:11,alignItems:'center',marginTop:4},outlineText:{color:colors.primary,fontWeight:'800',fontSize:13},saved:{textAlign:'center',color:colors.primary,fontWeight:'700',fontSize:12},proofPreview:{height:190,borderRadius:radius.md,overflow:'hidden',position:'relative'},proofImage:{width:'100%',height:'100%'},cameraBadge:{position:'absolute',right:10,bottom:10,width:38,height:38,borderRadius:19,backgroundColor:'rgba(15,23,42,.72)',alignItems:'center',justifyContent:'center'},photoGrid:{flexDirection:'row',gap:spacing.sm},photoButton:{flex:1,minHeight:120,borderWidth:1,borderStyle:'dashed',borderColor:colors.border,borderRadius:radius.md,alignItems:'center',justifyContent:'center',padding:spacing.sm,overflow:'hidden'},photoDone:{borderColor:colors.primary,backgroundColor:colors.primarySoft},thumbnail:{width:'100%',height:72,borderRadius:radius.sm,marginBottom:5},photoLabel:{fontSize:11,fontWeight:'700',color:colors.textMuted,textAlign:'center'},code:{fontSize:26,fontWeight:'800',letterSpacing:8,textAlign:'center'},notes:{minHeight:68,textAlignVertical:'top'},disabled:{opacity:.55},
   lineItem:{borderWidth:1,borderColor:colors.border,borderRadius:radius.md,padding:spacing.sm,gap:4},lineHead:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},lineTitle:{fontSize:11,fontWeight:'800',color:colors.textMuted},addItem:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6,paddingVertical:8},addItemText:{fontSize:12,fontWeight:'800',color:colors.primary},
   lockedPrice:{fontSize:12,fontWeight:'800',color:colors.text},lockedRow:{flexDirection:'row',alignItems:'center',gap:6,marginTop:2},lockedNote:{flex:1,fontSize:11,color:colors.textMuted,lineHeight:15},
   descriptionBox:{backgroundColor:colors.bg,borderWidth:1,borderColor:colors.border,borderRadius:radius.md,padding:spacing.md},descriptionText:{fontSize:13,lineHeight:19,color:colors.text},correctionBox:{backgroundColor:'#fffbeb',borderWidth:1,borderColor:'#fcd34d',borderRadius:radius.md,padding:spacing.md},correctionLabel:{fontSize:9.5,fontWeight:'800',color:'#b45309',letterSpacing:.5,marginBottom:3},

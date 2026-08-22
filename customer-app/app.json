@@ -2,9 +2,10 @@
   "expo": {
     "name": "Zimbabwe Shipping",
     "slug": "zimbabwe-shiipping",
+    "scheme": "zimbabweshipping",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/logo.png",
+    "icon": "./assets/icon-square.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -13,6 +14,7 @@
       "backgroundColor": "#10130F"
     },
     "plugins": [
+      "expo-apple-authentication",
       [
         "expo-image-picker",
         {
@@ -20,18 +22,21 @@
           "cameraPermission": "Allow Zimbabwe Shipping to photograph payment proof.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.zimbabweshipping.customer",
+      "bundleIdentifier": "com.voyagetech.zimbabweshipphing",
+      "icon": "./assets/ios-icon.png",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/logo.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#008C45"
       },
       "package": "com.zimbabweshipping.customer",

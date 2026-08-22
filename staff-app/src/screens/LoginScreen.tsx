@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { colors, radius, spacing } from '../theme';
@@ -10,11 +11,20 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [passwordVisible, setPasswordVisible] = useState(false);
 
   const onSubmit = async () => {
     setError(null);
+    if (!email.trim()) {
+      setError('Enter your email address.');
+      return;
+    }
+    if (!password) {
+      setError('Enter your password.');
+      return;
+    }
     setBusy(true);
-    const { error } = await signIn(email, password);
+    const { error } = await signIn(email.trim(), password);
     setBusy(false);
     if (error) setError(error);
   };
@@ -38,18 +48,29 @@ export default function LoginScreen() {
             placeholderTextColor={colors.textFaint}
           />
           <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            placeholder="••••••••"
-            placeholderTextColor={colors.textFaint}
-          />
+          <View>
+            <TextInput
+              style={[styles.input, styles.passwordInput]}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!passwordVisible}
+              placeholder="••••••••"
+              placeholderTextColor={colors.textFaint}
+            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={passwordVisible ? 'Hide password' : 'Show password'}
+              hitSlop={10}
+              onPress={() => setPasswordVisible((visible) => !visible)}
+              style={styles.passwordToggle}
+            >
+              <Ionicons name={passwordVisible ? 'eye-off-outline' : 'eye-outline'} size={21} color={colors.textMuted} />
+            </Pressable>
+          </View>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <Pressable style={[styles.button, busy && { opacity: 0.6 }]} onPress={onSubmit} disabled={busy}>
+          <Pressable accessibilityRole="button" style={[styles.button, busy && { opacity: 0.6 }]} onPress={onSubmit} disabled={busy}>
             {busy ? <ActivityIndicator color={colors.white} /> : <Text style={styles.buttonText}>Sign in</Text>}
           </Pressable>
           <Text style={styles.hint}>Staff access only. Use your admin account.</Text>
@@ -71,6 +92,8 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: 10,
     fontSize: 15, color: colors.text, backgroundColor: colors.surface,
   },
+  passwordInput: { paddingRight: 46 },
+  passwordToggle: { position: 'absolute', right: 13, top: 0, bottom: 0, justifyContent: 'center' },
   error: { color: colors.danger, fontSize: 13, marginTop: spacing.sm },
   button: { marginTop: spacing.lg, backgroundColor: colors.primary, borderRadius: radius.sm, paddingVertical: 13, alignItems: 'center' },
   buttonText: { color: colors.white, fontWeight: '700', fontSize: 15 },

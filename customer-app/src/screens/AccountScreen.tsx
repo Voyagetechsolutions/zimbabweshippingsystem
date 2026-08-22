@@ -20,6 +20,23 @@ export default function AccountScreen() {
     }).catch(() => {});
   };
 
+  // Apple guideline 5.1.1(v) / Google Play data-safety: an account created in the
+  // app must be deletable from inside the app. The flow itself lives on the site.
+  const requestAccountDeletion = () => {
+    Alert.alert(
+      'Delete your account?',
+      'This starts permanent deletion of your profile, saved addresses and contact details. Invoices we must keep for UK tax law are anonymised, not removed.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Continue',
+          style: 'destructive',
+          onPress: () => Linking.openURL('https://zimbabweshipping.com/delete-account'),
+        },
+      ],
+    );
+  };
+
   const rows = [
     { icon: 'cube-outline' as const, label: 'My Shipments', sub: 'Track and manage your bookings', onPress: () => navigation.navigate('Tabs', { screen: 'Shipments' }) },
     { icon: 'pricetag-outline' as const, label: 'My Quotes', sub: 'Requests and approved quotes ready to book', onPress: () => navigation.navigate('SavedQuotes') },
@@ -79,15 +96,21 @@ export default function AccountScreen() {
         ))}
 
         {session && (
-          <Button
-            title="Sign out"
-            variant="outline"
-            style={{ marginTop: spacing.lg }}
-            onPress={() => Alert.alert('Sign out?', '', [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Sign out', style: 'destructive', onPress: () => signOut() },
-            ])}
-          />
+          <>
+            <Button
+              title="Sign out"
+              variant="outline"
+              style={{ marginTop: spacing.lg }}
+              onPress={() => Alert.alert('Sign out?', '', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Sign out', style: 'destructive', onPress: () => signOut() },
+              ])}
+            />
+            <Pressable style={styles.deleteRow} onPress={requestAccountDeletion}>
+              <Ionicons name="trash-outline" size={16} color={colors.red} />
+              <Text style={styles.deleteText}>Delete my account</Text>
+            </Pressable>
+          </>
         )}
 
         <Text style={styles.footer}>Zimbabwe Shipping Services — family-run since 2011.{'\n'}Founded by Mr Tshakalisa Moyo.</Text>
@@ -110,5 +133,7 @@ const styles = StyleSheet.create({
   rowIcon: { backgroundColor: colors.greenSoft, borderRadius: radius.sm, padding: 8 },
   rowLabel: { fontSize: 14, fontWeight: '700', color: colors.text },
   rowSub: { fontSize: 12, color: colors.textMuted, marginTop: 1 },
+  deleteRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: spacing.md, padding: spacing.sm },
+  deleteText: { fontSize: 13, fontWeight: '700', color: colors.red },
   footer: { fontSize: 12, color: colors.textFaint, textAlign: 'center', marginTop: spacing.xl, lineHeight: 18 },
 });

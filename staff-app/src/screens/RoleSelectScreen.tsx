@@ -24,7 +24,7 @@ export default function RoleSelectScreen() {
         <Text style={styles.sub}>You have admin access. Pick the dashboard you want to work in — you can switch anytime from the Account tab.</Text>
 
         {OPTIONS.map((option) => (
-          <Pressable key={option.role} style={styles.card} onPress={() => chooseRole(option.role)}>
+          <Pressable accessibilityRole="button" key={option.role} style={styles.card} onPress={() => chooseRole(option.role)}>
             <View style={styles.iconWrap}><Ionicons name={option.icon} size={24} color={colors.primary} /></View>
             <View style={{ flex: 1 }}>
               <Text style={styles.cardTitle}>{option.title}</Text>
@@ -34,7 +34,7 @@ export default function RoleSelectScreen() {
           </Pressable>
         ))}
 
-        <Pressable onPress={signOut} style={styles.signOut}>
+        <Pressable accessibilityRole="button" onPress={signOut} style={styles.signOut}>
           <Text style={styles.signOutText}>Sign out</Text>
         </Pressable>
       </View>

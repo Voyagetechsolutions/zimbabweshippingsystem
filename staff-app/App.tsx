@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
@@ -20,6 +20,7 @@ import MenuStack from './src/navigation/MenuStack';
 import DriverStack from './src/navigation/DriverStack';
 import DriverRunStack from './src/navigation/DriverRunStack';
 import DriverMoreStack from './src/navigation/DriverMoreStack';
+import DeliveryStack from './src/navigation/DeliveryStack';
 import { DriverMessagesScreen } from './src/screens/DriverExperienceScreens';
 import FinanceOverviewStack from './src/navigation/FinanceOverviewStack';
 import FinancePaymentsStack from './src/navigation/FinancePaymentsStack';
@@ -33,6 +34,7 @@ import FinanceBooksScreen from './src/screens/FinanceBooksScreen';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { colors, spacing } from './src/theme';
 import MapPreviewScreen from './src/screens/MapPreviewScreen';
+import AppleReviewWorkspaceScreen from './src/screens/AppleReviewWorkspaceScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -103,18 +105,41 @@ function FinanceApp() {
   );
 }
 
-// Driver: collection and delivery runs.
-function DriverApp() {
+// Pickup driver: the shared collection route.
+function PickupDriverApp({ withDeliveries }: { withDeliveries?: boolean }) {
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
       <Tab.Screen name="Home" component={DriverStack} options={{ tabBarIcon: icon('home-outline') }} />
       {/* One collection route runs per day, so this is "Collections" — the day's
           addresses and their map pins — not a per-driver assigned run. */}
       <Tab.Screen name="Collections" component={DriverRunStack} options={{ tabBarIcon: icon('map-outline') }} />
+      {withDeliveries ? (
+        <Tab.Screen name="Deliveries" component={DeliveryStack} options={{ tabBarIcon: icon('cube-outline') }} />
+      ) : null}
       <Tab.Screen name="Messages" component={DriverMessagesScreen} options={{ tabBarIcon: icon('chatbubble-ellipses-outline') }} />
       <Tab.Screen name="My Account" component={DriverMoreStack} options={{ title: 'My Account', tabBarIcon: icon('person-outline') }} />
     </Tab.Navigator>
   );
+}
+
+// Delivery driver: a vehicle they load themselves at the depot, then run. They
+// never see the collection route — it is the other half of the journey and on
+// another continent.
+function DeliveryDriverApp() {
+  return (
+    <Tab.Navigator screenOptions={tabScreenOptions}>
+      <Tab.Screen name="Home" component={DeliveryStack} options={{ tabBarIcon: icon('home-outline') }} />
+      <Tab.Screen name="Messages" component={DriverMessagesScreen} options={{ tabBarIcon: icon('chatbubble-ellipses-outline') }} />
+      <Tab.Screen name="My Account" component={DriverMoreStack} options={{ title: 'My Account', tabBarIcon: icon('person-outline') }} />
+    </Tab.Navigator>
+  );
+}
+
+// Which driver experience this account gets. Admin sets the specialism in the
+// Staff Control Centre; an unset one means the driver does both.
+function DriverApp({ driverType }: { driverType: 'pickup' | 'delivery' | 'both' }) {
+  if (driverType === 'delivery') return <DeliveryDriverApp />;
+  return <PickupDriverApp withDeliveries={driverType === 'both'} />;
 }
 
 function NotAuthorized() {
@@ -134,20 +159,32 @@ function NotAuthorized() {
 }
 
 function Root() {
-  const { loading, session, dashboardRole } = useAuth();
+  const { loading, session, dashboardRole, driverType } = useAuth();
   const { viewRole, ready } = useViewRole();
+
+  const showReviewPreview = Platform.OS === 'web'
+    && new URLSearchParams(window.location?.search ?? '').has('reviewPreview');
 
   if (loading || !ready) {
     return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
   }
+  // Local-only capture route for generating App Store screenshots. The release
+  // build can reach this workspace only after authenticating as Apple's account.
+  if (showReviewPreview) return <AppleReviewWorkspaceScreen />;
   if (!session) return <LoginScreen />;
+  // Apple's reviewer account is deliberately routed to a local sample workspace.
+  // It can exercise all three role experiences without exposing live customers,
+  // addresses, driver locations or finance records during App Review.
+  if (session.user?.email?.toLowerCase() === 'mthokochaza+applereview@gmail.com') {
+    return <AppleReviewWorkspaceScreen />;
+  }
   // Staff created by an admin start on a temporary password that was read out to
   // them. This stands in front of everything — including the role check — until
   // they have replaced it.
   if (session.user?.user_metadata?.must_change_password) return <SetPasswordScreen />;
   if (!dashboardRole) return <NotAuthorized />;
-  const showMapPreview = __DEV__ && typeof window !== 'undefined'
-    && new URLSearchParams(window.location.search).has('mapPreview');
+  const showMapPreview = __DEV__ && Platform.OS === 'web'
+    && new URLSearchParams(window.location?.search ?? '').has('mapPreview');
   if (showMapPreview) return <MapPreviewScreen />;
 
   // Admins choose which dashboard to work in; everyone else goes straight
@@ -159,7 +196,7 @@ function Root() {
     <NavigationContainer>
       {effectiveRole === 'admin' && <AdminApp />}
       {effectiveRole === 'finance' && <FinanceApp />}
-      {effectiveRole === 'driver' && <DriverApp />}
+      {effectiveRole === 'driver' && <DriverApp driverType={driverType} />}
     </NavigationContainer>
   );
 }

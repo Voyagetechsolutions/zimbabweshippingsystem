@@ -28,16 +28,31 @@ export interface DeliveryNoteRow {
   notes: string | null;
   status: string;
   created_at: string;
+  // Present once the delivery-driver migration is applied. A note raised when a
+  // delivery driver loads the vehicle sits at 'pending' until an admin checks it.
+  verification_status?: 'pending' | 'verified' | 'rejected' | null;
+  verification_notes?: string | null;
+  verified_at?: string | null;
+  verified_by?: string | null;
+  seal_codes?: string[] | null;
+  seal_status?: string | null;
+  discrepancy_note?: string | null;
+  loaded_at?: string | null;
   shipment: Shipment | null;
 }
 
-const FILTERS = ['all', 'pending', 'signed', 'rejected', 'completed'] as const;
+const FILTERS = ['all', 'to verify', 'verified', 'rejected', 'signed'] as const;
 
 export function noteBadge(note: DeliveryNoteRow) {
-  if (note.status === 'exception' || note.status === 'void') return { label: 'Rejected', tone: BADGE.red };
+  // Verification is what decides whether the goods can travel, so it leads.
+  if (note.verification_status === 'rejected' || note.status === 'exception' || note.status === 'void') {
+    return { label: 'Rejected', tone: BADGE.red };
+  }
+  if (note.verification_status === 'pending') return { label: 'To verify', tone: BADGE.orange };
   if (note.status === 'completed' && note.customer_code_verified) return { label: 'Signed', tone: BADGE.green };
+  if (note.verification_status === 'verified') return { label: 'Verified', tone: BADGE.blue };
   if (note.status === 'completed') return { label: 'Completed', tone: BADGE.blue };
-  return { label: 'Pending', tone: BADGE.orange };
+  return { label: 'To verify', tone: BADGE.orange };
 }
 
 export default function DeliveryNotesScreen({ navigation }: Props) {
@@ -50,16 +65,30 @@ export default function DeliveryNotesScreen({ navigation }: Props) {
 
   const load = useCallback(async () => {
     setError(null);
-    const { data, error: loadError } = await supabase
-      .from('delivery_notes')
-      .select('id,note_number,shipment_id,driver_id,recipient_name,delivery_address,delivered_at,customer_code_verified,proof_count,notes,status,created_at,shipment:shipments(id,tracking_number,customer_reference,status,origin,destination,created_at,updated_at,metadata,goods_description,driver_description_correction)')
-      .order('created_at', { ascending: false })
-      .limit(200);
-    if (loadError) { setError(loadError.message); return; }
-    setNotes(((data || []) as any[]).map((row) => ({ ...row, shipment: row.shipment as Shipment | null })) as DeliveryNoteRow[]);
+    const BASE = 'id,note_number,shipment_id,driver_id,recipient_name,delivery_address,delivered_at,customer_code_verified,proof_count,notes,status,created_at';
+    const VERIFICATION = 'verification_status,verification_notes,verified_at,verified_by,seal_codes,seal_status,discrepancy_note,loaded_at';
+    const SHIPMENT = 'shipment:shipments(id,tracking_number,customer_reference,status,origin,destination,created_at,updated_at,metadata,goods_description,driver_description_correction)';
+
+    // The verification columns only exist once the delivery-driver migration is
+    // applied, so an un-migrated database still gets its register.
+    let result: { data: any[] | null; error: { message: string } | null } = await supabase.from('delivery_notes')
+      .select(`${BASE},${VERIFICATION},${SHIPMENT}`)
+      .order('created_at', { ascending: false }).limit(200);
+    if (result.error && /verification_status|seal_status|discrepancy_note/i.test(result.error.message)) {
+      result = await supabase.from('delivery_notes')
+        .select(`${BASE},${SHIPMENT}`)
+        .order('created_at', { ascending: false }).limit(200);
+    }
+    if (result.error) { setError(result.error.message); return; }
+    setNotes(((result.data || []) as any[]).map((row) => ({ ...row, shipment: row.shipment as Shipment | null })) as DeliveryNoteRow[]);
   }, []);
 
   useEffect(() => { (async () => { setLoading(true); await load(); setLoading(false); })(); }, [load]);
+
+  const awaiting = useMemo(
+    () => notes.filter((n) => (n.verification_status || 'pending') === 'pending' && !n.delivered_at).length,
+    [notes],
+  );
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -67,6 +96,9 @@ export default function DeliveryNotesScreen({ navigation }: Props) {
       .filter((n) => {
         if (filter === 'all') return true;
         const badge = noteBadge(n).label.toLowerCase();
+        // A delivered note that predates the verification gate reads as
+        // "Completed"; it belongs with the signed ones, not nowhere.
+        if (filter === 'signed') return badge === 'signed' || badge === 'completed';
         return badge === filter;
       })
       .filter((n) => {
@@ -83,11 +115,13 @@ export default function DeliveryNotesScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe} edges={[]}>
       <View style={styles.headerBlock}>
-        <ScreenHeader title="Delivery Notes" subtitle={`${notes.length} notes on record`} />
+        <ScreenHeader title="Delivery Notes" subtitle={awaiting > 0
+          ? `${awaiting} waiting for your verification · ${notes.length} on record`
+          : `${notes.length} notes on record`} />
         <SearchBar value={query} onChange={setQuery} placeholder="Note number, reference, tracking, customer or destination" />
         <View style={{ marginTop: spacing.sm }}>
           <Segmented options={FILTERS} value={filter} onChange={setFilter}
-            labels={{ all: 'All', pending: 'Pending', signed: 'Signed', rejected: 'Rejected', completed: 'Completed' }} />
+            labels={{ all: 'All', 'to verify': 'To verify', verified: 'Verified', rejected: 'Rejected', signed: 'Signed' }} />
         </View>
       </View>
 
@@ -121,6 +155,11 @@ export default function DeliveryNotesScreen({ navigation }: Props) {
                   {item.delivery_address || item.shipment?.destination || '—'}
                   {item.delivered_at ? ` · delivered ${new Date(item.delivered_at).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : ''}
                 </Text>
+                {item.seal_status === 'mismatch' ? (
+                  <Text style={styles.flag} numberOfLines={2}>
+                    Seal discrepancy{item.discrepancy_note ? ` — ${item.discrepancy_note}` : ''}
+                  </Text>
+                ) : null}
               </View>
               <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
             </Pressable>
@@ -142,5 +181,6 @@ const styles = StyleSheet.create({
   noteNumber: { fontSize: 13.5, fontWeight: '800', color: colors.text, flexShrink: 1 },
   reference: { fontSize: 10.5, fontWeight: '800', color: colors.primary, marginTop: 1 },
   meta: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
+  flag: { fontSize: 11, color: colors.danger, fontWeight: '700', marginTop: 3, lineHeight: 15 },
   footer: { textAlign: 'center', color: colors.textFaint, fontSize: 12, paddingVertical: spacing.md },
 });

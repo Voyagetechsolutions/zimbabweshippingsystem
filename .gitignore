@@ -47,3 +47,6 @@ Thumbs.db
 .cache
 .vercel
 .env*.local
+
+# Puppeteer profile used by the store-screenshot capture script (holds a live session)
+scripts/store-screenshots/.cache/

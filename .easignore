@@ -10,8 +10,11 @@
 **/node_modules/
 **/.expo/
 **/dist/
+**/dist-verify/
+**/dist-verify2/
 **/web-build/
 .git/
+.claude/
 
 # --- Monorepo parts not needed to build the mobile apps ---
 /tmp/
@@ -22,6 +25,8 @@
 /old whatsapp bots/
 /store-assets/
 /poster-output/
+/deliverables/
+/output/
 /docs/
 /scripts/
 /tools/

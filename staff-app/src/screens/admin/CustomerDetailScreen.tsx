@@ -115,9 +115,9 @@ export default function CustomerDetailScreen({ route, navigation }: Props) {
           <Badge text={disabled ? 'Disabled' : record.active ? 'Active' : 'Inactive'} tone={disabled ? BADGE.red : record.active ? BADGE.green : BADGE.grey} />
         </View>
         <View style={styles.actionGrid}>
-          <ActionButton icon="call-outline" label="Call" onPress={() => phone && Linking.openURL(`tel:${phone}`)} />
-          <ActionButton icon="logo-whatsapp" label="WhatsApp" onPress={() => phone && Linking.openURL(`https://wa.me/${phone.replace(/\D/g, '')}`)} />
-          <ActionButton icon="mail-outline" label="Email" onPress={() => email && Linking.openURL(`mailto:${email}`)} />
+          {phone ? <ActionButton icon="call-outline" label="Call" onPress={() => Linking.openURL(`tel:${phone}`)} /> : null}
+          {phone ? <ActionButton icon="logo-whatsapp" label="WhatsApp" onPress={() => Linking.openURL(`https://wa.me/${phone.replace(/\D/g, '')}`)} /> : null}
+          {email ? <ActionButton icon="mail-outline" label="Email" onPress={() => Linking.openURL(`mailto:${email}`)} /> : null}
           <ActionButton icon="add-circle-outline" label="Booking" onPress={() => navigation.navigate('ManualBooking')} />
           <ActionButton icon="pricetag-outline" label="Quote" onPress={() => navigation.navigate('CustomQuotes')} />
           <ActionButton icon={disabled ? 'refresh-circle-outline' : 'ban-outline'} label={disabled ? 'Reactivate' : 'Disable'} danger={!disabled} onPress={toggleDisabled} />

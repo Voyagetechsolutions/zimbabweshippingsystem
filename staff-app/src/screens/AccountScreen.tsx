@@ -17,10 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useViewRole } from '../context/ViewRoleContext';
 import { supabase } from '../lib/supabase';
+import { COMPANY, COMPANY_WHATSAPP_URL } from '../config/company';
 import { colors, radius, shadow, spacing } from '../theme';
-
-const SUPPORT_EMAIL = 'voyagetechsolutions@gmaail.com';
-const SUPPORT_WHATSAPP = '+27615321107';
 
 export default function AccountScreen() {
   const { session, profile, signOut, dashboardRole, canSwitchDashboards } = useAuth();
@@ -47,7 +45,7 @@ export default function AccountScreen() {
 
   const saveProfile = async () => {
     if (!session?.user.id || !name.trim()) {
-      Alert.alert('Name required', 'Enter the name to display on your finance profile.');
+      Alert.alert('Name required', 'Enter the name to display on your staff profile.');
       return;
     }
     setSaving(true);
@@ -59,31 +57,31 @@ export default function AccountScreen() {
     setSaving(false);
     const error = profileResult.error || authResult.error;
     if (error) Alert.alert('Could not save profile', error.message);
-    else Alert.alert('Profile saved', 'Your finance profile preferences have been updated.');
+    else Alert.alert('Profile saved', 'Your staff profile preferences have been updated.');
   };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
         <Text style={styles.title}>Account</Text>
 
         <View style={styles.profileCard}>
           <View style={styles.avatar}><Text style={styles.avatarText}>{initial}</Text></View>
           <View style={{ flex: 1 }}>
             <Text style={styles.profileName}>{profile?.full_name || 'Staff member'}</Text>
-            <Text style={styles.muted} numberOfLines={1}>{session?.user.email}</Text>
+            <Text style={styles.muted} numberOfLines={1}>{COMPANY.name} staff account</Text>
             <Text style={styles.role}>{roleLabel}</Text>
           </View>
         </View>
 
         <SectionTitle text="Company profile" />
         <View style={styles.card}>
-          <DetailRow icon="business-outline" label="Company name" value="VoyageTech Solutions" />
-          <Pressable onPress={() => Linking.openURL('https://www.voyagetechsolutions.com')}>
-            <DetailRow icon="globe-outline" label="Website" value="www.voyagetechsolutions.com" />
+          <DetailRow icon="business-outline" label="Company name" value={COMPANY.name} />
+          <Pressable onPress={() => Linking.openURL(COMPANY.websiteUrl)}>
+            <DetailRow icon="globe-outline" label="Website" value={COMPANY.websiteLabel} />
           </Pressable>
-          <DetailRow icon="mail-outline" label="Contact email" value={SUPPORT_EMAIL} />
-          <DetailRow icon="logo-whatsapp" label="Contact number" value={SUPPORT_WHATSAPP} last />
+          <DetailRow icon="mail-outline" label="Contact email" value={COMPANY.supportEmail} />
+          <DetailRow icon="logo-whatsapp" label="Contact number" value={COMPANY.supportPhone} last />
         </View>
 
         <SectionTitle text="Payment methods" />
@@ -96,11 +94,11 @@ export default function AccountScreen() {
         <SectionTitle text="Profile settings" />
         <View style={styles.settingsCard}>
           <Text style={styles.fieldLabel}>Display name</Text>
-          <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Finance profile name" placeholderTextColor={colors.textFaint} />
+          <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Staff profile name" placeholderTextColor={colors.textFaint} />
           <Text style={styles.fieldLabel}>Contact number</Text>
           <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="Your contact number" placeholderTextColor={colors.textFaint} keyboardType="phone-pad" />
           <View style={styles.switchRow}>
-            <View style={{ flex: 1 }}><Text style={styles.rowTitle}>Finance notifications</Text><Text style={styles.muted}>Payment, invoice and reconciliation alerts</Text></View>
+            <View style={{ flex: 1 }}><Text style={styles.rowTitle}>Staff notifications</Text><Text style={styles.muted}>Operations, payment and account alerts</Text></View>
             <Switch value={notifications} onValueChange={setNotifications} trackColor={{ true: colors.primarySoft }} thumbColor={notifications ? colors.primary : '#D0D5DD'} />
           </View>
           <Pressable style={styles.primary} onPress={saveProfile} disabled={saving}>
@@ -110,14 +108,14 @@ export default function AccountScreen() {
 
         <SectionTitle text="Help & support" />
         <View style={styles.card}>
-          <Pressable style={styles.supportRow} onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}>
+          <Pressable style={styles.supportRow} onPress={() => Linking.openURL(`mailto:${COMPANY.supportEmail}`)}>
             <Ionicons name="mail-outline" size={20} color={colors.primary} />
-            <View style={{ flex: 1 }}><Text style={styles.rowTitle}>Email support</Text><Text style={styles.muted}>{SUPPORT_EMAIL}</Text></View>
+            <View style={{ flex: 1 }}><Text style={styles.rowTitle}>Email support</Text><Text style={styles.muted}>{COMPANY.supportEmail}</Text></View>
             <Ionicons name="open-outline" size={17} color={colors.textFaint} />
           </Pressable>
-          <Pressable style={[styles.supportRow, styles.lastRow]} onPress={() => Linking.openURL(`https://wa.me/${SUPPORT_WHATSAPP.replace(/\D/g, '')}`)}>
+          <Pressable style={[styles.supportRow, styles.lastRow]} onPress={() => Linking.openURL(COMPANY_WHATSAPP_URL)}>
             <Ionicons name="logo-whatsapp" size={20} color={colors.primary} />
-            <View style={{ flex: 1 }}><Text style={styles.rowTitle}>WhatsApp support</Text><Text style={styles.muted}>{SUPPORT_WHATSAPP}</Text></View>
+            <View style={{ flex: 1 }}><Text style={styles.rowTitle}>WhatsApp support</Text><Text style={styles.muted}>{COMPANY.supportPhone}</Text></View>
             <Ionicons name="open-outline" size={17} color={colors.textFaint} />
           </Pressable>
         </View>

@@ -144,14 +144,14 @@ export default function RunDetailScreen({ route, navigation }: Props) {
           </View>
           <Badge text={run.status} tone={badge} />
         </View>
-        <View style={styles.contactRow}>
-          <Pressable style={styles.contactButton} onPress={() => phone && Linking.openURL(`tel:${phone}`)}>
+        {phone ? <View style={styles.contactRow}>
+          <Pressable style={styles.contactButton} onPress={() => Linking.openURL(`tel:${phone}`)}>
             <Ionicons name="call-outline" size={16} color={colors.blue} /><Text style={[styles.contactText, { color: colors.blue }]}>Call</Text>
           </Pressable>
-          <Pressable style={[styles.contactButton, { backgroundColor: colors.primarySoft }]} onPress={() => phone && Linking.openURL(`https://wa.me/${phone.replace(/\D/g, '')}`)}>
+          <Pressable style={[styles.contactButton, { backgroundColor: colors.primarySoft }]} onPress={() => Linking.openURL(`https://wa.me/${phone.replace(/\D/g, '')}`)}>
             <Ionicons name="logo-whatsapp" size={16} color={colors.primaryDark} /><Text style={[styles.contactText, { color: colors.primaryDark }]}>Message</Text>
           </Pressable>
-        </View>
+        </View> : null}
       </Card>
 
       <RunMap stops={mapStops} height={200} />

@@ -51,7 +51,7 @@ export default function FinanceBooksScreen() {
   const current=months[0]?.[1]||{income:0,expenses:0}; const chartRows=[...months].reverse().slice(-7); const chartMax=Math.max(1,...chartRows.flatMap(([,row])=>[row.income,row.expenses]));
 
   if(loading)return <SafeAreaView style={styles.safe}><View style={styles.center}><ActivityIndicator size="large" color={colors.primary}/></View></SafeAreaView>;
-  return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>}>
+  return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>}>
     <View><Text style={styles.title}>Books</Text><Text style={styles.subtitle}>Monthly performance and expense tracking</Text></View>
 
     <View style={styles.kpiRow}><View style={[styles.kpi,{backgroundColor:colors.primarySoft}]}><Text style={[styles.kpiLabel,{color:colors.primaryDark}]}>Income</Text><Text style={styles.kpiValue}>{money(current.income)}</Text></View><View style={[styles.kpi,{backgroundColor:colors.redSoft}]}><Text style={[styles.kpiLabel,{color:colors.danger}]}>Expenses</Text><Text style={styles.kpiValue}>{money(current.expenses)}</Text></View><View style={[styles.kpi,{backgroundColor:colors.blueSoft}]}><Text style={[styles.kpiLabel,{color:colors.blue}]}>Profit</Text><Text style={styles.kpiValue}>{money(current.income-current.expenses)}</Text></View></View>
