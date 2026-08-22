@@ -6,7 +6,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { itemFingerprint } from './lineItems';
-import type { DeliveryNoteDraft, InvoiceExtraction, LedgerRecord, NoteFlag } from './types';
+import type { DeliveryNoteDraft, InvoiceExtraction, LedgerRecord, NoteFlag, NoteRow } from './types';
 
 const TABLE = 'delivery_note_records';
 
@@ -54,6 +54,7 @@ export interface RegisterEntry extends LedgerRecord {
   recipient_phone: string | null;
   recipient_address: string | null;
   shipper_phone: string | null;
+  shipper_address: string | null;
   delivery_mode: string;
   balance_due: number | null;
   unpaid_hold: boolean;
@@ -61,15 +62,24 @@ export interface RegisterEntry extends LedgerRecord {
   pdf_filename: string | null;
   items: unknown;
   confirmed_by: string | null;
+  revision: number;
+  amended_at: string | null;
+  amended_by: string | null;
+  last_change_reason: string | null;
+  voided_at: string | null;
+  voided_by: string | null;
+  void_reason: string | null;
 }
 
 /** The register as a browsable list, newest first. */
-export async function listRegister(search = '', limit = 100): Promise<RegisterEntry[]> {
+export async function listRegister(search = '', limit = 100, includeVoided = false): Promise<RegisterEntry[]> {
   let query = db
     .from(TABLE)
     .select('*')
     .order('created_at', { ascending: false })
     .limit(limit);
+
+  if (!includeVoided) query = query.is('voided_at', null);
 
   const term = search.trim();
   if (term) {
@@ -81,6 +91,78 @@ export async function listRegister(search = '', limit = 100): Promise<RegisterEn
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data || []) as unknown as RegisterEntry[];
+}
+
+export interface AmendRegisterInput {
+  reference: string;
+  invoiceNumber: string;
+  loadSuffix: string;
+  shipperName: string;
+  shipperPhone: string;
+  shipperAddress: string;
+  recipientName: string;
+  recipientPhone: string;
+  recipientAddress: string;
+  recipientCity: string;
+  deliveryMode: 'door_to_door' | 'self_collection';
+  paid: boolean;
+  balanceDue: number | null;
+  noteDate: string;
+  rows: NoteRow[];
+  reason: string;
+}
+
+/** Amend an issued note. The database trigger stores the previous revision. */
+export async function amendRegisterEntry(id: string, input: AmendRegisterInput): Promise<RegisterEntry> {
+  const reason = input.reason.trim();
+  if (!reason) throw new Error('Enter a reason for this correction.');
+  if (!input.reference.trim() || !input.invoiceNumber.trim()) throw new Error('Reference and invoice number are required.');
+  if (!input.shipperName.trim()) throw new Error('Shipper name is required.');
+  if (!input.recipientName.trim() || !input.recipientAddress.trim() || !input.recipientCity.trim()) {
+    throw new Error('Recipient name, address and city are required.');
+  }
+  if (!input.rows.length) throw new Error('Add at least one manifest row.');
+  if (input.paid && input.balanceDue !== 0) throw new Error('A paid note must have a zero balance.');
+
+  const payload = {
+    reference: input.reference.trim().toUpperCase(),
+    invoice_number: input.invoiceNumber.trim(),
+    load_suffix: input.loadSuffix.trim().toUpperCase() || null,
+    shipper_name: input.shipperName.trim(),
+    shipper_phone: input.shipperPhone.trim() || null,
+    shipper_address: input.shipperAddress.trim() || null,
+    recipient_name: input.recipientName.trim(),
+    recipient_phone: input.recipientPhone.trim() || null,
+    recipient_address: input.recipientAddress.trim(),
+    recipient_city: input.recipientCity.trim(),
+    delivery_mode: input.deliveryMode,
+    paid: input.paid,
+    balance_due: input.balanceDue,
+    unpaid_hold: input.balanceDue !== null && input.balanceDue > 0,
+    note_date: input.noteDate || null,
+    items: input.rows,
+    item_fingerprint: itemFingerprint(input.rows),
+    last_change_reason: reason,
+  };
+
+  const { data, error } = await db.from(TABLE).update(payload).eq('id', id).is('voided_at', null).select('*').single();
+  if (error) throw new Error(error.message);
+  return data as unknown as RegisterEntry;
+}
+
+/** Admin "Delete": void the note but retain it in duplicate history. */
+export async function voidRegisterEntry(id: string, reasonValue: string): Promise<void> {
+  const reason = reasonValue.trim();
+  if (!reason) throw new Error('Enter a reason for deleting this delivery note.');
+  const { data: session } = await supabase.auth.getUser();
+  if (!session?.user?.id) throw new Error('Sign in again before deleting the note.');
+
+  const { error } = await db.from(TABLE).update({
+    voided_at: new Date().toISOString(),
+    voided_by: session.user.id,
+    void_reason: reason,
+  }).eq('id', id).is('voided_at', null);
+  if (error) throw new Error(error.message);
 }
 
 export interface RecordNoteInput {
