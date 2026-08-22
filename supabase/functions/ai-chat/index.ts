@@ -554,8 +554,8 @@ function customerReferenceBase(booking: BookingDetails, shipmentDate: Date): str
   const letters = String(booking.name || "CUS").replace(/[^a-z]/gi, "").toUpperCase();
   const prefix = (letters || "CUS").slice(0, 3).padEnd(3, "X");
   const phoneTail = String(booking.phone_number || "").replace(/\D/g, "").slice(-4).padStart(4, "0");
-  const mmyy = `${String(shipmentDate.getMonth() + 1).padStart(2, "0")}${String(shipmentDate.getFullYear()).slice(-2)}`;
-  return `${prefix}-${mmyy}-${phoneTail}`;
+  const mmyy = `${String(shipmentDate.getUTCMonth() + 1).padStart(2, "0")}${String(shipmentDate.getUTCFullYear()).slice(-2)}`;
+  return `${prefix}${mmyy}${phoneTail}`;
 }
 
 async function createAiBooking(booking: BookingDetails) {
@@ -592,10 +592,7 @@ async function createAiBooking(booking: BookingDetails) {
   const requested = booking.requested_collection_date || matchedSchedule?.pickup_date;
   const shipmentDate = parseCollectionDate(requested) || new Date();
   const referenceBase = customerReferenceBase(booking, shipmentDate);
-  const { count } = await supabase.from("shipments")
-    .select("id", { count: "exact", head: true })
-    .like("customer_reference", `${referenceBase}%`);
-  const customerReference = count ? `${referenceBase}-${String(count + 1).padStart(2, "0")}` : referenceBase;
+  const customerReference = referenceBase;
   const trackingNumber = `ZIMSHIP-${Math.floor(10000 + Math.random() * 90000)}`;
   const qrToken = `${crypto.randomUUID().replaceAll("-", "")}${crypto.randomUUID().replaceAll("-", "")}`;
   const nameParts = String(booking.name).trim().split(/\s+/);

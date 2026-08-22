@@ -23,6 +23,7 @@ const sqlPaths = [
   path.join(root, 'supabase/migrations/20260815090000_delivery_driver_operations.sql'),
   path.join(root, 'supabase/migrations/20260822090000_delivery_note_register.sql'),
   path.join(root, 'supabase/migrations/20260822120000_delivery_note_amendments.sql'),
+  path.join(root, 'supabase/migrations/20260822150000_whatsapp_ai_conversations.sql'),
 ];
 
 const src = fs.readFileSync(fnPath, 'utf8');

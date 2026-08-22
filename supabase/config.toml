@@ -146,6 +146,9 @@ verify_jwt = true
 [functions.read-invoice]
 verify_jwt = true
 
+[functions.twilio-whatsapp-webhook]
+verify_jwt = false
+
 # Called by pg_cron with a shared secret (checked against private.app_config),
 # so JWT verification is off for this function only.
 [functions.photo-retention]
