@@ -286,7 +286,7 @@ const CustomerDashboard: React.FC = () => {
 
         <div style="text-align: center; margin-top: 40px; font-size: 14px; color: #666;">
           <p>Thank you for choosing Zimbabwe Shipping Services.</p>
-          <p>For any queries, please contact us at support@zimbabweshipping.com</p>
+          <p>For any queries, please contact us at info@zimbabweshipping.com</p>
         </div>
       </div>
     `;

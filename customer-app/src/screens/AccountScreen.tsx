@@ -48,6 +48,8 @@ export default function AccountScreen() {
     { icon: 'gift-outline' as const, label: `Refer a friend — £${REFERRAL_DISCOUNT}/€${REFERRAL_DISCOUNT} off`, sub: 'Share your name with someone who ships', onPress: shareReferral },
     { icon: 'star-outline' as const, label: 'Rate driver & service', sub: 'Review your goods and overall experience', onPress: () => navigation.navigate('Feedback') },
     { icon: 'help-circle-outline' as const, label: 'FAQ & shipping guidelines', sub: 'Prices, customs, coverage', onPress: () => Linking.openURL('https://zimbabweshipping.com/faq') },
+    { icon: 'document-text-outline' as const, label: 'Terms & Conditions', sub: 'Your booking and shipping terms', onPress: () => Linking.openURL('https://zimbabweshipping.com/terms-and-conditions') },
+    { icon: 'shield-checkmark-outline' as const, label: 'Privacy & complaints', sub: 'How we use data and how to raise a concern', onPress: () => Linking.openURL('https://zimbabweshipping.com/privacy-policy') },
   ];
 
   return (

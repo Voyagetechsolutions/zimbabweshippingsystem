@@ -341,6 +341,7 @@ export const SimplifiedBookingForm = () => {
   const [showSecondPhone, setShowSecondPhone] = useState(false);
   const [showReceiverSecondPhone, setShowReceiverSecondPhone] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [bookingComplete, setBookingComplete] = useState(false);
   const [receiptData, setReceiptData] = useState<any>(null);
   const [collectionRoute, setCollectionRoute] = useState<string | null>(null);
@@ -719,6 +720,14 @@ export const SimplifiedBookingForm = () => {
   };
 
   const handleSubmit = async () => {
+    if (!agreedToTerms) {
+      toast({
+        title: 'Please review the legal information',
+        description: 'Read and accept the Terms and Conditions and acknowledge the Privacy Notice before submitting your booking request.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setIsSubmitting(true);
     
     try {
@@ -768,6 +777,13 @@ export const SimplifiedBookingForm = () => {
       
       // Prepare metadata for shipment
       const shipmentMetadata = {
+        legalAcceptance: {
+          accepted: true,
+          termsVersion: '2026-08-23',
+          privacyVersion: '2026-08-23',
+          acceptedAt: new Date().toISOString(),
+          bookingIsRequestUntilConfirmed: true,
+        },
         sender: {
           firstName: formData.senderFirstName,
           lastName: formData.senderLastName,
@@ -1655,7 +1671,7 @@ export const SimplifiedBookingForm = () => {
                     <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
                       <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">✓ Included Services</div>
                       <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
-                        <div>• Full insurance coverage</div>
+                        <div>• Metal coded seal and shipment tracking</div>
                         <div>• Real-time tracking & updates</div>
                       </div>
                     </div>
@@ -2051,7 +2067,7 @@ export const SimplifiedBookingForm = () => {
 
                 {/* Included Services */}
                 <div className="border-t pt-2 text-xs text-gray-500 dark:text-gray-400">
-                  ✓ Insurance & Tracking included
+                  ✓ Metal coded seal and tracking included
                 </div>
               </div>
             )}
@@ -2298,6 +2314,7 @@ export const SimplifiedBookingForm = () => {
           setBookingComplete(false);
           setReceiptData(null);
           setCurrentStep(1);
+          setAgreedToTerms(false);
           setFormData({
             senderFirstName: '',
             senderLastName: '',
@@ -2376,6 +2393,25 @@ export const SimplifiedBookingForm = () => {
         {currentStep === 5 && renderStep5()}
       </div>
 
+      {currentStep === 5 && (
+        <div className="mb-5 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
+          <label htmlFor="legalAgreement" className="flex cursor-pointer items-start gap-3 text-sm">
+            <input
+              id="legalAgreement"
+              type="checkbox"
+              checked={agreedToTerms}
+              onChange={(event) => setAgreedToTerms(event.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-zim-green focus:ring-zim-green"
+            />
+            <span className="text-gray-700 dark:text-gray-300">
+              I agree to the <a className="font-semibold text-zim-green underline" href="/terms-and-conditions" target="_blank" rel="noreferrer">Terms and Conditions</a>,
+              {' '}confirm I have read the <a className="font-semibold text-zim-green underline" href="/privacy-policy" target="_blank" rel="noreferrer">Privacy Notice</a>,
+              {' '}and understand this is a booking request until Zimbabwe Shipping Services sends confirmation.
+            </span>
+          </label>
+        </div>
+      )}
+
       {/* Navigation Buttons */}
       <div className="flex justify-between gap-4">
         {currentStep > 1 && (
@@ -2403,10 +2439,10 @@ export const SimplifiedBookingForm = () => {
           <Button
             type="button"
             onClick={handleSubmit}
-            disabled={isSubmitting}
+            disabled={isSubmitting || !agreedToTerms}
             className="ml-auto bg-zim-green hover:bg-zim-green/90"
           >
-            {isSubmitting ? 'Submitting...' : 'Submit Booking'}
+            {isSubmitting ? 'Submitting...' : 'Submit Booking Request'}
           </Button>
         )}
       </div>

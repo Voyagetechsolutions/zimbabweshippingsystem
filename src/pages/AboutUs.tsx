@@ -164,9 +164,9 @@ const AboutUs = () => {
                       <Shield className="h-6 w-6 text-zim-red" />
                     </div>
                     <div>
-                      <h3 className="font-semibold mb-2">Secure & Insured</h3>
+                      <h3 className="font-semibold mb-2">Secure &amp; Tracked</h3>
                       <p className="text-sm text-gray-600">
-                        Every drum gets a metal coded seal. Full insurance included. Your peace of mind is our priority.
+                        Every drum gets a metal coded seal and tracking updates. Customers should arrange adequate independent insurance for the declared value and route.
                       </p>
                     </div>
                   </div>

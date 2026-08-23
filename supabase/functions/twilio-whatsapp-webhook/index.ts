@@ -137,8 +137,11 @@ serve(async (req: Request) => {
       throw new Error("AI request failed");
     }
     const ai = await aiResponse.json();
-    const reply = String(ai?.reply || "Sorry, I couldn’t reply just now. Please try again shortly or ask for a staff member.")
-      .trim().slice(0, 1500);
+    const hasPreviousAiReply = (recent || []).some((item: { role: string }) => item.role === "assistant");
+    const generatedReply = String(ai?.reply || "Sorry, I couldn’t reply just now. Please try again shortly or ask for a staff member.")
+      .trim();
+    const disclosure = "I'm Zimmy, Zimbabwe Shipping's AI assistant. Ask for an agent at any time.\n\n";
+    const reply = `${hasPreviousAiReply ? "" : disclosure}${generatedReply}`.slice(0, 1500);
 
     await supabase.from("whatsapp_messages").insert({
       conversation_id: conversation.id,

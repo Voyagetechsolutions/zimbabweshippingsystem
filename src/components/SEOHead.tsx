@@ -88,7 +88,7 @@ export const SEO_CONFIGS = {
   },
   pricing: {
     title: 'Shipping Rates & Pricing | Affordable UK to Zimbabwe Delivery',
-    description: 'Transparent pricing for UK to Zimbabwe shipping. Drums from £45, boxes from £25. No hidden fees. Get instant quotes and book online.',
+    description: 'Transparent UK and Ireland to Zimbabwe pricing. Standard drum prices are shown online and custom goods receive a written quote before booking.',
     keywords: 'Zimbabwe shipping rates, UK Zimbabwe prices, drum shipping cost, affordable shipping Zimbabwe',
     canonicalUrl: '/pricing'
   },

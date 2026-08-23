@@ -400,7 +400,7 @@ const BookingReceipt: React.FC<BookingReceiptProps> = ({
 
       {/* Footer Note - inside ref for PDF */}
       <p className="text-center text-sm text-gray-500 dark:text-gray-400 print:text-gray-600 pb-4">
-        Keep this receipt for your records. Questions? Contact us at support@zimbabweshipping.com
+        Keep this receipt for your records. Questions? Contact us at info@zimbabweshipping.com
       </p>
       </div>
       {/* End of ref wrapper */}

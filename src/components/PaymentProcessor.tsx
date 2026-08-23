@@ -314,7 +314,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
                     </RadioGroup>
                     {payLaterMethod === 'bank_transfer' && (
                       <div className="mt-2 p-3 bg-gray-100 rounded text-sm">
-                        <p className="font-medium">For Bank Transfer Details please contact Mr Moyo at +44 7984 099041. Reference: Your tracking number or Surname and Initials </p>                        
+                        <p className="font-medium">For bank transfer details, contact the accounts office on +44 7770 761266. Reference: your tracking number or surname and initials.</p>
                       </div>
                     )}
                   </div>

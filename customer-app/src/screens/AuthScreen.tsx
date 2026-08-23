@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Alert, KeyboardAvoidingView, Platform, Image, Linking } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -205,7 +205,10 @@ export default function AuthScreen() {
           />
 
           <Text style={[styles.terms,{color:palette.textFaint}]}>
-            By continuing, you agree to our <Text style={styles.termsLink}>Terms & Conditions</Text>
+            By continuing, you agree to our{' '}
+            <Text accessibilityRole="link" onPress={() => Linking.openURL('https://zimbabweshipping.com/terms-and-conditions')} style={styles.termsLink}>Terms & Conditions</Text>
+            {' '}and confirm you have read our{' '}
+            <Text accessibilityRole="link" onPress={() => Linking.openURL('https://zimbabweshipping.com/privacy-policy')} style={styles.termsLink}>Privacy Notice</Text>.
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>

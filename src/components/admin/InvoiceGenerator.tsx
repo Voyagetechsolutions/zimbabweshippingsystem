@@ -238,7 +238,7 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                 </div>
                 <div className="text-sm text-gray-600 space-y-1">
                   <p>Ireland Branch</p>
-                  <p>support@zimbabweshipping.com</p>
+                  <p>info@zimbabweshipping.com</p>
                   <p>www.zimbabweshipping.com</p>
                 </div>
               </div>
@@ -329,7 +329,7 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
             <div className="border-t pt-6 text-center text-sm text-gray-500">
               <p className="font-medium text-gray-700 mb-2">Thank you for your business!</p>
               <p>Zimbabwe Shipping Nexus | www.zimbabweshipping.com</p>
-              <p>For questions, contact support@zimbabweshipping.com</p>
+              <p>For questions, contact info@zimbabweshipping.com</p>
             </div>
           </div>
         </div>

@@ -165,7 +165,7 @@ const SystemSettingsTab = () => {
       // For demo purposes, using mock data
       const mockSettings = {
         company_info: {
-          company_name: 'Zimbabwe Shipping Ltd',
+          company_name: 'Zimbabwe Shipping Services',
           address_line1: '123 Main Street',
           address_line2: 'Suite 456',
           city: 'London',

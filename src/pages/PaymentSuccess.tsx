@@ -175,7 +175,7 @@ const PaymentSuccess = () => {
                     </p>
                     {receiptData.payment_method === 'bank_transfer' && (
                       <div className="mt-2 text-sm text-blue-700 dark:text-blue-300">
-                        <p>Please transfer to: Zimbabwe Shipping Ltd</p>
+                        <p>Please use the account name shown in the bank details confirmed by our accounts office.</p>
                         <p>Account: 12345678 | Sort Code: 12-34-56</p>
                         <p>Reference: {receiptData.receipt_number}</p>
                       </div>

@@ -62,7 +62,7 @@ const FAQ = () => {
         },
         {
           question: 'Is insurance included in the shipping cost?',
-          answer: 'Basic coverage is included in all our shipping rates. Zimbabwe Shipping does not provide insurance. We recommend purchasing it elsewhere to cover the full declared value of your shipment.'
+          answer: 'No. Zimbabwe Shipping does not currently provide or promise shipment insurance. Customers should arrange adequate independent cover for the full declared value and the UK or Ireland to Zimbabwe route.'
         }
       ]
     },

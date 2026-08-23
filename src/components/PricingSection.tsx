@@ -32,8 +32,8 @@ const PricingSection = () => {
             Simple, honest pricing
           </h2>
           <p className="mt-4 text-lg text-gray-600 dark:text-gray-400">
-            No hidden fees, no surprises. Flat-rate shipping from the UK &amp; Ireland —
-            free collection and insurance included.
+            Flat-rate shipping from the UK &amp; Ireland with free collection and tracking.
+            Known additional charges are confirmed before booking.
           </p>
         </div>
 
@@ -104,7 +104,7 @@ const PricingSection = () => {
                   </div>
                   <div className="flex items-center gap-3">
                     <Check className="h-5 w-5 text-zim-green flex-shrink-0" />
-                    <span className="text-gray-600 dark:text-gray-400">Insurance included</span>
+                    <span className="text-gray-600 dark:text-gray-400">Metal coded seal included</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <Check className="h-5 w-5 text-zim-green flex-shrink-0" />
@@ -180,7 +180,7 @@ const PricingSection = () => {
                   </div>
                   <div className="flex items-center gap-3">
                     <Check className="h-5 w-5 text-amber-500 flex-shrink-0" />
-                    <span className="text-gray-600 dark:text-gray-400">Insurance included</span>
+                    <span className="text-gray-600 dark:text-gray-400">Metal coded seal included</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <Check className="h-5 w-5 text-amber-500 flex-shrink-0" />

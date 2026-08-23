@@ -113,16 +113,15 @@ serve(async (req) => {
       throw new Error('Unauthorized')
     }
 
-    // Check if user is admin
+    // Admins may process any request; a customer may process only their own.
+    // This makes the in-app deletion control effective without exposing another
+    // customer's request or relying on an unmonitored manual queue.
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single()
-
-    if (!profile || profile.role !== 'admin') {
-      throw new Error('Admin access required')
-    }
+    const isAdmin = profile?.role === 'admin'
 
     const { requestId } = await req.json()
 
@@ -141,11 +140,31 @@ serve(async (req) => {
       throw new Error('Deletion request not found')
     }
 
+    if (!isAdmin && deletionRequest.user_id !== user.id) {
+      throw new Error('You may process only your own deletion request')
+    }
+
     if (deletionRequest.status !== 'pending') {
       throw new Error('Request has already been processed')
     }
 
     const userIdToDelete = deletionRequest.user_id
+    if (!userIdToDelete) {
+      throw new Error('The account has already been removed; this request is retained as audit evidence')
+    }
+
+    // Capture identifiers and private-object paths before database rows and the
+    // auth identity are removed.
+    const { data: subjectProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('phone_number')
+      .eq('id', userIdToDelete)
+      .maybeSingle()
+    const normalizedPhone = String(subjectProfile?.phone_number || '').replace(/[^\d+]/g, '')
+    const { data: proofRows } = await supabaseAdmin
+      .from('payment_proofs')
+      .select('storage_path')
+      .eq('user_id', userIdToDelete)
 
     // Update request status to processing
     await supabaseAdmin
@@ -177,6 +196,49 @@ serve(async (req) => {
       .from('customer_addresses')
       .delete()
       .eq('user_id', userIdToDelete)
+
+    // Private payment files are storage objects, so deleting their database
+    // rows alone would leave the files behind.
+    const proofPaths = (proofRows || [])
+      .map((row: { storage_path?: string }) => row.storage_path)
+      .filter((path: string | undefined): path is string => Boolean(path))
+    if (proofPaths.length > 0) {
+      const { error: proofDeleteError } = await supabaseAdmin.storage
+        .from('payment-proofs')
+        .remove(proofPaths)
+      if (proofDeleteError) throw proofDeleteError
+    }
+
+    // Remove AI analytics attached to the account. These are not statutory
+    // financial records and should not survive an accepted erasure request.
+    await supabaseAdmin
+      .from('zimmy_chat_events')
+      .delete()
+      .eq('user_id', userIdToDelete)
+
+    // Quote descriptions and photos can identify the customer. Retain only a
+    // minimal financial/operational shell where a quote must remain referenced.
+    await supabaseAdmin
+      .from('custom_quotes')
+      .update({
+        user_id: null,
+        phone_number: '[deleted]',
+        description: '[Personal data removed following account deletion]',
+        image_urls: [],
+        sender_details: {},
+        recipient_details: {},
+        admin_notes: null,
+      })
+      .eq('user_id', userIdToDelete)
+
+    // WhatsApp does not require an app account, but when its customer identifier
+    // matches the verified account telephone number it is part of this request.
+    if (normalizedPhone) {
+      await supabaseAdmin
+        .from('whatsapp_conversations')
+        .delete()
+        .eq('external_customer_id', normalizedPhone)
+    }
 
     // 2. Anonymize feedback (keep for analytics but remove identifying info)
     await supabaseAdmin
@@ -227,7 +289,8 @@ serve(async (req) => {
       throw deleteUserError
     }
 
-    // 8. Mark deletion request as completed
+    // 8. Mark deletion request as completed. The FK is ON DELETE SET NULL, so
+    // this audit record remains after the auth user is gone.
     const notes = [
       'Account successfully deleted. Shipment and financial records retained as required by law.',
       appleRevocation.applicable ? `Sign in with Apple: ${appleRevocation.detail}` : null,

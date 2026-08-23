@@ -44,8 +44,9 @@ const Support = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-gray-600 mb-2">UK Phone: +44 7984 099041</p>
+                    <p className="text-gray-600 mb-2">UK bookings and enquiries: +44 7584 100552</p>
                     <p className="text-gray-600">Ireland Phone: +353 8719 54910</p>
+                    <p className="text-gray-600">Accounts office: +44 7770 761266</p>
                     <p className="text-gray-600">Zimbabwe Phone: +263 71 274 3178</p>
                   </CardContent>
                 </Card>
@@ -58,7 +59,7 @@ const Support = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-gray-600 mb-2">General Inquiries: info@zimshipping.com</p>
+                    <p className="text-gray-600 mb-2">General enquiries and privacy: info@zimbabweshipping.com</p>
                    
                     <div className="mt-4 pt-3 border-t border-gray-100">
                       <p className="text-sm text-gray-600 flex items-center">

@@ -37,6 +37,8 @@ const NotFound = lazy(() => import('@/pages/NotFound'));
 const CollectionSchedule = lazy(() => import('@/pages/CollectionSchedule'));
 const ShippingGuidelines = lazy(() => import('@/pages/ShippingGuidelines'));
 const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'));
+const PrivacyComplaint = lazy(() => import('@/pages/PrivacyComplaint'));
+const BusinessInformation = lazy(() => import('@/pages/BusinessInformation'));
 const TermsAndConditions = lazy(() => import('@/pages/TermsAndConditions'));
 const ShipmentDetails = lazy(() => import('@/pages/ShipmentDetails'));
 const GalleryAdmin = lazy(() => import('@/pages/GalleryAdmin'));
@@ -88,6 +90,8 @@ function AppRoutes() {
       <Route path="/collection-schedule" element={<CollectionSchedule />} />
       <Route path="/shipping-guidelines" element={<ShippingGuidelines />} />
       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+      <Route path="/privacy-complaint" element={<PrivacyComplaint />} />
+      <Route path="/business-information" element={<BusinessInformation />} />
       <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
       <Route path="/quote-submitted" element={<QuoteSubmitted />} />
       <Route path="/payment-success" element={<PaymentSuccess />} />

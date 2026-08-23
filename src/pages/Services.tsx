@@ -27,7 +27,7 @@ const Services = () => {
         'UK: £280/drum | Ireland: €360/drum',
         'Free collection across UK & Ireland',
         'Metal coded seal included',
-        'Full insurance & tracking',
+        'Metal coded seal & tracking',
       ],
       cta: 'Book Drums',
       link: '/book',

@@ -161,7 +161,7 @@ export default function ShipmentDetailScreen() {
               </View>
               {!invoice.paid && (
                 <Text style={styles.hint}>
-                  We accept bank transfer, cash on collection, or pay on arrival. For bank details contact Mr. Moyo on +44 7984 099041 and reference your tracking number, initials and surname.
+                  We accept bank transfer, cash on collection, or pay on arrival. For bank details contact the accounts office on +44 7770 761266 and reference your tracking number, initials and surname.
                 </Text>
               )}
             </Card>

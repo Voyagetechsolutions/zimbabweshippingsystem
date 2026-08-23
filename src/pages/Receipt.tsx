@@ -363,8 +363,8 @@ const Receipt = () => {
               
               {/* Terms and Conditions */}
               <div className="text-xs text-gray-500 mt-6 border-t pt-4">
-                <p className="mb-1">Thank you for choosing Zimbabwe Shipping Ltd for your shipping needs.</p>
-                <p>For any queries related to this receipt, please contact us at support@zimbabwe-shipping.co.uk or call +44 7984 099041.</p>
+                <p className="mb-1">Thank you for choosing Zimbabwe Shipping Services for your shipping needs.</p>
+                <p>For receipt or payment queries, contact info@zimbabweshipping.com or the accounts office on +44 7770 761266.</p>
               </div>
             </div>
           )}

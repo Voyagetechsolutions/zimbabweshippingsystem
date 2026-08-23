@@ -118,7 +118,7 @@ const ConfirmBooking = () => {
     if (paymentMethod === 'standard-payment') {
       return {
         displayName: 'Standard Payment',
-        instructions: `Please contact Mr. Moyo on +44 7984 099041 for bank details. Reference: Tracking number (${trackingNumber}), initials, and surname.`
+        instructions: `Please contact the accounts office on +44 7770 761266 for bank details. Reference: tracking number (${trackingNumber}), initials, and surname.`
       };
     } else if (paymentMethod === 'cash-on-collection') {
       return {
@@ -139,7 +139,7 @@ const ConfirmBooking = () => {
     
     return {
       displayName: 'Standard Payment',
-      instructions: `Please contact Mr. Moyo on +44 7984 099041 for bank details. Reference: Tracking number (${trackingNumber}), initials, and surname.`
+      instructions: `Please contact the accounts office on +44 7770 761266 for bank details. Reference: tracking number (${trackingNumber}), initials, and surname.`
     };
   };
   

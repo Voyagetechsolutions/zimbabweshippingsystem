@@ -13,7 +13,7 @@ const Pricing = () => {
     <>
       <Helmet>
         <title>Pricing | Zimbabwe Shipping - UK & Ireland Rates</title>
-        <meta name="description" content="Transparent pricing for UK & Ireland to Zimbabwe shipping. Drums and trunks with simple flat-rate pricing. Free collection included. No hidden fees." />
+        <meta name="description" content="Transparent pricing for UK and Ireland to Zimbabwe shipping. Standard prices are shown and known additional charges are confirmed before booking." />
         <meta name="keywords" content="Zimbabwe shipping prices, drum shipping cost, trunk shipping Ireland, UK to Zimbabwe rates, Ireland to Zimbabwe pricing" />
 
         {/* Open Graph */}
@@ -48,8 +48,8 @@ const Pricing = () => {
               Simple, honest pricing
             </h1>
             <p className="mx-auto mt-5 max-w-2xl text-xl text-gray-300">
-              Flat-rate drums, free collection and insurance included. No hidden fees,
-              no surprises when your goods arrive.
+              Flat-rate drums with free collection and tracking. Standard prices are shown
+              clearly, and known additional charges are confirmed before booking.
             </p>
           </div>
         </section>
@@ -151,7 +151,7 @@ const Pricing = () => {
                   </div>
                   <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
                     <Check className="h-5 w-5 text-zim-green flex-shrink-0" />
-                    <span>Full insurance</span>
+                    <span>Metal coded seal</span>
                   </div>
                   <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
                     <Check className="h-5 w-5 text-zim-green flex-shrink-0" />

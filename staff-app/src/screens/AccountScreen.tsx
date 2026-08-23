@@ -118,6 +118,11 @@ export default function AccountScreen() {
             <View style={{ flex: 1 }}><Text style={styles.rowTitle}>WhatsApp support</Text><Text style={styles.muted}>{COMPANY.supportPhone}</Text></View>
             <Ionicons name="open-outline" size={17} color={colors.textFaint} />
           </Pressable>
+          <Pressable style={[styles.supportRow, styles.lastRow]} onPress={() => Linking.openURL(`${COMPANY.websiteUrl}/privacy-policy`)}>
+            <Ionicons name="shield-checkmark-outline" size={20} color={colors.primary} />
+            <View style={{ flex: 1 }}><Text style={styles.rowTitle}>Staff privacy notice</Text><Text style={styles.muted}>Work accounts, job evidence, audit logs and active-job location</Text></View>
+            <Ionicons name="open-outline" size={17} color={colors.textFaint} />
+          </Pressable>
         </View>
 
         {canSwitchDashboards ? (

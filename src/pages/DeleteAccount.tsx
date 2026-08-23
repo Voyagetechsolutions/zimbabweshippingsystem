@@ -38,20 +38,29 @@ export default function DeleteAccount() {
     setIsDeleting(true);
     try {
       // Insert deletion request into database
-      const { error } = await supabase
+      const { data: deletionRequest, error } = await supabase
         .from('account_deletion_requests')
         .insert({
           user_id: user.id,
           email: user.email,
           status: 'pending',
           requested_at: new Date().toISOString(),
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
 
+      const { error: processingError } = await supabase.functions.invoke('process-account-deletion', {
+        body: { requestId: deletionRequest.id },
+      });
+      if (processingError) {
+        throw new Error(`Your request was recorded but could not be completed automatically. Support will review it: ${processingError.message}`);
+      }
+
       toast({
-        title: "Deletion request submitted",
-        description: "We've received your account deletion request. You'll receive a confirmation email within 48 hours.",
+        title: "Account deleted",
+        description: "Your account data was deleted or anonymised. Records we must retain are restricted to their legal purpose.",
       });
 
       // Sign out the user
@@ -151,7 +160,7 @@ export default function DeleteAccount() {
                 </li>
                 <li className="flex items-start gap-3">
                   <ChevronRight className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                  <span><strong>Invoices and payments:</strong> Financial records for tax and accounting purposes (retained for 7 years as required by UK law)</span>
+                  <span><strong>Invoices and payments:</strong> Financial records retained only as long as needed for tax, accounting, claims or another legal obligation</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <ChevronRight className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
@@ -159,7 +168,7 @@ export default function DeleteAccount() {
                 </li>
                 <li className="flex items-start gap-3">
                   <ChevronRight className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                  <span><strong>Support tickets:</strong> Customer service interactions (anonymized after 2 years)</span>
+                  <span><strong>Support communications:</strong> Normally removed or anonymized after 24 months unless needed for an active complaint or claim</span>
                 </li>
               </ul>
             </div>
@@ -178,7 +187,7 @@ export default function DeleteAccount() {
                   <strong className="text-foreground">2 years:</strong> Support tickets and communications (anonymized after deletion)
                 </p>
                 <p>
-                  <strong className="text-foreground">7 years:</strong> Financial records, invoices, and payment information (required by UK tax law)
+                  <strong className="text-foreground">Normally up to 7 years:</strong> Financial, shipment and customs records where needed for tax, accounting or legal claims
                 </p>
               </div>
             </div>
@@ -196,7 +205,7 @@ export default function DeleteAccount() {
                     You're currently signed in as <strong className="text-foreground">{user.email}</strong>
                   </p>
                   <p className="text-muted-foreground">
-                    Click the button below to submit your account deletion request. We'll process it within 48 hours and send you a confirmation email.
+                    Submit your request below. We will review it without undue delay, verify any legal retention requirement, and respond within the applicable legal timeframe.
                   </p>
                   <Button 
                     variant="destructive" 
@@ -227,8 +236,8 @@ export default function DeleteAccount() {
                     </li>
                     <li>
                       <strong className="text-foreground">Email us directly:</strong> Send an email to{' '}
-                      <a href="mailto:support@zimbabweshipping.com?subject=Account Deletion Request" className="text-primary hover:underline">
-                        support@zimbabweshipping.com
+                      <a href="mailto:info@zimbabweshipping.com?subject=Account Deletion Request" className="text-primary hover:underline">
+                        info@zimbabweshipping.com
                       </a>
                       {' '}with the subject "Account Deletion Request" from your registered email address
                     </li>
@@ -286,8 +295,8 @@ export default function DeleteAccount() {
               </p>
               <p>
                 Email us at{' '}
-                <a href="mailto:support@zimbabweshipping.com" className="text-primary hover:underline">
-                  support@zimbabweshipping.com
+                <a href="mailto:info@zimbabweshipping.com" className="text-primary hover:underline">
+                  info@zimbabweshipping.com
                 </a>
                 {' '}or call{' '}
                 <a href="tel:+447584100552" className="text-primary hover:underline">

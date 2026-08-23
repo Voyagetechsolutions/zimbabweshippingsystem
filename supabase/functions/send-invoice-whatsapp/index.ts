@@ -13,7 +13,7 @@ const TWILIO_WHATSAPP_INVOICE_CONTENT_SID = Deno.env.get("TWILIO_WHATSAPP_INVOIC
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const STORAGE_BUCKET = "images"; // existing public bucket
+const STORAGE_BUCKET = "invoice-documents"; // private bucket; Twilio receives a short-lived signed URL
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -93,7 +93,8 @@ serve(async (req: Request) => {
       return json({ error: `Could not build a WhatsApp number from "${to}".` }, 400);
     }
 
-    // 1) Upload the PDF to public storage so WhatsApp/Twilio can fetch it by URL.
+    // 1) Upload the PDF to private storage. Twilio receives a short-lived URL,
+    // never a permanently public customer invoice.
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const pdfBytes = Uint8Array.from(atob(pdfBase64), (c) => c.charCodeAt(0));
     const path = `invoices/${invoiceNumber.replace(/[^\w.-]/g, "_")}-${Date.now()}.pdf`;
@@ -105,8 +106,14 @@ serve(async (req: Request) => {
       console.error("Storage upload failed:", uploadError);
       return json({ error: `Could not store invoice PDF: ${uploadError.message}` }, 500);
     }
-    const { data: pub } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
-    const mediaUrl = pub.publicUrl;
+    const { data: signed, error: signedError } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .createSignedUrl(path, 15 * 60);
+    if (signedError || !signed?.signedUrl) {
+      await supabase.storage.from(STORAGE_BUCKET).remove([path]);
+      return json({ error: `Could not create a private invoice link: ${signedError?.message || "unknown error"}` }, 500);
+    }
+    const mediaUrl = signed.signedUrl;
 
     // 2) Send via Twilio REST API (form-encoded, Basic auth).
     const params = new URLSearchParams();

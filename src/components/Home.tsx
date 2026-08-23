@@ -53,7 +53,7 @@ const Home = () => {
     },
     {
       title: 'Transparent Pricing',
-      description: 'Clear pricing structure for Zimbabwe shipping with no hidden fees.',
+      description: 'Clear standard pricing with known additional charges confirmed before booking.',
       icon: <CalculatorIcon className="h-10 w-10 text-zim-green" />,
     },
     {

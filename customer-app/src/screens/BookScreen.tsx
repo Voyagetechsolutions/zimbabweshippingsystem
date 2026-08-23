@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert, Switch, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Alert, Switch, KeyboardAvoidingView, Platform, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -661,8 +661,12 @@ export default function BookScreen() {
               </Card>
               <Pressable onPress={() => setAgreed(!agreed)} style={styles.agreeRow} hitSlop={6}>
                 <Ionicons name={agreed ? 'checkbox' : 'square-outline'} size={22} color={agreed ? colors.green : palette.textFaint} />
-                <Text style={[styles.agreeText, { color: palette.text }]}>I agree to the <Text style={{ color: colors.green, fontWeight: '700' }}>Terms & Conditions</Text></Text>
+                <Text style={[styles.agreeText, { color: palette.text }]}>I agree to the Terms & Conditions and confirm I have read the Privacy Notice</Text>
               </Pressable>
+              <View style={styles.legalLinks}>
+                <Text accessibilityRole="link" onPress={() => Linking.openURL('https://zimbabweshipping.com/terms-and-conditions')} style={styles.legalLink}>Read Terms & Conditions</Text>
+                <Text accessibilityRole="link" onPress={() => Linking.openURL('https://zimbabweshipping.com/privacy-policy')} style={styles.legalLink}>Read Privacy Notice</Text>
+              </View>
             </>
           )}
         </ScrollView>
@@ -737,4 +741,6 @@ const styles = StyleSheet.create({
   footer: { padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface },
   agreeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
   agreeText: { fontSize: 13 },
+  legalLinks: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginLeft: 30, marginTop: 4 },
+  legalLink: { color: colors.green, fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
 });
