@@ -5,17 +5,15 @@
 // (public/downloads/zimbabwe-shipping.apk), so the URL is stable and branded.
 // To publish a new version, rebuild the APK and replace that file.
 //
-// PLAY_STORE_URL is the Google Play listing — leave empty until the app is
-// live on the store; the UI hides the Play button while it is empty.
+// Verified public Google Play listing for the customer app.
 export const ANDROID_APK_URL = '/downloads/zimbabwe-shipping.apk';
 
-export const PLAY_STORE_URL = '';
+export const PLAY_STORE_URL =
+  'https://play.google.com/store/apps/details?id=com.zimbabweshipping.customer';
 
-// APP_STORE_URL is the Apple App Store listing. iOS apps cannot be sideloaded
-// from a website, so there is no .ipa download — the UI shows an "App Store"
-// button instead, and only once this is set. Fill it in after the app is live,
-// e.g. 'https://apps.apple.com/app/idXXXXXXXXXX'.
-export const APP_STORE_URL = '';
+// Verified public Apple App Store listing. iOS apps cannot be sideloaded from
+// the website, so customers are always sent to this listing.
+export const APP_STORE_URL = 'https://apps.apple.com/app/id6798249540';
 
 // Shown next to the Android download so users know what they are getting.
 export const ANDROID_APP_VERSION = '1.0.0';

@@ -15,14 +15,14 @@ interface AppDownloadProps {
 }
 
 /**
- * Mobile app call-to-action. Android gets a direct APK download (sideload) plus
- * an optional Google Play link; iOS gets an App Store link (no sideloading on
- * iOS). Store buttons only appear once their URL is set.
+ * Mobile app call-to-action. The verified App Store and Google Play listings
+ * are the primary downloads. The direct Android APK remains a fallback for
+ * customers whose device cannot access Google Play.
  */
 const AppDownload: React.FC<AppDownloadProps> = ({ variant = 'footer', className = '' }) => {
   if (variant === 'section') {
     return (
-      <section className={`py-16 md:py-20 ${className}`}>
+      <section id="mobile-app" className={`scroll-mt-24 py-16 md:py-20 ${className}`}>
         <div className="container mx-auto px-4">
           <div className="relative isolate overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
             {/* Zimbabwe flag accent */}
@@ -61,22 +61,19 @@ const AppDownload: React.FC<AppDownloadProps> = ({ variant = 'footer', className
                 </ul>
 
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center md:justify-start">
-                  <a
-                    href={ANDROID_APK_URL}
-                    download
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-zim-green px-6 py-3.5 font-semibold text-white shadow-sm transition-colors hover:bg-zim-green-dark"
-                  >
-                    <Download className="h-5 w-5" />
-                    Download for Android
-                  </a>
                   {PLAY_STORE_URL && (
                     <a
                       href={PLAY_STORE_URL}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-input bg-background px-6 py-3.5 font-semibold text-foreground transition-colors hover:bg-accent"
+                      aria-label="Get Zimbabwe Shipping on Google Play"
+                      className="inline-flex min-h-14 items-center justify-center gap-3 rounded-xl bg-black px-6 py-3 text-left text-white shadow-sm transition hover:bg-black/90"
                     >
-                      Get it on Google Play
+                      <span className="text-2xl leading-none" aria-hidden="true">▶</span>
+                      <span>
+                        <span className="block text-[10px] uppercase leading-none tracking-wide text-gray-300">Get it on</span>
+                        <span className="mt-1 block text-lg font-semibold leading-none">Google Play</span>
+                      </span>
                     </a>
                   )}
                   {APP_STORE_URL && (
@@ -84,16 +81,28 @@ const AppDownload: React.FC<AppDownloadProps> = ({ variant = 'footer', className
                       href={APP_STORE_URL}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-black px-6 py-3.5 font-semibold text-white transition-colors hover:bg-black/90"
+                      aria-label="Download Zimbabwe Shipping on the App Store"
+                      className="inline-flex min-h-14 items-center justify-center gap-3 rounded-xl bg-black px-6 py-3 text-left text-white shadow-sm transition hover:bg-black/90"
                     >
-                      <Apple className="h-5 w-5" />
-                      App Store
+                      <Apple className="h-7 w-7" />
+                      <span>
+                        <span className="block text-[10px] leading-none tracking-wide text-gray-300">Download on the</span>
+                        <span className="mt-1 block text-lg font-semibold leading-none">App Store</span>
+                      </span>
                     </a>
                   )}
                 </div>
                 <p className="mt-3 text-xs text-muted-foreground">
-                  Free · Works on Android 6.0+ · v{ANDROID_APP_VERSION}
+                  Free · Available for iPhone and Android · v{ANDROID_APP_VERSION}
                 </p>
+                <a
+                  href={ANDROID_APK_URL}
+                  download
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Android APK fallback
+                </a>
               </div>
 
               {/* App icon visual */}
@@ -122,22 +131,14 @@ const AppDownload: React.FC<AppDownloadProps> = ({ variant = 'footer', className
     <div className={className}>
       <h3 className="text-lg font-semibold mb-4">Get the App</h3>
       <p className="text-gray-400 text-sm mb-3">Track and book from your phone.</p>
-      <a
-        href={ANDROID_APK_URL}
-        className="inline-flex items-center gap-2 rounded-md bg-zim-green px-4 py-2 text-white text-sm font-medium hover:bg-zim-green-dark transition-colors"
-        download
-      >
-        <Download className="h-4 w-4" />
-        Download for Android
-      </a>
       {PLAY_STORE_URL && (
         <a
           href={PLAY_STORE_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="block mt-2 text-gray-400 hover:text-white text-sm transition-colors"
+          className="block text-gray-300 hover:text-white text-sm font-medium transition-colors"
         >
-          Or get it on Google Play →
+          Get it on Google Play →
         </a>
       )}
       {APP_STORE_URL && (
@@ -145,11 +146,19 @@ const AppDownload: React.FC<AppDownloadProps> = ({ variant = 'footer', className
           href={APP_STORE_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="block mt-2 text-gray-400 hover:text-white text-sm transition-colors"
+          className="block mt-2 text-gray-300 hover:text-white text-sm font-medium transition-colors"
         >
-          Or download on the App Store →
+          Download on the App Store →
         </a>
       )}
+      <a
+        href={ANDROID_APK_URL}
+        className="mt-3 inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+        download
+      >
+        <Download className="h-3.5 w-3.5" />
+        Android APK fallback
+      </a>
     </div>
   );
 };

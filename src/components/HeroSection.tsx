@@ -81,7 +81,7 @@ const HeroSection: React.FC = () => {
 
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-gray-200">
             Free collection across the UK &amp; Ireland, door-to-door delivery to every
-            city in Zimbabwe, fully insured and tracked the whole way. Drums from
+            city in Zimbabwe, with secure handling and tracking along the way. Drums from
             <span className="font-semibold text-white"> £280</span>.
           </p>
 
@@ -118,7 +118,7 @@ const HeroSection: React.FC = () => {
             </div>
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-zim-green" />
-              <span>Every shipment insured</span>
+              <span>Secure, coded seals</span>
             </div>
             <div className="flex items-center gap-2">
               <Truck className="h-5 w-5 text-zim-green" />

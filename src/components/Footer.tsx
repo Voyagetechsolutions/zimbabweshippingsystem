@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Facebook, Instagram, Mail, Phone, MapPin, Download } from 'lucide-react';
-import { ANDROID_APK_URL, PLAY_STORE_URL, APP_STORE_URL } from '@/config/appDownload';
+import { Facebook, Instagram, Mail, Phone, MapPin } from 'lucide-react';
+import AppDownload from '@/components/AppDownload';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -59,37 +59,7 @@ const Footer = () => {
               </a>
             </div>
 
-            {/* Android app download */}
-            <div className="mt-6">
-              <a
-                href={ANDROID_APK_URL}
-                className="inline-flex items-center gap-2 rounded-md bg-zim-green px-4 py-2 text-white text-sm font-medium hover:bg-zim-green-dark transition-colors"
-                download
-              >
-                <Download className="h-4 w-4" />
-                Download the Android app
-              </a>
-              {PLAY_STORE_URL && (
-                <a
-                  href={PLAY_STORE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block mt-2 text-gray-400 hover:text-white text-sm transition-colors"
-                >
-                  Or get it on Google Play →
-                </a>
-              )}
-              {APP_STORE_URL && (
-                <a
-                  href={APP_STORE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block mt-2 text-gray-400 hover:text-white text-sm transition-colors"
-                >
-                  Or download on the App Store →
-                </a>
-              )}
-            </div>
+            <AppDownload className="mt-6" />
           </div>
 
           {/* Quick Links */}

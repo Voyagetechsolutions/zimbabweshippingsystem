@@ -8,7 +8,7 @@ const TrustSection: React.FC = () => {
   const features = [
     { icon: Users, title: 'A family, not a call centre', description: 'You deal with the people who handle your goods — no tickets, no runaround.' },
     { icon: Truck, title: 'Our own fleet in Zimbabwe', description: 'We control the whole journey, so deliveries are reliable and on time.' },
-    { icon: ShieldCheck, title: 'Insured & metal-sealed', description: 'Every drum is sealed with a coded metal seal and fully insured in transit.' },
+    { icon: ShieldCheck, title: 'Secure & metal-sealed', description: 'Every drum is secured with a uniquely coded metal seal for its journey.' },
     { icon: CreditCard, title: 'Pay on flexible terms', description: '30-day payment terms from collection. Pay-on-arrival options available.' },
     { icon: MapPin, title: 'Every city in Zimbabwe', description: 'Harare, Bulawayo, Mutare, Vic Falls and everywhere in between.' },
     { icon: Clock, title: '14+ years doing this', description: 'Trusted by the diaspora since 2011. We know exactly what we\'re doing.' },
