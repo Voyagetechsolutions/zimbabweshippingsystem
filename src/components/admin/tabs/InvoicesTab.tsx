@@ -1079,6 +1079,7 @@ const InvoicesTab = () => {
                   {draft.items.map((item, i) => (
                     <div key={i} className="grid grid-cols-12 gap-2 items-start">
                       <div className="col-span-12 sm:col-span-3">
+                        <Label className="mb-1 block text-xs sm:hidden">Item</Label>
                         <Input
                           placeholder="Item"
                           value={item.item || ''}
@@ -1086,6 +1087,7 @@ const InvoicesTab = () => {
                         />
                       </div>
                       <div className="col-span-12 sm:col-span-4">
+                        <Label className="mb-1 block text-xs sm:hidden">Description</Label>
                         <Input
                           placeholder="Description"
                           value={item.description}
@@ -1093,6 +1095,7 @@ const InvoicesTab = () => {
                         />
                       </div>
                       <div className="col-span-4 sm:col-span-2">
+                        <Label className="mb-1 block text-xs sm:hidden">Quantity *</Label>
                         <Input
                           type="number" min={0} step={1}
                           placeholder="Quantity *"
@@ -1102,6 +1105,7 @@ const InvoicesTab = () => {
                         />
                       </div>
                       <div className="col-span-6 sm:col-span-2">
+                        <Label className="mb-1 block text-xs sm:hidden">Amount *</Label>
                         <Input
                           type="number" min={0.01} step={0.01}
                           placeholder="Amount *"
@@ -1110,7 +1114,7 @@ const InvoicesTab = () => {
                           onChange={e => updateItem(i, { unitPrice: parseFloat(e.target.value) || 0 })}
                         />
                       </div>
-                      <div className="col-span-2 sm:col-span-1">
+                      <div className="col-span-2 sm:col-span-1 pt-5 sm:pt-0">
                         <Button variant="ghost" size="sm" onClick={() => removeItem(i)} title="Remove">
                           <Trash2 className="h-4 w-4 text-red-600" />
                         </Button>
