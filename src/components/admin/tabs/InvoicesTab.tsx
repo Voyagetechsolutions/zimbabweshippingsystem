@@ -81,6 +81,49 @@ function fmtMoney(amount: number, currency: string) {
   return `${sym}${(Number(amount) || 0).toFixed(2)}`;
 }
 
+const NEW_INVOICE_PREFIX = 'new-invoice-';
+
+function makeBlankInvoice(): { shipment: Shipment; invoice: InvoiceData } {
+  const now = new Date();
+  const due = new Date(now);
+  due.setDate(due.getDate() + 14);
+  const token = `${format(now, 'yyyyMMdd-HHmm')}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+  return {
+    shipment: {
+      id: `${NEW_INVOICE_PREFIX}${token}`,
+      tracking_number: `INVOICE-${token}`,
+      status: 'Invoice Only',
+      origin: '',
+      destination: '',
+      user_id: '',
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
+      metadata: {
+        recordType: 'invoice_only',
+        sender: { name: '', email: '', phone: '', address: '', city: '', country: '' },
+        recipient: { name: '', phone: '', address: '', city: '', country: 'Zimbabwe' },
+      },
+      can_cancel: false,
+      can_modify: false,
+    },
+    invoice: {
+      invoiceNumber: '',
+      issueDate: format(now, 'yyyy-MM-dd'),
+      dueDate: format(due, 'yyyy-MM-dd'),
+      items: [{ item: '', description: '', quantity: 1, unitPrice: 0 }],
+      discount: 0,
+      taxRate: 0,
+      paymentTerms: 'Payment due within 14 days of invoice date.',
+      notes: '',
+      currency: 'GBP',
+      paid: false,
+      payments: [],
+      sentAt: null,
+    },
+  };
+}
+
 const InvoicesTab = () => {
   const { toast } = useToast();
   const [shipments, setShipments] = useState<Shipment[]>([]);
@@ -172,16 +215,39 @@ const InvoicesTab = () => {
       return next;
     });
   };
-  const allSelected = filtered.length > 0 && filtered.every(s => selected.has(s.id));
+  // Only real, saved invoices can participate in invoice actions. Bookings with
+  // generated defaults remain available through the Create Invoice flow.
+  const selectableFiltered = filtered.filter(hasStoredInvoice);
+  const allSelected = selectableFiltered.length > 0 && selectableFiltered.every(s => selected.has(s.id));
   const someSelected = selected.size > 0 && !allSelected;
   const toggleAll = () => {
-    setSelected(allSelected ? new Set() : new Set(filtered.map(s => s.id)));
+    setSelected(allSelected ? new Set() : new Set(selectableFiltered.map(s => s.id)));
   };
 
   // ── Edit dialog ─────────────────────────────────────────────────────────────
   const openEdit = (shipment: Shipment) => {
     setEditingShipment(shipment);
-    setDraft(getInvoiceData(shipment));
+    setDraft({ ...getInvoiceData(shipment), taxRate: 0 });
+  };
+
+  const startBlankInvoice = () => {
+    const blank = makeBlankInvoice();
+    setEditingShipment(blank.shipment);
+    setDraft(blank.invoice);
+  };
+
+  const updateScratchParty = (party: 'sender' | 'recipient', patch: Record<string, string>) => {
+    setEditingShipment(prev => {
+      if (!prev) return prev;
+      const metadata = prev.metadata || {};
+      const nextParty = { ...(metadata[party] || {}), ...patch };
+      return {
+        ...prev,
+        origin: party === 'sender' && patch.country !== undefined ? patch.country : prev.origin,
+        destination: party === 'recipient' && patch.country !== undefined ? patch.country : prev.destination,
+        metadata: { ...metadata, [party]: nextParty },
+      };
+    });
   };
 
   const updateDraft = (patch: Partial<InvoiceData>) => {
@@ -197,11 +263,33 @@ const InvoicesTab = () => {
   };
 
   const addItem = () => {
-    setDraft(prev => prev ? { ...prev, items: [...prev.items, { description: '', quantity: 1, unitPrice: 0 }] } : prev);
+    setDraft(prev => prev ? { ...prev, items: [...prev.items, { item: '', description: '', quantity: 1, unitPrice: 0 }] } : prev);
   };
 
   const removeItem = (idx: number) => {
     setDraft(prev => prev ? { ...prev, items: prev.items.filter((_, i) => i !== idx) } : prev);
+  };
+
+  // Keep Amount Paid backed by a normal payment entry so every existing total,
+  // status, PDF and customer view uses the same source of truth.
+  const setAmountPaid = (amount: number) => {
+    setDraft(prev => {
+      if (!prev) return prev;
+      const editorPaymentId = 'invoice-editor-amount-paid';
+      const otherPayments = (prev.payments || []).filter(payment => payment.id !== editorPaymentId);
+      const alreadyRecorded = otherPayments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+      const adjustment = Math.max(0, (Number(amount) || 0) - alreadyRecorded);
+      const payments = adjustment > 0
+        ? [...otherPayments, {
+            id: editorPaymentId,
+            date: prev.issueDate || format(new Date(), 'yyyy-MM-dd'),
+            amount: adjustment,
+            method: 'other',
+            note: 'Amount paid entered on invoice',
+          }]
+        : otherPayments;
+      return { ...prev, payments };
+    });
   };
 
   // Persist an invoice onto a shipment's metadata, with optimistic update + rollback.
@@ -209,6 +297,32 @@ const InvoicesTab = () => {
   const persistInvoice = async (shipment: Shipment, invoice: InvoiceData): Promise<boolean> => {
     const synced: InvoiceData = { ...invoice, paid: getPaymentSummary(invoice).balance <= 0.005 && calculateTotals(invoice).total > 0 };
     const newMetadata = { ...(shipment.metadata || {}), invoice: synced };
+    const isNewStandalone = shipment.id.startsWith(NEW_INVOICE_PREFIX);
+
+    if (isNewStandalone) {
+      const { data, error } = await supabase
+        .from('shipments')
+        .insert({
+          tracking_number: shipment.tracking_number,
+          status: shipment.status,
+          origin: shipment.origin || 'Not specified',
+          destination: shipment.destination || 'Not specified',
+          metadata: newMetadata as never,
+          user_id: null,
+          can_cancel: false,
+          can_modify: false,
+        })
+        .select('*')
+        .single();
+
+      if (error) {
+        toast({ title: 'Could not create invoice', description: error.message, variant: 'destructive' });
+        return false;
+      }
+      setShipments(prev => [data as unknown as Shipment, ...prev]);
+      return true;
+    }
+
     const previous = shipment;
     setShipments(prev => prev.map(s => s.id === shipment.id ? { ...s, metadata: newMetadata } : s));
 
@@ -227,11 +341,30 @@ const InvoicesTab = () => {
 
   const saveInvoice = async () => {
     if (!editingShipment || !draft) return;
+    const isScratch = editingShipment.id.startsWith(NEW_INVOICE_PREFIX);
+    if (isScratch && !getSenderName(editingShipment).trim().replace('Unknown', '')) {
+      toast({ title: 'Customer name required', description: 'Enter the customer or business name before creating the invoice.', variant: 'destructive' });
+      return;
+    }
+    if (!draft.invoiceNumber.trim()) {
+      toast({ title: 'Customer reference required', description: 'Enter the customer reference before saving.', variant: 'destructive' });
+      return;
+    }
+    if (!draft.items.length || draft.items.some(item => !item.item?.trim() || !item.description.trim() || item.quantity <= 0 || item.unitPrice < 0)) {
+      toast({
+        title: 'Check the invoice lines',
+        description: 'Every line needs an item, description, quantity above zero, and a valid unit price.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const wasRaised = !isScratch && hasStoredInvoice(editingShipment);
     setSavingInvoice(true);
-    const ok = await persistInvoice(editingShipment, draft);
+    const invoiceToSave = { ...draft, taxRate: 0 };
+    const ok = await persistInvoice(editingShipment, invoiceToSave);
     setSavingInvoice(false);
     if (!ok) return;
-    toast({ title: 'Invoice saved', description: draft.invoiceNumber });
+    toast({ title: wasRaised ? 'Invoice updated' : 'Invoice created', description: draft.invoiceNumber });
     setEditingShipment(null);
     setDraft(null);
   };
@@ -576,6 +709,7 @@ const InvoicesTab = () => {
   ];
 
   const draftTotals = draft ? calculateTotals(draft) : null;
+  const draftPaymentSummary = draft ? getPaymentSummary(draft) : null;
   const paymentSummaryForPaying = payingShipment ? getPaymentSummary(getInvoiceData(payingShipment)) : null;
 
   return (
@@ -584,9 +718,20 @@ const InvoicesTab = () => {
         title="Invoices"
         description="Customer invoices for every shipment. Edit, preview, print or download as PDF."
         actions={
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={fetchShipments} disabled={loading}>
-            <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh
-          </Button>
+          <>
+            <Button
+              size="sm"
+              className="h-8 text-xs"
+              onClick={startBlankInvoice}
+              disabled={loading}
+              title="Create a completely new invoice"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1.5" /> Create Invoice
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={fetchShipments} disabled={loading}>
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh
+            </Button>
+          </>
         }
       />
 
@@ -594,7 +739,7 @@ const InvoicesTab = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by invoice #, tracking #, customer or recipient…"
+            placeholder="Search by customer ref, tracking #, customer or recipient…"
             className="pl-9"
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -691,7 +836,7 @@ const InvoicesTab = () => {
                         className={someSelected ? 'opacity-70' : ''}
                       />
                     </TableHead>
-                    <TableHead>Invoice #</TableHead>
+                    <TableHead>Customer Ref</TableHead>
                     <TableHead>Tracking #</TableHead>
                     <TableHead>Issue Date</TableHead>
                     <TableHead>Customer</TableHead>
@@ -717,6 +862,7 @@ const InvoicesTab = () => {
                             checked={isChecked}
                             onCheckedChange={() => toggleOne(shipment.id)}
                             aria-label={`Select ${inv.invoiceNumber}`}
+                            disabled={!raised}
                           />
                         </TableCell>
                         <TableCell className="font-mono text-sm font-medium">{inv.invoiceNumber}</TableCell>
@@ -748,7 +894,7 @@ const InvoicesTab = () => {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
-                            {status !== 'paid' && (
+                            {raised && status !== 'paid' && (
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -764,7 +910,7 @@ const InvoicesTab = () => {
                               variant="ghost"
                               size="sm"
                               onClick={() => publishInvoiceToCustomer(shipment)}
-                              disabled={publishingId === shipment.id}
+                              disabled={!raised || publishingId === shipment.id}
                               className="h-8 px-2 text-green-700 hover:text-green-800 hover:bg-green-50 disabled:opacity-60"
                               title={shipment.user_id
                                 ? 'Publish to the customer’s app and web dashboard'
@@ -778,7 +924,7 @@ const InvoicesTab = () => {
                               variant="ghost"
                               size="sm"
                               onClick={() => sendInvoice(shipment)}
-                              disabled={sendingId === shipment.id}
+                              disabled={!raised || sendingId === shipment.id}
                               className="h-8 px-2"
                               title="Email invoice to customer"
                             >
@@ -786,25 +932,30 @@ const InvoicesTab = () => {
                                 ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                                 : <Mail className="h-4 w-4 mr-1" />} Email
                             </Button>
-                            <Button variant="ghost" size="sm" onClick={() => openEdit(shipment)} className="h-8 px-2" title="Edit invoice">
-                              <Pencil className="h-4 w-4 mr-1" /> Edit
+                            <Button variant="ghost" size="sm" onClick={() => openEdit(shipment)} className="h-8 px-2" title={raised ? 'Edit invoice' : 'Create invoice'}>
+                              {raised ? <Pencil className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+                              {raised ? 'Edit' : 'Create'}
                             </Button>
-                            <Button variant="ghost" size="sm" onClick={() => setPreviewShipment(shipment)} className="h-8 px-2" title="Preview invoice">
-                              <Eye className="h-4 w-4 mr-1" /> View
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => downloadPdf(shipment)}
-                              disabled={downloadingId === shipment.id}
-                              className="h-8 px-2"
-                              title="Download PDF"
-                            >
-                              {downloadingId === shipment.id
-                                ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                : <Download className="h-4 w-4 mr-1" />}
-                              PDF
-                            </Button>
+                            {raised && (
+                              <>
+                                <Button variant="ghost" size="sm" onClick={() => setPreviewShipment(shipment)} className="h-8 px-2" title="Preview invoice">
+                                  <Eye className="h-4 w-4 mr-1" /> View
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => downloadPdf(shipment)}
+                                  disabled={downloadingId === shipment.id}
+                                  className="h-8 px-2"
+                                  title="Download PDF"
+                                >
+                                  {downloadingId === shipment.id
+                                    ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                    : <Download className="h-4 w-4 mr-1" />}
+                                  PDF
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -834,19 +985,49 @@ const InvoicesTab = () => {
       >
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Invoice</DialogTitle>
+            <DialogTitle>{editingShipment && !editingShipment.id.startsWith(NEW_INVOICE_PREFIX) && hasStoredInvoice(editingShipment) ? 'Edit Invoice' : 'Create Invoice'}</DialogTitle>
             <DialogDescription>
               {editingShipment && (
-                <>For shipment <span className="font-mono">{editingShipment.tracking_number}</span> — customer: {getSenderName(editingShipment)}</>
+                <>
+                  {editingShipment.id.startsWith(NEW_INVOICE_PREFIX)
+                    ? 'Enter the customer, recipient and billing details for this new invoice.'
+                    : <>For shipment <span className="font-mono">{editingShipment.tracking_number}</span> — customer: {getSenderName(editingShipment)}.{!hasStoredInvoice(editingShipment) && ' Details have been filled from the booking; review them before creating the invoice.'}</>}
+                </>
               )}
             </DialogDescription>
           </DialogHeader>
 
           {draft && (
             <div className="space-y-4">
+              {editingShipment?.id.startsWith(NEW_INVOICE_PREFIX) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-md border p-4 bg-muted/20">
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold">Bill to</h3>
+                    <Input placeholder="Customer or business name *" value={editingShipment.metadata?.sender?.name || ''} onChange={e => updateScratchParty('sender', { name: e.target.value })} />
+                    <Input type="email" placeholder="Email address" value={editingShipment.metadata?.sender?.email || ''} onChange={e => updateScratchParty('sender', { email: e.target.value })} />
+                    <Input placeholder="Phone number" value={editingShipment.metadata?.sender?.phone || ''} onChange={e => updateScratchParty('sender', { phone: e.target.value })} />
+                    <Input placeholder="Billing address" value={editingShipment.metadata?.sender?.address || ''} onChange={e => updateScratchParty('sender', { address: e.target.value })} />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input placeholder="City" value={editingShipment.metadata?.sender?.city || ''} onChange={e => updateScratchParty('sender', { city: e.target.value })} />
+                      <Input placeholder="Country" value={editingShipment.metadata?.sender?.country || ''} onChange={e => updateScratchParty('sender', { country: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold">Ship to / recipient</h3>
+                    <Input placeholder="Recipient name" value={editingShipment.metadata?.recipient?.name || ''} onChange={e => updateScratchParty('recipient', { name: e.target.value })} />
+                    <Input placeholder="Phone number" value={editingShipment.metadata?.recipient?.phone || ''} onChange={e => updateScratchParty('recipient', { phone: e.target.value })} />
+                    <Input placeholder="Delivery address" value={editingShipment.metadata?.recipient?.address || ''} onChange={e => updateScratchParty('recipient', { address: e.target.value })} />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input placeholder="City" value={editingShipment.metadata?.recipient?.city || ''} onChange={e => updateScratchParty('recipient', { city: e.target.value })} />
+                      <Input placeholder="Country" value={editingShipment.metadata?.recipient?.country || ''} onChange={e => updateScratchParty('recipient', { country: e.target.value })} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs">Invoice number</Label>
+                  <Label className="text-xs">Customer Ref</Label>
                   <Input value={draft.invoiceNumber} onChange={e => updateDraft({ invoiceNumber: e.target.value })} />
                 </div>
                 <div className="space-y-1">
@@ -859,7 +1040,7 @@ const InvoicesTab = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Currency</Label>
                   <Select value={draft.currency} onValueChange={v => updateDraft({ currency: v })}>
@@ -879,14 +1060,6 @@ const InvoicesTab = () => {
                     onChange={e => updateDraft({ discount: parseFloat(e.target.value) || 0 })}
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Tax rate (%)</Label>
-                  <Input
-                    type="number" min={0} max={100} step={0.1}
-                    value={draft.taxRate}
-                    onChange={e => updateDraft({ taxRate: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
               </div>
 
               <div className="space-y-2">
@@ -897,16 +1070,29 @@ const InvoicesTab = () => {
                   </Button>
                 </div>
                 <div className="space-y-2">
+                  <div className="hidden sm:grid grid-cols-12 gap-2 px-1 text-xs font-medium text-muted-foreground">
+                    <span className="col-span-3">Item</span>
+                    <span className="col-span-4">Description</span>
+                    <span className="col-span-2">Quantity</span>
+                    <span className="col-span-2">Unit price</span>
+                  </div>
                   {draft.items.map((item, i) => (
                     <div key={i} className="grid grid-cols-12 gap-2 items-start">
-                      <div className="col-span-7">
+                      <div className="col-span-12 sm:col-span-3">
+                        <Input
+                          placeholder="Item"
+                          value={item.item || ''}
+                          onChange={e => updateItem(i, { item: e.target.value })}
+                        />
+                      </div>
+                      <div className="col-span-12 sm:col-span-4">
                         <Input
                           placeholder="Description"
                           value={item.description}
                           onChange={e => updateItem(i, { description: e.target.value })}
                         />
                       </div>
-                      <div className="col-span-2">
+                      <div className="col-span-4 sm:col-span-2">
                         <Input
                           type="number" min={0} step={1}
                           placeholder="Qty"
@@ -914,7 +1100,7 @@ const InvoicesTab = () => {
                           onChange={e => updateItem(i, { quantity: parseFloat(e.target.value) || 0 })}
                         />
                       </div>
-                      <div className="col-span-2">
+                      <div className="col-span-6 sm:col-span-2">
                         <Input
                           type="number" min={0} step={0.01}
                           placeholder="Unit price"
@@ -922,7 +1108,7 @@ const InvoicesTab = () => {
                           onChange={e => updateItem(i, { unitPrice: parseFloat(e.target.value) || 0 })}
                         />
                       </div>
-                      <div className="col-span-1">
+                      <div className="col-span-2 sm:col-span-1">
                         <Button variant="ghost" size="sm" onClick={() => removeItem(i)} title="Remove">
                           <Trash2 className="h-4 w-4 text-red-600" />
                         </Button>
@@ -951,23 +1137,27 @@ const InvoicesTab = () => {
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <input
-                  id="invoice-paid"
-                  type="checkbox"
-                  checked={draft.paid}
-                  onChange={e => updateDraft({ paid: e.target.checked })}
-                  className="h-4 w-4"
-                />
-                <Label htmlFor="invoice-paid" className="text-sm cursor-pointer">Mark as fully paid without recording a payment (stamps PAID)</Label>
-              </div>
-
               {draftTotals && (
-                <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
-                  <div className="flex justify-between"><span>Subtotal</span><span>{fmtMoney(draftTotals.subtotal, draft.currency)}</span></div>
-                  {draftTotals.discount > 0 && <div className="flex justify-between text-red-600"><span>Discount</span><span>− {fmtMoney(draftTotals.discount, draft.currency)}</span></div>}
-                  {draft.taxRate > 0 && <div className="flex justify-between"><span>Tax ({draft.taxRate}%)</span><span>{fmtMoney(draftTotals.tax, draft.currency)}</span></div>}
-                  <div className="flex justify-between font-semibold border-t mt-1 pt-1"><span>Total</span><span>{fmtMoney(draftTotals.total, draft.currency)}</span></div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-md border bg-muted/40 px-3 py-3 text-sm">
+                  <div className="space-y-1">
+                    <Label htmlFor="invoice-amount-paid" className="text-xs">Amount Paid</Label>
+                    <Input
+                      id="invoice-amount-paid"
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={draftPaymentSummary?.paidAmount || 0}
+                      onChange={e => setAmountPaid(parseFloat(e.target.value) || 0)}
+                    />
+                    <p className="text-xs text-muted-foreground">Used to calculate the balance due and payment status.</p>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between"><span>Subtotal</span><span>{fmtMoney(draftTotals.subtotal, draft.currency)}</span></div>
+                    {draftTotals.discount > 0 && <div className="flex justify-between text-red-600"><span>Discount</span><span>− {fmtMoney(draftTotals.discount, draft.currency)}</span></div>}
+                    <div className="flex justify-between font-semibold border-t mt-1 pt-1"><span>Total</span><span>{fmtMoney(draftTotals.total, draft.currency)}</span></div>
+                    <div className="flex justify-between text-emerald-700"><span>Amount Paid</span><span>− {fmtMoney(draftPaymentSummary?.paidAmount || 0, draft.currency)}</span></div>
+                    <div className="flex justify-between font-semibold"><span>Balance Due</span><span>{fmtMoney(draftPaymentSummary?.balance || 0, draft.currency)}</span></div>
+                  </div>
                 </div>
               )}
             </div>
@@ -978,7 +1168,9 @@ const InvoicesTab = () => {
               Cancel
             </Button>
             <Button onClick={saveInvoice} disabled={savingInvoice || !draft}>
-              {savingInvoice ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</> : 'Save invoice'}
+              {savingInvoice
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</>
+                : editingShipment && !editingShipment.id.startsWith(NEW_INVOICE_PREFIX) && hasStoredInvoice(editingShipment) ? 'Save changes' : 'Create invoice'}
             </Button>
           </DialogFooter>
         </DialogContent>

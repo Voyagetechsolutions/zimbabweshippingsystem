@@ -11,6 +11,7 @@ import {
 } from '@/utils/invoiceTotals';
 
 export interface InvoiceLineItem {
+  item?: string;
   description: string;
   quantity: number;
   unitPrice: number;
@@ -116,7 +117,8 @@ export function buildDefaultInvoice(s: Shipment): InvoiceData {
   const drums = (itemsMeta.drums as { pricePerDrum?: number; quantity?: number } | undefined) || {};
   if (drumQty > 0) {
     items.push({
-      description: ship.drumsDescription ? `Drum (200–220L) — ${ship.drumsDescription}` : 'Drum (200–220L)',
+      item: 'Drum (200–220L)',
+      description: String(ship.drumsDescription || ''),
       quantity: drumQty,
       unitPrice: Number(drums.pricePerDrum ?? 0),
     });
@@ -126,7 +128,8 @@ export function buildDefaultInvoice(s: Shipment): InvoiceData {
   const trunks = (itemsMeta.trunks as { pricePerTrunk?: number; quantity?: number } | undefined) || {};
   if (trunkQty > 0) {
     items.push({
-      description: ship.trunksDescription ? `Trunk / Storage Box — ${ship.trunksDescription}` : 'Trunk / Storage Box',
+      item: 'Trunk / Storage Box',
+      description: String(ship.trunksDescription || ''),
       quantity: trunkQty,
       unitPrice: Number(trunks.pricePerTrunk ?? 0),
     });
@@ -143,6 +146,7 @@ export function buildDefaultInvoice(s: Shipment): InvoiceData {
     const sealQty = Number(addOns.metalSealQuantity ?? ship.metalSealQuantity ?? (drumQty + trunkQty)) || 0;
     if (sealQty > 0) {
       items.push({
+        item: 'Metal Coded Seal',
         description: option === 'have'
           ? `Metal Coded Seal (customer's own)${codes.length ? ` — ${codes.join(', ')}` : ''}`
           : 'Metal Coded Seal',
@@ -155,14 +159,15 @@ export function buildDefaultInvoice(s: Shipment): InvoiceData {
   const otherDesc = ship.boxesDescription || ship.category || ship.description;
   if (ship.includeOtherItems || ship.includeBoxes || otherDesc) {
     items.push({
-      description: `Other Items: ${otherDesc || 'agent quote'}`,
+      item: 'Other Items',
+      description: String(otherDesc || 'Agent quote'),
       quantity: 1,
       unitPrice: 0,
     });
   }
 
   if (items.length === 0) {
-    items.push({ description: 'Shipping service', quantity: 1, unitPrice: Number(pricing.finalAmount ?? 0) });
+    items.push({ item: 'Shipping service', description: '', quantity: 1, unitPrice: Number(pricing.finalAmount ?? 0) });
   }
 
   const issueDate = format(new Date(s.created_at), 'yyyy-MM-dd');
@@ -173,7 +178,7 @@ export function buildDefaultInvoice(s: Shipment): InvoiceData {
   const refTail = s.customer_reference || (s.tracking_number || '').replace(/[^0-9A-Z]/gi, '').slice(-6) || 'XXXXXX';
 
   return {
-    invoiceNumber: `INV-${refTail}`,
+    invoiceNumber: s.customer_reference || refTail,
     issueDate,
     dueDate,
     items,
@@ -237,9 +242,10 @@ function fmtMoney(amount: number, currency: string) {
 
 export const BillingInvoiceTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipment; invoice: InvoiceData }>(
   ({ shipment, invoice }, ref) => {
-    const totals = calculateTotals(invoice);
-    const { paidAmount, balance } = getPaymentSummary(invoice);
-    const status = getInvoiceStatus(invoice);
+    const taxFreeInvoice = { ...invoice, taxRate: 0 };
+    const totals = calculateTotals(taxFreeInvoice);
+    const { paidAmount, balance } = getPaymentSummary(taxFreeInvoice);
+    const status = getInvoiceStatus(taxFreeInvoice);
     const customerName = getSenderName(shipment);
     const customerEmail = getSenderEmail(shipment);
     const customerPhone = getSenderPhone(shipment);
@@ -281,7 +287,7 @@ export const BillingInvoiceTemplate = React.forwardRef<HTMLDivElement, { shipmen
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: '32px', fontWeight: 'bold', letterSpacing: '1px' }}>INVOICE</div>
             <div style={{ fontSize: '12px', color: '#444', lineHeight: '1.6', marginTop: '8px' }}>
-              <div>Invoice #: <strong style={{ fontSize: '15px', color: '#111' }}>{invoice.invoiceNumber}</strong></div>
+              <div>Customer Ref: <strong style={{ fontSize: '15px', color: '#111' }}>{invoice.invoiceNumber}</strong></div>
               <div>Issue Date: <strong>{invoice.issueDate}</strong></div>
               <div>Due Date: <strong>{invoice.dueDate}</strong></div>
             </div>
@@ -316,7 +322,7 @@ export const BillingInvoiceTemplate = React.forwardRef<HTMLDivElement, { shipmen
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', marginBottom: '12px' }}>
           <thead>
             <tr style={{ backgroundColor: '#2563eb', color: '#fff' }}>
-              <th style={{ padding: '10px 12px', textAlign: 'left', width: '40px' }}>#</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left' }}>Item</th>
               <th style={{ padding: '10px 12px', textAlign: 'left' }}>Description</th>
               <th style={{ padding: '10px 12px', textAlign: 'right', width: '60px' }}>Qty</th>
               <th style={{ padding: '10px 12px', textAlign: 'right', width: '110px' }}>Unit Price</th>
@@ -326,7 +332,7 @@ export const BillingInvoiceTemplate = React.forwardRef<HTMLDivElement, { shipmen
           <tbody>
             {invoice.items.map((it, i) => (
               <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#f8fafc' : '#fff', borderBottom: '1px solid #e2e8f0' }}>
-                <td style={{ padding: '10px 12px' }}>{i + 1}</td>
+                <td style={{ padding: '10px 12px', fontWeight: 600 }}>{it.item || `Item ${i + 1}`}</td>
                 <td style={{ padding: '10px 12px' }}>{it.description}</td>
                 <td style={{ padding: '10px 12px', textAlign: 'right' }}>{it.quantity}</td>
                 <td style={{ padding: '10px 12px', textAlign: 'right' }}>{fmtMoney(it.unitPrice, invoice.currency)}</td>
@@ -343,25 +349,18 @@ export const BillingInvoiceTemplate = React.forwardRef<HTMLDivElement, { shipmen
               {totals.discount > 0 && (
                 <tr><td style={{ padding: '4px 16px', textAlign: 'right', color: '#dc2626' }}>Discount</td><td style={{ padding: '4px 0', textAlign: 'right', color: '#dc2626' }}>− {fmtMoney(totals.discount, invoice.currency)}</td></tr>
               )}
-              {invoice.taxRate > 0 && (
-                <tr><td style={{ padding: '4px 16px', textAlign: 'right' }}>Tax ({invoice.taxRate}%)</td><td style={{ padding: '4px 0', textAlign: 'right' }}>{fmtMoney(totals.tax, invoice.currency)}</td></tr>
-              )}
               <tr style={{ borderTop: '2px solid #111', fontWeight: 'bold', fontSize: '15px' }}>
                 <td style={{ padding: '8px 16px', textAlign: 'right' }}>Total</td>
                 <td style={{ padding: '8px 0', textAlign: 'right' }}>{fmtMoney(totals.total, invoice.currency)}</td>
               </tr>
-              {paidAmount > 0 && (
-                <tr style={{ color: '#16a34a' }}>
-                  <td style={{ padding: '4px 16px', textAlign: 'right' }}>Amount Paid</td>
-                  <td style={{ padding: '4px 0', textAlign: 'right' }}>− {fmtMoney(paidAmount, invoice.currency)}</td>
-                </tr>
-              )}
-              {paidAmount > 0 && (
-                <tr style={{ fontWeight: 'bold', fontSize: '15px', color: balance <= 0.005 ? '#16a34a' : '#b91c1c' }}>
-                  <td style={{ padding: '8px 16px', textAlign: 'right' }}>Balance Due</td>
-                  <td style={{ padding: '8px 0', textAlign: 'right' }}>{fmtMoney(balance, invoice.currency)}</td>
-                </tr>
-              )}
+              <tr style={{ color: paidAmount > 0 ? '#16a34a' : '#444' }}>
+                <td style={{ padding: '4px 16px', textAlign: 'right' }}>Amount Paid</td>
+                <td style={{ padding: '4px 0', textAlign: 'right' }}>− {fmtMoney(paidAmount, invoice.currency)}</td>
+              </tr>
+              <tr style={{ fontWeight: 'bold', fontSize: '15px', color: balance <= 0.005 && totals.total > 0 ? '#16a34a' : '#b91c1c' }}>
+                <td style={{ padding: '8px 16px', textAlign: 'right' }}>Balance Due</td>
+                <td style={{ padding: '8px 0', textAlign: 'right' }}>{fmtMoney(balance, invoice.currency)}</td>
+              </tr>
             </tbody>
           </table>
         </div>
