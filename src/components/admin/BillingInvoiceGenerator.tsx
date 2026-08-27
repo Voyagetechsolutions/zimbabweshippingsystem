@@ -248,10 +248,10 @@ function fmtMoney(amount: number, currency: string) {
 
 export const BillingInvoiceTemplate = React.forwardRef<HTMLDivElement, { shipment: Shipment; invoice: InvoiceData }>(
   ({ shipment, invoice }, ref) => {
-    const taxFreeInvoice = { ...invoice, taxRate: 0 };
-    const totals = calculateTotals(taxFreeInvoice);
-    const { paidAmount, balance } = getPaymentSummary(taxFreeInvoice);
-    const status = getInvoiceStatus(taxFreeInvoice);
+    const invoiceWithoutAdjustments = { ...invoice, discount: 0, taxRate: 0 };
+    const totals = calculateTotals(invoiceWithoutAdjustments);
+    const { paidAmount, balance } = getPaymentSummary(invoiceWithoutAdjustments);
+    const status = getInvoiceStatus(invoiceWithoutAdjustments);
     const customerName = getSenderName(shipment);
     const customerEmail = getSenderEmail(shipment);
     const customerPhone = getSenderPhone(shipment);
@@ -354,9 +354,6 @@ export const BillingInvoiceTemplate = React.forwardRef<HTMLDivElement, { shipmen
           <table style={{ fontSize: '13px' }}>
             <tbody>
               <tr><td style={{ padding: '4px 16px', textAlign: 'right' }}>Subtotal</td><td style={{ padding: '4px 0', textAlign: 'right', minWidth: '110px' }}>{fmtMoney(totals.subtotal, invoice.currency)}</td></tr>
-              {totals.discount > 0 && (
-                <tr><td style={{ padding: '4px 16px', textAlign: 'right', color: '#dc2626' }}>Discount</td><td style={{ padding: '4px 0', textAlign: 'right', color: '#dc2626' }}>− {fmtMoney(totals.discount, invoice.currency)}</td></tr>
-              )}
               <tr style={{ borderTop: '2px solid #111', fontWeight: 'bold', fontSize: '15px' }}>
                 <td style={{ padding: '8px 16px', textAlign: 'right' }}>Total</td>
                 <td style={{ padding: '8px 0', textAlign: 'right' }}>{fmtMoney(totals.total, invoice.currency)}</td>

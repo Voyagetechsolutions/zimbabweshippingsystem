@@ -227,7 +227,7 @@ const InvoicesTab = () => {
   // ── Edit dialog ─────────────────────────────────────────────────────────────
   const openEdit = (shipment: Shipment) => {
     setEditingShipment(shipment);
-    setDraft({ ...getInvoiceData(shipment), taxRate: 0 });
+    setDraft({ ...getInvoiceData(shipment), discount: 0, taxRate: 0 });
   };
 
   const startBlankInvoice = () => {
@@ -360,7 +360,7 @@ const InvoicesTab = () => {
     }
     const wasRaised = !isScratch && hasStoredInvoice(editingShipment);
     setSavingInvoice(true);
-    const invoiceToSave = { ...draft, taxRate: 0 };
+    const invoiceToSave = { ...draft, discount: 0, taxRate: 0 };
     const ok = await persistInvoice(editingShipment, invoiceToSave);
     setSavingInvoice(false);
     if (!ok) return;
@@ -1040,7 +1040,7 @@ const InvoicesTab = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Currency</Label>
                   <Select value={draft.currency} onValueChange={v => updateDraft({ currency: v })}>
@@ -1051,14 +1051,6 @@ const InvoicesTab = () => {
                       <SelectItem value="USD">USD ($)</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Discount</Label>
-                  <Input
-                    type="number" min={0} step={0.01}
-                    value={draft.discount}
-                    onChange={e => updateDraft({ discount: parseFloat(e.target.value) || 0 })}
-                  />
                 </div>
               </div>
 
@@ -1159,7 +1151,6 @@ const InvoicesTab = () => {
                   </div>
                   <div className="space-y-1">
                     <div className="flex justify-between"><span>Subtotal</span><span>{fmtMoney(draftTotals.subtotal, draft.currency)}</span></div>
-                    {draftTotals.discount > 0 && <div className="flex justify-between text-red-600"><span>Discount</span><span>− {fmtMoney(draftTotals.discount, draft.currency)}</span></div>}
                     <div className="flex justify-between font-semibold border-t mt-1 pt-1"><span>Total</span><span>{fmtMoney(draftTotals.total, draft.currency)}</span></div>
                     <div className="flex justify-between text-emerald-700"><span>Amount Paid</span><span>− {fmtMoney(draftPaymentSummary?.paidAmount || 0, draft.currency)}</span></div>
                     <div className="flex justify-between font-semibold"><span>Balance Due</span><span>{fmtMoney(draftPaymentSummary?.balance || 0, draft.currency)}</span></div>
