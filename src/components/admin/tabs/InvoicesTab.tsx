@@ -54,13 +54,6 @@ function getSenderName(s: Shipment) {
     'Unknown';
 }
 
-function getRecipientName(s: Shipment) {
-  const m = s.metadata || {};
-  return m.recipient?.name || m.recipientDetails?.name ||
-    (m.recipient?.firstName ? `${m.recipient.firstName} ${m.recipient.lastName || ''}`.trim() : '') ||
-    'Unknown';
-}
-
 function getSenderEmail(s: Shipment) {
   const m = s.metadata || {};
   return m.sender?.email || m.senderDetails?.email || '';
@@ -102,7 +95,6 @@ function makeBlankInvoice(): { shipment: Shipment; invoice: InvoiceData } {
       metadata: {
         recordType: 'invoice_only',
         sender: { name: '', email: '', phone: '', address: '', city: '', country: '' },
-        recipient: { name: '', phone: '', address: '', city: '', country: 'Zimbabwe' },
       },
       can_cancel: false,
       can_modify: false,
@@ -174,7 +166,6 @@ const InvoicesTab = () => {
       s.tracking_number?.toLowerCase().includes(q) ||
       inv.invoiceNumber.toLowerCase().includes(q) ||
       getSenderName(s).toLowerCase().includes(q) ||
-      getRecipientName(s).toLowerCase().includes(q) ||
       buildRefNumber(s).toLowerCase().includes(q);
     const raised = hasStoredInvoice(s);
     const deleted = Boolean(inv.deletedAt);
@@ -243,16 +234,15 @@ const InvoicesTab = () => {
     setDraft(blank.invoice);
   };
 
-  const updateScratchParty = (party: 'sender' | 'recipient', patch: Record<string, string>) => {
+  const updateScratchShipper = (patch: Record<string, string>) => {
     setEditingShipment(prev => {
       if (!prev) return prev;
       const metadata = prev.metadata || {};
-      const nextParty = { ...(metadata[party] || {}), ...patch };
+      const sender = { ...(metadata.sender || {}), ...patch };
       return {
         ...prev,
-        origin: party === 'sender' && patch.country !== undefined ? patch.country : prev.origin,
-        destination: party === 'recipient' && patch.country !== undefined ? patch.country : prev.destination,
-        metadata: { ...metadata, [party]: nextParty },
+        origin: patch.country !== undefined ? patch.country : prev.origin,
+        metadata: { ...metadata, sender },
       };
     });
   };
@@ -771,7 +761,7 @@ const InvoicesTab = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by customer ref, tracking #, customer or recipient…"
+            placeholder="Search by customer ref, tracking # or shipper…"
             className="pl-9"
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -1050,7 +1040,7 @@ const InvoicesTab = () => {
               {editingShipment && (
                 <>
                   {editingShipment.id.startsWith(NEW_INVOICE_PREFIX)
-                    ? 'Enter the customer, recipient and billing details for this new invoice.'
+                    ? 'Enter the shipper and billing details for this new invoice.'
                     : <>For shipment <span className="font-mono">{editingShipment.tracking_number}</span> — customer: {getSenderName(editingShipment)}.{!hasStoredInvoice(editingShipment) && ' Details have been filled from the booking; review them before creating the invoice.'}</>}
                 </>
               )}
@@ -1060,26 +1050,16 @@ const InvoicesTab = () => {
           {draft && (
             <div className="space-y-4">
               {editingShipment?.id.startsWith(NEW_INVOICE_PREFIX) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-md border p-4 bg-muted/20">
+                <div className="rounded-md border p-4 bg-muted/20">
                   <div className="space-y-3">
-                    <h3 className="text-sm font-semibold">Bill to</h3>
-                    <Input placeholder="Customer or business name *" value={editingShipment.metadata?.sender?.name || ''} onChange={e => updateScratchParty('sender', { name: e.target.value })} />
-                    <Input type="email" placeholder="Email address" value={editingShipment.metadata?.sender?.email || ''} onChange={e => updateScratchParty('sender', { email: e.target.value })} />
-                    <Input placeholder="Phone number" value={editingShipment.metadata?.sender?.phone || ''} onChange={e => updateScratchParty('sender', { phone: e.target.value })} />
-                    <Input placeholder="Billing address" value={editingShipment.metadata?.sender?.address || ''} onChange={e => updateScratchParty('sender', { address: e.target.value })} />
+                    <h3 className="text-sm font-semibold">Shipper details</h3>
+                    <Input placeholder="Shipper or business name *" value={editingShipment.metadata?.sender?.name || ''} onChange={e => updateScratchShipper({ name: e.target.value })} />
+                    <Input type="email" placeholder="Email address" value={editingShipment.metadata?.sender?.email || ''} onChange={e => updateScratchShipper({ email: e.target.value })} />
+                    <Input placeholder="Phone number" value={editingShipment.metadata?.sender?.phone || ''} onChange={e => updateScratchShipper({ phone: e.target.value })} />
+                    <Input placeholder="Billing address" value={editingShipment.metadata?.sender?.address || ''} onChange={e => updateScratchShipper({ address: e.target.value })} />
                     <div className="grid grid-cols-2 gap-2">
-                      <Input placeholder="City" value={editingShipment.metadata?.sender?.city || ''} onChange={e => updateScratchParty('sender', { city: e.target.value })} />
-                      <Input placeholder="Country" value={editingShipment.metadata?.sender?.country || ''} onChange={e => updateScratchParty('sender', { country: e.target.value })} />
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold">Ship to / recipient</h3>
-                    <Input placeholder="Recipient name" value={editingShipment.metadata?.recipient?.name || ''} onChange={e => updateScratchParty('recipient', { name: e.target.value })} />
-                    <Input placeholder="Phone number" value={editingShipment.metadata?.recipient?.phone || ''} onChange={e => updateScratchParty('recipient', { phone: e.target.value })} />
-                    <Input placeholder="Delivery address" value={editingShipment.metadata?.recipient?.address || ''} onChange={e => updateScratchParty('recipient', { address: e.target.value })} />
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input placeholder="City" value={editingShipment.metadata?.recipient?.city || ''} onChange={e => updateScratchParty('recipient', { city: e.target.value })} />
-                      <Input placeholder="Country" value={editingShipment.metadata?.recipient?.country || ''} onChange={e => updateScratchParty('recipient', { country: e.target.value })} />
+                      <Input placeholder="City" value={editingShipment.metadata?.sender?.city || ''} onChange={e => updateScratchShipper({ city: e.target.value })} />
+                      <Input placeholder="Country" value={editingShipment.metadata?.sender?.country || ''} onChange={e => updateScratchShipper({ country: e.target.value })} />
                     </div>
                   </div>
                 </div>

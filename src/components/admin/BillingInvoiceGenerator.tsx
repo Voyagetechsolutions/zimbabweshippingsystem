@@ -96,13 +96,6 @@ function getSenderCountry(s: Shipment): string {
   return src.country || s.origin || 'Not specified';
 }
 
-function getRecipientName(s: Shipment) {
-  const m = s.metadata || {};
-  return m.recipient?.name || m.recipientDetails?.name ||
-    (m.recipient?.firstName ? `${m.recipient.firstName} ${m.recipient.lastName || ''}`.trim() : '') ||
-    'Unknown Recipient';
-}
-
 export function inferCurrency(s: Shipment): string {
   const m = (s.metadata as Record<string, unknown> | undefined) || {};
   const pricing = (m.pricing as { currency?: string } | undefined) || {};
@@ -262,7 +255,6 @@ export const BillingInvoiceTemplate = React.forwardRef<HTMLDivElement, { shipmen
     const customerPhone = getSenderPhone(shipment);
     const customerAddress = getSenderAddress(shipment);
     const customerCountry = getSenderCountry(shipment);
-    const recipientName = getRecipientName(shipment);
 
     return (
       <div
@@ -328,7 +320,6 @@ export const BillingInvoiceTemplate = React.forwardRef<HTMLDivElement, { shipmen
 
         <div style={{ background: '#f1f5f9', padding: '10px 14px', fontSize: '12px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', borderRadius: '4px' }}>
           <span><strong>Tracking:</strong> {shipment.tracking_number}</span>
-          <span><strong>Recipient:</strong> {recipientName}</span>
           <span><strong>Country:</strong> {customerCountry}</span>
         </div>
 
