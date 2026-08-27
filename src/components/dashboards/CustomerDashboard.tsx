@@ -169,7 +169,7 @@ const CustomerDashboard: React.FC = () => {
     const rows = (shipments || [])
       .map((shipment) => {
         const invoice = (shipment.metadata as any)?.invoice;
-        if (!invoice || !Array.isArray(invoice.items) || invoice.items.length === 0) return null;
+        if (!invoice || invoice.deletedAt || !Array.isArray(invoice.items) || invoice.items.length === 0) return null;
         const { total, balance } = getInvoicePaymentSummary(invoice);
         // `settled` is not just balance <= 0: legacy invoices carry a `paid`
         // flag with no itemised payments, and must not read as outstanding.

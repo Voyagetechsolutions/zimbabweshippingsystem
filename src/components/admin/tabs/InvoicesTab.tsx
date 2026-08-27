@@ -134,6 +134,8 @@ const InvoicesTab = () => {
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
   const [draft, setDraft] = useState<InvoiceData | null>(null);
   const [savingInvoice, setSavingInvoice] = useState(false);
+  const [deletingShipment, setDeletingShipment] = useState<Shipment | null>(null);
+  const [deletingInvoice, setDeletingInvoice] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   // Record-payment dialog
   const [payingShipment, setPayingShipment] = useState<Shipment | null>(null);
@@ -175,12 +177,14 @@ const InvoicesTab = () => {
       getRecipientName(s).toLowerCase().includes(q) ||
       buildRefNumber(s).toLowerCase().includes(q);
     const raised = hasStoredInvoice(s);
+    const deleted = Boolean(inv.deletedAt);
     const matchStatus =
-      statusFilter === 'all' ? true
-      : statusFilter === 'not_raised' ? !raised
-      : statusFilter === 'raised' ? raised
+      statusFilter === 'all' ? !deleted
+      : statusFilter === 'deleted' ? raised && deleted
+      : statusFilter === 'not_raised' ? !raised && !deleted
+      : statusFilter === 'raised' ? raised && !deleted
       // A shipment with no invoice must not answer to a real invoice status.
-      : raised && getInvoiceStatus(inv) === statusFilter;
+      : raised && !deleted && getInvoiceStatus(inv) === statusFilter;
     return matchSearch && matchStatus;
   });
 
@@ -194,8 +198,9 @@ const InvoicesTab = () => {
     const currencyCount: Record<string, number> = {};
     for (const s of shipments) {
       if (!hasStoredInvoice(s)) continue;
-      raised++;
       const inv = getInvoiceData(s);
+      if (inv.deletedAt) continue;
+      raised++;
       const { paidAmount, balance } = getPaymentSummary(inv);
       const status = getInvoiceStatus(inv);
       currencyCount[inv.currency] = (currencyCount[inv.currency] || 0) + 1;
@@ -204,7 +209,9 @@ const InvoicesTab = () => {
       if (status === 'overdue') overdue += balance;
     }
     const currency = Object.entries(currencyCount).sort((a, b) => b[1] - a[1])[0]?.[0] || 'EUR';
-    return { outstanding, overdue, paid, currency, raised, notRaised: shipments.length - raised };
+    const deleted = shipments.filter(s => hasStoredInvoice(s) && Boolean(getInvoiceData(s).deletedAt)).length;
+    const notRaised = shipments.filter(s => !hasStoredInvoice(s)).length;
+    return { outstanding, overdue, paid, currency, raised, deleted, notRaised };
   })();
 
   // ── Selection (for bulk actions) ────────────────────────────────────────────
@@ -217,7 +224,7 @@ const InvoicesTab = () => {
   };
   // Only real, saved invoices can participate in invoice actions. Bookings with
   // generated defaults remain available through the Create Invoice flow.
-  const selectableFiltered = filtered.filter(hasStoredInvoice);
+  const selectableFiltered = filtered.filter(s => hasStoredInvoice(s) && !getInvoiceData(s).deletedAt);
   const allSelected = selectableFiltered.length > 0 && selectableFiltered.every(s => selected.has(s.id));
   const someSelected = selected.size > 0 && !allSelected;
   const toggleAll = () => {
@@ -651,6 +658,30 @@ const InvoicesTab = () => {
     if (ok) toast({ title: 'Payment removed' });
   };
 
+  const softDeleteInvoice = async () => {
+    if (!deletingShipment) return;
+    setDeletingInvoice(true);
+    const invoice = getInvoiceData(deletingShipment);
+    const ok = await persistInvoice(deletingShipment, { ...invoice, deletedAt: new Date().toISOString() });
+    setDeletingInvoice(false);
+    if (!ok) return;
+    toast({ title: 'Invoice deleted', description: `${invoice.invoiceNumber} can be restored from the Deleted filter.` });
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.delete(deletingShipment.id);
+      return next;
+    });
+    setDeletingShipment(null);
+  };
+
+  const restoreInvoice = async (shipment: Shipment) => {
+    setBusyId(shipment.id);
+    const invoice = getInvoiceData(shipment);
+    const ok = await persistInvoice(shipment, { ...invoice, deletedAt: null });
+    setBusyId(null);
+    if (ok) toast({ title: 'Invoice restored', description: invoice.invoiceNumber });
+  };
+
   // ── Download single PDF without opening preview ─────────────────────────────
   const downloadPdf = async (shipment: Shipment) => {
     const invoice = getInvoiceData(shipment);
@@ -706,6 +737,7 @@ const InvoicesTab = () => {
     { value: 'partial', label: 'Partial' },
     { value: 'overdue', label: 'Overdue' },
     { value: 'paid', label: 'Paid' },
+    { value: 'deleted', label: 'Deleted' },
   ];
 
   const draftTotals = draft ? calculateTotals(draft) : null;
@@ -795,6 +827,7 @@ const InvoicesTab = () => {
             {summary.notRaised} booking{summary.notRaised !== 1 ? 's' : ''} with no invoice yet
           </span>
         )}
+        {summary.deleted > 0 && <span>{summary.deleted} deleted</span>}
         <span>· {filtered.length} shown</span>
         {selected.size > 0 && (
           <>
@@ -853,6 +886,7 @@ const InvoicesTab = () => {
                     const { total, paidAmount, balance } = getPaymentSummary(inv);
                     const status = getInvoiceStatus(inv);
                     const raised = hasStoredInvoice(shipment);
+                    const deleted = Boolean(inv.deletedAt);
                     const rowBusy = busyId === shipment.id;
                     const isChecked = selected.has(shipment.id);
                     return (
@@ -862,7 +896,7 @@ const InvoicesTab = () => {
                             checked={isChecked}
                             onCheckedChange={() => toggleOne(shipment.id)}
                             aria-label={`Select ${inv.invoiceNumber}`}
-                            disabled={!raised}
+                            disabled={!raised || deleted}
                           />
                         </TableCell>
                         <TableCell className="font-mono text-sm font-medium">{inv.invoiceNumber}</TableCell>
@@ -888,12 +922,26 @@ const InvoicesTab = () => {
                           {raised ? fmtMoney(balance, inv.currency) : '—'}
                         </TableCell>
                         <TableCell>
-                          {raised
+                          {deleted
+                            ? <Badge variant="outline" className="border-red-300 bg-red-50 text-red-700">Deleted</Badge>
+                            : raised
                             ? <StatusPill status={status} />
                             : <Badge variant="outline" className="text-muted-foreground">Not raised</Badge>}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
+                            {deleted ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => restoreInvoice(shipment)}
+                                disabled={rowBusy}
+                                className="h-8 px-2"
+                              >
+                                {rowBusy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+                                Restore
+                              </Button>
+                            ) : <>
                             {raised && status !== 'paid' && (
                               <Button
                                 variant="ghost"
@@ -956,6 +1004,18 @@ const InvoicesTab = () => {
                                 </Button>
                               </>
                             )}
+                            {raised && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDeletingShipment(shipment)}
+                                className="h-8 px-2 text-red-700 hover:text-red-800 hover:bg-red-50"
+                                title="Soft delete invoice"
+                              >
+                                <Trash2 className="h-4 w-4 mr-1" /> Delete
+                              </Button>
+                            )}
+                            </>}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1168,6 +1228,24 @@ const InvoicesTab = () => {
               {savingInvoice
                 ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</>
                 : editingShipment && !editingShipment.id.startsWith(NEW_INVOICE_PREFIX) && hasStoredInvoice(editingShipment) ? 'Save changes' : 'Create invoice'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Soft-delete confirmation. The invoice remains in metadata and can be restored. */}
+      <Dialog open={!!deletingShipment} onOpenChange={(open) => { if (!open && !deletingInvoice) setDeletingShipment(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Invoice?</DialogTitle>
+            <DialogDescription>
+              {deletingShipment && <>Customer Ref <span className="font-mono">{getInvoiceData(deletingShipment).invoiceNumber}</span> will be hidden from active and customer invoice views. You can restore it later from the Deleted filter.</>}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletingShipment(null)} disabled={deletingInvoice}>Cancel</Button>
+            <Button variant="destructive" onClick={softDeleteInvoice} disabled={deletingInvoice}>
+              {deletingInvoice ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Deleting…</> : 'Delete invoice'}
             </Button>
           </DialogFooter>
         </DialogContent>

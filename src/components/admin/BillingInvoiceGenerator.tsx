@@ -45,6 +45,9 @@ export interface InvoiceData {
   // dashboard. Both read metadata.invoice directly, so persisting the invoice is
   // the delivery — this records when the customer was told about it.
   publishedToCustomerAt?: string | null;
+  // Soft deletion keeps the financial record recoverable while removing it
+  // from active admin/customer invoice views.
+  deletedAt?: string | null;
 }
 
 export type InvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid' | 'overdue';
@@ -221,6 +224,8 @@ export function getInvoiceData(s: Shipment): InvoiceData {
     paid: Boolean(stored.paid),
     payments,
     sentAt: stored.sentAt ?? defaults.sentAt,
+    publishedToCustomerAt: stored.publishedToCustomerAt ?? null,
+    deletedAt: stored.deletedAt ?? null,
   };
 }
 
