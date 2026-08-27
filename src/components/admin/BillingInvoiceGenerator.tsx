@@ -87,6 +87,12 @@ function getSenderAddress(s: Shipment): string[] {
   return parts.length ? parts : [s.origin || ''];
 }
 
+function getSenderCountry(s: Shipment): string {
+  const m = s.metadata || {};
+  const src = m.sender || m.senderDetails || {};
+  return src.country || s.origin || 'Not specified';
+}
+
 function getRecipientName(s: Shipment) {
   const m = s.metadata || {};
   return m.recipient?.name || m.recipientDetails?.name ||
@@ -250,6 +256,7 @@ export const BillingInvoiceTemplate = React.forwardRef<HTMLDivElement, { shipmen
     const customerEmail = getSenderEmail(shipment);
     const customerPhone = getSenderPhone(shipment);
     const customerAddress = getSenderAddress(shipment);
+    const customerCountry = getSenderCountry(shipment);
     const recipientName = getRecipientName(shipment);
 
     return (
@@ -316,7 +323,7 @@ export const BillingInvoiceTemplate = React.forwardRef<HTMLDivElement, { shipmen
         <div style={{ background: '#f1f5f9', padding: '10px 14px', fontSize: '12px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', borderRadius: '4px' }}>
           <span><strong>Tracking:</strong> {shipment.tracking_number}</span>
           <span><strong>Recipient:</strong> {recipientName}</span>
-          <span><strong>Route:</strong> {shipment.origin} → {shipment.destination}</span>
+          <span><strong>Country:</strong> {customerCountry}</span>
         </div>
 
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', marginBottom: '12px' }}>
