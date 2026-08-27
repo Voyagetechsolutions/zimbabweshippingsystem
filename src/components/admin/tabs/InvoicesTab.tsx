@@ -350,10 +350,10 @@ const InvoicesTab = () => {
       toast({ title: 'Customer reference required', description: 'Enter the customer reference before saving.', variant: 'destructive' });
       return;
     }
-    if (!draft.items.length || draft.items.some(item => !item.item?.trim() || !item.description.trim() || item.quantity <= 0 || item.unitPrice < 0)) {
+    if (!draft.items.length || draft.items.some(item => !item.item?.trim() || !item.description.trim() || item.quantity <= 0 || item.unitPrice <= 0)) {
       toast({
         title: 'Check the invoice lines',
-        description: 'Every line needs an item, description, quantity above zero, and a valid unit price.',
+        description: 'Every line needs an item, description, quantity above zero, and amount above zero.',
         variant: 'destructive',
       });
       return;
@@ -1073,8 +1073,8 @@ const InvoicesTab = () => {
                   <div className="hidden sm:grid grid-cols-12 gap-2 px-1 text-xs font-medium text-muted-foreground">
                     <span className="col-span-3">Item</span>
                     <span className="col-span-4">Description</span>
-                    <span className="col-span-2">Quantity</span>
-                    <span className="col-span-2">Unit price</span>
+                    <span className="col-span-2">Quantity *</span>
+                    <span className="col-span-2">Amount *</span>
                   </div>
                   {draft.items.map((item, i) => (
                     <div key={i} className="grid grid-cols-12 gap-2 items-start">
@@ -1095,15 +1095,17 @@ const InvoicesTab = () => {
                       <div className="col-span-4 sm:col-span-2">
                         <Input
                           type="number" min={0} step={1}
-                          placeholder="Qty"
+                          placeholder="Quantity *"
+                          required
                           value={item.quantity}
                           onChange={e => updateItem(i, { quantity: parseFloat(e.target.value) || 0 })}
                         />
                       </div>
                       <div className="col-span-6 sm:col-span-2">
                         <Input
-                          type="number" min={0} step={0.01}
-                          placeholder="Unit price"
+                          type="number" min={0.01} step={0.01}
+                          placeholder="Amount *"
+                          required
                           value={item.unitPrice}
                           onChange={e => updateItem(i, { unitPrice: parseFloat(e.target.value) || 0 })}
                         />

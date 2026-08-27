@@ -331,8 +331,8 @@ export const BillingInvoiceTemplate = React.forwardRef<HTMLDivElement, { shipmen
             <tr style={{ backgroundColor: '#2563eb', color: '#fff' }}>
               <th style={{ padding: '10px 12px', textAlign: 'left' }}>Item</th>
               <th style={{ padding: '10px 12px', textAlign: 'left' }}>Description</th>
-              <th style={{ padding: '10px 12px', textAlign: 'right', width: '60px' }}>Qty</th>
-              <th style={{ padding: '10px 12px', textAlign: 'right', width: '110px' }}>Unit Price</th>
+              <th style={{ padding: '10px 12px', textAlign: 'right', width: '70px' }}>Quantity</th>
+              <th style={{ padding: '10px 12px', textAlign: 'right', width: '110px' }}>Amount Each</th>
               <th style={{ padding: '10px 12px', textAlign: 'right', width: '110px' }}>Amount</th>
             </tr>
           </thead>
