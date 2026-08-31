@@ -40,7 +40,6 @@ export default function HomeScreen() {
       .select('route, pickup_date, country, areas')
       .limit(200);
     const upcoming = (schedules || [])
-      .filter((s: any) => s.route !== 'SCOTLAND ROUTE')
       .filter((s:any)=>scheduleMatchesPostcode(s.areas,profile?.postal_code,profile?.pickup_city,profile?.country))
       .map((s: any) => ({ route: s.route as string, date: parseCollectionDate(s.pickup_date) }))
       .filter((s): s is { route: string; date: Date } => Boolean(s.date && s.date.getTime() >= Date.now() - 86400000))
@@ -62,9 +61,10 @@ export default function HomeScreen() {
 
   const actions = [
     { label: 'Get a\nQuote', icon: 'pricetag' as const, onPress: () => navigation.navigate('Quote') },
-    { label: 'Book\nShipment', icon: 'cube' as const, onPress: () => navigation.navigate('Book') },
+    { label: 'Book\nShipment', icon: 'cube' as const, onPress: () => navigation.navigate('Book', { freshToken: Date.now() }) },
     { label: 'Track\nShipment', icon: 'locate' as const, onPress: () => navigation.navigate('Tabs', { screen: 'Shipments' }) },
     { label: 'Ask\nZimmy', icon: 'chatbubbles' as const, onPress: () => navigation.navigate('Tabs', { screen: 'Zimmy' }) },
+    { label: 'Returning\nResident', icon: 'home' as const, onPress: () => navigation.navigate('Quote', { type: 'returning_resident' }) },
   ];
 
   // Pull origin/destination city names for the shipment rows.
@@ -218,8 +218,8 @@ const styles = StyleSheet.create({
   heroCtaText: { color: HEADER_GREEN, fontWeight: '800', fontSize: 12 },
   body: { padding: spacing.lg, paddingTop: spacing.lg },
   sectionLabel: { fontSize: 15, fontWeight: '800', marginBottom: spacing.md },
-  actionsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.lg },
-  action: { alignItems: 'center', width: '23%' },
+  actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
+  action: { alignItems: 'center', width: '18%' },
   actionIcon: { width: 54, height: 54, borderRadius: radius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
   actionText: { fontSize: 11.5, fontWeight: '700', textAlign: 'center', lineHeight: 15 },
   cardKicker: { fontSize: 11, fontWeight: '800', color: colors.green, letterSpacing: 0.8 },

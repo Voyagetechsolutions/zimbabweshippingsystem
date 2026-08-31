@@ -9,6 +9,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { colors, radius, spacing } from '../theme';
 import type { DriverStackParams } from '../navigation/types';
+import SignaturePad from '../components/SignaturePad';
+import { getDriverLocation } from '../lib/driverLocation';
 
 // React Native bundles local images as numeric module references.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -57,17 +59,22 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
   const [sealNotes, setSealNotes] = useState('');
   const [sealsSaved, setSealsSaved] = useState(false);
   const [draftReady, setDraftReady] = useState(false);
+  const [recipientName, setRecipientName] = useState(stop.customerName || '');
+  const [signatureSvg, setSignatureSvg] = useState<string | null>(null);
+  const [signatureAccepted, setSignatureAccepted] = useState(false);
+  const [signatureSaved, setSignatureSaved] = useState(false);
   const draftKey = `driver_handover_draft:${stop.id}`;
 
   useEffect(() => { navigation.setOptions({ title: pickup ? 'Proof of Collection' : 'Proof of Delivery' }); }, [navigation, pickup]);
 
   const load = useCallback(async () => {
-    const [invoiceResult, proofResult, stopResult, shipmentResult, sealResult] = await Promise.all([
+    const [invoiceResult, proofResult, stopResult, shipmentResult, sealResult, signatureResult] = await Promise.all([
       supabase.from('driver_invoices').select('id,currency,line_items,discount,tax,notes').eq('stop_id', stop.id).maybeSingle(),
       supabase.from('driver_proofs').select('id,proof_type,storage_path').eq('stop_id', stop.id).is('deleted_at', null).order('captured_at'),
       supabase.from('driver_run_stops').select('qr_verified_at').eq('id',stop.id).maybeSingle(),
       supabase.from('shipments').select('goods_description,driver_description_correction,seals_requested,metadata').eq('id', stop.shipmentId).maybeSingle(),
       supabase.from('shipment_seals').select('*').eq('shipment_id', stop.shipmentId).maybeSingle(),
+      supabase.from('driver_signatures').select('recipient_name').eq('stop_id', stop.id).maybeSingle(),
     ]);
 
     const shipment: any = shipmentResult.data || {};
@@ -110,6 +117,7 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
     }));
     setProofs(withUrls);
     setQrVerified(Boolean((stopResult.data as any)?.qr_verified_at));
+    if (signatureResult.data) { setRecipientName((signatureResult.data as any).recipient_name || stop.customerName); setSignatureSaved(true); setSignatureAccepted(true); }
   }, [stop.id, stop.shipmentId]);
 
   const verifyQr=async(value:string)=>{if(!value.trim())return;setBusy('qr');try{const{error}=await supabase.rpc('verify_driver_stop_qr',{p_stop_id:stop.id,p_qr_token:qrToken(value)});if(error)throw error;setQrVerified(true);Alert.alert('Customer signature verified','The shipment QR matches this assigned stop.');}catch(e:any){Alert.alert('QR verification failed',e?.message||'Scan the customer shipment QR code again.');}finally{setBusy(null);}};
@@ -216,6 +224,7 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
   const complete = async () => {
     if (code.trim().length !== 6) { Alert.alert('Customer code required', 'Ask the customer for the six-digit code shown in their app.'); return; }
     if (pickup && sealsRequested > 0 && !sealsSaved) { Alert.alert('Record the seals first', `The customer paid for ${sealsRequested} metal coded seal(s) — fit them and record every code before completing.`); return; }
+    if (!pickup && !signatureSaved) { Alert.alert('Recipient signature required', 'Ask the recipient to sign and save the signature before completing this delivery.'); return; }
     setBusy('complete');
     try {
       const { data, error } = await supabase.rpc('complete_driver_handover', { p_stop_id: stop.id, p_customer_code: code.trim(), p_notes: notes.trim() || null });
@@ -226,6 +235,28 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
     finally { setBusy(null); }
   };
 
+  const saveSignature = async () => {
+    if (!recipientName.trim()) { Alert.alert('Recipient name required', 'Enter the full name of the person receiving the packages.'); return; }
+    if (!signatureSvg) { Alert.alert('Signature required', 'Ask the recipient to sign inside the box.'); return; }
+    if (!signatureAccepted) { Alert.alert('Confirmation required', 'The recipient must confirm they received the listed packages.'); return; }
+    setBusy('signature');
+    try {
+      const location = await getDriverLocation().catch(() => ({ point: null }));
+      const { error } = await supabase.from('driver_signatures').upsert({
+        shipment_id: stop.shipmentId, stop_id: stop.id, driver_id: session?.user.id,
+        recipient_name: recipientName.trim(), signature_svg: signatureSvg,
+        confirmation_accepted: true, latitude: location.point?.latitude ?? null,
+        longitude: location.point?.longitude ?? null,
+      }, { onConflict: 'stop_id' });
+      if (error) throw error;
+      setSignatureSaved(true);
+      Alert.alert('Signature saved', 'The recipient signature is securely attached to this delivery.');
+    } catch (e: any) {
+      console.warn('Signature save failed', e?.message || e);
+      Alert.alert('Signature not saved', 'Check your connection and try again.');
+    } finally { setBusy(null); }
+  };
+
   const photoButtons: Array<[ProofType, string]> = pickup
     ? [['pickup_departure', 'Goods leaving pickup'], ['depot_arrival', 'Goods arriving at depot']]
     : [['depot_departure', 'Goods leaving depot'], ['delivery_arrival', 'Goods at drop-off']];
@@ -234,10 +265,23 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
 
   return (
     <ScrollView style={styles.safe} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
-      <View style={styles.hero}><Text style={styles.customer}>{stop.customerName}</Text><Text style={styles.ref}>{stop.trackingNumber}</Text><Text style={styles.draftNote}>Progress saves automatically on this device</Text></View>
+      <View style={styles.hero}><Text style={styles.stepEyebrow}>{pickup ? 'COLLECTION HANDOVER' : 'DELIVERY HANDOVER'}</Text><Text style={styles.customer}>{stop.customerName}</Text><Text style={styles.ref}>{stop.trackingNumber}</Text><Text style={styles.draftNote}>You are marked as arrived · Progress saves automatically on this device</Text></View>
+
+      <View style={styles.card}>
+        <View style={styles.sectionHead}><Ionicons name="qr-code-outline" size={21} color={colors.primary}/><View style={{flex:1}}><Text style={styles.stepEyebrow}>STEP 1 · OPEN SHIPMENT</Text><Text style={styles.sectionTitle}>Verify the customer shipment QR</Text></View></View>
+        {qrVerified ? <View style={styles.verified}><Ionicons name="shield-checkmark" size={24} color={colors.primary}/><Text style={styles.saved}>Correct shipment opened — continue with the handover details below</Text></View> : <>
+          <Text style={styles.help}>Ask the customer to open this shipment in their app and show its QR code. Scan it before handling or recording the goods.</Text>
+          {permission?.granted ? <View style={styles.qrCamera}><CameraView style={StyleSheet.absoluteFill} barcodeScannerSettings={{barcodeTypes:['qr']}} onBarcodeScanned={({data})=>busy!=='qr'&&verifyQr(data)}/><View style={styles.qrFrame}/></View> : <Pressable accessibilityRole="button" accessibilityLabel="Allow camera to scan customer QR" style={styles.outline} onPress={requestPermission}><Text style={styles.outlineText}>Allow camera to scan QR</Text></Pressable>}
+          <Text style={styles.orText}>OR ENTER THE QR TOKEN MANUALLY</Text>
+          <TextInput style={styles.input} value={manualQr} onChangeText={setManualQr} placeholder="Customer shipment QR token"/>
+          <Pressable accessibilityRole="button" accessibilityLabel="Verify customer shipment QR" style={[styles.primary, (!manualQr.trim() || busy==='qr') && styles.disabled]} onPress={()=>verifyQr(manualQr)} disabled={!manualQr.trim() || busy==='qr'}>{busy==='qr'?<ActivityIndicator color={colors.white}/>:<Text style={styles.primaryText}>Verify and open shipment</Text>}</Pressable>
+        </>}
+      </View>
+
+      {!qrVerified ? <View style={styles.lockedCard}><Ionicons name="lock-closed-outline" size={24} color={colors.textMuted}/><View style={{flex:1}}><Text style={styles.lockedTitle}>Shipment details are locked</Text><Text style={styles.lockedText}>Verify the customer's shipment QR above. The goods, invoice, seals, photos and final six-digit handover code will then open.</Text></View></View> : <>
 
       {pickup ? <View style={styles.card}>
-        <View style={styles.sectionHead}><Ionicons name="document-text-outline" size={21} color={colors.primary}/><Text style={styles.sectionTitle}>Customer's goods description</Text></View>
+        <View style={styles.sectionHead}><Ionicons name="document-text-outline" size={21} color={colors.primary}/><View style={{flex:1}}><Text style={styles.stepEyebrow}>STEP 2 · CHECK GOODS</Text><Text style={styles.sectionTitle}>Customer's goods description</Text></View></View>
         <Text style={styles.help}>Check the goods against what the customer declared. The original description stays on record — add a correction if anything differs.</Text>
         <View style={styles.descriptionBox}><Text style={styles.descriptionText}>{goodsDescription || 'No description was provided — add a collection note describing the goods.'}</Text></View>
         {savedCorrection ? <View style={styles.correctionBox}><Text style={styles.correctionLabel}>YOUR CORRECTION ON RECORD</Text><Text style={styles.descriptionText}>{savedCorrection}</Text></View> : null}
@@ -245,8 +289,6 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
         <TextInput style={[styles.input, styles.notes]} value={correction} onChangeText={setCorrection} multiline placeholder="e.g. Actually 3 drums not 2; TV box already dented on arrival…" placeholderTextColor={colors.textFaint} />
         <Pressable style={styles.outline} onPress={saveCorrection} disabled={busy === 'correction'}>{busy === 'correction' ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.outlineText}>Save correction</Text>}</Pressable>
       </View> : null}
-
-      <View style={styles.card}><View style={styles.sectionHead}><Ionicons name="qr-code-outline" size={21} color={colors.primary}/><Text style={styles.sectionTitle}>Customer QR signature</Text></View>{qrVerified?<View style={styles.verified}><Ionicons name="shield-checkmark" size={24} color={colors.primary}/><Text style={styles.saved}>Shipment identity verified</Text></View>:permission?.granted?<><View style={styles.qrCamera}><CameraView style={StyleSheet.absoluteFill} barcodeScannerSettings={{barcodeTypes:['qr']}} onBarcodeScanned={({data})=>busy!=='qr'&&verifyQr(data)}/><View style={styles.qrFrame}/></View><TextInput style={styles.input} value={manualQr} onChangeText={setManualQr} placeholder="Or enter QR token"/><Pressable style={styles.primary} onPress={()=>verifyQr(manualQr)}><Text style={styles.primaryText}>Verify customer QR</Text></Pressable></>:<Pressable style={styles.primary} onPress={requestPermission}><Text style={styles.primaryText}>Allow camera to scan QR</Text></Pressable>}</View>
 
       {pickup ? <View style={styles.card}>
         <View style={styles.sectionHead}><Ionicons name="receipt-outline" size={21} color={colors.primary} /><Text style={styles.sectionTitle}>Collection invoice</Text></View>
@@ -329,20 +371,31 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
         })}</View>
       </View>
 
+      {!pickup ? <View style={styles.card}>
+        <View style={styles.sectionHead}><Ionicons name="create-outline" size={21} color={colors.primary} /><Text style={styles.sectionTitle}>Recipient signature</Text></View>
+        <Text style={styles.help}>The recipient signs for the packages listed on this delivery. Do not photograph their identity document.</Text>
+        <Label text="Received by" />
+        <TextInput style={styles.input} value={recipientName} onChangeText={(value) => { setRecipientName(value); setSignatureSaved(false); }} placeholder="Recipient full name" placeholderTextColor={colors.textFaint} />
+        {signatureSaved ? <View style={styles.verified}><Ionicons name="shield-checkmark" size={23} color={colors.primary} /><Text style={styles.saved}>Signature captured securely</Text></View> : <SignaturePad onChange={(value) => { setSignatureSvg(value); setSignatureSaved(false); }} />}
+        <Pressable style={styles.confirmRow} onPress={() => { setSignatureAccepted((value) => !value); setSignatureSaved(false); }}><Ionicons name={signatureAccepted ? 'checkbox' : 'square-outline'} size={22} color={signatureAccepted ? colors.primary : colors.textMuted} /><Text style={styles.confirmText}>I confirm that I received the packages listed above.</Text></Pressable>
+        {!signatureSaved ? <Pressable style={[styles.primary, busy === 'signature' && styles.disabled]} onPress={saveSignature} disabled={busy === 'signature'}>{busy === 'signature' ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryText}>Save recipient signature</Text>}</Pressable> : null}
+      </View> : null}
+
       <View style={styles.card}>
-        <View style={styles.sectionHead}><Ionicons name="keypad-outline" size={21} color={colors.primary} /><Text style={styles.sectionTitle}>Customer verification</Text></View>
-        <Text style={styles.help}>Ask the customer for the six-digit {pickup ? 'collection' : 'delivery'} code displayed in their customer app.</Text>
+        <View style={styles.sectionHead}><Ionicons name="keypad-outline" size={21} color={colors.primary} /><View style={{flex:1}}><Text style={styles.stepEyebrow}>FINAL STEP · CUSTOMER HANDOVER</Text><Text style={styles.sectionTitle}>Enter the six-digit customer code</Text></View></View>
+        <Text style={styles.help}>After the goods and proof are recorded, ask the customer for the six-digit {pickup ? 'collection' : 'delivery'} code displayed in their app. This confirms the handover; it is not their account password.</Text>
         <TextInput style={[styles.input, styles.code]} value={code} onChangeText={(value) => setCode(value.replace(/\D/g, '').slice(0, 6))} keyboardType="number-pad" maxLength={6} placeholder="000000" />
         <Label text="Driver notes (optional)" /><TextInput style={[styles.input, styles.notes]} value={notes} onChangeText={setNotes} multiline />
         <Pressable style={[styles.primary, busy === 'complete' && styles.disabled]} onPress={complete} disabled={busy === 'complete'}>{busy === 'complete' ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryText}>{pickup ? 'Verify code & mark collected' : 'Verify code & mark delivered'}</Text>}</Pressable>
       </View>
+      </>}
     </ScrollView>
   );
 }
 
 function Label({ text }: { text: string }) { return <Text style={styles.label}>{text}</Text>; }
 const styles = StyleSheet.create({
-  safe:{flex:1,backgroundColor:colors.bg},content:{padding:spacing.lg,gap:spacing.md,paddingBottom:48},hero:{paddingBottom:spacing.sm},title:{fontSize:22,fontWeight:'800',color:colors.text},customer:{fontSize:16,fontWeight:'700',color:colors.text,marginTop:4},ref:{fontSize:12,fontWeight:'700',color:colors.primary,marginTop:2},draftNote:{fontSize:10.5,color:colors.textMuted,marginTop:5},card:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:radius.lg,padding:spacing.lg,gap:spacing.sm},sectionHead:{flexDirection:'row',alignItems:'center',gap:spacing.sm},sectionTitle:{fontSize:16,fontWeight:'800',color:colors.text},help:{fontSize:12,lineHeight:17,color:colors.textMuted,marginBottom:4},helpStrong:{fontSize:12,lineHeight:17,color:colors.amber,fontWeight:'800',marginBottom:4},label:{fontSize:11,fontWeight:'700',color:colors.textMuted,marginTop:4},input:{borderWidth:1,borderColor:colors.border,borderRadius:radius.sm,backgroundColor:colors.bg,paddingHorizontal:12,paddingVertical:10,color:colors.text,fontSize:14},row:{flexDirection:'row',gap:spacing.sm},flex:{flex:1},primary:{backgroundColor:colors.primary,borderRadius:radius.sm,paddingVertical:13,alignItems:'center',marginTop:4},primaryText:{color:colors.white,fontWeight:'800',fontSize:13},outline:{borderWidth:1.5,borderColor:colors.primary,borderRadius:radius.sm,paddingVertical:11,alignItems:'center',marginTop:4},outlineText:{color:colors.primary,fontWeight:'800',fontSize:13},saved:{textAlign:'center',color:colors.primary,fontWeight:'700',fontSize:12},proofPreview:{height:190,borderRadius:radius.md,overflow:'hidden',position:'relative'},proofImage:{width:'100%',height:'100%'},cameraBadge:{position:'absolute',right:10,bottom:10,width:38,height:38,borderRadius:19,backgroundColor:'rgba(15,23,42,.72)',alignItems:'center',justifyContent:'center'},photoGrid:{flexDirection:'row',gap:spacing.sm},photoButton:{flex:1,minHeight:120,borderWidth:1,borderStyle:'dashed',borderColor:colors.border,borderRadius:radius.md,alignItems:'center',justifyContent:'center',padding:spacing.sm,overflow:'hidden'},photoDone:{borderColor:colors.primary,backgroundColor:colors.primarySoft},thumbnail:{width:'100%',height:72,borderRadius:radius.sm,marginBottom:5},photoLabel:{fontSize:11,fontWeight:'700',color:colors.textMuted,textAlign:'center'},code:{fontSize:26,fontWeight:'800',letterSpacing:8,textAlign:'center'},notes:{minHeight:68,textAlignVertical:'top'},disabled:{opacity:.55},
+  safe:{flex:1,backgroundColor:colors.bg},content:{padding:spacing.lg,gap:spacing.md,paddingBottom:48},hero:{paddingBottom:spacing.sm},stepEyebrow:{fontSize:9.5,fontWeight:'900',color:colors.primary,letterSpacing:.8,marginBottom:3},title:{fontSize:22,fontWeight:'800',color:colors.text},customer:{fontSize:16,fontWeight:'700',color:colors.text,marginTop:4},ref:{fontSize:12,fontWeight:'700',color:colors.primary,marginTop:2},draftNote:{fontSize:10.5,color:colors.textMuted,marginTop:5},card:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:radius.lg,padding:spacing.lg,gap:spacing.sm},lockedCard:{backgroundColor:'#F4F6F8',borderWidth:1,borderColor:colors.border,borderRadius:radius.lg,padding:spacing.lg,flexDirection:'row',alignItems:'center',gap:spacing.md},lockedTitle:{fontSize:14,fontWeight:'800',color:colors.text},lockedText:{fontSize:11.5,lineHeight:17,color:colors.textMuted,marginTop:3},sectionHead:{flexDirection:'row',alignItems:'center',gap:spacing.sm},sectionTitle:{fontSize:16,fontWeight:'800',color:colors.text},help:{fontSize:12,lineHeight:17,color:colors.textMuted,marginBottom:4},helpStrong:{fontSize:12,lineHeight:17,color:colors.amber,fontWeight:'800',marginBottom:4},orText:{fontSize:9.5,fontWeight:'900',letterSpacing:.7,color:colors.textMuted,textAlign:'center',marginTop:4},label:{fontSize:11,fontWeight:'700',color:colors.textMuted,marginTop:4},input:{borderWidth:1,borderColor:colors.border,borderRadius:radius.sm,backgroundColor:colors.bg,paddingHorizontal:12,paddingVertical:10,color:colors.text,fontSize:14},row:{flexDirection:'row',gap:spacing.sm},flex:{flex:1},primary:{backgroundColor:colors.primary,borderRadius:radius.sm,paddingVertical:13,alignItems:'center',marginTop:4},primaryText:{color:colors.white,fontWeight:'800',fontSize:13},outline:{borderWidth:1.5,borderColor:colors.primary,borderRadius:radius.sm,paddingVertical:11,alignItems:'center',marginTop:4},outlineText:{color:colors.primary,fontWeight:'800',fontSize:13},saved:{textAlign:'center',color:colors.primary,fontWeight:'700',fontSize:12},proofPreview:{height:190,borderRadius:radius.md,overflow:'hidden',position:'relative'},proofImage:{width:'100%',height:'100%'},cameraBadge:{position:'absolute',right:10,bottom:10,width:38,height:38,borderRadius:19,backgroundColor:'rgba(15,23,42,.72)',alignItems:'center',justifyContent:'center'},photoGrid:{flexDirection:'row',gap:spacing.sm},photoButton:{flex:1,minHeight:120,borderWidth:1,borderStyle:'dashed',borderColor:colors.border,borderRadius:radius.md,alignItems:'center',justifyContent:'center',padding:spacing.sm,overflow:'hidden'},photoDone:{borderColor:colors.primary,backgroundColor:colors.primarySoft},thumbnail:{width:'100%',height:72,borderRadius:radius.sm,marginBottom:5},photoLabel:{fontSize:11,fontWeight:'700',color:colors.textMuted,textAlign:'center'},code:{fontSize:26,fontWeight:'800',letterSpacing:8,textAlign:'center'},notes:{minHeight:68,textAlignVertical:'top'},disabled:{opacity:.55},confirmRow:{flexDirection:'row',alignItems:'flex-start',gap:8,paddingVertical:6},confirmText:{flex:1,color:colors.text,fontSize:12,lineHeight:17,fontWeight:'600'},
   lineItem:{borderWidth:1,borderColor:colors.border,borderRadius:radius.md,padding:spacing.sm,gap:4},lineHead:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},lineTitle:{fontSize:11,fontWeight:'800',color:colors.textMuted},addItem:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6,paddingVertical:8},addItemText:{fontSize:12,fontWeight:'800',color:colors.primary},
   lockedPrice:{fontSize:12,fontWeight:'800',color:colors.text},lockedRow:{flexDirection:'row',alignItems:'center',gap:6,marginTop:2},lockedNote:{flex:1,fontSize:11,color:colors.textMuted,lineHeight:15},
   descriptionBox:{backgroundColor:colors.bg,borderWidth:1,borderColor:colors.border,borderRadius:radius.md,padding:spacing.md},descriptionText:{fontSize:13,lineHeight:19,color:colors.text},correctionBox:{backgroundColor:'#fffbeb',borderWidth:1,borderColor:'#fcd34d',borderRadius:radius.md,padding:spacing.md},correctionLabel:{fontSize:9.5,fontWeight:'800',color:'#b45309',letterSpacing:.5,marginBottom:3},

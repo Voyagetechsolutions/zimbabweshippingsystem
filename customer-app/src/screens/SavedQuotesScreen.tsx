@@ -21,6 +21,8 @@ type QuoteRow = {
   admin_notes: string | null;
   booked_shipment_id: string | null;
   created_at: string;
+  quote_items: Array<{ item?: number; description: string; amount?: number | null }> | null;
+  request_type?: string | null;
 };
 
 const STATUS_LABEL: Record<string, { label: string; bg: string; fg: string }> = {
@@ -46,7 +48,7 @@ export default function SavedQuotesScreen() {
     if (!session?.user.id) { setQuotes([]); setLoading(false); return; }
     const { data, error: loadError } = await supabase
       .from('custom_quotes')
-      .select('id,status,description,quoted_amount,currency,valid_until,admin_notes,booked_shipment_id,created_at')
+      .select('id,status,description,quoted_amount,currency,valid_until,admin_notes,booked_shipment_id,created_at,quote_items,request_type')
       .eq('user_id', session.user.id)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -71,6 +73,7 @@ export default function SavedQuotesScreen() {
       amount: Number(q.quoted_amount || 0),
       currency: q.currency === 'EUR' ? 'EUR' : 'GBP',
       description: q.description.replace(/^\[[^\]]+\]\s*/, ''),
+      items: q.quote_items || undefined,
     };
     navigation.navigate('Book', { quote });
   };
@@ -118,6 +121,12 @@ export default function SavedQuotesScreen() {
                 <Text style={[styles.rowMeta, { color: palette.textFaint }]}>{shortDate(q.created_at)}</Text>
               </View>
               <Text style={[styles.rowTitle, { color: palette.text }]} numberOfLines={3}>{q.description.replace(/^\[[^\]]+\]\s*/, '')}</Text>
+              {Array.isArray(q.quote_items) && q.quote_items.length > 0 && q.quote_items.map((item, index) => (
+                <View key={index} style={styles.quoteItem}>
+                  <Text style={[styles.rowTitle, { color: palette.text, flex: 1 }]}>Item {index + 1}: {item.description}</Text>
+                  {item.amount != null && <Text style={[styles.rowTitle, { color: palette.greenDark }]}>{money(Number(item.amount), q.currency === 'EUR' ? '€' : '£')}</Text>}
+                </View>
+              ))}
               {q.quoted_amount != null && (
                 <Text style={[styles.amount, { color: palette.greenDark }]}>
                   {money(Number(q.quoted_amount), symbol)}
@@ -137,6 +146,7 @@ export default function SavedQuotesScreen() {
             </View>
           );
         })}
+        <Button title="Book another shipment" variant="outline" onPress={() => navigation.navigate('Book', { freshToken: Date.now() })} style={{ marginTop: spacing.md }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -155,4 +165,5 @@ const styles = StyleSheet.create({
   rowMeta: { fontSize: 11 },
   amount: { fontSize: 18, fontWeight: '900', marginTop: 6 },
   notes: { fontSize: 12, marginTop: 4, lineHeight: 17 },
+  quoteItem: { flexDirection: 'row', gap: spacing.sm, paddingTop: 5, borderTopWidth: 1, borderTopColor: '#e2e8f0', marginTop: 5 },
 });

@@ -13,8 +13,12 @@
 **/dist-verify/
 **/dist-verify2/
 **/web-build/
+/.git/
 .git/
 .claude/
+**/.eas-archive-inspect/
+/staff-app/.eas-archive-inspect/
+/staff-app/.eas-archive-inspect/**
 
 # --- Monorepo parts not needed to build the mobile apps ---
 /tmp/

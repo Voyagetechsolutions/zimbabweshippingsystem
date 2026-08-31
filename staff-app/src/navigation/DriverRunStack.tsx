@@ -1,6 +1,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import CollectionScannerScreen from '../screens/CollectionScannerScreen';
+import DriverDepotHandoverScreen from '../screens/DriverDepotHandoverScreen';
 import { DriverReportIssueScreen, DriverRouteMapScreen, DriverRunOverviewScreen, DriverRunSummaryScreen, DriverStopDetailsScreen } from '../screens/DriverExperienceScreens';
 import type { DriverRunStackParams } from './types';
 import { colors } from '../theme';
@@ -12,6 +13,7 @@ export default function DriverRunStack() {
     <Stack.Screen name="MyRun" component={DriverRunOverviewScreen} options={{ headerShown: false }} />
     <Stack.Screen name="RouteMap" component={DriverRouteMapScreen} options={{ headerShown: false }} />
     <Stack.Screen name="RunSummary" component={DriverRunSummaryScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="DepotHandover" component={DriverDepotHandoverScreen} options={{ headerShown: false }} />
     <Stack.Screen name="StopDetails" component={DriverStopDetailsScreen} options={{ headerShown: false }} />
     <Stack.Screen name="ReportIssue" component={DriverReportIssueScreen} options={{ headerShown: false }} />
     <Stack.Screen name="StopWorkflow" component={CollectionScannerScreen as any} options={{ title: 'Proof of Collection' }} />

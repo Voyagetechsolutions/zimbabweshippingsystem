@@ -99,6 +99,10 @@ export default function CustomerDetailScreen({ route, navigation }: Props) {
   if (loading) return <Loading />;
 
   const outstandingInvoices = invoices.filter((i) => ['issued', 'partial', 'overdue'].includes(i.status));
+  const statement = [
+    ...invoices.map((i) => ({ id: `invoice-${i.id}`, date: i.issue_date, label: i.invoice_number, detail: 'Invoice', amount: Number(i.total) || 0, currency: i.currency || record.currency, credit: false, pending: false })),
+    ...payments.map((p) => {const posted=['completed','paid','success','succeeded','verified'].includes(String(p.payment_status||'').toLowerCase());return { id: `payment-${p.id}`, date: p.created_at, label: p.payment_method || 'Payment', detail: (p.payment_status || 'pending').replace(/_/g, ' '), amount: Number(p.amount) || 0, currency: p.currency || record.currency, credit: posted, pending: !posted };}),
+  ].sort((a,b)=>new Date(b.date||0).getTime()-new Date(a.date||0).getTime());
 
   return (
     <ScrollView style={styles.safe} contentContainerStyle={styles.content}
@@ -130,6 +134,12 @@ export default function CustomerDetailScreen({ route, navigation }: Props) {
         <Summary label="Lifetime" value={money(record.lifetimeValue, record.currency === 'EUR' ? '€' : '£')} />
         <Summary label="Outstanding" value={money(record.outstanding, record.currency === 'EUR' ? '€' : '£')} tone={record.outstanding > 0 ? colors.danger : colors.primaryDark} />
       </View>
+
+      <SectionLabel text={`Customer statement (${statement.length})`} />
+      <Card>
+        <View style={styles.statementHead}><Text style={styles.statementHeadText}>DATE / ACTIVITY</Text><Text style={styles.statementHeadText}>AMOUNT</Text></View>
+        {statement.length === 0 ? <Text style={styles.meta}>No invoice or payment activity yet.</Text> : statement.map((entry)=><View key={entry.id} style={styles.listRow}><View style={{flex:1}}><Text style={styles.rowTitle}>{entry.label}</Text><Text style={styles.meta}>{shortDate(entry.date)} · {entry.detail}</Text></View><Text style={[styles.rowValue,{color:entry.pending?colors.amber:entry.credit?colors.primaryDark:colors.danger}]}>{entry.pending?'PENDING ':entry.credit?'− ':'+ '}{money(entry.amount,entry.currency==='EUR'?'€':entry.currency==='USD'?'$':'£')}</Text></View>)}
+      </Card>
 
       {addresses.length ? (
         <>
@@ -281,4 +291,6 @@ const styles = StyleSheet.create({
   listRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   rowTitle: { fontSize: 13, fontWeight: '700', color: colors.text },
   rowValue: { fontSize: 12.5, fontWeight: '800', color: colors.text },
+  statementHead:{flexDirection:'row',justifyContent:'space-between',paddingBottom:8,borderBottomWidth:1,borderBottomColor:colors.border},
+  statementHeadText:{fontSize:9,fontWeight:'900',color:colors.textMuted,letterSpacing:.5},
 });

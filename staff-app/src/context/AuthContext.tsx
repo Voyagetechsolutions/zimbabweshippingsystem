@@ -9,7 +9,7 @@ import { supabase } from '../lib/supabase';
 //   finance           -> finance dashboard
 //   driver            -> driver dashboard
 //   customer / other  -> no access
-export type DashboardRole = 'admin' | 'finance' | 'driver';
+export type DashboardRole = 'admin' | 'finance' | 'driver' | 'dispatcher';
 
 // Drivers are specialised. A pickup driver works the shared UK/Ireland
 // collection route; a delivery driver loads a vehicle at the Zimbabwe depot and
@@ -25,6 +25,14 @@ interface AuthValue {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
+  /**
+   * False while a signed-in user's role is still being looked up.
+   *
+   * The session lands before the profile does, and for that gap a driver looks
+   * exactly like someone with no staff access at all. Screens must wait on this
+   * rather than telling them their account is not authorised.
+   */
+  roleReady: boolean;
   isStaff: boolean;
   dashboardRole: DashboardRole | null;
   /** Which half of the journey this driver works. Admins get 'both'. */
@@ -44,6 +52,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [adminFlag, setAdminFlag] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Which user id the role signals below actually describe.
+  const [resolvedFor, setResolvedFor] = useState<string | null>(null);
 
   const loadProfile = useCallback(async (userId: string, email?: string) => {
     // 1. Canonical admin check — the DB's own security-definer function for the
@@ -56,12 +66,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // 2. Profile for display + secondary role/is_admin signals.
-    let { data } = await supabase.from('profiles').select('id, full_name, role, is_admin, driver_type').eq('id', userId).maybeSingle();
-    if (!data && email) {
-      const byEmail = await supabase.from('profiles').select('id, full_name, role, is_admin, driver_type').eq('email', email).maybeSingle();
-      data = byEmail.data;
+    try {
+      let { data } = await supabase.from('profiles').select('id, full_name, role, is_admin, driver_type').eq('id', userId).maybeSingle();
+      if (!data && email) {
+        const byEmail = await supabase.from('profiles').select('id, full_name, role, is_admin, driver_type').eq('email', email).maybeSingle();
+        data = byEmail.data;
+      }
+      setProfile((data as Profile) ?? null);
+    } finally {
+      // Resolved either way: a genuinely unauthorised account still has to
+      // reach the access-restricted screen, it just must not get there first.
+      setResolvedFor(userId);
     }
-    setProfile((data as Profile) ?? null);
   }, []);
 
   useEffect(() => {
@@ -105,6 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setProfile(null);
         setAdminFlag(false);
+        setResolvedFor(null);
       }
       }, 0);
     });
@@ -125,20 +142,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
     setProfile(null);
     setAdminFlag(false);
+    setResolvedFor(null);
   }, []);
 
   // Resolve which dashboard this user gets. Admin wins (DB is_admin() function,
   // profiles.is_admin flag, or admin/logistics role); then finance; then driver.
   const role = (profile?.role || '').toLowerCase();
   let dashboardRole: DashboardRole | null = null;
-  if (adminFlag || profile?.is_admin === true || role === 'admin' || role === 'logistics') {
+  if (adminFlag || profile?.is_admin === true || role === 'admin') {
     dashboardRole = 'admin';
+  } else if (role === 'dispatcher' || role === 'logistics') {
+    dashboardRole = 'dispatcher';
   } else if (role === 'finance') {
     dashboardRole = 'finance';
   } else if (role === 'driver') {
     dashboardRole = 'driver';
   }
   const isStaff = dashboardRole !== null;
+  // Nothing to resolve when signed out; otherwise the role signals only mean
+  // something once they have been loaded for this exact user.
+  const roleReady = !session?.user ? true : resolvedFor === session.user.id;
   // A true admin (is_admin() / profiles.is_admin / role 'admin') gets finance
   // and can switch dashboards; a logistics user gets operations only.
   const isFullAdmin = adminFlag || profile?.is_admin === true || role === 'admin';
@@ -151,7 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     : savedDriverType === 'pickup' || savedDriverType === 'delivery' ? savedDriverType : 'both';
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading, isStaff, dashboardRole, driverType, canAccessFinance, canSwitchDashboards, signIn, signOut }}>
+    <AuthContext.Provider value={{ session, profile, loading, roleReady, isStaff, dashboardRole, driverType, canAccessFinance, canSwitchDashboards, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

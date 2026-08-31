@@ -54,7 +54,7 @@ export default function FinanceOverviewScreen() {
       supabase.rpc('admin_finance_overview'),
       supabase.from('driver_invoices').select('total,currency,status,created_at').gte('created_at', new Date(Date.now() - 30 * 864e5).toISOString()).neq('status', 'void'),
     ]);
-    if (rpcError) { setError(rpcError.message); return; }
+    if (rpcError) { console.error('Finance overview failed', rpcError); setError('Finance information is unavailable. Check your access and try again.'); return; }
     setOverview(data as Overview);
     if (!invoiceResult.error) {
       const rows = invoiceResult.data || []; const byCurrency: Record<string, number> = {};
@@ -133,11 +133,18 @@ export default function FinanceOverviewScreen() {
       <ScrollView contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={colors.primary} />}>
         <ScreenHeader
-          title="Finance Overview"
+          title="Finance control centre"
           subtitle={new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
           onBell={() => {}}
           right={<Avatar name={profile?.full_name || session?.user.email} size={36} />}
         />
+
+        <View style={styles.quickRow}>
+          <QuickAction icon="receipt-outline" label="Invoices" onPress={() => navigation.navigate('Invoices')} />
+          <QuickAction icon="card-outline" label="Payments" onPress={() => navigation.navigate('Payments')} />
+          <QuickAction icon="git-compare-outline" label="Reconcile" onPress={() => navigation.navigate('Reconciliation')} />
+          <QuickAction icon="bar-chart-outline" label="Reports" onPress={() => navigation.navigate('Reports')} />
+        </View>
 
         {error ? <ErrorState message={error} onRetry={load} /> : null}
         {loading || !overview ? (error ? null : <SkeletonList rows={6} />) : (
@@ -331,9 +338,12 @@ function SummaryRow({ label, value, tone }: { label: string; value: string; tone
   );
 }
 
+function QuickAction({icon,label,onPress}:{icon:keyof typeof Ionicons.glyphMap;label:string;onPress:()=>void}){return <Pressable accessibilityRole="button" style={styles.quickAction} onPress={onPress}><View style={styles.quickIcon}><Ionicons name={icon} size={18} color={colors.primaryDark}/></View><Text style={styles.quickText}>{label}</Text></Pressable>}
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg, paddingBottom: 56, gap: spacing.sm },
+  quickRow:{flexDirection:'row',gap:7,marginBottom:4},quickAction:{flex:1,minWidth:0,alignItems:'center',gap:5,paddingVertical:10,borderRadius:12,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},quickIcon:{width:31,height:31,borderRadius:9,alignItems:'center',justifyContent:'center',backgroundColor:colors.primarySoft},quickText:{fontSize:9.5,fontWeight:'800',color:colors.text},
   cashCard: { backgroundColor: colors.primaryDark, borderRadius: radius.lg, padding: spacing.lg, gap: 6 },
   cashLabel: { fontSize: 9.5, fontWeight: '800', color: '#C9F0DF', letterSpacing: 0.6 },
   cashValue: { fontSize: 26, fontWeight: '900', color: colors.white },

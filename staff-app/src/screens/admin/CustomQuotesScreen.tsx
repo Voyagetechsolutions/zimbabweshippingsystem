@@ -32,6 +32,8 @@ interface Quote {
   admin_notes: string | null;
   booked_shipment_id: string | null;
   created_at: string;
+  quote_items: Array<{ item?: number; description: string; amount?: number | null }> | null;
+  request_type?: string | null;
 }
 
 const FILTERS = ['all', 'new', 'quoted', 'accepted', 'expired', 'rejected'] as const;
@@ -58,15 +60,18 @@ export default function CustomQuotesScreen({ navigation }: Props) {
   const [detail, setDetail] = useState<Quote | null>(null);
   const [responding, setResponding] = useState<Quote | null>(null);
   const [amount, setAmount] = useState('');
+  const [quoteItems, setQuoteItems] = useState<Array<{ description: string; amount: string }>>([]);
   const [currency, setCurrency] = useState<'GBP' | 'EUR'>('GBP');
   const [validDays, setValidDays] = useState('30');
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newQuote, setNewQuote] = useState({ name: '', phone: '', email: '', description: '' });
 
   const load = useCallback(async () => {
     const { data, error: loadError } = await supabase
       .from('custom_quotes')
-      .select('id, user_id, name, phone_number, email, description, category, specific_item, image_urls, status, quoted_amount, currency, valid_until, admin_notes, booked_shipment_id, created_at')
+      .select('id, user_id, name, phone_number, email, description, category, specific_item, image_urls, status, quoted_amount, currency, valid_until, admin_notes, booked_shipment_id, created_at, quote_items, request_type')
       .order('created_at', { ascending: false })
       .limit(200);
     if (loadError) { setError(loadError.message); return; }
@@ -105,6 +110,7 @@ export default function CustomQuotesScreen({ navigation }: Props) {
     setDetail(null);
     setResponding(quote);
     setAmount(quote.quoted_amount != null ? String(quote.quoted_amount) : '');
+    setQuoteItems((quote.quote_items || []).map((item) => ({ description: item.description, amount: item.amount != null ? String(item.amount) : '' })));
     setCurrency(quote.currency === 'EUR' ? 'EUR' : 'GBP');
     setValidDays('30');
     setNotes(quote.admin_notes || '');
@@ -112,15 +118,21 @@ export default function CustomQuotesScreen({ navigation }: Props) {
 
   const respond = async (action: 'approve' | 'reject' | 'request_info') => {
     if (!responding) return;
-    if (action === 'approve' && !(Number(amount) > 0)) { Alert.alert('Price required', 'Enter the quoted amount before approving.'); return; }
+    const itemizedTotal = quoteItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+    if (action === 'approve' && quoteItems.length > 0 && quoteItems.some((item) => !(Number(item.amount) > 0))) { Alert.alert('Price every item', 'Enter a price for each requested item before approving.'); return; }
+    if (action === 'approve' && quoteItems.length === 0 && !(Number(amount) > 0)) { Alert.alert('Price required', 'Enter the quoted amount before approving.'); return; }
     setBusy(true);
     try {
       const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + Math.max(1, Number(validDays) || 30));
+      if (action === 'approve' && quoteItems.length > 0) {
+        const { error: itemError } = await supabase.from('custom_quotes').update({ quote_items: quoteItems.map((item, index) => ({ item: index + 1, description: item.description, amount: Number(item.amount) })) }).eq('id', responding.id);
+        if (itemError) throw itemError;
+      }
       const { error: rpcError } = await supabase.rpc('respond_custom_quote', {
         p_quote_id: responding.id,
         p_action: action,
-        p_amount: action === 'approve' ? Number(amount) : null,
+        p_amount: action === 'approve' ? (quoteItems.length > 0 ? itemizedTotal : Number(amount)) : null,
         p_currency: currency,
         p_valid_until: action === 'approve' ? validUntil.toISOString().slice(0, 10) : null,
         p_notes: notes.trim() || null,
@@ -160,10 +172,29 @@ export default function CustomQuotesScreen({ navigation }: Props) {
     if (kind === 'mail' && quote.email) Linking.openURL(`mailto:${quote.email}`);
   };
 
+  const createQuote = async () => {
+    if (!newQuote.name.trim() || !newQuote.phone.trim() || !newQuote.description.trim()) {
+      Alert.alert('Customer details required', 'Enter the customer name, phone number and quote description.'); return;
+    }
+    setBusy(true);
+    const { data, error: createError } = await supabase.from('custom_quotes').insert({
+      name: newQuote.name.trim(), phone_number: newQuote.phone.trim(), email: newQuote.email.trim() || null,
+      description: newQuote.description.trim(), status: 'pending', image_urls: [], category: 'Staff created',
+    }).select('*').single();
+    setBusy(false);
+    if (createError) { Alert.alert('Could not create quote', 'No quote was created. Check your access and try again.'); return; }
+    setCreating(false); setNewQuote({ name: '', phone: '', email: '', description: '' }); await load();
+    openResponder(data as Quote);
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={[]}>
       <View style={styles.headerBlock}>
-        <ScreenHeader title="Quote Requests" subtitle={`${quotes.length} requests`} />
+        <View style={styles.pageHead}>
+          {navigation.canGoBack() ? <Pressable accessibilityRole="button" accessibilityLabel="Back" style={styles.backButton} onPress={() => navigation.goBack()}><Ionicons name="arrow-back" size={20} color={colors.text} /></Pressable> : null}
+          <View style={{ flex: 1 }}><ScreenHeader title="Quotes" subtitle={`${quotes.length} quotes and requests`} /></View>
+          <Pressable accessibilityRole="button" style={styles.createButton} onPress={() => setCreating(true)}><Ionicons name="add" size={17} color={colors.white} /><Text style={styles.createText}>Create</Text></Pressable>
+        </View>
         <SearchBar value={query} onChange={setQuery} placeholder="Search name, phone, email or goods" />
         <View style={{ marginTop: spacing.sm }}>
           <Segmented options={FILTERS} value={filter} onChange={setFilter}
@@ -225,6 +256,9 @@ export default function CustomQuotesScreen({ navigation }: Props) {
 
                   <Text style={styles.blockLabel}>DETAILED GOODS DESCRIPTION</Text>
                   <Text style={styles.blockText}>{detail.description?.replace(/^\[([^\]]+)\]\s*/, '')}</Text>
+                  {Array.isArray(detail.quote_items) && detail.quote_items.length > 0 ? detail.quote_items.map((item, index) => (
+                    <View key={index} style={styles.itemPriceRow}><Text style={[styles.blockText, { flex: 1 }]}>Item {index + 1}: {item.description}</Text>{item.amount != null ? <Text style={styles.amount}>{money(Number(item.amount), detail.currency === 'EUR' ? '€' : '£')}</Text> : null}</View>
+                  )) : null}
                   {/\[([^\]]+)\]/.test(detail.description || '') ? (
                     <Text style={styles.meta}>Collection: {(detail.description.match(/^\[([^\]]+)\]/) || [])[1]} → Zimbabwe</Text>
                   ) : null}
@@ -287,6 +321,18 @@ export default function CustomQuotesScreen({ navigation }: Props) {
         </View>
       </Modal>
 
+      <Modal visible={creating} transparent animationType="slide" onRequestClose={() => setCreating(false)}>
+        <View style={styles.modalShade}><View style={styles.modalCard}><ScrollView keyboardShouldPersistTaps="handled">
+          <Text style={styles.modalTitle}>Create quote</Text><Text style={styles.modalDesc}>Create it against the existing quote workflow, then approve and send it through the customer app.</Text>
+          <Text style={styles.label}>Customer name</Text><TextInput style={styles.input} value={newQuote.name} onChangeText={name=>setNewQuote({...newQuote,name})} placeholder="Customer or business" />
+          <Text style={styles.label}>Phone</Text><TextInput style={styles.input} value={newQuote.phone} onChangeText={phone=>setNewQuote({...newQuote,phone})} placeholder="Customer phone" keyboardType="phone-pad" />
+          <Text style={styles.label}>Email (optional)</Text><TextInput style={styles.input} value={newQuote.email} onChangeText={email=>setNewQuote({...newQuote,email})} placeholder="Customer email" keyboardType="email-address" autoCapitalize="none" />
+          <Text style={styles.label}>Goods and service</Text><TextInput style={[styles.input,{minHeight:90,textAlignVertical:'top'}]} value={newQuote.description} onChangeText={description=>setNewQuote({...newQuote,description})} multiline placeholder="Route, goods, quantity and included services" />
+          <Pressable style={[styles.primaryButton,busy&&{opacity:.5}]} disabled={busy} onPress={createQuote}><Text style={styles.primaryText}>{busy?'Creating…':'Continue to price & send'}</Text></Pressable>
+          <Pressable style={styles.modalCancel} onPress={()=>setCreating(false)}><Text style={styles.modalCancelText}>Cancel</Text></Pressable>
+        </ScrollView></View></View>
+      </Modal>
+
       {/* Pricing form */}
       <Modal visible={Boolean(responding)} transparent animationType="slide" onRequestClose={() => setResponding(null)}>
         <View style={styles.modalShade}>
@@ -294,8 +340,13 @@ export default function CustomQuotesScreen({ navigation }: Props) {
             <ScrollView keyboardShouldPersistTaps="handled">
               <Text style={styles.modalTitle}>Respond to quote</Text>
               <Text style={styles.modalDesc} numberOfLines={5}>{responding?.description?.replace(/^\[[^\]]+\]\s*/, '')}</Text>
-              <Text style={styles.label}>Quoted price</Text>
-              <TextInput style={styles.input} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={colors.textFaint} />
+              {quoteItems.length > 0 ? (
+                <>
+                  <Text style={styles.label}>Price each requested item</Text>
+                  {quoteItems.map((item, index) => <View key={index} style={styles.itemPriceRow}><Text style={[styles.blockText, { flex: 1 }]}>Item {index + 1}: {item.description}</Text><TextInput style={[styles.input, { width: 100 }]} value={item.amount} onChangeText={(value) => setQuoteItems((current) => current.map((entry, i) => i === index ? { ...entry, amount: value } : entry))} keyboardType="decimal-pad" placeholder="0.00" /></View>)}
+                  <Text style={styles.quoteAmount}>Total: {money(quoteItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0), currency === 'EUR' ? '€' : '£')}</Text>
+                </>
+              ) : <><Text style={styles.label}>Quoted price</Text><TextInput style={styles.input} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={colors.textFaint} /></>}
               <Text style={styles.label}>Currency</Text>
               <View style={styles.chipRow}>
                 {(['GBP', 'EUR'] as const).map((c) => (
@@ -340,6 +391,10 @@ function ContactButton({ icon, label, onPress }: { icon: keyof typeof Ionicons.g
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   headerBlock: { padding: spacing.lg, paddingBottom: spacing.sm },
+  pageHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  createButton: { height: 40, paddingHorizontal: 12, borderRadius: 10, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  createText: { color: colors.white, fontSize: 12, fontWeight: '800' },
   list: { padding: spacing.lg, paddingTop: spacing.xs, gap: spacing.md, flexGrow: 1 },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: 5 },
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm },
@@ -377,4 +432,5 @@ const styles = StyleSheet.create({
   chipTextActive: { color: colors.white },
   modalCancel: { alignItems: 'center', paddingVertical: 12 },
   modalCancelText: { color: colors.textMuted, fontWeight: '700', fontSize: 13 },
+  itemPriceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
 });

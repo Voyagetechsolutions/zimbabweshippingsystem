@@ -8,18 +8,14 @@ export type CatalogueItem = {
   priceUK: number | null; // null = custom quote
   priceIE: number | null;
   note?: string;
+  description: string;
 };
 
 export const CATALOGUE: CatalogueItem[] = [
-  { id: 'drum', label: 'Drum (200–220L)', priceUK: 280, priceIE: 360 },
-  { id: 'trunk', label: 'Trunk / storage box', priceUK: null, priceIE: 220, note: 'UK boxes £180–£280 by size — team confirms' },
-  { id: 'seal', label: 'Metal coded seal', priceUK: 5, priceIE: 7 },
-  { id: 'stove', label: 'Stove / cooker', priceUK: 260, priceIE: 325 },
-  { id: 'washing_machine', label: 'Washing machine', priceUK: 300, priceIE: 328 },
-  { id: 'fridge', label: 'Fridge', priceUK: 450, priceIE: null, note: 'Ireland €490–€620 by size — team confirms' },
-  { id: 'american_fridge', label: 'American fridge freezer', priceUK: 600, priceIE: null },
-  { id: 'sofa', label: 'Sofa / lounge suite', priceUK: 1500, priceIE: 1560 },
-  { id: 'suitcase', label: 'Suitcase', priceUK: null, priceIE: null, note: 'UK £180–£200, Ireland €200–€230 by size' },
+  { id: 'plastic_drum', label: 'Plastic shipping drum (200–220L)', priceUK: 280, priceIE: 360, description: 'Heavy-duty plastic barrel for securely packed clothes, groceries and household goods. The declared contents are checked at collection.' },
+  { id: 'metal_drum', label: 'Metal shipping drum (200–220L)', priceUK: 280, priceIE: 360, description: 'Strong metal drum for securely packed household goods. The lid must be suitable for a coded security seal.' },
+  { id: 'trunk', label: 'Trunk / storage box', priceUK: null, priceIE: 220, note: 'UK £180–£280 depending on size — team confirms item by item', description: 'Rigid lockable trunk or storage box for personal and household goods. UK pricing depends on its dimensions; Ireland pricing is €220.' },
+  { id: 'seal', label: 'Metal coded seal', priceUK: 5, priceIE: 6, description: 'Tamper-evident numbered metal seal fitted to a drum or trunk. Its unique code is recorded at collection and checked at delivery.' },
 ];
 
 export const DELIVERY_FEE = 25; // per Zimbabwe delivery address (£ UK / € Ireland)

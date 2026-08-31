@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert, Switch, KeyboardAvoidingView, Platform, Linking } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Alert, KeyboardAvoidingView, Platform, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { colors, spacing, radius } from '../theme';
 import { Card, Button, Field, SectionTitle, FlagStripe } from '../components/ui';
 import { CATALOGUE, Country, currencyFor, priceFor, DELIVERY_FEE } from '../lib/catalogue';
-import { BookingDraft, EMPTY_DRAFT, QuoteCarry, createBooking, draftLines, DESCRIPTION_GUIDANCE } from '../lib/booking';
+import { BookingDraft, EMPTY_DRAFT, QuoteCarry, createBooking, draftLines } from '../lib/booking';
 import { CustomerAddress, listAddresses, addressSummary } from '../lib/addresses';
 import { parseCollectionDate, longDate, money } from '../lib/format';
 import {
@@ -19,7 +19,7 @@ import {
 import { SuggestField } from '../components/SuggestField';
 import { useAppTheme } from '../context/ThemeContext';
 
-const STEPS = ['Collection', 'Sender', 'Goods', 'Delivery', 'Extras', 'Date', 'Review'] as const;
+const STEPS = ['Collection', 'Sender', 'Delivery', 'Shipment', 'Date', 'Review'] as const;
 const DRAFT_KEY = 'zim-booking-draft-v2';
 
 // Payment is settled offline (bank transfer / remittance / cash) — the choice
@@ -27,13 +27,9 @@ const DRAFT_KEY = 'zim-booking-draft-v2';
 const PAYMENT_METHODS: Array<{ value: string; icon: keyof typeof Ionicons.glyphMap; note?: string }> = [
   { value: 'Bank Transfer', icon: 'business-outline', note: 'Details shared after booking' },
   { value: 'Cash on Collection', icon: 'cash-outline', note: 'Pay the driver at your door' },
-  { value: 'Pay on Arrival (+20%)', icon: 'time-outline', note: 'Pay when goods reach Zimbabwe' },
-  { value: 'WorldRemit', icon: 'globe-outline' },
-  { value: 'Western Union', icon: 'swap-horizontal-outline' },
-  { value: 'Mukuru', icon: 'send-outline' },
-  { value: 'Ria Money Transfer', icon: 'paper-plane-outline' },
-  { value: 'Remitly', icon: 'wallet-outline' },
+  { value: 'Pay on Arrival', icon: 'time-outline', note: 'Pay when goods reach Zimbabwe' },
 ];
+const OTHER_PAYMENT_METHODS = ['WorldRemit', 'Mukuru', 'Ria', 'Remitly (select ZB as pickup point)'];
 
 type ScheduleRow = { id: string; route: string; pickup_date: string; country?: string | null; areas?: any };
 type DepotRow = { id: string; name: string; city: string; address_line1: string; opening_hours: string | null };
@@ -47,6 +43,7 @@ export default function BookScreen() {
   const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  const [otherPaymentsOpen, setOtherPaymentsOpen] = useState(false);
   const { palette } = useAppTheme();
 
   // Coordinates of the resolved collection postcode — biases address search to
@@ -62,7 +59,7 @@ export default function BookScreen() {
   const [depots, setDepots] = useState<DepotRow[]>([]);
   const [depotId, setDepotId] = useState<string | null>(null);
 
-  const routeParams = (useRoute<any>().params || {}) as { quote?: QuoteCarry; prefillItems?: Record<string, number>; prefillCountry?: Country };
+  const routeParams = (useRoute<any>().params || {}) as { quote?: QuoteCarry; prefillItems?: Record<string, number>; prefillCountry?: Country; freshToken?: number };
 
   // Resume an unfinished booking; pre-fill from the profile and any quote.
   useEffect(() => {
@@ -70,7 +67,7 @@ export default function BookScreen() {
       let base = EMPTY_DRAFT;
       let resumed = false;
       try {
-        const saved = await AsyncStorage.getItem(DRAFT_KEY);
+        const saved = routeParams.freshToken ? null : await AsyncStorage.getItem(DRAFT_KEY);
         if (saved) { base = { ...EMPTY_DRAFT, ...JSON.parse(saved) }; resumed = true; }
       } catch { /* fresh draft */ }
       if (!resumed && profile?.full_name) {
@@ -92,12 +89,11 @@ export default function BookScreen() {
           ...base,
           quote: routeParams.quote,
           country: routeParams.quote.currency === 'EUR' ? 'Ireland' : 'United Kingdom',
-          goodsDescription: base.goodsDescription || routeParams.quote.description,
         };
       }
       setDraft(base);
     })();
-  }, [profile?.id]);
+  }, [profile?.id, routeParams.freshToken, routeParams.quote?.id]);
 
   useEffect(() => {
     AsyncStorage.setItem(DRAFT_KEY, JSON.stringify(draft)).catch(() => {});
@@ -130,7 +126,6 @@ export default function BookScreen() {
   const upcoming = useMemo(() => {
     const wantIreland = draft.country === 'Ireland';
     return schedules
-      .filter((s) => s.route !== 'SCOTLAND ROUTE')
       .filter((s) => {
         const c = String(s.country || 'UK').toLowerCase();
         return wantIreland ? c.includes('ireland') : !c.includes('ireland');
@@ -142,7 +137,7 @@ export default function BookScreen() {
       .slice(0, 12);
   }, [schedules, draft.country, draft.collectionPostcode, draft.collectionCity]);
 
-  const { lines, estimate, hasCustom, symbol } = draftLines(draft);
+  const { lines, estimate, hasCustom, symbol } = draftLines(draft, deliveryMethod);
   const set = (patch: Partial<BookingDraft>) => setDraft((d) => ({ ...d, ...patch }));
 
   const isIrelandPickup = draft.country === 'Ireland';
@@ -192,9 +187,8 @@ export default function BookScreen() {
           && draft.collectionCity.trim().length > 1
           && (isIrelandPickup || draft.collectionPostcode.replace(/\s/g, '').length >= 3);
       case 1: return Boolean(draft.sender.firstName.trim() && draft.sender.lastName.trim() && draft.sender.phone.trim());
-      case 2: return draft.goodsDescription.trim().length >= 15;
-      case 3: return hasDelivery;
-      case 4: return lines.length > 0;
+      case 2: return hasDelivery;
+      case 3: return lines.some((line) => !line.label.startsWith('Zimbabwe door delivery'));
       default: return true;
     }
   };
@@ -202,7 +196,7 @@ export default function BookScreen() {
   const submit = async () => {
     setSubmitting(true);
     try {
-      const created = await createBooking(draft, session?.user?.id ?? null);
+      const created = await createBooking(draft, session?.user?.id ?? null, deliveryMethod);
 
       // Record which delivery option was chosen. Pricing is already correct —
       // self-collection selects no paid addresses — so this only annotates the
@@ -383,26 +377,6 @@ export default function BookScreen() {
 
           {step === 2 && (
             <>
-              <SectionTitle text="Describe your goods in detail" />
-              <View style={[styles.guidance, { backgroundColor: palette.greenSoft }]}>
-                <Ionicons name="information-circle-outline" size={17} color={palette.greenDark} />
-                <Text style={[styles.guidanceText, { color: palette.greenDark }]}>{DESCRIPTION_GUIDANCE}</Text>
-              </View>
-              <Field
-                label="Detailed goods description (required)"
-                value={draft.goodsDescription}
-                onChangeText={(v) => set({ goodsDescription: v })}
-                multiline
-                placeholder="e.g. 2 blue 220L plastic drums packed with clothes, shoes and groceries; 1 silver LG washing machine (good condition); 1 brown wooden trunk 90×50×50cm marked 'T. Moyo' containing kitchenware — fragile plates inside…"
-              />
-              <Text style={[styles.hint, { color: palette.textMuted }]}>
-                The driver checks your goods against this description at collection, and it appears on your invoice and delivery note.
-              </Text>
-            </>
-          )}
-
-          {step === 3 && (
-            <>
               <SectionTitle text="How should the receiver get the goods?" />
               <View style={styles.methodRow}>
                 {([
@@ -499,7 +473,7 @@ export default function BookScreen() {
             </>
           )}
 
-          {step === 4 && (
+          {step === 3 && (
             <>
               {!draft.quote && (
                 <>
@@ -511,6 +485,7 @@ export default function BookScreen() {
                         <View style={{ flex: 1 }}>
                           <Text style={[styles.itemLabel, { color: palette.text }]}>{item.label}</Text>
                           <Text style={[styles.itemPrice, { color: palette.textMuted }]}>{price != null ? `${symbol}${price}` : item.note || 'Custom quote'}</Text>
+                          <Text style={[styles.itemDescription, { color: palette.textMuted }]}>{item.description}</Text>
                         </View>
                         <View style={styles.qtyRow}>
                           <Pressable style={styles.qtyBtn} onPress={() => bump(item.id, -1)}><Text style={styles.qtyBtnText}>−</Text></Pressable>
@@ -520,7 +495,6 @@ export default function BookScreen() {
                       </View>
                     );
                   })}
-                  <Field label="Anything else? (cars, furniture, commercial goods…)" value={draft.otherItems} onChangeText={(v) => set({ otherItems: v })} multiline placeholder="Describe the item — our team sends a custom quote" />
                 </>
               )}
               {draft.quote && (
@@ -528,7 +502,7 @@ export default function BookScreen() {
                   <Text style={[styles.itemLabel, { color: palette.text }]}>Approved quote</Text>
                   <Text style={[styles.itemPrice, { color: palette.textMuted }]} numberOfLines={3}>{draft.quote.description}</Text>
                   <Text style={[styles.quoteAmount, { color: palette.greenDark }]}>{money(draft.quote.amount, draft.quote.currency === 'EUR' ? '€' : '£')}</Text>
-                  <Text style={[styles.hint, { color: palette.textMuted }]}>This price was set by our team and can't be changed here. You can still add drums, trunks and other extras below.</Text>
+                  <Text style={[styles.hint, { color: palette.textMuted }]}>This price was set item by item by our team and can't be changed here. You can still add drums, trunks and seals below.</Text>
                 </Card>
               )}
 
@@ -566,18 +540,11 @@ export default function BookScreen() {
                 </>
               )}
 
-              <View style={[styles.switchRow, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.itemLabel, { color: palette.text }]}>I am a returning resident</Text>
-                  <Text style={styles.hint}>Moving back for good? You get a discount + customs help</Text>
-                </View>
-                <Switch value={draft.returningResident} onValueChange={(v) => set({ returningResident: v })} trackColor={{ true: colors.green }} />
-              </View>
               <Field label="Referred by (optional)" value={draft.referredBy} onChangeText={(v) => set({ referredBy: v })} placeholder="Friend's name — they get £20/€20 off" autoCapitalize="words" />
             </>
           )}
 
-          {step === 5 && (
+          {step === 4 && (
             <>
               <SectionTitle text="Pick a collection date" />
               {upcoming.length === 0 && (
@@ -619,10 +586,28 @@ export default function BookScreen() {
                   <Ionicons name={draft.paymentMethod === m.value ? 'radio-button-on' : 'radio-button-off'} size={21} color={draft.paymentMethod === m.value ? colors.green : palette.textFaint} />
                 </Pressable>
               ))}
+              <Pressable onPress={() => setOtherPaymentsOpen((open) => !open)}
+                style={[styles.dateCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+                <View style={[styles.payIcon, { backgroundColor: palette.greenSoft }]}><Ionicons name="apps-outline" size={17} color={palette.green} /></View>
+                <View style={{ flex: 1 }}><Text style={[styles.itemLabel, { color: palette.text }]}>Other payments</Text><Text style={[styles.itemPrice, { color: palette.textMuted }]}>WorldRemit, Mukuru, Ria or Remitly</Text></View>
+                <Ionicons name={otherPaymentsOpen ? 'chevron-up' : 'chevron-down'} size={20} color={palette.textFaint} />
+              </Pressable>
+              {otherPaymentsOpen && (
+                <Card>
+                  <Text style={[styles.itemLabel, { color: palette.text }]}>Send to: +263771789925</Text>
+                  <Text style={[styles.itemPrice, { color: palette.textMuted, marginBottom: spacing.sm }]}>Reference: Tshakalisa Moyo</Text>
+                  {OTHER_PAYMENT_METHODS.map((method) => (
+                    <Pressable key={method} onPress={() => set({ paymentMethod: method })} style={styles.otherPaymentRow}>
+                      <Ionicons name={draft.paymentMethod === method ? 'radio-button-on' : 'radio-button-off'} size={20} color={draft.paymentMethod === method ? colors.green : palette.textFaint} />
+                      <Text style={[styles.itemLabel, { color: palette.text, flex: 1 }]}>{method}</Text>
+                    </Pressable>
+                  ))}
+                </Card>
+              )}
             </>
           )}
 
-          {step === 6 && (
+          {step === 5 && (
             <>
               <SectionTitle text="Review your booking" />
               <Card>
@@ -640,10 +625,9 @@ export default function BookScreen() {
                 ) : (
                   <Text style={[styles.reviewLine, { color: palette.text }]}><Text style={styles.reviewKey}>Receiver: </Text>{draft.recipient.name} · {draft.recipient.city}</Text>
                 )}
-                <Text style={[styles.reviewLine, { color: palette.text }]}><Text style={styles.reviewKey}>Goods: </Text>{draft.goodsDescription.slice(0, 140)}{draft.goodsDescription.length > 140 ? '…' : ''}</Text>
+                <Text style={[styles.reviewLine, { color: palette.text }]}><Text style={styles.reviewKey}>Items: </Text>{lines.filter((line) => !line.label.startsWith('Zimbabwe door delivery')).map((line) => `${line.qty} × ${line.label}`).join(', ')}</Text>
                 <Text style={[styles.reviewLine, { color: palette.text }]}><Text style={styles.reviewKey}>Date: </Text>{draft.route ? `${draft.route} — ${draft.collectionDate}` : 'Team confirms next available'}</Text>
                 <Text style={[styles.reviewLine, { color: palette.text }]}><Text style={styles.reviewKey}>Payment: </Text>{draft.paymentMethod}</Text>
-                {draft.returningResident && <Text style={styles.reviewLine}>✓ Returning resident discount requested</Text>}
                 {Boolean(draft.referredBy.trim()) && <Text style={styles.reviewLine}>✓ Referred by {draft.referredBy}</Text>}
               </Card>
               <Card>
@@ -728,6 +712,7 @@ const styles = StyleSheet.create({
   itemRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm },
   itemLabel: { fontSize: 14, fontWeight: '700', color: colors.text },
   itemPrice: { fontSize: 12, color: colors.textMuted, marginTop: 1 },
+  itemDescription: { fontSize: 11.5, lineHeight: 16, marginTop: 5, paddingRight: 8 },
   qtyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   qtyBtn: { width: 32, height: 32, borderRadius: radius.sm, backgroundColor: colors.greenSoft, alignItems: 'center', justifyContent: 'center' },
   qtyBtnText: { fontSize: 18, fontWeight: '800', color: colors.greenDark },
@@ -743,4 +728,5 @@ const styles = StyleSheet.create({
   agreeText: { fontSize: 13 },
   legalLinks: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginLeft: 30, marginTop: 4 },
   legalLink: { color: colors.green, fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
+  otherPaymentRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 8 },
 });

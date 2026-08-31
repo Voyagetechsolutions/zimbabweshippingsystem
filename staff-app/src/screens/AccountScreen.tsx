@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,7 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, type DashboardRole } from '../context/AuthContext';
 import { useViewRole } from '../context/ViewRoleContext';
 import { supabase } from '../lib/supabase';
 import { COMPANY, COMPANY_WHATSAPP_URL } from '../config/company';
@@ -22,7 +23,8 @@ import { colors, radius, shadow, spacing } from '../theme';
 
 export default function AccountScreen() {
   const { session, profile, signOut, dashboardRole, canSwitchDashboards } = useAuth();
-  const { clearRole } = useViewRole();
+  const { chooseRole } = useViewRole();
+  const [switching, setSwitching] = useState(false);
   // Show the viewer's real role — this screen is also reached from the admin
   // Menu → Settings, where a hardcoded "Finance" label is wrong.
   const roleLabel = canSwitchDashboards
@@ -30,6 +32,7 @@ export default function AccountScreen() {
     : dashboardRole === 'driver' ? 'Driver'
     : dashboardRole === 'admin' ? 'Admin'
     : dashboardRole === 'finance' ? 'Finance'
+    : dashboardRole === 'dispatcher' ? 'Dispatcher'
     : profile?.role ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1) : 'Staff';
   const [name, setName] = useState(profile?.full_name || '');
   const [phone, setPhone] = useState(String(session?.user.user_metadata?.phone || ''));
@@ -58,6 +61,11 @@ export default function AccountScreen() {
     const error = profileResult.error || authResult.error;
     if (error) Alert.alert('Could not save profile', error.message);
     else Alert.alert('Profile saved', 'Your staff profile preferences have been updated.');
+  };
+
+  const selectDashboard = (role: DashboardRole) => {
+    setSwitching(false);
+    chooseRole(role);
   };
 
   return (
@@ -126,13 +134,25 @@ export default function AccountScreen() {
         </View>
 
         {canSwitchDashboards ? (
-          <Pressable style={styles.switchDashboard} onPress={clearRole}>
+          <Pressable style={styles.switchDashboard} onPress={() => setSwitching(true)}>
             <Ionicons name="swap-horizontal-outline" size={19} color={colors.primary} />
             <Text style={styles.switchText}>Switch dashboard</Text>
           </Pressable>
         ) : null}
         <Pressable style={styles.signOut} onPress={signOut}><Text style={styles.signOutText}>Sign Out</Text></Pressable>
       </ScrollView>
+      <Modal visible={switching} transparent animationType="fade" onRequestClose={() => setSwitching(false)}>
+        <Pressable style={styles.modalShade} onPress={() => setSwitching(false)}><Pressable style={styles.dashboardSheet} onPress={() => {}}>
+          <Text style={styles.sheetTitle}>Switch dashboard</Text><Text style={styles.sheetSub}>Choose where you want to work. Your account stays signed in.</Text>
+          {([
+            ['admin','grid-outline','Admin','Operations, bookings and staff'],
+            ['finance','stats-chart-outline','Finance','Accounting and financial control'],
+            ['driver','car-outline','Driver','Routes, scans and handovers'],
+            ['dispatcher','map-outline','Dispatcher','Live routes and driver locations'],
+          ] as const).map(([role,icon,title,sub])=><Pressable accessibilityRole="button" key={role} style={styles.dashboardChoice} onPress={()=>selectDashboard(role)}><View style={styles.choiceIcon}><Ionicons name={icon} size={21} color={colors.primary}/></View><View style={{flex:1}}><Text style={styles.rowTitle}>{title}</Text><Text style={styles.muted}>{sub}</Text></View><Ionicons name="chevron-forward" size={18} color={colors.textFaint}/></Pressable>)}
+          <Pressable style={styles.modalCancel} onPress={()=>setSwitching(false)}><Text style={styles.modalCancelText}>Cancel</Text></Pressable>
+        </Pressable></Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -178,4 +198,11 @@ const styles = StyleSheet.create({
   switchText: { color: colors.primary, fontWeight: '800', fontSize: 13 },
   signOut: { minHeight: 49, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.danger, borderRadius: radius.sm },
   signOutText: { color: colors.danger, fontWeight: '800', fontSize: 13 },
+  modalShade: { flex: 1, backgroundColor: 'rgba(15,23,42,.5)', justifyContent: 'center', padding: spacing.xl },
+  dashboardSheet: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.sm },
+  sheetTitle: { fontSize: 20, fontWeight: '900', color: colors.text },
+  sheetSub: { fontSize: 12.5, lineHeight: 18, color: colors.textMuted, marginBottom: spacing.sm },
+  dashboardChoice: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
+  choiceIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft },
+  modalCancel: { alignItems: 'center', paddingVertical: 10 }, modalCancelText: { color: colors.textMuted, fontWeight: '700' },
 });

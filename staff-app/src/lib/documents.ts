@@ -100,6 +100,8 @@ export function buildInvoiceHtml(shipment: Shipment): string {
         <div style="font-weight:bold;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#666;margin-bottom:6px">FROM</div>
         <div style="font-weight:600">Zimbabwe Shipping</div>
         <div style="color:#444;line-height:1.6">www.zimbabweshipping.ie</div>
+        <div style="color:#444;line-height:1.6">UK: +44 7584 100552</div>
+        <div style="color:#444;line-height:1.6">Ireland: +353 87 195 4910</div>
       </div>
       <div style="flex:1">
         <div style="font-weight:bold;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#666;margin-bottom:6px">BILL TO</div>

@@ -5,7 +5,7 @@ import type { Shipment } from './shipment';
 
 export type InvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid' | 'overdue';
 
-export interface InvoiceLineItem { description?: string; quantity?: number; unitPrice?: number; }
+export interface InvoiceLineItem { item?: string; description?: string; quantity?: number; unitPrice?: number; }
 export interface PaymentEntry { amount?: number; method?: string; date?: string; }
 export interface InvoiceData {
   invoiceNumber?: string;
@@ -18,6 +18,10 @@ export interface InvoiceData {
   payments?: PaymentEntry[];
   paid?: boolean;
   sentAt?: string;
+  publishedToCustomerAt?: string | null;
+  paymentTerms?: string;
+  notes?: string;
+  deletedAt?: string | null;
 }
 
 export function hasInvoice(s: Shipment): boolean {

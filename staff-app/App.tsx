@@ -2,7 +2,7 @@ import 'react-native-gesture-handler';
 import React from 'react';
 import { View, Text, Pressable, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,40 +23,46 @@ import DriverMoreStack from './src/navigation/DriverMoreStack';
 import DeliveryStack from './src/navigation/DeliveryStack';
 import { DriverMessagesScreen } from './src/screens/DriverExperienceScreens';
 import FinanceOverviewStack from './src/navigation/FinanceOverviewStack';
-import FinancePaymentsStack from './src/navigation/FinancePaymentsStack';
-import FinanceBooksStack from './src/navigation/FinanceBooksStack';
+import FinanceWorkspaceStack from './src/navigation/FinanceWorkspaceStack';
 import FinanceDashboardScreen from './src/screens/FinanceDashboardScreen';
 import AccountScreen from './src/screens/AccountScreen';
-import PaymentsScreen from './src/screens/admin/PaymentsScreen';
-import InvoicesScreen from './src/screens/admin/InvoicesScreen';
 import DriverRunsScreen from './src/screens/admin/DriverRunsScreen';
-import FinanceBooksScreen from './src/screens/FinanceBooksScreen';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { colors, spacing } from './src/theme';
 import MapPreviewScreen from './src/screens/MapPreviewScreen';
-import AppleReviewWorkspaceScreen from './src/screens/AppleReviewWorkspaceScreen';
+import DriverOperationsHomeScreen from './src/screens/DriverOperationsHomeScreen';
+import DriverScanScreen from './src/screens/DriverScanScreen';
+import DriverHistoryScreen from './src/screens/DriverHistoryScreen';
+import { DriverCountryProvider, useDriverCountry } from './src/context/DriverCountryContext';
 
 const Tab = createBottomTabNavigator();
 
-const tabScreenOptions = {
-  headerShown: false,
-  tabBarActiveTintColor: colors.primary,
-  tabBarInactiveTintColor: colors.textMuted,
-  tabBarHideOnKeyboard: true,
-  tabBarLabelStyle: { fontSize: 10, fontWeight: '700' as const, marginTop: 2 },
-  tabBarItemStyle: { paddingTop: 5 },
-  tabBarStyle: {
-    height: 68,
-    paddingBottom: 8,
-    borderTopColor: colors.border,
-    backgroundColor: colors.surface,
-    shadowColor: '#0f172a',
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: -3 },
-    elevation: 8,
-  },
-};
+function useTabScreenOptions() {
+  const insets = useSafeAreaInsets();
+  // A fixed tab-bar height overlaps Android's gesture/three-button navigation
+  // area on edge-to-edge devices. Add the actual device inset to the visual
+  // 60px bar so every dashboard remains fully above the system controls.
+  const bottomInset = Math.max(insets.bottom, Platform.OS === 'android' ? 12 : 8);
+  return React.useMemo(() => ({
+    headerShown: false,
+    tabBarActiveTintColor: colors.primary,
+    tabBarInactiveTintColor: colors.textMuted,
+    tabBarHideOnKeyboard: true,
+    tabBarLabelStyle: { fontSize: 10, fontWeight: '700' as const, marginTop: 2 },
+    tabBarItemStyle: { paddingTop: 5 },
+    tabBarStyle: {
+      height: 60 + bottomInset,
+      paddingBottom: bottomInset,
+      borderTopColor: colors.border,
+      backgroundColor: colors.surface,
+      shadowColor: '#0f172a',
+      shadowOpacity: 0.06,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: -3 },
+      elevation: 8,
+    },
+  }), [bottomInset]);
+}
 
 function icon(name: keyof typeof Ionicons.glyphMap) {
   return ({ color, size }: { color: string; size: number }) => <Ionicons name={name} size={size} color={color} />;
@@ -73,6 +79,7 @@ function FabButton({ children, onPress }: any) {
 
 // Admin: operations command centre.
 function AdminApp() {
+  const tabScreenOptions = useTabScreenOptions();
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
       <Tab.Screen name="Home" component={AdminDashboardScreen} options={{ tabBarIcon: icon('home-outline') }} />
@@ -94,30 +101,35 @@ function AdminApp() {
 
 // Finance: finance dashboard only.
 function FinanceApp() {
+  const tabScreenOptions = useTabScreenOptions();
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
       <Tab.Screen name="Finance" component={FinanceOverviewStack} options={{ title: 'Overview', tabBarIcon: icon('stats-chart-outline') }} />
-      <Tab.Screen name="Payments" component={FinancePaymentsStack} options={{ tabBarIcon: icon('card-outline') }} />
-      <Tab.Screen name="Invoices" component={InvoicesScreen} options={{ tabBarIcon: icon('receipt-outline') }} />
-      <Tab.Screen name="Books" component={FinanceBooksStack} options={{ title: 'Books', tabBarIcon: icon('book-outline') }} />
+      <Tab.Screen name="ERP" component={FinanceWorkspaceStack} options={{ title: 'ERP', tabBarIcon: icon('grid-outline') }} />
       <Tab.Screen name="Account" component={AccountScreen} options={{ tabBarIcon: icon('person-outline') }} />
     </Tab.Navigator>
   );
 }
 
 // Pickup driver: the shared collection route.
-function PickupDriverApp({ withDeliveries }: { withDeliveries?: boolean }) {
+function DriverScanButton({ children, onPress }: any) {
+  return <Pressable onPress={onPress} style={styles.driverScanWrap}><View style={styles.driverScanButton}>{children}</View></Pressable>;
+}
+
+function DispatcherApp(){const tabScreenOptions=useTabScreenOptions();return <Tab.Navigator screenOptions={tabScreenOptions}><Tab.Screen name="Dispatch" component={RunsStack} options={{tabBarIcon:icon('map-outline')}}/><Tab.Screen name="Account" component={AccountScreen} options={{tabBarIcon:icon('person-outline')}}/></Tab.Navigator>}
+
+function DriverRouteGateway(){const {country}=useDriverCountry();if(country==='Zimbabwe')return <DeliveryStack/>;return <DriverRunStack/>;}
+
+function PickupDriverApp() {
+  const tabScreenOptions = useTabScreenOptions();
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
-      <Tab.Screen name="Home" component={DriverStack} options={{ tabBarIcon: icon('home-outline') }} />
-      {/* One collection route runs per day, so this is "Collections" — the day's
-          addresses and their map pins — not a per-driver assigned run. */}
-      <Tab.Screen name="Collections" component={DriverRunStack} options={{ tabBarIcon: icon('map-outline') }} />
-      {withDeliveries ? (
-        <Tab.Screen name="Deliveries" component={DeliveryStack} options={{ tabBarIcon: icon('cube-outline') }} />
-      ) : null}
-      <Tab.Screen name="Messages" component={DriverMessagesScreen} options={{ tabBarIcon: icon('chatbubble-ellipses-outline') }} />
-      <Tab.Screen name="My Account" component={DriverMoreStack} options={{ title: 'My Account', tabBarIcon: icon('person-outline') }} />
+      <Tab.Screen name="Home" component={DriverOperationsHomeScreen} options={{ tabBarIcon: icon('home-outline') }} />
+      <Tab.Screen name="Route" component={DriverRouteGateway} options={{ tabBarIcon: icon('map-outline') }} />
+      <Tab.Screen name="Scan" component={DriverScanScreen} options={{ title: 'Scan', tabBarLabel: 'Scan', tabBarIcon: () => <Ionicons name="scan" size={27} color={colors.white} />, tabBarButton: (props) => <DriverScanButton {...props} /> }} />
+      <Tab.Screen name="History" component={DriverHistoryScreen} options={{ tabBarIcon: icon('time-outline') }} />
+      <Tab.Screen name="Profile" component={DriverMoreStack} options={{ tabBarIcon: icon('person-outline') }} />
+      <Tab.Screen name="Messages" component={DriverMessagesScreen} options={{ tabBarButton: () => null }} />
     </Tab.Navigator>
   );
 }
@@ -126,11 +138,15 @@ function PickupDriverApp({ withDeliveries }: { withDeliveries?: boolean }) {
 // never see the collection route — it is the other half of the journey and on
 // another continent.
 function DeliveryDriverApp() {
+  const tabScreenOptions = useTabScreenOptions();
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
-      <Tab.Screen name="Home" component={DeliveryStack} options={{ tabBarIcon: icon('home-outline') }} />
-      <Tab.Screen name="Messages" component={DriverMessagesScreen} options={{ tabBarIcon: icon('chatbubble-ellipses-outline') }} />
-      <Tab.Screen name="My Account" component={DriverMoreStack} options={{ title: 'My Account', tabBarIcon: icon('person-outline') }} />
+      <Tab.Screen name="Home" component={DriverOperationsHomeScreen} options={{ tabBarIcon: icon('home-outline') }} />
+      <Tab.Screen name="Route" component={DeliveryStack} options={{ tabBarIcon: icon('map-outline') }} />
+      <Tab.Screen name="Scan" component={DriverScanScreen} options={{ title: 'Scan', tabBarLabel: 'Scan', tabBarIcon: () => <Ionicons name="scan" size={27} color={colors.white} />, tabBarButton: (props) => <DriverScanButton {...props} /> }} />
+      <Tab.Screen name="History" component={DriverHistoryScreen} options={{ tabBarIcon: icon('time-outline') }} />
+      <Tab.Screen name="Profile" component={DriverMoreStack} options={{ tabBarIcon: icon('person-outline') }} />
+      <Tab.Screen name="Messages" component={DriverMessagesScreen} options={{ tabBarButton: () => null }} />
     </Tab.Navigator>
   );
 }
@@ -138,8 +154,7 @@ function DeliveryDriverApp() {
 // Which driver experience this account gets. Admin sets the specialism in the
 // Staff Control Centre; an unset one means the driver does both.
 function DriverApp({ driverType }: { driverType: 'pickup' | 'delivery' | 'both' }) {
-  if (driverType === 'delivery') return <DeliveryDriverApp />;
-  return <PickupDriverApp withDeliveries={driverType === 'both'} />;
+  return <DriverCountryProvider>{driverType === 'delivery' ? <DeliveryDriverApp /> : <PickupDriverApp />}</DriverCountryProvider>;
 }
 
 function NotAuthorized() {
@@ -159,29 +174,23 @@ function NotAuthorized() {
 }
 
 function Root() {
-  const { loading, session, dashboardRole, driverType } = useAuth();
+  const { loading, session, dashboardRole, driverType, roleReady } = useAuth();
   const { viewRole, ready } = useViewRole();
-
-  const showReviewPreview = Platform.OS === 'web'
-    && new URLSearchParams(window.location?.search ?? '').has('reviewPreview');
 
   if (loading || !ready) {
     return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
   }
-  // Local-only capture route for generating App Store screenshots. The release
-  // build can reach this workspace only after authenticating as Apple's account.
-  if (showReviewPreview) return <AppleReviewWorkspaceScreen />;
   if (!session) return <LoginScreen />;
-  // Apple's reviewer account is deliberately routed to a local sample workspace.
-  // It can exercise all three role experiences without exposing live customers,
-  // addresses, driver locations or finance records during App Review.
-  if (session.user?.email?.toLowerCase() === 'mthokochaza+applereview@gmail.com') {
-    return <AppleReviewWorkspaceScreen />;
-  }
   // Staff created by an admin start on a temporary password that was read out to
   // them. This stands in front of everything — including the role check — until
   // they have replaced it.
   if (session.user?.user_metadata?.must_change_password) return <SetPasswordScreen />;
+  // The role lookup is a second round trip after the session restores. Holding
+  // the spinner for it stops a driver being told, every single cold start, that
+  // their account is not a staff account.
+  if (!roleReady) {
+    return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
+  }
   if (!dashboardRole) return <NotAuthorized />;
   const showMapPreview = __DEV__ && Platform.OS === 'web'
     && new URLSearchParams(window.location?.search ?? '').has('mapPreview');
@@ -197,6 +206,7 @@ function Root() {
       {effectiveRole === 'admin' && <AdminApp />}
       {effectiveRole === 'finance' && <FinanceApp />}
       {effectiveRole === 'driver' && <DriverApp driverType={driverType} />}
+      {effectiveRole === 'dispatcher' && <DispatcherApp />}
     </NavigationContainer>
   );
 }
@@ -222,6 +232,12 @@ const styles = StyleSheet.create({
     width: 50, height: 50, borderRadius: 25, backgroundColor: colors.primary,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: colors.primaryDark, shadowOpacity: 0.35, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 6,
+  },
+  driverScanWrap: { top: -13, justifyContent: 'center', alignItems: 'center' },
+  driverScanButton: {
+    width: 54, height: 54, borderRadius: 18, backgroundColor: colors.primary,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: colors.surface,
+    shadowColor: colors.primaryDark, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 7,
   },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg, padding: spacing.xl },
   blockTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginTop: spacing.md },

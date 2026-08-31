@@ -2,6 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import DriverRunsScreen from '../screens/admin/DriverRunsScreen';
 import RunDetailScreen from '../screens/admin/RunDetailScreen';
+import DispatchRouteBuilderScreen from '../screens/admin/DispatchRouteBuilderScreen';
 import type { RunsStackParams } from './types';
 import { colors } from '../theme';
 
@@ -18,6 +19,7 @@ export default function RunsStack() {
     >
       <Stack.Screen name="DriverRuns" component={DriverRunsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="RunDetail" component={RunDetailScreen} options={{ title: 'Run Details' }} />
+      <Stack.Screen name="BuildRoute" component={DispatchRouteBuilderScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

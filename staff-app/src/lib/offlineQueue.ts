@@ -7,9 +7,17 @@ import { supabase } from './supabase';
 
 export type QueuedCall = {
   id: string;
-  fn: 'transition_driver_stop' | 'fail_driver_stop';
+  fn:
+    | 'transition_driver_stop'
+    | 'fail_driver_stop'
+    | 'arrive_driver_stop'
+    | 'scan_driver_package'
+    | 'scan_driver_package_for_country'
+    | 'set_driver_presence'
+    | 'set_driver_break'
+    | 'request_driver_reschedule';
   args: Record<string, unknown>;
-  stopId: string;
+  stopId: string | null;
   queuedAt: string;
 };
 
@@ -20,6 +28,35 @@ export function isNetworkError(error: unknown): boolean {
   return message.includes('network') || message.includes('fetch') || message.includes('timeout') ||
     message.includes('failed to connect') || message.includes('abort');
 }
+
+/**
+ * True when the database object this call needs is not deployed yet.
+ *
+ * An installed app outlives any single schema version: a driver on an older
+ * build can call a function a later migration removed, and a driver on a newer
+ * build can call one that has not been applied to the database yet. Both look
+ * identical from here — PostgREST answers "not in the schema cache" (PGRST202
+ * for a function, PGRST205 for a table) and Postgres answers 42883 / 42P01.
+ *
+ * It is deliberately not treated as a normal failure: the work is real, so
+ * queued calls are kept rather than dropped, and optional telemetry stays quiet
+ * instead of telling a driver their connection is broken when it is not.
+ */
+export function isMissingBackend(error: unknown): boolean {
+  const code = String((error as any)?.code || '').toUpperCase();
+  if (code === 'PGRST202' || code === 'PGRST205' || code === '42883' || code === '42P01') return true;
+  const message = String((error as any)?.message || error || '').toLowerCase();
+  return message.includes('schema cache') || message.includes('does not exist');
+}
+
+/**
+ * What a driver is told when a feature's backend has not reached this database.
+ *
+ * Never "check your connection": the phone is online, the signal is fine, and
+ * sending a driver to look for one wastes their time and a dispatch call.
+ */
+export const BACKEND_PENDING_MESSAGE =
+  'This part of the driver app is not switched on for your account yet. Dispatch can enable it — carry on with the rest of your route.';
 
 export async function readQueue(): Promise<QueuedCall[]> {
   try {
@@ -41,6 +78,10 @@ export async function enqueue(call: Omit<QueuedCall, 'id' | 'queuedAt'>) {
   await writeQueue(queue);
 }
 
+export async function queueCount() {
+  return (await readQueue()).length;
+}
+
 // Replays queued calls in order. Network failures keep the item (and stop the
 // flush — later items usually depend on earlier ones for the same stop).
 // Server-side rejections (invalid transition etc.) drop the item so one bad
@@ -55,7 +96,9 @@ export async function flushQueue(): Promise<{ flushed: number; remaining: number
     try {
       const { error } = await supabase.rpc(call.fn, call.args as any);
       if (error) {
-        if (isNetworkError(error)) {
+        // Missing backend is held, not dropped: the call is valid work that the
+        // database cannot accept yet, and it will replay once the schema ships.
+        if (isNetworkError(error) || isMissingBackend(error)) {
           remaining.push(...queue.slice(i));
           break;
         }
@@ -65,7 +108,7 @@ export async function flushQueue(): Promise<{ flushed: number; remaining: number
         flushed += 1;
       }
     } catch (e) {
-      if (isNetworkError(e)) {
+      if (isNetworkError(e) || isMissingBackend(e)) {
         remaining.push(...queue.slice(i));
         break;
       }

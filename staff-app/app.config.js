@@ -1,6 +1,9 @@
 // Dynamic Expo config kept in one file so EAS and Expo Doctor evaluate the
 // exact same release metadata. Secrets stay in EAS environment variables.
-const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY;
+// Expo's web bundle and the native Android manifest must receive the same
+// restricted Maps key. Local development keeps it in the EXPO_PUBLIC name,
+// while EAS can provide the non-public alias as a build environment secret.
+const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 module.exports = {
   expo: {
@@ -39,10 +42,10 @@ module.exports = {
       [
         'expo-location',
         {
-          locationAlwaysAndWhenInUsePermission: 'Allow Zimbabwe Shipping Staff to use your location to sort today’s collections by how close they are to you.',
-          locationWhenInUsePermission: 'Allow Zimbabwe Shipping Staff to use your location to sort today’s collections by how close they are to you.',
-          isIosBackgroundLocationEnabled: false,
-          isAndroidBackgroundLocationEnabled: false,
+          locationAlwaysAndWhenInUsePermission: 'Allow Zimbabwe Shipping to share your route location with dispatch only while you are online and working.',
+          locationWhenInUsePermission: 'Allow Zimbabwe Shipping to use your location for navigation, arrivals and route operations.',
+          isIosBackgroundLocationEnabled: true,
+          isAndroidBackgroundLocationEnabled: true,
         },
       ],
     ],

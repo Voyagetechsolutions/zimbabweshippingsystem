@@ -42,9 +42,10 @@ const CollectionSchedule = () => {
         if (schedulesError) throw schedulesError;
 
         if (schedulesData && schedulesData.length > 0) {
-          const filteredData = schedulesData.filter(schedule => schedule.route !== 'SCOTLAND ROUTE');
-          setSchedules(filteredData);
-          const routes = [...new Set(filteredData.map(schedule => schedule.route))];
+          // Show every published route, including the Scotland route. Admin
+          // controls publication by approving the schedule row.
+          setSchedules(schedulesData);
+          const routes = [...new Set(schedulesData.map(schedule => schedule.route))];
           setAllRoutes(routes);
         } else {
           setSchedules([]);

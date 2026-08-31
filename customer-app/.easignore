@@ -5,6 +5,7 @@
 **/dist-verify/
 **/dist-verify2/
 **/web-build/
+**/dist-release-check/
 .git/
 
 # Unrelated monorepo projects and release material.

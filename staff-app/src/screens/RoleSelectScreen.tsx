@@ -11,6 +11,7 @@ const OPTIONS: Array<{ role: DashboardRole; icon: keyof typeof Ionicons.glyphMap
   { role: 'admin', icon: 'grid-outline', title: 'Admin dashboard', description: 'Shipments, bookings, runs, schedules and the full operations menu' },
   { role: 'finance', icon: 'stats-chart-outline', title: 'Finance dashboard', description: 'Payments, invoices, payment proofs, expenses and the books' },
   { role: 'driver', icon: 'car-outline', title: 'Driver dashboard', description: 'Today’s run, stop-by-stop workflow, QR scanning and handovers' },
+  { role: 'dispatcher', icon: 'map-outline', title: 'Dispatcher dashboard', description: 'Live driver locations, routes, assignments, progress and exceptions' },
 ];
 
 export default function RoleSelectScreen() {

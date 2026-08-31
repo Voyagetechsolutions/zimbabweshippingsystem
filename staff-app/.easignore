@@ -1,17 +1,29 @@
 # EAS reads this file from the app directory in a monorepo.
 **/node_modules/
 **/.expo/
+**/.claude/
+**/.eas-archive-inspect/
+**/.eas-archive-inspect/**
 **/dist/
 **/dist-verify/
 **/dist-verify2/
 **/web-build/
 .git/
+.env
+
+# Root-level generated/local folders. EAS ignore matching is evaluated from
+# this app directory, so keep explicit forms as well as the recursive forms.
+node_modules/
+.expo/
+.claude/
+.eas-archive-inspect/
+.eas-archive-inspect/**
+dist/
 
 # Unrelated monorepo projects and release material.
 /customer-app/
 /tmp/
 /public/
-/src/
 /supabase/
 /whatsapp-bot/
 /old whatsapp bots/

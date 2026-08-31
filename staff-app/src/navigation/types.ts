@@ -38,6 +38,7 @@ export type DriverRunStackParams = {
   MyRun: undefined;
   RouteMap: undefined;
   RunSummary: undefined;
+  DepotHandover: undefined;
   StopDetails: { stop: DriverStopParam };
   ReportIssue: { stop: DriverStopParam };
   StopWorkflow: { stop: DriverStopParam };
@@ -49,6 +50,8 @@ export type DriverMoreStackParams = {
   Account: undefined;
   Profile: undefined;
   Vehicle: undefined;
+  VehicleCheck: undefined;
+  Documents: undefined;
   Performance: undefined;
   Settings: undefined;
 };
@@ -57,6 +60,7 @@ export type DriverMoreStackParams = {
 export type RunsStackParams = {
   DriverRuns: undefined;
   RunDetail: { runId: string };
+  BuildRoute: { date: string };
 };
 
 // Sections menu — mirrors the website admin sidebar.

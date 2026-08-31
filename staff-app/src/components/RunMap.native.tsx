@@ -91,7 +91,8 @@ export default function RunMap({ stops, polylines = [], onStopPress, height = 22
       return;
     }
     const destination = encodeURIComponent(`${stop.latitude},${stop.longitude}`);
-    void Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`);
+    void Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`)
+      .catch(() => undefined);
   };
 
   return (

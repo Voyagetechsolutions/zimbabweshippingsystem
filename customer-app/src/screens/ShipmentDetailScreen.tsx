@@ -235,6 +235,7 @@ export default function ShipmentDetailScreen() {
         )}
 
         <Button title="Need help? Ask Zimmy" variant="outline" onPress={() => navigation.navigate('Tabs', { screen: 'Zimmy', params: { prefill: `I need help with my shipment ${shipment.tracking_number}` } })} />
+        {stage === 0 && <Button title="Edit booking details" variant="outline" onPress={() => navigation.navigate('EditShipment', { id: shipment.id })} style={{marginTop:spacing.sm}} />}
         <Button title="Invoices & payment proof" variant="outline" onPress={()=>navigation.navigate('Billing')} style={{marginTop:spacing.sm}}/>
         {stage>=1?<Button title="Rate driver and service" variant="outline" onPress={()=>navigation.navigate('Feedback')} style={{marginTop:spacing.sm}}/>:null}
       </ScrollView>

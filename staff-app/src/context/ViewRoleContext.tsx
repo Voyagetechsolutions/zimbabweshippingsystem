@@ -21,7 +21,7 @@ export function ViewRoleProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     AsyncStorage.getItem(KEY)
       .then((saved) => {
-        if (saved === 'admin' || saved === 'finance' || saved === 'driver') setViewRole(saved);
+        if (saved === 'admin' || saved === 'finance' || saved === 'driver' || saved === 'dispatcher') setViewRole(saved);
       })
       .finally(() => setReady(true));
   }, []);

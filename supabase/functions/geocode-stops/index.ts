@@ -31,6 +31,24 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const normalisePostcode = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
+// Eircode: routing key (letter + 2 digits) then a 4-character unique identifier.
+const EIRCODE = /^[AC-FHKNPRTV-Y]\d{2}\s?[0-9AC-FHKNPRTV-Y]{4}$/i;
+
+/**
+ * Is this collection in the Republic of Ireland?
+ *
+ * It matters twice over: postcodes.io does not know Eircodes, so an Irish
+ * postcode is a guaranteed miss, and a Nominatim search restricted to "gb"
+ * can never find a Dublin or Galway street. Northern Ireland is deliberately
+ * excluded — it is in the UK and both of those paths work for it already.
+ */
+function isIrish(country: unknown, postcode: unknown): boolean {
+  const value = String(country || '').trim().toLowerCase();
+  if (value === 'northern ireland') return false;
+  if (['ireland', 'republic of ireland', 'eire', 'éire'].includes(value)) return true;
+  return EIRCODE.test(String(postcode || '').trim());
+}
+
 /** Cache key that ignores punctuation and case so near-identical inputs share a row. */
 const cacheKey = (kind: string, query: string) =>
   `${kind}:${query.toLowerCase().replace(/\s+/g, ' ').trim()}`;
@@ -142,7 +160,15 @@ serve(async (req) => {
       let kind: string;
       let query1: string;
       let fallback: string | null = null;
-      if (stop.stop_type === 'collection') {
+      if (stop.stop_type === 'collection' && isIrish(sender.country, sender.postcode || sender.postalCode)) {
+        // Ireland has no free postcode-to-point service, so go straight to a
+        // free-text search and fall back to the town, which is still accurate
+        // enough to group a day's stops.
+        kind = 'ie-address';
+        query1 = [stop.address || sender.address, sender.city, sender.postcode || sender.postalCode, 'Ireland']
+          .filter(Boolean).map(String).filter((part) => !/^n\/?a$/i.test(part.trim())).join(', ');
+        fallback = [sender.city, 'Ireland'].filter(Boolean).join(', ');
+      } else if (stop.stop_type === 'collection') {
         kind = 'uk-postcode';
         query1 = String(sender.postcode || sender.postalCode || '').trim();
         // Without a postcode, try the street address in GB.
@@ -156,7 +182,10 @@ serve(async (req) => {
       const attempts: Array<{ kind: string; query: string }> = [];
       if (query1 && query1.length >= 3) attempts.push({ kind, query: query1 });
       if (fallback && fallback.length >= 3 && fallback !== query1) {
-        attempts.push({ kind: kind === 'uk-postcode' ? 'gb-address' : 'zw-city', query: fallback });
+        const fallbackKind = kind === 'uk-postcode' ? 'gb-address'
+          : kind === 'ie-address' ? 'ie-city'
+          : 'zw-city';
+        attempts.push({ kind: fallbackKind, query: fallback });
       }
 
       let coords: Coords | null = null;
@@ -185,6 +214,9 @@ serve(async (req) => {
         } else if (attempt.kind === 'gb-address') {
           coords = await lookupNominatim(attempt.query, 'gb');
           await sleep(1100); // Nominatim: max 1 request/second.
+        } else if (attempt.kind === 'ie-address' || attempt.kind === 'ie-city') {
+          coords = await lookupNominatim(attempt.query, 'ie');
+          await sleep(1100);
         } else {
           coords = await lookupNominatim(attempt.query, 'zw');
           await sleep(1100);

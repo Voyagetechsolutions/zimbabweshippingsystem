@@ -1,0 +1,2 @@
+-- Placeholder for a migration already present in the linked production history.
+-- Its production changes are already applied; this file only reconciles local history.

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Linking, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -20,7 +20,7 @@ import type { RunsStackParams } from '../../navigation/types';
 type Props = NativeStackScreenProps<RunsStackParams, 'DriverRuns'>;
 
 interface Driver {
-  id: string; full_name: string | null; email?: string | null;
+  id: string; full_name: string | null; email?: string | null; phone_number?: string | null;
   driver_type?: 'pickup' | 'delivery' | 'both' | null; role?: string | null;
   is_admin?: boolean | null; on_leave?: boolean | null; staff_active?: boolean | null;
   vehicle_label?: string | null;
@@ -37,7 +37,38 @@ interface StopRow {
 interface Attendance { driver_id: string; clocked_in_at: string; clocked_out_at: string | null; }
 interface ScheduleRow { id: string; route: string; pickup_date: string; country?: string | null; }
 interface ClaimRow { id: string; shipment_id: string; driver_id: string | null; stop_id: string | null; status: string; claimed_at: string | null; issue_reason: string | null; }
-interface DriverLocationRow { driver_id: string; latitude: number; longitude: number; accuracy_m: number | null; recorded_at: string; }
+interface DriverLocationRow { driver_id: string; latitude: number; longitude: number; accuracy_m: number | null; recorded_at: string; status?: string | null; }
+interface PresenceRow { driver_id: string; status: string | null; current_latitude: number | null; current_longitude: number | null; location_accuracy_m: number | null; last_location_update: string | null; last_seen: string | null; }
+
+/**
+ * One position per driver, newest wins.
+ *
+ * Two write paths report a driver's position: the older run screens call
+ * update_driver_live_location, while the operations dashboard and background
+ * tracking write driver_presence. A driver is invisible to dispatch if this
+ * board reads only one of them, so both are merged here.
+ */
+function mergeDriverPositions(legacy: DriverLocationRow[], presence: PresenceRow[]): DriverLocationRow[] {
+  const byDriver = new Map<string, DriverLocationRow>();
+  const consider = (row: DriverLocationRow) => {
+    if (!Number.isFinite(row.latitude) || !Number.isFinite(row.longitude)) return;
+    const existing = byDriver.get(row.driver_id);
+    if (!existing || new Date(row.recorded_at).getTime() > new Date(existing.recorded_at).getTime()) byDriver.set(row.driver_id, row);
+  };
+  legacy.forEach(consider);
+  for (const row of presence) {
+    if (row.current_latitude == null || row.current_longitude == null) continue;
+    consider({
+      driver_id: row.driver_id,
+      latitude: Number(row.current_latitude),
+      longitude: Number(row.current_longitude),
+      accuracy_m: row.location_accuracy_m,
+      recorded_at: row.last_location_update || row.last_seen || new Date(0).toISOString(),
+      status: row.status,
+    });
+  }
+  return [...byDriver.values()];
+}
 
 interface RouteGroup {
   route: string; date: string; shipments: Shipment[]; run: RunRow | null;
@@ -64,6 +95,19 @@ function runStatusBadge(status: string) {
   return { label: 'Planned', tone: BADGE.orange };
 }
 
+function openDriverContact(kind: 'call' | 'whatsapp', phone: string | null | undefined) {
+  const value = String(phone || '').replace(/[^\d+]/g, '');
+  if (!value || value.replace(/\D/g, '').length < 7) {
+    Alert.alert('Contact unavailable', 'This driver has no valid phone number on their staff profile.');
+    return;
+  }
+  const url = kind === 'call' ? `tel:${value}` : `https://wa.me/${value.replace(/\D/g, '')}`;
+  void Linking.openURL(url).catch(() => Alert.alert(
+    kind === 'call' ? 'Could not start call' : 'Could not open WhatsApp',
+    kind === 'call' ? 'Check that your device supports phone calls.' : 'Check that WhatsApp is installed or try again in your browser.',
+  ));
+}
+
 export default function DriverRunsScreen({ navigation }: Props) {
   const { session, profile, dashboardRole } = useAuth();
   const [date, setDate] = useState(todayIso());
@@ -88,8 +132,8 @@ export default function DriverRunsScreen({ navigation }: Props) {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [driverResult, runResult, shipmentResult, scheduleResult, attendanceResult, claimResult, locationResult] = await Promise.all([
-        supabase.from('profiles').select('id,full_name,email,driver_type,role,is_admin,on_leave,staff_active,vehicle_label').or('role.eq.driver,role.eq.admin,role.eq.logistics,is_admin.eq.true').order('full_name'),
+      const [driverResult, runResult, shipmentResult, scheduleResult, attendanceResult, claimResult, locationResult, presenceResult] = await Promise.all([
+        supabase.from('profiles').select('id,full_name,email,phone_number,driver_type,role,is_admin,on_leave,staff_active,vehicle_label').or('role.eq.driver,role.eq.admin,role.eq.logistics,is_admin.eq.true').order('full_name'),
         supabase.from('driver_runs').select('id,driver_id,status,run_date,vehicle_label,route_name,run_type,scheduled_start,started_at').eq('run_date', date).order('created_at'),
         supabase.from('shipments').select('id,tracking_number,customer_reference,status,driver_status,collection_status,collection_schedule_id,created_at,updated_at,metadata').is('deleted_at', null).not('status', 'in', '(Delivered,Cancelled)').order('created_at', { ascending: false }).limit(400),
         supabase.from('collection_schedules').select('id,route,pickup_date,country').limit(200),
@@ -97,6 +141,9 @@ export default function DriverRunsScreen({ navigation }: Props) {
         supabase.from('route_collection_claims').select('id,shipment_id,driver_id,stop_id,status,claimed_at,issue_reason').eq('claim_date', date),
         supabase.from('driver_live_locations').select('driver_id,latitude,longitude,accuracy_m,recorded_at')
           .gte('recorded_at', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()),
+        supabase.from('driver_presence')
+          .select('driver_id,status,current_latitude,current_longitude,location_accuracy_m,last_location_update,last_seen')
+          .neq('status', 'offline'),
       ]);
       for (const result of [driverResult, runResult, shipmentResult, scheduleResult, attendanceResult]) {
         if ((result as any).error) throw (result as any).error;
@@ -113,7 +160,7 @@ export default function DriverRunsScreen({ navigation }: Props) {
       }
       const loadedDrivers = [...((driverResult.data as Driver[]) || [])];
       if (dashboardRole === 'admin' && session?.user.id && !loadedDrivers.some((d) => d.id === session.user.id)) {
-        loadedDrivers.unshift({ id: session.user.id, full_name: profile?.full_name || null, email: session.user.email || null, driver_type: 'both', role: 'admin', is_admin: true });
+        loadedDrivers.unshift({ id: session.user.id, full_name: profile?.full_name || null, email: session.user.email || null, phone_number: null, driver_type: 'both', role: 'admin', is_admin: true });
       }
       setDrivers(loadedDrivers);
       setRuns(runRows);
@@ -122,7 +169,10 @@ export default function DriverRunsScreen({ navigation }: Props) {
       setSchedules((scheduleResult.data as ScheduleRow[]) || []);
       setAttendance((attendanceResult.data as Attendance[]) || []);
       setClaims(claimResult.error ? [] : ((claimResult.data as ClaimRow[]) || []));
-      setLiveLocations(locationResult.error ? [] : ((locationResult.data as DriverLocationRow[]) || []));
+      setLiveLocations(mergeDriverPositions(
+        locationResult.error ? [] : ((locationResult.data as DriverLocationRow[]) || []),
+        presenceResult.error ? [] : ((presenceResult.data as PresenceRow[]) || []),
+      ));
     } catch (e: any) {
       setError(e?.message || 'Could not load driver runs.');
     }
@@ -138,7 +188,13 @@ export default function DriverRunsScreen({ navigation }: Props) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'route_collection_claims' }, () => load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'driver_live_locations' }, () => load())
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    // Separate channel: presence ships in a later migration than the rest of
+    // this board, and a missing table would otherwise kill every subscription
+    // above it.
+    const presenceChannel = supabase.channel(`runs-presence-${date}-${Date.now()}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'driver_presence' }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); supabase.removeChannel(presenceChannel); };
   }, [date, load]);
 
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
@@ -170,10 +226,20 @@ export default function DriverRunsScreen({ navigation }: Props) {
 
       // Linked schedule wins; otherwise match the route name against the routes
       // scheduled for this day, with and without the " ROUTE" suffix.
+      // A booking that names this day is authoritative even when its schedule
+      // row still carries an old pickup_date — schedule rows drift when a route
+      // is re-run, and dispatch must not lose sight of live collections because
+      // of it.
+      const bookedThisDay = (() => {
+        const raw = (shipment.metadata as any)?.collection?.date || (shipment.metadata as any)?.collectionDate;
+        const parsed = parseCollectionDate(raw);
+        if (!parsed) return false;
+        return new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000).toISOString().slice(0, 10) === date;
+      })();
       const scheduledToday = schedule
         ? routesToday.some((s) => s.id === schedule.id)
         : todayByKey.has(routeKey(rawRoute));
-      if (!scheduledToday) continue;
+      if (!scheduledToday && !bookedThisDay) continue;
 
       // Already-collected bookings are no longer work for this day.
       if ((shipment as any).collection_status === 'Collected') continue;
@@ -303,6 +369,18 @@ export default function DriverRunsScreen({ navigation }: Props) {
     }
   };
 
+  /**
+   * Who dispatch needs eyes on today.
+   *
+   * Role alone is too narrow: an admin or logistics account covering a route
+   * still has to be visible on the board. Anyone with a run, a live position
+   * or a clock-in for the day counts as on duty regardless of their role.
+   */
+  const onDutyToday = (driver: Driver) => String(driver.role || '').toLowerCase() === 'driver'
+    || runs.some((run) => run.driver_id === driver.id)
+    || liveLocations.some((row) => row.driver_id === driver.id)
+    || attendance.some((row) => row.driver_id === driver.id);
+
   const estCompletion = (run: RunRow, stopTotal: number) => {
     const base = run.started_at ? new Date(run.started_at)
       : run.scheduled_start ? new Date(`${run.run_date}T${run.scheduled_start}`) : null;
@@ -313,7 +391,14 @@ export default function DriverRunsScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
-        <ScreenHeader title="Driver Runs" subtitle="Route-based dispatch" onBell={() => (navigation as any).getParent()?.navigate('Home')} />
+        <ScreenHeader title="Dispatch control" subtitle="Live drivers, routes and completion" />
+
+        {/* Build a route by hand when the schedule has not matched one, or
+            when dispatch wants to choose the stops and the customer windows. */}
+        <Pressable accessibilityRole="button" style={styles.buildRouteButton} onPress={() => navigation.navigate('BuildRoute', { date })}>
+          <Ionicons name="add-circle-outline" size={19} color={colors.white} />
+          <Text style={styles.buildRouteText}>CREATE ROUTE</Text>
+        </Pressable>
 
         <View style={styles.announcementCard}>
           <View style={{ flex: 1 }}><Text style={styles.announcementTitle}>Message all drivers</Text><TextInput style={styles.announcementInput} value={announcement} onChangeText={setAnnouncement} placeholder="Route change, depot notice, urgent instruction…" placeholderTextColor={colors.textFaint} multiline maxLength={2000} /></View>
@@ -346,15 +431,21 @@ export default function DriverRunsScreen({ navigation }: Props) {
               <StatCard label="Collection issues" value={issueClaims.length} icon="alert-circle-outline" tone={colors.orange} toneSoft={colors.orangeSoft} />
             </View>
 
+            <SectionLabel text="Driver live status" />
+            <View style={styles.driverStatusList}>{drivers.filter(onDutyToday).map(driver=>{const driverRuns=runs.filter(run=>run.driver_id===driver.id);const driverStops=stops.filter(stop=>driverRuns.some(run=>run.id===stop.run_id));const collections=driverStops.filter(stop=>stop.stop_type==='collection');const deliveries=driverStops.filter(stop=>stop.stop_type==='delivery');const location=liveLocations.find(row=>row.driver_id===driver.id);const working=driverRuns.some(run=>run.status==='active');return <View key={driver.id} style={styles.driverStatusRow}><Avatar name={driver.full_name||driver.email} size={38}/><View style={{flex:1}}><View style={styles.runTop}><Text style={styles.runDriver}>{driver.full_name||driver.email||'Driver'}</Text><Badge text={working?'On route':driverAttendance(driver.id)} tone={working?BADGE.blue:BADGE.grey}/></View><Text style={styles.runMeta}>{collections.filter(s=>s.status==='completed').length}/{collections.length} collections · {deliveries.filter(s=>s.status==='completed').length}/{deliveries.length} deliveries</Text><Text style={styles.runMeta}>{location?`${location.status?`${String(location.status).replace(/_/g,' ')} · `:''}${Number(location.latitude).toFixed(4)}, ${Number(location.longitude).toFixed(4)} · ${new Date(location.recorded_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`:'No live location today'}</Text></View><View style={styles.driverContactActions}><Pressable accessibilityLabel={`Call ${driver.full_name||'driver'}`} style={styles.driverContactButton} onPress={()=>openDriverContact('call',driver.phone_number)}><Ionicons name="call-outline" size={17} color={colors.primary}/></Pressable><Pressable accessibilityLabel={`WhatsApp ${driver.full_name||'driver'}`} style={styles.driverContactButton} onPress={()=>openDriverContact('whatsapp',driver.phone_number)}><Ionicons name="logo-whatsapp" size={17} color={colors.primary}/></Pressable></View></View>})}</View>
+
             {/* Map */}
             <SectionLabel text={`${dayLabel(date)}'s routes`} />
             <RunMap
               stops={mapStops}
               polylines={polylines}
+              height={300}
+              emptyNote="No stops or driver positions reported yet for this day."
               onStopPress={(stop) => {
                 const destination = encodeURIComponent(`${stop.latitude},${stop.longitude}`);
-                void Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`)
-                  .catch(() => Alert.alert('Could not open navigation', 'Check that a maps application or browser is available.'));
+                const url = `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`;
+                if (Platform.OS === 'web') { const opened = window.open(url, '_blank', 'noopener,noreferrer'); if (!opened) Alert.alert('Could not open navigation', 'Your browser blocked the maps window. Allow pop-ups and try again.'); }
+                else void Linking.openURL(url).catch(() => Alert.alert('Could not open navigation', 'Check that a maps application or browser is available.'));
               }}
             />
 
@@ -365,6 +456,8 @@ export default function DriverRunsScreen({ navigation }: Props) {
             ) : runs.filter((r) => r.status !== 'cancelled').map((run) => {
               const runStops = stops.filter((s) => s.run_id === run.id);
               const done = runStops.filter((s) => s.status === 'completed').length;
+              const collectionStops=runStops.filter(s=>s.stop_type==='collection');
+              const deliveryStops=runStops.filter(s=>s.stop_type==='delivery');
               const badge = runStatusBadge(run.status);
               const eta = estCompletion(run, runStops.length - done);
               return (
@@ -381,6 +474,7 @@ export default function DriverRunsScreen({ navigation }: Props) {
                       {run.scheduled_start ? ` · starts ${String(run.scheduled_start).slice(0, 5)}` : ''}
                       {eta && run.status === 'active' ? ` · est. finish ${eta.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
                     </Text>
+                    <Text style={styles.runMeta}>{collectionStops.filter(s=>s.status==='completed').length}/{collectionStops.length} collections · {deliveryStops.filter(s=>s.status==='completed').length}/{deliveryStops.length} deliveries</Text>
                     <View style={styles.progressTrack}>
                       <View style={[styles.progressFill, { width: `${runStops.length ? (done / runStops.length) * 100 : 0}%` }]} />
                     </View>
@@ -458,6 +552,8 @@ export default function DriverRunsScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg, paddingBottom: 56, gap: spacing.sm },
+  buildRouteButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: radius.sm, backgroundColor: colors.primary, marginBottom: spacing.md },
+  buildRouteText: { color: colors.white, fontWeight: '900', fontSize: 12.5, letterSpacing: 0.6 },
   announcementCard: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
   announcementTitle: { fontSize: 12, fontWeight: '800', color: colors.text, marginBottom: 6 },
   announcementInput: { minHeight: 42, maxHeight: 92, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 8, color: colors.text, textAlignVertical: 'top' },
@@ -469,6 +565,7 @@ const styles = StyleSheet.create({
   dateChipTextActive: { color: colors.white },
   calendarChip: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   statRow: { flexDirection: 'row', gap: spacing.sm },
+  driverStatusList:{gap:8},driverStatusRow:{flexDirection:'row',alignItems:'center',gap:spacing.md,padding:spacing.md,borderRadius:radius.md,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},driverContactActions:{flexDirection:'row',gap:6},driverContactButton:{width:34,height:34,borderRadius:17,alignItems:'center',justifyContent:'center',backgroundColor:colors.primarySoft,borderWidth:1,borderColor:'#B7E4D4'},
   runCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
   runTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   runDriver: { fontSize: 14, fontWeight: '800', color: colors.text, flexShrink: 1 },

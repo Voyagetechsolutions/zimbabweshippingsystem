@@ -12,7 +12,7 @@ let cachedIrelandRoutes: { city: string; route: string; pickupDate: string }[] =
 let cacheTimestamp: number = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-// Fallback map of postal code prefixes to routes for England (used if database is empty)
+// Fallback map of postal code prefixes to routes (used if database is empty)
 export const postalCodeToRouteMap: Record<string, string> = {
   // London area
   'EC': 'LONDON',
@@ -55,6 +55,26 @@ export const postalCodeToRouteMap: Record<string, string> = {
   'CW': 'MANCHESTER',
   'CH': 'MANCHESTER',
   'LL': 'MANCHESTER',
+  // Scotland route: Aberdeen, Dundee, Edinburgh, Glasgow, Newcastle and
+  // surrounding areas. The schedule row remains the source of published dates.
+  'AB': 'SCOTLAND ROUTE',
+  'DD': 'SCOTLAND ROUTE',
+  'IV': 'SCOTLAND ROUTE',
+  'PH': 'SCOTLAND ROUTE',
+  'KY': 'SCOTLAND ROUTE',
+  'FK': 'SCOTLAND ROUTE',
+  'EH': 'SCOTLAND ROUTE',
+  'ML': 'SCOTLAND ROUTE',
+  'TD': 'SCOTLAND ROUTE',
+  'G': 'SCOTLAND ROUTE',
+  'PA': 'SCOTLAND ROUTE',
+  'KA': 'SCOTLAND ROUTE',
+  'DG': 'SCOTLAND ROUTE',
+  'NE': 'SCOTLAND ROUTE',
+  'DH': 'SCOTLAND ROUTE',
+  'SR': 'SCOTLAND ROUTE',
+  'DL': 'SCOTLAND ROUTE',
+  'TS': 'SCOTLAND ROUTE',
   // Leeds area
   'LS': 'LEEDS',
   'WF': 'LEEDS',
@@ -290,9 +310,7 @@ export const irelandCities: { city: string; route: string }[] = [
 
 // List of restricted postal codes (areas we don't service)
 export const restrictedPostalCodes: string[] = [
-  'EX', 'TQ', 'DT', 'LD', 'HR', 'HU',
-  'TS', 'DL', 'SR', 'CA', 'NE', 'TD', 'EH', 'ML',
-  'KA', 'DG', 'G', 'DH', 'KY', 'PA', 'IV', 'AB', 'DD'
+  'EX', 'TQ', 'DT', 'LD', 'HR', 'HU', 'CA'
 ];
 
 /**
@@ -314,7 +332,7 @@ export const fetchRoutesFromDatabase = async (): Promise<void> => {
 
     if (error) throw error;
 
-    // Process UK routes (England)
+    // Process UK routes (England, Scotland, and other UK nations)
     cachedUKRoutes = [];
     cachedIrelandRoutes = [];
 
@@ -323,7 +341,7 @@ export const fetchRoutesFromDatabase = async (): Promise<void> => {
       const pickupDate = schedule.pickup_date || 'Not set';
       const country = schedule.country || 'England';
 
-      if (country === 'England') {
+      if (country !== 'Ireland') {
         // Extract postcodes from areas (stored as "Postcodes: SW1, SW2, ...")
         const postcodesEntry = schedule.areas.find((a: string) => a.startsWith('Postcodes:'));
         if (postcodesEntry) {

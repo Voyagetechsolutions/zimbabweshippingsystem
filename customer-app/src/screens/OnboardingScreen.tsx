@@ -67,7 +67,6 @@ export default function OnboardingScreen() {
     const townCandidates = wantIreland ? [city] : [city, ...(ukLookup?.candidates || [])];
     const byRoute = new Map<string, Date | null>();
     schedules
-      .filter((s) => s.route !== 'SCOTLAND ROUTE')
       .filter((s) => {
         const c = String(s.country || 'UK').toLowerCase();
         return wantIreland ? c.includes('ireland') : !c.includes('ireland');

@@ -12,9 +12,10 @@ const UK_ROUTE_PREFIXES: Record<string, string[]> = {
   'BRIGHTON ROUTE': ['BN','RH','SL','TN','CT','CR','TW','KT','ME'],
   'SOUTHEND ROUTE': ['NR','IP','CO','CM','CB','SS','SG'],
   'NORTHAMPTON ROUTE': ['MK','LU','AL','HP','NN'],
+  'SCOTLAND ROUTE': ['AB','DD','IV','PH','KY','FK','EH','ML','TD','G','PA','KA','DG','NE','DH','SR','DL','TS'],
 };
 
-const RESTRICTED_UK_PREFIXES = new Set(['EX','TQ','DT','LD','HR','HU','TS','DL','SR','CA','NE','TD','EH','ML','KA','DG','G','DH','KY','PA','IV','AB','DD']);
+const RESTRICTED_UK_PREFIXES = new Set(['EX','TQ','DT','LD','HR','HU','CA']);
 
 function postcodePrefix(value?: string | null) {
   return (outwardCode(value).match(/^[A-Z]+/) || [''])[0];
