@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 interface PaymentMethodSectionProps {
   bookingData: any;
@@ -41,12 +42,14 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const {config:business}=useBusinessConfiguration();const premiumPercent=business.fees.payOnArrivalPremiumPercent;
+  const sealPrice=Number(business.catalogue.find((item)=>item.id==='seal')?.priceUK)||0;
   
   const isSpecialDeal = selectedPaymentMethod === 'cashOnCollection';
   const drumQuantity = bookingData?.shipmentDetails?.type === 'drum' ? (bookingData?.shipmentDetails?.quantity || 1) : 0;
   
   const isPayOnArrival = selectedPaymentMethod === 'payOnArrival';
-  const payOnArrivalPremium = isPayOnArrival ? (totalAmount * 0.20) : 0;
+  const payOnArrivalPremium = isPayOnArrival ? (totalAmount * premiumPercent/100) : 0;
   
   const finalAmount = isPayOnArrival ? (totalAmount + payOnArrivalPremium) : 
                       totalAmount;
@@ -145,8 +148,8 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
         services: [
           ...(bookingData?.shipmentDetails?.services || []),
           ...(bookingData?.wantMetalSeal ? [{
-            name: `Metal Seal${parseInt(bookingData?.drumQuantity || '1') > 1 ? 's' : ''} (${parseInt(bookingData?.drumQuantity || '1')} x £5)`,
-            price: 5 * parseInt(bookingData?.drumQuantity || '1')
+            name: `Metal Seal${parseInt(bookingData?.drumQuantity || '1') > 1 ? 's' : ''} (${parseInt(bookingData?.drumQuantity || '1')} x £${sealPrice})`,
+            price: sealPrice * parseInt(bookingData?.drumQuantity || '1')
           }] : [])
         ]
       };
@@ -360,7 +363,7 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
               <label htmlFor="payOnArrival" className="font-medium flex items-center justify-between">
                 <span className="flex items-center">
                   <CalendarClock className="mr-2 h-4 w-4" />
-                  Pay on Arrival (20% Premium)
+                  Pay on Arrival ({premiumPercent}% Premium)
                 </span>
                 <div className="text-right">
                   <span className="text-gray-500 dark:text-gray-400 line-through mr-2">£{totalAmount.toFixed(2)}</span>
@@ -372,7 +375,7 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
               <div className="mt-3 flex items-start rounded-md bg-amber-100 dark:bg-amber-900/30 p-2 text-sm">
                 <AlertCircle className="mr-2 h-4 w-4 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" />
                 <span className="text-amber-700 dark:text-amber-400">
-                  This option adds a 20% premium to the total cost.
+                  This option adds a {premiumPercent}% premium to the total cost.
                 </span>
               </div>
             </div>
@@ -391,7 +394,7 @@ export const PaymentMethodSection: React.FC<PaymentMethodSectionProps> = ({
           
           {isPayOnArrival && (
             <div className="flex justify-between mb-2 text-amber-600 dark:text-amber-400">
-              <span>Pay on arrival premium (20%):</span>
+              <span>Pay on arrival premium ({premiumPercent}%):</span>
               <span>+£{payOnArrivalPremium.toFixed(2)}</span>
             </div>
           )}

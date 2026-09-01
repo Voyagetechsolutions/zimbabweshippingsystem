@@ -2,9 +2,13 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Facebook, Instagram, Mail, Phone, MapPin } from 'lucide-react';
 import AppDownload from '@/components/AppDownload';
+import BusinessContactValue from '@/components/BusinessContactValue';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
+  const { config: business } = useBusinessConfiguration();
+  const whatsappNumber=String(business.company.whatsappPhone||'').replace(/\D/g,'');
 
   return (
     <footer className="bg-gray-900 text-white mt-auto">
@@ -29,7 +33,7 @@ const Footer = () => {
             </p>
             <div className="flex space-x-4">
               <a
-                href="https://www.facebook.com/profile.php?id=61565306426707"
+                href={business.company.facebookUrl || undefined}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-zim-green transition-colors"
@@ -38,7 +42,7 @@ const Footer = () => {
                 <Facebook className="h-6 w-6" />
               </a>
               <a
-                href="https://www.instagram.com/zimbabwe__shipping/"
+                href={business.company.instagramUrl || undefined}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-zim-green transition-colors"
@@ -47,7 +51,7 @@ const Footer = () => {
                 <Instagram className="h-6 w-6" />
               </a>
               <a
-                href="https://wa.me/447584100552"
+                href={whatsappNumber ? `https://wa.me/${whatsappNumber}` : undefined}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-zim-green transition-colors"
@@ -101,21 +105,19 @@ const Footer = () => {
               <li className="flex items-start gap-3">
                 <MapPin className="h-5 w-5 text-zim-green mt-0.5 flex-shrink-0" />
                 <span className="text-gray-400 text-sm">
-                  Pastures Lodge Farm<br />
-                  Chelveston Rd<br />
-                  Wellingborough NN9 6AA
+                  {business.company.address}
                 </span>
               </li>
               <li>
-                <a href="tel:+447584100552" className="flex items-center gap-3 text-gray-400 hover:text-white transition-colors">
+                <a href={business.company.ukPhone ? `tel:${business.company.ukPhone}` : undefined} className="flex items-center gap-3 text-gray-400 hover:text-white transition-colors">
                   <Phone className="h-5 w-5 text-zim-yellow" />
-                  +44 7584 100552
+                  <BusinessContactValue />
                 </a>
               </li>
               <li>
-                <a href="mailto:info@zimbabweshipping.com" className="flex items-center gap-3 text-gray-400 hover:text-white transition-colors">
+                <a href={business.company.supportEmail ? `mailto:${business.company.supportEmail}` : undefined} className="flex items-center gap-3 text-gray-400 hover:text-white transition-colors">
                   <Mail className="h-5 w-5 text-zim-red" />
-                  info@zimbabweshipping.com
+                  {business.company.supportEmail}
                 </a>
               </li>
             </ul>

@@ -6,7 +6,9 @@ import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import BusinessContactValue from '@/components/BusinessContactValue';
 import { toast } from '@/hooks/use-toast';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +25,8 @@ export default function DeleteAccount() {
   const navigate = useNavigate();
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const { config: business } = useBusinessConfiguration();
+  const whatsappNumber=String(business.company.whatsappPhone||'').replace(/\D/g,'');
 
   const handleDeleteRequest = async () => {
     if (!user) {
@@ -236,15 +240,15 @@ export default function DeleteAccount() {
                     </li>
                     <li>
                       <strong className="text-foreground">Email us directly:</strong> Send an email to{' '}
-                      <a href="mailto:info@zimbabweshipping.com?subject=Account Deletion Request" className="text-primary hover:underline">
-                        info@zimbabweshipping.com
+                      <a href={business.company.supportEmail ? `mailto:${business.company.supportEmail}?subject=Account%20Deletion%20Request` : undefined} className="text-primary hover:underline">
+                        {business.company.supportEmail}
                       </a>
                       {' '}with the subject "Account Deletion Request" from your registered email address
                     </li>
                     <li>
                       <strong className="text-foreground">WhatsApp:</strong> Message us on{' '}
-                      <a href="https://wa.me/447584100552?text=I%20would%20like%20to%20delete%20my%20Zimbabwe%20Shipping%20account" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">
-                        +44 7584 100552
+                      <a href={whatsappNumber ? `https://wa.me/${whatsappNumber}?text=I%20would%20like%20to%20delete%20my%20Zimbabwe%20Shipping%20account` : undefined} className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">
+                        <BusinessContactValue />
                       </a>
                     </li>
                   </ol>
@@ -295,12 +299,12 @@ export default function DeleteAccount() {
               </p>
               <p>
                 Email us at{' '}
-                <a href="mailto:info@zimbabweshipping.com" className="text-primary hover:underline">
-                  info@zimbabweshipping.com
+                <a href={business.company.supportEmail ? `mailto:${business.company.supportEmail}` : undefined} className="text-primary hover:underline">
+                  {business.company.supportEmail}
                 </a>
                 {' '}or call{' '}
-                <a href="tel:+447584100552" className="text-primary hover:underline">
-                  +44 7584 100552
+                <a href={business.company.ukPhone ? `tel:${business.company.ukPhone}` : undefined} className="text-primary hover:underline">
+                  <BusinessContactValue />
                 </a>
               </p>
             </div>

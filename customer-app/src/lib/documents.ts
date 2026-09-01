@@ -5,8 +5,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import type { Shipment } from './shipment';
-
-const LOGO_URL = 'https://www.zimbabweshipping.ie/logo.png';
+import { getCachedBusinessConfig } from './businessConfig';
 
 type InvoiceItem = { description?: string; quantity?: number; unitPrice?: number };
 
@@ -33,11 +32,12 @@ function invoiceTotals(invoice: any) {
 }
 
 function headerHtml(title: string, refLines: string) {
+  const company = getCachedBusinessConfig().company;
   return `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px">
       <div>
-        <img src="${LOGO_URL}" style="height:80px" onerror="this.style.display='none'" />
-        <div style="font-size:18px;font-weight:700;color:#046A38;margin-top:4px">Zimbabwe Shipping</div>
+        <img src="${esc(company.logoUrl)}" style="height:80px" onerror="this.style.display='none'" />
+        <div style="font-size:18px;font-weight:700;color:#046A38;margin-top:4px">${esc(company.name)}</div>
       </div>
       <div style="text-align:right">
         <div style="font-size:30px;font-weight:bold;letter-spacing:1px">${title}</div>
@@ -66,6 +66,7 @@ function sealsBlock(shipment: Shipment): string {
 }
 
 export function buildInvoiceHtml(shipment: Shipment): string {
+  const company = getCachedBusinessConfig().company;
   const m: any = shipment.metadata || {};
   const invoice = m.invoice || {};
   const { items, subtotal, discount, tax, total, paidAmount, balance } = invoiceTotals(invoice);
@@ -98,10 +99,10 @@ export function buildInvoiceHtml(shipment: Shipment): string {
     <div style="display:flex;gap:40px;margin-bottom:28px">
       <div style="flex:1">
         <div style="font-weight:bold;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#666;margin-bottom:6px">FROM</div>
-        <div style="font-weight:600">Zimbabwe Shipping</div>
-        <div style="color:#444;line-height:1.6">www.zimbabweshipping.ie</div>
-        <div style="color:#444;line-height:1.6">UK: +44 7584 100552</div>
-        <div style="color:#444;line-height:1.6">Ireland: +353 87 195 4910</div>
+        <div style="font-weight:600">${esc(company.name)}</div>
+        <div style="color:#444;line-height:1.6">${esc(company.website)}</div>
+        <div style="color:#444;line-height:1.6">UK: ${esc(company.ukPhone)}</div>
+        <div style="color:#444;line-height:1.6">Ireland: ${esc(company.irelandPhone)}</div>
       </div>
       <div style="flex:1">
         <div style="font-weight:bold;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#666;margin-bottom:6px">BILL TO</div>
@@ -153,6 +154,7 @@ export function buildInvoiceHtml(shipment: Shipment): string {
 export function buildDeliveryNoteHtml(shipment: Shipment, extras?: {
   deliveryNote?: any; seals?: any; proofSummary?: { count: number; capturedAt?: string | null } | null;
 }): string {
+  const company = getCachedBusinessConfig().company;
   const m: any = shipment.metadata || {};
   const sender = m.sender || m.senderDetails || {};
   const recipient = m.recipient || m.recipientDetails || {};
@@ -253,7 +255,7 @@ export function buildDeliveryNoteHtml(shipment: Shipment, extras?: {
       </div>
     </div>
     <div style="margin-top:32px;border-top:1px solid #ddd;padding-top:16px;display:flex;justify-content:space-between;font-size:11px;color:#888">
-      <span>Zimbabwe Shipping</span>
+      <span>${esc(company.name)}</span>
       <span>Tracking: ${esc(shipment.tracking_number)}</span>
       <span>Generated: ${new Date().toLocaleString('en-GB')}</span>
     </div>

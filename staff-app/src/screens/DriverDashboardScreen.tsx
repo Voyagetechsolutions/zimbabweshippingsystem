@@ -20,6 +20,7 @@ import type { DriverStackParams, DriverStopKind } from '../navigation/types';
 import { loadRouteDay, sortByProximity, type RouteDay } from '../lib/collections';
 import { getDriverLocation, describeLocationStatus, type Point } from '../lib/driverLocation';
 import { DriverCollectionsPanel } from './DriverExperienceScreens';
+import { getStaffBusinessConfig } from '../lib/businessConfig';
 
 type Props = NativeStackScreenProps<DriverStackParams, 'TodayRun'>;
 type StopStatus = 'planned' | 'en_route' | 'arrived' | 'completed' | 'failed';
@@ -339,13 +340,7 @@ export default function DriverDashboardScreen({ navigation }: Props) {
     ]);
   };
 
-  const FAIL_REASONS: Array<{ key: string; label: string }> = [
-    { key: 'not_home', label: 'Customer not home' },
-    { key: 'goods_not_ready', label: 'Goods not ready' },
-    { key: 'payment_issue', label: 'Payment issue' },
-    { key: 'access_problem', label: 'Access problem' },
-    { key: 'other', label: 'Other' },
-  ];
+  const FAIL_REASONS: Array<{ key: string; label: string }> = (getStaffBusinessConfig()?.operations.failedStopReasons || []).map((item)=>({key:item.id,label:item.label}));
 
   const failStop = (stop: RunStop) => {
     if (run?.status !== 'active') {

@@ -3,6 +3,7 @@ import TabHeader from '../TabHeader';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminCountry } from '@/contexts/AdminCountryContext';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 import { 
   Card, 
   CardContent, 
@@ -78,6 +79,7 @@ interface RouteData {
 const RouteManagementTab = () => {
   const { toast } = useToast();
   const { selectedCountry } = useAdminCountry();
+  const { config: business } = useBusinessConfiguration(true);
   const [routes, setRoutes] = useState<RouteData[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -91,117 +93,11 @@ const RouteManagementTab = () => {
   const [editingRoute, setEditingRoute] = useState<RouteData | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-  // Available predefined routes for quick selection - England
-  const predefinedEnglandRoutes = [
-    'LONDON',
-    'LEEDS',
-    'MANCHESTER',
-    'BIRMINGHAM',
-    'NOTTINGHAM',
-    'CARDIFF',
-    'BOURNEMOUTH',
-    'SOUTHEND',
-    'NORTHAMPTON',
-    'BRIGHTON'
-  ];
-
-  // Available predefined routes for quick selection - Ireland
-  const predefinedIrelandRoutes = [
-    'LONDONDERRY',
-    'BELFAST',
-    'CAVAN',
-    'ATHLONE',
-    'LIMERICK',
-    'DUBLIN CITY',
-    'CORK'
-  ];
-
-  // England routes with their cities and postcodes (for seeding)
-  const englandRoutesData: { route: string; cities: string[]; postcodes: string[] }[] = [
-    {
-      route: 'LONDON',
-      cities: ['Central London', 'East London', 'West London', 'North London', 'South London'],
-      postcodes: ['EC', 'WC', 'N', 'NW', 'E', 'SE', 'SW', 'W', 'EN', 'IG', 'RM', 'DA', 'BR', 'UB', 'HA', 'WD']
-    },
-    {
-      route: 'BIRMINGHAM',
-      cities: ['Birmingham', 'Coventry', 'Wolverhampton', 'Dudley', 'Walsall', 'Worcester', 'Shrewsbury', 'Telford'],
-      postcodes: ['B', 'CV', 'WV', 'DY', 'WS', 'WR', 'SY', 'TF']
-    },
-    {
-      route: 'MANCHESTER',
-      cities: ['Manchester', 'Liverpool', 'Warrington', 'Oldham', 'Stockport', 'Stoke', 'Blackburn', 'Preston', 'Blackpool', 'Bolton', 'Wigan', 'Crewe', 'Chester'],
-      postcodes: ['M', 'L', 'WA', 'OL', 'SK', 'ST', 'BB', 'PR', 'FY', 'BL', 'WN', 'CW', 'CH', 'LL']
-    },
-    {
-      route: 'LEEDS',
-      cities: ['Leeds', 'Wakefield', 'Halifax', 'Doncaster', 'Sheffield', 'Huddersfield', 'York', 'Bradford', 'Harrogate'],
-      postcodes: ['LS', 'WF', 'HX', 'DN', 'S', 'HD', 'YO', 'BD', 'HG']
-    },
-    {
-      route: 'CARDIFF',
-      cities: ['Cardiff', 'Gloucester', 'Bristol', 'Swindon', 'Bath', 'Salisbury', 'Newport', 'Swansea'],
-      postcodes: ['CF', 'GL', 'BS', 'SN', 'BA', 'SP', 'NP', 'SA']
-    },
-    {
-      route: 'BOURNEMOUTH',
-      cities: ['Southampton', 'Portsmouth', 'Reading', 'Guildford', 'Bournemouth', 'Oxford'],
-      postcodes: ['SO', 'PO', 'RG', 'GU', 'BH', 'OX']
-    },
-    {
-      route: 'NOTTINGHAM',
-      cities: ['Nottingham', 'Leicester', 'Derby', 'Peterborough', 'Lincoln'],
-      postcodes: ['NG', 'LE', 'DE', 'PE', 'LN']
-    },
-    {
-      route: 'BRIGHTON',
-      cities: ['Brighton', 'Redhill', 'Slough', 'Tunbridge Wells', 'Canterbury', 'Croydon', 'Twickenham', 'Kingston', 'Maidstone'],
-      postcodes: ['BN', 'RH', 'SL', 'TN', 'CT', 'CR', 'TW', 'KT', 'ME']
-    },
-    {
-      route: 'SOUTHEND',
-      cities: ['Norwich', 'Ipswich', 'Colchester', 'Chelmsford', 'Cambridge', 'Southend', 'Stevenage'],
-      postcodes: ['NR', 'IP', 'CO', 'CM', 'CB', 'SS', 'SG']
-    },
-    {
-      route: 'NORTHAMPTON',
-      cities: ['Milton Keynes', 'Luton', 'St Albans', 'Hemel Hempstead', 'Northampton'],
-      postcodes: ['MK', 'LU', 'AL', 'HP', 'NN']
-    }
-  ];
-
-  // Ireland routes with their cities (for seeding)
-  const irelandRoutesData: { route: string; cities: string[] }[] = [
-    {
-      route: 'LONDONDERRY',
-      cities: ['Larne', 'Ballyclare', 'Ballymena', 'Ballymoney', 'Kilrea', 'Coleraine', 'Londonderry', 'Lifford', 'Omagh', 'Cookstown', 'Carrickfergus']
-    },
-    {
-      route: 'BELFAST',
-      cities: ['Belfast', 'Bangor', 'Comber', 'Lisburn', 'Newry', 'Newtownards', 'Dunmurry', 'Lurgan', 'Portadown', 'Banbridge', 'Moy', 'Dungannon', 'Armagh']
-    },
-    {
-      route: 'CAVAN',
-      cities: ['Maynooth', 'Ashbourne', 'Swords', 'Skerries', 'Drogheda', 'Dundalk', 'Cavan', 'Virginia', 'Kells', 'Navan', 'Trim']
-    },
-    {
-      route: 'ATHLONE',
-      cities: ['Mullingar', 'Longford', 'Roscommon', 'Boyle', 'Sligo', 'Ballina', 'Swinford', 'Castlebar', 'Tuam', 'Galway', 'Athenry', 'Athlone']
-    },
-    {
-      route: 'LIMERICK',
-      cities: ['Newbridge', 'Portlaoise', 'Roscrea', 'Limerick', 'Ennis', 'Doolin', 'Loughrea', 'Ballinasloe', 'Tullamore']
-    },
-    {
-      route: 'DUBLIN CITY',
-      cities: ['Sandyford', 'Rialto', 'Ballymount', 'Cabra', 'Beaumont', 'Malahide', 'Portmarnock', 'Dalkey', 'Shankill', 'Bray', 'Dublin']
-    },
-    {
-      route: 'CORK',
-      cities: ['Cashel', 'Fermoy', 'Cork', 'Dungarvan', 'Waterford', 'New Ross', 'Wexford', 'Gorey', 'Greystones']
-    }
-  ];
-
+  // Route templates are maintained in app_configuration and visible only to staff.
+  const englandRoutesData = business.routeTemplates.england;
+  const irelandRoutesData = business.routeTemplates.ireland;
+  const predefinedEnglandRoutes = englandRoutesData.map((item) => item.route);
+  const predefinedIrelandRoutes = irelandRoutesData.map((item) => item.route);
   const [isSeedingIreland, setIsSeedingIreland] = useState(false);
   const [isSeedingEngland, setIsSeedingEngland] = useState(false);
 

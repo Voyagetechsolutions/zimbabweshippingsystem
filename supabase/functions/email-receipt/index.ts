@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { Resend } from "npm:resend@2.0.0";
 
 // Initialize Resend client
-const resend = new Resend(Deno.env.get("re_CfiA4KVD_CqCS6hkA9stb9fNbxAfaivJ5") || "");
+const resend = new Resend(Deno.env.get("RESEND_API_KEY") || "");
 
 // CORS Headers
 const corsHeaders = {
@@ -48,6 +48,10 @@ serve(async (req) => {
     
     // Parse the request body
     const { receiptId, email, receiptData, shipmentData }: EmailReceiptRequest = await req.json();
+    const { data: companyRow, error: companyError } = await supabaseAdmin.from('app_configuration').select('value').eq('key','company_profile').single();
+    if (companyError) throw companyError;
+    const company = (companyRow?.value || {}) as Record<string,string>;
+    if (!company.name || !company.noreplyEmail) throw new Error('Company email configuration is incomplete');
 
     console.log(`Processing email request for receipt: ${receiptId} to ${email}`);
 
@@ -100,7 +104,7 @@ serve(async (req) => {
 
     // Send the email using Resend
     const { error } = await resend.emails.send({
-      from: "Zimbabwe Shipping <noreply@zimbabweshipping.com>",
+      from: `${company.name} <${company.noreplyEmail}>`,
       to: [email],
       subject: `Your Receipt - ${receipt.receipt_number}`,
       html: emailContent,

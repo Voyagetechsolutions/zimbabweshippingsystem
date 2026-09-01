@@ -15,6 +15,7 @@ import PostcodeField from '@/components/address/PostcodeField';
 import AddressSearchField from '@/components/address/AddressSearchField';
 import type { Coverage, PostcodeDetails } from '@/utils/addressLookup';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 interface FormData {
   // Sender Details
@@ -99,29 +100,6 @@ interface Depot {
   phone: string | null;
   opening_hours: string | null;
 }
-
-// UK drum prices (GBP) — flat rate
-const getDrumPrice = (quantity: number): number => {
-  return 280;
-};
-
-// Ireland drum prices (EUR) — flat rate
-const getIrelandDrumPrice = (quantity: number): number => {
-  return 360;
-};
-
-// Ireland trunk/storage box prices (EUR) — flat rate
-const getTrunkPrice = (quantity: number): number => {
-  return 220;
-};
-
-// Metal seal prices
-const getMetalSealPrice = (country: string): number => {
-  return country === 'Ireland' || country === 'Northern Ireland' ? 7 : 5;
-};
-
-// Door-to-door delivery in Zimbabwe — flat fee per address (£25 / €25).
-const DOOR_TO_DOOR_PRICE = 25;
 
 // Payment Schedule Builder Component
 interface PaymentScheduleBuilderProps {
@@ -337,6 +315,15 @@ const PaymentScheduleBuilder: React.FC<PaymentScheduleBuilderProps> = ({
 };
 
 export const SimplifiedBookingForm = () => {
+  const {config:business,loading:businessLoading,error:businessError}=useBusinessConfiguration();
+  const price=(id:string,country:string)=>{const item=business.catalogue.find((row)=>row.id===id);return Number(country==='Ireland'||country==='Northern Ireland'?item?.priceIE:item?.priceUK)||0;};
+  const getDrumPrice=(_quantity:number)=>price('plastic_drum','United Kingdom');
+  const getIrelandDrumPrice=(_quantity:number)=>price('plastic_drum','Ireland');
+  const getTrunkPrice=(_quantity:number)=>price('trunk',formData?.pickupCountry||'Ireland');
+  const getMetalSealPrice=(country:string)=>price('seal',country);
+  const DOOR_TO_DOOR_PRICE=business.fees.doorDeliveryPerAddress;
+  const metalDrumPurchase=business.fees.metalDrumPurchase||0;
+  const plasticDrumPurchase=business.fees.plasticDrumPurchase||0;
   const [currentStep, setCurrentStep] = useState(1);
   const [showSecondPhone, setShowSecondPhone] = useState(false);
   const [showReceiverSecondPhone, setShowReceiverSecondPhone] = useState(false);
@@ -587,7 +574,7 @@ export const SimplifiedBookingForm = () => {
         if (!isIreland && pickupCoverage.status === 'not_covered') {
           toast({
             title: 'We don\'t collect from this postcode',
-            description: 'Call us on +44 7584 100552 or send a custom quote request and we\'ll find the nearest area we cover.',
+            description: `Call us on ${business.company.ukPhone||''} or send a custom quote request and we'll find the nearest area we cover.`,
             variant: 'destructive',
           });
           return false;
@@ -709,7 +696,7 @@ export const SimplifiedBookingForm = () => {
 
     // Apply payment method adjustments
     if (formData.paymentMethod === 'payOnArrival') {
-      return baseTotal * 1.20; // 20% premium
+      return baseTotal * (1 + business.fees.payOnArrivalPremiumPercent / 100);
     }
     return baseTotal;
   };
@@ -772,7 +759,7 @@ export const SimplifiedBookingForm = () => {
       if (formData.includeBoxes) notes.push(`Other Items (agent quote): ${formData.boxesDescription}`);
       if (formData.includeTrunks && formData.trunkQuantity > 0) notes.push(`${formData.trunkQuantity} x Trunk/Storage Box`);
       if (formData.purchaseDrums && formData.purchaseDrumType && formData.purchaseDrumQuantity > 0) {
-        notes.push(`Purchase ${formData.purchaseDrumQuantity} x ${formData.purchaseDrumType === 'metal' ? 'Metal Drum (£40)' : 'Plastic Barrel (£50)'}`);
+        notes.push(`Purchase ${formData.purchaseDrumQuantity} x ${formData.purchaseDrumType === 'metal' ? `Metal Drum (£${metalDrumPurchase})` : `Plastic Barrel (£${plasticDrumPurchase})`}`);
       }
       
       // Prepare metadata for shipment
@@ -848,7 +835,7 @@ export const SimplifiedBookingForm = () => {
           purchasedDrums: formData.purchaseDrums ? {
             type: formData.purchaseDrumType,
             quantity: formData.purchaseDrumQuantity,
-            priceEach: formData.purchaseDrumType === 'metal' ? 40 : 50,
+            priceEach: formData.purchaseDrumType === 'metal' ? business.fees.metalDrumPurchase : business.fees.plasticDrumPurchase,
             totalPrice: formData.purchaseDrumQuantity * (formData.purchaseDrumType === 'metal' ? 40 : 50)
           } : null
         },
@@ -1593,9 +1580,9 @@ export const SimplifiedBookingForm = () => {
   );
 
   const renderStep3 = () => {
-    const drumPrice = formData.drumQuantity > 0 ? getCurrentDrumPrice(formData.drumQuantity) : (isIrelandBooking ? 360 : 280);
+    const drumPrice = formData.drumQuantity > 0 ? getCurrentDrumPrice(formData.drumQuantity) : (isIrelandBooking ? getIrelandDrumPrice(1) : getDrumPrice(1));
     const metalSealPrice = getMetalSealPrice(formData.pickupCountry);
-    const trunkPrice = formData.trunkQuantity > 0 ? getTrunkPrice(formData.trunkQuantity) : 220;
+    const trunkPrice = formData.trunkQuantity > 0 ? getTrunkPrice(formData.trunkQuantity) : getTrunkPrice(1);
 
     return (
       <Card>
@@ -1621,11 +1608,11 @@ export const SimplifiedBookingForm = () => {
                 {/* Show country-specific pricing */}
                 {isIrelandBooking ? (
                   <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 space-y-1">
-                    <div className="text-green-600 dark:text-green-400 font-medium">• €360 per drum</div>
+                    <div className="text-green-600 dark:text-green-400 font-medium">• €{getIrelandDrumPrice(1)} per drum</div>
                   </div>
                 ) : (
                   <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 space-y-1">
-                    <div>• £280 per drum</div>
+                    <div>• £{getDrumPrice(1)} per drum</div>
                   </div>
                 )}
 
@@ -1694,7 +1681,7 @@ export const SimplifiedBookingForm = () => {
                 <div className="flex-1">
                   <div className="font-semibold text-lg">Trunks / Storage Boxes</div>
                   <div className="text-sm text-gray-600 dark:text-gray-400 mt-1 space-y-1">
-                    <div className="text-purple-600 dark:text-purple-400 font-medium">• €220 per trunk</div>
+                    <div className="text-purple-600 dark:text-purple-400 font-medium">• €{getTrunkPrice(1)} per trunk</div>
                   </div>
 
                   {formData.includeTrunks && (
@@ -1780,7 +1767,7 @@ export const SimplifiedBookingForm = () => {
                             />
                             <div>
                               <div className="font-medium">Metal Drum</div>
-                              <div className="text-lg font-bold text-blue-600 dark:text-blue-400">£40 each</div>
+                              <div className="text-lg font-bold text-blue-600 dark:text-blue-400">£{metalDrumPurchase} each</div>
                             </div>
                           </label>
 
@@ -1796,7 +1783,7 @@ export const SimplifiedBookingForm = () => {
                             />
                             <div>
                               <div className="font-medium">Plastic Barrel</div>
-                              <div className="text-lg font-bold text-blue-600 dark:text-blue-400">£50 each</div>
+                              <div className="text-lg font-bold text-blue-600 dark:text-blue-400">£{plasticDrumPurchase} each</div>
                             </div>
                           </label>
                         </div>
@@ -2145,7 +2132,7 @@ export const SimplifiedBookingForm = () => {
 
   const renderStep5 = () => {
     const baseTotal = calculateBaseTotal();
-    const premiumTotal = baseTotal * 1.20;
+    const premiumTotal = baseTotal * (1 + business.fees.payOnArrivalPremiumPercent / 100);
     const cs = currencySymbol; // shorthand for currency symbol
 
     return (
@@ -2248,7 +2235,7 @@ export const SimplifiedBookingForm = () => {
                   
                   <div className="flex items-start rounded-md bg-orange-100 dark:bg-orange-900/30 p-3 text-sm mt-2">
                     <AlertCircle className="mr-2 h-5 w-5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
-                    <span className="text-orange-700 dark:text-orange-400">This option adds a 20% premium (+{cs}{(premiumTotal - baseTotal).toFixed(2)}) to the total cost.</span>
+                    <span className="text-orange-700 dark:text-orange-400">This option adds a {business.fees.payOnArrivalPremiumPercent}% premium (+{cs}{(premiumTotal - baseTotal).toFixed(2)}) to the total cost.</span>
                   </div>
                 </div>
               </label>
@@ -2267,7 +2254,7 @@ export const SimplifiedBookingForm = () => {
 
               {formData.paymentMethod === 'payOnArrival' && (
                 <div className="flex justify-between text-orange-600 dark:text-orange-400 font-medium">
-                  <span>Payment Premium (20%):</span>
+                  <span>Payment Premium ({business.fees.payOnArrivalPremiumPercent}%):</span>
                   <span>+{cs}{(premiumTotal - baseTotal).toFixed(2)}</span>
                 </div>
               )}
@@ -2284,6 +2271,10 @@ export const SimplifiedBookingForm = () => {
   };
 
   // Show receipt after successful booking
+  if (businessLoading || businessError || !business.catalogue.length) {
+    return <Card><CardContent className="p-8 text-center"><p>{businessLoading ? 'Loading current shipping options…' : businessError || 'Current shipping options are unavailable.'}</p></CardContent></Card>;
+  }
+
   if (bookingComplete && receiptData) {
     return (
       <BookingReceipt

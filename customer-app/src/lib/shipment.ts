@@ -14,14 +14,8 @@ export type Shipment = {
   metadata?: any;
 };
 
-export const JOURNEY_STAGES = [
-  { key: 'booked', label: 'Booking confirmed', icon: 'checkmark-circle-outline' },
-  { key: 'collected', label: 'Collected', icon: 'cube-outline' },
-  { key: 'transit', label: 'On the water', icon: 'boat-outline' },
-  { key: 'arrived', label: 'Arrived in Zimbabwe', icon: 'flag-outline' },
-  { key: 'delivery', label: 'Out for delivery', icon: 'car-outline' },
-  { key: 'delivered', label: 'Delivered', icon: 'home-outline' },
-] as const;
+export const JOURNEY_STAGES:Array<{key:string;label:string;title:string;description:string;icon:string}>=[];
+export function configureJourneyStages(stages:Array<{id:string;label:string;title?:string;description?:string;icon?:string}>){JOURNEY_STAGES.splice(0,JOURNEY_STAGES.length,...stages.map((stage)=>({key:stage.id,label:stage.label,title:stage.title||stage.label,description:stage.description||'',icon:stage.icon||'ellipse-outline'})));}
 
 // Map the operational statuses (set by staff/driver/admin) onto the timeline.
 export function journeyIndex(status: string): number {

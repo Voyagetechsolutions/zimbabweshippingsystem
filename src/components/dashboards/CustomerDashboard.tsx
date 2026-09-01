@@ -14,6 +14,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/EmptyState';
 import html2pdf from 'html2pdf.js';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 import { 
   PackageCheck, 
@@ -49,6 +50,7 @@ const CustomerDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('shipments');
+  const { config: business } = useBusinessConfiguration();
 
   // Fetch user's shipments
   const fetchShipments = async () => {
@@ -286,7 +288,7 @@ const CustomerDashboard: React.FC = () => {
 
         <div style="text-align: center; margin-top: 40px; font-size: 14px; color: #666;">
           <p>Thank you for choosing Zimbabwe Shipping Services.</p>
-          <p>For any queries, please contact us at info@zimbabweshipping.com</p>
+          <p>For any queries, please contact us at {business.company.supportEmail}</p>
         </div>
       </div>
     `;

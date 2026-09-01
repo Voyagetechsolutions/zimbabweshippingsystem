@@ -24,10 +24,16 @@ import {
   Phone
 } from 'lucide-react';
 import { photos } from '@/data/sitePhotos';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
+import BusinessContactValue from '@/components/BusinessContactValue';
 
 const FAQ = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const {config:business}=useBusinessConfiguration();const drum=business.catalogue.find((item)=>item.id==='plastic_drum');
+  const whatsappNumber=String(business.company.whatsappPhone||'').replace(/\D/g,'');
+  const ukDrum=drum?.priceUK||0,ieDrum=drum?.priceIE||0,deliveryFee=business.fees.doorDeliveryPerAddress,referral=business.fees.referralDiscount;
+  const methods=business.payments.methods.map((method)=>method.label).join(', ');const covered=business.coveredZimbabwePlaces;
 
   const faqCategories = [
     {
@@ -50,7 +56,7 @@ const FAQ = () => {
         },
         {
           question: 'Do you ship from Ireland as well?',
-          answer: 'Yes! We now offer shipping from Ireland to Zimbabwe. Drum shipping from Ireland is €360 per drum. Collection is available across Ireland.'
+          answer: `Yes! We now offer shipping from Ireland to Zimbabwe. Drum shipping from Ireland is €${ieDrum} per drum. Collection is available across Ireland.`
         },
         {
           question: 'What items can I ship to Zimbabwe?',
@@ -74,11 +80,11 @@ const FAQ = () => {
       questions: [
         {
           question: 'What payment methods do you accept?',
-          answer: 'We accept cash payment, PayPal, bank transfers, payment in Zimbabwe, and mobile payment options. All payment methods are secure and encrypted for your protection.'
+          answer: `We accept ${methods}. The selected method is recorded with the booking.`
         },
         {
           question: 'What are the UK drum prices?',
-          answer: 'UK drum shipping is £280 per drum, regardless of quantity. These prices are the same regardless of payment method — cash, card, or bank transfer.'
+          answer: `UK drum shipping is £${ukDrum} per drum, regardless of quantity.`
         },
         {
           question: 'When do I need to pay for my shipment?',
@@ -90,7 +96,7 @@ const FAQ = () => {
         },
         {
           question: 'Can I pay in Euros for Ireland shipments?',
-          answer: 'Yes! All Ireland shipments are priced in Euros (EUR). Drum shipping from Ireland is €360 per drum.'
+          answer: `Yes! All Ireland shipments are priced in Euros (EUR). Drum shipping from Ireland is €${ieDrum} per drum.`
         }
       ]
     },
@@ -146,11 +152,11 @@ const FAQ = () => {
       questions: [
         {
           question: 'Do you deliver to all areas in Zimbabwe?',
-          answer: 'We deliver to all major cities and towns in Zimbabwe — Harare, Bulawayo, Chitungwiza, Mutare, Epworth, Gweru, Kwekwe, Kadoma, Masvingo, Chinhoyi, Victoria Falls, Hwange, Zvishavane, Bindura, Marondera, Chegutu, Beitbridge, Kariba, Chiredzi, Rusape, Plumtree, Ruwa, Norton, Redcliff, Gwanda, Lupane, Gokwe, Shurugwi, Mvuma, Chipinge, Karoi, Mashava, Triangle and Shamva. We do not deliver to rural areas, small villages, farms or growth points — recipients in those areas collect from our depot or an agreed point in the nearest covered town. Depot collection in Harare, Bulawayo or Mutare is free.'
+          answer: `We deliver to the major cities and towns in our current coverage list: ${covered.join(', ')}. Recipients outside covered areas collect from the nearest agreed town or depot.`
         },
         {
           question: 'How does door-to-door delivery work in Zimbabwe?',
-          answer: 'Our door-to-door service delivers your shipment directly to your recipient\'s address in Zimbabwe. We contact the recipient to inform them about the delivery day. This service costs an additional £25 (UK shipments) or €25 (Ireland shipments) per delivery address.'
+          answer: `Our door-to-door service delivers directly to the recipient. It costs £${deliveryFee} for UK shipments or €${deliveryFee} for Ireland shipments per delivery address.`
         },
         {
           question: 'Is there a depot collection option in Zimbabwe?',
@@ -198,7 +204,7 @@ const FAQ = () => {
         },
         {
           question: 'How do I set up a business account?',
-          answer: 'To set up a business account, please contact our support team at +44 7584 100552. We\'ll assess your shipping needs and set up an appropriate account structure with competitive rates.'
+          answer: `To set up a business account, contact our support team at ${business.company.ukPhone||''}. We'll assess your shipping needs and set up the account.`
         }
       ]
     },
@@ -222,11 +228,11 @@ const FAQ = () => {
         },
         {
           question: 'Do you have a referral discount?',
-          answer: 'Yes! Refer a friend or family member who ships with us and you get £20 (UK) or €20 (Ireland) off your next shipment. Just make sure they mention your name when they book.'
+          answer: `Yes! Refer someone who ships with us and get £${referral} (UK) or €${referral} (Ireland) off your next shipment.`
         },
         {
           question: 'Who runs Zimbabwe Shipping?',
-          answer: 'Zimbabwe Shipping is a family-run business founded and directed by Mr Tshakalisa Moyo. He started out as a FedEx driver, built Telk Removals, and launched Zimbabwe Shipping Services in 2011. If you need to reach Mr Moyo or the office, leave your details with Zimmy (our chat assistant) or call +44 7584 100552.'
+          answer: `${business.company.name||'The company'} is ${business.company.tagline||'family run'}. For the office, leave your details with Zimmy or call ${business.company.ukPhone||''}.`
         },
         {
           question: 'Do you offer any assistance with packing?',
@@ -422,7 +428,7 @@ const FAQ = () => {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <a
-                    href="https://wa.me/447584100552"
+                    href={whatsappNumber ? `https://wa.me/${whatsappNumber}` : undefined}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -431,10 +437,10 @@ const FAQ = () => {
                       Chat on WhatsApp
                     </Button>
                   </a>
-                  <a href="tel:+447584100552">
+                  <a href={business.company.ukPhone ? `tel:${business.company.ukPhone}` : undefined}>
                     <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10 w-full sm:w-auto">
                       <Phone className="mr-2 h-5 w-5" />
-                      +44 7584 100552
+                      <BusinessContactValue />
                     </Button>
                   </a>
                 </div>

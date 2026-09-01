@@ -6,17 +6,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { colors, spacing, radius } from '../theme';
 import { FlagStripe, Card, Button } from '../components/ui';
-import { REFERRAL_DISCOUNT } from '../lib/catalogue';
+import { useBusinessConfig } from '../lib/businessConfig';
 import { useAppTheme } from '../context/ThemeContext';
 
 export default function AccountScreen() {
   const navigation = useNavigation<any>();
   const { session, profile, signOut } = useAuth();
   const {dark,palette,setPreference}=useAppTheme();
+  const { config: business } = useBusinessConfig();
+  const referralDiscount = business.fees.referralDiscount;
+  const ukPhone = business.company.ukPhone || '';
 
   const shareReferral = () => {
     Share.share({
-      message: `I ship home with Zimbabwe Shipping — UK & Ireland to Zimbabwe, door to door in 6-8 weeks. Mention my name${profile?.full_name ? ` (${profile.full_name})` : ''} when you book! https://zimbabweshipping.com`,
+      message: `I ship home with ${business.company.name || 'our shipping team'} — UK & Ireland to Zimbabwe. Mention my name${profile?.full_name ? ` (${profile.full_name})` : ''} when you book! ${business.company.website || ''}`,
     }).catch(() => {});
   };
 
@@ -31,7 +34,7 @@ export default function AccountScreen() {
         {
           text: 'Continue',
           style: 'destructive',
-          onPress: () => Linking.openURL('https://zimbabweshipping.com/delete-account'),
+          onPress: () => Linking.openURL(`${business.company.website || ''}/delete-account`),
         },
       ],
     );
@@ -43,13 +46,13 @@ export default function AccountScreen() {
     { icon: 'location-outline' as const, label: 'Delivery Addresses', sub: 'Saved receivers in Zimbabwe', onPress: () => navigation.navigate('Addresses') },
     { icon: 'notifications-outline' as const, label: 'Notifications', sub: 'Schedule, shipment and finance updates', onPress: () => navigation.navigate('Notifications') },
     { icon: 'receipt-outline' as const, label: 'Invoices & payments', sub: 'View invoices and upload payment proof', onPress: () => navigation.navigate('Billing') },
-    { icon: 'logo-whatsapp' as const, label: 'WhatsApp us', sub: '+44 7584 100552', onPress: () => Linking.openURL('https://wa.me/447584100552') },
-    { icon: 'call-outline' as const, label: 'Call us', sub: '+44 7584 100552', onPress: () => Linking.openURL('tel:+447584100552') },
-    { icon: 'gift-outline' as const, label: `Refer a friend — £${REFERRAL_DISCOUNT}/€${REFERRAL_DISCOUNT} off`, sub: 'Share your name with someone who ships', onPress: shareReferral },
+    { icon: 'logo-whatsapp' as const, label: 'WhatsApp us', sub: ukPhone, onPress: () => Linking.openURL(`https://wa.me/${business.company.whatsappPhone || ''}`) },
+    { icon: 'call-outline' as const, label: 'Call us', sub: ukPhone, onPress: () => Linking.openURL(`tel:${ukPhone.replace(/\s/g, '')}`) },
+    { icon: 'gift-outline' as const, label: `Refer a friend — £${referralDiscount}/€${referralDiscount} off`, sub: 'Share your name with someone who ships', onPress: shareReferral },
     { icon: 'star-outline' as const, label: 'Rate driver & service', sub: 'Review your goods and overall experience', onPress: () => navigation.navigate('Feedback') },
-    { icon: 'help-circle-outline' as const, label: 'FAQ & shipping guidelines', sub: 'Prices, customs, coverage', onPress: () => Linking.openURL('https://zimbabweshipping.com/faq') },
-    { icon: 'document-text-outline' as const, label: 'Terms & Conditions', sub: 'Your booking and shipping terms', onPress: () => Linking.openURL('https://zimbabweshipping.com/terms-and-conditions') },
-    { icon: 'shield-checkmark-outline' as const, label: 'Privacy & complaints', sub: 'How we use data and how to raise a concern', onPress: () => Linking.openURL('https://zimbabweshipping.com/privacy-policy') },
+    { icon: 'help-circle-outline' as const, label: 'FAQ & shipping guidelines', sub: 'Prices, customs, coverage', onPress: () => Linking.openURL(`${business.company.website || ''}/faq`) },
+    { icon: 'document-text-outline' as const, label: 'Terms & Conditions', sub: 'Your booking and shipping terms', onPress: () => Linking.openURL(`${business.company.website || ''}/terms-and-conditions`) },
+    { icon: 'shield-checkmark-outline' as const, label: 'Privacy & complaints', sub: 'How we use data and how to raise a concern', onPress: () => Linking.openURL(`${business.company.website || ''}/privacy-policy`) },
   ];
 
   return (
@@ -115,7 +118,7 @@ export default function AccountScreen() {
           </>
         )}
 
-        <Text style={styles.footer}>Zimbabwe Shipping Services — family-run since 2011.{'\n'}Founded by Mr Tshakalisa Moyo.</Text>
+        <Text style={styles.footer}>{business.company.name}{business.company.tagline ? ` — ${business.company.tagline}` : ''}</Text>
       </ScrollView>
     </SafeAreaView>
   );

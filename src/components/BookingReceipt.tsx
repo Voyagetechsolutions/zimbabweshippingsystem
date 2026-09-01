@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle2, Download, Share2, Package, MapPin, User, CreditCard, Calendar, CalendarClock, Truck, Clock, FileText, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 interface PaymentInstallment {
   id: string;
@@ -65,6 +66,7 @@ const BookingReceipt: React.FC<BookingReceiptProps> = ({
   paymentSchedule,
   onNewBooking
 }) => {
+  const { config: business } = useBusinessConfiguration();
   const receiptRef = useRef<HTMLDivElement>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const { toast } = useToast();
@@ -400,7 +402,7 @@ const BookingReceipt: React.FC<BookingReceiptProps> = ({
 
       {/* Footer Note - inside ref for PDF */}
       <p className="text-center text-sm text-gray-500 dark:text-gray-400 print:text-gray-600 pb-4">
-        Keep this receipt for your records. Questions? Contact us at info@zimbabweshipping.com
+        Keep this receipt for your records. Questions? Contact us at {business.company.supportEmail}
       </p>
       </div>
       {/* End of ref wrapper */}

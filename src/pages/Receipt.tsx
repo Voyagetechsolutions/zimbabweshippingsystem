@@ -13,6 +13,7 @@ import { formatDate, formatCurrency } from '@/utils/formatters';
 import { Printer, Download, Mail, ArrowLeft, Loader2 } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import Logo from '@/components/Logo';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 // This page has multiple data sources:
 // 1. From URL state when navigating from the booking/payment flow
@@ -24,6 +25,7 @@ const Receipt = () => {
   const params = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { config: business } = useBusinessConfiguration();
   
   // State for receipt data and loading status
   const [receipt, setReceipt] = useState<ReceiptType | null>(null);
@@ -158,7 +160,7 @@ const Receipt = () => {
     
     switch(method) {
       case 'payOnArrival':
-        return 'Pay on Arrival (20% Premium)';
+        return `Pay on Arrival (${business.fees.payOnArrivalPremiumPercent}% Premium)`;
       case 'cashOnCollection':
         return 'Pay Full on Collection';
       case 'bankTransfer':
@@ -364,7 +366,7 @@ const Receipt = () => {
               {/* Terms and Conditions */}
               <div className="text-xs text-gray-500 mt-6 border-t pt-4">
                 <p className="mb-1">Thank you for choosing Zimbabwe Shipping Services for your shipping needs.</p>
-                <p>For receipt or payment queries, contact info@zimbabweshipping.com or the accounts office on +44 7770 761266.</p>
+                <p>For receipt or payment queries, contact {business.company.supportEmail} or the accounts office on {business.company.accountsPhone}.</p>
               </div>
             </div>
           )}

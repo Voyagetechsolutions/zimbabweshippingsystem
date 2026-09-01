@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase';
 import { colors, spacing, radius } from '../theme';
 import { FlagStripe } from '../components/ui';
 import { useAppTheme } from '../context/ThemeContext';
+import { useBusinessConfig } from '../lib/businessConfig';
 
 // Same Zimmy brain as the website — the ai-chat edge function handles pricing,
 // coverage, schedules, tracking, bookings, quotes and Mr Moyo leads.
@@ -15,7 +16,7 @@ type ChatMessage = { role: 'user' | 'assistant'; content: string };
 
 const GREETING: ChatMessage = {
   role: 'assistant',
-  content: "Hi! I'm Zimmy, the Zimbabwe Shipping assistant. Ask me about prices, collection dates, tracking — or let me book your shipment right here.",
+  content: "Hi! I'm Zimmy, your shipping assistant. Ask me about prices, collection dates, tracking — or let me book your shipment right here.",
 };
 
 const STORAGE_KEY = 'zimmy-app-chat';
@@ -40,6 +41,7 @@ export default function ZimmyScreen() {
   const conversationId = useRef<string>('');
   const listRef = useRef<FlatList>(null);
   const {palette}=useAppTheme();
+  const { config: business } = useBusinessConfig();
 
   useEffect(() => {
     (async () => {
@@ -75,17 +77,17 @@ export default function ZimmyScreen() {
       });
       if (error) throw error;
       const reply = (data as { reply?: string } | null)?.reply ||
-        'Sorry, I had a problem replying. Please try again, or reach us on WhatsApp +44 7584 100552.';
+        `Sorry, I had a problem replying. Please try again, or reach us on WhatsApp ${business.company.ukPhone || ''}.`;
       setMessages((prev) => [...prev, { role: 'assistant', content: reply }]);
     } catch {
       setMessages((prev) => [...prev, {
         role: 'assistant',
-        content: "Sorry, I'm having trouble right now. Please try again shortly, or contact us on WhatsApp +44 7584 100552.",
+        content: `Sorry, I'm having trouble right now. Please try again shortly, or contact us on WhatsApp ${business.company.ukPhone || ''}.`,
       }]);
     } finally {
       setLoading(false);
     }
-  }, [input, loading, messages]);
+  }, [input, loading, messages, business.company.ukPhone]);
 
   // Quick actions elsewhere in the app can hand Zimmy an opening message.
   useEffect(() => {
@@ -106,7 +108,7 @@ export default function ZimmyScreen() {
         <View style={styles.avatar}><Ionicons name="chatbubbles" size={18} color={colors.white} /></View>
         <View style={{ flex: 1 }}>
           <Text style={[styles.headerTitle,{color:palette.text}]}>Zimmy</Text>
-          <Text style={[styles.headerSub,{color:palette.textMuted}]}>Zimbabwe Shipping AI assistant</Text>
+          <Text style={[styles.headerSub,{color:palette.textMuted}]}>{business.company.name} AI assistant</Text>
         </View>
         <Pressable onPress={reset} hitSlop={12}><Ionicons name="refresh" size={19} color={colors.textMuted} /></Pressable>
       </View>

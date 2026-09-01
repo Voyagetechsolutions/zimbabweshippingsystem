@@ -5,8 +5,9 @@ import { AuthProvider } from './src/context/AuthContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import { ThemeProvider, useAppTheme } from './src/context/ThemeContext';
 import ErrorBoundary from './src/components/ErrorBoundary';
+import { useBusinessConfig } from './src/lib/businessConfig';
 
-function ThemedApp(){const {dark}=useAppTheme();return <><StatusBar style={dark?'light':'dark'} /><RootNavigator /></>}
+function ThemedApp(){const {dark}=useAppTheme();useBusinessConfig();return <><StatusBar style={dark?'light':'dark'} /><RootNavigator /></>}
 
 export default function App() {
   return (

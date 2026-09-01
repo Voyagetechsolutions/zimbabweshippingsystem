@@ -1,6 +1,7 @@
 import { Helmet } from 'react-helmet';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import BusinessContactValue, { BusinessContactLink } from '@/components/BusinessContactValue';
 
 const PrivacyComplaint = () => (
   <>
@@ -10,9 +11,9 @@ const PrivacyComplaint = () => (
       <article className="prose max-w-3xl mx-auto">
         <h1>Privacy complaints and requests</h1>
         <p>
-          Email <a href="mailto:info@zimbabweshipping.com?subject=Privacy%20complaint">info@zimbabweshipping.com</a>
-          {' '}with the subject <strong>Privacy complaint</strong>, or write to Zimbabwe Shipping Services,
-          Pastures Lodge Farm, Chelveston Road, Wellingborough NN9 6AA, United Kingdom.
+          Email <BusinessContactLink subject="Privacy complaint" />
+          {' '}with the subject <strong>Privacy complaint</strong>, or write to <BusinessContactValue field="name" />,
+          {' '}<BusinessContactValue field="address" />.
         </p>
         <h2>What to include</h2>
         <ul>

@@ -2,6 +2,7 @@ import React from 'react';
 import { Separator } from '@/components/ui/separator';
 import { User, MapPin, Package, Cylinder, Phone, Mail } from 'lucide-react';
 import type { BookingData } from '../SimpleBookingForm';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 interface SummaryStepProps {
   data: BookingData;
@@ -9,8 +10,8 @@ interface SummaryStepProps {
 }
 
 const SummaryStep: React.FC<SummaryStepProps> = ({ data, total }) => {
-  const drumPrice = 75;
-  const boxPrice = 25;
+  const { config: business } = useBusinessConfiguration();
+  const drumPrice=Number(business.catalogue.find((item)=>item.id==='plastic_drum')?.priceUK)||0;
 
   return (
     <div className="space-y-6">
@@ -99,7 +100,7 @@ const SummaryStep: React.FC<SummaryStepProps> = ({ data, total }) => {
                 <span>Boxes & Other</span>
                 <span className="text-muted-foreground">× {data.shipment.boxes}</span>
               </div>
-              <span className="font-medium">£{data.shipment.boxes * boxPrice}</span>
+              <span className="font-medium">Custom quote</span>
             </div>
           )}
           {data.shipment.otherItemsDescription && (

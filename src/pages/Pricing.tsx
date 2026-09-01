@@ -7,8 +7,13 @@ import WhatsAppButton from '@/components/WhatsAppButton';
 import { Button } from '@/components/ui/button';
 import { Check, Banknote, Package, ArrowRight, Phone, Truck, Shield } from 'lucide-react';
 import { photos } from '@/data/sitePhotos';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 const Pricing = () => {
+  const {config:business}=useBusinessConfiguration();
+  const drum=business.catalogue.find((item)=>item.id==='plastic_drum');const seal=business.catalogue.find((item)=>item.id==='seal');
+  const ukDrum=Number(drum?.priceUK)||0,ieDrum=Number(drum?.priceIE)||0,ukSeal=Number(seal?.priceUK)||0;
+  const arrivalPremium=business.fees.payOnArrivalPremiumPercent,deliveryFee=business.fees.doorDeliveryPerAddress,collectionFee=business.fees.doorCollection,referral=business.fees.referralDiscount;
   return (
     <>
       <Helmet>
@@ -85,7 +90,7 @@ const Pricing = () => {
                           <span className="font-semibold text-lg">1+ drums</span>
                           <span className="ml-2 text-xs text-zim-green font-medium">PER DRUM</span>
                         </div>
-                        <span className="text-3xl font-bold text-zim-green">£280</span>
+                        <span className="text-3xl font-bold text-zim-green">£{ukDrum}</span>
                       </div>
                     </div>
 
@@ -103,11 +108,11 @@ const Pricing = () => {
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                       <h3 className="font-semibold text-lg text-amber-900">Pay on Goods Arriving</h3>
-                      <p className="text-amber-700 text-sm">Pay when your goods arrive in Zimbabwe - 20% premium applies</p>
+                      <p className="text-amber-700 text-sm">Pay when your goods arrive in Zimbabwe{arrivalPremium?` - ${arrivalPremium}% premium applies`:''}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-amber-700">Example: 1 drum = £336</p>
-                      <p className="text-xs text-amber-600">(£280 + 20%)</p>
+                      <p className="text-sm text-amber-700">Example: 1 drum = £{(ukDrum*(1+arrivalPremium/100)).toFixed(0)}</p>
+                      <p className="text-xs text-amber-600">(£{ukDrum}{arrivalPremium?` + ${arrivalPremium}%`:''})</p>
                     </div>
                   </div>
                 </div>
@@ -132,7 +137,7 @@ const Pricing = () => {
                         <span className="font-semibold text-lg">1+ drums</span>
                         <span className="ml-2 text-xs text-emerald-600 font-medium">PER DRUM</span>
                       </div>
-                      <span className="text-3xl font-bold text-emerald-600">€360</span>
+                      <span className="text-3xl font-bold text-emerald-600">€{ieDrum}</span>
                     </div>
                   </div>
                   <p className="text-sm text-emerald-700 mt-4 text-center">
@@ -176,17 +181,17 @@ const Pricing = () => {
                         <p className="text-sm text-gray-600">Security seal for your drum</p>
                       </div>
                     </div>
-                    <span className="text-xl font-bold">£5</span>
+                    <span className="text-xl font-bold">£{ukSeal}</span>
                   </div>
                   <div className="flex items-center justify-between p-6 bg-gray-50 rounded-xl">
                     <div className="flex items-center gap-4">
                       <Truck className="h-6 w-6 text-gray-600" />
                       <div>
                         <p className="font-semibold">Door-to-Door Collection</p>
-                        <p className="text-sm text-gray-600">We collect from your door — £25 in the UK, €25 in Ireland</p>
+                        <p className="text-sm text-gray-600">We collect from your door — £{collectionFee} in the UK, €{collectionFee} in Ireland</p>
                       </div>
                     </div>
-                    <span className="text-xl font-bold">£25 / €25</span>
+                    <span className="text-xl font-bold">£{collectionFee} / €{collectionFee}</span>
                   </div>
                   <div className="flex items-center justify-between p-6 bg-gray-50 rounded-xl md:col-span-2">
                     <div className="flex items-center gap-4">
@@ -194,13 +199,13 @@ const Pricing = () => {
                       <div>
                         <p className="font-semibold">Delivery in Zimbabwe</p>
                         <p className="text-sm text-gray-600">
-                          Direct to the recipient's address in all major cities and towns — £25 (UK shipments) or €25 (Ireland
+                          Direct to the recipient's address in all major cities and towns — £{deliveryFee} (UK shipments) or €{deliveryFee} (Ireland
                           shipments) per delivery address. We don't deliver to rural areas or small villages; depot collection
                           in Harare, Bulawayo or Mutare is free.
                         </p>
                       </div>
                     </div>
-                    <span className="text-xl font-bold whitespace-nowrap">£25 / €25</span>
+                    <span className="text-xl font-bold whitespace-nowrap">£{deliveryFee} / €{deliveryFee}</span>
                   </div>
                 </div>
               </div>
@@ -212,7 +217,7 @@ const Pricing = () => {
                   <div className="p-6 bg-green-50 border border-green-200 rounded-xl">
                     <p className="font-semibold text-green-900">Referral Discount</p>
                     <p className="text-sm text-green-800 mt-1">
-                      Refer someone who ships with us and get £20 (UK) or €20 (Ireland) off your next shipment.
+                      Refer someone who ships with us and get £{referral} (UK) or €{referral} (Ireland) off your next shipment.
                     </p>
                   </div>
                   <div className="p-6 bg-green-50 border border-green-200 rounded-xl">
@@ -240,7 +245,7 @@ const Pricing = () => {
                         Get a Quote
                       </Button>
                     </Link>
-                    <a href="tel:+447584100552">
+                    <a href={`tel:${(business.company.ukPhone||'').replace(/\s/g,'')}`}>
                       <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
                         <Phone className="mr-2 h-5 w-5" />
                         Call Us

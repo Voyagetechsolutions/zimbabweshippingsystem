@@ -9,12 +9,14 @@ import { colors, radius, spacing } from '../theme';
 import { useAppTheme } from '../context/ThemeContext';
 import { parseCollectionDate, longDate } from '../lib/format';
 import { lookupUkPostcode, normalizePostcode, outwardCode, routeForIrelandCity, routeForUkPostcode, scheduleMatchesPostcode } from '../lib/postcode';
+import { useBusinessConfig } from '../lib/businessConfig';
 
 type ScheduleRow = { route: string; pickup_date: string; country?: string | null; areas?: any };
 
 export default function OnboardingScreen() {
   const { session, profile, refreshProfile } = useAuth();
   const { palette } = useAppTheme();
+  const { config: business } = useBusinessConfig();
   const parts = (profile?.full_name || '').split(' ');
   const [first, setFirst] = useState(profile?.first_name || parts[0] || '');
   const [last, setLast] = useState(profile?.last_name || parts.slice(1).join(' ') || '');
@@ -125,7 +127,7 @@ export default function OnboardingScreen() {
       await refreshProfile();
     } catch (e: any) {
       const message = /row-level security/i.test(String(e?.message))
-        ? 'We could not create your profile — please close the app and try again, or contact us on WhatsApp +44 7584 100552.'
+        ? `We could not create your profile — please close the app and try again, or contact us on WhatsApp ${business.company.ukPhone || ''}.`
         : e?.message || 'Try again.';
       Alert.alert('Profile not saved', message);
     } finally {

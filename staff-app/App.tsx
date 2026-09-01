@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,6 +34,7 @@ import DriverOperationsHomeScreen from './src/screens/DriverOperationsHomeScreen
 import DriverScanScreen from './src/screens/DriverScanScreen';
 import DriverHistoryScreen from './src/screens/DriverHistoryScreen';
 import { DriverCountryProvider, useDriverCountry } from './src/context/DriverCountryContext';
+import { loadStaffBusinessConfig } from './src/lib/businessConfig';
 
 const Tab = createBottomTabNavigator();
 
@@ -176,11 +177,14 @@ function NotAuthorized() {
 function Root() {
   const { loading, session, dashboardRole, driverType, roleReady } = useAuth();
   const { viewRole, ready } = useViewRole();
+  const [configReady,setConfigReady]=useState(false);
+  useEffect(()=>{if(!session){setConfigReady(false);return;}loadStaffBusinessConfig().then(()=>setConfigReady(true)).catch(()=>setConfigReady(false));},[session?.user.id]);
 
   if (loading || !ready) {
     return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
   }
   if (!session) return <LoginScreen />;
+  if (!configReady) return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /><Text style={styles.blockBody}>Loading current business settings…</Text></View>;
   // Staff created by an admin start on a temporary password that was read out to
   // them. This stands in front of everything — including the role check — until
   // they have replaced it.

@@ -24,13 +24,9 @@ export interface Shipment {
   seals_requested?: number | null;
 }
 
-export const STATUS_OPTIONS = [
-  'Pending', 'Confirmed', 'Collected', 'In Transit', 'Zim Warehouse', 'Out for Delivery', 'Delivered', 'Cancelled',
-];
-
-export const STATUS_STEPS = [
-  'Pending', 'Confirmed', 'Collected', 'In Transit', 'Zim Warehouse', 'Out for Delivery', 'Delivered',
-];
+export const STATUS_OPTIONS:string[]=[];
+export const STATUS_STEPS:string[]=[];
+export function configureShipmentStatuses(options:string[],steps:string[]){STATUS_OPTIONS.splice(0,STATUS_OPTIONS.length,...options);STATUS_STEPS.splice(0,STATUS_STEPS.length,...steps);}
 
 const STEP_MAP: Record<string, number> = {
   pending: 0, confirmed: 1, collected: 2,

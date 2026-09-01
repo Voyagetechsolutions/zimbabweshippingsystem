@@ -290,16 +290,6 @@ export async function failStop(stopId: string, reason: string, note?: string): P
   if (error) rethrow(error);
 }
 
-export const FAIL_REASONS: Array<{ key: string; label: string }> = [
-  { key: 'not_home', label: 'Customer not available' },
-  { key: 'wrong_address', label: 'Wrong address' },
-  { key: 'access_problem', label: 'Access problem' },
-  { key: 'goods_not_ready', label: 'Goods not ready' },
-  { key: 'payment_issue', label: 'Payment issue' },
-  { key: 'vehicle_problem', label: 'Vehicle problem' },
-  { key: 'other', label: 'Other' },
-];
-
 // ── Labels shared by the driver and admin surfaces ──────────────────────────
 
 export function sealStatusLabel(status: SealStatus | null | undefined): string {

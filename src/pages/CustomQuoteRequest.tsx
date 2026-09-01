@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
+import BusinessContactValue from '@/components/BusinessContactValue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,6 +17,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import { Package, Phone, Clock, Check, ArrowRight } from 'lucide-react';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 const formSchema = z.object({
   itemCategory: z.string().min(1, 'Please select a category'),
@@ -30,6 +32,7 @@ const CustomQuoteRequest = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { config: business } = useBusinessConfiguration();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -266,10 +269,10 @@ const CustomQuoteRequest = () => {
                     <p className="text-sm text-gray-600 mb-4">
                       Speak to us directly for an instant quote.
                     </p>
-                    <a href="tel:+447584100552">
+                    <a href={business.company.ukPhone ? `tel:${business.company.ukPhone}` : undefined}>
                       <Button variant="outline" className="w-full">
                         <Phone className="mr-2 h-4 w-4" />
-                        +44 7584 100552
+                        <BusinessContactValue />
                       </Button>
                     </a>
                   </div>

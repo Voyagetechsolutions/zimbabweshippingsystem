@@ -3,9 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Phone, MessageCircle } from 'lucide-react';
 import { photos } from '@/data/sitePhotos';
+import BusinessContactValue from '@/components/BusinessContactValue';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 const CallToAction: React.FC = () => {
   const navigate = useNavigate();
+  const { config: business } = useBusinessConfiguration();
+  const whatsappNumber=String(business.company.whatsappPhone||'').replace(/\D/g,'');
 
   return (
     <section className="py-20 md:py-24">
@@ -45,7 +49,7 @@ const CallToAction: React.FC = () => {
                   Book your shipment
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
-                <a href="https://wa.me/447584100552" target="_blank" rel="noopener noreferrer">
+                <a href={whatsappNumber ? `https://wa.me/${whatsappNumber}` : undefined} target="_blank" rel="noopener noreferrer">
                   <Button
                     size="lg"
                     className="h-auto w-full bg-[#25D366] px-8 py-6 text-lg font-semibold text-white hover:bg-[#1da851]"
@@ -54,14 +58,14 @@ const CallToAction: React.FC = () => {
                     Chat on WhatsApp
                   </Button>
                 </a>
-                <a href="tel:+447584100552">
+                <a href={business.company.ukPhone ? `tel:${business.company.ukPhone}` : undefined}>
                   <Button
                     size="lg"
                     variant="outline"
                     className="h-auto w-full border-white/30 bg-transparent px-8 py-6 text-lg font-semibold text-white hover:bg-white/10"
                   >
                     <Phone className="mr-2 h-5 w-5" />
-                    +44 7584 100552
+                    <BusinessContactValue />
                   </Button>
                 </a>
               </div>

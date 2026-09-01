@@ -20,6 +20,7 @@ import { useViewRole } from '../context/ViewRoleContext';
 import { supabase } from '../lib/supabase';
 import { COMPANY, COMPANY_WHATSAPP_URL } from '../config/company';
 import { colors, radius, shadow, spacing } from '../theme';
+import { getStaffBusinessConfig } from '../lib/businessConfig';
 
 export default function AccountScreen() {
   const { session, profile, signOut, dashboardRole, canSwitchDashboards } = useAuth();
@@ -39,6 +40,7 @@ export default function AccountScreen() {
   const [notifications, setNotifications] = useState(true);
   const [saving, setSaving] = useState(false);
   const initial = (profile?.full_name || session?.user.email || 'V').charAt(0).toUpperCase();
+  const business=getStaffBusinessConfig();
 
   useEffect(() => {
     AsyncStorage.getItem('finance_notifications').then((value) => {
@@ -94,9 +96,7 @@ export default function AccountScreen() {
 
         <SectionTitle text="Payment methods" />
         <View style={styles.card}>
-          <PaymentRow icon="cash-outline" title="Cash on Collection" description="Payment collected when goods are received." />
-          <PaymentRow icon="airplane-outline" title="Cash on Arrival in Zimbabwe" description="Arrival payment includes a 20% premium." />
-          <PaymentRow icon="calendar-outline" title="30-Day Payment Plan" description="Approved customers settle within 30 days." last />
+          {(business?.payments.methods||[]).map((method,index)=><PaymentRow key={method.id} icon={method.id==='cash_on_collection'?'cash-outline':method.id==='pay_on_arrival'?'airplane-outline':'wallet-outline'} title={method.label} description={method.note||''} last={index===(business?.payments.methods.length||0)-1}/>) }
         </View>
 
         <SectionTitle text="Profile settings" />

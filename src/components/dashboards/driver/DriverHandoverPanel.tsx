@@ -24,8 +24,6 @@ import {
 
 const db = supabase as any;
 
-const SEAL_CONDITIONS = ['intact', 'damaged', 'missing', 'other'] as const;
-
 export type HandoverStop = {
   stopId: string;
   shipmentId: string;
@@ -78,7 +76,8 @@ export default function DriverHandoverPanel({ stop, onDone, onCancel }: {
   const [sealsRequested, setSealsRequested] = useState(0);
   const [sealsUsed, setSealsUsed] = useState(false);
   const [sealCodes, setSealCodes] = useState<string[]>([]);
-  const [sealCondition, setSealCondition] = useState<(typeof SEAL_CONDITIONS)[number]>('intact');
+  const [sealConditions,setSealConditions]=useState<string[]>([]);
+  const [sealCondition, setSealCondition] = useState<string>('');
   const [sealNotes, setSealNotes] = useState('');
   const [sealsSaved, setSealsSaved] = useState(false);
 
@@ -87,13 +86,15 @@ export default function DriverHandoverPanel({ stop, onDone, onCancel }: {
   const [cameraOn, setCameraOn] = useState(false);
 
   const load = useCallback(async () => {
-    const [invoiceResult, proofResult, stopResult, shipmentResult, sealResult] = await Promise.all([
+    const [invoiceResult, proofResult, stopResult, shipmentResult, sealResult, operationsResult] = await Promise.all([
       db.from('driver_invoices').select('id,currency,line_items,discount,tax,notes').eq('stop_id', stop.stopId).maybeSingle(),
       db.from('driver_proofs').select('id,proof_type,storage_path').eq('stop_id', stop.stopId).is('deleted_at', null).order('captured_at'),
       db.from('driver_run_stops').select('qr_verified_at').eq('id', stop.stopId).maybeSingle(),
       db.from('shipments').select('goods_description,driver_description_correction,seals_requested,metadata').eq('id', stop.shipmentId).maybeSingle(),
       db.from('shipment_seals').select('*').eq('shipment_id', stop.shipmentId).maybeSingle(),
+      db.from('app_configuration').select('value').eq('key','operations').maybeSingle(),
     ]);
+    const configuredConditions=operationsResult.data?.value?.sealConditions||[];setSealConditions(configuredConditions);setSealCondition((current)=>current||configuredConditions[0]||'');
 
     const shipment: any = shipmentResult.data || {};
     const metaInvoice = shipment.metadata?.invoice;
@@ -124,7 +125,7 @@ export default function DriverHandoverPanel({ stop, onDone, onCancel }: {
       const seal: any = sealResult.data;
       setSealsUsed(Boolean(seal.seals_used));
       setSealCodes(Array.isArray(seal.seal_codes) ? seal.seal_codes : []);
-      setSealCondition(SEAL_CONDITIONS.includes(seal.condition) ? seal.condition : 'intact');
+      setSealCondition(configuredConditions.includes(seal.condition) ? seal.condition : (configuredConditions[0]||''));
       setSealNotes(seal.notes || '');
       setSealsSaved(true);
     } else if (Number(shipment.seals_requested || 0) > 0) {
@@ -453,7 +454,7 @@ export default function DriverHandoverPanel({ stop, onDone, onCancel }: {
                 ))}
                 <Button size="sm" variant="ghost" onClick={() => setSealCodes((c) => [...c, ''])}>Add another seal code</Button>
                 <div className="flex flex-wrap gap-1.5">
-                  {SEAL_CONDITIONS.map((condition) => (
+                  {sealConditions.map((condition) => (
                     <Button
                       key={condition} size="sm"
                       variant={sealCondition === condition ? 'default' : 'outline'}

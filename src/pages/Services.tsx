@@ -16,15 +16,17 @@ import {
   Phone
 } from 'lucide-react';
 import { photos } from '@/data/sitePhotos';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 const Services = () => {
+  const {config:business}=useBusinessConfiguration();const drum=business.catalogue.find((item)=>item.id==='plastic_drum');
   const services = [
     {
       icon: Package,
       title: 'Drum Shipping',
       description: 'Our most popular service. Ship your goods in secure 200-220L drums.',
       features: [
-        'UK: £280/drum | Ireland: €360/drum',
+        `UK: £${drum?.priceUK||0}/drum | Ireland: €${drum?.priceIE||0}/drum`,
         'Free collection across UK & Ireland',
         'Metal coded seal included',
         'Metal coded seal & tracking',
@@ -255,10 +257,10 @@ const Services = () => {
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
-              <a href="tel:+447584100552">
+              <a href={`tel:${(business.company.ukPhone||'').replace(/\s/g,'')}`}>
                 <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
                   <Phone className="mr-2 h-5 w-5" />
-                  +44 7584 100552
+                  {business.company.ukPhone}
                 </Button>
               </a>
             </div>

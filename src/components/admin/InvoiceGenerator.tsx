@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -42,6 +43,7 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
   const [isSending, setIsSending] = useState(false);
   const [invoiceSent, setInvoiceSent] = useState(false);
   const { toast } = useToast();
+  const { config: business } = useBusinessConfiguration();
 
   const currencySymbol = invoiceData.currency === 'USD' ? '$' : '£';
 
@@ -232,14 +234,14 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                     crossOrigin="anonymous"
                   />
                   <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Zimbabwe Shipping</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">{business.company.name}</h1>
                     <p className="text-sm text-gray-500">Ireland to Zimbabwe Express</p>
                   </div>
                 </div>
                 <div className="text-sm text-gray-600 space-y-1">
                   <p>Ireland Branch</p>
-                  <p>info@zimbabweshipping.com</p>
-                  <p>www.zimbabweshipping.com</p>
+                  <p>{business.company.supportEmail}</p>
+                  <p>{String(business.company.website||'').replace(/^https?:\/\//,'')}</p>
                 </div>
               </div>
               <div className="text-right">
@@ -328,8 +330,8 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
             {/* Footer */}
             <div className="border-t pt-6 text-center text-sm text-gray-500">
               <p className="font-medium text-gray-700 mb-2">Thank you for your business!</p>
-              <p>Zimbabwe Shipping Nexus | www.zimbabweshipping.com</p>
-              <p>For questions, contact info@zimbabweshipping.com</p>
+              <p>{business.company.name} | {String(business.company.website||'').replace(/^https?:\/\//,'')}</p>
+              <p>For questions, contact {business.company.supportEmail}</p>
             </div>
           </div>
         </div>

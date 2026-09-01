@@ -2,10 +2,12 @@ import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { OWNER_VERIFIED_REGISTRATION, PUBLIC_BUSINESS_INFORMATION as business } from '@/config/legal';
+import { OWNER_VERIFIED_REGISTRATION } from '@/config/legal';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 const BusinessInformation = () => {
   const registration = OWNER_VERIFIED_REGISTRATION;
+  const {config}=useBusinessConfiguration();const business:any=config.company;
 
   return (
     <>
@@ -27,10 +29,10 @@ const BusinessInformation = () => {
             {registration.vatNumber && <><dt>VAT number</dt><dd>{registration.vatNumber}</dd></>}
             <dt>Founder and director</dt><dd>{business.founderAndDirector}</dd>
             <dt>Operating address</dt><dd>{business.operatingAddress.map((line) => <span className="block" key={line}>{line}</span>)}</dd>
-            <dt>Email</dt><dd><a href={`mailto:${business.email}`}>{business.email}</a></dd>
-            <dt>UK bookings and enquiries</dt><dd><a href="tel:+447584100552">{business.ukBookingsPhone}</a></dd>
-            <dt>Ireland bookings and enquiries</dt><dd><a href="tel:+353871954910">{business.irelandBookingsPhone}</a></dd>
-            <dt>Accounts office</dt><dd><a href="tel:+447770761266">{business.accountsPhone}</a></dd>
+            <dt>Email</dt><dd><a href={`mailto:${business.supportEmail}`}>{business.supportEmail}</a></dd>
+            <dt>UK bookings and enquiries</dt><dd><a href={`tel:${String(business.ukPhone||'').replace(/\s/g,'')}`}>{business.ukPhone}</a></dd>
+            <dt>Ireland bookings and enquiries</dt><dd><a href={`tel:${String(business.irelandPhone||'').replace(/\s/g,'')}`}>{business.irelandPhone}</a></dd>
+            <dt>Accounts office</dt><dd><a href={`tel:${String(business.accountsPhone||'').replace(/\s/g,'')}`}>{business.accountsPhone}</a></dd>
           </dl>
 
           <h2>How the booking contract is made</h2>
@@ -69,7 +71,7 @@ const BusinessInformation = () => {
           <h2>Claims and complaints</h2>
           <p>
             Report loss, damage, delay, incorrect charges or service concerns promptly to{' '}
-            <a href={`mailto:${business.email}`}>{business.email}</a> with the booking reference, photographs
+            <a href={`mailto:${business.supportEmail}`}>{business.supportEmail}</a> with the booking reference, photographs
             and relevant evidence. We will acknowledge and investigate fairly. Data-protection concerns use
             our <Link to="/privacy-complaint">Privacy Complaints procedure</Link>. See our{' '}
             <Link to="/terms-and-conditions">Terms and Conditions</Link>,{' '}

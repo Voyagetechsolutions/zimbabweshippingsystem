@@ -6,8 +6,11 @@ import SupportTicketForm from '@/components/SupportTicketForm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessagesSquare, Phone, Mail, Clock, ArrowRight, HelpCircle } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import BusinessContactValue from '@/components/BusinessContactValue';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 const Support = () => {
+  const { config: business } = useBusinessConfiguration();
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -44,10 +47,9 @@ const Support = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-gray-600 mb-2">UK bookings and enquiries: +44 7584 100552</p>
-                    <p className="text-gray-600">Ireland Phone: +353 8719 54910</p>
-                    <p className="text-gray-600">Accounts office: +44 7770 761266</p>
-                    <p className="text-gray-600">Zimbabwe Phone: +263 71 274 3178</p>
+                    <p className="text-gray-600 mb-2">UK bookings and enquiries: <BusinessContactValue /></p>
+                    <p className="text-gray-600">Ireland Phone: {business.company.irelandPhone}</p>
+                    <p className="text-gray-600">Accounts office: {business.company.accountsPhone}</p>
                   </CardContent>
                 </Card>
                 
@@ -59,7 +61,7 @@ const Support = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-gray-600 mb-2">General enquiries and privacy: info@zimbabweshipping.com</p>
+                    <p className="text-gray-600 mb-2">General enquiries and privacy: {business.company.supportEmail}</p>
                    
                     <div className="mt-4 pt-3 border-t border-gray-100">
                       <p className="text-sm text-gray-600 flex items-center">

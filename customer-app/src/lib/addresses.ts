@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 
 // Saved Zimbabwe delivery addresses (customer_addresses). Each address chosen
-// on a booking adds the £25/€25 door-delivery fee, priced server-side.
+// on a booking adds the database-configured door-delivery fee, priced server-side.
 
 export type CustomerAddress = {
   id: string;

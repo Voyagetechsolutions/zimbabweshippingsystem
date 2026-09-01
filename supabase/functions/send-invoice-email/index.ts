@@ -1,12 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 // SMTP Configuration - set these in Supabase Edge Function secrets
 const SMTP_HOST = Deno.env.get("SMTP_HOST") || "";
 const SMTP_PORT = parseInt(Deno.env.get("SMTP_PORT") || "587");
 const SMTP_USERNAME = Deno.env.get("SMTP_USERNAME") || "";
 const SMTP_PASSWORD = Deno.env.get("SMTP_PASSWORD") || "";
-const FROM_EMAIL = Deno.env.get("SMTP_FROM_EMAIL") || "noreply@zimbabweshipping.com";
+const FROM_EMAIL = Deno.env.get("SMTP_FROM_EMAIL") || "";
 const FROM_NAME = Deno.env.get("SMTP_FROM_NAME") || "Zimbabwe Shipping";
 
 const corsHeaders = {
@@ -39,6 +40,11 @@ serve(async (req: Request) => {
     const { to, customerName, invoiceNumber, pdfBase64, amount, total, amountDue, dueDate } = body;
     // Default to "paid" when no status is given, preserving the legacy receipt behaviour.
     const status = body.status || "paid";
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const { data: companyRow, error: companyError } = await supabase.from("app_configuration").select("value").eq("key", "company_profile").single();
+    if (companyError) throw companyError;
+    const company = (companyRow?.value || {}) as Record<string, string>;
+    if (!company.name || !company.supportEmail || !company.website) throw new Error("Company contact configuration is incomplete");
 
     // Validate required fields
     if (!to || !customerName || !invoiceNumber || !pdfBase64) {
@@ -49,7 +55,7 @@ serve(async (req: Request) => {
     }
 
     // Check if SMTP is configured
-    if (!SMTP_HOST || !SMTP_USERNAME || !SMTP_PASSWORD) {
+    if (!SMTP_HOST || !SMTP_USERNAME || !SMTP_PASSWORD || !FROM_EMAIL) {
       console.error("SMTP settings not configured");
       return new Response(
         JSON.stringify({ error: "Email service not configured. Please set SMTP secrets." }),
@@ -91,8 +97,8 @@ serve(async (req: Request) => {
     rows.push(`<tr><td style="padding:8px 0;color:#6b7280;">Status:</td><td style="padding:8px 0;text-align:right;">${statusPill}</td></tr>`);
 
     const subject = isPaid
-      ? `Receipt ${invoiceNumber} - Zimbabwe Shipping`
-      : `Invoice ${invoiceNumber} - Zimbabwe Shipping`;
+      ? `Receipt ${invoiceNumber} - ${company.name}`
+      : `Invoice ${invoiceNumber} - ${company.name}`;
 
     // Create email HTML content
     const emailHtml = `
@@ -105,7 +111,7 @@ serve(async (req: Request) => {
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: ${headerGradient}; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">Zimbabwe Shipping</h1>
+            <h1 style="color: white; margin: 0; font-size: 28px;">${company.name}</h1>
             <p style="color: rgba(255,255,255,0.9); margin: 5px 0 0 0;">Nexus Logistics</p>
           </div>
 
@@ -133,10 +139,10 @@ serve(async (req: Request) => {
 
           <div style="background: #111827; padding: 20px; text-align: center; border-radius: 0 0 10px 10px;">
             <p style="color: #9ca3af; margin: 0; font-size: 14px;">
-              Zimbabwe Shipping Nexus
+              ${company.name}
             </p>
             <p style="color: #6b7280; margin: 5px 0 0 0; font-size: 12px;">
-              support@zimbabweshipping.com | www.zimbabweshipping.com
+              ${company.supportEmail} | ${company.website.replace(/^https?:\/\//, "")}
             </p>
           </div>
         </body>

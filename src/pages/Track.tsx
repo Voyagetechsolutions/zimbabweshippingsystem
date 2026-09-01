@@ -6,9 +6,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Search, AlertCircle, Package, Truck, MapPin, Calendar, ChevronDown, ChevronUp, Phone } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import Navbar from '@/components/Navbar';
+import BusinessContactValue from '@/components/BusinessContactValue';
 import Footer from '@/components/Footer';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import { Helmet } from 'react-helmet';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 type TrackingResult = {
   status: string;
@@ -27,6 +29,7 @@ const Track = () => {
   const [trackingResult, setTrackingResult] = useState<TrackingResult | null>(null);
   const [showStatusHelp, setShowStatusHelp] = useState(false);
   const { toast } = useToast();
+  const { config: business } = useBusinessConfiguration();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -302,11 +305,11 @@ const Track = () => {
                   Can't find your shipment?
                 </p>
                 <a
-                  href="tel:+447584100552"
+                  href={business.company.ukPhone ? `tel:${business.company.ukPhone}` : undefined}
                   className="inline-flex items-center gap-2 text-zim-green hover:underline font-medium"
                 >
                   <Phone className="h-4 w-4" />
-                  Call us: +44 7584 100552
+                  Call us: <BusinessContactValue />
                 </a>
               </div>
             </div>

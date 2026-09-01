@@ -2,6 +2,7 @@ import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import BusinessContactValue, { BusinessContactLink } from '@/components/BusinessContactValue';
 
 const PrivacyPolicy = () => (
   <>
@@ -18,9 +19,8 @@ const PrivacyPolicy = () => (
           This notice explains how the business trading as <strong>Zimbabwe Shipping Services</strong>
           ("we", "us") uses personal information through our websites, customer app, staff app,
           bookings, deliveries, payments, support channels and WhatsApp services. We act as the data
-          controller for this information. Our operating address is Pastures Lodge Farm, Chelveston
-          Road, Wellingborough NN9 6AA, United Kingdom. Contact us at{' '}
-          <a href="mailto:info@zimbabweshipping.com">info@zimbabweshipping.com</a>.
+          controller for this information. Our operating address is <BusinessContactValue field="address" />. Contact us at{' '}
+          <BusinessContactLink />.
         </p>
 
         <h2>Information we use</h2>
@@ -98,7 +98,7 @@ const PrivacyPolicy = () => (
         </p>
         <p>
           Send a request or privacy complaint to{' '}
-          <a href="mailto:info@zimbabweshipping.com?subject=Data%20protection%20request">info@zimbabweshipping.com</a>
+          <BusinessContactLink subject="Data protection request" />
           {' '}or use our <Link to="/privacy-complaint">privacy complaint procedure</Link>. We acknowledge
           complaints within 30 days and provide the result of our investigation without undue delay.
           You can also complain to the UK Information Commissioner's Office, Ireland's Data Protection

@@ -1,5 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,6 +31,11 @@ const handler = async (req: Request): Promise<Response> => {
     if (!apiKey) {
       throw new Error("BREVO_API_KEY environment variable not set");
     }
+    const supabase=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const {data:companyRow,error:companyError}=await supabase.from('app_configuration').select('value').eq('key','company_profile').single();
+    if(companyError)throw companyError;
+    const company=(companyRow?.value||{}) as Record<string,string>;
+    if(!company.name||!company.noreplyEmail)throw new Error('Company email configuration is incomplete');
 
     const { to, templateId, subject, htmlContent, params, cc, bcc, replyTo, attachment, tags } = await req.json() as EmailRequest;
 
@@ -50,8 +56,8 @@ const handler = async (req: Request): Promise<Response> => {
     // Prepare the request body
     const emailData: any = {
       sender: { 
-        email: "noreply@zimbabweshipping.com", 
-        name: "Zimbabwe Shipping" 
+        email: company.noreplyEmail,
+        name: company.name
       },
       to: toArray,
     };

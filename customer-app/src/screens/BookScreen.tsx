@@ -8,7 +8,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { colors, spacing, radius } from '../theme';
 import { Card, Button, Field, SectionTitle, FlagStripe } from '../components/ui';
-import { CATALOGUE, Country, currencyFor, priceFor, DELIVERY_FEE } from '../lib/catalogue';
+import { Country, currencyFor, priceFor } from '../lib/catalogue';
+import { useBusinessConfig } from '../lib/businessConfig';
 import { BookingDraft, EMPTY_DRAFT, QuoteCarry, createBooking, draftLines } from '../lib/booking';
 import { CustomerAddress, listAddresses, addressSummary } from '../lib/addresses';
 import { parseCollectionDate, longDate, money } from '../lib/format';
@@ -21,15 +22,6 @@ import { useAppTheme } from '../context/ThemeContext';
 
 const STEPS = ['Collection', 'Sender', 'Delivery', 'Shipment', 'Date', 'Review'] as const;
 const DRAFT_KEY = 'zim-booking-draft-v2';
-
-// Payment is settled offline (bank transfer / remittance / cash) — the choice
-// here is recorded on the invoice so the finance team knows what to expect.
-const PAYMENT_METHODS: Array<{ value: string; icon: keyof typeof Ionicons.glyphMap; note?: string }> = [
-  { value: 'Bank Transfer', icon: 'business-outline', note: 'Details shared after booking' },
-  { value: 'Cash on Collection', icon: 'cash-outline', note: 'Pay the driver at your door' },
-  { value: 'Pay on Arrival', icon: 'time-outline', note: 'Pay when goods reach Zimbabwe' },
-];
-const OTHER_PAYMENT_METHODS = ['WorldRemit', 'Mukuru', 'Ria', 'Remitly (select ZB as pickup point)'];
 
 type ScheduleRow = { id: string; route: string; pickup_date: string; country?: string | null; areas?: any };
 type DepotRow = { id: string; name: string; city: string; address_line1: string; opening_hours: string | null };
@@ -45,6 +37,9 @@ export default function BookScreen() {
   const [agreed, setAgreed] = useState(false);
   const [otherPaymentsOpen, setOtherPaymentsOpen] = useState(false);
   const { palette } = useAppTheme();
+  const { config: business, loading: configLoading, error: configError, reload: reloadConfig } = useBusinessConfig();
+  const catalogue = business.catalogue;
+  const paymentMethods = business.payments.methods;
 
   // Coordinates of the resolved collection postcode — biases address search to
   // the customer's own area rather than the whole country.
@@ -137,7 +132,7 @@ export default function BookScreen() {
       .slice(0, 12);
   }, [schedules, draft.country, draft.collectionPostcode, draft.collectionCity]);
 
-  const { lines, estimate, hasCustom, symbol } = draftLines(draft, deliveryMethod);
+  const { lines, estimate, hasCustom, symbol } = draftLines(draft, business, deliveryMethod);
   const set = (patch: Partial<BookingDraft>) => setDraft((d) => ({ ...d, ...patch }));
 
   const isIrelandPickup = draft.country === 'Ireland';
@@ -196,7 +191,7 @@ export default function BookScreen() {
   const submit = async () => {
     setSubmitting(true);
     try {
-      const created = await createBooking(draft, session?.user?.id ?? null, deliveryMethod);
+      const created = await createBooking(draft, session?.user?.id ?? null, business, deliveryMethod);
 
       // Record which delivery option was chosen. Pricing is already correct —
       // self-collection selects no paid addresses — so this only annotates the
@@ -233,6 +228,21 @@ export default function BookScreen() {
         : [...draft.deliveryAddressIds, id],
     });
   };
+
+  if (configLoading || configError || !catalogue.length) {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: palette.bg }]} edges={['top']}>
+        <FlagStripe />
+        <View style={[styles.body, { flex: 1, justifyContent: 'center' }]}>
+          <Text style={[styles.headerTitle, { color: palette.text, textAlign: 'center' }]}>
+            {configLoading ? 'Loading current shipping options…' : 'Shipping options are temporarily unavailable'}
+          </Text>
+          {configError ? <Text style={[styles.hint, { color: palette.textMuted, textAlign: 'center' }]}>{configError}</Text> : null}
+          {!configLoading ? <Button title="Try again" onPress={reloadConfig} /> : null}
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: palette.bg }]} edges={['top']}>
@@ -380,7 +390,7 @@ export default function BookScreen() {
               <SectionTitle text="How should the receiver get the goods?" />
               <View style={styles.methodRow}>
                 {([
-                  { value: 'door' as const, title: 'Door delivery', note: `${symbol}${DELIVERY_FEE} per address`, icon: 'car-outline' as const },
+                  { value: 'door' as const, title: 'Door delivery', note: `${symbol}${business.fees.doorDeliveryPerAddress} per address`, icon: 'car-outline' as const },
                   { value: 'self_collection' as const, title: 'Self-collection', note: 'Free', icon: 'storefront-outline' as const },
                 ]).map((option) => {
                   const active = deliveryMethod === option.value;
@@ -441,7 +451,7 @@ export default function BookScreen() {
               <>
               <SectionTitle text="Deliver to (Zimbabwe)" />
               <Text style={[styles.hint, { color: palette.textMuted }]}>
-                Select one or more saved delivery addresses — door delivery is {symbol}{DELIVERY_FEE} per address, added to your total.
+                Select one or more saved delivery addresses — door delivery is {symbol}{business.fees.doorDeliveryPerAddress} per address, added to your total.
               </Text>
               {addresses.map((a) => {
                 const selected = draft.deliveryAddressIds.includes(a.id);
@@ -478,7 +488,7 @@ export default function BookScreen() {
               {!draft.quote && (
                 <>
                   <SectionTitle text="What are you shipping?" />
-                  {CATALOGUE.filter((c) => c.id !== 'seal').map((item) => {
+                  {catalogue.filter((c) => c.id !== 'seal').map((item) => {
                     const price = priceFor(item, draft.country);
                     return (
                       <View key={item.id} style={[styles.itemRow, { backgroundColor: palette.surface, borderColor: palette.border }]}>
@@ -511,7 +521,7 @@ export default function BookScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.itemLabel, { color: palette.text }]}>Metal coded seal</Text>
                   <Text style={[styles.itemPrice, { color: palette.textMuted }]}>
-                    {symbol}{priceFor(CATALOGUE.find((c) => c.id === 'seal')!, draft.country)} each — the driver seals your drums/trunks and records every code
+                    {symbol}{priceFor(catalogue.find((c) => c.id === 'seal')!, draft.country)} each — the driver seals your drums/trunks and records every code
                   </Text>
                 </View>
                 <View style={styles.qtyRow}>
@@ -524,7 +534,7 @@ export default function BookScreen() {
               {draft.quote && (
                 <>
                   <SectionTitle text="Add fixed-price extras (optional)" />
-                  {CATALOGUE.filter((c) => c.id !== 'seal' && priceFor(c, draft.country) != null).map((item) => (
+                  {catalogue.filter((c) => c.id !== 'seal' && priceFor(c, draft.country) != null).map((item) => (
                     <View key={item.id} style={[styles.itemRow, { backgroundColor: palette.surface, borderColor: palette.border }]}>
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.itemLabel, { color: palette.text }]}>{item.label}</Text>
@@ -540,7 +550,7 @@ export default function BookScreen() {
                 </>
               )}
 
-              <Field label="Referred by (optional)" value={draft.referredBy} onChangeText={(v) => set({ referredBy: v })} placeholder="Friend's name — they get £20/€20 off" autoCapitalize="words" />
+              <Field label="Referred by (optional)" value={draft.referredBy} onChangeText={(v) => set({ referredBy: v })} placeholder={`Friend's name — they get £${business.fees.referralDiscount}/€${business.fees.referralDiscount} off`} autoCapitalize="words" />
             </>
           )}
 
@@ -573,33 +583,33 @@ export default function BookScreen() {
               </Pressable>
 
               <SectionTitle text="Choose payment method" />
-              {PAYMENT_METHODS.map((m) => (
-                <Pressable key={m.value} onPress={() => set({ paymentMethod: m.value })}
-                  style={[styles.dateCard, { backgroundColor: palette.surface, borderColor: palette.border }, draft.paymentMethod === m.value && { borderColor: palette.green, backgroundColor: palette.greenSoft }]}>
+              {paymentMethods.filter((m) => m.id !== 'other_payment').map((m) => (
+                <Pressable key={m.id} onPress={() => set({ paymentMethod: m.label })}
+                  style={[styles.dateCard, { backgroundColor: palette.surface, borderColor: palette.border }, draft.paymentMethod === m.label && { borderColor: palette.green, backgroundColor: palette.greenSoft }]}>
                   <View style={[styles.payIcon, { backgroundColor: palette.greenSoft }]}>
-                    <Ionicons name={m.icon} size={17} color={palette.green} />
+                    <Ionicons name={(m.icon || 'wallet-outline') as keyof typeof Ionicons.glyphMap} size={17} color={palette.green} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.itemLabel, { color: palette.text }]}>{m.value}</Text>
+                    <Text style={[styles.itemLabel, { color: palette.text }]}>{m.label}</Text>
                     {m.note ? <Text style={[styles.itemPrice, { color: palette.textMuted }]}>{m.note}</Text> : null}
                   </View>
-                  <Ionicons name={draft.paymentMethod === m.value ? 'radio-button-on' : 'radio-button-off'} size={21} color={draft.paymentMethod === m.value ? colors.green : palette.textFaint} />
+                  <Ionicons name={draft.paymentMethod === m.label ? 'radio-button-on' : 'radio-button-off'} size={21} color={draft.paymentMethod === m.label ? colors.green : palette.textFaint} />
                 </Pressable>
               ))}
               <Pressable onPress={() => setOtherPaymentsOpen((open) => !open)}
                 style={[styles.dateCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
                 <View style={[styles.payIcon, { backgroundColor: palette.greenSoft }]}><Ionicons name="apps-outline" size={17} color={palette.green} /></View>
-                <View style={{ flex: 1 }}><Text style={[styles.itemLabel, { color: palette.text }]}>Other payments</Text><Text style={[styles.itemPrice, { color: palette.textMuted }]}>WorldRemit, Mukuru, Ria or Remitly</Text></View>
+                <View style={{ flex: 1 }}><Text style={[styles.itemLabel, { color: palette.text }]}>Other payments</Text><Text style={[styles.itemPrice, { color: palette.textMuted }]}>{business.payments.otherProviders.map((p) => p.label).join(', ')}</Text></View>
                 <Ionicons name={otherPaymentsOpen ? 'chevron-up' : 'chevron-down'} size={20} color={palette.textFaint} />
               </Pressable>
               {otherPaymentsOpen && (
                 <Card>
-                  <Text style={[styles.itemLabel, { color: palette.text }]}>Send to: +263771789925</Text>
-                  <Text style={[styles.itemPrice, { color: palette.textMuted, marginBottom: spacing.sm }]}>Reference: Tshakalisa Moyo</Text>
-                  {OTHER_PAYMENT_METHODS.map((method) => (
-                    <Pressable key={method} onPress={() => set({ paymentMethod: method })} style={styles.otherPaymentRow}>
-                      <Ionicons name={draft.paymentMethod === method ? 'radio-button-on' : 'radio-button-off'} size={20} color={draft.paymentMethod === method ? colors.green : palette.textFaint} />
-                      <Text style={[styles.itemLabel, { color: palette.text, flex: 1 }]}>{method}</Text>
+                  <Text style={[styles.itemLabel, { color: palette.text }]}>Send to: {business.payments.otherPaymentInstructions?.sendTo}</Text>
+                  <Text style={[styles.itemPrice, { color: palette.textMuted, marginBottom: spacing.sm }]}>Reference: {business.payments.otherPaymentInstructions?.reference}</Text>
+                  {business.payments.otherProviders.map((method) => (
+                    <Pressable key={method.id} onPress={() => set({ paymentMethod: method.label })} style={styles.otherPaymentRow}>
+                      <Ionicons name={draft.paymentMethod === method.label ? 'radio-button-on' : 'radio-button-off'} size={20} color={draft.paymentMethod === method.label ? colors.green : palette.textFaint} />
+                      <Text style={[styles.itemLabel, { color: palette.text, flex: 1 }]}>{method.label}</Text>
                     </Pressable>
                   ))}
                 </Card>
@@ -648,8 +658,8 @@ export default function BookScreen() {
                 <Text style={[styles.agreeText, { color: palette.text }]}>I agree to the Terms & Conditions and confirm I have read the Privacy Notice</Text>
               </Pressable>
               <View style={styles.legalLinks}>
-                <Text accessibilityRole="link" onPress={() => Linking.openURL('https://zimbabweshipping.com/terms-and-conditions')} style={styles.legalLink}>Read Terms & Conditions</Text>
-                <Text accessibilityRole="link" onPress={() => Linking.openURL('https://zimbabweshipping.com/privacy-policy')} style={styles.legalLink}>Read Privacy Notice</Text>
+                <Text accessibilityRole="link" onPress={() => Linking.openURL(`${business.company.website || ''}/terms-and-conditions`)} style={styles.legalLink}>Read Terms & Conditions</Text>
+                <Text accessibilityRole="link" onPress={() => Linking.openURL(`${business.company.website || ''}/privacy-policy`)} style={styles.legalLink}>Read Privacy Notice</Text>
               </View>
             </>
           )}

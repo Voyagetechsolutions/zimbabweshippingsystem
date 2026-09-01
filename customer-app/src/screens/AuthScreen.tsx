@@ -10,6 +10,7 @@ import { colors, spacing, radius } from '../theme';
 import { Field, Button } from '../components/ui';
 import { useAppTheme } from '../context/ThemeContext';
 import { IMG } from '../img';
+import { useBusinessConfig } from '../lib/businessConfig';
 
 // Mirrors the Supabase project's password policy so new users are guided before
 // the request is sent. Returns a human message when the password falls short,
@@ -32,6 +33,7 @@ export default function AuthScreen() {
   const [busy, setBusy] = useState(false);
   const [appleReady, setAppleReady] = useState(false);
   const {dark,palette}=useAppTheme();
+  const {config:business}=useBusinessConfig();
 
   // Sign in with Apple needs iOS 13+, so ask rather than assume.
   useEffect(() => {
@@ -206,9 +208,9 @@ export default function AuthScreen() {
 
           <Text style={[styles.terms,{color:palette.textFaint}]}>
             By continuing, you agree to our{' '}
-            <Text accessibilityRole="link" onPress={() => Linking.openURL('https://zimbabweshipping.com/terms-and-conditions')} style={styles.termsLink}>Terms & Conditions</Text>
+            <Text accessibilityRole="link" onPress={() => Linking.openURL(`${business.company.website || ''}/terms-and-conditions`)} style={styles.termsLink}>Terms & Conditions</Text>
             {' '}and confirm you have read our{' '}
-            <Text accessibilityRole="link" onPress={() => Linking.openURL('https://zimbabweshipping.com/privacy-policy')} style={styles.termsLink}>Privacy Notice</Text>.
+            <Text accessibilityRole="link" onPress={() => Linking.openURL(`${business.company.website || ''}/privacy-policy`)} style={styles.termsLink}>Privacy Notice</Text>.
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>
