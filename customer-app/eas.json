@@ -31,7 +31,7 @@
   "submit": {
     "production": {
       "android": {
-        "track": "internal"
+        "track": "production"
       },
       "ios": {
         "appleId": "itumelengmorena20@gmail.com",
