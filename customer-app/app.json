@@ -3,7 +3,7 @@
     "name": "Zimbabwe Shipping",
     "slug": "zimbabwe-shiipping",
     "scheme": "zimbabweshipping",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon-square.png",
     "userInterfaceStyle": "automatic",
@@ -28,6 +28,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.voyagetech.zimbabweshipphing",
+      "buildNumber": "10",
       "icon": "./assets/ios-icon.png",
       "usesAppleSignIn": true,
       "infoPlist": {
