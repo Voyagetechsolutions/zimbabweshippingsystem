@@ -9,6 +9,7 @@ import { colors, radius, spacing, shadow, type as typeScale } from '../theme';
 import { money, moneyMap, addToMoneyMap, shortDate, greeting, todayLabel } from '../lib/format';
 import { getInvoice, getInvoiceStatus, getPaymentSummary, hasInvoice, invoiceSymbol } from '../lib/invoice';
 import type { Shipment } from '../lib/shipment';
+import { COMPANY } from '../config/company';
 
 interface Payment {
   id: string;
@@ -154,7 +155,7 @@ export default function FinanceDashboardScreen() {
       return;
     }
     const message = encodeURIComponent(
-      `Hello ${item.name.split(' ')[0]}, this is Zimbabwe Shipping. A friendly reminder that ${item.symbol}${item.balance.toFixed(2)} is outstanding on shipment ${item.reference}. Please reply here or call us on +44 7584 100552 to arrange payment. Thank you!`,
+      `Hello ${item.name.split(' ')[0]}, this is ${COMPANY.name}. A friendly reminder that ${item.symbol}${item.balance.toFixed(2)} is outstanding on shipment ${item.reference}. Please reply here or call us on ${COMPANY.supportPhone} to arrange payment. Thank you!`,
     );
     Linking.openURL(`https://wa.me/${digits.replace('+', '')}?text=${message}`)
       .catch(() => Alert.alert('Could not open WhatsApp', 'Check that WhatsApp or a web browser is available.'));

@@ -26,6 +26,7 @@ import {
   Tag
 } from 'lucide-react';
 import { generateUniqueId } from '@/lib/utils';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 interface PaymentProcessorProps {
   bookingData: any;
@@ -41,6 +42,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
 }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const {config:business}=useBusinessConfiguration();const premiumPercent=business.fees.payOnArrivalPremiumPercent;
   
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('standard');
   const [payLaterMethod, setPayLaterMethod] = useState<string>('cash');
@@ -50,7 +52,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
   const [userId, setUserId] = useState<string | null>(null);
 
   const drumQuantity = bookingData?.shipmentDetails?.type === 'drum' ? bookingData.shipmentDetails.quantity : 0;
-  const payOnArrivalPremium = bookingData?.shipmentDetails?.type === 'drum' ? totalAmount * 0.2 : 0;
+  const payOnArrivalPremium = bookingData?.shipmentDetails?.type === 'drum' ? totalAmount * premiumPercent/100 : 0;
 
   let finalAmount = totalAmount;
   if (isPayOnArrival && bookingData?.shipmentDetails?.type === 'drum') {
@@ -248,18 +250,18 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
                     <div className="flex justify-between items-center">
                       <Label htmlFor="payOnArrival" className="flex items-center text-lg font-medium">
                         <Tag className="h-5 w-5 mr-2 text-blue-700" />
-                        Pay on Arrival <span className="ml-2 text-blue-700 font-bold">(20% Premium)</span>
+                        Pay on Arrival <span className="ml-2 text-blue-700 font-bold">({premiumPercent}% Premium)</span>
                       </Label>
                     </div>
                     <p className="text-sm text-gray-600">
-                      Pay in Zimbabwe when your drums arrive—attracts a 20% premium on your total.
+                      Pay in Zimbabwe when your drums arrive{premiumPercent?`—attracts a ${premiumPercent}% premium on your total.`:'.'}
                     </p>
                     {selectedPaymentMethod === 'payOnArrival' && (
                       <div className="mt-3 p-3 bg-blue-100 rounded-md">
                         <div className="grid grid-cols-2 gap-1 mt-2 text-sm">
                           <span className="text-blue-700">Original Price:</span>
                           <span className="text-right font-medium">£{totalAmount.toFixed(2)}</span>
-                          <span className="text-blue-700">Pay on Arrival Premium (20%):</span>
+                          <span className="text-blue-700">Pay on Arrival Premium ({premiumPercent}%):</span>
                           <span className="text-right font-medium">+£{payOnArrivalPremium.toFixed(2)}</span>
                           <span className="text-blue-900 font-medium pt-1 border-t border-blue-200">Final Total:</span>
                           <span className="text-right font-bold pt-1 border-t border-blue-200">£{(totalAmount + payOnArrivalPremium).toFixed(2)}</span>
@@ -314,7 +316,7 @@ const PaymentProcessor: React.FC<PaymentProcessorProps> = ({
                     </RadioGroup>
                     {payLaterMethod === 'bank_transfer' && (
                       <div className="mt-2 p-3 bg-gray-100 rounded text-sm">
-                        <p className="font-medium">For bank transfer details, contact the accounts office on +44 7770 761266. Reference: your tracking number or surname and initials.</p>
+                        <p className="font-medium">For bank transfer details, contact the accounts office on {business.company.accountsPhone}. Reference: your tracking number or surname and initials.</p>
                       </div>
                     )}
                   </div>

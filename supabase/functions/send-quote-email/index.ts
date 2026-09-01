@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -34,10 +35,21 @@ const handler = async (req: Request) => {
       throw new Error("Quote amount is required");
     }
 
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const { data: configRows, error: configError } = await supabase
+      .from("app_configuration").select("key,value").in("key", ["company_profile", "booking_fees"]);
+    if (configError) throw configError;
+    const config = Object.fromEntries((configRows || []).map((row) => [row.key, row.value]));
+    const company = (config.company_profile || {}) as Record<string, string>;
+    const fees = (config.booking_fees || {}) as Record<string, number>;
+    if (!company.name || !company.supportEmail || !company.ukPhone || !company.website || !company.noreplyEmail) {
+      throw new Error("Company contact configuration is incomplete");
+    }
+
     console.log(`Sending custom quote email to ${email} for £${quoted_amount}`);
 
     const { data, error } = await resend.emails.send({
-      from: "Zimbabwe Shipping <noreply@zimbabweshipping.com>",
+      from: `${company.name} <${company.noreplyEmail}>`,
       to: [email],
       subject: "Your Custom Shipping Quote",
       html: `
@@ -55,14 +67,14 @@ const handler = async (req: Request) => {
           </div>
           
           <p>To proceed with this quote, please log in to your account on our website or contact us directly at the phone number below.</p>
-          <p>This quote is valid for 7 days from the date of this email.</p>
+          <p>This quote is valid for ${fees.quoteValidityDays || 0} days from the date of this email.</p>
           
           <div style="margin-top: 30px; border-top: 1px solid #e0e0e0; padding-top: 20px;">
             <p style="color: #666; font-size: 14px;">
-              <strong>UK to Zimbabwe Shipping</strong><br>
-              Phone: +44 2071122233<br>
-              Email: contact@zimbabweshipping.com<br>
-              Website: <a href="https://zimbabweshipping.com" style="color: #4CAF50;">zimbabweshipping.com</a>
+              <strong>${company.name}</strong><br>
+              Phone: ${company.ukPhone}<br>
+              Email: ${company.supportEmail}<br>
+              Website: <a href="${company.website}" style="color: #4CAF50;">${company.website.replace(/^https?:\/\//, "")}</a>
             </p>
           </div>
         </div>

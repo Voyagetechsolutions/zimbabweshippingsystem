@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
@@ -75,6 +76,8 @@ interface SimpleBookingFormProps {
 }
 
 const SimpleBookingForm: React.FC<SimpleBookingFormProps> = ({ onComplete }) => {
+  const { config: business } = useBusinessConfiguration();
+  const drumPrice=Number(business.catalogue.find((item)=>item.id==='plastic_drum')?.priceUK)||0;
   const [currentStep, setCurrentStep] = useState(1);
   const [data, setData] = useState<BookingData>(initialData);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -137,9 +140,7 @@ const SimpleBookingForm: React.FC<SimpleBookingFormProps> = ({ onComplete }) => 
   };
 
   const calculateTotal = () => {
-    const drumPrice = 75;
-    const boxPrice = 25;
-    return (data.shipment.drums * drumPrice) + (data.shipment.boxes * boxPrice);
+    return data.shipment.drums * drumPrice;
   };
 
   const handleSubmit = async () => {

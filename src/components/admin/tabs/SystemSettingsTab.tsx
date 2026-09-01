@@ -106,13 +106,7 @@ const SystemSettingsTab = () => {
   const [activeTab, setActiveTab] = useState<string>('company');
   const [settings, setSettings] = useState<Record<string, any>>({});
   const [pickupZones, setPickupZones] = useState<PickupZone[]>([]);
-  const [emailTemplates, setEmailTemplates] = useState<Record<string, string>>({
-    'welcome': 'Welcome to Zimbabwe Shipping! We\'re delighted to have you on board.',
-    'shipment_confirmation': 'Your shipment #{tracking_number} has been confirmed.',
-    'pickup_scheduled': 'Your collection has been scheduled for {date}.',
-    'payment_received': 'Thank you for your payment of {amount} for shipment #{tracking_number}.',
-    'delivery_notification': 'Your shipment #{tracking_number} is out for delivery.',
-  });
+  const [emailTemplates, setEmailTemplates] = useState<Record<string, string>>({});
   const [selectedTemplate, setSelectedTemplate] = useState<string>('welcome');
   const [templateContent, setTemplateContent] = useState<string>('');
   
@@ -137,7 +131,7 @@ const SystemSettingsTab = () => {
   const paymentForm = useForm<z.infer<typeof paymentMethodSchema>>({
     resolver: zodResolver(paymentMethodSchema),
     defaultValues: {
-      gbp_to_usd: 1.25,
+      gbp_to_usd: 1,
       standard_payment: true,
       cash_on_collection: true,
       cash_on_delivery: true,
@@ -161,36 +155,15 @@ const SystemSettingsTab = () => {
   const fetchSettings = async () => {
     setLoading(true);
     try {
-      // In a real implementation, fetch from Supabase
-      // For demo purposes, using mock data
-      const mockSettings = {
-        company_info: {
-          company_name: 'Zimbabwe Shipping Services',
-          address_line1: '123 Main Street',
-          address_line2: 'Suite 456',
-          city: 'London',
-          postal_code: 'SW1A 1AA',
-          country: 'United Kingdom',
-          phone: '+44 20 1234 5678',
-          email: 'info@zimbabweshipping.com',
-          website: 'https://zimbabweshipping.com',
-          registration_number: '12345678',
-          vat_number: 'GB123456789',
-        },
-        payment_settings: {
-          gbp_to_usd: 1.25,
-          standard_payment: true,
-          cash_on_collection: true,
-          cash_on_delivery: true,
-          bank_transfer: false,
-          paypal_email: 'payments@zimbabweshipping.com',
-          stripe_enabled: true,
-        }
-      };
-      
-      setSettings(mockSettings);
-      companyForm.reset(mockSettings.company_info);
-      paymentForm.reset(mockSettings.payment_settings);
+      const { data, error } = await supabase.from('app_configuration' as any).select('key,value').in('key',['company_profile','system_payment_settings','email_templates']);
+      if(error) throw error;
+      const rows=Object.fromEntries(((data||[]) as any[]).map((row)=>[row.key,row.value]));
+      const profile=rows.company_profile||{};
+      const nextSettings={company_info:{company_name:profile.name||'',address_line1:profile.addressLine1||'',address_line2:profile.addressLine2||'',city:profile.city||'',postal_code:profile.postalCode||'',country:profile.country||'',phone:profile.ukPhone||'',email:profile.supportEmail||'',website:profile.website||'',registration_number:profile.registrationNumber||'',vat_number:profile.vatNumber||''},payment_settings:rows.system_payment_settings||{}};
+      setSettings({...nextSettings,company_profile:profile});
+      setEmailTemplates(rows.email_templates||{});
+      companyForm.reset(nextSettings.company_info);
+      paymentForm.reset(nextSettings.payment_settings);
     } catch (error) {
       console.error('Error fetching settings:', error);
       toast({
@@ -205,40 +178,9 @@ const SystemSettingsTab = () => {
 
   const fetchPickupZones = async () => {
     try {
-      // In a real implementation, fetch from Supabase
-      // For demo purposes, using mock data
-      const mockZones: PickupZone[] = [
-        {
-          id: '1',
-          name: 'London Central',
-          postal_codes: ['W1', 'W2', 'EC1', 'EC2', 'SW1'],
-          is_active: true,
-          pricing_tier: 'standard'
-        },
-        {
-          id: '2',
-          name: 'London North',
-          postal_codes: ['N1', 'N2', 'N3', 'NW1', 'NW2'],
-          is_active: true,
-          pricing_tier: 'standard'
-        },
-        {
-          id: '3',
-          name: 'London South',
-          postal_codes: ['SE1', 'SE2', 'SW2', 'SW3'],
-          is_active: true,
-          pricing_tier: 'standard'
-        },
-        {
-          id: '4',
-          name: 'Birmingham',
-          postal_codes: ['B1', 'B2', 'B3', 'B4'],
-          is_active: true,
-          pricing_tier: 'premium'
-        }
-      ];
-      
-      setPickupZones(mockZones);
+      const {data,error}=await supabase.from('pickup_zones').select('id,name,postal_codes,is_active,pricing_tier').order('name');
+      if(error)throw error;
+      setPickupZones((data||[]) as PickupZone[]);
     } catch (error) {
       console.error('Error fetching pickup zones:', error);
       toast({
@@ -251,11 +193,14 @@ const SystemSettingsTab = () => {
 
   const saveCompanyInfo = async (data: z.infer<typeof companyInfoSchema>) => {
     try {
-      // In production, save to Supabase
-      // For demo purposes, just updating state
+      const existing=settings.company_profile||{};
+      const value={...existing,name:data.company_name,addressLine1:data.address_line1,addressLine2:data.address_line2||'',city:data.city,postalCode:data.postal_code,country:data.country,address:[data.address_line1,data.address_line2,data.city,data.postal_code,data.country].filter(Boolean).join(', '),ukPhone:data.phone,supportEmail:data.email,website:data.website||'',registrationNumber:data.registration_number||'',vatNumber:data.vat_number||''};
+      const {error}=await supabase.from('app_configuration' as any).update({value,updated_at:new Date().toISOString()} as any).eq('key','company_profile');
+      if(error)throw error;
       setSettings({
         ...settings,
-        company_info: data
+        company_info: data,
+        company_profile:value,
       });
       
       toast({
@@ -274,8 +219,8 @@ const SystemSettingsTab = () => {
 
   const savePaymentSettings = async (data: z.infer<typeof paymentMethodSchema>) => {
     try {
-      // In production, save to Supabase
-      // For demo purposes, just updating state
+      const {error}=await supabase.from('app_configuration' as any).update({value:data,updated_at:new Date().toISOString()} as any).eq('key','system_payment_settings');
+      if(error)throw error;
       setSettings({
         ...settings,
         payment_settings: data
@@ -300,12 +245,15 @@ const SystemSettingsTab = () => {
     setTemplateContent(emailTemplates[templateKey] || '');
   };
 
-  const saveEmailTemplate = () => {
+  const saveEmailTemplate = async () => {
     if (selectedTemplate) {
-      setEmailTemplates({
+      const next={
         ...emailTemplates,
         [selectedTemplate]: templateContent
-      });
+      };
+      const {error}=await supabase.from('app_configuration' as any).update({value:next,updated_at:new Date().toISOString()} as any).eq('key','email_templates');
+      if(error){toast({title:'Error',description:'Failed to save email template',variant:'destructive'});return;}
+      setEmailTemplates(next);
       
       toast({
         title: 'Template saved',
@@ -314,7 +262,11 @@ const SystemSettingsTab = () => {
     }
   };
 
-  const toggleZoneStatus = (zoneId: string) => {
+  const toggleZoneStatus = async (zoneId: string) => {
+    const zone=pickupZones.find((item)=>item.id===zoneId);
+    if(!zone)return;
+    const {error}=await supabase.from('pickup_zones').update({is_active:!zone.is_active}).eq('id',zoneId);
+    if(error){toast({title:'Error',description:'Failed to update pickup zone',variant:'destructive'});return;}
     setPickupZones(zones =>
       zones.map(zone =>
         zone.id === zoneId

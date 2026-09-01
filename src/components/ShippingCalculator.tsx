@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Ship, Package, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useShipping } from '@/contexts/ShippingContext';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 const ShippingCalculator: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>("drum");
@@ -19,6 +20,9 @@ const ShippingCalculator: React.FC = () => {
     doorToDoor: false
   });
   const { formatPrice } = useShipping();
+  const { config: business } = useBusinessConfiguration();
+  const drumPrice = Number(business.catalogue.find((item) => item.id === 'plastic_drum')?.priceUK) || 0;
+  const deliveryFee = business.fees.doorDeliveryPerAddress;
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, checked } = e.target;
@@ -32,23 +36,16 @@ const ShippingCalculator: React.FC = () => {
     if (activeTab === 'drum') {
       const qty = parseInt(drumQuantity);
       
-      if (paymentType === "standard") {
-        // Standard payment prices
-        basePrice = qty * 260;
-      } else {
-        // Pay later prices (30-day terms)
-        basePrice = qty * 280;
-      }
+      basePrice = qty * drumPrice;
     } else {
       // For parcels, calculate based on volume (cubic meters)
-      const volumeValue = parseFloat(volume);
-      basePrice = Math.max(volumeValue * 15, 20); // £15 per cubic meter with £20 minimum
+      basePrice = 0; // Other items require an itemised custom quote.
     }
     
     // Add price for additional services
     let additionalCost = 0;
     if (additionalServices.doorToDoor) {
-      additionalCost += 25;
+      additionalCost += deliveryFee;
     }
     
     return {
@@ -127,11 +124,11 @@ const ShippingCalculator: React.FC = () => {
                     <div className="font-medium mb-2 dark:text-white">Pricing Tiers:</div>
                     {paymentType === "standard" ? (
                       <ul className="space-y-1 list-disc pl-5 dark:text-gray-200">
-                        <li>£260 per drum (Discount Deal)</li>
+                        <li>{formatPrice(drumPrice)} per drum</li>
                       </ul>
                     ) : (
                       <ul className="space-y-1 list-disc pl-5 dark:text-gray-200">
-                        <li>£280 per drum</li>
+                        <li>{formatPrice(drumPrice)} per drum</li>
                       </ul>
                     )}
                     <p className="mt-2 text-gray-500 dark:text-gray-300">Each drum has a capacity of 200L-220L</p>
@@ -196,7 +193,7 @@ const ShippingCalculator: React.FC = () => {
                       />
                       <div>
                         <Label htmlFor="doorToDoor" className="cursor-pointer font-medium dark:text-white">
-                          Door-to-Door Delivery <span className="text-zim-green dark:text-zim-yellow ml-2">{formatPrice(25)}</span>
+                          Door-to-Door Delivery <span className="text-zim-green dark:text-zim-yellow ml-2">{formatPrice(deliveryFee)}</span>
                         </Label>
                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                           We pick up from your address and deliver directly to recipient

@@ -1,14 +1,37 @@
 import { describe, it, expect, vi } from 'vitest';
 
-// postalCodeUtils imports the Supabase client at module load, which would try to
-// read Vite env vars. The route lookup under test only needs the static maps.
+// Route coverage is database-driven. Supply the same payload shape returned by
+// get_app_configuration so these tests never depend on bundled route constants.
 vi.mock('@/integrations/supabase/client', () => ({
-  supabase: { from: () => ({ select: () => ({ order: async () => ({ data: [], error: null }) }) }) },
+  supabase: {
+    from: () => ({
+      select: () => ({ order: async () => ({ data: [], error: null }) }),
+    }),
+    rpc: async () => ({
+      data: {
+        configuration: {
+          uk_route_coverage: {
+            restrictedPrefixes: [],
+            routes: [
+              { route: 'NORTHAMPTON', prefixes: ['LU'] },
+              { route: 'CARDIFF', prefixes: ['GL'] },
+              { route: 'BOURNEMOUTH', prefixes: ['GU'] },
+              { route: 'LONDON', prefixes: ['N', 'NW', 'SE'] },
+              { route: 'LEEDS', prefixes: ['S'] },
+              { route: 'SCOTLAND', prefixes: ['G', 'NE', 'EH', 'SR'] },
+            ],
+          },
+        },
+      },
+      error: null,
+    }),
+  },
 }));
 
 const { coverageForPostcode, outwardCode, postcodePrefix, prettyPostcode, normalisePostcode } =
   await import('@/utils/addressLookup');
-const { getRouteForPostalCode } = await import('@/utils/postalCodeUtils');
+const { fetchRoutesFromDatabase, getRouteForPostalCode } = await import('@/utils/postalCodeUtils');
+await fetchRoutesFromDatabase();
 
 describe('postcode parsing', () => {
   it('strips spaces and punctuation and upper-cases', () => {
@@ -43,11 +66,10 @@ describe('coverageForPostcode', () => {
     expect(luton.route).toBe('NORTHAMPTON');
   });
 
-  it('rejects an area we do not service', () => {
-    // Glasgow, Newcastle and Edinburgh are on the restricted list.
-    expect(coverageForPostcode('G1 1AA').status).toBe('not_covered');
-    expect(coverageForPostcode('NE1 1AA').status).toBe('not_covered');
-    expect(coverageForPostcode('EH1 1AA').status).toBe('not_covered');
+  it('accepts the new Scotland route', () => {
+    expect(coverageForPostcode('G1 1AA').route).toBe('SCOTLAND');
+    expect(coverageForPostcode('NE1 1AA').route).toBe('SCOTLAND');
+    expect(coverageForPostcode('EH1 1AA').route).toBe('SCOTLAND');
   });
 
   it('does not let the single-letter restricted area G reject GL or GU', () => {
@@ -70,9 +92,9 @@ describe('coverageForPostcode', () => {
     expect(coverageForPostcode('N1 1AA').route).toBe('LONDON');
     expect(coverageForPostcode('NW1 1AA').route).toBe('LONDON');
     expect(coverageForPostcode('SE1 1AA').route).toBe('LONDON');
-    // Sheffield is on the Leeds route; Sunderland is restricted.
+    // Sheffield is on the Leeds route; Sunderland is on the Scotland route.
     expect(coverageForPostcode('S1 1AA').route).toBe('LEEDS');
-    expect(coverageForPostcode('SR1 1AA').status).toBe('not_covered');
+    expect(coverageForPostcode('SR1 1AA').route).toBe('SCOTLAND');
   });
 
   it('asks for confirmation on an unrecognised area rather than refusing', () => {

@@ -6,9 +6,12 @@ import WhatsAppButton from '@/components/WhatsAppButton';
 import { Button } from '@/components/ui/button';
 import { Truck, Shield, Users, MapPin, Calendar, ArrowRight, Phone } from 'lucide-react';
 import { Helmet } from 'react-helmet';
+import BusinessContactValue from '@/components/BusinessContactValue';
 import { photos } from '@/data/sitePhotos';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 const AboutUs = () => {
+  const { config: business } = useBusinessConfiguration();
   return (
     <>
       <Helmet>
@@ -84,7 +87,7 @@ const AboutUs = () => {
                 <div>
                   <h2 className="text-3xl font-bold mb-6 text-gray-900">Our Story</h2>
                   <p className="text-gray-600 mb-4 leading-relaxed">
-                    Zimbabwe Shipping Services started from hands-on logistics experience. Our founder and director, Mr Tshakalisa Moyo, began as a FedEx driver — learning the importance of careful handling and reliability firsthand — before building Telk Removals and launching Zimbabwe Shipping.
+                    {business.company.founderStory}
                   </p>
                   <p className="text-gray-600 mb-4 leading-relaxed">
                     In 2011, recognizing the need for trustworthy shipping between the UK and Zimbabwe, we launched our service. What started as Bulawayo Shipping Services has grown to cover all of Zimbabwe.
@@ -200,10 +203,10 @@ const AboutUs = () => {
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </Link>
-                  <a href="tel:+447584100552">
+                  <a href={business.company.ukPhone ? `tel:${business.company.ukPhone}` : undefined}>
                     <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10 w-full sm:w-auto">
                       <Phone className="mr-2 h-5 w-5" />
-                      +44 7584 100552
+                      <BusinessContactValue />
                     </Button>
                   </a>
                 </div>

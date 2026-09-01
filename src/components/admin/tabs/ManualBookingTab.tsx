@@ -33,6 +33,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminCountry } from '@/contexts/AdminCountryContext';
 import { getRouteForPostalCode, getIrelandRouteForCity, irelandCities, initializeRouteCache } from '@/utils/postalCodeUtils';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 interface FormData {
   // Sender Details
@@ -69,14 +70,8 @@ interface FormData {
   bookingSource: string;
 }
 
-const getDrumPrice = (quantity: number): number => {
-  return 280;
-};
-
-// Door-to-door delivery in Zimbabwe — flat fee per address.
-const DOOR_TO_DOOR_PRICE = 25;
-
 const ManualBookingTab: React.FC = () => {
+  const {config:business,loading:businessLoading,error:businessError}=useBusinessConfiguration();
   const { toast } = useToast();
   const { selectedCountry } = useAdminCountry();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -85,6 +80,10 @@ const ManualBookingTab: React.FC = () => {
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [trackingNumber, setTrackingNumber] = useState('');
+  const cataloguePrice=(id:string)=>{const item=business.catalogue.find((row)=>row.id===id);return Number(selectedCountry==='Ireland'?item?.priceIE:item?.priceUK)||0;};
+  const getDrumPrice=(_quantity:number)=>cataloguePrice('plastic_drum');
+  const sealPrice=cataloguePrice('seal');
+  const DOOR_TO_DOOR_PRICE=business.fees.doorDeliveryPerAddress;
 
   const [formData, setFormData] = useState<FormData>({
     senderFirstName: '',
@@ -103,6 +102,10 @@ const ManualBookingTab: React.FC = () => {
     drumQuantity: 1,
     boxesDescription: '',
     wantMetalSeal: false,
+    sealOption: 'need',
+    sealCodes: [''],
+    sealQuantity: 1,
+    doorToDoor: false,
     paymentMethod: 'standard',
     adminNotes: '',
     bookingSource: 'WhatsApp',
@@ -206,7 +209,7 @@ const ManualBookingTab: React.FC = () => {
     }
     // Metal coded seal — charged only when we supply seals (not customer's own)
     if (formData.wantMetalSeal && formData.sealOption === 'need' && formData.sealQuantity > 0) {
-      total += formData.sealQuantity * 5;
+      total += formData.sealQuantity * sealPrice;
     }
     if (formData.doorToDoor) {
       total += DOOR_TO_DOOR_PRICE;
@@ -218,7 +221,7 @@ const ManualBookingTab: React.FC = () => {
     const baseTotal = calculateBaseTotal();
 
     if (formData.paymentMethod === 'payOnArrival') {
-      return baseTotal * 1.20;
+      return baseTotal * (1 + business.fees.payOnArrivalPremiumPercent / 100);
     }
     return baseTotal;
   };
@@ -424,6 +427,7 @@ const ManualBookingTab: React.FC = () => {
     }
   };
 
+  if(businessLoading||businessError||!business.catalogue.length)return <Card><CardContent className="p-8 text-center">{businessLoading?'Loading current catalogue…':businessError||'Current catalogue unavailable.'}</CardContent></Card>;
   if (bookingSuccess) {
     return (
       <Card className="max-w-2xl mx-auto">
@@ -757,7 +761,7 @@ const ManualBookingTab: React.FC = () => {
                       </div>
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="need" id="mb-sealNeed" />
-                        <Label htmlFor="mb-sealNeed" className="text-sm cursor-pointer">Supply seals (+£5 each)</Label>
+                        <Label htmlFor="mb-sealNeed" className="text-sm cursor-pointer">Supply seals (+£{sealPrice} each)</Label>
                       </div>
                     </RadioGroup>
 
@@ -852,7 +856,7 @@ const ManualBookingTab: React.FC = () => {
                   <RadioGroupItem value="payOnArrival" id="arrival" />
                   <Label htmlFor="arrival" className="flex-1 cursor-pointer">
                     <div className="font-medium">Pay on Arrival</div>
-                    <div className="text-sm text-orange-600">+20% premium</div>
+                    <div className="text-sm text-orange-600">+{business.fees.payOnArrivalPremiumPercent}% premium</div>
                   </Label>
                 </div>
               </RadioGroup>
@@ -865,8 +869,8 @@ const ManualBookingTab: React.FC = () => {
                 </div>
                 {formData.wantMetalSeal && formData.sealOption === 'need' && formData.sealQuantity > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span>Metal Seal ({formData.sealQuantity} x £5)</span>
-                    <span>£{(formData.sealQuantity * 5).toFixed(2)}</span>
+                    <span>Metal Seal ({formData.sealQuantity} x £{sealPrice})</span>
+                    <span>£{(formData.sealQuantity * sealPrice).toFixed(2)}</span>
                   </div>
                 )}
                 {formData.wantMetalSeal && formData.sealOption === 'have' && (
@@ -884,8 +888,8 @@ const ManualBookingTab: React.FC = () => {
 
                 {formData.paymentMethod === 'payOnArrival' && (
                   <div className="flex justify-between text-sm text-orange-600">
-                    <span>Pay on Arrival Premium (20%)</span>
-                    <span>+£{(calculateBaseTotal() * 0.20).toFixed(2)}</span>
+                    <span>Pay on Arrival Premium ({business.fees.payOnArrivalPremiumPercent}%)</span>
+                    <span>+£{(calculateBaseTotal() * business.fees.payOnArrivalPremiumPercent / 100).toFixed(2)}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-bold text-lg pt-2 border-t">

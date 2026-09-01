@@ -27,6 +27,7 @@ import { AlertCircle, CheckCircle2, Package, Ship, Info, User, Phone, FileBox, C
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { getRouteForPostalCode, getIrelandRouteForCity, restrictedPostalCodes } from '@/utils/postalCodeUtils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 // Define the validation schema
 const formSchema = z.object({
@@ -90,6 +91,10 @@ interface BookingFormNewProps {
 }
 
 const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onRequestCustomQuote }) => {
+  const {config:business}=useBusinessConfiguration();
+  const ukPrice=(id:string)=>Number(business.catalogue.find((item)=>item.id===id)?.priceUK)||0;
+  const drumPrice=ukPrice('plastic_drum');
+  const sealPrice=ukPrice('seal');
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('sender');
   const [availableRoutes, setAvailableRoutes] = useState<{ route: string; pickupDate: string }[]>([]);
@@ -160,7 +165,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
       if (isRestricted) {
         toast({
           title: "Contact Support",
-          description: "Please contact +44 7584 100552 to place a booking manually. We currently don't have a schedule for this route unless manually booking.",
+          description: `Please contact ${business.company.ukPhone||''} to place a booking manually. We currently don't have a schedule for this route unless manually booking.`,
           variant: "destructive"
         });
         return;
@@ -186,7 +191,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
     if (isRestrictedPostcode) {
       toast({
         title: "Booking Unavailable",
-        description: "Please contact +44 7584 100552 to place a booking manually for this postal code area.",
+        description: `Please contact ${business.company.ukPhone||''} to place a booking manually for this postal code area.`,
         variant: "destructive"
       });
       return;
@@ -203,10 +208,10 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
         
         if (values.paymentOption === 'standard') {
           // Standard payment prices
-          basePrice = qty * 280;
+          basePrice = qty * drumPrice;
         } else {
           // Pay later prices
-          basePrice = qty * 280;
+          basePrice = qty * drumPrice;
         }
       }
       
@@ -306,14 +311,14 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
     if (values.includeDrums) {
       const qty = parseInt(values.drumQuantity || '1');
       if (values.paymentOption === 'standard') {
-        total += qty * 280;
+        total += qty * drumPrice;
       } else {
-        total += qty * 280;
+        total += qty * drumPrice;
       }
       
       // Add metal seal cost
       if (values.wantMetalSeal) {
-        total += 5 * qty;
+        total += sealPrice * qty;
       }
     }
     
@@ -540,7 +545,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
                 {isRestrictedPostcode && (
                   <Alert className="bg-amber-50 border-amber-200">
                     <AlertDescription className="text-amber-700">
-                      Please contact +44 7584 100552 to place a booking manually. We currently don't have a schedule for this route unless manually booking.
+                      Please contact {business.company.ukPhone} to place a booking manually. We currently don't have a schedule for this route unless manually booking.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -762,7 +767,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
                             />
                           </FormControl>
                           <FormLabel className="font-normal">
-                            Add Metal coded seal for security (£5 per drum)
+                            Add Metal coded seal for security (£{sealPrice} per drum)
                           </FormLabel>
                         </FormItem>
                       )}
@@ -849,14 +854,14 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
                   {form.watch('includeDrums') && (
                     <div className="space-y-2">
                       <div className="flex justify-between">
-                        <span>Drums ({form.watch('drumQuantity') || '1'} × £280)</span>
-                        <span>£{parseInt(form.watch('drumQuantity') || '1') * 280}</span>
+                        <span>Drums ({form.watch('drumQuantity') || '1'} × £{drumPrice})</span>
+                        <span>£{parseInt(form.watch('drumQuantity') || '1') * drumPrice}</span>
                       </div>
                       
                       {form.watch('wantMetalSeal') && (
                         <div className="flex justify-between">
-                          <span>Metal Coded Seals ({form.watch('drumQuantity') || '1'} × £5)</span>
-                          <span>£{parseInt(form.watch('drumQuantity') || '1') * 5}</span>
+                          <span>Metal Coded Seals ({form.watch('drumQuantity') || '1'} × £{sealPrice})</span>
+                          <span>£{parseInt(form.watch('drumQuantity') || '1') * sealPrice}</span>
                         </div>
                       )}
                     </div>
@@ -930,7 +935,7 @@ const BookingFormNew: React.FC<BookingFormNewProps> = ({ onSubmitComplete, onReq
                 {isRestrictedPostcode && (
                   <Alert className="bg-amber-50 border-amber-200">
                     <AlertDescription className="text-amber-700">
-                      Booking is not available for this postal code area. Please contact +44 7584 100552 to place a booking manually.
+                      Booking is not available for this postal code area. Please contact {business.company.ukPhone} to place a booking manually.
                     </AlertDescription>
                   </Alert>
                 )}

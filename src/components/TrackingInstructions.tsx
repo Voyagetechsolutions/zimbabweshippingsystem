@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { CheckCircle } from 'lucide-react';
+import BusinessContactValue from '@/components/BusinessContactValue';
 
 const TrackingInstructions = () => {
   return (
@@ -57,7 +58,7 @@ const TrackingInstructions = () => {
           <div>
             <p className="font-medium">Need Help?</p>
             <p className="text-sm text-gray-600">
-              If you need assistance tracking your shipment, please call us at <span className="text-zim-green">+44 7584 100552</span>.
+              If you need assistance tracking your shipment, please call us at <span className="text-zim-green"><BusinessContactValue /></span>.
             </p>
           </div>
         </div>

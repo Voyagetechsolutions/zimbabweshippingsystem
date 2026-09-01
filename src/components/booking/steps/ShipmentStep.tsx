@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Minus, Plus, Package, Cylinder, Info } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 interface ShipmentData {
   drums: number;
@@ -18,8 +19,8 @@ interface ShipmentStepProps {
 }
 
 const ShipmentStep: React.FC<ShipmentStepProps> = ({ data, onChange }) => {
-  const drumPrice = 75;
-  const boxPrice = 25;
+  const { config: business } = useBusinessConfiguration();
+  const drumPrice=Number(business.catalogue.find((item)=>item.id==='plastic_drum')?.priceUK)||0;
 
   const incrementDrums = () => onChange({ drums: data.drums + 1 });
   const decrementDrums = () => onChange({ drums: Math.max(0, data.drums - 1) });
@@ -83,7 +84,7 @@ const ShipmentStep: React.FC<ShipmentStepProps> = ({ data, onChange }) => {
             <div>
               <h3 className="font-medium text-foreground">Boxes & Other Items</h3>
               <p className="text-sm text-muted-foreground">Standard shipping boxes</p>
-              <p className="text-sm font-medium text-primary">£{boxPrice} each</p>
+              <p className="text-sm font-medium text-primary">Itemised custom quote</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -134,7 +135,7 @@ const ShipmentStep: React.FC<ShipmentStepProps> = ({ data, onChange }) => {
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">Estimated Total</span>
             <span className="text-2xl font-bold text-primary">
-              £{(data.drums * drumPrice) + (data.boxes * boxPrice)}
+              £{data.drums * drumPrice}
             </span>
           </div>
         </div>

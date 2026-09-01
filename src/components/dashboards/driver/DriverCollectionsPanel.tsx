@@ -12,11 +12,12 @@ import {
   AlertTriangle, CheckCircle2, Loader2, MapPin, Navigation, Phone, PackageCheck,
 } from 'lucide-react';
 import {
-  FAIL_REASONS, claimRouteCollection, currentPosition, failStop, loadRouteDay,
+  claimRouteCollection, currentPosition, failStop, loadRouteDay,
   navigationUrl, releaseRouteCollection, sortByProximity, transitionStop,
   type RouteCollection, type RouteDay,
 } from '@/lib/driverOps';
 import DriverHandoverPanel, { type HandoverStop } from './DriverHandoverPanel';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 // Today's collection route.
 //
@@ -28,6 +29,8 @@ import DriverHandoverPanel, { type HandoverStop } from './DriverHandoverPanel';
 export default function DriverCollectionsPanel({ onDuty }: { onDuty: boolean }) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { config: business } = useBusinessConfiguration(true);
+  const failReasons=business.operations.failedStopReasons.map((item)=>({key:item.id,label:item.label}));
   const [day, setDay] = useState<RouteDay | null>(null);
   const [point, setPoint] = useState<{ latitude: number; longitude: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -272,7 +275,7 @@ export default function DriverCollectionsPanel({ onDuty }: { onDuty: boolean }) 
                           <SelectValue placeholder="Report issue" />
                         </SelectTrigger>
                         <SelectContent>
-                          {FAIL_REASONS.map((reason) => (
+                          {failReasons.map((reason) => (
                             <SelectItem key={reason.key} value={reason.key} className="text-xs">{reason.label}</SelectItem>
                           ))}
                         </SelectContent>

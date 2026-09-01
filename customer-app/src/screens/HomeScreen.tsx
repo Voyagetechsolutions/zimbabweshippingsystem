@@ -9,7 +9,7 @@ import { colors, spacing, radius } from '../theme';
 import { Card, Pill } from '../components/ui';
 import { greeting, parseCollectionDate, longDate, daysUntil } from '../lib/format';
 import { Shipment, journeyIndex, JOURNEY_STAGES, itemsSummary, statusTone } from '../lib/shipment';
-import { REFERRAL_DISCOUNT } from '../lib/catalogue';
+import { useBusinessConfig } from '../lib/businessConfig';
 import { scheduleMatchesPostcode } from '../lib/postcode';
 import { useAppTheme } from '../context/ThemeContext';
 import { IMG } from '../img';
@@ -22,6 +22,8 @@ export default function HomeScreen() {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [nextCollection, setNextCollection] = useState<{ route: string; date: Date } | null>(null);
   const {palette}=useAppTheme();
+  const { config: business } = useBusinessConfig();
+  const referralDiscount = business.fees.referralDiscount;
 
   const load = useCallback(async () => {
     if (session?.user) {
@@ -49,13 +51,15 @@ export default function HomeScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  if (!business.journeyStages.length) return <SafeAreaView style={[styles.safe,{backgroundColor:palette.bg}]}><View style={{flex:1,alignItems:'center',justifyContent:'center'}}><Text style={{color:palette.textMuted}}>Loading current shipment settings…</Text></View></SafeAreaView>;
+
   const firstName = profile?.full_name?.split(' ')[0];
   const active = shipments.find((s) => journeyIndex(s.status) < 5);
   const stageIndex = active ? journeyIndex(active.status) : 0;
 
   const shareReferral = () => {
     Share.share({
-      message: `I ship my drums and goods home with Zimbabwe Shipping — door to door from the UK & Ireland to Zimbabwe in 6-8 weeks. Mention my name${firstName ? ` (${profile?.full_name})` : ''} when you book and I get £${REFERRAL_DISCOUNT} off my next shipment! https://zimbabweshipping.com`,
+      message: `I ship my drums and goods home with ${business.company.name || 'our shipping team'} — door to door from the UK & Ireland to Zimbabwe. Mention my name${firstName ? ` (${profile?.full_name})` : ''} when you book and I get £${referralDiscount} off my next shipment! ${business.company.website || ''}`,
     }).catch(() => {});
   };
 
@@ -180,7 +184,7 @@ export default function HomeScreen() {
           <Pressable onPress={shareReferral}>
             <Card style={{ backgroundColor: colors.ink, borderColor: colors.ink }}>
               <Text style={[styles.cardKicker, { color: colors.yellow }]}>REFER & SAVE</Text>
-              <Text style={[styles.cardTitle, { color: colors.white }]}>Get £{REFERRAL_DISCOUNT}/€{REFERRAL_DISCOUNT} off your next shipment</Text>
+              <Text style={[styles.cardTitle, { color: colors.white }]}>Get £{referralDiscount}/€{referralDiscount} off your next shipment</Text>
               <Text style={[styles.cardMeta, { color: '#c8ccc7' }]}>Refer a friend — they mention your name when booking, you save. Tap to share.</Text>
             </Card>
           </Pressable>

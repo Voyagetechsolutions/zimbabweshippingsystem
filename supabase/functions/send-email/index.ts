@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -29,6 +30,11 @@ const sendAuthEmail = async (req: Request) => {
 
   try {
     const { type, email, token, redirect_to, csrf_token }: AuthEmailRequest = await req.json();
+    const supabase = createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const {data:companyRow,error:companyError}=await supabase.from('app_configuration').select('value').eq('key','company_profile').single();
+    if(companyError)throw companyError;
+    const company=(companyRow?.value||{}) as Record<string,string>;
+    if(!company.name||!company.website||!company.noreplyEmail)throw new Error('Company email configuration is incomplete');
 
     // Validate email format
     if (!validateEmail(email)) {
@@ -38,7 +44,7 @@ const sendAuthEmail = async (req: Request) => {
     let subject = '';
     let html = '';
 
-    const safeRedirect = redirect_to || 'https://zimbabweshipping.com';
+    const safeRedirect = redirect_to || company.website;
     const linkWithToken = token ? `${safeRedirect}?token=${token}` : safeRedirect;
 
     switch (type) {
@@ -140,7 +146,7 @@ const sendAuthEmail = async (req: Request) => {
     }
 
     const { error } = await resend.emails.send({
-      from: "Zimbabwe Shipping <noreply@zimbabweshipping.com>",
+      from: `${company.name} <${company.noreplyEmail}>`,
       to: [email],
       subject,
       html,

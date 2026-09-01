@@ -1,9 +1,10 @@
 import { supabase } from './supabase';
-import { CATALOGUE, Country, currencyFor, priceFor, DELIVERY_FEE } from './catalogue';
+import { Country, currencyFor, priceFor } from './catalogue';
+import type { BusinessConfig } from './businessConfig';
 import type { CustomerAddress } from './addresses';
 
 // The booking is priced and created server-side (create_customer_booking):
-// catalogue prices, £25/€25 per delivery address, seals and any approved
+// catalogue prices, configured delivery-address fees, seals and any approved
 // custom-quote amount are all validated in the database. The totals shown in
 // the UI are computed with the same rules purely for display.
 
@@ -52,10 +53,10 @@ export const EMPTY_DRAFT: BookingDraft = {
   quote: null,
 };
 
-export function draftLines(draft: BookingDraft, deliveryMethod: 'door' | 'self_collection' = 'door') {
+export function draftLines(draft: BookingDraft, business: BusinessConfig, deliveryMethod: 'door' | 'self_collection' = 'door') {
   const { symbol } = currencyFor(draft.country);
   const lines: Array<{ label: string; qty: number; unit: number | null }> = [];
-  for (const item of CATALOGUE) {
+  for (const item of business.catalogue) {
     if (item.id === 'seal') continue; // seals have their own selector
     const qty = draft.items[item.id] || 0;
     if (qty > 0) lines.push({ label: item.label, qty, unit: priceFor(item, draft.country) });
@@ -67,14 +68,14 @@ export function draftLines(draft: BookingDraft, deliveryMethod: 'door' | 'self_c
     else lines.push({ label: `Approved quote: ${draft.quote.description.slice(0, 60)}`, qty: 1, unit: draft.quote.amount });
   }
   if (draft.sealsRequested > 0) {
-    const seal = CATALOGUE.find((c) => c.id === 'seal');
+    const seal = business.catalogue.find((c) => c.id === 'seal');
     lines.push({ label: 'Metal coded seal', qty: draft.sealsRequested, unit: seal ? priceFor(seal, draft.country) : null });
   }
   const directReceiver = deliveryMethod === 'door' && draft.deliveryAddressIds.length === 0
     && Boolean(draft.recipient.name.trim() && draft.recipient.address.trim() && draft.recipient.city.trim());
   const addressCount = deliveryMethod === 'door' ? draft.deliveryAddressIds.length + (directReceiver ? 1 : 0) : 0;
   if (addressCount > 0) {
-    lines.push({ label: `Zimbabwe door delivery (${addressCount} address${addressCount > 1 ? 'es' : ''})`, qty: addressCount, unit: DELIVERY_FEE });
+    lines.push({ label: `Zimbabwe door delivery (${addressCount} address${addressCount > 1 ? 'es' : ''})`, qty: addressCount, unit: business.fees.doorDeliveryPerAddress });
   }
   const priced = lines.filter((l) => l.unit != null);
   const hasCustom = lines.some((l) => l.unit == null);
@@ -86,9 +87,9 @@ export function draftLines(draft: BookingDraft, deliveryMethod: 'door' | 'self_c
 export const DESCRIPTION_GUIDANCE =
   'Include: what the goods are, materials, brand/model where relevant, condition, sizes or approximate dimensions, colours, identifying marks, the contents of any boxes, drums or trunks, and anything fragile, restricted or high-value.';
 
-export async function createBooking(draft: BookingDraft, userId: string | null, deliveryMethod: 'door' | 'self_collection' = 'door') {
+export async function createBooking(draft: BookingDraft, userId: string | null, business: BusinessConfig, deliveryMethod: 'door' | 'self_collection' = 'door') {
   if (!userId) throw new Error('Sign in to book a shipment.');
-  const physicalLines = draftLines(draft).lines.filter((line) => !line.label.startsWith('Zimbabwe door delivery'));
+  const physicalLines = draftLines(draft, business, deliveryMethod).lines.filter((line) => !line.label.startsWith('Zimbabwe door delivery'));
   const generatedDescription = physicalLines.map((line, index) => `Item ${index + 1}: ${line.qty} × ${line.label}`).join('; ');
   const payload = {
     country: draft.country,

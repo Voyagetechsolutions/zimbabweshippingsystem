@@ -6,12 +6,14 @@ import Footer from '@/components/Footer';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import { Calendar as CalendarIcon, MapPin, Truck, Search, ArrowRight, Phone, ChevronDown, ChevronUp } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import BusinessContactValue from '@/components/BusinessContactValue';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 interface CollectionScheduleItem {
   id: string;
@@ -29,6 +31,7 @@ const CollectionSchedule = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [allRoutes, setAllRoutes] = useState<string[]>([]);
   const { toast } = useToast();
+  const { config: business } = useBusinessConfiguration();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -229,10 +232,10 @@ const CollectionSchedule = () => {
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
-              <a href="tel:+447584100552">
+              <a href={business.company.ukPhone ? `tel:${business.company.ukPhone}` : undefined}>
                 <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
                   <Phone className="mr-2 h-5 w-5" />
-                  +44 7584 100552
+                  <BusinessContactValue />
                 </Button>
               </a>
             </div>

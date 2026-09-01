@@ -5,8 +5,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import type { Shipment } from './shipment';
-
-const LOGO_URL = 'https://www.zimbabweshipping.ie/logo.png';
+import { COMPANY } from '../config/company';
 
 type InvoiceItem = { description?: string; quantity?: number; unitPrice?: number };
 
@@ -36,8 +35,8 @@ function headerHtml(title: string, refLines: string) {
   return `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px">
       <div>
-        <img src="${LOGO_URL}" style="height:80px" onerror="this.style.display='none'" />
-        <div style="font-size:18px;font-weight:700;color:#046A38;margin-top:4px">Zimbabwe Shipping</div>
+        <img src="${esc(COMPANY.logoUrl)}" style="height:80px" onerror="this.style.display='none'" />
+        <div style="font-size:18px;font-weight:700;color:#046A38;margin-top:4px">${esc(COMPANY.name)}</div>
       </div>
       <div style="text-align:right">
         <div style="font-size:30px;font-weight:bold;letter-spacing:1px">${title}</div>
@@ -98,10 +97,10 @@ export function buildInvoiceHtml(shipment: Shipment): string {
     <div style="display:flex;gap:40px;margin-bottom:28px">
       <div style="flex:1">
         <div style="font-weight:bold;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#666;margin-bottom:6px">FROM</div>
-        <div style="font-weight:600">Zimbabwe Shipping</div>
-        <div style="color:#444;line-height:1.6">www.zimbabweshipping.ie</div>
-        <div style="color:#444;line-height:1.6">UK: +44 7584 100552</div>
-        <div style="color:#444;line-height:1.6">Ireland: +353 87 195 4910</div>
+        <div style="font-weight:600">${esc(COMPANY.name)}</div>
+        <div style="color:#444;line-height:1.6">${esc(COMPANY.websiteLabel)}</div>
+        <div style="color:#444;line-height:1.6">UK: ${esc(COMPANY.supportPhone)}</div>
+        <div style="color:#444;line-height:1.6">Ireland: ${esc(COMPANY.irelandPhone)}</div>
       </div>
       <div style="flex:1">
         <div style="font-weight:bold;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#666;margin-bottom:6px">BILL TO</div>
@@ -253,7 +252,7 @@ export function buildDeliveryNoteHtml(shipment: Shipment, extras?: {
       </div>
     </div>
     <div style="margin-top:32px;border-top:1px solid #ddd;padding-top:16px;display:flex;justify-content:space-between;font-size:11px;color:#888">
-      <span>Zimbabwe Shipping</span>
+      <span>${esc(COMPANY.name)}</span>
       <span>Tracking: ${esc(shipment.tracking_number || '')}</span>
       <span>Generated: ${new Date().toLocaleString('en-GB')}</span>
     </div>

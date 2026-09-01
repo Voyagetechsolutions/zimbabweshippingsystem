@@ -6,13 +6,16 @@ import WhatsAppButton from '@/components/WhatsAppButton';
 import { Mail, Phone, MapPin, Clock, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { photos } from '@/data/sitePhotos';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 const Contact = () => {
+  const {config:business}=useBusinessConfiguration();
+  const whatsappNumber=String(business.company.whatsappPhone||'').replace(/\D/g,'');
   return (
     <>
       <Helmet>
         <title>Contact Us | Zimbabwe Shipping - Get in Touch</title>
-        <meta name="description" content="Contact Zimbabwe Shipping for quotes, bookings or support across the UK and Ireland. Call +44 7584 100552 or use WhatsApp." />
+        <meta name="description" content={`Contact ${business.company.name||'our team'} for quotes, bookings or support. Call ${business.company.ukPhone||''} or use WhatsApp.`} />
         <meta name="keywords" content="contact Zimbabwe Shipping, Zimbabwe shipping phone, shipping support UK Ireland, WhatsApp Zimbabwe shipping" />
 
         {/* Open Graph */}
@@ -59,18 +62,18 @@ const Contact = () => {
             <div className="max-w-5xl mx-auto">
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
                 {/* Phone */}
-                <a href="tel:+447584100552" className="block">
+                <a href={business.company.ukPhone ? `tel:${business.company.ukPhone}` : undefined} className="block">
                   <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 text-center hover:shadow-lg transition-shadow h-full">
                     <div className="inline-flex p-4 bg-zim-green/10 rounded-full mb-4">
                       <Phone className="h-6 w-6 text-zim-green" />
                     </div>
                     <h3 className="font-semibold mb-2 text-gray-900 dark:text-white">Call Us</h3>
-                    <p className="text-zim-green font-medium">+44 7584 100552</p>
+                    <p className="text-zim-green font-medium">{business.company.ukPhone}</p>
                   </div>
                 </a>
 
                 {/* WhatsApp */}
-                <a href="https://wa.me/447584100552" target="_blank" rel="noopener noreferrer" className="block">
+                <a href={whatsappNumber ? `https://wa.me/${whatsappNumber}` : undefined} target="_blank" rel="noopener noreferrer" className="block">
                   <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 text-center hover:shadow-lg transition-shadow h-full">
                     <div className="inline-flex p-4 bg-green-100 dark:bg-green-900/30 rounded-full mb-4">
                       <MessageCircle className="h-6 w-6 text-green-600" />
@@ -81,13 +84,13 @@ const Contact = () => {
                 </a>
 
                 {/* Email */}
-                <a href="mailto:info@zimbabweshipping.com" className="block">
+                <a href={business.company.supportEmail ? `mailto:${business.company.supportEmail}` : undefined} className="block">
                   <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 text-center hover:shadow-lg transition-shadow h-full">
                     <div className="inline-flex p-4 bg-zim-yellow/10 rounded-full mb-4">
                       <Mail className="h-6 w-6 text-zim-yellow" />
                     </div>
                     <h3 className="font-semibold mb-2 text-gray-900 dark:text-white">Email</h3>
-                    <p className="text-gray-600 dark:text-gray-400 text-sm">info@zimbabweshipping.com</p>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">{business.company.supportEmail}</p>
                   </div>
                 </a>
 
@@ -112,13 +115,7 @@ const Contact = () => {
                     </div>
                     <div>
                       <h3 className="font-semibold mb-1 text-gray-900 dark:text-white">UK Warehouse</h3>
-                      <p className="text-gray-600 dark:text-gray-400">
-                        Pastures Lodge Farm<br />
-                        Chelveston Road<br />
-                        Wellingborough<br />
-                        Northamptonshire<br />
-                        NN9 6AA
-                      </p>
+                      <p className="text-gray-600 dark:text-gray-400">{business.company.address}</p>
                     </div>
                   </div>
                   <Button asChild className="bg-zim-green hover:bg-zim-green/90">

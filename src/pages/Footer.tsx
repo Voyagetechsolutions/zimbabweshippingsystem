@@ -3,8 +3,10 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, Phone, MapPin } from 'lucide-react';
 import Logo from '@/components/Logo';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 const Footer = () => {
+  const { config: business } = useBusinessConfiguration();
   return (
     <footer className="bg-gray-900 text-white pt-16 pb-8">
       <div className="container mx-auto px-4">
@@ -94,20 +96,19 @@ const Footer = () => {
               <li className="flex items-start">
                 <MapPin className="h-5 w-5 text-zim-green mr-2 mt-0.5" />
                 <span className="text-gray-300">
-                  Pasture Lodge Farm, Chelveston Road<br />
-                  Raunds Wellington, Northampton Shire
+                  {business.company.address}
                 </span>
               </li>
               <li className="flex items-center">
                 <Phone className="h-5 w-5 text-zim-green mr-2" />
-                <a href="tel:+1234567890" className="text-gray-300 hover:text-white transition-colors">
-                  +44 123 456 7890
+                <a href={business.company.ukPhone ? `tel:${business.company.ukPhone}` : undefined} className="text-gray-300 hover:text-white transition-colors">
+                  {business.company.ukPhone}
                 </a>
               </li>
               <li className="flex items-center">
                 <Mail className="h-5 w-5 text-zim-green mr-2" />
-                <a href="mailto:info@example.com" className="text-gray-300 hover:text-white transition-colors">
-                  info@example.com
+                <a href={business.company.supportEmail ? `mailto:${business.company.supportEmail}` : undefined} className="text-gray-300 hover:text-white transition-colors">
+                  {business.company.supportEmail}
                 </a>
               </li>
             </ul>

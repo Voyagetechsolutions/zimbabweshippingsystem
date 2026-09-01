@@ -12,10 +12,11 @@ import {
   CheckCircle2, ClipboardCheck, Clock, Loader2, Navigation, PackageCheck, Phone, ShieldCheck, XCircle,
 } from 'lucide-react';
 import {
-  FAIL_REASONS, completeRun, failStop, loadDeliveryDay, navigationUrl, startRun,
+  completeRun, failStop, loadDeliveryDay, navigationUrl, startRun,
   transitionStop, verificationLabel, type DeliveryDay, type DeliveryLoadItem,
 } from '@/lib/driverOps';
 import DriverHandoverPanel, { type HandoverStop } from './DriverHandoverPanel';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 // The delivery run.
 //
@@ -37,6 +38,8 @@ export default function DriverDeliveryRunPanel({ onDuty, onGoToLoad }: {
 }) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { config: business } = useBusinessConfiguration(true);
+  const failReasons=business.operations.failedStopReasons.map((item)=>({key:item.id,label:item.label}));
   const [day, setDay] = useState<DeliveryDay | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -260,7 +263,7 @@ export default function DriverDeliveryRunPanel({ onDuty, onGoToLoad }: {
                           <SelectValue placeholder="Can't deliver" />
                         </SelectTrigger>
                         <SelectContent>
-                          {FAIL_REASONS.map((reason) => (
+                          {failReasons.map((reason) => (
                             <SelectItem key={reason.key} value={reason.key} className="text-xs">{reason.label}</SelectItem>
                           ))}
                         </SelectContent>

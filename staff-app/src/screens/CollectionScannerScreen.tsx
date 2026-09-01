@@ -11,6 +11,7 @@ import { colors, radius, spacing } from '../theme';
 import type { DriverStackParams } from '../navigation/types';
 import SignaturePad from '../components/SignaturePad';
 import { getDriverLocation } from '../lib/driverLocation';
+import { getStaffBusinessConfig } from '../lib/businessConfig';
 
 // React Native bundles local images as numeric module references.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -29,8 +30,6 @@ function base64Bytes(value: string) {
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
   return bytes.buffer;
 }
-
-const SEAL_CONDITIONS = ['intact', 'damaged', 'missing', 'other'] as const;
 
 export default function CollectionScannerScreen({ route, navigation }: Props) {
   const { stop } = route.params;
@@ -55,7 +54,8 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
   const [sealsRequested, setSealsRequested] = useState(0);
   const [sealsUsed, setSealsUsed] = useState(false);
   const [sealCodes, setSealCodes] = useState<string[]>([]);
-  const [sealCondition, setSealCondition] = useState<(typeof SEAL_CONDITIONS)[number]>('intact');
+  const sealConditions=getStaffBusinessConfig()?.operations.sealConditions||[];
+  const [sealCondition, setSealCondition] = useState<string>(sealConditions[0]||'');
   const [sealNotes, setSealNotes] = useState('');
   const [sealsSaved, setSealsSaved] = useState(false);
   const [draftReady, setDraftReady] = useState(false);
@@ -102,7 +102,7 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
       const seal: any = sealResult.data;
       setSealsUsed(Boolean(seal.seals_used));
       setSealCodes(Array.isArray(seal.seal_codes) ? seal.seal_codes : []);
-      setSealCondition(SEAL_CONDITIONS.includes(seal.condition) ? seal.condition : 'intact');
+      setSealCondition(sealConditions.includes(seal.condition) ? seal.condition : (sealConditions[0]||''));
       setSealNotes(seal.notes || '');
       setSealsSaved(true);
     } else if (Number(shipment.seals_requested || 0) > 0) {
@@ -136,7 +136,7 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
         if (typeof draft.correction === 'string') setCorrection(draft.correction);
         if (typeof draft.sealsUsed === 'boolean') setSealsUsed(draft.sealsUsed);
         if (Array.isArray(draft.sealCodes)) setSealCodes(draft.sealCodes);
-        if (SEAL_CONDITIONS.includes(draft.sealCondition)) setSealCondition(draft.sealCondition);
+        if (sealConditions.includes(draft.sealCondition)) setSealCondition(draft.sealCondition);
         if (typeof draft.sealNotes === 'string') setSealNotes(draft.sealNotes);
       } catch { await AsyncStorage.removeItem(draftKey); }
     }
@@ -338,7 +338,7 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
             ))}
             <Pressable style={styles.addItem} onPress={() => setSealCodes((current) => [...current, ''])}><Ionicons name="add-circle-outline" size={18} color={colors.primary} /><Text style={styles.addItemText}>Add another seal code</Text></Pressable>
             <Label text="Seal condition" />
-            <View style={styles.chipRow}>{SEAL_CONDITIONS.map((c) => (
+            <View style={styles.chipRow}>{sealConditions.map((c) => (
               <Pressable key={c} style={[styles.chip, sealCondition === c && styles.chipActive]} onPress={() => { setSealCondition(c); setSealsSaved(false); }}>
                 <Text style={[styles.chipText, sealCondition === c && styles.chipTextActive]}>{c}</Text>
               </Pressable>

@@ -12,6 +12,7 @@ import { useShipping } from '@/contexts/ShippingContext';
 import { supabase } from '@/integrations/supabase/client';
 import { exportElementToPdf } from '@/utils/exportUtils';
 import { formatDate } from '@/utils/formatters';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 const ConfirmBooking = () => {
   const location = useLocation();
@@ -19,6 +20,9 @@ const ConfirmBooking = () => {
   const { toast } = useToast();
   const { formatPrice } = useShipping();
   const bookingSummaryRef = useRef(null);
+  const { config: business } = useBusinessConfiguration();
+  const sealPrice = business.catalogue.find((item) => item.id === 'seal')?.priceUK ?? 0;
+  const drumPrice = business.catalogue.find((item) => item.id === 'plastic_drum')?.priceUK ?? 0;
 
   useEffect(() => {
     // Set the page title
@@ -108,7 +112,7 @@ const ConfirmBooking = () => {
     
     const drumQuantity = parseInt(data.shipmentDetails?.quantity || data.drumQuantity || '1');
     
-    return drumQuantity * 280;
+    return drumQuantity * drumPrice;
   }
 
   // Payment method information
@@ -118,7 +122,7 @@ const ConfirmBooking = () => {
     if (paymentMethod === 'standard-payment') {
       return {
         displayName: 'Standard Payment',
-        instructions: `Please contact the accounts office on +44 7770 761266 for bank details. Reference: tracking number (${trackingNumber}), initials, and surname.`
+        instructions: `Please contact the accounts office on ${business.company.accountsPhone || ''} for bank details. Reference: tracking number (${trackingNumber}), initials, and surname.`
       };
     } else if (paymentMethod === 'cash-on-collection') {
       return {
@@ -127,7 +131,7 @@ const ConfirmBooking = () => {
       };
     } else if (paymentMethod === 'pay-on-arrival') {
       return {
-        displayName: 'Pay on Arrival (20% Premium)',
+        displayName: `Pay on Arrival (${business.fees.payOnArrivalPremiumPercent}% Premium)`,
         instructions: "Payment will be required when goods arrive in Zimbabwe."
       };
     } else if (paymentMethod === 'standard' && paymentData?.payLaterMethod === 'payLater') {
@@ -139,7 +143,7 @@ const ConfirmBooking = () => {
     
     return {
       displayName: 'Standard Payment',
-      instructions: `Please contact the accounts office on +44 7770 761266 for bank details. Reference: tracking number (${trackingNumber}), initials, and surname.`
+      instructions: `Please contact the accounts office on ${business.company.accountsPhone || ''} for bank details. Reference: tracking number (${trackingNumber}), initials, and surname.`
     };
   };
   
@@ -375,8 +379,8 @@ const ConfirmBooking = () => {
                     
                     {bookingData.wantMetalSeal && bookingData.includeDrums && (
                       <li className="flex justify-between">
-                        <span>Metal Coded Seal ({bookingData.drumQuantity || 1} x £5)</span>
-                        <span className="font-medium">{formatPrice(5 * parseInt(bookingData.drumQuantity || '1'))}</span>
+                        <span>Metal Coded Seal ({bookingData.drumQuantity || 1} x £{sealPrice})</span>
+                        <span className="font-medium">{formatPrice(sealPrice * parseInt(bookingData.drumQuantity || '1'))}</span>
                       </li>
                     )}
                     

@@ -8,13 +8,14 @@ import { Button, Field, FlagStripe, SectionTitle } from '../components/ui';
 import { colors, radius, spacing } from '../theme';
 import { useAppTheme } from '../context/ThemeContext';
 import { longDate, parseCollectionDate } from '../lib/format';
-
-const PAYMENTS = ['Bank Transfer', 'Cash on Collection', 'Pay on Arrival', 'WorldRemit', 'Mukuru', 'Ria', 'Remitly (select ZB as pickup point)'];
+import { useBusinessConfig } from '../lib/businessConfig';
 
 export default function EditShipmentScreen() {
   const navigation = useNavigation<any>();
   const { id } = useRoute<any>().params || {};
   const { palette } = useAppTheme();
+  const { config: business } = useBusinessConfig();
+  const payments = [...business.payments.methods.filter((m) => m.id !== 'other_payment').map((m) => m.label), ...business.payments.otherProviders.map((m) => m.label)];
   const [busy, setBusy] = useState(true);
   const [sender, setSender] = useState<any>({});
   const [recipient, setRecipient] = useState<any>({});
@@ -63,7 +64,7 @@ export default function EditShipmentScreen() {
       <SectionTitle text="Upcoming collection date" />
       {schedules.map((date) => <Pressable key={date.id} onPress={() => setCollection({route:date.route,date:date.pickup_date,scheduleId:date.id})} style={[styles.option,{backgroundColor:palette.surface,borderColor:collection.scheduleId===date.id?colors.green:palette.border}]}><View style={{flex:1}}><Text style={[styles.optionTitle,{color:palette.text}]}>{date.route}</Text><Text style={{color:palette.textMuted}}>{longDate(date.parsed)}</Text></View><Ionicons name={collection.scheduleId===date.id?'radio-button-on':'radio-button-off'} size={21} color={collection.scheduleId===date.id?colors.green:palette.textFaint}/></Pressable>)}
       <SectionTitle text="Payment method" />
-      {PAYMENTS.map((method) => <Pressable key={method} onPress={() => setPaymentMethod(method)} style={[styles.option,{backgroundColor:palette.surface,borderColor:paymentMethod===method?colors.green:palette.border}]}><Text style={[styles.optionTitle,{color:palette.text,flex:1}]}>{method}</Text><Ionicons name={paymentMethod===method?'radio-button-on':'radio-button-off'} size={21} color={paymentMethod===method?colors.green:palette.textFaint}/></Pressable>)}
+      {payments.map((method) => <Pressable key={method} onPress={() => setPaymentMethod(method)} style={[styles.option,{backgroundColor:palette.surface,borderColor:paymentMethod===method?colors.green:palette.border}]}><Text style={[styles.optionTitle,{color:palette.text,flex:1}]}>{method}</Text><Ionicons name={paymentMethod===method?'radio-button-on':'radio-button-off'} size={21} color={paymentMethod===method?colors.green:palette.textFaint}/></Pressable>)}
       <Text style={[styles.note,{color:palette.textMuted}]}>Items and prices are locked after booking. Ask the team if those need changing.</Text>
       <Button title="SAVE CHANGES" onPress={save} busy={busy} />
     </ScrollView>

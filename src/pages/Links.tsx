@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 import { Helmet } from 'react-helmet';
 import {
   MessageCircle,
@@ -18,57 +19,7 @@ const TikTokIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-const origins = {
-  uk: {
-    key: 'uk',
-    flag: '🇬🇧',
-    label: 'UK',
-    number: '+44 7584 100552',
-    wa: '447584100552',
-  },
-  ireland: {
-    key: 'ireland',
-    flag: '🇮🇪',
-    label: 'Ireland',
-    number: '+353 87 195 4910',
-    wa: '353871954910',
-  },
-} as const;
-
-type OriginKey = keyof typeof origins;
-
-const customerCare = { wa: '447901217618' };
-
-const socials = [
-  {
-    label: 'Instagram',
-    sublabel: '@zimbabwe_shipping_services',
-    href: 'https://www.instagram.com/zimbabwe_shipping_services?igsh=MXJ3Zjk5MnY1MXl6eA==',
-    icon: Instagram,
-    iconBg: 'bg-gradient-to-tr from-[#feda75] via-[#d62976] to-[#4f5bd5]',
-  },
-  {
-    label: 'Facebook',
-    sublabel: 'Follow our latest updates',
-    href: 'https://www.facebook.com/share/1NRVYTAu3d/',
-    icon: Facebook,
-    iconBg: 'bg-[#1877F2]',
-  },
-  {
-    label: 'TikTok',
-    sublabel: '@zimbabweshipping',
-    href: 'https://www.tiktok.com/@zimbabweshipping?_r=1&_t=ZS-98FLnagvujt',
-    icon: TikTokIcon,
-    iconBg: 'bg-black border border-white/15',
-  },
-  {
-    label: 'Visit our website',
-    sublabel: 'zimbabweshipping.com',
-    href: 'https://zimbabweshipping.com/',
-    icon: Globe,
-    iconBg: 'bg-gradient-to-tr from-emerald-500 to-teal-600',
-  },
-];
+type OriginKey = 'uk'|'ireland';
 
 /* ---------- Route map hero ---------- */
 const RouteMap = () => {
@@ -182,6 +133,15 @@ const RouteMap = () => {
 };
 
 const Links = () => {
+  const {config:business}=useBusinessConfiguration();
+  const origins={uk:{key:'uk',flag:'🇬🇧',label:'UK',number:business.company.ukPhone||'',wa:business.company.whatsappPhone||''},ireland:{key:'ireland',flag:'🇮🇪',label:'Ireland',number:business.company.irelandPhone||'',wa:String(business.company.irelandPhone||'').replace(/\D/g,'')}} as const;
+  const customerCare={wa:business.company.customerCareWhatsApp||business.company.whatsappPhone||''};
+  const socials = [
+    { label:'Instagram',sublabel:business.company.instagramHandle||'',href:business.company.instagramUrl||'',icon:Instagram,iconBg:'bg-gradient-to-tr from-[#feda75] via-[#d62976] to-[#4f5bd5]' },
+    { label:'Facebook',sublabel:'Follow our latest updates',href:business.company.facebookUrl||'',icon:Facebook,iconBg:'bg-[#1877F2]' },
+    { label:'TikTok',sublabel:business.company.tiktokHandle||'',href:business.company.tiktokUrl||'',icon:TikTokIcon,iconBg:'bg-black border border-white/15' },
+    { label:'Visit our website',sublabel:String(business.company.website||'').replace(/^https?:\/\//,'').replace(/\/$/,''),href:business.company.website||'',icon:Globe,iconBg:'bg-gradient-to-tr from-emerald-500 to-teal-600' },
+  ].filter((item)=>item.href);
   const [origin, setOrigin] = useState<OriginKey>('uk');
   const active = origins[origin];
 

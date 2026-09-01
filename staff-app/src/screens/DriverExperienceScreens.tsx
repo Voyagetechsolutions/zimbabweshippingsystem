@@ -18,6 +18,7 @@ import type { DriverRunStackParams, DriverStopKind } from '../navigation/types';
 import { COMPANY, COMPANY_WHATSAPP_URL } from '../config/company';
 import { BACKEND_PENDING_MESSAGE, enqueue, isMissingBackend, isNetworkError } from '../lib/offlineQueue';
 import { useDriverCountry } from '../context/DriverCountryContext';
+import { getStaffBusinessConfig } from '../lib/businessConfig';
 
 // React Native bundles local images as numeric module references.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -470,7 +471,7 @@ export function DriverStopDetailsScreen({ route, navigation }: NativeStackScreen
 
 export function DriverReportIssueScreen({ route, navigation }: NativeStackScreenProps<DriverRunStackParams, 'ReportIssue'>) {
   const { stop } = route.params; const [reason, setReason] = useState(''); const [notes, setNotes] = useState(''); const [busy, setBusy] = useState(false); const [showReschedule, setShowReschedule] = useState(false); const [rescheduleOption, setRescheduleOption] = useState('dispatch_decision');
-  const reasons = [['not_home', 'Customer not home'], ['customer_unavailable', 'Customer unavailable'], ['customer_cancelled', 'Customer cancelled'], ['wrong_address', 'Wrong address'], ['access_problem', 'Cannot access property'], ['goods_not_ready', 'Package not ready'], ['customer_refused', 'Customer refused'], ['damaged_goods', 'Package damaged'], ['vehicle_problem', 'Vehicle issue'], ['address_not_found', 'Address cannot be found'], ['unsafe_location', 'Unsafe location'], ['other', 'Other']];
+  const reasons = (getStaffBusinessConfig()?.operations.failedStopReasons || []).map((item)=>[item.id,item.label]);
   const noteRequired = ['wrong_address','access_problem','damaged_goods','vehicle_problem','address_not_found','unsafe_location','other'].includes(reason);
   const submit = async () => { if (!reason) { Alert.alert('Choose an issue', 'Select what stopped you completing this stop.'); return; } if (noteRequired && !notes.trim()) { Alert.alert('Add a note', 'Give dispatch enough detail to decide what happens next.'); return; } Alert.alert('Report this stop as failed?', `Dispatch will be notified immediately about ${stop.customerName}.`, [{text:'Cancel',style:'cancel'},{text:'Report issue',style:'destructive',onPress:async()=>{setBusy(true); const result = await supabase.rpc('fail_driver_stop', { p_stop_id: stop.id, p_reason: reason, p_note: notes.trim() || null }); setBusy(false); if (result.error) { console.warn('Issue report failed',result.error.message); Alert.alert('Issue not reported','Check your connection and try again.'); } else Alert.alert('Issue reported', 'Dispatch can now replan this stop.', [{ text: 'Done', onPress: () => navigation.popToTop() }]);}}]); };
   const reschedule = async () => {

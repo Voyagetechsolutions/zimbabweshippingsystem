@@ -2,26 +2,16 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Check, ArrowRight, Banknote, Package, MessageSquare, Box } from 'lucide-react';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 const PricingSection = () => {
   const navigate = useNavigate();
   const [selectedRegion, setSelectedRegion] = useState<'uk' | 'ireland'>('uk');
-
-  const ukPrices = {
-    one: { standard: '£280' },
-    currency: '£',
-  };
-
-  const irelandPrices = {
-    one: { standard: '€360' },
-    currency: '€',
-  };
-
-  const trunkPrices = {
-    one: '€220',
-  };
-
-  const prices = selectedRegion === 'uk' ? ukPrices : irelandPrices;
+  const { config: business } = useBusinessConfiguration();
+  const drum = business.catalogue.find((item) => item.id === 'plastic_drum');
+  const trunk = business.catalogue.find((item) => item.id === 'trunk');
+  const seal = business.catalogue.find((item) => item.id === 'seal');
+  const whatsappNumber = (business.company.whatsapp || business.company.ukPhone || '').replace(/\D/g, '');
 
   return (
     <section className="py-20 md:py-28 bg-white dark:bg-gray-900">
@@ -86,7 +76,7 @@ const PricingSection = () => {
                       <span className="text-sm text-gray-500 ml-2">Per drum</span>
                     </div>
                     <span className={`text-3xl font-bold ${selectedRegion === 'uk' ? 'text-zim-green' : 'text-emerald-600'}`}>
-                      {selectedRegion === 'uk' ? ukPrices.one.standard : irelandPrices.one.standard}
+                      {selectedRegion === 'uk' ? `£${drum?.priceUK ?? '—'}` : `€${drum?.priceIE ?? '—'}`}
                       <span className="text-sm font-normal text-gray-500">/each</span>
                     </span>
                   </div>
@@ -157,7 +147,7 @@ const PricingSection = () => {
                       <span className="text-sm text-gray-500 ml-2">Per trunk</span>
                     </div>
                     <span className="text-3xl font-bold text-amber-600">
-                      {trunkPrices.one}
+                      €{trunk?.priceIE ?? '—'}
                       <span className="text-sm font-normal text-gray-500">/each</span>
                     </span>
                   </div>
@@ -168,7 +158,7 @@ const PricingSection = () => {
                   <div>
                     <span className="font-medium text-gray-700 dark:text-gray-300">Metal Coded Seal</span>
                     <span className="text-gray-500 ml-1">(optional)</span>
-                    <span className="ml-2 font-semibold text-amber-600">+€7/trunk</span>
+                    <span className="ml-2 font-semibold text-amber-600">+€{seal?.priceIE ?? '—'}/trunk</span>
                   </div>
                 </div>
 
@@ -261,7 +251,7 @@ const PricingSection = () => {
                 <div className="mt-4 text-center">
                   <span className="text-sm text-gray-500">or </span>
                   <a
-                    href="https://wa.me/447584100552"
+                    href={whatsappNumber ? `https://wa.me/${whatsappNumber}` : undefined}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-sm text-zim-green hover:underline"
@@ -285,7 +275,7 @@ const PricingSection = () => {
                 </p>
               </div>
               <div className="flex items-center gap-4">
-                <span className="text-2xl font-bold text-gray-900 dark:text-white">+£25</span>
+                <span className="text-2xl font-bold text-gray-900 dark:text-white">+£{business.fees.doorDeliveryPerAddress}</span>
                 <span className="text-sm text-gray-500">per address</span>
               </div>
             </div>

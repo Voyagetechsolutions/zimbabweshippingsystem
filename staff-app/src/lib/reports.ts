@@ -2,6 +2,7 @@ import { Share } from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { supabase } from './supabase';
+import { COMPANY } from '../config/company';
 
 // Server-side report aggregation (admin_reports RPC) shared by the Reports and
 // Analytics screens, plus CSV/PDF export helpers.
@@ -90,7 +91,7 @@ export function buildReportCsv(report: AdminReport): string {
   const lines: string[] = [];
   const push = (...cells: Array<string | number | null | undefined>) =>
     lines.push(cells.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','));
-  push('Zimbabwe Shipping report', `${report.range.from} to ${report.range.to}`);
+  push(`${COMPANY.name} report`, `${report.range.from} to ${report.range.to}`);
   push('');
   push('Revenue by currency');
   Object.entries(report.revenue.byCurrency).forEach(([c, v]) => push(c, v));
@@ -144,7 +145,7 @@ export function buildReportHtml(report: AdminReport, title = 'Operations Report'
   return `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
   <body style="font-family:Arial,Helvetica,sans-serif;color:#101828;padding:36px 42px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <div style="font-size:20px;font-weight:700;color:#006B4B">Zimbabwe Shipping</div>
+      <div style="font-size:20px;font-weight:700;color:#006B4B">${COMPANY.name}</div>
       <div style="font-size:12px;color:#667085">Generated ${new Date().toLocaleString('en-GB')}</div>
     </div>
     <div style="font-size:24px;font-weight:bold;margin-bottom:2px">${esc(title)}</div>

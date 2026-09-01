@@ -12,16 +12,7 @@ import { buildInvoiceHtml, buildDeliveryNoteHtml, sharePdf } from '../lib/docume
 import { money } from '../lib/format';
 import { useAppTheme } from '../context/ThemeContext';
 import { IMG } from '../img';
-
-// Friendly headline for the hero banner, keyed by journey stage.
-const STAGE_HEADLINES = [
-  { title: 'Booking Confirmed', sub: "We're preparing your collection" },
-  { title: 'Collected', sub: 'Your items are safely with our team' },
-  { title: 'In Transit', sub: 'Your shipment is on the way' },
-  { title: 'Arrived in Zimbabwe', sub: 'Clearing customs and heading to the depot' },
-  { title: 'Out for Delivery', sub: 'Your receiver should be ready today' },
-  { title: 'Delivered 🎉', sub: 'Thank you for shipping with us' },
-] as const;
+import { useBusinessConfig } from '../lib/businessConfig';
 
 export default function ShipmentDetailScreen() {
   const navigation = useNavigation<any>();
@@ -31,6 +22,7 @@ export default function ShipmentDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
   const {palette}=useAppTheme();
+  const { config: business } = useBusinessConfig();
 
   useEffect(() => {
     supabase
@@ -63,7 +55,7 @@ export default function ShipmentDetailScreen() {
 
   const shareTracking = () => {
     Share.share({
-      message: `Track our Zimbabwe Shipping delivery: ${shipment.tracking_number} — https://zimbabweshipping.com/track?number=${shipment.tracking_number}`,
+      message: `Track our ${business.company.name || ''} delivery: ${shipment.tracking_number} — ${business.company.website || ''}/track?number=${shipment.tracking_number}`,
     }).catch(() => {});
   };
 
@@ -103,8 +95,8 @@ export default function ShipmentDetailScreen() {
         <ImageBackground source={IMG.trackBanner} style={styles.banner} imageStyle={{ borderRadius: radius.lg }} resizeMode="cover">
           <View style={styles.bannerShade} />
           <View style={styles.bannerInner}>
-            <Text style={styles.bannerTitle}>{STAGE_HEADLINES[stage].title}</Text>
-            <Text style={styles.bannerSub}>{STAGE_HEADLINES[stage].sub}</Text>
+            <Text style={styles.bannerTitle}>{JOURNEY_STAGES[stage]?.title}</Text>
+            <Text style={styles.bannerSub}>{JOURNEY_STAGES[stage]?.description}</Text>
           </View>
         </ImageBackground>
 
@@ -161,7 +153,7 @@ export default function ShipmentDetailScreen() {
               </View>
               {!invoice.paid && (
                 <Text style={styles.hint}>
-                  We accept bank transfer, cash on collection, or pay on arrival. For bank details contact the accounts office on +44 7770 761266 and reference your tracking number, initials and surname.
+                  We accept {business.payments.methods.filter((m) => m.id !== 'other_payment').map((m) => m.label.toLowerCase()).join(', ')}. For bank details contact the accounts office on {business.company.accountsPhone} and reference your tracking number, initials and surname.
                 </Text>
               )}
             </Card>

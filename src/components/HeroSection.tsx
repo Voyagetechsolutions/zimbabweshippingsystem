@@ -5,9 +5,13 @@ import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { format, isValid } from 'date-fns';
 import { photos } from '@/data/sitePhotos';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 const HeroSection: React.FC = () => {
   const navigate = useNavigate();
+  const { config: business } = useBusinessConfiguration();
+  const drum = business.catalogue.find((item) => item.id === 'plastic_drum') || business.catalogue.find((item) => item.id.includes('drum'));
+  const whatsappNumber = (business.company.whatsappPhone || business.company.ukPhone || '').replace(/\D/g, '');
   const [nextCollection, setNextCollection] = useState<{ label: string; route: string } | null>(null);
 
   // Surface the genuine next collection date for honest urgency.
@@ -70,7 +74,7 @@ const HeroSection: React.FC = () => {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-zim-green opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-zim-green" />
             </span>
-            UK &amp; Ireland to Zimbabwe · Family-run since 2011
+            UK &amp; Ireland to Zimbabwe · Family-run since {business.company.foundedYear || '—'}
           </div>
 
           {/* Headline */}
@@ -82,7 +86,7 @@ const HeroSection: React.FC = () => {
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-gray-200">
             Free collection across the UK &amp; Ireland, door-to-door delivery to every
             city in Zimbabwe, with secure handling and tracking along the way. Drums from
-            <span className="font-semibold text-white"> £280</span>.
+            <span className="font-semibold text-white"> £{drum?.priceUK ?? '—'}</span>.
           </p>
 
           {/* CTAs */}
@@ -141,7 +145,7 @@ const HeroSection: React.FC = () => {
               <Search className="h-4 w-4" /> Track a shipment
             </Link>
             <a
-              href="https://wa.me/447584100552"
+              href={whatsappNumber ? `https://wa.me/${whatsappNumber}` : undefined}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-gray-200 transition hover:text-white"

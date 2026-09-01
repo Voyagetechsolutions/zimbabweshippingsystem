@@ -1,21 +1,13 @@
 export function normalizePostcode(value?:string|null){return(value||'').toUpperCase().replace(/[^A-Z0-9]/g,'')}
 export function outwardCode(value?:string|null){const clean=normalizePostcode(value);return clean.length>4?clean.slice(0,-3):clean}
 
-const UK_ROUTE_PREFIXES: Record<string, string[]> = {
-  'LONDON ROUTE': ['EC','WC','N','NW','E','SE','SW','W','EN','IG','RM','DA','BR','UB','HA','WD'],
-  'BIRMINGHAM ROUTE': ['B','CV','WV','DY','WS','WR','SY','TF'],
-  'MANCHESTER ROUTE': ['M','L','WA','OL','SK','ST','BB','PR','FY','BL','WN','CW','CH','LL'],
-  'LEEDS ROUTE': ['LS','WF','HX','DN','S','HD','YO','BD','HG'],
-  'CARDIFF ROUTE': ['CF','GL','BS','SN','BA','SP','NP','CP','SA'],
-  'BOURNEMOUTH ROUTE': ['SO','PO','RG','GU','BH','OX'],
-  'NOTTINGHAM ROUTE': ['NG','LE','DE','PE','LN'],
-  'BRIGHTON ROUTE': ['BN','RH','SL','TN','CT','CR','TW','KT','ME'],
-  'SOUTHEND ROUTE': ['NR','IP','CO','CM','CB','SS','SG'],
-  'NORTHAMPTON ROUTE': ['MK','LU','AL','HP','NN'],
-  'SCOTLAND ROUTE': ['AB','DD','IV','PH','KY','FK','EH','ML','TD','G','PA','KA','DG','NE','DH','SR','DL','TS'],
-};
+let UK_ROUTE_PREFIXES: Record<string, string[]> = {};
+let RESTRICTED_UK_PREFIXES = new Set<string>();
 
-const RESTRICTED_UK_PREFIXES = new Set(['EX','TQ','DT','LD','HR','HU','CA']);
+export function configurePostcodeCoverage(config: { restrictedPrefixes?: string[]; routes?: Array<{ route: string; prefixes: string[] }> }) {
+  UK_ROUTE_PREFIXES = Object.fromEntries((config.routes || []).map((row) => [row.route, row.prefixes || []]));
+  RESTRICTED_UK_PREFIXES = new Set(config.restrictedPrefixes || []);
+}
 
 function postcodePrefix(value?: string | null) {
   return (outwardCode(value).match(/^[A-Z]+/) || [''])[0];

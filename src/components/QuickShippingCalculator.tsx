@@ -6,15 +6,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Calculator, Package } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 const QuickShippingCalculator = () => {
   const [drums, setDrums] = useState<string>("1");
   const [quote, setQuote] = useState<number | null>(null);
+  const { config: business } = useBusinessConfiguration();
+  const pricePerDrum = Number(business.catalogue.find((item) => item.id === 'plastic_drum')?.priceUK) || 0;
 
   const calculateShippingCost = () => {
     const drumCount = parseInt(drums);
-    const pricePerDrum = 280;
-    
     const totalPrice = drumCount * pricePerDrum;
     setQuote(totalPrice);
   };
@@ -51,7 +52,7 @@ const QuickShippingCalculator = () => {
           <div className="bg-gray-50 p-3 rounded-md text-sm space-y-2">
             <p className="font-medium">Pricing:</p>
             <ul className="list-disc pl-5 space-y-1">
-              <li>£280 per drum</li>
+              <li>£{pricePerDrum} per drum</li>
             </ul>
           </div>
           

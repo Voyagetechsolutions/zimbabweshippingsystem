@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../theme';
 import { Button, Field, FlagStripe, Pill, SectionTitle } from '../components/ui';
 import { CustomerAddress, AddressInput, listAddresses, saveAddress, deleteAddress, addressSummary } from '../lib/addresses';
-import { COVERED_ZIM_PLACES } from '../lib/catalogue';
+import { useBusinessConfig } from '../lib/businessConfig';
 import { useAuth } from '../context/AuthContext';
 import { useAppTheme } from '../context/ThemeContext';
 
@@ -15,12 +15,13 @@ const EMPTY_FORM: AddressInput = {
   city: '', province: '', country: 'Zimbabwe', postal_code: '', delivery_instructions: '', is_default: false,
 };
 
-// Saved Zimbabwe delivery addresses. Each address selected during booking adds
-// the £25/€25 door-delivery fee (charged per address, priced server-side).
+// Saved Zimbabwe delivery addresses. Each selected address adds the current
+// database-configured door-delivery fee, which is also enforced server-side.
 export default function AddressesScreen() {
   const navigation = useNavigation<any>();
   const { session } = useAuth();
   const { palette } = useAppTheme();
+  const { config: business } = useBusinessConfig();
   const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<AddressInput | null>(null);
@@ -43,7 +44,7 @@ export default function AddressesScreen() {
       Alert.alert('Missing details', 'Recipient name, phone, address and city are required.');
       return;
     }
-    const covered = COVERED_ZIM_PLACES.some((p) => form.city.trim().toLowerCase().includes(p.toLowerCase()) || p.toLowerCase().includes(form.city.trim().toLowerCase()));
+    const covered = business.coveredZimbabwePlaces.some((p) => form.city.trim().toLowerCase().includes(p.toLowerCase()) || p.toLowerCase().includes(form.city.trim().toLowerCase()));
     const doSave = async () => {
       setBusy(true);
       try {
@@ -90,7 +91,7 @@ export default function AddressesScreen() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <Text style={[styles.hint, { color: palette.textMuted }]}>
-            Save the people and places we deliver to in Zimbabwe. Door delivery is £25 per address from the UK or €25 from Ireland — selected addresses are each added to your booking total.
+            Save the people and places we deliver to in Zimbabwe. Door delivery is £{business.fees.doorDeliveryPerAddress} per address from the UK or €{business.fees.doorDeliveryPerAddress} from Ireland — selected addresses are each added to your booking total.
           </Text>
 
           {loading && <ActivityIndicator color={colors.green} style={{ marginTop: 24 }} />}

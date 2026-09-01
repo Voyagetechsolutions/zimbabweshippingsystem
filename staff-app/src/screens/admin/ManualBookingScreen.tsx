@@ -1,16 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, Alert, Switch } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { colors, radius, spacing } from '../../theme';
+import { loadStaffBusinessConfig, type StaffBusinessConfig } from '../../lib/businessConfig';
 
 // Mirrors the website's booking submit: shipments + payments + receipts rows
 // with the same metadata shape, so the booking shows up everywhere.
-
-const PAYMENT_METHODS = [
-  { key: 'standard', label: 'Standard' },
-  { key: 'cashOnCollection', label: 'Cash on Collection' },
-  { key: 'payOnArrival', label: 'Pay on Arrival (+20%)' },
-] as const;
 
 function trackingNumber() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -20,6 +15,8 @@ function trackingNumber() {
 }
 
 export default function ManualBookingScreen() {
+  const [business, setBusiness] = useState<StaffBusinessConfig | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
   const [country, setCountry] = useState<'England' | 'Ireland'>('England');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -34,16 +31,27 @@ export default function ManualBookingScreen() {
   const [rxCity, setRxCity] = useState('');
   const [drums, setDrums] = useState('0');
   const [trunks, setTrunks] = useState('0');
-  const [drumPrice, setDrumPrice] = useState('360');
-  const [trunkPrice, setTrunkPrice] = useState('220');
-  const [sealPrice, setSealPrice] = useState('7');
+  const [drumPrice, setDrumPrice] = useState('');
+  const [trunkPrice, setTrunkPrice] = useState('');
+  const [sealPrice, setSealPrice] = useState('');
   const [wantSeal, setWantSeal] = useState(false);
   const [otherItems, setOtherItems] = useState('');
-  const [payment, setPayment] = useState<(typeof PAYMENT_METHODS)[number]['key']>('standard');
+  const [payment, setPayment] = useState('');
   const [busy, setBusy] = useState(false);
 
   const currency = country === 'Ireland' ? 'EUR' : 'GBP';
   const symbol = country === 'Ireland' ? '€' : '£';
+
+  useEffect(() => { loadStaffBusinessConfig().then((next) => { setBusiness(next); setPayment(next.payments.methods[0]?.label || ''); }).catch((e) => setConfigError(e?.message || 'Could not load business settings.')); }, []);
+  useEffect(() => {
+    if (!business) return;
+    const localPrice = (id: string) => {
+      const row = business.catalogue.find((item) => item.id === id);
+      return country === 'Ireland' ? row?.priceIE : row?.priceUK;
+    };
+    const drum = localPrice('plastic_drum'); const trunk = localPrice('trunk'); const seal = localPrice('seal');
+    setDrumPrice(drum == null ? '' : String(drum)); setTrunkPrice(trunk == null ? '' : String(trunk)); setSealPrice(seal == null ? '' : String(seal));
+  }, [business, country]);
 
   const totals = useMemo(() => {
     const dQty = parseInt(drums, 10) || 0;
@@ -53,9 +61,10 @@ export default function ManualBookingScreen() {
     const sUnit = parseFloat(sealPrice) || 0;
     const sealQty = wantSeal ? dQty + tQty : 0;
     const base = dQty * dUnit + tQty * tUnit + sealQty * sUnit;
-    const final = payment === 'payOnArrival' ? base * 1.2 : base;
+    const premium = payment === 'Pay on Arrival' ? Number(business?.fees.payOnArrivalPremiumPercent || 0) : 0;
+    const final = base * (1 + premium / 100);
     return { dQty, tQty, dUnit, tUnit, sUnit, sealQty, base, final };
-  }, [drums, trunks, drumPrice, trunkPrice, sealPrice, wantSeal, payment]);
+  }, [drums, trunks, drumPrice, trunkPrice, sealPrice, wantSeal, payment, business]);
 
   const submit = async () => {
     if (!firstName.trim() || !phone.trim() || !address.trim() || !city.trim()) {
@@ -159,6 +168,8 @@ export default function ManualBookingScreen() {
     }
   };
 
+  if (!business || configError) return <View style={[styles.safe,{alignItems:'center',justifyContent:'center',padding:spacing.lg}]}><Text style={styles.group}>{configError || 'Loading current catalogue…'}</Text></View>;
+
   return (
     <ScrollView style={styles.safe} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.group}>Collection country</Text>
@@ -206,16 +217,16 @@ export default function ManualBookingScreen() {
 
       <Text style={styles.group}>Payment</Text>
       <View style={styles.rowWrap}>
-        {PAYMENT_METHODS.map((m) => (
-          <Pressable key={m.key} onPress={() => setPayment(m.key)} style={[styles.chip, payment === m.key && styles.chipActive]}>
-            <Text style={[styles.chipText, payment === m.key && styles.chipTextActive]}>{m.label}</Text>
+        {(business?.payments.methods || []).filter((m) => m.id !== 'other_payment').map((m) => (
+          <Pressable key={m.id} onPress={() => setPayment(m.label)} style={[styles.chip, payment === m.label && styles.chipActive]}>
+            <Text style={[styles.chipText, payment === m.label && styles.chipTextActive]}>{m.label}</Text>
           </Pressable>
         ))}
       </View>
 
       <View style={styles.totalCard}>
         <Row k="Subtotal" v={`${symbol}${totals.base.toFixed(2)}`} />
-        {payment === 'payOnArrival' && <Row k="Pay on Arrival premium (20%)" v={`${symbol}${(totals.final - totals.base).toFixed(2)}`} />}
+        {payment === 'Pay on Arrival' && Number(business.fees.payOnArrivalPremiumPercent || 0)>0 && <Row k={`Pay on Arrival premium (${business.fees.payOnArrivalPremiumPercent}%)`} v={`${symbol}${(totals.final - totals.base).toFixed(2)}`} />}
         <Row k="Total" v={`${symbol}${totals.final.toFixed(2)}`} bold />
       </View>
 

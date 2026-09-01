@@ -6,6 +6,7 @@ import { Download, Loader2, Printer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Shipment } from '@/types/shipment';
 import { buildRefNumber } from '@/components/admin/DeliveryNoteGenerator';
+import BusinessContactValue from '@/components/BusinessContactValue';
 import {
   calculateInvoiceTotals, getInvoicePaymentSummary, getInvoiceStatusValue,
 } from '@/utils/invoiceTotals';
@@ -305,7 +306,7 @@ export const BillingInvoiceTemplate = React.forwardRef<HTMLDivElement, { shipmen
             <div style={{ fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#666', marginBottom: '6px' }}>FROM</div>
             <div style={{ fontWeight: 600 }}>Zimbabwe Shipping Service</div>
             <div style={{ color: '#444', lineHeight: '1.6' }}>www.zimbabweshipping.com</div>
-            <div style={{ color: '#444', lineHeight: '1.6' }}>+353 87 195 4910</div>
+            <div style={{ color: '#444', lineHeight: '1.6' }}><BusinessContactValue field="irelandPhone" /></div>
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#666', marginBottom: '6px' }}>BILL TO</div>

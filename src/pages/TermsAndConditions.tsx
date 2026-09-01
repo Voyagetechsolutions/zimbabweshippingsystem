@@ -2,6 +2,7 @@ import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import BusinessContactValue, { BusinessContactLink } from '@/components/BusinessContactValue';
 
 const TermsAndConditions = () => (
   <>
@@ -17,8 +18,8 @@ const TermsAndConditions = () => (
         <p>
           These terms apply to collection and shipping services supplied by the business identified as
           the supplier on your booking confirmation or invoice, trading as Zimbabwe Shipping Services
-          from Pastures Lodge Farm, Chelveston Road, Wellingborough NN9 6AA, United Kingdom. Email{' '}
-          <a href="mailto:info@zimbabweshipping.com">info@zimbabweshipping.com</a> or call +44 7584 100552.
+          from <BusinessContactValue field="address" />. Email{' '}
+          <BusinessContactValue field="supportEmail" /> or call <BusinessContactValue />.
           Your confirmation identifies the service, route, price and any additional terms agreed with you.
           Please save a copy of it and these terms.
         </p>
@@ -74,7 +75,7 @@ const TermsAndConditions = () => (
         </p>
         <h2>7. Complaints, refunds and disputes</h2>
         <p>
-          Email <a href="mailto:info@zimbabweshipping.com">info@zimbabweshipping.com</a> with your reference
+          Email <BusinessContactLink /> with your reference
           and desired resolution. We will acknowledge and investigate fairly. An agreed refund is returned
           through the original payment method unless another lawful method is agreed. These terms do not
           restrict chargeback rights, statutory remedies or access to a court. Mandatory consumer law and

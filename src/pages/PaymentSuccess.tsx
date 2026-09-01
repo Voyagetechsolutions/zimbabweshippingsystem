@@ -9,12 +9,14 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { CheckCircle2, Loader2, ArrowRight } from 'lucide-react';
+import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 const PaymentSuccess = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const {config:business}=useBusinessConfiguration();
   
   const [loading, setLoading] = useState(true);
   const [receiptData, setReceiptData] = useState<any>(null);
@@ -182,7 +184,7 @@ const PaymentSuccess = () => {
                     )}
                     {receiptData.payment_method === 'goods_arriving' && (
                       <p className="mt-2 text-sm text-blue-700 dark:text-blue-300">
-                        You'll pay when your goods arrive in Zimbabwe (20% premium included).
+                        You'll pay when your goods arrive in Zimbabwe{business.fees.payOnArrivalPremiumPercent?` (${business.fees.payOnArrivalPremiumPercent}% premium included)`:''}.
                       </p>
                     )}
                     {receiptData.payment_method === 'cash_on_collection' && (
