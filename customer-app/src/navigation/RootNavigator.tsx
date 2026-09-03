@@ -23,6 +23,7 @@ import QuoteScreen from '../screens/QuoteScreen';
 import SavedQuotesScreen from '../screens/SavedQuotesScreen';
 import AddressesScreen from '../screens/AddressesScreen';
 import EditShipmentScreen from '../screens/EditShipmentScreen';
+import ConfirmCollectionScreen from '../screens/ConfirmCollectionScreen';
 import { useAuth } from '../context/AuthContext';
 import { useAppTheme } from '../context/ThemeContext';
 import { IMG } from '../img';
@@ -112,6 +113,7 @@ export default function RootNavigator() {
         <Stack.Screen name="SavedQuotes" component={SavedQuotesScreen} />
         <Stack.Screen name="Addresses" component={AddressesScreen} />
         <Stack.Screen name="EditShipment" component={EditShipmentScreen} />
+        <Stack.Screen name="ConfirmCollection" component={ConfirmCollectionScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

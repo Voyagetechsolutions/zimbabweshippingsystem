@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAwareScroll } from '../components/KeyboardAwareScroll';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -50,7 +51,7 @@ export default function EditShipmentScreen() {
 
   return <SafeAreaView style={[styles.safe,{backgroundColor:palette.bg}]} edges={['top']}><FlagStripe />
     <View style={styles.header}><Pressable onPress={() => navigation.goBack()}><Ionicons name="arrow-back" size={22} color={palette.text} /></Pressable><Text style={[styles.title,{color:palette.text}]}>Edit booking</Text><View style={{width:22}} /></View>
-    <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+    <KeyboardAwareScroll contentContainerStyle={styles.body}>
       <SectionTitle text="Collection contact" />
       <Field label="Collection address" value={sender.address || ''} onChangeText={(address) => setSender({...sender,address})} />
       <Field label="Town / city" value={sender.city || ''} onChangeText={(city) => setSender({...sender,city})} />
@@ -67,7 +68,7 @@ export default function EditShipmentScreen() {
       {payments.map((method) => <Pressable key={method} onPress={() => setPaymentMethod(method)} style={[styles.option,{backgroundColor:palette.surface,borderColor:paymentMethod===method?colors.green:palette.border}]}><Text style={[styles.optionTitle,{color:palette.text,flex:1}]}>{method}</Text><Ionicons name={paymentMethod===method?'radio-button-on':'radio-button-off'} size={21} color={paymentMethod===method?colors.green:palette.textFaint}/></Pressable>)}
       <Text style={[styles.note,{color:palette.textMuted}]}>Items and prices are locked after booking. Ask the team if those need changing.</Text>
       <Button title="SAVE CHANGES" onPress={save} busy={busy} />
-    </ScrollView>
+    </KeyboardAwareScroll>
   </SafeAreaView>;
 }
 

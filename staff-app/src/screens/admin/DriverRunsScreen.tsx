@@ -393,11 +393,18 @@ export default function DriverRunsScreen({ navigation }: Props) {
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
         <ScreenHeader title="Dispatch control" subtitle="Live drivers, routes and completion" />
 
+        {/* The usual way in: work a route's collections as one group rather
+            than picking them out of a flat list of every open booking. */}
+        <Pressable accessibilityRole="button" style={styles.buildRouteButton} onPress={() => navigation.navigate('CollectionGroups')}>
+          <Ionicons name="albums-outline" size={19} color={colors.white} />
+          <Text style={styles.buildRouteText}>COLLECTION GROUPS</Text>
+        </Pressable>
+
         {/* Build a route by hand when the schedule has not matched one, or
             when dispatch wants to choose the stops and the customer windows. */}
-        <Pressable accessibilityRole="button" style={styles.buildRouteButton} onPress={() => navigation.navigate('BuildRoute', { date })}>
-          <Ionicons name="add-circle-outline" size={19} color={colors.white} />
-          <Text style={styles.buildRouteText}>CREATE ROUTE</Text>
+        <Pressable accessibilityRole="button" style={[styles.buildRouteButton, styles.buildRouteSecondary]} onPress={() => navigation.navigate('BuildRoute', { date })}>
+          <Ionicons name="add-circle-outline" size={19} color={colors.primaryDark} />
+          <Text style={[styles.buildRouteText, { color: colors.primaryDark }]}>CREATE ROUTE BY HAND</Text>
         </Pressable>
 
         <View style={styles.announcementCard}>
@@ -554,6 +561,7 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: 56, gap: spacing.sm },
   buildRouteButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: radius.sm, backgroundColor: colors.primary, marginBottom: spacing.md },
   buildRouteText: { color: colors.white, fontWeight: '900', fontSize: 12.5, letterSpacing: 0.6 },
+  buildRouteSecondary: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.primary },
   announcementCard: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
   announcementTitle: { fontSize: 12, fontWeight: '800', color: colors.text, marginBottom: 6 },
   announcementInput: { minHeight: 42, maxHeight: 92, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 8, color: colors.text, textAlignVertical: 'top' },

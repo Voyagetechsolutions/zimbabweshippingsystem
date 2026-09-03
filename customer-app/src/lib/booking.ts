@@ -10,6 +10,8 @@ import type { CustomerAddress } from './addresses';
 
 export type QuoteItem = { description: string; amount?: number | null };
 export type QuoteCarry = { id: string; amount: number; currency: 'GBP' | 'EUR'; description: string; items?: QuoteItem[] };
+/** Drums bought from us and handed over at collection, not shipping capacity. */
+export type DrumPurchase = { type: 'metal' | 'plastic'; quantity: number };
 
 export type BookingDraft = {
   country: Country;
@@ -30,6 +32,7 @@ export type BookingDraft = {
   collectionDate: string | null;
   paymentMethod: string;
   quote: QuoteCarry | null;
+  purchaseDrums: DrumPurchase | null;
 };
 
 export const EMPTY_DRAFT: BookingDraft = {
@@ -51,6 +54,7 @@ export const EMPTY_DRAFT: BookingDraft = {
   collectionDate: null,
   paymentMethod: 'Bank Transfer',
   quote: null,
+  purchaseDrums: null,
 };
 
 export function draftLines(draft: BookingDraft, business: BusinessConfig, deliveryMethod: 'door' | 'self_collection' = 'door') {
@@ -66,6 +70,18 @@ export function draftLines(draft: BookingDraft, business: BusinessConfig, delive
     const itemized = (draft.quote.items || []).filter((item) => item.description.trim());
     if (itemized.length) itemized.forEach((item, index) => lines.push({ label: `Quote item ${index + 1}: ${item.description}`, qty: 1, unit: Number(item.amount) || 0 }));
     else lines.push({ label: `Approved quote: ${draft.quote.description.slice(0, 60)}`, qty: 1, unit: draft.quote.amount });
+  }
+  // Buying a drum is the same number in either currency, like the collection
+  // and delivery fees. Priced server-side from app_configuration either way.
+  if (draft.purchaseDrums && draft.purchaseDrums.quantity > 0) {
+    const unit = draft.purchaseDrums.type === 'metal'
+      ? business.fees.metalDrumPurchase
+      : business.fees.plasticDrumPurchase;
+    lines.push({
+      label: draft.purchaseDrums.type === 'metal' ? 'Metal drum purchased from us' : 'Plastic barrel purchased from us',
+      qty: draft.purchaseDrums.quantity,
+      unit: unit ?? null,
+    });
   }
   if (draft.sealsRequested > 0) {
     const seal = business.catalogue.find((c) => c.id === 'seal');
@@ -87,9 +103,29 @@ export function draftLines(draft: BookingDraft, business: BusinessConfig, delive
 export const DESCRIPTION_GUIDANCE =
   'Include: what the goods are, materials, brand/model where relevant, condition, sizes or approximate dimensions, colours, identifying marks, the contents of any boxes, drums or trunks, and anything fragile, restricted or high-value.';
 
-export async function createBooking(draft: BookingDraft, userId: string | null, business: BusinessConfig, deliveryMethod: 'door' | 'self_collection' = 'door') {
-  if (!userId) throw new Error('Sign in to book a shipment.');
-  const physicalLines = draftLines(draft, business, deliveryMethod).lines.filter((line) => !line.label.startsWith('Zimbabwe door delivery'));
+/**
+ * Thrown when the customer's login has genuinely lapsed, so the caller can
+ * offer to sign in again instead of showing a dead-end "booking failed".
+ */
+export class SessionExpiredError extends Error {
+  constructor() {
+    super('Your session has expired. Please sign in again — your booking details have been saved.');
+    this.name = 'SessionExpiredError';
+  }
+}
+
+export async function createBooking(draft: BookingDraft, business: BusinessConfig, deliveryMethod: 'door' | 'self_collection' = 'door') {
+  // Deliberately not the `session` held in React state: that snapshot can be
+  // an access token that expired while the app sat in the background, which is
+  // how customers who really were signed in ended up being told they weren't.
+  // `getSession()` renews it from the refresh token first and only comes back
+  // empty when the login is actually gone.
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user?.id ?? null;
+  if (!userId) throw new SessionExpiredError();
+  const physicalLines = draftLines(draft, business, deliveryMethod).lines
+    .filter((line) => !line.label.startsWith('Zimbabwe door delivery'))
+    .filter((line) => !line.label.endsWith('purchased from us'));
   const generatedDescription = physicalLines.map((line, index) => `Item ${index + 1}: ${line.qty} × ${line.label}`).join('; ');
   const payload = {
     country: draft.country,
@@ -111,6 +147,7 @@ export async function createBooking(draft: BookingDraft, userId: string | null, 
     paymentMethod: draft.paymentMethod,
     quoteId: draft.quote?.id ?? null,
     deliveryMethod,
+    purchaseDrums: draft.purchaseDrums && draft.purchaseDrums.quantity > 0 ? draft.purchaseDrums : null,
   };
   const { data, error } = await supabase.rpc('create_customer_booking', { p: payload });
   if (error) throw error;

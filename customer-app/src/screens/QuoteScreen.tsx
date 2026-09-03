@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
+import { KeyboardAwareScroll } from '../components/KeyboardAwareScroll';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -81,8 +82,8 @@ export default function QuoteScreen() {
         </Pressable>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <View style={{ flex: 1 }}>
+        <KeyboardAwareScroll contentContainerStyle={styles.body}>
           <SectionTitle text="Collection country" />
           <View style={styles.toggleRow}>
             {(['United Kingdom', 'Ireland'] as Country[]).map((c) => (
@@ -127,12 +128,12 @@ export default function QuoteScreen() {
             Our team reviews your description and sends back a custom price, usually within a few hours.
             You'll get a notification, and approved quotes can be booked straight from the app.
           </Text>
-        </ScrollView>
+        </KeyboardAwareScroll>
 
         <View style={[styles.footer, { backgroundColor: palette.surface, borderTopColor: palette.border }]}>
           <Button title="REQUEST QUOTE" onPress={submit} busy={busy} />
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }

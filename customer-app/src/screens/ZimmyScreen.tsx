@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, FlatList, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TextInput, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useKeyboardInset } from '../components/KeyboardAwareScroll';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,6 +42,8 @@ export default function ZimmyScreen() {
   const [loading, setLoading] = useState(false);
   const conversationId = useRef<string>('');
   const listRef = useRef<FlatList>(null);
+  const keyboardInset = useKeyboardInset();
+  const tabBarHeight = useBottomTabBarHeight();
   const {palette}=useAppTheme();
   const { config: business } = useBusinessConfig();
 
@@ -113,7 +117,11 @@ export default function ZimmyScreen() {
         <Pressable onPress={reset} hitSlop={12}><Ionicons name="refresh" size={19} color={colors.textMuted} /></Pressable>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
+      {/* The keyboard is drawn over the app rather than resizing it, so the
+          composer has to be lifted by hand. The tab bar is already below this
+          screen and is covered by the keyboard too, so its height comes off the
+          lift or the composer floats a tab bar too high. */}
+      <View style={{ flex: 1, paddingBottom: Math.max(0, keyboardInset - tabBarHeight) }}>
         <FlatList
           ref={listRef}
           data={messages}
@@ -159,7 +167,7 @@ export default function ZimmyScreen() {
             <Ionicons name="send" size={17} color={colors.white} />
           </Pressable>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }

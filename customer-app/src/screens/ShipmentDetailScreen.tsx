@@ -10,6 +10,7 @@ import { FlagStripe, Card, Pill, Button, SectionTitle } from '../components/ui';
 import { Shipment, JOURNEY_STAGES, journeyIndex, itemsSummary, invoiceOf, senderOf, recipientOf, statusTone } from '../lib/shipment';
 import { buildInvoiceHtml, buildDeliveryNoteHtml, sharePdf } from '../lib/documents';
 import { money } from '../lib/format';
+import { CollectionSlot, effectiveWindow, loadSlot, slotState } from '../lib/collectionSlots';
 import { useAppTheme } from '../context/ThemeContext';
 import { IMG } from '../img';
 import { useBusinessConfig } from '../lib/businessConfig';
@@ -21,6 +22,7 @@ export default function ShipmentDetailScreen() {
   const [shipment, setShipment] = useState<Shipment | null>(null);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [slot, setSlot] = useState<CollectionSlot | null>(null);
   const {palette}=useAppTheme();
   const { config: business } = useBusinessConfig();
 
@@ -31,6 +33,7 @@ export default function ShipmentDetailScreen() {
       .eq('id', id)
       .maybeSingle()
       .then(({ data }) => { setShipment(data as Shipment | null); setLoading(false); });
+    loadSlot(id).then(setSlot).catch(() => {});
     // A unique channel name avoids reusing a subscribed channel during Expo
     // Fast Refresh or React development-mode effect remounts.
     const channel=supabase.channel(`customer-shipment-${id}-${Date.now()}`).on('postgres_changes',{event:'UPDATE',schema:'public',table:'shipments',filter:`id=eq.${id}`},(payload)=>setShipment((current)=>current?{...current,...(payload.new as any)}:payload.new as Shipment)).subscribe();
@@ -116,6 +119,34 @@ export default function ShipmentDetailScreen() {
           {Boolean(collection.route) && <Text style={styles.metaText}>Collection: {collection.route} — {collection.date}</Text>}
         </Card>
 
+        {stage < 2 && (() => {
+          // Only worth showing while the goods are still to be collected.
+          const state = slotState(slot);
+          const pending = state === 'awaiting_customer';
+          const moved = state === 'dispatch_moved_untold' || state === 'dispatch_moved_told';
+          return (
+            <Pressable onPress={() => navigation.navigate('ConfirmCollection', { id })}>
+              <Card style={{ borderColor: pending || moved ? colors.yellow : colors.green }}>
+                <View style={styles.rowBetween}>
+                  <Text style={styles.itemTitle}>
+                    {pending ? 'Collection time (optional)' : moved ? 'Your collection time changed' : 'Collection time'}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
+                </View>
+                <Text style={styles.metaText}>
+                  {pending
+                    ? 'Prefer a particular time? Pick a two-hour window between 7am and 11pm. Otherwise the driver will call ahead on the day.'
+                    : state === 'customer_moved'
+                      ? `You changed your window to ${effectiveWindow(slot)} — we are re-checking the route.`
+                      : moved
+                        ? `We now plan to collect between ${effectiveWindow(slot)}.${slot?.change_reason ? ` ${slot.change_reason}` : ''} Tap to pick a different window.`
+                        : `${effectiveWindow(slot)} — tap to change it.`}
+                </Text>
+              </Card>
+            </Pressable>
+          );
+        })()}
+
         <SectionTitle text="Journey" />
         <Card>
           {JOURNEY_STAGES.map((s, i) => {
@@ -144,12 +175,28 @@ export default function ShipmentDetailScreen() {
             <SectionTitle text="Invoice" />
             <Card>
               <View style={styles.rowBetween}>
-                <Text style={styles.metaText}>Estimated total</Text>
+                <Text style={styles.metaText}>Total</Text>
                 <Text style={styles.invoiceTotal}>{money(invoice.total, symbol)}</Text>
               </View>
+              {invoice.paidAmount > 0 && (
+                <>
+                  <View style={styles.rowBetween}>
+                    <Text style={styles.metaText}>Amount paid</Text>
+                    <Text style={[styles.metaText, { color: colors.greenDark, fontWeight: '700' }]}>− {money(invoice.paidAmount, symbol)}</Text>
+                  </View>
+                  <View style={styles.rowBetween}>
+                    <Text style={styles.metaText}>Balance due</Text>
+                    <Text style={styles.invoiceTotal}>{money(invoice.balance, symbol)}</Text>
+                  </View>
+                </>
+              )}
               <View style={styles.rowBetween}>
                 <Text style={styles.metaText}>Status</Text>
-                <Pill text={invoice.paid ? 'Paid' : 'Payment due'} bg={invoice.paid ? colors.greenSoft : colors.yellowSoft} fg={invoice.paid ? colors.greenDark : '#8a6d00'} />
+                <Pill
+                  text={invoice.paid ? 'Paid' : invoice.partial ? 'Part paid' : 'Payment due'}
+                  bg={invoice.paid ? colors.greenSoft : colors.yellowSoft}
+                  fg={invoice.paid ? colors.greenDark : '#8a6d00'}
+                />
               </View>
               {!invoice.paid && (
                 <Text style={styles.hint}>

@@ -20,6 +20,12 @@ interface AuthValue {
   signInWithApple: () => Promise<{ error?: string; cancelled?: boolean }>;
   signOut: () => Promise<void>;
   refreshProfile:()=>Promise<void>;
+  /**
+   * The live session, refreshed if the stored access token has expired.
+   * `session` is a React snapshot and can be stale by minutes; anything about
+   * to make an authenticated call should await this instead.
+   */
+  ensureSession: () => Promise<Session | null>;
 }
 
 const AuthContext = createContext<AuthValue | undefined>(undefined);
@@ -75,6 +81,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     return () => sub.subscription.unsubscribe();
   }, [loadProfile, claimGuestBookings]);
+
+  /**
+   * Ask Supabase for a usable session rather than trusting React state.
+   * `getSession()` renews an expired access token from the refresh token and
+   * only returns null when the login is genuinely gone, so this is what
+   * distinguishes "your token went stale in the background" (recoverable, and
+   * the customer never needs to know) from "you really are signed out".
+   */
+  const ensureSession = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) return null;
+      const fresh = data.session ?? null;
+      setSession((current) => (current?.access_token === fresh?.access_token ? current : fresh));
+      return fresh;
+    } catch {
+      return null;
+    }
+  }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
@@ -221,7 +246,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshProfile=useCallback(async()=>{if(session?.user.id)await loadProfile(session.user.id);},[session?.user.id,loadProfile]);
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading, signIn, signUp, signInWithGoogle, signInWithApple, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ session, profile, loading, signIn, signUp, signInWithGoogle, signInWithApple, signOut, refreshProfile, ensureSession }}>
       {children}
     </AuthContext.Provider>
   );

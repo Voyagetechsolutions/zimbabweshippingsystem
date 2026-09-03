@@ -11,6 +11,7 @@ import { greeting, parseCollectionDate, longDate, daysUntil } from '../lib/forma
 import { Shipment, journeyIndex, JOURNEY_STAGES, itemsSummary, statusTone } from '../lib/shipment';
 import { useBusinessConfig } from '../lib/businessConfig';
 import { scheduleMatchesPostcode } from '../lib/postcode';
+import { CollectionSlot, loadMySlots, slotState, slotSummary } from '../lib/collectionSlots';
 import { useAppTheme } from '../context/ThemeContext';
 import { IMG } from '../img';
 
@@ -20,7 +21,13 @@ export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const { session, profile } = useAuth();
   const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [nextCollection, setNextCollection] = useState<{ route: string; date: Date } | null>(null);
+  const [nextCollection, setNextCollection] = useState<{ route: string; date: Date | null } | null>(null);
+  // The customer's own booked collection, which is a different question from
+  // "when does the van next come to this area" — they may have booked onto a
+  // later run, or onto a route their postcode does not obviously belong to.
+  const [myCollection, setMyCollection] = useState<
+    { slot: CollectionSlot | null; shipmentId: string; reference: string; route: string | null; date: Date | null } | null
+  >(null);
   const {palette}=useAppTheme();
   const { config: business } = useBusinessConfig();
   const referralDiscount = business.fees.referralDiscount;
@@ -33,20 +40,60 @@ export default function HomeScreen() {
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false })
         .limit(10);
-      setShipments((data as Shipment[]) || []);
+      const mine = (data as Shipment[]) || [];
+      setShipments(mine);
+
+      // Driven by the booking, not by the slot row: a slot only exists once the
+      // customer has been asked (48 hours out) or has volunteered a time, and
+      // this card has to be there from the moment they book.
+      const slots = await loadMySlots().catch(() => []);
+      const byShipment = Object.fromEntries(slots.map((slot) => [slot.shipment_id, slot]));
+      const waiting = mine
+        .filter((shipment) => journeyIndex(shipment.status) === 0)
+        .map((shipment) => {
+          const slot = byShipment[shipment.id];
+          return {
+            shipment,
+            slot,
+            route: slot?.route || shipment.metadata?.collection?.route || null,
+            date: parseCollectionDate(slot?.collection_date ?? shipment.metadata?.collection?.date),
+          };
+        })
+        // A date we cannot read sorts last rather than dropping out — the
+        // customer still needs to see that the booking is waiting on a date.
+        .sort((a, b) => (a.date?.getTime() ?? Infinity) - (b.date?.getTime() ?? Infinity));
+
+      const soonest = waiting[0];
+      setMyCollection(soonest
+        ? {
+            slot: soonest.slot ?? null,
+            shipmentId: soonest.shipment.id,
+            reference: soonest.shipment.customer_reference || soonest.shipment.tracking_number,
+            route: soonest.route,
+            date: soonest.date,
+          }
+        : null);
     } else {
       setShipments([]);
+      setMyCollection(null);
     }
     const { data: schedules } = await supabase
       .from('collection_schedules')
       .select('route, pickup_date, country, areas')
       .limit(200);
-    const upcoming = (schedules || [])
+    const mine = (schedules || [])
       .filter((s:any)=>scheduleMatchesPostcode(s.areas,profile?.postal_code,profile?.pickup_city,profile?.country))
-      .map((s: any) => ({ route: s.route as string, date: parseCollectionDate(s.pickup_date) }))
+      .map((s: any) => ({ route: s.route as string, date: parseCollectionDate(s.pickup_date) }));
+    const upcoming = mine
       .filter((s): s is { route: string; date: Date } => Boolean(s.date && s.date.getTime() >= Date.now() - 86400000))
       .sort((a, b) => a.date.getTime() - b.date.getTime());
-    setNextCollection(upcoming[0] || null);
+    // When every published date for this area has already gone, the card used
+    // to disappear — which reads as "we don't come to you" rather than "your
+    // next date has not been published yet". Show the route with no date.
+    const awaiting = mine
+      .filter((s) => !s.date || s.date.getTime() < Date.now() - 86400000)
+      .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
+    setNextCollection(upcoming[0] || (awaiting[0] ? { route: awaiting[0].route, date: null } : null));
   }, [session?.user?.id,profile?.postal_code,profile?.pickup_city,profile?.country]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -174,12 +221,50 @@ export default function HomeScreen() {
             <Card>
               <Text style={styles.cardKicker}>NEXT COLLECTION</Text>
               <Text style={[styles.cardTitle,{color:palette.text}]}>{nextCollection.route}</Text>
-              <Text style={[styles.cardMeta,{color:palette.textMuted}]}>{longDate(nextCollection.date)}</Text>
-              {daysUntil(nextCollection.date) >= 0 && (
+              <Text style={[styles.cardMeta,{color:palette.textMuted}]}>
+                {nextCollection.date ? longDate(nextCollection.date) : 'Next date being confirmed — book and we will tell you'}
+              </Text>
+              {nextCollection.date && daysUntil(nextCollection.date) >= 0 && (
                 <Pill text={daysUntil(nextCollection.date) === 0 ? 'Today!' : `In ${daysUntil(nextCollection.date)} day${daysUntil(nextCollection.date) === 1 ? '' : 's'}`} />
               )}
+              {!nextCollection.date && <Pill text="New date due" bg={colors.yellowSoft} fg="#8a6d00" />}
             </Card>
           )}
+
+          {myCollection && (() => {
+            const state = slotState(myCollection.slot);
+            // Two states want something from the customer, one is just news;
+            // a settled time stays quiet green.
+            const needsAttention = state === 'awaiting_customer'
+              || state === 'dispatch_moved_untold' || state === 'dispatch_moved_told';
+            const days = myCollection.date ? daysUntil(myCollection.date) : null;
+            return (
+              <Pressable onPress={() => navigation.navigate('ConfirmCollection', { id: myCollection.shipmentId })}>
+                <Card style={{ borderColor: needsAttention ? colors.yellow : colors.green }}>
+                  <View style={styles.rowBetween}>
+                    <Text style={styles.cardKicker}>YOUR COLLECTION</Text>
+                    <Text style={[styles.cardKicker, { color: palette.textMuted }]}>{myCollection.reference}</Text>
+                  </View>
+                  <Text style={[styles.cardTitle, { color: palette.text }]}>{myCollection.route || 'Route to be assigned'}</Text>
+                  <Text style={[styles.cardMeta, { color: palette.textMuted }]}>
+                    {myCollection.date ? longDate(myCollection.date) : 'Date to be confirmed'}
+                    {days !== null && days >= 0 ? ` · ${days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`}` : ''}
+                  </Text>
+                  <View style={styles.slotRow}>
+                    <Ionicons
+                      name={state === 'awaiting_customer' ? 'alarm-outline' : needsAttention ? 'swap-horizontal' : 'checkmark-circle'}
+                      size={15}
+                      color={needsAttention ? '#8a6d00' : palette.greenDark}
+                    />
+                    <Text style={[styles.slotText, { color: needsAttention ? '#8a6d00' : palette.greenDark }]}>
+                      {slotSummary(myCollection.slot)}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={15} color={palette.textFaint} />
+                  </View>
+                </Card>
+              </Pressable>
+            );
+          })()}
 
           <Pressable onPress={shareReferral}>
             <Card style={{ backgroundColor: colors.ink, borderColor: colors.ink }}>
@@ -237,6 +322,8 @@ const styles = StyleSheet.create({
   shipIcon: { width: 38, height: 38, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   shipRef: { fontSize: 14, fontWeight: '700' },
   shipMeta: { fontSize: 12, marginTop: 1 },
+  slotRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  slotText: { flex: 1, fontSize: 12.5, fontWeight: '700', lineHeight: 17 },
   link: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   linkText: { color: colors.green, fontWeight: '700', fontSize: 14 },
 });

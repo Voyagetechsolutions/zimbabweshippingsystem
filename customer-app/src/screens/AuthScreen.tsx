@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert, KeyboardAvoidingView, Platform, Image, Linking } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Alert, Platform, Image, Linking } from 'react-native';
+import { KeyboardAwareScroll } from '../components/KeyboardAwareScroll';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -124,18 +125,8 @@ export default function AuthScreen() {
 
   return (
     <SafeAreaView style={[styles.safe,{backgroundColor:palette.bg}]} edges={['top']}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={8}
-      >
-        <ScrollView
-          contentContainerStyle={styles.body}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
-          automaticallyAdjustKeyboardInsets
-          nestedScrollEnabled
-        >
+      <View style={{ flex: 1 }}>
+        <KeyboardAwareScroll contentContainerStyle={styles.body} nestedScrollEnabled>
           <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ alignSelf: 'flex-start' }}>
             <Ionicons name="close" size={24} color={palette.text} />
           </Pressable>
@@ -212,8 +203,8 @@ export default function AuthScreen() {
             {' '}and confirm you have read our{' '}
             <Text accessibilityRole="link" onPress={() => Linking.openURL(`${business.company.website || ''}/privacy-policy`)} style={styles.termsLink}>Privacy Notice</Text>.
           </Text>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </KeyboardAwareScroll>
+      </View>
     </SafeAreaView>
   );
 }

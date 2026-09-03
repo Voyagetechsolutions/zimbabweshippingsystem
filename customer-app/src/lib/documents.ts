@@ -6,6 +6,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import type { Shipment } from './shipment';
 import { getCachedBusinessConfig } from './businessConfig';
+import { issuedInvoiceView } from './invoiceTotals';
 
 type InvoiceItem = { description?: string; quantity?: number; unitPrice?: number };
 
@@ -20,15 +21,20 @@ function fmtMoney(amount: number, currency?: string): string {
   return `${sym}${(Number(amount) || 0).toFixed(2)}`;
 }
 
+// The office's invoice is the plain sum of its line items — its template
+// renders the invoice with discount and tax zeroed, so this document must too
+// or the customer's copy disagrees with the one they were billed from.
 function invoiceTotals(invoice: any) {
-  const items: InvoiceItem[] = Array.isArray(invoice?.items) ? invoice.items : [];
-  const subtotal = items.reduce((sum, it) => sum + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0), 0);
-  const discount = Number(invoice?.discount) || 0;
-  const taxable = Math.max(0, subtotal - discount);
-  const tax = taxable * ((Number(invoice?.taxRate) || 0) / 100);
-  const paidAmount = (invoice?.payments || []).reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
-  const total = taxable + tax;
-  return { items, subtotal, discount, tax, total, paidAmount, balance: Math.max(0, total - paidAmount) };
+  const view = issuedInvoiceView(invoice);
+  return {
+    items: view.items as InvoiceItem[],
+    subtotal: view.subtotal,
+    total: view.total,
+    paidAmount: view.paidAmount,
+    balance: view.balance,
+    settled: view.settled,
+    partial: view.partial,
+  };
 }
 
 function headerHtml(title: string, refLines: string) {
@@ -69,10 +75,10 @@ export function buildInvoiceHtml(shipment: Shipment): string {
   const company = getCachedBusinessConfig().company;
   const m: any = shipment.metadata || {};
   const invoice = m.invoice || {};
-  const { items, subtotal, discount, tax, total, paidAmount, balance } = invoiceTotals(invoice);
+  const { items, subtotal, total, paidAmount, balance, settled, partial } = invoiceTotals(invoice);
   const sender = m.sender || m.senderDetails || {};
   const recipient = m.recipient || m.recipientDetails || {};
-  const status = total > 0 && balance <= 0.005 ? 'paid' : paidAmount > 0 ? 'partial' : null;
+  const status = settled ? 'paid' : partial ? 'partial' : null;
   const description = (shipment as any).goods_description || m.shipment?.description || '';
   const correction = (shipment as any).driver_description_correction || m.driverDescriptionCorrection?.text || '';
   const collection = m.collection || {};
@@ -135,11 +141,9 @@ export function buildInvoiceHtml(shipment: Shipment): string {
     <div style="display:flex;justify-content:flex-end;margin-bottom:24px">
       <table style="font-size:13px"><tbody>
         <tr><td style="padding:4px 16px;text-align:right">Subtotal</td><td style="padding:4px 0;text-align:right;min-width:110px">${fmtMoney(subtotal, invoice.currency)}</td></tr>
-        ${discount > 0 ? `<tr><td style="padding:4px 16px;text-align:right;color:#dc2626">Discount</td><td style="padding:4px 0;text-align:right;color:#dc2626">− ${fmtMoney(discount, invoice.currency)}</td></tr>` : ''}
-        ${Number(invoice.taxRate) > 0 ? `<tr><td style="padding:4px 16px;text-align:right">Tax (${invoice.taxRate}%)</td><td style="padding:4px 0;text-align:right">${fmtMoney(tax, invoice.currency)}</td></tr>` : ''}
         <tr style="border-top:2px solid #111;font-weight:bold;font-size:15px"><td style="padding:8px 16px;text-align:right">Total</td><td style="padding:8px 0;text-align:right">${fmtMoney(total, invoice.currency)}</td></tr>
-        ${paidAmount > 0 ? `<tr style="color:#16a34a"><td style="padding:4px 16px;text-align:right">Amount Paid</td><td style="padding:4px 0;text-align:right">− ${fmtMoney(paidAmount, invoice.currency)}</td></tr>
-        <tr style="font-weight:bold;font-size:15px;color:${balance <= 0.005 ? '#16a34a' : '#b91c1c'}"><td style="padding:8px 16px;text-align:right">Balance Due</td><td style="padding:8px 0;text-align:right">${fmtMoney(balance, invoice.currency)}</td></tr>` : ''}
+        <tr style="color:${paidAmount > 0 ? '#16a34a' : '#444'}"><td style="padding:4px 16px;text-align:right">Amount Paid</td><td style="padding:4px 0;text-align:right">− ${fmtMoney(paidAmount, invoice.currency)}</td></tr>
+        <tr style="font-weight:bold;font-size:15px;color:${balance <= 0.005 && total > 0 ? '#16a34a' : '#b91c1c'}"><td style="padding:8px 16px;text-align:right">Balance Due</td><td style="padding:8px 0;text-align:right">${fmtMoney(balance, invoice.currency)}</td></tr>
       </tbody></table>
     </div>
     ${invoice.paymentTerms ? `<div style="margin-bottom:12px"><div style="font-weight:bold;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#666;margin-bottom:4px">Payment Method</div><div style="color:#333;line-height:1.6">${esc(invoice.paymentTerms)}</div></div>` : ''}
