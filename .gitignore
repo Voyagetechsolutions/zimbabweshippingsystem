@@ -51,3 +51,9 @@ tmp/
 
 # Puppeteer profile used by the store-screenshot capture script (holds a live session)
 scripts/store-screenshots/.cache/
+
+# Build artifacts: GitHub rejects files over 100 MB, and two 117 MB APKs
+# here once blocked every push. Keep them on disk, out of the repo.
+deliverables/*.apk
+deliverables/*.aab
+deliverables/*.ipa
