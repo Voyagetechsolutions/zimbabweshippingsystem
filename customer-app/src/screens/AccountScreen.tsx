@@ -43,7 +43,7 @@ export default function AccountScreen() {
   const rows = [
     { icon: 'cube-outline' as const, label: 'My Shipments', sub: 'Track and manage your bookings', onPress: () => navigation.navigate('Tabs', { screen: 'Shipments' }) },
     { icon: 'pricetag-outline' as const, label: 'My Quotes', sub: 'Requests and approved quotes ready to book', onPress: () => navigation.navigate('SavedQuotes') },
-    { icon: 'location-outline' as const, label: 'Delivery Addresses', sub: 'Saved receivers in Zimbabwe', onPress: () => navigation.navigate('Addresses') },
+    { icon: 'location-outline' as const, label: 'My Addresses', sub: 'Where we collect from and deliver to', onPress: () => navigation.navigate('Addresses') },
     { icon: 'notifications-outline' as const, label: 'Notifications', sub: 'Schedule, shipment and finance updates', onPress: () => navigation.navigate('Notifications') },
     { icon: 'receipt-outline' as const, label: 'Invoices & payments', sub: 'View invoices and upload payment proof', onPress: () => navigation.navigate('Billing') },
     { icon: 'logo-whatsapp' as const, label: 'WhatsApp us', sub: ukPhone, onPress: () => Linking.openURL(`https://wa.me/${business.company.whatsappPhone || ''}`) },

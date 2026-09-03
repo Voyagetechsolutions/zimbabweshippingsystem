@@ -1,3 +1,4 @@
+import { issuedInvoiceView } from './invoiceTotals';
 // Shipment metadata helpers + the customer-facing journey timeline.
 export type Shipment = {
   id: string;
@@ -49,15 +50,23 @@ export function itemsSummary(s: Shipment): string {
   return parts.join(', ') || 'Shipment';
 }
 
-export function invoiceOf(s: Shipment): { currency: string; total: number; paid: boolean } | null {
+/**
+ * The shipment's invoice exactly as the office issued it — same total, same
+ * paid/partial reading. The arithmetic lives in one place so the app can never
+ * quote a customer a figure the admin does not recognise.
+ */
+export function invoiceOf(s: Shipment) {
   const invoice = s.metadata?.invoice;
   if (!invoice) return null;
-  const subtotal = Array.isArray(invoice.items)
-    ? invoice.items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0), 0)
-    : 0;
-  const discounted = Math.max(0, subtotal - Number(invoice.discount || 0));
-  const total = discounted + discounted * (Number(invoice.taxRate || 0) / 100);
-  return { currency: invoice.currency || 'GBP', total, paid: Boolean(invoice.paid) };
+  const view = issuedInvoiceView(invoice);
+  return {
+    currency: view.currency,
+    total: view.total,
+    paid: view.settled,
+    partial: view.partial,
+    paidAmount: view.paidAmount,
+    balance: view.balance,
+  };
 }
 
 export function statusTone(status: string): { bg: string; fg: string } {

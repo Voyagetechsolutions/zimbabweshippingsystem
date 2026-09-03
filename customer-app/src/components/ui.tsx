@@ -50,7 +50,7 @@ export function Field({
 }: {
   label: string; value: string; onChangeText: (v: string) => void; placeholder?: string;
   keyboardType?: 'default' | 'email-address' | 'phone-pad' | 'numeric';
-  autoCapitalize?: 'none' | 'words' | 'sentences'; secureTextEntry?: boolean; multiline?: boolean;
+  autoCapitalize?: 'none' | 'words' | 'sentences' | 'characters'; secureTextEntry?: boolean; multiline?: boolean;
 }) {
   const {palette}=useAppTheme();
   const [passwordVisible, setPasswordVisible] = useState(false);

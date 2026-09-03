@@ -60,7 +60,10 @@ export type DriverMoreStackParams = {
 export type RunsStackParams = {
   DriverRuns: undefined;
   RunDetail: { runId: string };
-  BuildRoute: { date: string };
+  CollectionGroups: undefined;
+  // `runId` narrows the builder to one collection group; without it every open
+  // collection is offered, which is how dispatch works an unassigned booking.
+  BuildRoute: { date: string; runId?: string; runRoute?: string };
 };
 
 // Sections menu — mirrors the website admin sidebar.

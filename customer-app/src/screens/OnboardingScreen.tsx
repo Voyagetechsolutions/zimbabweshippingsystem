@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAwareScroll } from '../components/KeyboardAwareScroll';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -138,19 +139,8 @@ export default function OnboardingScreen() {
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: palette.bg }]}>
       <FlagStripe />
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={8}
-      >
-        <ScrollView
-          contentContainerStyle={s.body}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
-          automaticallyAdjustKeyboardInsets
-          nestedScrollEnabled
-          showsVerticalScrollIndicator={false}
-        >
+      <View style={{ flex: 1 }}>
+        <KeyboardAwareScroll contentContainerStyle={s.body} nestedScrollEnabled showsVerticalScrollIndicator={false}>
           <Text style={[s.title, { color: palette.text }]}>Set up your shipping profile</Text>
           <Text style={[s.sub, { color: palette.textMuted }]}>
             {isIreland
@@ -218,8 +208,8 @@ export default function OnboardingScreen() {
 
           <Button title="Save and continue" onPress={submit} busy={busy} />
           <Text style={[s.hint, { color: palette.textMuted }]}>Your permanent customer code will be generated from your name, joining month and phone number.</Text>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </KeyboardAwareScroll>
+      </View>
     </SafeAreaView>
   );
 }

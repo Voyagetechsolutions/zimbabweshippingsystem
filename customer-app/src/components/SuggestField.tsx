@@ -35,7 +35,7 @@ export function SuggestField({
   fetcher: (query: string) => Promise<Suggestion[]>;
   onPick: (suggestion: Suggestion) => void;
   placeholder?: string;
-  autoCapitalize?: 'none' | 'words' | 'sentences';
+  autoCapitalize?: 'none' | 'words' | 'sentences' | 'characters';
   hint?: string;
   minChars?: number;
   debounceMs?: number;

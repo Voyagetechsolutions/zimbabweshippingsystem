@@ -5,6 +5,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { colors, radius, spacing } from '../../theme';
 import { Shipment, customerRef, senderName, senderPhone } from '../../lib/shipment';
+import {
+  CollectionSlot, hhmm, loadSlots, markCustomerInformed, owesContact, requestedLabel, slotState, windowLabel,
+} from '../../lib/collectionSlots';
 import { Badge, BADGE, Avatar, Card, SectionLabel, Loading, ErrorState } from '../../components/adminui';
 import RunMap from '../../components/RunMap';
 import type { RunsStackParams } from '../../navigation/types';
@@ -37,6 +40,7 @@ export default function RunDetailScreen({ route, navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [slots, setSlots] = useState<Record<string, CollectionSlot>>({});
 
   const load = useCallback(async () => {
     setError(null);
@@ -49,8 +53,10 @@ export default function RunDetailScreen({ route, navigation }: Props) {
       supabase.from('profiles').select('id,full_name,email,driver_type,on_leave,staff_active').or('role.eq.driver,role.eq.admin,is_admin.eq.true').order('full_name'),
     ]);
     setDriver(driverResult.data || null);
-    setStops(((stopResult.data || []) as any[]).map((row) => ({ ...row, shipment: row.shipment as Shipment })) as StopRow[]);
+    const rows = ((stopResult.data || []) as any[]).map((row) => ({ ...row, shipment: row.shipment as Shipment })) as StopRow[];
+    setStops(rows);
     setDrivers(driversResult.data || []);
+    setSlots(await loadSlots(rows.filter((r) => r.stop_type === 'collection').map((r) => r.shipment_id)).catch(() => ({})));
   }, [runId]);
 
   useEffect(() => { (async () => { setLoading(true); await load(); setLoading(false); })(); }, [load]);
@@ -73,6 +79,46 @@ export default function RunDetailScreen({ route, navigation }: Props) {
       await load();
     } catch (e: any) { Alert.alert('Could not reassign', e?.message); }
     finally { setBusy(false); }
+  };
+
+  /**
+   * Close the loop on a customer whose time we changed.
+   *
+   * The link is opened first and the record is made second, on an explicit
+   * "yes I spoke to them" — stamping it on the tap alone would turn a dialled
+   * number that rang out into a note saying the customer had been told.
+   */
+  const contactCustomer = (stop: StopRow, via: 'whatsapp' | 'call') => {
+    const slot = slots[stop.shipment_id];
+    const phone = (senderPhone(stop.shipment) || '').replace(/[^0-9+]/g, '');
+    if (!phone) { Alert.alert('No number on file', 'This booking has no phone number to reach the customer on.'); return; }
+
+    if (via === 'call') {
+      Linking.openURL(`tel:${phone}`).catch(() => {});
+    } else {
+      const message = [
+        `Hi ${senderName(stop.shipment)}, it is Zimbabwe Shipping about ${customerRef(stop.shipment)}.`,
+        `We have had to move your collection to ${windowLabel(slot?.dispatch_start, slot?.dispatch_end)} on ${run.run_date}.`,
+        slot?.change_reason || '',
+        'Does that still work for you?',
+      ].filter(Boolean).join(' ');
+      Linking.openURL(`https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`).catch(() => {});
+    }
+
+    Alert.alert(
+      'Did you reach them?',
+      `Only mark this done once ${senderName(stop.shipment)} actually knows about the new time.`,
+      [
+        { text: 'Not yet', style: 'cancel' },
+        {
+          text: 'Yes, they know',
+          onPress: async () => {
+            try { await markCustomerInformed(stop.shipment_id, via); await load(); }
+            catch (e: any) { Alert.alert('Could not record that', e?.message || 'Try again.'); }
+          },
+        },
+      ],
+    );
   };
 
   const moveStop = async (stop: StopRow, direction: 'up' | 'down') => {
@@ -119,6 +165,11 @@ export default function RunDetailScreen({ route, navigation }: Props) {
   if (loading) return <Loading />;
   if (error || !run) return <View style={styles.safe}><ErrorState message={error || 'Run not found'} onRetry={load} /></View>;
 
+  // Only open stops matter: a collection that already happened cannot be
+  // rescued by a phone call about its time.
+  const untold = stops.filter((s) => s.stop_type === 'collection'
+    && !['completed', 'failed'].includes(s.status)
+    && owesContact(slots[s.shipment_id]));
   const done = stops.filter((s) => s.status === 'completed').length;
   const failed = stops.filter((s) => s.status === 'failed').length;
   const phone = (driver?.phone_number || '').replace(/[^0-9+]/g, '');
@@ -154,6 +205,22 @@ export default function RunDetailScreen({ route, navigation }: Props) {
         </View> : null}
       </Card>
 
+      {untold.length ? (
+        <View style={styles.owedCard}>
+          <Ionicons name="call-outline" size={19} color="#8a6d00" />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.owedTitle}>
+              {untold.length} customer{untold.length === 1 ? '' : 's'} still to be told
+            </Text>
+            <Text style={styles.owedText}>
+              {untold.length === 1 ? 'This collection was' : 'These collections were'} moved off the time the customer
+              chose. The app has told them, but a message or a call is what stops a wasted doorstep — use the buttons on
+              the stop below, then mark it done.
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
       <RunMap stops={mapStops} height={200} />
 
       <SectionLabel text={`Stops (${done}/${stops.length} completed${failed ? `, ${failed} exceptions` : ''})`} />
@@ -178,6 +245,46 @@ export default function RunDetailScreen({ route, navigation }: Props) {
               {stop.status === 'failed' ? (
                 <Text style={styles.exception}>Exception: {String(stop.failure_reason || 'other').replace(/_/g, ' ')}{stop.failure_note ? ` — ${stop.failure_note}` : ''}</Text>
               ) : null}
+              {stop.stop_type === 'collection' ? (() => {
+                const slot = slots[stop.shipment_id];
+                if (!slot) return null;
+                const state = slotState(slot);
+                const agreed = windowLabel(slot.dispatch_start, slot.dispatch_end);
+                return (
+                  <View style={styles.slotBlock}>
+                    <Text style={styles.slotLine}>
+                      {agreed ? `Collecting ${agreed}` : 'No window set'}
+                      {slot.requested_at && !slot.requested_flexible && hhmm(slot.requested_start) !== hhmm(slot.dispatch_start)
+                        ? ` · customer asked for ${requestedLabel(slot)}`
+                        : slot.requested_flexible ? ' · customer is flexible' : ''}
+                    </Text>
+                    {state === 'awaiting_customer' ? (
+                      <Text style={styles.slotMuted}>Customer has not chosen a time yet.</Text>
+                    ) : null}
+                    {state === 'customer_moved' ? (
+                      <Text style={styles.slotWarn}>Customer changed to {requestedLabel(slot)} after you planned — re-check this stop.</Text>
+                    ) : null}
+                    {state === 'dispatch_moved_told' ? (
+                      <Text style={styles.slotOk}>
+                        Told by {slot.customer_informed_via === 'call' ? 'phone' : slot.customer_informed_via}
+                        {slot.customer_informed_at ? ` on ${new Date(slot.customer_informed_at).toLocaleDateString('en-GB')}` : ''}
+                      </Text>
+                    ) : null}
+                    {owesContact(slot) ? (
+                      <View style={styles.slotActions}>
+                        <Pressable style={[styles.slotButton, { backgroundColor: colors.primarySoft }]} onPress={() => contactCustomer(stop, 'whatsapp')}>
+                          <Ionicons name="logo-whatsapp" size={15} color={colors.primaryDark} />
+                          <Text style={[styles.slotButtonText, { color: colors.primaryDark }]}>WhatsApp</Text>
+                        </Pressable>
+                        <Pressable style={styles.slotButton} onPress={() => contactCustomer(stop, 'call')}>
+                          <Ionicons name="call-outline" size={15} color={colors.blue} />
+                          <Text style={[styles.slotButtonText, { color: colors.blue }]}>Call</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })() : null}
             </View>
             {!['completed', 'failed'].includes(stop.status) && run.status !== 'completed' ? (
               <View style={styles.stopActions}>
@@ -265,6 +372,17 @@ const styles = StyleSheet.create({
   stopName: { fontSize: 14, fontWeight: '700', color: colors.text, marginTop: 2 },
   goods: { fontSize: 11.5, color: colors.text, marginTop: 4, lineHeight: 16, backgroundColor: colors.bg, borderRadius: radius.sm, padding: 8 },
   exception: { fontSize: 11.5, color: colors.danger, fontWeight: '700', marginTop: 4 },
+  owedCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#FEF6DC', borderWidth: 1.5, borderColor: '#E8C765', borderRadius: radius.lg, padding: spacing.md },
+  owedTitle: { fontSize: 13, fontWeight: '900', color: '#8a6d00' },
+  owedText: { fontSize: 11.5, color: '#8a6d00', lineHeight: 16, marginTop: 3 },
+  slotBlock: { marginTop: 7, paddingTop: 7, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  slotLine: { fontSize: 11.5, fontWeight: '800', color: colors.text },
+  slotMuted: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
+  slotWarn: { fontSize: 11, color: '#8a6d00', fontWeight: '700', marginTop: 2 },
+  slotOk: { fontSize: 11, color: colors.primaryDark, fontWeight: '700', marginTop: 2 },
+  slotActions: { flexDirection: 'row', gap: 8, marginTop: 7 },
+  slotButton: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: 11, paddingVertical: 7 },
+  slotButtonText: { fontSize: 11, fontWeight: '900' },
   kv: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
   k: { fontSize: 12.5, color: colors.textMuted },
   v: { fontSize: 12.5, fontWeight: '700', color: colors.text },

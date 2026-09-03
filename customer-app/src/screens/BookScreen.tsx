@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert, KeyboardAvoidingView, Platform, Linking } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, Pressable, StyleSheet, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,17 +10,18 @@ import { colors, spacing, radius } from '../theme';
 import { Card, Button, Field, SectionTitle, FlagStripe } from '../components/ui';
 import { Country, currencyFor, priceFor } from '../lib/catalogue';
 import { useBusinessConfig } from '../lib/businessConfig';
-import { BookingDraft, EMPTY_DRAFT, QuoteCarry, createBooking, draftLines } from '../lib/booking';
-import { CustomerAddress, listAddresses, addressSummary } from '../lib/addresses';
+import { BookingDraft, EMPTY_DRAFT, QuoteCarry, SessionExpiredError, createBooking, draftLines } from '../lib/booking';
+import { CustomerAddress, listAddresses, addressSummary, pickupSummary } from '../lib/addresses';
 import { parseCollectionDate, longDate, money } from '../lib/format';
 import {
   scheduleMatchesPostcode, autocompletePostcode, searchAddresses, lookupUkPostcode,
   coverageForUkPostcode, prettyPostcode, type Coverage,
 } from '../lib/postcode';
 import { SuggestField } from '../components/SuggestField';
+import { KeyboardAwareScroll } from '../components/KeyboardAwareScroll';
 import { useAppTheme } from '../context/ThemeContext';
 
-const STEPS = ['Collection', 'Sender', 'Delivery', 'Shipment', 'Date', 'Review'] as const;
+const STEPS = ['Collection', 'Sender', 'Delivery', 'Shipment', 'Payment', 'Review'] as const;
 const DRAFT_KEY = 'zim-booking-draft-v2';
 
 type ScheduleRow = { id: string; route: string; pickup_date: string; country?: string | null; areas?: any };
@@ -28,11 +29,17 @@ type DepotRow = { id: string; name: string; city: string; address_line1: string;
 
 export default function BookScreen() {
   const navigation = useNavigation<any>();
-  const { session, profile } = useAuth();
+  const { session, profile, ensureSession } = useAuth();
+  // Checked on focus rather than only at submit: a session that lapsed in the
+  // background leaves every screen looking signed in, so without an explicit
+  // check the customer only finds out six steps later.
+  const [signedOut, setSignedOut] = useState(false);
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<BookingDraft>(EMPTY_DRAFT);
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
   const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
+  const [pickupAddresses, setPickupAddresses] = useState<CustomerAddress[]>([]);
+  const [pickupAddressId, setPickupAddressId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [otherPaymentsOpen, setOtherPaymentsOpen] = useState(false);
@@ -44,9 +51,13 @@ export default function BookScreen() {
   // Coordinates of the resolved collection postcode — biases address search to
   // the customer's own area rather than the whole country.
   const [postcodePoint, setPostcodePoint] = useState<{ latitude: number; longitude: number } | null>(null);
-  // Whether the town was filled in for the customer. An auto-filled town follows
-  // the postcode; one they typed themselves is left alone.
-  const [cityAutoFilled, setCityAutoFilled] = useState(false);
+  // Whether the customer has taken ownership of the town field, by typing in it
+  // or by picking an address. Their town is never overwritten by a later
+  // postcode lookup; only a blank or previously auto-filled one is.
+  const cityTouchedRef = useRef(false);
+  // The draft is only persisted once it has been restored, so the empty first
+  // render cannot overwrite a saved booking.
+  const draftReadyRef = useRef(false);
 
   // Door delivery keeps its per-address fee; self-collection is free and the
   // receiver picks the goods up from a depot.
@@ -86,11 +97,18 @@ export default function BookScreen() {
           country: routeParams.quote.currency === 'EUR' ? 'Ireland' : 'United Kingdom',
         };
       }
+      cityTouchedRef.current = Boolean(base.collectionCity.trim());
       setDraft(base);
+      // Book stays mounted in the stack, so starting a new booking used to
+      // drop the customer back on whatever step they last left — step 5 with
+      // an empty draft, most confusingly.
+      if (routeParams.freshToken) setStep(0);
+      draftReadyRef.current = true;
     })();
   }, [profile?.id, routeParams.freshToken, routeParams.quote?.id]);
 
   useEffect(() => {
+    if (!draftReadyRef.current) return;
     AsyncStorage.setItem(DRAFT_KEY, JSON.stringify(draft)).catch(() => {});
   }, [draft]);
 
@@ -114,11 +132,27 @@ export default function BookScreen() {
 
   const loadAddresses = useCallback(async () => {
     if (!session?.user.id) return;
-    try { setAddresses(await listAddresses(session.user.id)); } catch { /* shown as empty */ }
+    try { setAddresses(await listAddresses(session.user.id, 'delivery')); } catch { /* shown as empty */ }
+    try { setPickupAddresses(await listAddresses(session.user.id, 'pickup')); } catch { /* shown as empty */ }
   }, [session?.user.id]);
   useFocusEffect(useCallback(() => { loadAddresses(); }, [loadAddresses]));
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    ensureSession().then((live) => { if (!cancelled) setSignedOut(!live); });
+    return () => { cancelled = true; };
+  }, [ensureSession]));
 
-  const upcoming = useMemo(() => {
+  // Every published route covering this customer, with its date parsed once.
+  //
+  // Nothing resolves until they have actually said where they are. An empty
+  // postcode matches every route in `scheduleMatchesPostcode` — which is right
+  // for browsing the schedule and quite wrong here, where it would promise a
+  // Northampton date to somebody who has typed nothing at all.
+  const hasLocation = draft.collectionPostcode.replace(/\s/g, '').length >= 3
+    || draft.collectionCity.trim().length >= 3;
+
+  const myRoutes = useMemo(() => {
+    if (!hasLocation) return [];
     const wantIreland = draft.country === 'Ireland';
     return schedules
       .filter((s) => {
@@ -126,11 +160,34 @@ export default function BookScreen() {
         return wantIreland ? c.includes('ireland') : !c.includes('ireland');
       })
       .filter((s) => scheduleMatchesPostcode(s.areas, draft.collectionPostcode, draft.collectionCity, draft.country))
-      .map((s) => ({ ...s, parsed: parseCollectionDate(s.pickup_date) }))
-      .filter((s) => s.parsed && s.parsed.getTime() >= Date.now() - 86400000)
-      .sort((a, b) => (a.parsed as Date).getTime() - (b.parsed as Date).getTime())
-      .slice(0, 12);
-  }, [schedules, draft.country, draft.collectionPostcode, draft.collectionCity]);
+      .map((s) => ({ ...s, parsed: parseCollectionDate(s.pickup_date) }));
+  }, [hasLocation, schedules, draft.country, draft.collectionPostcode, draft.collectionCity]);
+
+  const upcoming = useMemo(() => myRoutes
+    .filter((s) => s.parsed && s.parsed.getTime() >= Date.now() - 86400000)
+    .sort((a, b) => (a.parsed as Date).getTime() - (b.parsed as Date).getTime())
+    .slice(0, 12), [myRoutes]);
+
+  /**
+   * The collection date, which the customer does not choose.
+   *
+   * The postcode decides the route and the route carries the date, so as soon
+   * as a serviceable postcode is typed the answer is already known — there is
+   * nothing to pick. The soonest published date on a covering route wins.
+   */
+  const resolvedCollection = useMemo(() => upcoming[0] ?? null, [upcoming]);
+
+  /**
+   * Routes that cover this customer but whose published date has already gone.
+   *
+   * Offering one would book a collection into the past, so they stay
+   * unselectable — but hiding them altogether is what made a customer in an
+   * area awaiting a new date see no route at all and assume we do not come to
+   * them. Naming the route and saying a new date is due is the honest version.
+   */
+  const awaitingNewDate = useMemo(() => myRoutes
+    .filter((s) => !s.parsed || s.parsed.getTime() < Date.now() - 86400000)
+    .sort((a, b) => a.route.localeCompare(b.route)), [myRoutes]);
 
   const { lines, estimate, hasCustom, symbol } = draftLines(draft, business, deliveryMethod);
   const set = (patch: Partial<BookingDraft>) => setDraft((d) => ({ ...d, ...patch }));
@@ -155,15 +212,32 @@ export default function BookScreen() {
         : null);
       if (place?.city) {
         setDraft((d) => {
-          if (d.collectionCity && !cityAutoFilled) return d;
+          // The customer's own town wins. This used to be decided by a piece of
+          // state that the effect itself then set, which re-ran the effect with
+          // the flag flipped and let the second pass replace the town the
+          // customer had just typed a beat after they typed it.
+          if (cityTouchedRef.current && d.collectionCity.trim()) return d;
           if (d.collectionCity === place.city) return d;
           return { ...d, collectionCity: place.city };
         });
-        setCityAutoFilled(true);
       }
     }, 450);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [draft.collectionPostcode, isIrelandPickup, cityAutoFilled]);
+  }, [draft.collectionPostcode, isIrelandPickup]);
+
+  // Keep the draft in step with whatever the postcode resolved to. Guarded on
+  // the values themselves so it settles immediately instead of re-running.
+  useEffect(() => {
+    // Nothing is resolvable until the schedules arrive, and clearing a restored
+    // draft's date in that window would blank the review for a beat.
+    if (!schedules.length) return;
+    const id = resolvedCollection?.id ?? null;
+    const route = resolvedCollection?.route ?? null;
+    const date = resolvedCollection?.pickup_date ?? null;
+    setDraft((d) => (d.scheduleId === id && d.route === route && d.collectionDate === date
+      ? d
+      : { ...d, scheduleId: id, route, collectionDate: date }));
+  }, [resolvedCollection, schedules.length]);
 
   // Door delivery needs somewhere to drive to. Self-collection only needs to
   // know who is collecting and from where — there is no street address.
@@ -183,7 +257,8 @@ export default function BookScreen() {
           && (isIrelandPickup || draft.collectionPostcode.replace(/\s/g, '').length >= 3);
       case 1: return Boolean(draft.sender.firstName.trim() && draft.sender.lastName.trim() && draft.sender.phone.trim());
       case 2: return hasDelivery;
-      case 3: return lines.some((line) => !line.label.startsWith('Zimbabwe door delivery'));
+      case 3: return lines.some((line) =>
+        !line.label.startsWith('Zimbabwe door delivery') && !line.label.endsWith('purchased from us'));
       default: return true;
     }
   };
@@ -191,7 +266,7 @@ export default function BookScreen() {
   const submit = async () => {
     setSubmitting(true);
     try {
-      const created = await createBooking(draft, session?.user?.id ?? null, business, deliveryMethod);
+      const created = await createBooking(draft, business, deliveryMethod);
 
       // Record which delivery option was chosen. Pricing is already correct —
       // self-collection selects no paid addresses — so this only annotates the
@@ -210,7 +285,21 @@ export default function BookScreen() {
       await AsyncStorage.removeItem(DRAFT_KEY);
       navigation.replace('ShipmentDetail', { id: created.id, celebrate: true });
     } catch (e: any) {
-      Alert.alert('Booking failed', e?.message || 'Please try again, or ask Zimmy to book for you.');
+      // The database raises the same thing when the JWT does not reach it, so
+      // both the local and the server-side version of "you are not signed in"
+      // land here and get an offer to sign in rather than a dead end. The draft
+      // stays in storage, so nothing typed is lost.
+      const lapsed = e instanceof SessionExpiredError || /sign in to book/i.test(e?.message || '');
+      if (lapsed) {
+        setSignedOut(true);
+        Alert.alert(
+          'Please sign in again',
+          'Your session has expired. Sign in and your booking details will be waiting for you.',
+          [{ text: 'Not now', style: 'cancel' }, { text: 'Sign in', onPress: () => navigation.navigate('Auth') }],
+        );
+      } else {
+        Alert.alert('Booking failed', e?.message || 'Please try again, or ask Zimmy to book for you.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -268,8 +357,19 @@ export default function BookScreen() {
       </View>
       <Text style={[styles.stepCaption, { color: palette.textMuted }]}>{STEPS[step]}</Text>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <View style={{ flex: 1 }}>
+        <KeyboardAwareScroll contentContainerStyle={styles.body}>
+          {signedOut && (
+            <Pressable
+              onPress={() => navigation.navigate('Auth')}
+              style={[styles.signedOut, { backgroundColor: palette.yellowSoft, borderColor: colors.yellow }]}
+            >
+              <Ionicons name="lock-closed-outline" size={16} color="#8a6d00" />
+              <Text style={[styles.signedOutText, { color: '#8a6d00' }]}>
+                You are not signed in. Tap here to sign in — we will keep everything you have filled in so far.
+              </Text>
+            </Pressable>
+          )}
           {draft.quote && (
             <View style={[styles.quoteBanner, { backgroundColor: palette.greenSoft, borderColor: colors.green }]}>
               <Ionicons name="pricetag" size={16} color={palette.greenDark} />
@@ -294,6 +394,41 @@ export default function BookScreen() {
                   );
                 })}
               </View>
+              {pickupAddresses.length > 0 && (
+                <>
+                  <SectionTitle text="Saved pickup addresses" />
+                  {pickupAddresses.map((a) => {
+                    const selected = pickupAddressId === a.id;
+                    return (
+                      <Pressable
+                        key={a.id}
+                        onPress={() => {
+                          setPickupAddressId(selected ? null : a.id);
+                          if (selected) return;
+                          // An explicit pick owns all three fields, so the
+                          // postcode lookup must not overwrite the town.
+                          cityTouchedRef.current = Boolean(a.city.trim());
+                          set({
+                            collectionAddress: [a.address_line1, a.address_line2].filter(Boolean).join(', '),
+                            collectionCity: a.city,
+                            collectionPostcode: a.postal_code || '',
+                            country: a.country === 'Ireland' ? 'Ireland' : 'United Kingdom',
+                          });
+                        }}
+                        style={[styles.dateCard, { backgroundColor: palette.surface, borderColor: palette.border }, selected && { borderColor: palette.green, backgroundColor: palette.greenSoft }]}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.itemLabel, { color: palette.text }]}>{a.recipient_name}{a.is_default ? '  ★' : ''}</Text>
+                          <Text style={[styles.itemPrice, { color: palette.textMuted }]}>{pickupSummary(a)}</Text>
+                        </View>
+                        <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={22} color={selected ? colors.green : palette.textFaint} />
+                      </Pressable>
+                    );
+                  })}
+                  <Text style={[styles.hint, { color: palette.textMuted }]}>Or type a one-off address below.</Text>
+                </>
+              )}
+
               <SuggestField
                 label="Collection address"
                 value={draft.collectionAddress}
@@ -307,20 +442,30 @@ export default function BookScreen() {
                 onPick={(suggestion) => {
                   const [town, postcode] = String(suggestion.secondary || '').split(' · ');
                   // An explicit pick is authoritative: take its town and
-                  // postcode too, so the three fields can't disagree.
+                  // postcode too, so the three fields can't disagree — and hold
+                  // that town against the postcode lookup that the new postcode
+                  // is about to kick off.
+                  if (town) cityTouchedRef.current = true;
+                  // Photon often matches the street without the number, and
+                  // taking its line verbatim then quietly deleted the house
+                  // number the customer had already typed. Keep theirs when the
+                  // suggestion has none of its own.
+                  const typedNumber = draft.collectionAddress.trim().match(/^([0-9]+[A-Za-z]?)\b/)?.[1];
+                  const picked = /^[0-9]/.test(suggestion.primary) || !typedNumber
+                    ? suggestion.primary
+                    : `${typedNumber} ${suggestion.primary}`;
                   set({
-                    collectionAddress: suggestion.primary,
+                    collectionAddress: picked,
                     ...(town ? { collectionCity: town } : {}),
                     ...(postcode && !isIrelandPickup ? { collectionPostcode: postcode } : {}),
                   });
-                  setCityAutoFilled(Boolean(town));
                 }}
               />
 
               <Field
                 label="Town / city"
                 value={draft.collectionCity}
-                onChangeText={(v) => { setCityAutoFilled(false); set({ collectionCity: v }); }}
+                onChangeText={(v) => { cityTouchedRef.current = Boolean(v.trim()); set({ collectionCity: v }); }}
                 placeholder={draft.country === 'Ireland' ? 'Dublin' : 'Luton'}
               />
 
@@ -338,9 +483,9 @@ export default function BookScreen() {
                     icon="mail-outline"
                     minChars={2}
                     debounceMs={350}
-                    autoCapitalize="none"
+                    autoCapitalize="characters"
                     value={draft.collectionPostcode}
-                    onChangeText={(v) => set({ collectionPostcode: v.toUpperCase() })}
+                    onChangeText={(v) => set({ collectionPostcode: v })}
                     placeholder="LU1 1AA"
                     hint="Your postcode decides which collection route covers you."
                     fetcher={async (query) => {
@@ -348,6 +493,13 @@ export default function BookScreen() {
                       return options.map((option) => ({ key: option, primary: option }));
                     }}
                     onPick={(suggestion) => set({ collectionPostcode: prettyPostcode(suggestion.primary) })}
+                  />
+
+                  <Button
+                    title={pickupAddresses.length ? 'Manage saved pickup addresses' : 'Save this address for next time'}
+                    variant="outline"
+                    onPress={() => navigation.navigate('Addresses')}
+                    style={{ marginBottom: spacing.md }}
                   />
 
                   {coverage.status !== 'unknown' && (
@@ -372,6 +524,25 @@ export default function BookScreen() {
                   )}
                 </>
               )}
+
+              {/* The date follows the location, so it belongs after both the
+                  UK postcode and the Irish town — Ireland routes by city. */}
+              {resolvedCollection ? (
+                <View style={[styles.coverage, { backgroundColor: palette.greenSoft, borderColor: colors.green }]}>
+                  <Ionicons name="calendar" size={16} color={palette.greenDark} />
+                  <Text style={[styles.coverageText, { color: palette.greenDark }]}>
+                    Your collection date: {resolvedCollection.parsed ? longDate(resolvedCollection.parsed) : resolvedCollection.pickup_date}
+                    {'\n'}{resolvedCollection.route}
+                  </Text>
+                </View>
+              ) : awaitingNewDate.length ? (
+                <View style={[styles.coverage, { backgroundColor: palette.yellowSoft, borderColor: colors.yellow }]}>
+                  <Ionicons name="time-outline" size={16} color="#8a6d00" />
+                  <Text style={[styles.coverageText, { color: '#8a6d00' }]}>
+                    {awaitingNewDate[0].route} covers you, but its next date has not been published yet. Book anyway and we will confirm your date.
+                  </Text>
+                </View>
+              ) : null}
             </>
           )}
 
@@ -507,6 +678,70 @@ export default function BookScreen() {
                   })}
                 </>
               )}
+              <SectionTitle text="Buy drums from us" />
+              <Text style={[styles.hint, { color: palette.textMuted }]}>
+                Need something to pack into? We can bring drums to your collection. This is the drum itself — the
+                shipping price above is separate.
+              </Text>
+              <View style={styles.drumRow}>
+                {([
+                  { value: 'metal' as const, label: 'Metal Drum', price: business.fees.metalDrumPurchase },
+                  { value: 'plastic' as const, label: 'Plastic Barrel', price: business.fees.plasticDrumPurchase },
+                ]).map((option) => {
+                  const active = draft.purchaseDrums?.type === option.value;
+                  return (
+                    <Pressable
+                      key={option.value}
+                      onPress={() => set({
+                        purchaseDrums: active
+                          ? null
+                          : { type: option.value, quantity: Math.max(1, draft.purchaseDrums?.quantity || 1) },
+                      })}
+                      style={[
+                        styles.drum,
+                        { backgroundColor: palette.surface, borderColor: palette.border },
+                        active && { borderColor: colors.green, backgroundColor: palette.greenSoft },
+                      ]}
+                    >
+                      <Ionicons
+                        name={active ? 'radio-button-on' : 'radio-button-off'}
+                        size={19}
+                        color={active ? colors.green : palette.textFaint}
+                      />
+                      <Text style={[styles.itemLabel, { color: palette.text }]}>{option.label}</Text>
+                      <Text style={[styles.drumPrice, { color: active ? palette.greenDark : palette.textMuted }]}>
+                        {symbol}{option.price ?? 0} each
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {draft.purchaseDrums && (
+                <View style={[styles.itemRow, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.itemLabel, { color: palette.text }]}>How many to buy?</Text>
+                    <Text style={[styles.itemPrice, { color: palette.greenDark }]}>
+                      Total {money(draft.purchaseDrums.quantity * ((draft.purchaseDrums.type === 'metal' ? business.fees.metalDrumPurchase : business.fees.plasticDrumPurchase) || 0), symbol)}
+                    </Text>
+                  </View>
+                  <View style={styles.qtyRow}>
+                    <Pressable
+                      style={styles.qtyBtn}
+                      onPress={() => set({
+                        purchaseDrums: draft.purchaseDrums!.quantity <= 1
+                          ? null
+                          : { ...draft.purchaseDrums!, quantity: draft.purchaseDrums!.quantity - 1 },
+                      })}
+                    ><Text style={styles.qtyBtnText}>−</Text></Pressable>
+                    <Text style={styles.qtyText}>{draft.purchaseDrums.quantity}</Text>
+                    <Pressable
+                      style={styles.qtyBtn}
+                      onPress={() => set({ purchaseDrums: { ...draft.purchaseDrums!, quantity: draft.purchaseDrums!.quantity + 1 } })}
+                    ><Text style={styles.qtyBtnText}>+</Text></Pressable>
+                  </View>
+                </View>
+              )}
+
               {draft.quote && (
                 <Card>
                   <Text style={[styles.itemLabel, { color: palette.text }]}>Approved quote</Text>
@@ -556,31 +791,34 @@ export default function BookScreen() {
 
           {step === 4 && (
             <>
-              <SectionTitle text="Pick a collection date" />
-              {upcoming.length === 0 && (
-                <Text style={styles.hint}>No published dates for {draft.country} yet — book anyway and our team will confirm your collection date.</Text>
-              )}
-              {upcoming.map((s) => {
-                const selected = draft.scheduleId === s.id;
-                return (
-                  <Pressable key={s.id} onPress={() => set({ scheduleId: s.id, route: s.route, collectionDate: s.pickup_date })}
-                    style={[styles.dateCard, { backgroundColor: palette.surface, borderColor: palette.border }, selected && { borderColor: palette.green, backgroundColor: palette.greenSoft }]}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.itemLabel, { color: palette.text }]}>{s.route}</Text>
-                      <Text style={[styles.itemPrice, { color: palette.textMuted }]}>{s.parsed ? longDate(s.parsed) : s.pickup_date}</Text>
-                    </View>
-                    {selected && <Ionicons name="checkmark-circle" size={22} color={colors.green} />}
-                  </Pressable>
-                );
-              })}
-              <Pressable onPress={() => set({ scheduleId: null, route: null, collectionDate: null })}
-                style={[styles.dateCard, { backgroundColor: palette.surface, borderColor: palette.border }, !draft.scheduleId && { borderColor: palette.green, backgroundColor: palette.greenSoft }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.itemLabel, { color: palette.text }]}>Let the team pick for me</Text>
-                  <Text style={[styles.itemPrice, { color: palette.textMuted }]}>We confirm the next date for your area</Text>
+              <SectionTitle text="Your collection date" />
+              {resolvedCollection ? (
+                <View style={[styles.dateCard, { backgroundColor: palette.greenSoft, borderColor: colors.green }]}>
+                  <Ionicons name="calendar" size={20} color={palette.greenDark} />
+                  <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                    <Text style={[styles.itemLabel, { color: palette.text }]}>
+                      {resolvedCollection.parsed ? longDate(resolvedCollection.parsed) : resolvedCollection.pickup_date}
+                    </Text>
+                    <Text style={[styles.itemPrice, { color: palette.greenDark }]}>{resolvedCollection.route}</Text>
+                  </View>
                 </View>
-                {!draft.scheduleId && <Ionicons name="checkmark-circle" size={22} color={colors.green} />}
-              </Pressable>
+              ) : (
+                <View style={[styles.dateCard, { backgroundColor: palette.surface, borderColor: colors.yellow }]}>
+                  <Ionicons name="time-outline" size={20} color={colors.yellow} />
+                  <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                    <Text style={[styles.itemLabel, { color: palette.text }]}>Date to be confirmed</Text>
+                    <Text style={[styles.itemPrice, { color: '#8a6d00' }]}>
+                      {awaitingNewDate.length
+                        ? `${awaitingNewDate[0].route} covers you — its next date has not been published yet.`
+                        : `No published dates for ${draft.country} yet.`}
+                    </Text>
+                  </View>
+                </View>
+              )}
+              <Text style={[styles.hint, { color: palette.textMuted }]}>
+                Your postcode sets your collection route, and the route sets the date — so there is nothing to choose
+                here. If the date needs to move, message us and we will sort it.
+              </Text>
 
               <SectionTitle text="Choose payment method" />
               {paymentMethods.filter((m) => m.id !== 'other_payment').map((m) => (
@@ -635,8 +873,8 @@ export default function BookScreen() {
                 ) : (
                   <Text style={[styles.reviewLine, { color: palette.text }]}><Text style={styles.reviewKey}>Receiver: </Text>{draft.recipient.name} · {draft.recipient.city}</Text>
                 )}
-                <Text style={[styles.reviewLine, { color: palette.text }]}><Text style={styles.reviewKey}>Items: </Text>{lines.filter((line) => !line.label.startsWith('Zimbabwe door delivery')).map((line) => `${line.qty} × ${line.label}`).join(', ')}</Text>
-                <Text style={[styles.reviewLine, { color: palette.text }]}><Text style={styles.reviewKey}>Date: </Text>{draft.route ? `${draft.route} — ${draft.collectionDate}` : 'Team confirms next available'}</Text>
+                <Text style={[styles.reviewLine, { color: palette.text }]}><Text style={styles.reviewKey}>Items: </Text>{lines.filter((line) => !line.label.startsWith('Zimbabwe door delivery') && !line.label.endsWith('purchased from us')).map((line) => `${line.qty} × ${line.label}`).join(', ')}</Text>
+                <Text style={[styles.reviewLine, { color: palette.text }]}><Text style={styles.reviewKey}>Date: </Text>{resolvedCollection ? `${resolvedCollection.route} — ${resolvedCollection.parsed ? longDate(resolvedCollection.parsed) : resolvedCollection.pickup_date}` : 'We will confirm your date'}</Text>
                 <Text style={[styles.reviewLine, { color: palette.text }]}><Text style={styles.reviewKey}>Payment: </Text>{draft.paymentMethod}</Text>
                 {Boolean(draft.referredBy.trim()) && <Text style={styles.reviewLine}>✓ Referred by {draft.referredBy}</Text>}
               </Card>
@@ -663,14 +901,14 @@ export default function BookScreen() {
               </View>
             </>
           )}
-        </ScrollView>
+        </KeyboardAwareScroll>
 
         <View style={styles.footer}>
           {step < STEPS.length - 1
             ? <Button title="Continue" onPress={() => setStep(step + 1)} disabled={!stepValid()} />
             : <Button title="CONFIRM BOOKING" onPress={submit} busy={submitting} disabled={!agreed} />}
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -687,7 +925,15 @@ const styles = StyleSheet.create({
   stepCaption: { fontSize: 12, fontWeight: '700', paddingHorizontal: spacing.lg, marginTop: 6 },
   payIcon: { width: 34, height: 34, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm },
   body: { padding: spacing.lg, paddingBottom: 24 },
+  signedOut: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+    borderWidth: 1.5, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md,
+  },
+  signedOutText: { flex: 1, fontSize: 12.5, fontWeight: '600', lineHeight: 17 },
   toggleRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+  drumRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  drum: { flex: 1, alignItems: 'center', gap: 5, borderWidth: 1.5, borderRadius: radius.md, paddingVertical: spacing.md },
+  drumPrice: { fontSize: 15, fontWeight: '800' },
   toggle: { flex: 1, borderWidth: 1.5, borderColor: colors.green, borderRadius: radius.sm, paddingVertical: 11, alignItems: 'center', backgroundColor: colors.white },
   toggleOn: { backgroundColor: colors.green },
   toggleText: { fontWeight: '700', color: colors.green, fontSize: 14 },
