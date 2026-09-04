@@ -31,7 +31,8 @@
   "submit": {
     "production": {
       "android": {
-        "track": "production"
+        "track": "production",
+        "serviceAccountKeyPath": "./google-service-account.json"
       },
       "ios": {
         "appleId": "itumelengmorena20@gmail.com",

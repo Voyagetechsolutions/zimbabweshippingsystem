@@ -57,3 +57,9 @@ scripts/store-screenshots/.cache/
 deliverables/*.apk
 deliverables/*.aab
 deliverables/*.ipa
+
+# Google Play service-account key used by `eas submit`. A private credential
+# with publish rights to the Play account: never commit it.
+google-service-account.json
+**/google-service-account.json
+*-service-account*.json
