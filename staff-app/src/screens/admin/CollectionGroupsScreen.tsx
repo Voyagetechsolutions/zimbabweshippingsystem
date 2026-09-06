@@ -7,7 +7,7 @@ import {
   CollectionDriver, CollectionRunRow, STALE_ROUTE, UNASSIGNED_ROUTE, assignRunDriver, daysAway,
   isSyntheticRun, loadCollectionDrivers, loadCollectionRuns, runDateLabel,
 } from '../../lib/collectionRuns';
-import { Avatar, Badge, BADGE, EmptyState, ErrorState, Loading, SectionLabel } from '../../components/adminui';
+import { Avatar, BackButton, Badge, BADGE, EmptyState, ErrorState, Loading, SectionLabel } from '../../components/adminui';
 import { colors, radius, shadow, spacing } from '../../theme';
 
 /**
@@ -113,6 +113,7 @@ export default function CollectionGroupsScreen({ navigation }: any) {
           />
         }
       >
+        <BackButton style={{ marginBottom: 10 }} />
         <Text style={styles.eyebrow}>DISPATCH</Text>
         <Text style={styles.title}>Collection groups</Text>
         <Text style={styles.subtitle}>

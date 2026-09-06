@@ -37,19 +37,12 @@ export const FINANCE_REGISTERS: Record<FinanceRegisterKey, RegisterConfig> = {
 
 const groups: Array<{ title: string; disabled?: boolean; note?: string; entries: Array<[string, string, keyof typeof Ionicons.glyphMap, FinanceRegisterKey | 'payments' | 'invoices' | 'expenses' | 'reports' | 'customers' | 'quote_requests']> }> = [
   { title: 'Sales & customers', entries: [
-    ['Customers','Financial accounts and activity','people-outline','customers'], ['Quotes','Create, price and send estimates','document-text-outline','quote_requests'],
-    ['Quote requests','Respond to customer requests','pricetag-outline','quote_requests'], ['Invoices','Billing and collection','receipt-outline','invoices'],
-    ['Payments','Verification and allocation','card-outline','payments'], ['Accounts receivable','Aging and collection','trending-up-outline','receivables'],
-  ] },
-  { title: 'Purchases & cash', disabled: true, note: 'Reserved for a future phase. Supplier purchasing and cash-book entry are disabled until Zimbabwe Shipping enables this workflow.', entries: [
-    ['Expenses','Receipts and approvals','wallet-outline','expenses'], ['Suppliers','Vendor records','storefront-outline','suppliers'],
-    ['Supplier bills','Bills and approvals','document-attach-outline','supplier_bills'], ['Accounts payable','Supplier aging','trending-down-outline','payables'],
-    ['Banking','Bank and cash accounts','business-outline','banking'], ['Reconciliation','Match imported transactions','git-compare-outline','reconciliation'],
-  ] },
-  { title: 'Accounting & control', entries: [
-    ['Chart of accounts','Configurable ledger','book-outline','accounts'], ['Journal entries','Balanced accounting entries','swap-horizontal-outline','journals'],
-    ['General ledger','Posted transaction detail','list-outline','ledger'], ['Consignment finance','Shipping cost allocation','boat-outline','consignment_finance'],
-    ['Reports','Management and statutory views','bar-chart-outline','reports'],
+    ['Customers','Financial accounts and activity','people-outline','customers'],
+    // One quotes entry. "Quotes" and "Quote requests" were two tiles opening
+    // the same screen.
+    ['Quotes','Price and respond to customer requests','pricetag-outline','quote_requests'],
+    ['Invoices','Billing and collection','receipt-outline','invoices'],
+    ['Payments','Verification and allocation','card-outline','payments'],
   ] },
 ];
 

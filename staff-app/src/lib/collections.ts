@@ -460,3 +460,130 @@ export function sortByProximity(
     return (a.customerName || '').localeCompare(b.customerName || '');
   });
 }
+
+/**
+ * Collections scheduled ahead of today, so a driver can plan their own route.
+ *
+ * Dispatch used to answer this question — it assigned a route, and the driver
+ * saw only the day they were standing in. With the dispatch board gone the
+ * driver needs the same forward view dispatch had: which bookings are due on
+ * which published date, where they are, and how many.
+ *
+ * Deliberately built from plain table reads rather than a per-day RPC call.
+ * The whole horizon is two queries, so a fortnight costs the same as a day and
+ * the screen still works on deployments where the routine is missing.
+ */
+export type ScheduledDay = {
+  /** ISO date, e.g. "2026-09-14". */
+  date: string;
+  routes: string[];
+  collections: RouteCollection[];
+};
+
+export async function loadCollectionsAhead(days = 21): Promise<ScheduledDay[]> {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const horizon = new Date(startOfToday.getTime() + days * 86400000);
+
+  const [scheduleResult, shipmentResult] = await Promise.all([
+    supabase.from('collection_schedules').select('id, route, country, pickup_date').limit(300),
+    supabase
+      .from('shipments')
+      .select('id, tracking_number, customer_reference, metadata, collection_status, collection_schedule_id, goods_description, assigned_driver_id, driver_status, pickup_latitude, pickup_longitude')
+      .is('deleted_at', null)
+      .limit(1000),
+  ]);
+  if (scheduleResult.error) throw scheduleResult.error;
+  if (shipmentResult.error) throw shipmentResult.error;
+
+  const inWindow = (value: Date | null) =>
+    Boolean(value && value.getTime() >= startOfToday.getTime() && value.getTime() <= horizon.getTime());
+  const iso = (value: Date) => {
+    const local = new Date(value.getTime() - value.getTimezoneOffset() * 60_000);
+    return local.toISOString().slice(0, 10);
+  };
+
+  // Every published date inside the horizon, and the route key it belongs to.
+  const scheduled = (scheduleResult.data || [])
+    .map((row: any) => ({ ...row, parsed: parseScheduleDate(row.pickup_date) }))
+    .filter((row: any) => inWindow(row.parsed));
+
+  const byDate = new Map<string, ScheduledDay>();
+  const dayFor = (date: string) => {
+    const existing = byDate.get(date);
+    if (existing) return existing;
+    const created: ScheduledDay = { date, routes: [], collections: [] };
+    byDate.set(date, created);
+    return created;
+  };
+  for (const row of scheduled) {
+    const day = dayFor(iso(row.parsed as Date));
+    if (row.route && !day.routes.includes(row.route)) day.routes.push(row.route);
+  }
+
+  const scheduleDate = new Map<string, string>();
+  const routeDates = new Map<string, string>();
+  for (const row of scheduled) {
+    scheduleDate.set(row.id, iso(row.parsed as Date));
+    const key = routeKey(row.route);
+    // Soonest date wins when a route is published more than once in the window.
+    const seen = routeDates.get(key);
+    if (!seen || iso(row.parsed as Date) < seen) routeDates.set(key, iso(row.parsed as Date));
+  }
+
+  const COLLECTION_COUNTRIES = ['ireland', 'republic of ireland', 'northern ireland', 'united kingdom', 'england', 'uk', 'great britain'];
+
+  for (const s of (shipmentResult.data || []) as any[]) {
+    const sender = s.metadata?.sender || s.metadata?.senderDetails || {};
+    const country = String(sender.country || s.metadata?.collection?.country || '').toLowerCase();
+    if (country && !COLLECTION_COUNTRIES.includes(country)) continue;
+    if (s.collection_status === 'Collected') continue;
+
+    // The booking's own date is the truth; the route or schedule it was matched
+    // to fills in when the booking never carried one.
+    const booked = parseScheduleDate(s.metadata?.collection?.date || s.metadata?.collectionDate);
+    const date = inWindow(booked)
+      ? iso(booked as Date)
+      : scheduleDate.get(s.collection_schedule_id)
+        || routeDates.get(routeKey(s.metadata?.collection?.route))
+        || null;
+    if (!date) continue;
+
+    const day = dayFor(date);
+    const route = s.metadata?.collection?.route || null;
+    if (route && !day.routes.includes(route)) day.routes.push(route);
+    day.collections.push({
+      shipmentId: s.id,
+      trackingNumber: s.tracking_number,
+      customerReference: s.customer_reference,
+      customerName: [sender.firstName, sender.lastName].filter(Boolean).join(' ').trim() || sender.name || '',
+      phone: sender.phone || null,
+      address: sender.address || null,
+      city: sender.city || '',
+      postcode: sender.postcode || sender.postalCode || '',
+      route,
+      country: sender.country || s.metadata?.collection?.country || null,
+      goodsDescription: (s.goods_description || '').slice(0, 400) || null,
+      collectionStatus: s.collection_status,
+      latitude: s.pickup_latitude ?? null,
+      longitude: s.pickup_longitude ?? null,
+      stopId: null,
+      claimId: null,
+      claimStatus: ['claimed', 'en_route', 'arrived', 'failed'].includes(String(s.driver_status || ''))
+        ? s.driver_status
+        : 'available',
+      claimedBy: s.assigned_driver_id || null,
+      claimedByName: null,
+      claimedAt: null,
+    });
+  }
+
+  return [...byDate.values()]
+    .filter((day) => day.collections.length > 0)
+    .map((day) => ({
+      ...day,
+      collections: day.collections.sort((a, b) =>
+        (a.city || '').localeCompare(b.city || '') || (a.customerName || '').localeCompare(b.customerName || '')),
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}

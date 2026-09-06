@@ -3,6 +3,9 @@ import type { Shipment } from '../lib/shipment';
 export type ShipmentsStackParams = {
   ShipmentsList: undefined;
   ShipmentDetail: { shipment: Shipment };
+  // The invoice and the delivery note, viewable and editable rather than
+  // download-only.
+  Document: { shipmentId: string; kind: 'invoice' | 'delivery_note' };
 };
 
 export type DriverStopKind = 'collection' | 'delivery';
@@ -27,6 +30,7 @@ export type DriverStackParams = {
 // behind it, and "DeliveryNotes" is the driver's own copy of the paperwork.
 export type DeliveryStackParams = {
   DeliveryHome: undefined;
+  CollectionsAhead: undefined;
   DeliveryLoad: undefined;
   DeliveryNotes: undefined;
   StopDetails: { stop: DriverStopParam };
@@ -36,6 +40,9 @@ export type DeliveryStackParams = {
 
 export type DriverRunStackParams = {
   MyRun: undefined;
+  // The forward view that replaced the dispatch board: what is booked onto
+  // each published date, so a driver can plan their own route.
+  CollectionsAhead: undefined;
   RouteMap: undefined;
   RunSummary: undefined;
   DepotHandover: undefined;
@@ -71,9 +78,8 @@ export type MenuStackParams = {
   MenuHome: undefined;
   ManualBooking: undefined;
   Customers: undefined;
-  CustomerDetail: { record: any };
+  CustomerDetail: { record: any; shipmentId?: string };
   CustomQuotes: undefined;
-  Schedule: undefined;
   Delivery: undefined;
   DeliveryNotes: undefined;
   DeliveryNoteDetail: { noteId: string };
@@ -81,8 +87,10 @@ export type MenuStackParams = {
   Payments: undefined;
   PaymentDetails: { paymentId: string };
   Reconciliation: undefined;
-  Invoices: undefined;
-  Reports: undefined;
+  PaymentProofs: undefined;
+  Invoices: { create?: boolean; open?: string } | undefined;
+  Document: { shipmentId: string; kind: 'invoice' | 'delivery_note' };
+  Reports: { range?: 'today' | 'week' | 'month' | 'last30' | 'custom' } | undefined;
   Analytics: undefined;
   FinanceOverview: undefined;
   Feedback: undefined;

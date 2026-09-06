@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
+import { BackButton } from '../components/adminui';
 import { colors, radius, spacing } from '../theme';
 import { money, shortDate } from '../lib/format';
 
@@ -52,7 +53,7 @@ export default function FinanceBooksScreen() {
 
   if(loading)return <SafeAreaView style={styles.safe}><View style={styles.center}><ActivityIndicator size="large" color={colors.primary}/></View></SafeAreaView>;
   return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>}>
-    <View><Text style={styles.title}>Books</Text><Text style={styles.subtitle}>Monthly performance and expense tracking</Text></View>
+    <View><BackButton style={{ marginBottom: 10 }} /><Text style={styles.title}>Books</Text><Text style={styles.subtitle}>Monthly performance and expense tracking</Text></View>
 
     <View style={styles.kpiRow}><View style={[styles.kpi,{backgroundColor:colors.primarySoft}]}><Text style={[styles.kpiLabel,{color:colors.primaryDark}]}>Income</Text><Text style={styles.kpiValue}>{money(current.income)}</Text></View><View style={[styles.kpi,{backgroundColor:colors.redSoft}]}><Text style={[styles.kpiLabel,{color:colors.danger}]}>Expenses</Text><Text style={styles.kpiValue}>{money(current.expenses)}</Text></View><View style={[styles.kpi,{backgroundColor:colors.blueSoft}]}><Text style={[styles.kpiLabel,{color:colors.blue}]}>Profit</Text><Text style={styles.kpiValue}>{money(current.income-current.expenses)}</Text></View></View>
 

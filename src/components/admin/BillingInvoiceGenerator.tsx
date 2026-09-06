@@ -304,9 +304,13 @@ export const BillingInvoiceTemplate = React.forwardRef<HTMLDivElement, { shipmen
         <div style={{ display: 'flex', gap: '40px', marginBottom: '28px' }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#666', marginBottom: '6px' }}>FROM</div>
-            <div style={{ fontWeight: 600 }}>Zimbabwe Shipping Service</div>
+            <div style={{ fontWeight: 600 }}><BusinessContactValue field="name" /></div>
             <div style={{ color: '#444', lineHeight: '1.6' }}>www.zimbabweshipping.com</div>
-            <div style={{ color: '#444', lineHeight: '1.6' }}><BusinessContactValue field="irelandPhone" /></div>
+            {/* Both numbers. The invoice carried the Ireland one alone, which
+                left every UK customer — the majority — with no way to call
+                about their own bill. */}
+            <div style={{ color: '#444', lineHeight: '1.6' }}>UK: <BusinessContactValue field="ukPhone" /></div>
+            <div style={{ color: '#444', lineHeight: '1.6' }}>Ireland: <BusinessContactValue field="irelandPhone" /></div>
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#666', marginBottom: '6px' }}>BILL TO</div>

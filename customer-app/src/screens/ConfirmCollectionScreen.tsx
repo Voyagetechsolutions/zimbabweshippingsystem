@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
@@ -8,6 +8,7 @@ import { colors, spacing, radius } from '../theme';
 import { Card, Button, FlagStripe, SectionTitle } from '../components/ui';
 import { KeyboardAwareScroll } from '../components/KeyboardAwareScroll';
 import { longDate, parseCollectionDate } from '../lib/format';
+import { loadNextCollection, type NextCollection } from '../lib/collectionSchedule';
 import {
   CollectionSlot, SLOT_WINDOWS, confirmSlot, effectiveWindow, hhmm, loadSlot, slotState, windowLabel,
 } from '../lib/collectionSlots';
@@ -32,11 +33,16 @@ export default function ConfirmCollectionScreen() {
   const navigation = useNavigation<any>();
   const { id } = (useRoute<any>().params || {}) as { id: string };
   const { palette } = useAppTheme();
+  // Keep the last action clear of Android's system navigation bar.
+  const insets = useSafeAreaInsets();
 
   const [slot, setSlot] = useState<CollectionSlot | null>(null);
   const [reference, setReference] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  // The date the route is published for, used when this booking has not been
+  // given one of its own yet — the same date the website is showing.
+  const [published, setPublished] = useState<NextCollection | null>(null);
 
   const load = useCallback(async () => {
     const [{ data: shipment }, current] = await Promise.all([
@@ -59,6 +65,13 @@ export default function ConfirmCollectionScreen() {
       const parsed = parseCollectionDate(raw);
       if (parsed) setSlot((s) => (s ? { ...s, collection_date: parsed.toISOString().slice(0, 10) } : s));
     }
+    const meta = (shipment as any)?.metadata || {};
+    const sender = meta.sender || meta.senderDetails || {};
+    setPublished(await loadNextCollection({
+      postcode: sender.postcode || sender.postalCode,
+      city: sender.city,
+      country: sender.country || meta.collection?.country,
+    }).catch(() => null));
     setLoading(false);
   }, [id]);
 
@@ -84,7 +97,8 @@ export default function ConfirmCollectionScreen() {
   };
 
   const state = slotState(slot);
-  const collectionDate = slot?.collection_date ? parseCollectionDate(slot.collection_date) : null;
+  const ownDate = slot?.collection_date ? parseCollectionDate(slot.collection_date) : null;
+  const collectionDate = ownDate || published?.date || null;
   const pickedStart = hhmm(slot?.requested_start);
   const isPicked = (start: string, end: string) =>
     !slot?.requested_flexible && pickedStart === start && hhmm(slot?.requested_end) === end;
@@ -103,13 +117,18 @@ export default function ConfirmCollectionScreen() {
       {loading ? (
         <View style={styles.loading}><ActivityIndicator color={colors.green} size="large" /></View>
       ) : (
-        <KeyboardAwareScroll contentContainerStyle={styles.body}>
+        <KeyboardAwareScroll contentContainerStyle={[styles.body, { paddingBottom: 40 + insets.bottom }]}>
           <Card>
             <Text style={[styles.reference, { color: palette.green }]}>{reference}</Text>
-            <Text style={[styles.date, { color: palette.text }]}>
-              {collectionDate ? longDate(collectionDate) : 'Collection date to be confirmed'}
-            </Text>
-            {Boolean(slot?.route) && <Text style={[styles.route, { color: palette.textMuted }]}>{slot?.route}</Text>}
+            {collectionDate ? (
+              <Text style={[styles.date, { color: palette.text }]}>{longDate(collectionDate)}</Text>
+            ) : null}
+            {Boolean(slot?.route || published?.route) && (
+              <Text style={[styles.route, { color: palette.textMuted }]}>
+                {slot?.route || published?.route}
+                {!ownDate && collectionDate ? ' · next published date, we will confirm yours' : ''}
+              </Text>
+            )}
           </Card>
 
           {state === 'dispatch_moved_untold' || state === 'dispatch_moved_told' ? (

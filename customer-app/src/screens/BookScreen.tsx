@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Alert, Linking } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -17,9 +17,10 @@ import {
   scheduleMatchesPostcode, autocompletePostcode, searchAddresses, lookupUkPostcode,
   coverageForUkPostcode, prettyPostcode, type Coverage,
 } from '../lib/postcode';
+import { pickNextCollection } from '../lib/collectionSchedule';
 import { SuggestField } from '../components/SuggestField';
 import { KeyboardAwareScroll } from '../components/KeyboardAwareScroll';
-import { useAppTheme } from '../context/ThemeContext';
+import { useAppTheme, useThemedStyles } from '../context/ThemeContext';
 
 const STEPS = ['Collection', 'Sender', 'Delivery', 'Shipment', 'Payment', 'Review'] as const;
 const DRAFT_KEY = 'zim-booking-draft-v2';
@@ -44,6 +45,11 @@ export default function BookScreen() {
   const [agreed, setAgreed] = useState(false);
   const [otherPaymentsOpen, setOtherPaymentsOpen] = useState(false);
   const { palette } = useAppTheme();
+  const styles = useThemedStyles(baseStyles);
+  // Android draws its gesture/three-button bar over the app on edge-to-edge
+  // windows, so a footer pinned to the bottom of the screen sits underneath it
+  // and Continue cannot be tapped. Lift it clear by the device's own inset.
+  const insets = useSafeAreaInsets();
   const { config: business, loading: configLoading, error: configError, reload: reloadConfig } = useBusinessConfig();
   const catalogue = business.catalogue;
   const paymentMethods = business.payments.methods;
@@ -188,6 +194,38 @@ export default function BookScreen() {
   const awaitingNewDate = useMemo(() => myRoutes
     .filter((s) => !s.parsed || s.parsed.getTime() < Date.now() - 86400000)
     .sort((a, b) => a.route.localeCompare(b.route)), [myRoutes]);
+
+  /**
+   * The date to put in front of the customer when their own route has none.
+   *
+   * Same answer the website's hero gives: the soonest published date for the
+   * country they are collecting from. It is shown as the date we are working
+   * towards rather than written into the booking — the office still confirms
+   * which route picks them up — but a real date is always on screen.
+   */
+  const nextPublished = useMemo(() => {
+    const wantIreland = draft.country === 'Ireland';
+    const forCountry = schedules.filter((s) => {
+      const c = String(s.country || 'UK').toLowerCase();
+      return wantIreland ? c.includes('ireland') : !c.includes('ireland');
+    });
+    return pickNextCollection(forCountry, {
+      postcode: draft.collectionPostcode,
+      city: draft.collectionCity,
+      country: draft.country,
+    });
+  }, [schedules, draft.country, draft.collectionPostcode, draft.collectionCity]);
+
+  /** What the collection cards actually render — the matched route, else the published next date. */
+  const shownCollection = useMemo(() => (resolvedCollection
+    ? {
+      route: resolvedCollection.route,
+      label: resolvedCollection.parsed ? longDate(resolvedCollection.parsed) : resolvedCollection.pickup_date,
+      confirmed: true,
+    }
+    : nextPublished
+      ? { route: nextPublished.route, label: longDate(nextPublished.date), confirmed: false }
+      : null), [resolvedCollection, nextPublished]);
 
   const { lines, estimate, hasCustom, symbol } = draftLines(draft, business, deliveryMethod);
   const set = (patch: Partial<BookingDraft>) => setDraft((d) => ({ ...d, ...patch }));
@@ -527,19 +565,24 @@ export default function BookScreen() {
 
               {/* The date follows the location, so it belongs after both the
                   UK postcode and the Irish town — Ireland routes by city. */}
-              {resolvedCollection ? (
-                <View style={[styles.coverage, { backgroundColor: palette.greenSoft, borderColor: colors.green }]}>
-                  <Ionicons name="calendar" size={16} color={palette.greenDark} />
-                  <Text style={[styles.coverageText, { color: palette.greenDark }]}>
-                    Your collection date: {resolvedCollection.parsed ? longDate(resolvedCollection.parsed) : resolvedCollection.pickup_date}
-                    {'\n'}{resolvedCollection.route}
-                  </Text>
-                </View>
-              ) : awaitingNewDate.length ? (
-                <View style={[styles.coverage, { backgroundColor: palette.yellowSoft, borderColor: colors.yellow }]}>
-                  <Ionicons name="time-outline" size={16} color="#8a6d00" />
-                  <Text style={[styles.coverageText, { color: '#8a6d00' }]}>
-                    {awaitingNewDate[0].route} covers you, but its next date has not been published yet. Book anyway and we will confirm your date.
+              {shownCollection ? (
+                <View style={[
+                  styles.coverage,
+                  shownCollection.confirmed
+                    ? { backgroundColor: palette.greenSoft, borderColor: colors.green }
+                    : { backgroundColor: palette.yellowSoft, borderColor: colors.yellow },
+                ]}>
+                  <Ionicons
+                    name={shownCollection.confirmed ? 'calendar' : 'time-outline'}
+                    size={16}
+                    color={shownCollection.confirmed ? palette.greenDark : '#8a6d00'}
+                  />
+                  <Text style={[styles.coverageText, { color: shownCollection.confirmed ? palette.greenDark : '#8a6d00' }]}>
+                    {shownCollection.confirmed ? 'Your collection date: ' : 'Next collection: '}{shownCollection.label}
+                    {'\n'}{shownCollection.route}
+                    {shownCollection.confirmed
+                      ? ''
+                      : `\n${awaitingNewDate.length ? `${awaitingNewDate[0].route} covers you and its new date is due — book` : 'Book'} and we will confirm your own date.`}
                   </Text>
                 </View>
               ) : null}
@@ -792,29 +835,27 @@ export default function BookScreen() {
           {step === 4 && (
             <>
               <SectionTitle text="Your collection date" />
-              {resolvedCollection ? (
-                <View style={[styles.dateCard, { backgroundColor: palette.greenSoft, borderColor: colors.green }]}>
-                  <Ionicons name="calendar" size={20} color={palette.greenDark} />
+              {shownCollection ? (
+                <View style={[
+                  styles.dateCard,
+                  shownCollection.confirmed
+                    ? { backgroundColor: palette.greenSoft, borderColor: colors.green }
+                    : { backgroundColor: palette.surface, borderColor: colors.yellow },
+                ]}>
+                  <Ionicons
+                    name={shownCollection.confirmed ? 'calendar' : 'time-outline'}
+                    size={20}
+                    color={shownCollection.confirmed ? palette.greenDark : colors.yellow}
+                  />
                   <View style={{ flex: 1, marginLeft: spacing.sm }}>
-                    <Text style={[styles.itemLabel, { color: palette.text }]}>
-                      {resolvedCollection.parsed ? longDate(resolvedCollection.parsed) : resolvedCollection.pickup_date}
-                    </Text>
-                    <Text style={[styles.itemPrice, { color: palette.greenDark }]}>{resolvedCollection.route}</Text>
-                  </View>
-                </View>
-              ) : (
-                <View style={[styles.dateCard, { backgroundColor: palette.surface, borderColor: colors.yellow }]}>
-                  <Ionicons name="time-outline" size={20} color={colors.yellow} />
-                  <View style={{ flex: 1, marginLeft: spacing.sm }}>
-                    <Text style={[styles.itemLabel, { color: palette.text }]}>Date to be confirmed</Text>
-                    <Text style={[styles.itemPrice, { color: '#8a6d00' }]}>
-                      {awaitingNewDate.length
-                        ? `${awaitingNewDate[0].route} covers you — its next date has not been published yet.`
-                        : `No published dates for ${draft.country} yet.`}
+                    <Text style={[styles.itemLabel, { color: palette.text }]}>{shownCollection.label}</Text>
+                    <Text style={[styles.itemPrice, { color: shownCollection.confirmed ? palette.greenDark : '#8a6d00' }]}>
+                      {shownCollection.route}
+                      {shownCollection.confirmed ? '' : ' — we will confirm your own date after booking'}
                     </Text>
                   </View>
                 </View>
-              )}
+              ) : null}
               <Text style={[styles.hint, { color: palette.textMuted }]}>
                 Your postcode sets your collection route, and the route sets the date — so there is nothing to choose
                 here. If the date needs to move, message us and we will sort it.
@@ -874,7 +915,7 @@ export default function BookScreen() {
                   <Text style={[styles.reviewLine, { color: palette.text }]}><Text style={styles.reviewKey}>Receiver: </Text>{draft.recipient.name} · {draft.recipient.city}</Text>
                 )}
                 <Text style={[styles.reviewLine, { color: palette.text }]}><Text style={styles.reviewKey}>Items: </Text>{lines.filter((line) => !line.label.startsWith('Zimbabwe door delivery') && !line.label.endsWith('purchased from us')).map((line) => `${line.qty} × ${line.label}`).join(', ')}</Text>
-                <Text style={[styles.reviewLine, { color: palette.text }]}><Text style={styles.reviewKey}>Date: </Text>{resolvedCollection ? `${resolvedCollection.route} — ${resolvedCollection.parsed ? longDate(resolvedCollection.parsed) : resolvedCollection.pickup_date}` : 'We will confirm your date'}</Text>
+                <Text style={[styles.reviewLine, { color: palette.text }]}><Text style={styles.reviewKey}>Date: </Text>{shownCollection ? `${shownCollection.route} — ${shownCollection.label}${shownCollection.confirmed ? '' : ' (we will confirm)'}` : 'We will confirm your date'}</Text>
                 <Text style={[styles.reviewLine, { color: palette.text }]}><Text style={styles.reviewKey}>Payment: </Text>{draft.paymentMethod}</Text>
                 {Boolean(draft.referredBy.trim()) && <Text style={styles.reviewLine}>✓ Referred by {draft.referredBy}</Text>}
               </Card>
@@ -903,7 +944,7 @@ export default function BookScreen() {
           )}
         </KeyboardAwareScroll>
 
-        <View style={styles.footer}>
+        <View style={[styles.footer, { backgroundColor: palette.surface, borderTopColor: palette.border, paddingBottom: spacing.lg + insets.bottom }]}>
           {step < STEPS.length - 1
             ? <Button title="Continue" onPress={() => setStep(step + 1)} disabled={!stepValid()} />
             : <Button title="CONFIRM BOOKING" onPress={submit} busy={submitting} disabled={!agreed} />}
@@ -913,7 +954,7 @@ export default function BookScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   header: { flexDirection: 'row', alignItems: 'center', padding: spacing.lg, gap: spacing.md },
   headerTitle: { flex: 1, fontSize: 17, fontWeight: '800', color: colors.text },

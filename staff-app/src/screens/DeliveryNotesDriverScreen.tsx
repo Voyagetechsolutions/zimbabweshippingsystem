@@ -5,6 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { BackButton } from '../components/adminui';
 import { colors, radius, shadow, spacing } from '../theme';
 import { buildDeliveryNoteHtml, sharePdf } from '../lib/documents';
 import { receiverName, type Shipment } from '../lib/shipment';
@@ -114,6 +115,7 @@ export default function DeliveryNotesDriverScreen() {
       <ScrollView contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={colors.primary} />}>
         <View>
+          <BackButton style={{ marginBottom: 10 }} />
           <Text style={styles.title}>Delivery notes</Text>
           <Text style={styles.subtitle}>
             {counts.verified} verified · {counts.pending} waiting on admin{counts.rejected ? ` · ${counts.rejected} rejected` : ''}

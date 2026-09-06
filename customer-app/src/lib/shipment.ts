@@ -12,6 +12,9 @@ export type Shipment = {
   delivery_code?:string|null;
   driver_status?:string|null;
   created_at: string;
+  // Cleared once an admin has confirmed the booking on the phone and locked it.
+  // The stamp in metadata.confirmation is the authority; this mirrors it.
+  can_modify?: boolean | null;
   metadata?: any;
 };
 

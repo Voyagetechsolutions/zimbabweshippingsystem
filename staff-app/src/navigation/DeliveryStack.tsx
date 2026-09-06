@@ -5,6 +5,7 @@ import DeliveryLoadScreen from '../screens/DeliveryLoadScreen';
 import DeliveryNotesDriverScreen from '../screens/DeliveryNotesDriverScreen';
 import CollectionScannerScreen from '../screens/CollectionScannerScreen';
 import { DriverReportIssueScreen, DriverStopDetailsScreen } from '../screens/DriverExperienceScreens';
+import CollectionsAheadScreen from '../screens/CollectionsAheadScreen';
 import type { DeliveryStackParams } from './types';
 import { colors } from '../theme';
 
@@ -26,6 +27,7 @@ export default function DeliveryStack() {
       <Stack.Screen name="DeliveryLoad" component={DeliveryLoadScreen} options={{ headerShown: false }} />
       <Stack.Screen name="DeliveryNotes" component={DeliveryNotesDriverScreen} options={{ headerShown: false }} />
       <Stack.Screen name="StopDetails" component={DriverStopDetailsScreen as any} options={{ headerShown: false }} />
+      <Stack.Screen name="CollectionsAhead" component={CollectionsAheadScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ReportIssue" component={DriverReportIssueScreen as any} options={{ headerShown: false }} />
       <Stack.Screen name="StopWorkflow" component={CollectionScannerScreen as any} options={{ title: 'Proof of Delivery' }} />
     </Stack.Navigator>

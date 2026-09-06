@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { Card, SectionTitle, StatusBadge, CountryChips } from '../components/ui';
 import { colors, radius, spacing, shadow, type as typeScale } from '../theme';
 import {
-  money, moneyMap, addToMoneyMap, shortDate, greeting, todayLabel, matchesCountry, customerName, type CountryFilter,
+  shortDate, greeting, todayLabel, matchesCountry, customerName, type CountryFilter,
 } from '../lib/format';
 
 interface Shipment {
@@ -53,28 +53,6 @@ function todayIso(offsetDays = 0) {
   return local.toISOString().slice(0, 10);
 }
 
-function AttentionRow({ count, title, description, icon, tone, onPress }: {
-  count: number;
-  title: string;
-  description: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  tone: string;
-  onPress?: () => void;
-}) {
-  return (
-    <Pressable style={styles.attentionRow} onPress={onPress} disabled={!onPress}>
-      <View style={[styles.attentionIcon, { backgroundColor: `${tone}14` }]}>
-        <Ionicons name={icon} size={18} color={tone} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.attentionTitle}>{count} {title}</Text>
-        <Text style={styles.attentionDescription} numberOfLines={1}>{description}</Text>
-      </View>
-      {onPress ? <Ionicons name="chevron-forward" size={17} color={colors.textFaint} /> : null}
-    </Pressable>
-  );
-}
-
 export default function AdminDashboardScreen() {
   const { profile } = useAuth();
   const navigation = useNavigation<any>();
@@ -85,51 +63,30 @@ export default function AdminDashboardScreen() {
   const [query, setQuery] = useState('');
 
   const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [revenue, setRevenue] = useState<Record<string, number>>({});
-  const [revenueToday, setRevenueToday] = useState<Record<string, number>>({});
-  const [pendingQuotes, setPendingQuotes] = useState(0);
-  const [quoteValue, setQuoteValue] = useState(0);
   const [runsToday, setRunsToday] = useState(0);
   const [events, setEvents] = useState<any[]>([]);
-  const [attention, setAttention] = useState({ requests: 0, flaggedReviews: 0, failedStops: 0, pendingProofs: 0, pendingExpenses: 0, unreconciled: 0 });
+  // Only what "Today's activity" still needs. The scoring, the attention list
+  // and the collected-today total were removed, and their queries with them.
+  const [paymentsWaiting, setPaymentsWaiting] = useState(0);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const startOfToday = new Date();
-      startOfToday.setHours(0, 0, 0, 0);
-      const [ship, pay, quotes, requests, reviews, failedStops, proofs, expenses, runs, eventRows] = await Promise.all([
+      const [ship, pay, proofs, runs, eventRows] = await Promise.all([
         supabase.from('shipments').select('id, tracking_number, customer_reference, status, created_at, metadata').order('created_at', { ascending: false }),
-        supabase.from('payments').select('amount, currency, payment_status, created_at, reconciled_at'),
-        supabase.from('custom_quotes').select('id, quoted_amount').eq('status', 'pending'),
-        supabase.from('customer_requests').select('id', { count: 'exact', head: true }).eq('status', 'New'),
-        supabase.from('reviews').select('id', { count: 'exact', head: true }).eq('moderation_status', 'flagged'),
-        supabase.from('driver_run_stops').select('id', { count: 'exact', head: true }).eq('status', 'failed').gte('updated_at', startOfToday.toISOString()),
+        supabase.from('payments').select('amount, currency, payment_status, reconciled_at'),
         supabase.from('payment_proofs').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('finance_expenses').select('id', { count: 'exact', head: true }).in('status', ['recorded', 'draft']),
         supabase.from('driver_runs').select('id', { count: 'exact', head: true }).eq('run_date', todayIso()),
         supabase.from('shipment_events').select('event_type, new_status, created_at, details').order('created_at', { ascending: false }).limit(6),
       ]);
       if (ship.error) throw ship.error;
       setShipments((ship.data as Shipment[]) || []);
-      const payments = (pay.data || []) as any[];
-      const collectedPayments = payments.filter((p) => PAID_STATUSES.has(String(p.payment_status || '').toLowerCase()));
-      setRevenue(collectedPayments.reduce((map: Record<string, number>, p: any) => addToMoneyMap(map, p.amount, p.currency), {}));
-      setRevenueToday(collectedPayments
-        .filter((p) => new Date(p.created_at).getTime() >= startOfToday.getTime())
-        .reduce((map: Record<string, number>, p: any) => addToMoneyMap(map, p.amount, p.currency), {}));
-      setPendingQuotes(quotes.data?.length || 0);
-      setQuoteValue((quotes.data || []).reduce((sum: number, q: any) => sum + (Number(q.quoted_amount) || 0), 0));
+      const unreconciled = ((pay.data || []) as any[])
+        .filter((p) => PAID_STATUSES.has(String(p.payment_status || '').toLowerCase()))
+        .filter((p) => !p.reconciled_at).length;
+      setPaymentsWaiting((proofs.count || 0) + unreconciled);
       setRunsToday(runs.count || 0);
       setEvents(eventRows.error ? [] : (eventRows.data || []));
-      setAttention({
-        requests: requests.count || 0,
-        flaggedReviews: reviews.count || 0,
-        failedStops: failedStops.count || 0,
-        pendingProofs: proofs.count || 0,
-        pendingExpenses: expenses.count || 0,
-        unreconciled: collectedPayments.filter((p) => !p.reconciled_at).length,
-      });
     } catch (e: any) {
       console.error('Dashboard load failed:', e);
       setError(e?.message || 'Failed to load dashboard');
@@ -146,9 +103,6 @@ export default function AdminDashboardScreen() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'shipments' }, load)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, load)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_proofs' }, load)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'custom_quotes' }, load)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'customer_requests' }, load)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'finance_expenses' }, load)
       .subscribe();
 
     return () => { void supabase.removeChannel(channel); };
@@ -176,13 +130,6 @@ export default function AdminDashboardScreen() {
     outForDelivery: filtered.filter((s) => s.status === 'Out for Delivery').length,
     delivered: filtered.filter((s) => s.status === 'Delivered').length,
   }), [filtered]);
-
-  // Operations score: start at 100 and lose points for things needing humans.
-  const opsScore = useMemo(() => {
-    const penalty = attention.failedStops * 8 + attention.requests * 3 + attention.pendingProofs * 2 +
-      attention.flaggedReviews * 2 + Math.min(20, stats.pending);
-    return Math.max(40, 100 - penalty);
-  }, [attention, stats.pending]);
 
   const recent = useMemo(() => filtered.slice(0, 6), [filtered]);
 
@@ -258,19 +205,6 @@ export default function AdminDashboardScreen() {
           <Card><Text style={{ color: colors.danger, fontSize: 13 }}>{error}</Text></Card>
         ) : null}
 
-        <Card style={styles.scoreCard}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.scoreKicker}>OPERATIONS SCORE</Text>
-            <Text style={styles.scoreValue}>{opsScore}%</Text>
-            <Text style={styles.scoreText}>
-              {opsScore >= 90 ? 'Everything running smoothly' : opsScore >= 70 ? 'A few items need your attention' : 'Operations need attention now'}
-            </Text>
-          </View>
-          <View style={styles.scoreRing}>
-            <Ionicons name={opsScore >= 90 ? 'flame' : opsScore >= 70 ? 'pulse' : 'warning'} size={26} color={colors.white} />
-          </View>
-        </Card>
-
         <View>
           <SectionTitle>Today’s activity</SectionTitle>
           <View style={styles.activityGrid}>
@@ -278,7 +212,7 @@ export default function AdminDashboardScreen() {
               { value: stats.pending, label: 'Pickups queued', color: colors.orange },
               { value: stats.outForDelivery, label: 'Out for delivery', color: colors.cyan },
               { value: runsToday, label: 'Driver runs', color: colors.blue },
-              { value: attention.pendingProofs + attention.unreconciled, label: 'Payments waiting', color: colors.purple },
+              { value: paymentsWaiting, label: 'Payments waiting', color: colors.purple },
             ].map((item) => (
               <Card key={item.label} style={styles.activityCard}>
                 <Text style={[styles.activityValue, { color: item.color }]}>{item.value}</Text>
@@ -287,42 +221,6 @@ export default function AdminDashboardScreen() {
             ))}
           </View>
         </View>
-
-        <View>
-          <SectionTitle>Needs attention</SectionTitle>
-          <View style={styles.stack}>
-            {attention.failedStops > 0 && (
-              <AttentionRow count={attention.failedStops} title="failed stops" description="Replan today's exceptions" icon="alert-circle" tone={colors.danger} onPress={() => navigation.navigate('Runs')} />
-            )}
-            {attention.requests > 0 && (
-              <AttentionRow count={attention.requests} title="new leads" description="Customers waiting for a response" icon="person-add" tone={colors.orange} />
-            )}
-            {stats.pending > 0 && (
-              <AttentionRow count={stats.pending} title="pending collections" description="Shipments waiting to be picked up" icon="cube" tone={colors.blue} onPress={() => navigation.navigate('Runs')} />
-            )}
-            {pendingQuotes > 0 && (
-              <AttentionRow count={pendingQuotes} title="quote requests" description={quoteValue > 0 ? `Potential revenue ${money(quoteValue)}` : 'Awaiting your response'} icon="pricetag" tone={colors.purple} onPress={() => navigation.navigate('Menu', { screen: 'CustomQuotes' })} />
-            )}
-            {attention.pendingProofs > 0 && (
-              <AttentionRow count={attention.pendingProofs} title="payment proofs" description="Uploaded by customers for verification" icon="receipt" tone={colors.primary} onPress={() => navigation.navigate('Menu', { screen: 'Payments' })} />
-            )}
-            {attention.flaggedReviews > 0 && (
-              <AttentionRow count={attention.flaggedReviews} title="flagged reviews" description="Held for an admin decision" icon="star-half" tone={colors.gold} />
-            )}
-            {!attention.failedStops && !attention.requests && !stats.pending && !pendingQuotes && !attention.pendingProofs && !attention.flaggedReviews ? (
-              <AttentionRow count={0} title="items need attention" description="Everything is running smoothly" icon="checkmark-circle" tone={colors.primary} />
-            ) : null}
-          </View>
-        </View>
-
-        <Card style={styles.revenueCard}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.revenueKicker}>COLLECTED TODAY</Text>
-            <Text style={styles.revenueValue}>{moneyMap(revenueToday)}</Text>
-            <Text style={styles.revenueTotal}>Collected all time {moneyMap(revenue)}</Text>
-          </View>
-          <View style={styles.revenueIcon}><Ionicons name="trending-up" size={22} color={colors.primary} /></View>
-        </Card>
 
         <View>
           <SectionTitle>Quick actions</SectionTitle>
@@ -396,25 +294,11 @@ const styles = StyleSheet.create({
   profileButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md, ...shadow },
   searchInput: { flex: 1, paddingVertical: 11, fontSize: 14, color: colors.text },
-  scoreCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.primary, paddingVertical: 18 },
-  scoreKicker: { fontSize: 10.5, fontWeight: '800', color: '#D1FAE5', letterSpacing: 0.8 },
-  scoreValue: { fontSize: 36, fontWeight: '800', color: colors.white, marginVertical: 1 },
-  scoreText: { fontSize: 12.5, color: '#D1FAE5' },
-  scoreRing: { width: 58, height: 58, borderRadius: 29, borderWidth: 6, borderColor: '#A7F3D0', backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   activityGrid: { flexDirection: 'row', gap: 6 },
   activityCard: { flex: 1, paddingHorizontal: 5, paddingVertical: 12, alignItems: 'center' },
   activityValue: { fontSize: 20, fontWeight: '800' },
   activityLabel: { fontSize: 9.5, color: colors.textMuted, marginTop: 2, fontWeight: '600', textAlign: 'center' },
   stack: { gap: 0, backgroundColor: colors.surface, borderRadius: radius.md, overflow: 'hidden', ...shadow },
-  attentionRow: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  attentionIcon: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  attentionTitle: { fontSize: 13.5, fontWeight: '800', color: colors.text },
-  attentionDescription: { fontSize: 11.5, color: colors.textMuted, marginTop: 2 },
-  revenueCard: { flexDirection: 'row', alignItems: 'center' },
-  revenueKicker: { fontSize: 10.5, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.8 },
-  revenueValue: { fontSize: 28, fontWeight: '800', color: colors.text, marginTop: 3 },
-  revenueTotal: { fontSize: 12, color: colors.textMuted, marginTop: 3 },
-  revenueIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   quickRow: { flexDirection: 'row', gap: spacing.sm },
   quickItem: { flex: 1, alignItems: 'center', gap: 6, backgroundColor: colors.surface, borderRadius: radius.md, paddingVertical: spacing.md, ...shadow },
   quickIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },

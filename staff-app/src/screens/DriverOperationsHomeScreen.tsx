@@ -14,6 +14,7 @@ import {
   loadDriverOperationsDay, loadPresence, navigationUrls, setPresence,
   type DriverJob, type DriverOperationsDay,
 } from '../lib/driverOperations';
+import { isIrishAddress } from '../lib/collections';
 import { BACKEND_PENDING_MESSAGE, isMissingBackend } from '../lib/offlineQueue';
 import { COMPANY, COMPANY_WHATSAPP_URL } from '../config/company';
 import { startOperationalTracking, stopOperationalTracking } from '../lib/driverBackgroundLocation';
@@ -23,7 +24,13 @@ const logo = require('../../assets/staff-icon-v2.png');
 
 type ViewMode = 'map' | 'list';
 const COUNTRY_ORDER: DriverCountry[] = ['United Kingdom','Ireland','Zimbabwe'];
-function jobCountry(job:DriverJob):DriverCountry { if(job.kind==='delivery')return 'Zimbabwe'; return job.country==='Ireland'?'Ireland':'United Kingdom'; }
+// `job.country` is normalised to exactly "Ireland" / "United Kingdom" when the
+// day is built, but this stays tolerant of the raw values that reach it from a
+// cached day written by an older build.
+function jobCountry(job:DriverJob):DriverCountry {
+  if (job.kind === 'delivery') return 'Zimbabwe';
+  return isIrishAddress(job.country, job.postcode) ? 'Ireland' : 'United Kingdom';
+}
 function countryWorkLabel(country:DriverCountry){return country==='Zimbabwe'?'Deliveries':'Collections';}
 
 function closed(job: DriverJob) { return job.status === 'completed' || job.status === 'failed'; }
@@ -79,7 +86,6 @@ export default function DriverOperationsHomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('map');
   const [unread, setUnread] = useState(0);
-  const [onBreak, setOnBreak] = useState(false);
   const channelKey = useRef(`driver-home-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`);
 
   const load = useCallback(async () => {
@@ -270,20 +276,9 @@ export default function DriverOperationsHomeScreen() {
     navigation.navigate(target);
   };
 
-  const manageBreak = () => {
-    if (!online) { Alert.alert('Go online first', 'Breaks are recorded only while you are online and working.'); return; }
-    if (onBreak) {
-      Alert.alert('End your break?', 'Remaining route ETAs will resume from now.', [{ text: 'Keep break', style: 'cancel' }, { text: 'End break', onPress: async () => { const result = await supabase.rpc('set_driver_break', { p_minutes: null }); if (result.error) Alert.alert('Break not ended', 'Check your connection and try again.'); else setOnBreak(false); } }]);
-      return;
-    }
-    const options: Array<{ text: string; style?: 'cancel'; onPress?: () => void }> = [15, 30, 60].map((minutes) => ({ text: `${minutes} minutes`, onPress: () => { void (async () => { const result = await supabase.rpc('set_driver_break', { p_minutes: minutes }); if (result.error) Alert.alert('Break not started', 'Check your route status and try again.'); else setOnBreak(true); })(); } }));
-    options.push({ text: 'Cancel', style: 'cancel' });
-    Alert.alert('Take a break', 'Choose the planned duration. Remaining ETAs will be adjusted.', options);
-  };
-
   if (loading) return <SafeAreaView style={styles.safe}><View style={styles.loading}><ActivityIndicator size="large" color={colors.primary} /><Text style={styles.loadingText}>Preparing today’s route…</Text></View></SafeAreaView>;
 
-  if(!selectedCountry)return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.countryContent} refreshControl={<RefreshControl refreshing={refreshing} tintColor={colors.primary} onRefresh={async()=>{setRefreshing(true);await load();setRefreshing(false);}}/>}><View style={styles.header}><View style={styles.brand}><Image source={logo} style={styles.logo}/><View><Text style={styles.company}>{COMPANY.name}</Text><Text style={styles.date}>Driver operations</Text></View></View><View style={[styles.connection,online&&styles.connectionOnline]}><View style={[styles.connectionDot,online&&styles.connectionDotOnline]}/><Text style={[styles.connectionText,online&&styles.connectionTextOnline]}>{online?'ONLINE':'OFFLINE'}</Text></View></View><View style={styles.countryHero}><Text style={styles.eyebrow}>TODAY’S ASSIGNMENT</Text><Text style={styles.countryTitle}>Choose your country</Text><Text style={styles.countrySubtitle}>Only live bookings assigned to this driver and today’s shift are shown. Choose a country to view its collections or deliveries.</Text></View>{error?<View style={styles.errorCard}><Ionicons name="cloud-offline-outline" size={22} color={colors.danger}/><View style={{flex:1}}><Text style={styles.errorTitle}>Driver dashboard unavailable</Text><Text style={styles.errorText}>{error}</Text></View><Pressable onPress={load}><Ionicons name="refresh" size={21} color={colors.primary}/></Pressable></View>:null}<View style={styles.countryList}>{countryOptions.map(option=>{const empty=option.jobs===0;return <Pressable accessibilityRole="button" key={option.country} onPress={()=>setSelectedCountry(option.country)} style={styles.countryCard}><View style={styles.flagBox}><Ionicons name={option.country==='Zimbabwe'?'home-outline':'airplane-outline'} size={24} color={colors.primaryDark}/></View><View style={{flex:1}}><Text style={styles.countryName}>{option.country}</Text><Text style={styles.countryKind}>{countryWorkLabel(option.country)} · {option.shift}</Text><Text style={[styles.countryMeta,empty&&styles.countryMetaEmpty]}>{empty?`No ${countryWorkLabel(option.country).toLowerCase()} assigned today`:`${option.jobs} live job${option.jobs===1?'':'s'} · ${option.packages} package${option.packages===1?'':'s'}`}</Text></View><Ionicons name="chevron-forward" size={20} color={colors.primary}/></Pressable>})}</View><Text style={styles.assignmentNote}>{'Dispatch controls driver assignments, country, shift and route. Drivers cannot see another driver’s work.'}</Text></ScrollView></SafeAreaView>;
+  if(!selectedCountry)return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.countryContent} refreshControl={<RefreshControl refreshing={refreshing} tintColor={colors.primary} onRefresh={async()=>{setRefreshing(true);await load();setRefreshing(false);}}/>}><View style={styles.header}><View style={styles.brand}><Image source={logo} style={styles.logo}/><View><Text style={styles.company}>{COMPANY.name}</Text><Text style={styles.date}>Driver operations</Text></View></View><View style={[styles.connection,online&&styles.connectionOnline]}><View style={[styles.connectionDot,online&&styles.connectionDotOnline]}/><Text style={[styles.connectionText,online&&styles.connectionTextOnline]}>{online?'ONLINE':'OFFLINE'}</Text></View></View><View style={styles.countryHero}><Text style={styles.eyebrow}>TODAY’S ASSIGNMENT</Text><Text style={styles.countryTitle}>Choose your country</Text><Text style={styles.countrySubtitle}>Only live bookings assigned to this driver and today’s shift are shown. Choose a country to view its collections or deliveries.</Text></View>{error?<View style={styles.errorCard}><Ionicons name="cloud-offline-outline" size={22} color={colors.danger}/><View style={{flex:1}}><Text style={styles.errorTitle}>Driver dashboard unavailable</Text><Text style={styles.errorText}>{error}</Text></View><Pressable onPress={load}><Ionicons name="refresh" size={21} color={colors.primary}/></Pressable></View>:null}<View style={styles.countryList}>{countryOptions.map(option=>{const empty=option.jobs===0;return <Pressable accessibilityRole="button" key={option.country} onPress={()=>setSelectedCountry(option.country)} style={styles.countryCard}><View style={styles.flagBox}><Ionicons name={option.country==='Zimbabwe'?'home-outline':'airplane-outline'} size={24} color={colors.primaryDark}/></View><View style={{flex:1}}><Text style={styles.countryName}>{option.country}</Text><Text style={styles.countryKind}>{countryWorkLabel(option.country)} · {option.shift}</Text><Text style={[styles.countryMeta,empty&&styles.countryMetaEmpty]}>{empty?`No ${countryWorkLabel(option.country).toLowerCase()} assigned today`:`${option.jobs} live job${option.jobs===1?'':'s'} · ${option.packages} package${option.packages===1?'':'s'}`}</Text></View><Ionicons name="chevron-forward" size={20} color={colors.primary}/></Pressable>})}</View><Text style={styles.assignmentNote}>{'Today’s jobs are the ones assigned to you. Use “Collections ahead” to see what is booked on the dates coming up and plan your own route.'}</Text></ScrollView></SafeAreaView>;
 
   return <SafeAreaView style={styles.safe} edges={['top']}>
     <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} tintColor={colors.primary} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}>
@@ -331,7 +326,7 @@ export default function DriverOperationsHomeScreen() {
       
 
       <Text style={styles.sectionTitle}>Quick actions</Text>
-      <View style={styles.quickGrid}><Quick icon="scan-outline" label="Scan package" onPress={() => quickAction('Scan')} /><Quick icon="map-outline" label="View route" onPress={() => quickAction('Route')} /><Quick icon="alert-circle-outline" label="Report issue" onPress={() => quickAction('Messages')} danger /><Quick icon="headset-outline" label="Contact dispatch" onPress={() => quickAction('dispatch')} /><Quick icon="car-sport-outline" label="Vehicle check" onPress={() => navigation.navigate('Profile', { screen: 'VehicleCheck' })} /><Quick icon={onBreak ? 'play-outline' : 'cafe-outline'} label={onBreak ? 'End break' : 'Take break'} onPress={manageBreak} /></View>
+      <View style={styles.quickGrid}><Quick icon="map-outline" label="View route" onPress={() => quickAction('Route')} />{selectedCountry === 'Zimbabwe' ? null : <Quick icon="calendar-outline" label="Collections ahead" onPress={() => navigation.navigate('Route', { screen: 'CollectionsAhead' })} />}<Quick icon="alert-circle-outline" label="Report issue" onPress={() => quickAction('Messages')} danger /><Quick icon="headset-outline" label="Contact dispatch" onPress={() => quickAction('dispatch')} /></View>
     </ScrollView>
   </SafeAreaView>;
 }

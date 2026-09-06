@@ -10,9 +10,9 @@ import { Card, Pill } from '../components/ui';
 import { greeting, parseCollectionDate, longDate, daysUntil } from '../lib/format';
 import { Shipment, journeyIndex, JOURNEY_STAGES, itemsSummary, statusTone } from '../lib/shipment';
 import { useBusinessConfig } from '../lib/businessConfig';
-import { scheduleMatchesPostcode } from '../lib/postcode';
+import { loadSchedules, pickNextCollection, realValue, type NextCollection } from '../lib/collectionSchedule';
 import { CollectionSlot, loadMySlots, slotState, slotSummary } from '../lib/collectionSlots';
-import { useAppTheme } from '../context/ThemeContext';
+import { useAppTheme, useThemedStyles } from '../context/ThemeContext';
 import { IMG } from '../img';
 
 const HEADER_GREEN = '#0b4a2f';
@@ -21,7 +21,7 @@ export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const { session, profile } = useAuth();
   const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [nextCollection, setNextCollection] = useState<{ route: string; date: Date | null } | null>(null);
+  const [nextCollection, setNextCollection] = useState<NextCollection | null>(null);
   // The customer's own booked collection, which is a different question from
   // "when does the van next come to this area" — they may have booked onto a
   // later run, or onto a route their postcode does not obviously belong to.
@@ -29,10 +29,17 @@ export default function HomeScreen() {
     { slot: CollectionSlot | null; shipmentId: string; reference: string; route: string | null; date: Date | null } | null
   >(null);
   const {palette}=useAppTheme();
+  const styles = useThemedStyles(baseStyles);
   const { config: business } = useBusinessConfig();
   const referralDiscount = business.fees.referralDiscount;
 
   const load = useCallback(async () => {
+    // Resolved first, because a booking that has not been given its own date
+    // yet is shown against this one rather than against "to be confirmed".
+    const area = { postcode: profile?.postal_code, city: profile?.pickup_city, country: profile?.country };
+    const next = pickNextCollection(await loadSchedules(), area);
+    setNextCollection(next);
+
     if (session?.user) {
       const { data } = await supabase
         .from('shipments')
@@ -55,8 +62,12 @@ export default function HomeScreen() {
           return {
             shipment,
             slot,
-            route: slot?.route || shipment.metadata?.collection?.route || null,
-            date: parseCollectionDate(slot?.collection_date ?? shipment.metadata?.collection?.date),
+            route: realValue(slot?.route) || realValue(shipment.metadata?.collection?.route) || next?.route || null,
+            // A booking whose own date has not been written yet falls back to
+            // the published date for the route we would collect it on.
+            date: parseCollectionDate(slot?.collection_date ?? shipment.metadata?.collection?.date)
+              ?? next?.date
+              ?? null,
           };
         })
         // A date we cannot read sorts last rather than dropping out — the
@@ -77,23 +88,6 @@ export default function HomeScreen() {
       setShipments([]);
       setMyCollection(null);
     }
-    const { data: schedules } = await supabase
-      .from('collection_schedules')
-      .select('route, pickup_date, country, areas')
-      .limit(200);
-    const mine = (schedules || [])
-      .filter((s:any)=>scheduleMatchesPostcode(s.areas,profile?.postal_code,profile?.pickup_city,profile?.country))
-      .map((s: any) => ({ route: s.route as string, date: parseCollectionDate(s.pickup_date) }));
-    const upcoming = mine
-      .filter((s): s is { route: string; date: Date } => Boolean(s.date && s.date.getTime() >= Date.now() - 86400000))
-      .sort((a, b) => a.date.getTime() - b.date.getTime());
-    // When every published date for this area has already gone, the card used
-    // to disappear — which reads as "we don't come to you" rather than "your
-    // next date has not been published yet". Show the route with no date.
-    const awaiting = mine
-      .filter((s) => !s.date || s.date.getTime() < Date.now() - 86400000)
-      .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
-    setNextCollection(upcoming[0] || (awaiting[0] ? { route: awaiting[0].route, date: null } : null));
   }, [session?.user?.id,profile?.postal_code,profile?.pickup_city,profile?.country]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -217,27 +211,27 @@ export default function HomeScreen() {
             </>
           )}
 
-          {nextCollection && (
-            <Card>
-              <Text style={styles.cardKicker}>NEXT COLLECTION</Text>
-              <Text style={[styles.cardTitle,{color:palette.text}]}>{nextCollection.route}</Text>
-              <Text style={[styles.cardMeta,{color:palette.textMuted}]}>
-                {nextCollection.date ? longDate(nextCollection.date) : 'Next date being confirmed — book and we will tell you'}
-              </Text>
-              {nextCollection.date && daysUntil(nextCollection.date) >= 0 && (
-                <Pill text={daysUntil(nextCollection.date) === 0 ? 'Today!' : `In ${daysUntil(nextCollection.date)} day${daysUntil(nextCollection.date) === 1 ? '' : 's'}`} />
-              )}
-              {!nextCollection.date && <Pill text="New date due" bg={colors.yellowSoft} fg="#8a6d00" />}
-            </Card>
-          )}
-
-          {myCollection && (() => {
+          {/* One collection card.
+              These used to be two — "next collection in your area" and "your
+              collection" — which on the common path printed the same route and
+              the same date twice, one above the other. The customer's own
+              booking is the answer when they have one; the area's next date is
+              the answer when they don't, and it is only worth repeating
+              alongside a booking when the two genuinely differ. */}
+          {myCollection ? (() => {
             const state = slotState(myCollection.slot);
             // Two states want something from the customer, one is just news;
             // a settled time stays quiet green.
             const needsAttention = state === 'awaiting_customer'
               || state === 'dispatch_moved_untold' || state === 'dispatch_moved_told';
             const days = myCollection.date ? daysUntil(myCollection.date) : null;
+            // A booking still carrying the old "To be assigned" placeholder
+            // falls back to the route we would actually collect it on.
+            const route = realValue(myCollection.route) || nextCollection?.route || null;
+            // Only mention the area's next run when it is not the same day the
+            // customer is already booked onto.
+            const areaDiffers = Boolean(nextCollection && myCollection.date
+              && nextCollection.date.toDateString() !== myCollection.date.toDateString());
             return (
               <Pressable onPress={() => navigation.navigate('ConfirmCollection', { id: myCollection.shipmentId })}>
                 <Card style={{ borderColor: needsAttention ? colors.yellow : colors.green }}>
@@ -245,11 +239,18 @@ export default function HomeScreen() {
                     <Text style={styles.cardKicker}>YOUR COLLECTION</Text>
                     <Text style={[styles.cardKicker, { color: palette.textMuted }]}>{myCollection.reference}</Text>
                   </View>
-                  <Text style={[styles.cardTitle, { color: palette.text }]}>{myCollection.route || 'Route to be assigned'}</Text>
-                  <Text style={[styles.cardMeta, { color: palette.textMuted }]}>
-                    {myCollection.date ? longDate(myCollection.date) : 'Date to be confirmed'}
-                    {days !== null && days >= 0 ? ` · ${days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`}` : ''}
-                  </Text>
+                  {route ? <Text style={[styles.cardTitle, { color: palette.text }]}>{route}</Text> : null}
+                  {myCollection.date ? (
+                    <Text style={[styles.cardMeta, { color: palette.textMuted }]}>
+                      {longDate(myCollection.date)}
+                      {days !== null && days >= 0 ? ` · ${days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`}` : ''}
+                    </Text>
+                  ) : null}
+                  {areaDiffers && nextCollection ? (
+                    <Text style={[styles.cardMeta, { color: palette.textFaint }]}>
+                      Next {nextCollection.route} run: {longDate(nextCollection.date)}
+                    </Text>
+                  ) : null}
                   <View style={styles.slotRow}>
                     <Ionicons
                       name={state === 'awaiting_customer' ? 'alarm-outline' : needsAttention ? 'swap-horizontal' : 'checkmark-circle'}
@@ -264,7 +265,19 @@ export default function HomeScreen() {
                 </Card>
               </Pressable>
             );
-          })()}
+          })() : nextCollection ? (
+            <Card>
+              <Text style={styles.cardKicker}>NEXT COLLECTION</Text>
+              <Text style={[styles.cardTitle,{color:palette.text}]}>{nextCollection.route}</Text>
+              <Text style={[styles.cardMeta,{color:palette.textMuted}]}>
+                {longDate(nextCollection.date)}
+                {nextCollection.isMyArea ? '' : ` · next published ${nextCollection.country} collection`}
+              </Text>
+              {daysUntil(nextCollection.date) >= 0 && (
+                <Pill text={daysUntil(nextCollection.date) === 0 ? 'Today!' : `In ${daysUntil(nextCollection.date)} day${daysUntil(nextCollection.date) === 1 ? '' : 's'}`} />
+              )}
+            </Card>
+          ) : null}
 
           <Pressable onPress={shareReferral}>
             <Card style={{ backgroundColor: colors.ink, borderColor: colors.ink }}>
@@ -290,7 +303,7 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   safe: { flex: 1 },
   scroll: { paddingBottom: 48 },
   header: { backgroundColor: HEADER_GREEN, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.xl, borderBottomLeftRadius: 22, borderBottomRightRadius: 22 },

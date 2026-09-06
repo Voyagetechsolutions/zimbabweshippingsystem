@@ -9,7 +9,7 @@ import { colors, spacing, radius } from '../theme';
 import { FlagStripe, Pill, Button } from '../components/ui';
 import { Shipment, itemsSummary, statusTone } from '../lib/shipment';
 import { shortDate } from '../lib/format';
-import { useAppTheme } from '../context/ThemeContext';
+import { useAppTheme, useThemedStyles } from '../context/ThemeContext';
 
 export default function ShipmentsScreen() {
   const navigation = useNavigation<any>();
@@ -18,6 +18,7 @@ export default function ShipmentsScreen() {
   const [tracking, setTracking] = useState('');
   const [searching, setSearching] = useState(false);
   const {palette}=useAppTheme();
+  const styles = useThemedStyles(baseStyles);
 
   const load = useCallback(async () => {
     if (!session?.user) { setShipments([]); return; }
@@ -111,7 +112,7 @@ export default function ShipmentsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   body: { padding: spacing.lg, paddingBottom: 48, flexGrow: 1 },
   title: { fontSize: 24, fontWeight: '800', color: colors.text, marginBottom: spacing.md, marginTop: spacing.sm },

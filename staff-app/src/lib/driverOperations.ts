@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
-import { loadRouteDay, type RouteCollection } from './collections';
+import { isIrishAddress, loadRouteDay, type RouteCollection } from './collections';
 import { loadDeliveryDay } from './deliveries';
 import { getDriverLocation, type Point } from './driverLocation';
 import { isMissingBackend, isNetworkError } from './offlineQueue';
@@ -125,13 +125,15 @@ async function loadAssignedStops(): Promise<DriverJob[]> {
     const metadata = shipment?.metadata || {};
     const sender = metadata.sender || metadata.senderDetails || {};
     const isDelivery = row.stop_type === 'delivery';
-    const rawCountry = String(sender.country || metadata.collection?.country || '').toLowerCase();
+    const rawCountry = sender.country || metadata.collection?.country || '';
     return {
       id: row.id,
       shipmentId: row.shipment_id,
       runId: row.run_id,
       kind: isDelivery ? 'delivery' : 'collection',
-      country: isDelivery ? 'Zimbabwe' : rawCountry.includes('ireland') ? 'Ireland' : 'United Kingdom',
+      country: isDelivery
+        ? 'Zimbabwe'
+        : isIrishAddress(rawCountry, sender.postcode || sender.postalCode) ? 'Ireland' : 'United Kingdom',
       sequence: row.stop_order,
       customer: row.recipient_name
         || [sender.firstName, sender.lastName].filter(Boolean).join(' ').trim()
@@ -197,12 +199,43 @@ export async function loadDriverOperationsDay(mode: DriverMode): Promise<DriverO
     assignedPromise,
   ]);
 
+  /**
+   * Which of today's routes are Irish, by name.
+   *
+   * A booking whose country field holds something else entirely — a city, most
+   * often — can still be placed by the route it is being collected on, because
+   * the schedule states each route's country.
+   */
+  const irishRoutes = new Set(
+    (collectionDay?.routes || [])
+      .filter((route) => String(route.country || '').toLowerCase().includes('ireland'))
+      .map((route) => String(route.route || '').toUpperCase().replace(/\s+ROUTE$/, '').trim()),
+  );
+
+  /**
+   * Ireland or the UK, decided once here rather than compared by hand later.
+   *
+   * `country` is free text a customer typed, and live data holds "Ireland ",
+   * "IRELAND " and "Ireland" — an exact `=== 'Ireland'` comparison, which is
+   * what this used to do downstream, matched two bookings out of thirty and
+   * filed the other twenty-eight under the UK. So the driver's country picker
+   * showed almost every Irish collection on the UK tab and next to nothing on
+   * the Irish one. `isIrishAddress` trims and lowercases, knows the other names
+   * for the Republic, keeps Northern Ireland in the UK, and recognises an
+   * Eircode when the country is blank.
+   */
+  const countryOf = (c: RouteCollection): 'Ireland' | 'United Kingdom' =>
+    isIrishAddress(c.country, c.postcode)
+      || irishRoutes.has(String(c.route || '').toUpperCase().replace(/\s+ROUTE$/, '').trim())
+      ? 'Ireland'
+      : 'United Kingdom';
+
   const collectionJobs: DriverJob[] = (collectionDay?.collections || []).map((c, index) => ({
     id: c.stopId || c.shipmentId,
     shipmentId: c.shipmentId,
     runId: (c as RouteCollection & { runId?: string | null }).runId || null,
     kind: 'collection',
-    country: c.country || 'United Kingdom',
+    country: countryOf(c),
     sequence: index + 1,
     customer: c.customerName || 'Collection customer',
     reference: c.customerReference || c.trackingNumber || 'Collection',

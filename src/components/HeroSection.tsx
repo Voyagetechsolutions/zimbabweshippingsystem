@@ -3,9 +3,10 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight, Star, ShieldCheck, Truck, Phone, Search, Calendar } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { format, isValid } from 'date-fns';
+import { format } from 'date-fns';
 import { photos } from '@/data/sitePhotos';
 import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
+import { nextPublishedCollection } from '@/utils/collectionDate';
 
 const HeroSection: React.FC = () => {
   const navigate = useNavigate();
@@ -25,13 +26,11 @@ const HeroSection: React.FC = () => {
 
         if (error || !data) return;
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const next = data
-          .map((d) => ({ ...d, date: new Date(d.pickup_date) }))
-          .filter((d) => isValid(d.date) && d.date >= today)
-          .sort((a, b) => a.date.getTime() - b.date.getTime())[0];
+        // pickup_date is free text and every live row is written as
+        // "September 14th, 2026". `new Date()` cannot read that, so this chip
+        // silently never rendered — the shared parser handles all three shapes
+        // the column holds, and is the one the customer app uses.
+        const next = nextPublishedCollection(data);
 
         if (next) {
           setNextCollection({

@@ -7,16 +7,18 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Button, Field, FlagStripe } from '../components/ui';
 import { colors, radius, spacing } from '../theme';
-import { useAppTheme } from '../context/ThemeContext';
+import { useAppTheme, useThemedStyles } from '../context/ThemeContext';
 import { parseCollectionDate, longDate } from '../lib/format';
 import { lookupUkPostcode, normalizePostcode, outwardCode, routeForIrelandCity, routeForUkPostcode, scheduleMatchesPostcode } from '../lib/postcode';
 import { useBusinessConfig } from '../lib/businessConfig';
+import { pickNextCollection } from '../lib/collectionSchedule';
 
 type ScheduleRow = { route: string; pickup_date: string; country?: string | null; areas?: any };
 
 export default function OnboardingScreen() {
   const { session, profile, refreshProfile } = useAuth();
   const { palette } = useAppTheme();
+  const s = useThemedStyles(baseSheet);
   const { config: business } = useBusinessConfig();
   const parts = (profile?.full_name || '').split(' ');
   const [first, setFirst] = useState(profile?.first_name || parts[0] || '');
@@ -88,6 +90,17 @@ export default function OnboardingScreen() {
     if (routeHint && !byRoute.has(routeHint)) byRoute.set(routeHint, null);
     return [...byRoute.entries()].slice(0, 3).map(([route, date]) => ({ route, date }));
   }, [schedules, lookupReady, isIreland, postcode, city, country, ukLookup, routeHint]);
+
+  // A route whose own next date has not been published yet still shows a real
+  // date: the soonest published one for that country, the same date the
+  // website advertises. Nothing on this screen says "to be announced".
+  const nextPublished = useMemo(() => {
+    const wantIreland = isIreland;
+    return pickNextCollection(schedules.filter((s) => {
+      const c = String(s.country || 'UK').toLowerCase();
+      return wantIreland ? c.includes('ireland') : !c.includes('ireland');
+    }), { postcode, city, country });
+  }, [schedules, isIreland, postcode, city, country]);
 
   const submit = async () => {
     if (!first.trim() || !last.trim() || phone.replace(/\D/g, '').length < 7 || address.trim().length < 5 || (isIreland ? city.trim().length < 2 : postcode.replace(/\s/g, '').length < 3)) {
@@ -188,7 +201,11 @@ export default function OnboardingScreen() {
                 <View key={m.route} style={s.routeRow}>
                   <Text style={[s.routeName, { color: palette.text }]}>{m.route}</Text>
                   <Text style={[s.routeDate, { color: palette.textMuted }]}>
-                    {m.date ? `Next collection: ${longDate(m.date)}` : 'Next date to be announced'}
+                    {m.date
+                      ? `Next collection: ${longDate(m.date)}`
+                      : nextPublished
+                        ? `Next collection: ${longDate(nextPublished.date)} (${nextPublished.route})`
+                        : 'We will confirm your collection date'}
                   </Text>
                 </View>
               ))}
@@ -214,7 +231,7 @@ export default function OnboardingScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const baseSheet = StyleSheet.create({
   safe: { flex: 1 },
   body: { flexGrow: 1, padding: spacing.xl, paddingBottom: 220 },
   title: { fontSize: 25, fontWeight: '800' },

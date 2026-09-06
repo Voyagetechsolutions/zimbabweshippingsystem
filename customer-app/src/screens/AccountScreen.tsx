@@ -7,12 +7,13 @@ import { useAuth } from '../context/AuthContext';
 import { colors, spacing, radius } from '../theme';
 import { FlagStripe, Card, Button } from '../components/ui';
 import { useBusinessConfig } from '../lib/businessConfig';
-import { useAppTheme } from '../context/ThemeContext';
+import { useAppTheme, useThemedStyles } from '../context/ThemeContext';
 
 export default function AccountScreen() {
   const navigation = useNavigation<any>();
   const { session, profile, signOut } = useAuth();
   const {dark,palette,setPreference}=useAppTheme();
+  const styles = useThemedStyles(baseStyles);
   const { config: business } = useBusinessConfig();
   const referralDiscount = business.fees.referralDiscount;
   const ukPhone = business.company.ukPhone || '';
@@ -124,7 +125,7 @@ export default function AccountScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   body: { padding: spacing.lg, paddingBottom: 48 },
   title: { fontSize: 24, fontWeight: '800', color: colors.text, marginTop: spacing.sm, marginBottom: spacing.md },

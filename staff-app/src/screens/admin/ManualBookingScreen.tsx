@@ -35,7 +35,16 @@ export default function ManualBookingScreen() {
   const [trunkPrice, setTrunkPrice] = useState('');
   const [sealPrice, setSealPrice] = useState('');
   const [wantSeal, setWantSeal] = useState(false);
-  const [otherItems, setOtherItems] = useState('');
+  /**
+   * Anything that is not a drum, one row each.
+   *
+   * This used to be a single "Other items (agent quote)" text box, so a booking
+   * for a sofa, a fridge and two suitcases arrived as one unpriced sentence —
+   * which the invoice could not itemise and the warehouse could not tick off.
+   * Drums stay a quantity because they genuinely are interchangeable; a fridge
+   * is not, and every one of these needs its own description.
+   */
+  const [otherItems, setOtherItems] = useState<Array<{ description: string; quantity: string; unitPrice: string }>>([]);
   const [payment, setPayment] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -60,11 +69,19 @@ export default function ManualBookingScreen() {
     const tUnit = parseFloat(trunkPrice) || 0;
     const sUnit = parseFloat(sealPrice) || 0;
     const sealQty = wantSeal ? dQty + tQty : 0;
-    const base = dQty * dUnit + tQty * tUnit + sealQty * sUnit;
+    const otherLines = otherItems
+      .map((item) => ({
+        description: item.description.trim(),
+        quantity: Math.max(1, parseInt(item.quantity, 10) || 1),
+        unitPrice: parseFloat(item.unitPrice) || 0,
+      }))
+      .filter((item) => item.description.length > 0);
+    const otherTotal = otherLines.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+    const base = dQty * dUnit + tQty * tUnit + sealQty * sUnit + otherTotal;
     const premium = payment === 'Pay on Arrival' ? Number(business?.fees.payOnArrivalPremiumPercent || 0) : 0;
     const final = base * (1 + premium / 100);
-    return { dQty, tQty, dUnit, tUnit, sUnit, sealQty, base, final };
-  }, [drums, trunks, drumPrice, trunkPrice, sealPrice, wantSeal, payment, business]);
+    return { dQty, tQty, dUnit, tUnit, sUnit, sealQty, base, final, otherLines, otherTotal };
+  }, [drums, trunks, drumPrice, trunkPrice, sealPrice, wantSeal, payment, business, otherItems]);
 
   const submit = async () => {
     if (!firstName.trim() || !phone.trim() || !address.trim() || !city.trim()) {
@@ -75,8 +92,12 @@ export default function ManualBookingScreen() {
       Alert.alert('Missing details', 'Receiver name, phone, address and city are required.');
       return;
     }
-    if (totals.dQty <= 0 && totals.tQty <= 0 && !otherItems.trim()) {
-      Alert.alert('No items', 'Add drums, trunks, or describe other items.');
+    if (otherItems.some((item) => item.description.trim().length < 3)) {
+      Alert.alert('Describe every item', 'Each item needs its own description — what it is, its size or material, and its condition. Remove any row you do not need.');
+      return;
+    }
+    if (totals.dQty <= 0 && totals.tQty <= 0 && totals.otherLines.length === 0) {
+      Alert.alert('No items', 'Add drums, trunks, or list the items being shipped.');
       return;
     }
 
@@ -86,7 +107,7 @@ export default function ManualBookingScreen() {
       const ts = Date.now();
       const receiptNumber = `RCP-${String(ts).slice(-10)}`;
       const transactionId = `TX-${String(ts).slice(-12)}`;
-      const hasPriced = totals.dQty > 0 || totals.tQty > 0;
+      const hasPriced = totals.dQty > 0 || totals.tQty > 0 || totals.otherTotal > 0;
       const paymentMethod = hasPriced ? payment : 'agentQuote';
 
       const sender = {
@@ -103,16 +124,34 @@ export default function ManualBookingScreen() {
         items: {
           drums: totals.dQty > 0 ? { quantity: totals.dQty, pricePerDrum: totals.dUnit, totalPrice: totals.dQty * totals.dUnit, currency } : null,
           trunks: totals.tQty > 0 ? { quantity: totals.tQty, pricePerTrunk: totals.tUnit, totalPrice: totals.tQty * totals.tUnit, currency } : null,
-          boxes: otherItems.trim() ? { description: otherItems.trim() } : null,
+          // One row per item, plus the joined summary the older readers expect.
+          otherItems: totals.otherLines,
+          boxes: totals.otherLines.length
+            ? { description: totals.otherLines.map((i) => `${i.quantity} × ${i.description}`).join('; ') }
+            : null,
           addOns: { metalSeal: wantSeal, metalSealPrice: totals.sUnit },
         },
         pricing: { baseAmount: totals.base, finalAmount: totals.final, paymentMethod, currency },
         shipmentDetails: {
-          type: [totals.dQty > 0 && 'Drums', totals.tQty > 0 && 'Trunks', !!otherItems.trim() && 'Other Items'].filter(Boolean).join(' + ') || 'Standard',
+          type: [totals.dQty > 0 && 'Drums', totals.tQty > 0 && 'Trunks', totals.otherLines.length > 0 && 'Other Items'].filter(Boolean).join(' + ') || 'Standard',
           includeDrums: totals.dQty > 0, drumQuantity: totals.dQty,
           includeTrunks: totals.tQty > 0, trunkQuantity: totals.tQty,
-          includeOtherItems: !!otherItems.trim(), wantMetalSeal: wantSeal,
-          category: otherItems.trim() || null,
+          includeOtherItems: totals.otherLines.length > 0, wantMetalSeal: wantSeal,
+          category: totals.otherLines.map((i) => i.description).join('; ') || null,
+        },
+        // A manual booking now carries invoice lines like every other booking,
+        // so its invoice and delivery note itemise instead of showing one total.
+        invoice: {
+          invoiceNumber: `INV-${tn}`,
+          issueDate: new Date(ts).toISOString().slice(0, 10),
+          currency,
+          items: [
+            ...(totals.dQty > 0 ? [{ item: 'Drums', description: 'Plastic shipping drum (200-220L)', quantity: totals.dQty, unitPrice: totals.dUnit }] : []),
+            ...(totals.tQty > 0 ? [{ item: 'Trunks', description: 'Trunk / storage box', quantity: totals.tQty, unitPrice: totals.tUnit }] : []),
+            ...(totals.sealQty > 0 ? [{ item: 'Metal coded seals', description: 'Metal coded seal', quantity: totals.sealQty, unitPrice: totals.sUnit }] : []),
+            ...totals.otherLines.map((line) => ({ item: line.description, description: line.description, quantity: line.quantity, unitPrice: line.unitPrice })),
+          ],
+          payments: [],
         },
         bookingSource: 'staff-app-manual',
         createdAt: new Date(ts).toISOString(),
@@ -126,6 +165,11 @@ export default function ManualBookingScreen() {
           origin: `${city.trim()}, ${country}`,
           destination: `${rxCity.trim()}, Zimbabwe`,
           status: hasPriced ? 'Pending' : 'Awaiting Quote',
+          goods_description: [
+            totals.dQty > 0 ? `${totals.dQty} × Plastic shipping drum (200-220L)` : '',
+            totals.tQty > 0 ? `${totals.tQty} × Trunk / storage box` : '',
+            ...totals.otherLines.map((i) => `${i.quantity} × ${i.description}`),
+          ].filter(Boolean).join('\n') || null,
           metadata,
           can_modify: true,
           can_cancel: true,
@@ -160,7 +204,7 @@ export default function ManualBookingScreen() {
 
       Alert.alert('Booking created', `Tracking: ${tn}\nTotal: ${symbol}${totals.final.toFixed(2)}`);
       // Reset the items but keep the form usable for another booking.
-      setDrums('0'); setTrunks('0'); setOtherItems(''); setWantSeal(false);
+      setDrums('0'); setTrunks('0'); setOtherItems([]); setWantSeal(false);
     } catch (e: any) {
       Alert.alert('Booking failed', e?.message || 'Could not create booking');
     } finally {
@@ -213,7 +257,39 @@ export default function ManualBookingScreen() {
         <Text style={styles.switchLabel}>Metal coded seals ({symbol}{sealPrice} per item)</Text>
         <Switch value={wantSeal} onValueChange={setWantSeal} trackColor={{ true: colors.primary }} />
       </View>
-      <Field label="Other items (agent quote)" value={otherItems} onChange={setOtherItems} />
+      <Text style={styles.fieldLabel}>OTHER ITEMS</Text>
+      <Text style={styles.itemsHint}>
+        Anything that is not a drum goes on its own line — a sofa, a fridge, a suitcase. Describe each
+        one; leave the price at 0 if the office is still quoting it.
+      </Text>
+      {otherItems.map((item, index) => (
+        <View key={index} style={styles.itemCard}>
+          <Field
+            label={`Item ${index + 1} description`}
+            value={item.description}
+            onChange={(v) => setOtherItems((rows) => rows.map((row, i) => (i === index ? { ...row, description: v } : row)))}
+          />
+          <View style={styles.rowWrap}>
+            <Field
+              style={{ flex: 1 }} label="Qty" keyboard="number-pad" value={item.quantity}
+              onChange={(v) => setOtherItems((rows) => rows.map((row, i) => (i === index ? { ...row, quantity: v } : row)))}
+            />
+            <Field
+              style={{ flex: 1 }} label={`Unit price (${symbol})`} keyboard="decimal-pad" value={item.unitPrice}
+              onChange={(v) => setOtherItems((rows) => rows.map((row, i) => (i === index ? { ...row, unitPrice: v } : row)))}
+            />
+          </View>
+          <Pressable onPress={() => setOtherItems((rows) => rows.filter((_, i) => i !== index))} hitSlop={8}>
+            <Text style={styles.removeItem}>Remove item {index + 1}</Text>
+          </Pressable>
+        </View>
+      ))}
+      <Pressable
+        style={styles.addItem}
+        onPress={() => setOtherItems((rows) => [...rows, { description: '', quantity: '1', unitPrice: '' }])}
+      >
+        <Text style={styles.addItemText}>+ ADD AN ITEM</Text>
+      </Pressable>
 
       <Text style={styles.group}>Payment</Text>
       <View style={styles.rowWrap}>
@@ -263,6 +339,11 @@ function Row({ k, v, bold }: { k: string; v: string; bold?: boolean }) {
 }
 
 const styles = StyleSheet.create({
+  itemsHint: { fontSize: 11.5, color: colors.textMuted, lineHeight: 16, marginBottom: spacing.sm },
+  itemCard: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, backgroundColor: colors.surface },
+  removeItem: { fontSize: 12, fontWeight: '700', color: colors.danger },
+  addItem: { borderWidth: 1.5, borderColor: colors.primary, borderRadius: radius.sm, paddingVertical: 12, alignItems: 'center', marginBottom: spacing.sm },
+  addItemText: { fontSize: 12.5, fontWeight: '800', color: colors.primary },
   safe: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg, paddingBottom: 48 },
   group: {

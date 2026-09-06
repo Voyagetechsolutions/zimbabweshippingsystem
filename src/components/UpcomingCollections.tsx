@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Calendar, MapPin, ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { format, parse, isValid } from 'date-fns';
+import { format } from 'date-fns';
+import { parseCollectionDate } from '@/utils/collectionDate';
 
 interface CollectionSchedule {
   id: string;
@@ -30,27 +31,22 @@ const UpcomingCollections: React.FC = () => {
 
       if (error) throw error;
 
-      // Filter to upcoming dates and take first 4
+      // Filter to upcoming dates and take first 4.
+      //
+      // pickup_date is free text and every live row reads "September 14th,
+      // 2026", which `new Date()` rejects — parsing it that way filtered the
+      // whole schedule out and left this section permanently empty. The shared
+      // parser reads all three shapes the column holds.
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
       const upcoming = (data || [])
-        .filter(schedule => {
-          try {
-            // Try parsing the date
-            const dateStr = schedule.pickup_date;
-            const date = new Date(dateStr);
-            return isValid(date) && date >= today;
-          } catch {
-            return false;
-          }
-        })
-        .sort((a, b) => {
-          const dateA = new Date(a.pickup_date);
-          const dateB = new Date(b.pickup_date);
-          return dateA.getTime() - dateB.getTime();
-        })
-        .slice(0, 4);
+        .map(schedule => ({ schedule, date: parseCollectionDate(schedule.pickup_date) }))
+        .filter((row): row is { schedule: typeof row.schedule; date: Date } =>
+          Boolean(row.date && row.date >= today))
+        .sort((a, b) => a.date.getTime() - b.date.getTime())
+        .slice(0, 4)
+        .map(row => row.schedule);
 
       setSchedules(upcoming);
     } catch (error) {
@@ -61,27 +57,13 @@ const UpcomingCollections: React.FC = () => {
   };
 
   const formatPickupDate = (dateStr: string) => {
-    try {
-      const date = new Date(dateStr);
-      if (isValid(date)) {
-        return format(date, 'MMM d');
-      }
-      return dateStr;
-    } catch {
-      return dateStr;
-    }
+    const date = parseCollectionDate(dateStr);
+    return date ? format(date, 'MMM d') : dateStr;
   };
 
   const formatFullDate = (dateStr: string) => {
-    try {
-      const date = new Date(dateStr);
-      if (isValid(date)) {
-        return format(date, 'EEEE, MMMM d');
-      }
-      return dateStr;
-    } catch {
-      return dateStr;
-    }
+    const date = parseCollectionDate(dateStr);
+    return date ? format(date, 'EEEE, MMMM d') : dateStr;
   };
 
   if (loading) {

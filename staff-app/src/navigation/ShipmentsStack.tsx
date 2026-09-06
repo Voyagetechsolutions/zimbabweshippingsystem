@@ -2,6 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import ShipmentsListScreen from '../screens/ShipmentsListScreen';
 import ShipmentDetailScreen from '../screens/ShipmentDetailScreen';
+import DocumentScreen from '../screens/admin/DocumentScreen';
 import type { ShipmentsStackParams } from './types';
 import { colors } from '../theme';
 
@@ -18,6 +19,7 @@ export default function ShipmentsStack() {
     >
       <Stack.Screen name="ShipmentsList" component={ShipmentsListScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ShipmentDetail" component={ShipmentDetailScreen} options={{ title: 'Shipment Details' }} />
-    </Stack.Navigator>
+          <Stack.Screen name="Document" component={DocumentScreen} options={{ headerShown: false }} />
+</Stack.Navigator>
   );
 }

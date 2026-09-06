@@ -87,11 +87,41 @@ export function percentChange(current: number, previous: number): number | null 
   return ((current - previous) / Math.abs(previous)) * 100;
 }
 
-export function buildReportCsv(report: AdminReport): string {
+/**
+ * The three figures the report is actually opened for: how many shipments were
+ * collected in the period, and what was taken in each currency.
+ *
+ * They were all derivable before — `collections.completed` and
+ * `revenue.byCurrency` — but only by reading two different cards, and the
+ * pounds and euros were joined into one string, so neither could be quoted on
+ * its own. Named here so the screen, the CSV and the PDF all state the same
+ * three numbers.
+ */
+export function reportHeadline(report: AdminReport, collectedOverride?: number | null) {
+  const money = (code: string) => Number(report.revenue.byCurrency?.[code] || 0);
+  return {
+    // The screen counts this from the shipments themselves, because the
+    // routine's own figure comes from completed driver run stops and those are
+    // barely written — see the note in ReportsScreen. Passed in so the screen,
+    // the CSV and the PDF cannot state three different numbers.
+    collected: collectedOverride ?? report.collections.completed,
+    gbp: money('GBP'),
+    eur: money('EUR'),
+    gbpLabel: `£${money('GBP').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    eurLabel: `€${money('EUR').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+  };
+}
+
+export function buildReportCsv(report: AdminReport, collected?: number | null): string {
   const lines: string[] = [];
   const push = (...cells: Array<string | number | null | undefined>) =>
     lines.push(cells.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','));
   push(`${COMPANY.name} report`, `${report.range.from} to ${report.range.to}`);
+  push('');
+  const headline = reportHeadline(report, collected);
+  push('Total shipments collected', headline.collected);
+  push('Total collected GBP', headline.gbp);
+  push('Total collected EUR', headline.eur);
   push('');
   push('Revenue by currency');
   Object.entries(report.revenue.byCurrency).forEach(([c, v]) => push(c, v));
@@ -128,14 +158,14 @@ export function buildReportCsv(report: AdminReport): string {
   return lines.join('\n');
 }
 
-export async function shareReportCsv(report: AdminReport) {
+export async function shareReportCsv(report: AdminReport, collected?: number | null) {
   await Share.share({
     title: `zimbabwe-shipping-report-${report.range.from}-${report.range.to}.csv`,
-    message: buildReportCsv(report),
+    message: buildReportCsv(report, collected),
   });
 }
 
-export function buildReportHtml(report: AdminReport, title = 'Operations Report'): string {
+export function buildReportHtml(report: AdminReport, title = 'Operations Report', collected?: number | null): string {
   const esc = (v: unknown) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;');
   const table = (headers: string[], rows: Array<Array<string | number | null | undefined>>) => `
     <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:18px">
@@ -151,6 +181,9 @@ export function buildReportHtml(report: AdminReport, title = 'Operations Report'
     <div style="font-size:24px;font-weight:bold;margin-bottom:2px">${esc(title)}</div>
     <div style="font-size:13px;color:#667085;margin-bottom:22px">${report.range.from} — ${report.range.to}</div>
     ${table(['Metric', 'Value'], [
+      ['Total shipments collected', reportHeadline(report, collected).collected],
+      ['Total collected (GBP)', reportHeadline(report, collected).gbpLabel],
+      ['Total collected (EUR)', reportHeadline(report, collected).eurLabel],
       ['Revenue', currencyLine(report.revenue.byCurrency)],
       ['Previous period revenue', currencyLine(report.revenue.prevByCurrency)],
       ['Shipments', report.shipments.total],
@@ -178,8 +211,8 @@ export function buildReportHtml(report: AdminReport, title = 'Operations Report'
   </body></html>`;
 }
 
-export async function shareReportPdf(report: AdminReport, title?: string) {
-  const { uri } = await Print.printToFileAsync({ html: buildReportHtml(report, title) });
+export async function shareReportPdf(report: AdminReport, title?: string, collected?: number | null) {
+  const { uri } = await Print.printToFileAsync({ html: buildReportHtml(report, title, collected) });
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
   } else {

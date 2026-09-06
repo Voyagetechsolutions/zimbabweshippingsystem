@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, ViewStyle, ActivityIndicator } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Circle, Line as SvgLine, Text as SvgText } from 'react-native-svg';
 import { colors, radius, shadow, spacing } from '../theme';
@@ -8,11 +9,47 @@ import { colors, radius, shadow, spacing } from '../theme';
 // they read as one application: headers, stat tiles, badges, segmented
 // filters, search fields, skeletons, empty/error states and SVG charts.
 
-export function ScreenHeader({ title, subtitle, onBell, right }: {
+/**
+ * The way back, on screens that draw their own header.
+ *
+ * Most of this app hides the navigator's header and paints its own, and a
+ * handful of those screens were then pushed with no back control on them at
+ * all — the collection groups board, the depot handover, the delivery load and
+ * notes, the expenses book. On a phone with no hardware back button those are
+ * dead ends, and the only way out is to kill the app.
+ *
+ * It falls through to the parent navigator when this stack has nothing left to
+ * pop (a screen opened as a tab's root still sits inside one), and renders
+ * nothing at all when there is genuinely nowhere to go — a control that does
+ * nothing is worse than no control.
+ */
+export function BackButton({ style }: { style?: ViewStyle }) {
+  const navigation = useNavigation<any>();
+  const parent = navigation.getParent?.();
+  const here = Boolean(navigation.canGoBack?.());
+  const above = Boolean(parent?.canGoBack?.());
+  if (!here && !above) return null;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Back"
+      hitSlop={8}
+      style={[styles.backButton, style]}
+      onPress={() => (here ? navigation.goBack() : parent?.goBack())}
+    >
+      <Ionicons name="arrow-back" size={20} color={colors.text} />
+    </Pressable>
+  );
+}
+
+export function ScreenHeader({ title, subtitle, onBell, right, back }: {
   title: string; subtitle?: string; onBell?: () => void; right?: React.ReactNode;
+  /** Show the back control ahead of the title. */
+  back?: boolean;
 }) {
   return (
     <View style={styles.header}>
+      {back ? <BackButton /> : null}
       <View style={{ flex: 1 }}>
         <Text style={styles.headerTitle}>{title}</Text>
         {subtitle ? <Text style={styles.headerSubtitle}>{subtitle}</Text> : null}
@@ -291,6 +328,10 @@ export function LegendRow({ color, label, value, percent }: { color: string; lab
 }
 
 const styles = StyleSheet.create({
+  backButton: {
+    width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, marginRight: spacing.sm,
+  },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.sm },
   headerTitle: { fontSize: 22, fontWeight: '800', color: colors.text },
   headerSubtitle: { fontSize: 12, color: colors.textMuted, marginTop: 2 },

@@ -13,7 +13,6 @@ import RoleSelectScreen from './src/screens/RoleSelectScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import SetPasswordScreen from './src/screens/SetPasswordScreen';
 import AdminDashboardScreen from './src/screens/AdminDashboardScreen';
-import QuickCreateScreen from './src/screens/QuickCreateScreen';
 import ShipmentsStack from './src/navigation/ShipmentsStack';
 import RunsStack from './src/navigation/RunsStack';
 import MenuStack from './src/navigation/MenuStack';
@@ -49,11 +48,14 @@ function useTabScreenOptions() {
     tabBarActiveTintColor: colors.primary,
     tabBarInactiveTintColor: colors.textMuted,
     tabBarHideOnKeyboard: true,
-    tabBarLabelStyle: { fontSize: 10, fontWeight: '700' as const, marginTop: 2 },
-    tabBarItemStyle: { paddingTop: 5 },
+    tabBarLabelStyle: { fontSize: 10, fontWeight: '700' as const, marginTop: 0 },
+    tabBarItemStyle: { paddingVertical: 0 },
     tabBarStyle: {
-      height: 60 + bottomInset,
-      paddingBottom: bottomInset,
+      // Padding top and bottom match, so the icon/label pair is centred in the
+      // bar instead of being pushed up by a bottom-only inset.
+      height: 58 + bottomInset,
+      paddingTop: 6,
+      paddingBottom: bottomInset + 6,
       borderTopColor: colors.border,
       backgroundColor: colors.surface,
       shadowColor: '#0f172a',
@@ -69,15 +71,6 @@ function icon(name: keyof typeof Ionicons.glyphMap) {
   return ({ color, size }: { color: string; size: number }) => <Ionicons name={name} size={size} color={color} />;
 }
 
-// Centre FAB for the admin tab bar — the "new booking" affordance.
-function FabButton({ children, onPress }: any) {
-  return (
-    <Pressable onPress={onPress} style={styles.fabWrap}>
-      <View style={styles.fab}>{children}</View>
-    </Pressable>
-  );
-}
-
 // Admin: operations command centre.
 function AdminApp() {
   const tabScreenOptions = useTabScreenOptions();
@@ -85,15 +78,6 @@ function AdminApp() {
     <Tab.Navigator screenOptions={tabScreenOptions}>
       <Tab.Screen name="Home" component={AdminDashboardScreen} options={{ tabBarIcon: icon('home-outline') }} />
       <Tab.Screen name="Shipments" component={ShipmentsStack} options={{ tabBarIcon: icon('cube-outline') }} />
-      <Tab.Screen
-        name="Create"
-        component={QuickCreateScreen}
-        options={{
-          title: '',
-          tabBarIcon: () => <Ionicons name="add" size={30} color={colors.white} />,
-          tabBarButton: (props) => <FabButton {...props} />,
-        }}
-      />
       <Tab.Screen name="Runs" component={RunsStack} options={{ title: 'Runs', tabBarIcon: icon('car-outline') }} />
       <Tab.Screen name="Menu" component={MenuStack} options={{ title: 'More', tabBarIcon: icon('menu-outline') }} />
     </Tab.Navigator>
@@ -113,11 +97,10 @@ function FinanceApp() {
 }
 
 // Pickup driver: the shared collection route.
-function DriverScanButton({ children, onPress }: any) {
-  return <Pressable onPress={onPress} style={styles.driverScanWrap}><View style={styles.driverScanButton}>{children}</View></Pressable>;
-}
-
-function DispatcherApp(){const tabScreenOptions=useTabScreenOptions();return <Tab.Navigator screenOptions={tabScreenOptions}><Tab.Screen name="Dispatch" component={RunsStack} options={{tabBarIcon:icon('map-outline')}}/><Tab.Screen name="Account" component={AccountScreen} options={{tabBarIcon:icon('person-outline')}}/></Tab.Navigator>}
+// Dispatcher: the dispatch dashboard was removed. Drivers now see the
+// collections scheduled ahead of them and plan their own route, so there is no
+// board to assign from — a dispatcher account is left with its own profile.
+function DispatcherApp(){return <AccountScreen/>}
 
 function DriverRouteGateway(){const {country}=useDriverCountry();if(country==='Zimbabwe')return <DeliveryStack/>;return <DriverRunStack/>;}
 
@@ -127,10 +110,16 @@ function PickupDriverApp() {
     <Tab.Navigator screenOptions={tabScreenOptions}>
       <Tab.Screen name="Home" component={DriverOperationsHomeScreen} options={{ tabBarIcon: icon('home-outline') }} />
       <Tab.Screen name="Route" component={DriverRouteGateway} options={{ tabBarIcon: icon('map-outline') }} />
-      <Tab.Screen name="Scan" component={DriverScanScreen} options={{ title: 'Scan', tabBarLabel: 'Scan', tabBarIcon: () => <Ionicons name="scan" size={27} color={colors.white} />, tabBarButton: (props) => <DriverScanButton {...props} /> }} />
+      <Tab.Screen name="Scan" component={DriverScanScreen} options={{ title: 'Scan', tabBarIcon: icon('scan-outline') }} />
       <Tab.Screen name="History" component={DriverHistoryScreen} options={{ tabBarIcon: icon('time-outline') }} />
       <Tab.Screen name="Profile" component={DriverMoreStack} options={{ tabBarIcon: icon('person-outline') }} />
-      <Tab.Screen name="Messages" component={DriverMessagesScreen} options={{ tabBarButton: () => null }} />
+      <Tab.Screen name="Messages" component={DriverMessagesScreen} options={{
+        // `tabBarButton: () => null` renders nothing but still leaves the
+        // item in the row, so the five visible tabs were laid out as six and
+        // sat off-centre with a gap on the right. Taking it out of the flex
+        // row as well is what actually hides it.
+        tabBarButton: () => null, tabBarItemStyle: { display: 'none' },
+      }} />
     </Tab.Navigator>
   );
 }
@@ -144,10 +133,16 @@ function DeliveryDriverApp() {
     <Tab.Navigator screenOptions={tabScreenOptions}>
       <Tab.Screen name="Home" component={DriverOperationsHomeScreen} options={{ tabBarIcon: icon('home-outline') }} />
       <Tab.Screen name="Route" component={DeliveryStack} options={{ tabBarIcon: icon('map-outline') }} />
-      <Tab.Screen name="Scan" component={DriverScanScreen} options={{ title: 'Scan', tabBarLabel: 'Scan', tabBarIcon: () => <Ionicons name="scan" size={27} color={colors.white} />, tabBarButton: (props) => <DriverScanButton {...props} /> }} />
+      <Tab.Screen name="Scan" component={DriverScanScreen} options={{ title: 'Scan', tabBarIcon: icon('scan-outline') }} />
       <Tab.Screen name="History" component={DriverHistoryScreen} options={{ tabBarIcon: icon('time-outline') }} />
       <Tab.Screen name="Profile" component={DriverMoreStack} options={{ tabBarIcon: icon('person-outline') }} />
-      <Tab.Screen name="Messages" component={DriverMessagesScreen} options={{ tabBarButton: () => null }} />
+      <Tab.Screen name="Messages" component={DriverMessagesScreen} options={{
+        // `tabBarButton: () => null` renders nothing but still leaves the
+        // item in the row, so the five visible tabs were laid out as six and
+        // sat off-centre with a gap on the right. Taking it out of the flex
+        // row as well is what actually hides it.
+        tabBarButton: () => null, tabBarItemStyle: { display: 'none' },
+      }} />
     </Tab.Navigator>
   );
 }
@@ -231,18 +226,6 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  fabWrap: { top: -12, justifyContent: 'center', alignItems: 'center' },
-  fab: {
-    width: 50, height: 50, borderRadius: 25, backgroundColor: colors.primary,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: colors.primaryDark, shadowOpacity: 0.35, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 6,
-  },
-  driverScanWrap: { top: -13, justifyContent: 'center', alignItems: 'center' },
-  driverScanButton: {
-    width: 54, height: 54, borderRadius: 18, backgroundColor: colors.primary,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: colors.surface,
-    shadowColor: colors.primaryDark, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 7,
-  },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg, padding: spacing.xl },
   blockTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginTop: spacing.md },
   blockBody: { fontSize: 14, color: colors.textMuted, textAlign: 'center', marginTop: spacing.sm, lineHeight: 20 },

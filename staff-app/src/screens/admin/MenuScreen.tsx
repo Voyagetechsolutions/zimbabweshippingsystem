@@ -1,12 +1,10 @@
-import React, { useCallback, useState } from 'react';
+import React from 'react';
 import { View, Text, SectionList, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useViewRole } from '../../context/ViewRoleContext';
 import { useAuth } from '../../context/AuthContext';
-import { supabase } from '../../lib/supabase';
 import { colors, radius, spacing } from '../../theme';
 import type { MenuStackParams } from '../../navigation/types';
 
@@ -32,10 +30,7 @@ const SECTIONS: { title: string; data: Item[] }[] = [
     data: [
       { label: 'Manual Booking', icon: 'add-circle-outline', to: 'ManualBooking' },
       { label: 'All Shipments', icon: 'cube-outline', tab: 'Shipments' },
-      { label: 'Driver Runs', icon: 'car-outline', tab: 'Runs' },
       { label: 'Pickup Zones', icon: 'location-outline', to: 'PickupZones' },
-      { label: 'Delivery Notes', icon: 'document-text-outline', to: 'DeliveryNotes' },
-      { label: 'Collection Schedule', icon: 'calendar-outline', to: 'Schedule' },
     ],
   },
   {
@@ -43,7 +38,6 @@ const SECTIONS: { title: string; data: Item[] }[] = [
     data: [
       { label: 'Customers', icon: 'people-outline', to: 'Customers' },
       { label: 'Quote Requests', icon: 'pricetag-outline', to: 'CustomQuotes' },
-      { label: 'Feedback', icon: 'star-outline', to: 'Feedback' },
     ],
   },
   {
@@ -59,9 +53,6 @@ const SECTIONS: { title: string; data: Item[] }[] = [
   {
     title: 'Administration',
     data: [
-      { label: 'Staff Control Centre', icon: 'shield-checkmark-outline', to: 'StaffRecords', adminOnly: true },
-      { label: 'Drivers', icon: 'people-circle-outline', to: 'StaffRecords', params: { filter: 'drivers' }, adminOnly: true },
-      { label: 'Vehicles', icon: 'bus-outline', to: 'Vehicles', adminOnly: true },
       { label: 'Settings', icon: 'settings-outline', to: 'Account' },
     ],
   },
@@ -70,22 +61,6 @@ const SECTIONS: { title: string; data: Item[] }[] = [
 export default function MenuScreen({ navigation }: Props) {
   const { clearRole } = useViewRole();
   const { canAccessFinance, canSwitchDashboards } = useAuth();
-  // A loaded delivery vehicle waits on admin, so the count of notes needing
-  // verification is surfaced here rather than only inside the register.
-  const [toVerify, setToVerify] = useState(0);
-
-  useFocusEffect(useCallback(() => {
-    let active = true;
-    (async () => {
-      const { count, error } = await supabase.from('delivery_notes')
-        .select('id', { count: 'exact', head: true })
-        .eq('verification_status', 'pending').is('delivered_at', null);
-      // The column only exists once the delivery-driver migration is applied.
-      if (active) setToVerify(error ? 0 : count || 0);
-    })();
-    return () => { active = false; };
-  }, []));
-
   // Logistics staff share this dashboard but must not see finance or staff
   // administration; the same rules are enforced again by RLS and the RPCs.
   const sections = SECTIONS
@@ -124,9 +99,6 @@ export default function MenuScreen({ navigation }: Props) {
           <Pressable style={styles.row} onPress={() => open(item)}>
             <Ionicons name={item.icon} size={18} color={colors.primary} style={styles.rowIcon} />
             <Text style={styles.rowLabel}>{item.label}</Text>
-            {item.to === 'DeliveryNotes' && toVerify > 0 ? (
-              <View style={styles.countPill}><Text style={styles.countText}>{toVerify} to verify</Text></View>
-            ) : null}
             <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
           </Pressable>
         )}
@@ -158,8 +130,6 @@ const styles = StyleSheet.create({
   },
   rowIcon: { marginRight: spacing.md },
   rowLabel: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text },
-  countPill: { backgroundColor: colors.amberSoft, borderWidth: 1, borderColor: colors.amberBorder, borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 3, marginRight: spacing.sm },
-  countText: { fontSize: 10, fontWeight: '800', color: colors.amber },
   switchRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.lg, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.primary, borderRadius: radius.sm, backgroundColor: colors.surface },
   switchLabel: { flex: 1, fontSize: 14, fontWeight: '800', color: colors.primary },
 });

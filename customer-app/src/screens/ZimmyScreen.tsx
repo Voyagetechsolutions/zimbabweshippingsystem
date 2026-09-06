@@ -9,7 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { colors, spacing, radius } from '../theme';
 import { FlagStripe } from '../components/ui';
-import { useAppTheme } from '../context/ThemeContext';
+import { useAppTheme, useThemedStyles } from '../context/ThemeContext';
 import { useBusinessConfig } from '../lib/businessConfig';
 
 // Same Zimmy brain as the website — the ai-chat edge function handles pricing,
@@ -45,6 +45,7 @@ export default function ZimmyScreen() {
   const keyboardInset = useKeyboardInset();
   const tabBarHeight = useBottomTabBarHeight();
   const {palette}=useAppTheme();
+  const styles = useThemedStyles(baseStyles);
   const { config: business } = useBusinessConfig();
 
   useEffect(() => {
@@ -172,7 +173,7 @@ export default function ZimmyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface },
   avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center' },

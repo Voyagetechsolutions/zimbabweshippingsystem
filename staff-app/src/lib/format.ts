@@ -72,6 +72,10 @@ export function addToMoneyMap(map: Record<string, number>, amount: number | null
 export function parseCollectionDate(value: unknown): Date | null {
   const raw = String(value || '').trim();
   if (!raw) return null;
+  // Older booking code wrote literal placeholders into this field. They are not
+  // dates, and passing them to Date() only produced an Invalid Date further
+  // down, where the reason was no longer obvious.
+  if (/^(to be (confirmed|assigned)|not (set|assigned)|tbc|n\/?a)$/i.test(raw)) return null;
   const isoDate = raw.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
   const ukDate = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   const normalised = raw.replace(/(\d{1,2})(?:st|nd|rd|th)\b/gi, '$1');

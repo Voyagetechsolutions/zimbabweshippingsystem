@@ -9,7 +9,7 @@ import { FlagStripe, Pill, Button } from '../components/ui';
 import { parseCollectionDate, longDate, daysUntil } from '../lib/format';
 import { useAuth } from '../context/AuthContext';
 import { scheduleMatchesPostcode } from '../lib/postcode';
-import { useAppTheme } from '../context/ThemeContext';
+import { useAppTheme, useThemedStyles } from '../context/ThemeContext';
 
 type Row = {
   id: string;
@@ -41,6 +41,7 @@ export default function ScheduleScreen() {
   const [showAllAreas, setShowAllAreas] = useState(false);
   const { profile } = useAuth();
   const { palette } = useAppTheme();
+  const styles = useThemedStyles(baseStyles);
 
   const load = useCallback(async () => {
     const { data, error: loadError } = await supabase
@@ -222,17 +223,13 @@ export default function ScheduleScreen() {
               <View style={styles.routeDetails}>
                 <Text style={[styles.route, { color: palette.text }]}>{item.route}</Text>
                 <Text style={styles.date}>
-                  {item.parsed ? longDate(item.parsed) : item.pickup_date || 'Date to be confirmed'}
+                  {item.parsed ? longDate(item.parsed) : item.pickup_date}
                 </Text>
                 {Boolean(areas) && <Text style={styles.areas} numberOfLines={2}>{areas}</Text>}
               </View>
               <View style={styles.badges}>
                 {item.isCustomerArea && <Pill text="Your area" />}
-                {days === null ? (
-                  <Pill text="To be confirmed" bg="#fff4cc" fg="#806000" />
-                ) : days < 0 ? (
-                  <Pill text="Date update due" bg="#fff4cc" fg="#806000" />
-                ) : (
+                {days !== null && days >= 0 && (
                   <Pill text={days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `${days} days`} />
                 )}
               </View>
@@ -244,7 +241,7 @@ export default function ScheduleScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   body: { padding: spacing.lg, paddingBottom: 48, flexGrow: 1 },
   title: { fontSize: 24, fontWeight: '800', color: colors.text, marginTop: spacing.sm },

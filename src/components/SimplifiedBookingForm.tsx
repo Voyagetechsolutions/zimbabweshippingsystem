@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,6 +45,16 @@ interface FormData {
   drumsDescription: string;
   includeBoxes: boolean;
   boxesDescription: string;
+  /**
+   * Anything that is not a drum, one row each.
+   *
+   * `boxesDescription` was a single free-text box, so "a sofa, a fridge and two
+   * suitcases" arrived as one sentence that no invoice could itemise and no
+   * warehouse could tick off. Drums stay a quantity because they really are
+   * interchangeable; these are not, so each carries its own description.
+   * `boxesDescription` is still written on submit, joined, for older readers.
+   */
+  otherItems: Array<{ description: string; quantity: number }>;
 
   // Trunks/Storage Boxes (Ireland only)
   includeTrunks: boolean;
@@ -335,6 +346,7 @@ export const SimplifiedBookingForm = () => {
   const [collectionDate, setCollectionDate] = useState<string | null>(null);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
   // Booking stays open to guests, but a signed-in customer's booking must be
   // stamped with their user_id or it never appears on their dashboard.
   const { user } = useAuth();
@@ -368,6 +380,7 @@ export const SimplifiedBookingForm = () => {
     drumsDescription: '',
     includeBoxes: false,
     boxesDescription: '',
+    otherItems: [{ description: '', quantity: 1 }],
     includeTrunks: false,
     trunkQuantity: 0,
     trunksDescription: '',
@@ -601,6 +614,43 @@ export const SimplifiedBookingForm = () => {
           });
           return false;
         }
+        if (formData.includeBoxes && !formData.otherItems.some((item) => item.description.trim().length >= 3)) {
+          toast({
+            title: 'Describe your items',
+            description: 'List each item separately and describe it — what it is, its size or material, and its condition.',
+            variant: 'destructive',
+          });
+          return false;
+        }
+        /**
+         * Other items are a custom quote, and a custom quote needs an account.
+         *
+         * The team prices these line by line and the customer has to be able to
+         * see the price come back, accept it and book against it — all of which
+         * hang off a profile. A guest booking has no user_id, so the quote had
+         * nowhere to land and no way to reach the person who asked for it.
+         * Drums are unaffected: they are priced from the catalogue and a guest
+         * can still book them without an account.
+         */
+        if (formData.includeBoxes && !user) {
+          toast({
+            title: 'Sign in to quote your items',
+            description: 'Other items are priced individually by our team. Create an account or sign in so we can send you the price and you can book from it.',
+            variant: 'destructive',
+          });
+          return false;
+        }
+        // Every row, including a blank one. A row the customer added and left
+        // empty used to be dropped silently at submit, so they were never told
+        // the item they meant to list did not make it onto the booking.
+        if (formData.includeBoxes && formData.otherItems.some((item) => item.description.trim().length < 3)) {
+          toast({
+            title: 'Describe every item',
+            description: 'Each line needs a description of its own — what it is, its size or material, and its condition. Remove any row you do not need.',
+            variant: 'destructive',
+          });
+          return false;
+        }
         if (formData.includeDrums && formData.drumQuantity < 1) {
           toast({
             title: 'Drum Quantity',
@@ -727,6 +777,14 @@ export const SimplifiedBookingForm = () => {
       
       // Build notes with add-ons and custom items
       const cleanedSealCodes = formData.sealCodes.map(c => c.trim()).filter(Boolean);
+      // Each "other item" as its own row, and the joined sentence the older
+      // readers (receipts, the WhatsApp bot, the website admin) still expect.
+      const cleanedOtherItems = formData.includeBoxes
+        ? formData.otherItems
+            .map((item) => ({ description: item.description.trim(), quantity: Math.max(1, Number(item.quantity) || 1) }))
+            .filter((item) => item.description.length > 0)
+        : [];
+      const otherItemsSummary = cleanedOtherItems.map((item) => `${item.quantity} × ${item.description}`).join('; ');
       const sealSuppliedQty = formData.sealOption === 'need' ? formData.sealQuantity : cleanedSealCodes.length;
 
       // Extra delivery addresses with any content
@@ -756,7 +814,7 @@ export const SimplifiedBookingForm = () => {
         notes.push(`Extra delivery addresses: ${cleanedDeliveryAddresses.map(a => `${a.address}${a.city ? ', ' + a.city : ''}`).join(' | ')}`);
       }
       if (formData.paymentMethod === 'cashOnCollection') notes.push('Cash payment on collection');
-      if (formData.includeBoxes) notes.push(`Other Items (agent quote): ${formData.boxesDescription}`);
+      if (cleanedOtherItems.length) notes.push(`Other Items (agent quote): ${otherItemsSummary}`);
       if (formData.includeTrunks && formData.trunkQuantity > 0) notes.push(`${formData.trunkQuantity} x Trunk/Storage Box`);
       if (formData.purchaseDrums && formData.purchaseDrumType && formData.purchaseDrumQuantity > 0) {
         notes.push(`Purchase ${formData.purchaseDrumQuantity} x ${formData.purchaseDrumType === 'metal' ? `Metal Drum (£${metalDrumPurchase})` : `Plastic Barrel (£${plasticDrumPurchase})`}`);
@@ -818,9 +876,10 @@ export const SimplifiedBookingForm = () => {
             currency: 'EUR',
             description: formData.trunksDescription || null
           } : null,
-          boxes: formData.includeBoxes ? {
-            description: formData.boxesDescription
-          } : null,
+          boxes: cleanedOtherItems.length ? { description: otherItemsSummary } : null,
+          // The itemised list. `boxes.description` above stays for readers that
+          // predate it.
+          otherItems: cleanedOtherItems,
           addOns: {
             metalSeal: formData.wantMetalSeal,
             metalSealOption: formData.wantMetalSeal ? formData.sealOption : null,
@@ -875,13 +934,13 @@ export const SimplifiedBookingForm = () => {
           includeTrunks: formData.includeTrunks,
           trunkQuantity: formData.trunkQuantity,
           trunksDescription: formData.trunksDescription || null,
-          includeOtherItems: formData.includeBoxes,
+          includeOtherItems: cleanedOtherItems.length > 0,
           wantMetalSeal: formData.wantMetalSeal,
           metalSealOption: formData.wantMetalSeal ? formData.sealOption : null,
           metalSealCodes: formData.wantMetalSeal && formData.sealOption === 'have' ? cleanedSealCodes : [],
           metalSealQuantity: formData.wantMetalSeal ? sealSuppliedQty : 0,
           doorToDoor: formData.doorToDoor,
-          category: formData.boxesDescription
+          category: otherItemsSummary
         },
         notes: notes.length > 0 ? notes.join(' | ') : null
       };
@@ -968,7 +1027,9 @@ export const SimplifiedBookingForm = () => {
             user_id: user?.id ?? null,
             origin: `${formData.pickupCity}, ${formData.pickupCountry}`,
             destination: `${formData.deliveryCity}, Zimbabwe`,
-            status: 'pending',
+            // Matches create_public_booking and the customer app: a booking is
+            // confirmed the moment it is made, whichever door it came through.
+            status: 'Booking Confirmed',
             metadata: shipmentMetadata,
             collection_schedule_id: collectionScheduleId,
             can_modify: true,
@@ -1036,11 +1097,43 @@ export const SimplifiedBookingForm = () => {
       const linkedToAccount = Boolean((booking as any)?.linkedToAccount);
 
       toast({
-        title: 'Booking Submitted Successfully! 🎉',
+        title: 'Booking Confirmed! 🎉',
         description: linkedToAccount
           ? `Saved to your account · Receipt #${savedReceiptNo} | Tracking: ${savedTracking}`
           : `Receipt #${savedReceiptNo} | Tracking: ${savedTracking}`,
       });
+
+      /**
+       * Other items become a real quote request, not a note in the metadata.
+       *
+       * Same two shapes the customer app writes — numbered prose for anyone
+       * reading it, and `quote_items` for the staff app to price one row at a
+       * time — and linked to the shipment so the priced lines can be put onto
+       * its invoice. Best effort: a booking must not fail because the quote
+       * request did, so this only warns.
+       */
+      if (cleanedOtherItems.length && user?.id) {
+        const quoteShipmentId = (booking as any)?.shipmentId ?? null;
+        const { error: quoteError } = await supabase.from('custom_quotes').insert({
+          user_id: user.id,
+          shipment_id: quoteShipmentId,
+          name: `${formData.senderFirstName} ${formData.senderLastName}`.trim(),
+          email: formData.senderEmail || null,
+          phone_number: formData.senderPhone,
+          description: cleanedOtherItems.map((item, index) => `Item ${index + 1}: ${item.quantity} \u00d7 ${item.description}`).join('\n'),
+          quote_items: cleanedOtherItems.map((item, index) => ({
+            item: index + 1,
+            description: `${item.quantity} \u00d7 ${item.description}`,
+            amount: null,
+          })),
+          category: 'Website booking',
+          request_type: 'custom',
+          status: 'pending',
+          currency,
+          image_urls: [],
+        } as never);
+        if (quoteError) console.warn('Could not raise the custom quote for other items:', quoteError.message);
+      }
 
       // Store receipt data for display
       setReceiptData({
@@ -1830,16 +1923,77 @@ export const SimplifiedBookingForm = () => {
                   Shipping something else? Tell us what you're sending and our agent will contact you with a personalised quote.
                 </div>
 
-                {formData.includeBoxes && (
-                  <div className="mt-4">
-                    <Label htmlFor="boxesDesc" className="text-base">What are you shipping?</Label>
-                    <textarea
-                      id="boxesDesc"
-                      placeholder="e.g., 3 boxes of clothes, 1 suitcase of books, small furniture, electronics…"
-                      value={formData.boxesDescription}
-                      onChange={(e) => updateField('boxesDescription', e.target.value)}
-                      className="w-full mt-2 p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md focus:ring-2 focus:ring-zim-yellow focus:border-transparent min-h-[100px]"
-                    />
+                {formData.includeBoxes && !user && (
+                  <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-900/20"
+                       onClick={(e) => e.preventDefault()}>
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+                      <div>
+                        <p className="font-semibold text-amber-900 dark:text-amber-200">An account is needed for these</p>
+                        <p className="mt-1 text-sm text-amber-900/80 dark:text-amber-200/80">
+                          We price other items one by one and send the quote back to you. That needs somewhere
+                          to send it — create an account or sign in, and your drums can still be booked either way.
+                        </p>
+                        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                          <Button type="button" onClick={() => navigate('/auth?mode=signup&next=/book')} className="bg-zim-green hover:bg-zim-green/90">
+                            Create an account
+                          </Button>
+                          <Button type="button" variant="outline" onClick={() => navigate('/auth?next=/book')}>
+                            Sign in
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {formData.includeBoxes && user && (
+                  <div className="mt-4" onClick={(e) => e.preventDefault()}>
+                    <Label className="text-base">What are you shipping?</Label>
+                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                      One line per item. We price them individually, and that breakdown becomes the
+                      lines on your invoice and delivery note.
+                    </p>
+                    <div className="mt-3 space-y-3">
+                      {formData.otherItems.map((item, index) => (
+                        <div key={index} className="flex items-start gap-2">
+                          <input
+                            type="number"
+                            min={1}
+                            aria-label={`Quantity for item ${index + 1}`}
+                            value={item.quantity}
+                            onChange={(e) => updateField('otherItems', formData.otherItems.map((row, i) =>
+                              i === index ? { ...row, quantity: Math.max(1, parseInt(e.target.value, 10) || 1) } : row))}
+                            className="w-16 shrink-0 p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md focus:ring-2 focus:ring-zim-yellow focus:border-transparent"
+                          />
+                          <textarea
+                            aria-label={`Description for item ${index + 1}`}
+                            placeholder={`Item ${index + 1} — what it is, size or material, contents and condition`}
+                            value={item.description}
+                            onChange={(e) => updateField('otherItems', formData.otherItems.map((row, i) =>
+                              i === index ? { ...row, description: e.target.value } : row))}
+                            className="w-full p-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-md focus:ring-2 focus:ring-zim-yellow focus:border-transparent min-h-[76px]"
+                          />
+                          {formData.otherItems.length > 1 && (
+                            <button
+                              type="button"
+                              aria-label={`Remove item ${index + 1}`}
+                              onClick={() => updateField('otherItems', formData.otherItems.filter((_, i) => i !== index))}
+                              className="mt-1 shrink-0 rounded-md border border-gray-300 p-2 text-red-600 hover:bg-red-50 dark:border-gray-600"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => updateField('otherItems', [...formData.otherItems, { description: '', quantity: 1 }])}
+                      className="mt-3 w-full rounded-md border-2 border-dashed border-gray-300 py-2.5 text-sm font-semibold text-gray-700 hover:border-zim-yellow dark:border-gray-600 dark:text-gray-300"
+                    >
+                      + Add another item
+                    </button>
                     <div className="flex items-start gap-2 mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
                       <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
                       <p className="text-xs text-blue-900 dark:text-blue-300">
@@ -2083,7 +2237,11 @@ export const SimplifiedBookingForm = () => {
             {formData.includeBoxes && (
               <div className={(formData.includeDrums || formData.includeTrunks) ? 'border-t pt-3' : ''}>
                 <p className="font-medium text-gray-700 dark:text-gray-300">Other Items:</p>
-                <p className="text-gray-600 dark:text-gray-400 mt-1">{formData.boxesDescription}</p>
+                <ul className="mt-1 space-y-0.5 text-gray-600 dark:text-gray-400">
+                  {formData.otherItems.filter((item) => item.description.trim()).map((item, index) => (
+                    <li key={index}>{item.quantity} × {item.description.trim()}</li>
+                  ))}
+                </ul>
                 <p className="text-xs italic mt-2 text-blue-600 dark:text-blue-400">Our agent will contact you with a quote</p>
               </div>
             )}
@@ -2123,7 +2281,7 @@ export const SimplifiedBookingForm = () => {
 
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
           <p className="text-sm text-yellow-900 dark:text-yellow-300">
-            <strong>Next steps:</strong> We'll contact you within 24 hours to confirm collection time and payment details.
+            <strong>Next steps:</strong> Your booking is confirmed as soon as you submit it. We'll call within 24 hours to agree your collection time and payment details.
           </p>
         </div>
       </CardContent>
@@ -2326,6 +2484,7 @@ export const SimplifiedBookingForm = () => {
             drumsDescription: '',
             includeBoxes: false,
             boxesDescription: '',
+            otherItems: [{ description: '', quantity: 1 }],
             includeTrunks: false,
             trunkQuantity: 0,
             trunksDescription: '',

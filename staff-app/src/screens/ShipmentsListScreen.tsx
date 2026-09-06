@@ -12,6 +12,7 @@ import {
   customerRef, senderEmail,
 } from '../lib/shipment';
 import { getInvoice, getInvoiceStatus, hasInvoice, invoiceSymbol, calculateTotals } from '../lib/invoice';
+import { collectionDateLabel, loadSchedules, resolveCollection, type ScheduleRow } from '../lib/collectionSchedule';
 import type { ShipmentsStackParams } from '../navigation/types';
 
 type Props = NativeStackScreenProps<ShipmentsStackParams, 'ShipmentsList'>;
@@ -39,6 +40,7 @@ function matchesFilter(s: Shipment, filter: string): boolean {
 
 export default function ShipmentsListScreen({ navigation }: Props) {
   const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState('');
@@ -57,6 +59,8 @@ export default function ShipmentsListScreen({ navigation }: Props) {
   useFocusEffect(useCallback(() => {
     let active = true;
     (async () => { setLoading(true); await load(); if (active) setLoading(false); })();
+    // The published schedule resolves each booking's route and date.
+    loadSchedules().then((rows) => { if (active) setSchedules(rows); });
     return () => { active = false; };
   }, [load]));
 
@@ -87,6 +91,10 @@ export default function ShipmentsListScreen({ navigation }: Props) {
 
   const renderItem = ({ item }: { item: Shipment }) => {
     const st = stageTone(item.status);
+    // Every shipment has a collection route and date — the schedule decides
+    // them — so the list shows them rather than leaving staff to open each
+    // booking to find out when the van is coming.
+    const collection = resolveCollection(item, schedules);
     const originCity = (item.metadata as any)?.sender?.city || (item.origin || '').split(':').pop()?.split(',')[0]?.trim() || '—';
     const destCity = (item.metadata as any)?.recipient?.city || (item.destination || '').split(',').pop()?.trim() || '—';
     const invoice = hasInvoice(item) ? getInvoice(item) : null;
@@ -116,6 +124,12 @@ export default function ShipmentsListScreen({ navigation }: Props) {
           <Ionicons name="arrow-forward" size={12} color={colors.primary} />
           <Text style={styles.routeText} numberOfLines={1}>{destCity}</Text>
           <Text style={styles.pSub} numberOfLines={1}> · {receiverName(item)}</Text>
+        </View>
+        <View style={styles.routeRow}>
+          <Ionicons name="calendar-outline" size={13} color={colors.primary} />
+          <Text style={styles.pSub} numberOfLines={1}>
+            {collection.route || 'No route yet'} · {collectionDateLabel(collection.date)}
+          </Text>
         </View>
         <StageDots status={item.status} />
       </Pressable>

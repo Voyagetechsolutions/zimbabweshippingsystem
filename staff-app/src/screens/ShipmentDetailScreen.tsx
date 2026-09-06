@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, Alert, Image, Linking, Modal, Platform } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, Alert, Image, Linking, Modal, Platform, TextInput } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { supabase } from '../lib/supabase';
@@ -8,17 +9,89 @@ import { colors, radius, spacing } from '../theme';
 import {
   Shipment, STATUS_OPTIONS, statusStyle,
   senderName, senderEmail, senderPhone, receiverName, receiverPhone, pickupAddress, deliveryAddress,
-  collectionInfo, paymentAmount, shipmentType,
+  collectionInfo, paymentAmount, shipmentType, shippedItems,
 } from '../lib/shipment';
 import { buildInvoiceHtml, buildDeliveryNoteHtml, sharePdf } from '../lib/documents';
+import {
+  collectionDateLabel, loadSchedules, resolveCollection,
+  type ResolvedCollection, type ScheduleRow,
+} from '../lib/collectionSchedule';
 import type { ShipmentsStackParams } from '../navigation/types';
 
 type Props = NativeStackScreenProps<ShipmentsStackParams, 'ShipmentDetail'>;
 
 interface ProofPhoto { id: string; proof_type: string; captured_at: string; signedUrl?: string; deleted_at?: string | null; }
 
+/**
+ * The shipping details admin corrects on the phone.
+ *
+ * Bookings arrive with typos, half addresses and the wrong postcode, and the
+ * confirmation call is where that gets fixed. Only fields a customer could
+ * have got wrong are editable — pricing, seals and status are not touched
+ * here, they have their own paths.
+ */
+type DetailsForm = {
+  senderFirstName: string; senderLastName: string; senderEmail: string; senderPhone: string;
+  senderAddress: string; senderCity: string; senderPostcode: string; senderCountry: string;
+  receiverName: string; receiverPhone: string; receiverAddress: string; receiverCity: string;
+  goodsDescription: string; collectionRoute: string; collectionDate: string;
+  /**
+   * What is actually being shipped, and what it was charged at.
+   *
+   * These are the invoice's own lines. Editing them here is the point: a
+   * confirmation call is where a customer says "it's three drums, not two" or
+   * a price is corrected, and until now admin could fix the address but not the
+   * consignment — the one thing the call is for. The same lines drive the
+   * contents list, the invoice and the delivery note, so they only have to be
+   * right once.
+   */
+  items: Array<{ description: string; quantity: string; unitPrice: string }>;
+  currency: string;
+};
+
+const blankForm = (): DetailsForm => ({
+  senderFirstName: '', senderLastName: '', senderEmail: '', senderPhone: '',
+  senderAddress: '', senderCity: '', senderPostcode: '', senderCountry: '',
+  receiverName: '', receiverPhone: '', receiverAddress: '', receiverCity: '',
+  goodsDescription: '', collectionRoute: '', collectionDate: '',
+  items: [], currency: 'GBP',
+});
+
+function formFrom(shipment: Shipment, resolved: ResolvedCollection): DetailsForm {
+  const m: any = shipment.metadata || {};
+  const sender = m.sender || m.senderDetails || {};
+  const recipient = m.recipient || m.recipientDetails || {};
+  const [first, ...rest] = String(sender.name || '').trim().split(' ');
+  return {
+    senderFirstName: sender.firstName || first || '',
+    senderLastName: sender.lastName || rest.join(' ') || '',
+    senderEmail: sender.email || '',
+    senderPhone: sender.phone || '',
+    senderAddress: sender.address || '',
+    senderCity: sender.city || '',
+    senderPostcode: sender.postcode || sender.postalCode || '',
+    senderCountry: sender.country || '',
+    receiverName: recipient.name || '',
+    receiverPhone: recipient.phone || '',
+    receiverAddress: recipient.address || '',
+    receiverCity: recipient.city || '',
+    goodsDescription: shipment.goods_description || m.shipment?.description || '',
+    // Prefilled from the schedule when the booking never carried them, so
+    // saving during the confirmation call writes the real values onto the
+    // shipment instead of leaving the placeholder in place.
+    collectionRoute: resolved.route || '',
+    collectionDate: resolved.date ? resolved.date.toISOString().slice(0, 10) : '',
+    items: ((m.invoice?.items || []) as any[]).map((line) => ({
+      description: String(line.description || line.item || ''),
+      quantity: String(line.quantity ?? 1),
+      unitPrice: String(line.unitPrice ?? 0),
+    })),
+    currency: String(m.invoice?.currency || m.pricing?.currency || 'GBP'),
+  };
+}
+
 export default function ShipmentDetailScreen({ route, navigation }: Props) {
-  const { dashboardRole } = useAuth();
+  const { dashboardRole, session, profile } = useAuth();
   const [shipment, setShipment] = useState<Shipment>(route.params.shipment);
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState(route.params.shipment.status);
@@ -34,6 +107,9 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
   const [proofUri, setProofUri] = useState<string | null>(null);
   const [viewer, setViewer] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
+  const [editDetails, setEditDetails] = useState(false);
+  const [form, setForm] = useState<DetailsForm>(blankForm());
 
   const load = useCallback(async () => {
     const { data: fresh } = await supabase.from('shipments').select('*').eq('id', route.params.shipment.id).maybeSingle();
@@ -79,13 +155,25 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
   }, [route.params.shipment]);
 
   useEffect(() => { load(); }, [load]);
+  // The published schedule is what actually decides a booking's route and
+  // date. Loaded once so every shipment can be shown against it.
+  useEffect(() => { loadSchedules().then(setSchedules); }, []);
 
   const st = statusStyle(shipment.status);
   const ci = collectionInfo(shipment);
+  const collection: ResolvedCollection = resolveCollection(shipment, schedules);
+  // Say where the answer came from, so an inferred route never reads as an
+  // agreed one on a confirmation call.
+  const collectionNote = collection.source === 'booking' ? ''
+    : collection.source === 'schedule' ? ' · from the matched schedule'
+    : collection.source === 'route' ? ' · next run on this route'
+    : collection.source === 'area' ? ' · route covering this postcode'
+    : '';
   const terminal = shipment.status === 'Delivered' || shipment.status === 'Cancelled';
   const meta: any = shipment.metadata || {};
   const invoice = meta.invoice || {};
   const goodsDescription = shipment.goods_description || meta.shipment?.description || '—';
+  const contents = shippedItems(shipment);
   const correction = shipment.driver_description_correction || meta.driverDescriptionCorrection?.text;
   const phone = senderPhone(shipment).replace(/[^0-9+]/g, '');
   const canReviewProof = dashboardRole === 'admin' || dashboardRole === 'finance';
@@ -114,6 +202,150 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
     }
   };
 
+  /**
+   * Confirmed means an admin has been through the booking with the customer
+   * on the phone and everything on this screen is now agreed. It locks the
+   * shipping details against further edits — from here and, via can_modify,
+   * from the customer's own app — so nothing changes silently between the call
+   * and the van arriving. An admin can unlock it again to correct a mistake.
+   */
+  const confirmed = Boolean(meta.confirmation?.confirmedAt);
+  // Only the desk that makes the confirmation call can lock a booking.
+  const canConfirm = dashboardRole === 'admin';
+
+  const writeMetadata = async (patch: any, extra: Record<string, unknown> = {}) => {
+    const metadata = { ...(shipment.metadata || {}), ...patch };
+    const { error } = await supabase.from('shipments')
+      .update({ metadata, updated_at: new Date().toISOString(), ...extra })
+      .eq('id', shipment.id);
+    if (error) throw error;
+    setShipment({ ...shipment, metadata, ...(extra as any), updated_at: new Date().toISOString() });
+    return metadata;
+  };
+
+  const saveDetails = async () => {
+    if (!form.senderPhone.trim() || !form.senderAddress.trim()) {
+      Alert.alert('Missing details', 'A collection address and a sender phone number are required.');
+      return;
+    }
+    if (form.items.some((line) => line.description.trim() && !(Number(line.quantity) > 0))) {
+      Alert.alert('Check the quantities', 'Every item needs a quantity of at least one. Remove any line you do not need.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const existing: any = shipment.metadata || {};
+      const sender = {
+        ...(existing.sender || existing.senderDetails || {}),
+        firstName: form.senderFirstName.trim(),
+        lastName: form.senderLastName.trim(),
+        name: `${form.senderFirstName} ${form.senderLastName}`.trim(),
+        email: form.senderEmail.trim(),
+        phone: form.senderPhone.trim(),
+        address: form.senderAddress.trim(),
+        city: form.senderCity.trim(),
+        postcode: form.senderPostcode.trim(),
+        country: form.senderCountry.trim(),
+      };
+      const recipient = {
+        ...(existing.recipient || existing.recipientDetails || {}),
+        name: form.receiverName.trim(),
+        phone: form.receiverPhone.trim(),
+        address: form.receiverAddress.trim(),
+        city: form.receiverCity.trim(),
+      };
+      const collectionPatch = {
+        ...(existing.collection || {}),
+        route: form.collectionRoute.trim() || null,
+        date: form.collectionDate.trim() || null,
+      };
+      // Blank rows are dropped rather than written as empty lines.
+      const lines = form.items
+        .map((line) => ({
+          description: line.description.trim(),
+          quantity: Math.max(0, Number(line.quantity) || 0),
+          unitPrice: Math.max(0, Number(line.unitPrice) || 0),
+        }))
+        .filter((line) => line.description.length > 0);
+      const invoicePatch = { ...(existing.invoice || {}), currency: form.currency, items: lines };
+      const invoiceTotal = lines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0);
+
+      await writeMetadata(
+        {
+          sender, recipient, collection: collectionPatch, invoice: invoicePatch,
+          pricing: { ...(existing.pricing || {}), currency: form.currency, finalAmount: invoiceTotal },
+          senderDetails: undefined, recipientDetails: undefined,
+        },
+        {
+          origin: [sender.country, `${sender.address}, ${sender.city} ${sender.postcode}`.trim()].filter(Boolean).join(': '),
+          destination: [recipient.address, recipient.city].filter(Boolean).join(', '),
+          goods_description: form.goodsDescription.trim() || null,
+        },
+      );
+      setShipment((current) => ({ ...current, goods_description: form.goodsDescription.trim() || null }));
+      setEditDetails(false);
+      Alert.alert('Details saved', 'The collection team and the driver see these straight away.');
+    } catch (e: any) {
+      Alert.alert('Could not save', e?.message || 'No changes were saved. Check your access and try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmShipment = () => {
+    Alert.alert(
+      'Confirm this shipment',
+      'Everything above has been checked with the customer? Confirming locks the shipping details so they cannot change before collection.',
+      [
+        { text: 'Not yet', style: 'cancel' },
+        {
+          text: 'Confirm & lock',
+          onPress: async () => {
+            setBusy(true);
+            try {
+              await writeMetadata(
+                { confirmation: { confirmedAt: new Date().toISOString(), confirmedBy: session?.user.id ?? null, confirmedByName: profile?.full_name || session?.user.email || null } },
+                { can_modify: false, ...(shipment.status === 'pending' ? { status: 'Booking Confirmed' } : {}) },
+              );
+              if (shipment.status === 'pending') setShipment((current) => ({ ...current, status: 'Booking Confirmed' }));
+              await supabase.from('audit_logs').insert({
+                user_id: session?.user.id, action: 'CONFIRM_SHIPMENT', entity_type: 'SHIPMENT', entity_id: shipment.id,
+                details: { tracking_number: shipment.tracking_number },
+              });
+            } catch (e: any) {
+              Alert.alert('Could not confirm', e?.message || 'Nothing was changed. Check your access and try again.');
+            } finally {
+              setBusy(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const unlockShipment = () => {
+    Alert.alert('Unlock this shipment', 'Reopen the shipping details for editing? Confirm it again once they are right.', [
+      { text: 'Keep locked', style: 'cancel' },
+      {
+        text: 'Unlock',
+        onPress: async () => {
+          setBusy(true);
+          try {
+            await writeMetadata({ confirmation: null }, { can_modify: true });
+            await supabase.from('audit_logs').insert({
+              user_id: session?.user.id, action: 'UNLOCK_SHIPMENT', entity_type: 'SHIPMENT', entity_id: shipment.id,
+              details: { tracking_number: shipment.tracking_number },
+            });
+          } catch (e: any) {
+            Alert.alert('Could not unlock', e?.message || 'Nothing was changed.');
+          } finally {
+            setBusy(false);
+          }
+        },
+      },
+    ]);
+  };
+
   const reviewProof = (approved: boolean) => {
     if (!paymentProof) return;
     const run = async (note: string | null) => {
@@ -138,13 +370,13 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
 
   const downloadInvoice = async () => {
     setDownloading('invoice');
-    try { await sharePdf(buildInvoiceHtml(shipment), `${invoice.invoiceNumber || invoiceRow?.invoice_number || 'invoice'}.pdf`); }
+    try { await sharePdf(buildInvoiceHtml(shipment, collection), `${invoice.invoiceNumber || invoiceRow?.invoice_number || 'invoice'}.pdf`); }
     catch (e: any) { Alert.alert('Could not create PDF', e?.message || 'Try again.'); }
     finally { setDownloading(null); }
   };
   const downloadNote = async () => {
     setDownloading('note');
-    try { await sharePdf(buildDeliveryNoteHtml(shipment, { deliveryNote, proofSummary: { count: photos.length } }), `${deliveryNote?.note_number || 'delivery-note'}.pdf`); }
+    try { await sharePdf(buildDeliveryNoteHtml(shipment, { deliveryNote, proofSummary: { count: photos.length }, collection }), `${deliveryNote?.note_number || 'delivery-note'}.pdf`); }
     catch (e: any) { Alert.alert('Could not create PDF', e?.message || 'Try again.'); }
     finally { setDownloading(null); }
   };
@@ -174,8 +406,160 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
           <Text style={styles.updated}>Updated {new Date(shipment.updated_at).toLocaleDateString()}</Text>
         </View>
 
+        {/* ── Confirmation ── */}
+        <View style={[styles.card, confirmed ? styles.cardConfirmed : styles.cardUnconfirmed]}>
+          <View style={styles.confirmHead}>
+            <Ionicons
+              name={confirmed ? 'lock-closed' : 'call-outline'}
+              size={19}
+              color={confirmed ? colors.primaryDark : colors.amber}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.confirmTitle, { color: confirmed ? colors.primaryDark : colors.amber }]}>
+                {confirmed ? 'Confirmed and locked' : 'Not confirmed yet'}
+              </Text>
+              <Text style={styles.confirmText}>
+                {confirmed
+                  ? `Confirmed by ${meta.confirmation?.confirmedByName || 'a member of staff'} on ${new Date(meta.confirmation.confirmedAt).toLocaleString()}. The shipping details below cannot be edited while it is locked.`
+                  : 'Call the customer, check everything below is right, correct anything that is not, then confirm to lock it in.'}
+              </Text>
+            </View>
+          </View>
+          {/* Both primary actions sit together at the top. Edit used to be a
+              small text link beside the "Details" heading further down, which
+              is not where anyone looks for it. */}
+          <View style={styles.actionRow}>
+            <Pressable
+              style={[styles.btn, styles.btnOutline, busy && { opacity: 0.5 }]}
+              disabled={busy}
+              onPress={() => {
+                if (confirmed) {
+                  Alert.alert(
+                    'This shipment is locked',
+                    'It was confirmed with the customer. Unlock it to make a change, then confirm it again.',
+                    [{ text: 'Cancel', style: 'cancel' }, { text: 'Unlock', onPress: unlockShipment }],
+                  );
+                  return;
+                }
+                setForm(formFrom(shipment, collection));
+                setEditDetails(true);
+              }}
+            >
+              <Text style={styles.btnOutlineText}>Edit shipment</Text>
+            </Pressable>
+            {canConfirm ? (
+              <Pressable
+                style={[styles.btn, confirmed ? styles.btnOutline : styles.btnPrimary, busy && { opacity: 0.5 }]}
+                disabled={busy}
+                onPress={confirmed ? unlockShipment : confirmShipment}
+              >
+                <Text style={confirmed ? styles.btnOutlineText : styles.btnPrimaryText}>
+                  {confirmed ? 'Unlock' : 'Confirm shipment'}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+
         {/* ── Details ── */}
-        <Text style={styles.sectionHeading}>Details</Text>
+        <View style={styles.headingRow}>
+          <Text style={styles.sectionHeading}>Details</Text>
+          {!editDetails ? (
+            <Pressable
+              hitSlop={8}
+              onPress={() => {
+                // Hiding Edit on a confirmed shipment left admin with no way to
+                // correct one without first realising Unlock was the way in.
+                if (confirmed) {
+                  Alert.alert(
+                    'This shipment is locked',
+                    'It was confirmed with the customer. Unlock it to make a change, then confirm it again.',
+                    [{ text: 'Cancel', style: 'cancel' }, { text: 'Unlock', onPress: unlockShipment }],
+                  );
+                  return;
+                }
+                setForm(formFrom(shipment, collection));
+                setEditDetails(true);
+              }}
+            >
+              <Text style={styles.headingAction}>{confirmed ? 'Locked' : 'Edit'}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+
+        {editDetails ? (
+          <View style={styles.card}>
+            <Text style={styles.blockLabel}>SENDER</Text>
+            <FormField label="First name" value={form.senderFirstName} onChange={(v) => setForm({ ...form, senderFirstName: v })} />
+            <FormField label="Last name" value={form.senderLastName} onChange={(v) => setForm({ ...form, senderLastName: v })} />
+            <FormField label="Email" value={form.senderEmail} onChange={(v) => setForm({ ...form, senderEmail: v })} keyboardType="email-address" />
+            <FormField label="Phone" value={form.senderPhone} onChange={(v) => setForm({ ...form, senderPhone: v })} keyboardType="phone-pad" />
+            <Text style={styles.blockLabel}>COLLECTION ADDRESS</Text>
+            <FormField label="Address" value={form.senderAddress} onChange={(v) => setForm({ ...form, senderAddress: v })} multiline />
+            <FormField label="Town / city" value={form.senderCity} onChange={(v) => setForm({ ...form, senderCity: v })} />
+            <FormField label="Postcode / Eircode" value={form.senderPostcode} onChange={(v) => setForm({ ...form, senderPostcode: v })} autoCapitalize="characters" />
+            <FormField label="Country" value={form.senderCountry} onChange={(v) => setForm({ ...form, senderCountry: v })} />
+            <FormField label="Collection route" value={form.collectionRoute} onChange={(v) => setForm({ ...form, collectionRoute: v })} />
+            <FormField label="Collection date" value={form.collectionDate} onChange={(v) => setForm({ ...form, collectionDate: v })} />
+            <Text style={styles.blockLabel}>RECEIVER IN ZIMBABWE</Text>
+            <FormField label="Full name" value={form.receiverName} onChange={(v) => setForm({ ...form, receiverName: v })} />
+            <FormField label="Phone" value={form.receiverPhone} onChange={(v) => setForm({ ...form, receiverPhone: v })} keyboardType="phone-pad" />
+            <FormField label="Delivery address" value={form.receiverAddress} onChange={(v) => setForm({ ...form, receiverAddress: v })} multiline />
+            <FormField label="Town / city" value={form.receiverCity} onChange={(v) => setForm({ ...form, receiverCity: v })} />
+            <Text style={styles.blockLabel}>WHAT IS BEING SHIPPED</Text>
+            <FormField label="Goods description" value={form.goodsDescription} onChange={(v) => setForm({ ...form, goodsDescription: v })} multiline />
+
+            <Text style={styles.blockLabel}>ITEMS AND PRICES</Text>
+            {form.items.map((line, index) => (
+              <View key={index} style={styles.lineCard}>
+                <FormField
+                  label={`Item ${index + 1}`}
+                  value={line.description}
+                  onChange={(v) => setForm({ ...form, items: form.items.map((row, i) => (i === index ? { ...row, description: v } : row)) })}
+                />
+                <View style={styles.actionRow}>
+                  <View style={{ flex: 1 }}>
+                    <FormField
+                      label="Qty" keyboardType="number-pad" value={line.quantity}
+                      onChange={(v) => setForm({ ...form, items: form.items.map((row, i) => (i === index ? { ...row, quantity: v } : row)) })}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <FormField
+                      label={`Unit price (${form.currency === 'EUR' ? '\u20ac' : '\u00a3'})`} keyboardType="decimal-pad" value={line.unitPrice}
+                      onChange={(v) => setForm({ ...form, items: form.items.map((row, i) => (i === index ? { ...row, unitPrice: v } : row)) })}
+                    />
+                  </View>
+                </View>
+                <Pressable hitSlop={8} onPress={() => setForm({ ...form, items: form.items.filter((_, i) => i !== index) })}>
+                  <Text style={styles.removeLine}>Remove item {index + 1}</Text>
+                </Pressable>
+              </View>
+            ))}
+            <Pressable
+              style={styles.addLine}
+              onPress={() => setForm({ ...form, items: [...form.items, { description: '', quantity: '1', unitPrice: '' }] })}
+            >
+              <Text style={styles.addLineText}>+ ADD AN ITEM</Text>
+            </Pressable>
+            <View style={styles.editTotal}>
+              <Text style={styles.editTotalLabel}>Shipment total</Text>
+              <Text style={styles.editTotalValue}>
+                {form.currency === 'EUR' ? '\u20ac' : '\u00a3'}
+                {form.items.reduce((sum, line) => sum + (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0), 0).toFixed(2)}
+              </Text>
+            </View>
+            <View style={styles.actionRow}>
+              <Pressable style={[styles.btn, styles.btnPrimary, busy && { opacity: 0.5 }]} disabled={busy} onPress={saveDetails}>
+                {busy ? <ActivityIndicator color={colors.white} /> : <Text style={styles.btnPrimaryText}>Save details</Text>}
+              </Pressable>
+              <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => setEditDetails(false)}>
+                <Text style={styles.btnGhostText}>Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+
         <View style={styles.card}>
           <Row k="Sender" v={senderName(shipment)} />
           <Row k="Email" v={senderEmail(shipment) || '—'} />
@@ -198,8 +582,8 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
           <Row k="Address" v={pickupAddress(shipment)} multiline />
           <Row k="City" v={ci.city || '—'} />
           <Row k="Postcode" v={ci.postalCode || '—'} />
-          <Row k="Matched route" v={ci.route} />
-          <Row k="Collection date" v={ci.date} />
+          <Row k="Matched route" v={collection.route ? `${collection.route}${collectionNote}` : 'No route covers this address yet'} multiline />
+          <Row k="Collection date" v={collectionDateLabel(collection.date)} />
           <Row k="Assigned driver" v={driverName || 'Not assigned'} />
           <Row k="Run status" v={runInfo ? `${runInfo.status} · stop ${runInfo.stopStatus.replace('_', ' ')}` : '—'} />
         </View>
@@ -219,14 +603,19 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
               <Text style={styles.blockText}>{correction}</Text>
             </>
           ) : null}
-          {Array.isArray(invoice.items) && invoice.items.length > 0 && (
-            <>
-              <Text style={styles.blockLabel}>PACKAGES / ITEMS</Text>
-              {invoice.items.map((it: any, i: number) => (
-                <Text key={i} style={styles.blockText}>• {it.quantity} × {it.description}</Text>
-              ))}
-            </>
-          )}
+          <Text style={styles.blockLabel}>EVERYTHING BEING SHIPPED</Text>
+          {contents.length === 0 ? (
+            <Text style={styles.blockText}>Nothing itemised on this booking — the description above is all the customer gave.</Text>
+          ) : contents.map((line, i) => (
+            <View key={`${line.label}-${i}`} style={styles.itemRow}>
+              <View style={styles.itemQty}><Text style={styles.itemQtyText}>{line.quantity ?? '•'}</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.itemLabel}>{line.label}</Text>
+                {line.detail ? <Text style={styles.itemDetail}>{line.detail}</Text> : null}
+              </View>
+              {line.amount ? <Text style={styles.itemAmount}>{line.amount}</Text> : null}
+            </View>
+          ))}
           <Text style={styles.blockLabel}>METAL CODED SEALS</Text>
           {seals ? (
             <Text style={styles.blockText}>
@@ -274,6 +663,23 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
         {/* ── Documents ── */}
         <Text style={styles.sectionHeading}>Documents</Text>
         <View style={styles.card}>
+          {/* Open rather than export. Both documents are readable and editable
+              on their own screen, with the download alongside — they used to be
+              download-only, so a wrong address meant a trip to the website. */}
+          <View style={styles.actionRow}>
+            <Pressable
+              style={[styles.btn, styles.btnPrimary]}
+              onPress={() => navigation.navigate('Document', { shipmentId: shipment.id, kind: 'invoice' })}
+            >
+              <Text style={styles.btnPrimaryText}>Invoice</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.btn, styles.btnPrimary]}
+              onPress={() => navigation.navigate('Document', { shipmentId: shipment.id, kind: 'delivery_note' })}
+            >
+              <Text style={styles.btnPrimaryText}>Delivery note</Text>
+            </Pressable>
+          </View>
           <View style={styles.actionRow}>
             <Pressable style={[styles.btn, styles.btnOutline, downloading === 'invoice' && { opacity: 0.5 }]} onPress={downloadInvoice} disabled={downloading === 'invoice'}>
               {downloading === 'invoice' ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.btnOutlineText}>Download invoice</Text>}
@@ -359,6 +765,30 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
   );
 }
 
+function FormField({ label, value, onChange, multiline, keyboardType, autoCapitalize }: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  multiline?: boolean;
+  keyboardType?: 'default' | 'email-address' | 'phone-pad' | 'number-pad' | 'decimal-pad';
+  autoCapitalize?: 'none' | 'words' | 'characters';
+}) {
+  return (
+    <View style={{ marginTop: 8 }}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TextInput
+        style={[styles.fieldInput, multiline && styles.fieldInputMultiline]}
+        value={value}
+        onChangeText={onChange}
+        multiline={multiline}
+        keyboardType={keyboardType}
+        autoCapitalize={autoCapitalize}
+        placeholderTextColor={colors.textFaint}
+      />
+    </View>
+  );
+}
+
 function Row({ k, v, multiline }: { k: string; v: string; multiline?: boolean }) {
   return (
     <View style={styles.kv}>
@@ -376,6 +806,29 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 12, fontWeight: '700' },
   updated: { fontSize: 12, color: colors.textMuted },
   sectionHeading: { fontSize: 13, fontWeight: '800', color: colors.text, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: spacing.sm },
+  headingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headingAction: { fontSize: 13, fontWeight: '800', color: colors.primary, marginTop: spacing.sm },
+  lineCard: { marginTop: 10, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.bg },
+  removeLine: { fontSize: 12, fontWeight: '700', color: colors.danger, marginTop: 8 },
+  addLine: { marginTop: 10, paddingVertical: 12, alignItems: 'center', borderRadius: radius.sm, borderWidth: 1.5, borderColor: colors.primary },
+  addLineText: { fontSize: 12.5, fontWeight: '800', color: colors.primary },
+  editTotal: { marginTop: spacing.md, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.primarySoft, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  editTotalLabel: { fontSize: 13, fontWeight: '700', color: colors.primaryDark },
+  editTotalValue: { fontSize: 19, fontWeight: '900', color: colors.primaryDark },
+  cardConfirmed: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  cardUnconfirmed: { borderColor: colors.amberBorder, backgroundColor: colors.amberSoft },
+  confirmHead: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  confirmTitle: { fontSize: 14, fontWeight: '800' },
+  confirmText: { fontSize: 12, color: colors.textMuted, marginTop: 3, lineHeight: 17 },
+  fieldLabel: { fontSize: 9.5, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.5, marginBottom: 4 },
+  fieldInput: { minHeight: 42, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: 11, paddingVertical: 9, fontSize: 13, color: colors.text, backgroundColor: colors.bg },
+  fieldInputMultiline: { minHeight: 68, textAlignVertical: 'top' },
+  itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: 7, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  itemQty: { minWidth: 28, height: 24, paddingHorizontal: 6, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  itemQtyText: { fontSize: 11.5, fontWeight: '900', color: colors.primaryDark },
+  itemLabel: { fontSize: 13, fontWeight: '700', color: colors.text },
+  itemDetail: { fontSize: 11.5, color: colors.textMuted, marginTop: 2, lineHeight: 16 },
+  itemAmount: { fontSize: 12.5, fontWeight: '800', color: colors.text },
   sectionLabel: { fontSize: 12, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
   kv: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },

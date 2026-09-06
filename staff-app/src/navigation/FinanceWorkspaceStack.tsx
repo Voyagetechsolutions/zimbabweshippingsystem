@@ -1,3 +1,4 @@
+import PaymentProofsScreen from '../screens/admin/PaymentProofsScreen';
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { FinanceRegisterScreen, FinanceWorkspaceScreen } from '../screens/FinanceWorkspaceScreen';
@@ -12,6 +13,9 @@ import PaymentsScreen from '../screens/admin/PaymentsScreen';
 import InvoicesScreen from '../screens/admin/InvoicesScreen';
 import { PaymentDetailsScreen, ReconciliationScreen } from '../screens/FinanceExperienceScreens';
 
+import DocumentScreen from '../screens/admin/DocumentScreen';
+import ManualBookingScreen from '../screens/admin/ManualBookingScreen';
+import ShipmentDetailScreen from '../screens/ShipmentDetailScreen';
 const Stack=createNativeStackNavigator();
 export default function FinanceWorkspaceStack(){return <Stack.Navigator screenOptions={{headerShown:false}}>
   <Stack.Screen name="Workspace" component={FinanceWorkspaceScreen}/>
@@ -21,10 +25,13 @@ export default function FinanceWorkspaceStack(){return <Stack.Navigator screenOp
   <Stack.Screen name="Zimmy" component={ZimmyFinanceScreen}/>
   <Stack.Screen name="Reports" component={ReportsScreen as any}/>
   <Stack.Screen name="Customers" component={CustomersScreen as any}/>
-  <Stack.Screen name="CustomerDetail" component={CustomerDetailScreen as any}/>
+  <Stack.Screen name="CustomerDetail" component={CustomerDetailScreen as any} options={{headerShown:true,title:'Customer'}}/>
+  <Stack.Screen name="ManualBooking" component={ManualBookingScreen as any}/>
+  <Stack.Screen name="ShipmentDetail" component={ShipmentDetailScreen as any} options={{headerShown:true,title:'Shipment'}}/>
   <Stack.Screen name="QuoteRequests" component={CustomQuotesScreen as any}/>
   <Stack.Screen name="Payments" component={PaymentsScreen}/>
   <Stack.Screen name="PaymentDetails" component={PaymentDetailsScreen}/>
   <Stack.Screen name="Reconciliation" component={ReconciliationScreen}/>
   <Stack.Screen name="Invoices" component={InvoicesScreen}/>
+<Stack.Screen name="Document" component={DocumentScreen} options={{headerShown:false}}/>  <Stack.Screen name="PaymentProofs" component={PaymentProofsScreen}/>
 </Stack.Navigator>}

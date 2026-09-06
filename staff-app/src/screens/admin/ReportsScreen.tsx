@@ -6,10 +6,12 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, radius, spacing } from '../../theme';
 import {
   AdminReport, RangeKey, rangeFor, fetchAdminReport, currencyLine, percentChange,
-  shareReportCsv, shareReportPdf,
+  reportHeadline, shareReportCsv, shareReportPdf,
 } from '../../lib/reports';
 import { ScreenHeader, Card, SectionLabel, SkeletonList, ErrorState, LineChart, BarChart, TrendChip } from '../../components/adminui';
 import CalendarModal from '../../components/CalendarModal';
+import { supabase } from '../../lib/supabase';
+import { hasBeenCollected } from '../../lib/shipment';
 import type { MenuStackParams } from '../../navigation/types';
 
 // Reports: server-aggregated operational and financial reporting with
@@ -25,10 +27,13 @@ const RANGES: Array<{ key: RangeKey; label: string }> = [
   { key: 'custom', label: 'Custom' },
 ];
 
-export default function ReportsScreen({ navigation }: Props) {
+export default function ReportsScreen({ navigation, route }: Props) {
   const { width } = useWindowDimensions();
   const chartWidth = Math.min(width, 520) - spacing.lg * 2 - spacing.md * 2;
-  const [rangeKey, setRangeKey] = useState<RangeKey>('last30');
+  // Callers can land on a specific range — finance opens this on the month.
+  const requested = (route.params as { range?: RangeKey } | undefined)?.range;
+  const [rangeKey, setRangeKey] = useState<RangeKey>(
+    requested && RANGES.some((r) => r.key === requested) ? requested : 'last30');
   const [custom, setCustom] = useState<{ from: string; to: string }>(rangeFor('last30'));
   const [pickingEnd, setPickingEnd] = useState<null | 'from' | 'to'>(null);
   const [report, setReport] = useState<AdminReport | null>(null);
@@ -36,6 +41,9 @@ export default function ReportsScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  // Counted here rather than taken from the report routine — see the note
+  // on the totals card below.
+  const [collected, setCollected] = useState<number | null>(null);
 
   const range = rangeKey === 'custom' ? custom : rangeFor(rangeKey);
 
@@ -46,6 +54,24 @@ export default function ReportsScreen({ navigation }: Props) {
     } catch (e: any) {
       setError(e?.message || 'Could not load the report.');
     }
+    /**
+     * "Shipments collected", counted from the shipments themselves.
+     *
+     * `admin_reports` answers this from completed `driver_run_stops`, which are
+     * only written when dispatch built a run and the driver worked it in the
+     * app. That is not how most of these are collected, so the routine reports
+     * near zero while the bookings are already in transit. Status is the field
+     * that is actually kept up to date, so it is counted instead — over the
+     * same window and the same `created_at` the rest of the report uses, which
+     * keeps this directly comparable with the shipment total beside it.
+     */
+    const result = await supabase
+      .from('shipments')
+      .select('status,collection_status')
+      .is('deleted_at', null)
+      .gte('created_at', `${range.from}T00:00:00`)
+      .lte('created_at', `${range.to}T23:59:59`);
+    setCollected(result.error ? null : (result.data || []).filter(hasBeenCollected).length);
   }, [range.from, range.to]);
 
   useEffect(() => { (async () => { setLoading(true); await load(); setLoading(false); })(); }, [load]);
@@ -53,7 +79,7 @@ export default function ReportsScreen({ navigation }: Props) {
   const doExport = (kind: 'pdf' | 'csv') => {
     if (!report) return;
     setExporting(true);
-    (kind === 'pdf' ? shareReportPdf(report, 'Operations Report') : shareReportCsv(report))
+    (kind === 'pdf' ? shareReportPdf(report, 'Operations Report', collected) : shareReportCsv(report, collected))
       .catch((e: any) => Alert.alert('Export failed', e?.message || 'Try again.'))
       .finally(() => setExporting(false));
   };
@@ -102,6 +128,36 @@ export default function ReportsScreen({ navigation }: Props) {
         {error ? <ErrorState message={error} onRetry={load} /> : null}
         {loading || !report ? (error ? null : <SkeletonList rows={6} />) : (
           <>
+            {/* The three figures the report is opened for. All three were
+                derivable before — but only by reading two separate cards, with
+                pounds and euros joined into one string so neither could be read
+                on its own. */}
+            <Card>
+              <Text style={styles.cardTitle}>Totals for this period</Text>
+              <View style={styles.headlineRow}>
+                <View style={styles.headlineCell}>
+                  <Text style={styles.headlineValue}>{collected ?? '\u2014'}</Text>
+                  <Text style={styles.headlineLabel}>Shipments collected</Text>
+                </View>
+                <View style={styles.headlineCell}>
+                  <Text style={styles.headlineValue} numberOfLines={1} adjustsFontSizeToFit>
+                    {reportHeadline(report).gbpLabel}
+                  </Text>
+                  <Text style={styles.headlineLabel}>Total pounds</Text>
+                </View>
+                <View style={styles.headlineCell}>
+                  <Text style={styles.headlineValue} numberOfLines={1} adjustsFontSizeToFit>
+                    {reportHeadline(report).eurLabel}
+                  </Text>
+                  <Text style={styles.headlineLabel}>Total euros</Text>
+                </View>
+              </View>
+              <Text style={styles.headlineNote}>
+                Collected counts bookings from this period that have reached collection or beyond.
+                Totals are payments received, kept apart by currency rather than added together.
+              </Text>
+            </Card>
+
             {/* Revenue */}
             <Card onPress={() => navigation.navigate('Analytics')}>
               <View style={styles.cardHead}>
@@ -180,14 +236,6 @@ export default function ReportsScreen({ navigation }: Props) {
 
             <SectionLabel text="Operations" />
             <Card>
-              <Text style={styles.cardTitle}>Driver completion</Text>
-              {report.driverPerformance.length === 0 ? <Text style={styles.compare}>No driver activity in this range.</Text>
-                : report.driverPerformance.map((d) => (
-                  <BreakdownRow key={d.driverId} label={d.name}
-                    value={`${d.completed} done${d.failed ? ` · ${d.failed} exceptions` : ''}`} />
-                ))}
-            </Card>
-            <Card>
               <Text style={styles.cardTitle}>Quote conversion</Text>
               <View style={styles.pairRow}>
                 <Metric label="Requested" value={String(report.quotes.requested)} />
@@ -204,13 +252,6 @@ export default function ReportsScreen({ navigation }: Props) {
                 <Metric label="New customers" value={String(report.customers.new)} tone={colors.primaryDark} />
                 <Metric label="Returning" value={String(report.customers.returning)} />
               </View>
-            </Card>
-            <Card>
-              <Text style={styles.cardTitle}>Delivery exceptions</Text>
-              {Object.keys(report.failReasons).length === 0 ? <Text style={styles.compare}>No exceptions in this range.</Text>
-                : Object.entries(report.failReasons).map(([reason, count]) => (
-                  <BreakdownRow key={reason} label={reason.replace(/_/g, ' ')} value={String(count)} />
-                ))}
             </Card>
             <Card>
               <Text style={styles.cardTitle}>Payment-proof approvals</Text>
@@ -263,6 +304,11 @@ function BreakdownRow({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+  headlineRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  headlineCell: { flex: 1, alignItems: 'center', paddingVertical: spacing.md, borderRadius: radius.md, backgroundColor: colors.primarySoft },
+  headlineValue: { fontSize: 19, fontWeight: '900', color: colors.primaryDark },
+  headlineLabel: { fontSize: 10, fontWeight: '700', color: colors.primaryDark, marginTop: 4, textAlign: 'center' },
+  headlineNote: { fontSize: 11, color: colors.textMuted, lineHeight: 16, marginTop: spacing.sm },
   safe: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg, paddingBottom: 56, gap: spacing.sm },
   exportRow: { flexDirection: 'row', gap: spacing.sm },

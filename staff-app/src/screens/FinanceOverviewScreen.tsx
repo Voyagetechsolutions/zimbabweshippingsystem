@@ -1,326 +1,422 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import {
+  ActivityIndicator, Alert, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { colors, radius, spacing } from '../theme';
-import { money } from '../lib/format';
-import { currencyLine, percentChange } from '../lib/reports';
-import { ScreenHeader, Card, SectionLabel, Badge, BADGE, Avatar, SkeletonList, ErrorState, LineChart, TrendChip } from '../components/adminui';
+import { hasBeenCollected, type Shipment, senderName } from '../lib/shipment';
+import {
+  getInvoice, getInvoiceStatus, getPaymentSummary, hasInvoice, INVOICE_STATUS_STYLE, invoiceSymbol,
+} from '../lib/invoice';
+import { ScreenHeader, Avatar, SkeletonList, ErrorState } from '../components/adminui';
 
-// Finance Overview: server-aggregated cash position, cash flow, reconciliation
-// workload and recent transactions with proof review + reconcile actions.
+const RECEIVED_PAYMENT_STATUSES = new Set(['completed', 'paid', 'success', 'succeeded', 'verified']);
 
-interface Overview {
-  collectedByCurrency: Record<string, number>;
-  pendingByCurrency: Record<string, number>;
-  pendingPaymentCount: number;
-  expensesTotal: number;
-  incoming30: number; incomingPrev30: number;
-  outgoing30: number; outgoingPrev30: number;
-  billedByCurrency: Record<string, number>;
-  unpaidInvoices: number;
-  outstandingByCurrency: Record<string, number>;
-  unreconciledPayments: number;
-  pendingProofs: number;
-  cashflow: Array<{ day: string; inGBP: number; inEUR: number; out: number }>;
-  recentTransactions: Array<{
-    id: string; amount: number; currency: string; method: string | null; status: string | null;
-    reconciled: boolean; createdAt: string; shipmentId: string | null; reference: string | null;
-    customer: string; proofId: string | null;
-  }>;
-}
+/**
+ * A proof of payment, with the customer who sent it attached.
+ *
+ * `payment_proofs.user_id` points at an auth user, not at `profiles`, so
+ * PostgREST cannot join the two for us — the name is resolved separately and
+ * folded in here. A proof that cannot be tied to a named customer is the one
+ * thing finance cannot act on, so the shipment's own sender name is used as the
+ * fallback before giving up and saying so.
+ */
+type ProofRow = {
+  id: string;
+  amount: number | null;
+  currency: string | null;
+  status: 'pending' | 'verified' | 'rejected' | string;
+  storage_path: string;
+  customer_notes: string | null;
+  finance_notes: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+  customer: string;
+  contact: string;
+  reference: string;
+};
 
+const PROOF_TONE: Record<string, { bg: string; fg: string; label: string }> = {
+  pending: { bg: '#fef3c7', fg: '#b45309', label: 'Awaiting review' },
+  verified: { bg: '#d1fae5', fg: '#047857', label: 'Approved' },
+  rejected: { bg: '#fee2e2', fg: '#b91c1c', label: 'Rejected' },
+};
+
+
+/**
+ * Finance, deliberately small.
+ *
+ * This screen used to carry a cash position, incoming/outgoing/net metrics, a
+ * financial summary, a cash-flow chart, reconciliation counters and a
+ * transaction feed. None of it was what finance actually does here day to day,
+ * which is: raise an invoice, correct one, remove one, and pull the month's
+ * numbers. So that is all this is — the four things, the live collection and
+ * payment totals, plus the invoices you most recently touched.
+ */
 export default function FinanceOverviewScreen() {
   const navigation = useNavigation<any>();
-  const { session, profile, dashboardRole } = useAuth();
-  const { width } = useWindowDimensions();
-  const chartWidth = Math.min(width, 520) - spacing.lg * 2 - spacing.md * 2;
-  const [overview, setOverview] = useState<Overview | null>(null);
+  const { session, profile } = useAuth();
+  const [recent, setRecent] = useState<Shipment[]>([]);
+  const [collectionTotals, setCollectionTotals] = useState({ count: 0, money: {} as Record<string, number> });
+  const [proofs, setProofs] = useState<ProofRow[]>([]);
+  const [proofsError, setProofsError] = useState<string | null>(null);
+  const [openProof, setOpenProof] = useState<ProofRow | null>(null);
+  const [proofUri, setProofUri] = useState<string | null>(null);
+  const [reviewNote, setReviewNote] = useState('');
+  const [reviewing, setReviewing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [period, setPeriod] = useState<7 | 30>(30);
-  const [transaction, setTransaction] = useState<Overview['recentTransactions'][number] | null>(null);
-  const [proofUri, setProofUri] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [driverInvoices, setDriverInvoices] = useState<{ count: number; byCurrency: Record<string, number> }>({ count: 0, byCurrency: {} });
 
   const load = useCallback(async () => {
     setError(null);
-    const [{ data, error: rpcError }, invoiceResult] = await Promise.all([
-      supabase.rpc('admin_finance_overview'),
-      supabase.from('driver_invoices').select('total,currency,status,created_at').gte('created_at', new Date(Date.now() - 30 * 864e5).toISOString()).neq('status', 'void'),
+    const [shipmentResult, collectionResult, paymentResult, proofResult] = await Promise.all([
+      supabase.from('shipments').select('*').is('deleted_at', null).order('updated_at', { ascending: false }).limit(200),
+      supabase.from('shipments').select('status,collection_status').is('deleted_at', null),
+      supabase.from('payments').select('amount,currency,payment_status'),
+      // Pending first. Ordering purely by date meant that once forty proofs
+      // had been reviewed, a new one needing action could sit below the cut and
+      // never be seen.
+      supabase.from('payment_proofs')
+        .select('id,user_id,shipment_id,amount,currency,status,storage_path,customer_notes,finance_notes,created_at,reviewed_at')
+        .order('status', { ascending: true })
+        .order('created_at', { ascending: false })
+        .limit(40),
     ]);
-    if (rpcError) { console.error('Finance overview failed', rpcError); setError('Finance information is unavailable. Check your access and try again.'); return; }
-    setOverview(data as Overview);
-    if (!invoiceResult.error) {
-      const rows = invoiceResult.data || []; const byCurrency: Record<string, number> = {};
-      for (const row of rows) byCurrency[row.currency || 'GBP'] = (byCurrency[row.currency || 'GBP'] || 0) + (Number(row.total) || 0);
-      setDriverInvoices({ count: rows.length, byCurrency });
+    // Reported separately: these are independent queries, and letting one
+    // failure return early hid the proofs behind an invoice problem.
+    if (shipmentResult.error) setError('Invoices are unavailable. Check your access and try again.');
+    const shipments = (shipmentResult.data as Shipment[]) || [];
+    const collectionShipments = (collectionResult.data as Array<{ status: string | null; collection_status: string | null }>) || [];
+    const moneyByCurrency: Record<string, number> = {};
+    for (const payment of paymentResult.data || []) {
+      if (!RECEIVED_PAYMENT_STATUSES.has(String(payment.payment_status || '').toLowerCase())) continue;
+      const currency = String(payment.currency || 'GBP').toUpperCase();
+      moneyByCurrency[currency] = (moneyByCurrency[currency] || 0) + (Number(payment.amount) || 0);
+    }
+    setCollectionTotals({
+      count: collectionShipments.filter(hasBeenCollected).length,
+      money: moneyByCurrency,
+    });
+    setRecent(shipments
+      .filter((s) => hasInvoice(s) && !getInvoice(s).deletedAt)
+      .slice(0, 6));
+
+    // Attach the customer. Two lookups rather than a join, because
+    // payment_proofs references auth.users and PostgREST cannot reach profiles
+    // from there. A missing profile falls back to the shipment's own sender.
+    // A failed query is not an empty one. Reporting "no proofs" when the read
+    // actually broke tells finance there is nothing to do, which is the one
+    // wrong answer this screen must never give.
+    if (proofResult.error) {
+      setProofsError('Proof of payment could not be loaded. Check your access and try again.');
+      setProofs([]);
+      return;
+    }
+    setProofsError(null);
+    const proofRows = (proofResult.data as any[]) || [];
+    if (proofRows.length) {
+      const userIds = [...new Set(proofRows.map((row) => row.user_id).filter(Boolean))];
+      const shipmentIds = [...new Set(proofRows.map((row) => row.shipment_id).filter(Boolean))];
+      const [profileResult, proofShipments] = await Promise.all([
+        userIds.length
+          ? supabase.from('profiles').select('id,full_name,email,phone_number').in('id', userIds)
+          : Promise.resolve({ data: [] as any[] }),
+        shipmentIds.length
+          ? supabase.from('shipments').select('id,customer_reference,tracking_number,metadata').in('id', shipmentIds)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
+      const byUser = new Map((profileResult.data || []).map((row: any) => [row.id, row]));
+      const byShipment = new Map((proofShipments.data || []).map((row: any) => [row.id, row]));
+      setProofs(proofRows.map((row) => {
+        const profileRow: any = byUser.get(row.user_id);
+        const shipmentRow: any = byShipment.get(row.shipment_id);
+        const fromShipment = shipmentRow ? senderName(shipmentRow as Shipment) : '';
+        return {
+          id: row.id,
+          amount: row.amount,
+          currency: row.currency,
+          status: row.status,
+          storage_path: row.storage_path,
+          customer_notes: row.customer_notes,
+          finance_notes: row.finance_notes,
+          created_at: row.created_at,
+          reviewed_at: row.reviewed_at,
+          customer: profileRow?.full_name
+            || (fromShipment && fromShipment !== 'No Name' ? fromShipment : '')
+            || profileRow?.email
+            || 'Customer not matched',
+          contact: profileRow?.email || profileRow?.phone_number || '',
+          reference: shipmentRow?.customer_reference || shipmentRow?.tracking_number || 'No shipment linked',
+        } satisfies ProofRow;
+      }));
+    } else {
+      setProofs([]);
     }
   }, []);
 
-  useEffect(() => { (async () => { setLoading(true); await load(); setLoading(false); })(); }, [load]);
-
-  useEffect(() => {
-    const channel = supabase
-      .channel('staff-finance-overview-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, load)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_proofs' }, load)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'finance_expenses' }, load)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shipments' }, load)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'driver_invoices' }, load)
-      .subscribe();
-
-    return () => { void supabase.removeChannel(channel); };
-  }, [load]);
-
-  const cashflow = useMemo(() => (overview?.cashflow || []).slice(-period), [overview, period]);
-  const netSeries = cashflow.map((d) => ({
-    label: new Date(`${d.day}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
-    value: Number(d.inGBP) + Number(d.inEUR),
-  }));
-
-  const openTransaction = async (t: Overview['recentTransactions'][number]) => {
-    setTransaction(t);
+  /** Open one proof and fetch a short-lived link to the image behind it. */
+  const viewProof = async (proof: ProofRow) => {
+    setOpenProof(proof);
     setProofUri(null);
-    if (t.proofId) {
-      const { data: proof } = await supabase.from('payment_proofs').select('storage_path,status').eq('id', t.proofId).maybeSingle();
-      if (proof?.storage_path) {
-        const { data: signed } = await supabase.storage.from('payment-proofs').createSignedUrl(proof.storage_path, 600);
-        setProofUri(signed?.signedUrl || null);
-      }
+    setReviewNote('');
+    const { data } = await supabase.storage.from('payment-proofs').createSignedUrl(proof.storage_path, 600);
+    setProofUri(data?.signedUrl || null);
+  };
+
+  const review = async (approved: boolean) => {
+    if (!openProof) return;
+    if (!approved && !reviewNote.trim()) {
+      Alert.alert('Say why', 'A rejected proof is sent back to the customer, so tell them what was wrong with it.');
+      return;
+    }
+    setReviewing(true);
+    try {
+      const { error: rpcError } = await supabase.rpc('review_payment_proof', {
+        p_proof_id: openProof.id,
+        p_approved: approved,
+        p_finance_notes: reviewNote.trim() || null,
+      });
+      if (rpcError) throw rpcError;
+      setOpenProof(null);
+      await load();
+      Alert.alert(approved ? 'Proof approved' : 'Proof rejected',
+        approved
+          ? 'The payment is recorded against the customer.'
+          : 'The customer has been told and can upload another.');
+    } catch (e: any) {
+      Alert.alert('Could not save the review', e?.message || 'Nothing was changed. Check your access and try again.');
+    } finally {
+      setReviewing(false);
     }
   };
 
-  const reviewProof = async (approved: boolean) => {
-    if (!transaction?.proofId) return;
-    setBusy(true);
-    try {
-      const { error: rpcError } = await supabase.rpc('review_payment_proof', {
-        p_proof_id: transaction.proofId, p_approved: approved, p_finance_notes: null,
-      });
-      if (rpcError) throw rpcError;
-      Alert.alert('Done', approved ? 'Proof approved.' : 'Proof rejected — the customer has been notified.');
-      setTransaction(null);
-      await load();
-    } catch (e: any) { Alert.alert('Review failed', e?.message); }
-    finally { setBusy(false); }
-  };
+  useFocusEffect(useCallback(() => { (async () => { setLoading(true); await load(); setLoading(false); })(); }, [load]));
 
-  const reconcile = async () => {
-    if (!transaction) return;
-    setBusy(true);
-    try {
-      const { error: rpcError } = await supabase.rpc('set_payment_reconciled', {
-        p_payment_id: transaction.id, p_reconciled: true, p_notes: null,
-      });
-      if (rpcError) throw rpcError;
-      setTransaction(null);
-      await load();
-    } catch (e: any) { Alert.alert('Could not reconcile', e?.message); }
-    finally { setBusy(false); }
-  };
+  const pendingProofs = useMemo(() => proofs.filter((proof) => proof.status === 'pending').length, [proofs]);
 
-  const incomingChange = overview ? percentChange(overview.incoming30, overview.incomingPrev30) : null;
-  const net30 = overview ? overview.incoming30 - overview.outgoing30 : 0;
+  const receivedMoney = useMemo(() => {
+    const currencies = ['GBP', 'EUR'];
+    return currencies.map((currency) => {
+      const symbol = currency === 'EUR' ? '€' : '£';
+      return `${symbol}${(collectionTotals.money[currency] || 0).toFixed(2)}`;
+    }).join('  ·  ');
+  }, [collectionTotals.money]);
+
+  const actions: Array<{ icon: keyof typeof Ionicons.glyphMap; title: string; text: string; onPress: () => void; primary?: boolean }> = [
+    {
+      icon: 'add-circle-outline',
+      title: 'Create invoice',
+      text: 'Raise a new invoice for a customer',
+      onPress: () => navigation.navigate('Invoices', { create: true }),
+      primary: true,
+    },
+    {
+      icon: 'receipt-outline',
+      title: 'Invoices',
+      text: 'Open, edit or delete any invoice',
+      onPress: () => navigation.navigate('Invoices'),
+    },
+    {
+      icon: 'card-outline',
+      title: 'Payments',
+      text: 'Verification and allocation',
+      onPress: () => navigation.navigate('Payments'),
+    },
+    {
+      icon: 'bar-chart-outline',
+      title: 'Monthly report',
+      text: 'This month’s numbers, with PDF and CSV export',
+      onPress: () => navigation.navigate('Reports', { range: 'month' }),
+    },
+  ];
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={colors.primary} />}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} tintColor={colors.primary} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
+      >
         <ScreenHeader
-          title="Finance control centre"
+          title="Finance"
           subtitle={new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
-          onBell={() => {}}
           right={<Avatar name={profile?.full_name || session?.user.email} size={36} />}
         />
 
-        <View style={styles.quickRow}>
-          <QuickAction icon="receipt-outline" label="Invoices" onPress={() => navigation.navigate('Invoices')} />
-          <QuickAction icon="card-outline" label="Payments" onPress={() => navigation.navigate('Payments')} />
-          <QuickAction icon="git-compare-outline" label="Reconcile" onPress={() => navigation.navigate('Reconciliation')} />
-          <QuickAction icon="bar-chart-outline" label="Reports" onPress={() => navigation.navigate('Reports')} />
+        {actions.map((action) => (
+          <Pressable
+            key={action.title}
+            accessibilityRole="button"
+            style={[styles.action, action.primary && styles.actionPrimary]}
+            onPress={action.onPress}
+          >
+            <View style={[styles.actionIcon, action.primary && styles.actionIconPrimary]}>
+              <Ionicons name={action.icon} size={22} color={action.primary ? colors.white : colors.primaryDark} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.actionTitle, action.primary && styles.actionTitlePrimary]}>{action.title}</Text>
+              <Text style={[styles.actionText, action.primary && styles.actionTextPrimary]}>{action.text}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={action.primary ? colors.white : colors.textFaint} />
+          </Pressable>
+        ))}
+
+        <Text style={styles.sectionLabel}>COLLECTION & PAYMENT TOTALS</Text>
+        <View style={styles.totalRow}>
+          <View style={styles.totalCard}>
+            <Ionicons name="cube-outline" size={20} color={colors.primaryDark} />
+            <Text style={styles.totalValue}>{collectionTotals.count}</Text>
+            <Text style={styles.totalLabel}>Shipments collected</Text>
+          </View>
+          <View style={styles.totalCard}>
+            <Ionicons name="cash-outline" size={20} color={colors.primaryDark} />
+            <Text style={styles.totalValue} numberOfLines={1} adjustsFontSizeToFit>{receivedMoney}</Text>
+            <Text style={styles.totalLabel}>Money received</Text>
+          </View>
         </View>
 
         {error ? <ErrorState message={error} onRetry={load} /> : null}
-        {loading || !overview ? (error ? null : <SkeletonList rows={6} />) : (
-          <>
-            {/* Cash position */}
-            <View style={styles.cashCard}>
-              <Text style={styles.cashLabel}>CASH POSITION</Text>
-              <Text style={styles.cashValue}>{currencyLine(overview.collectedByCurrency)}</Text>
-              <View style={styles.cashTrendRow}>
-                <TrendChip current={overview.incoming30} previous={overview.incomingPrev30} />
-                <Text style={styles.cashCompare}>vs previous 30 days</Text>
+
+        {/* Proof of payment, with the customer who sent it. Finance cannot act
+            on a slip it cannot attribute, so the name leads each row. */}
+        <View style={styles.proofHead}>
+          <Text style={styles.sectionLabel}>PROOF OF PAYMENT</Text>
+          {pendingProofs > 0 ? (
+            <View style={styles.pendingPill}><Text style={styles.pendingPillText}>{pendingProofs} to review</Text></View>
+          ) : null}
+        </View>
+        {loading ? <SkeletonList rows={2} /> : proofsError ? (
+          <ErrorState message={proofsError} onRetry={load} />
+        ) : proofs.length === 0 ? (
+          <View style={styles.empty}>
+            <Ionicons name="receipt-outline" size={28} color={colors.textFaint} />
+            <Text style={styles.emptyText}>No customer has uploaded a proof of payment yet.</Text>
+          </View>
+        ) : proofs.slice(0, 6).map((proof) => {
+          const tone = PROOF_TONE[proof.status] || PROOF_TONE.pending;
+          const symbol = String(proof.currency || 'GBP').toUpperCase() === 'EUR' ? '\u20ac' : '\u00a3';
+          return (
+            <Pressable key={proof.id} style={styles.row} onPress={() => viewProof(proof)}>
+              <View style={styles.proofIcon}><Ionicons name="document-attach-outline" size={19} color={colors.primaryDark} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.customer} numberOfLines={1}>{proof.customer}</Text>
+                <Text style={styles.proofMeta} numberOfLines={1}>
+                  {proof.reference} · {new Date(proof.created_at).toLocaleDateString('en-GB')}
+                </Text>
               </View>
-              <LineChart width={chartWidth} height={72} color={colors.white}
-                points={netSeries.slice(-14)} />
-            </View>
-
-            {/* Metric cards */}
-            <View style={styles.metricRow}>
-              <Card style={{ flex: 1 }}>
-                <Text style={styles.metricLabel}>INCOMING (30D)</Text>
-                <Text style={[styles.metricValue, { color: colors.primaryDark }]}>{money(overview.incoming30)}</Text>
-              </Card>
-              <Card style={{ flex: 1 }}>
-                <Text style={styles.metricLabel}>OUTGOING (30D)</Text>
-                <Text style={[styles.metricValue, { color: colors.danger }]}>{money(overview.outgoing30)}</Text>
-              </Card>
-              <Card style={{ flex: 1 }}>
-                <Text style={styles.metricLabel}>NET</Text>
-                <Text style={[styles.metricValue, { color: net30 >= 0 ? colors.primaryDark : colors.danger }]}>{money(net30)}</Text>
-              </Card>
-            </View>
-
-            {/* Awaiting collection — real money not yet marked as received */}
-            {overview.pendingPaymentCount > 0 ? (
-              <Card onPress={() => navigation.navigate('Payments')} style={{ borderColor: colors.amberBorder, backgroundColor: colors.amberSoft }}>
-                <View style={styles.pendingRow}>
-                  <Ionicons name="hourglass-outline" size={19} color={colors.amber} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.pendingTitle}>{currencyLine(overview.pendingByCurrency)} awaiting collection</Text>
-                    <Text style={styles.pendingText}>
-                      {overview.pendingPaymentCount} payment{overview.pendingPaymentCount === 1 ? '' : 's'} still marked pending — they are excluded from the cash position until marked as paid.
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.amber} />
-                </View>
-              </Card>
-            ) : null}
-
-            <Card onPress={() => navigation.navigate('Invoices')}>
-              <View style={styles.pendingRow}>
-                <Ionicons name="car-outline" size={19} color={colors.primary} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.pendingTitle}>Driver-confirmed collection invoices</Text>
-                  <Text style={styles.pendingText}>{driverInvoices.count} in the last 30 days · {currencyLine(driverInvoices.byCurrency)}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={colors.primary} />
-              </View>
-            </Card>
-
-            {/* Financial summary */}
-            <SectionLabel text="Financial summary" />
-            <Card>
-              <SummaryRow label="Total billed" value={currencyLine(overview.billedByCurrency)} />
-              <SummaryRow label="Total collected" value={currencyLine(overview.collectedByCurrency)} />
-              <SummaryRow label="Awaiting collection" value={`${currencyLine(overview.pendingByCurrency)} (${overview.pendingPaymentCount} pending)`} tone={overview.pendingPaymentCount ? colors.amber : undefined} />
-              <SummaryRow label="Outstanding" value={`${currencyLine(overview.outstandingByCurrency)} (${overview.unpaidInvoices} invoices)`} tone={overview.unpaidInvoices ? colors.danger : undefined} />
-              <SummaryRow label="Expenses" value={money(overview.expensesTotal)} />
-              <SummaryRow label="Incoming change" value={incomingChange != null ? `${incomingChange >= 0 ? '+' : ''}${incomingChange.toFixed(0)}% vs previous period` : '—'} />
-            </Card>
-
-            {/* Cash-flow trend */}
-            <SectionLabel text="Cash-flow trend" />
-            <Card>
-              <View style={styles.cardHead}>
-                <Text style={styles.cardTitle}>Incoming payments</Text>
-                <View style={styles.periodRow}>
-                  {[7, 30].map((p) => (
-                    <Pressable key={p} style={[styles.periodChip, period === p && styles.periodChipActive]} onPress={() => setPeriod(p as 7 | 30)}>
-                      <Text style={[styles.periodText, period === p && { color: colors.white }]}>{p}d</Text>
-                    </Pressable>
-                  ))}
+              <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                <Text style={styles.amount}>{proof.amount != null ? `${symbol}${Number(proof.amount).toFixed(2)}` : '\u2014'}</Text>
+                <View style={[styles.badge, { backgroundColor: tone.bg }]}>
+                  <Text style={{ color: tone.fg, fontSize: 9, fontWeight: '900' }}>{tone.label.toUpperCase()}</Text>
                 </View>
               </View>
-              <LineChart width={chartWidth} points={netSeries} />
-              <Text style={styles.muted}>Outgoing (expenses) in range: {money(cashflow.reduce((s, d) => s + Number(d.out), 0))}</Text>
-            </Card>
-
-            {/* Reconciliation workload */}
-            <View style={styles.metricRow}>
-              <Card style={{ flex: 1 }} onPress={() => navigation.navigate('Payments')}>
-                <Text style={styles.metricLabel}>NEED RECONCILING</Text>
-                <Text style={[styles.metricValue, { color: overview.unreconciledPayments ? colors.orange : colors.primaryDark }]}>{overview.unreconciledPayments}</Text>
-                <Text style={styles.muted}>payments</Text>
-              </Card>
-              <Card style={{ flex: 1 }} onPress={() => navigation.navigate('Payments')}>
-                <Text style={styles.metricLabel}>PROOFS TO VALIDATE</Text>
-                <Text style={[styles.metricValue, { color: overview.pendingProofs ? colors.orange : colors.primaryDark }]}>{overview.pendingProofs}</Text>
-                <Text style={styles.muted}>awaiting review</Text>
-              </Card>
-            </View>
-
-            {/* Recent transactions */}
-            <SectionLabel text="Recent transactions" />
-            {overview.recentTransactions.length === 0 ? (
-              <Card><Text style={styles.muted}>No payments recorded yet.</Text></Card>
-            ) : overview.recentTransactions.map((t) => {
-              const statusLower = String(t.status || '').toLowerCase();
-              const badge = t.reconciled ? { label: 'Reconciled', tone: BADGE.blue }
-                : ['completed', 'paid', 'success', 'succeeded'].includes(statusLower) ? { label: 'Paid', tone: BADGE.green }
-                : statusLower.includes('reject') || statusLower.includes('fail') ? { label: 'Rejected', tone: BADGE.red }
-                : { label: 'Pending', tone: BADGE.orange };
-              return (
-                <Pressable key={t.id} style={styles.txRow} onPress={() => openTransaction(t)}>
-                  <View style={styles.txIcon}><Ionicons name="card-outline" size={17} color={colors.primaryDark} /></View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.txCustomer} numberOfLines={1}>{t.customer}</Text>
-                    <Text style={styles.muted}>{[t.reference, t.method].filter(Boolean).join(' · ')} · {new Date(t.createdAt).toLocaleDateString()}</Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end', gap: 3 }}>
-                    <Text style={styles.txAmount}>{money(Number(t.amount) || 0, t.currency === 'EUR' ? '€' : '£')}</Text>
-                    <Badge text={badge.label} tone={badge.tone} />
-                  </View>
-                </Pressable>
-              );
-            })}
-
-            <Pressable style={styles.reportsButton} onPress={() => navigation.navigate('Reports')}>
-              <Ionicons name="stats-chart-outline" size={16} color={colors.white} />
-              <Text style={styles.reportsText}>Open full reports</Text>
             </Pressable>
-          </>
-        )}
+          );
+        })}
+
+        <Text style={styles.sectionLabel}>RECENT INVOICES</Text>
+        {loading ? <SkeletonList rows={4} /> : recent.length === 0 ? (
+          <View style={styles.empty}>
+            <Ionicons name="receipt-outline" size={30} color={colors.textFaint} />
+            <Text style={styles.emptyText}>No invoices yet. Create the first one above.</Text>
+          </View>
+        ) : recent.map((s) => {
+          const invoice = getInvoice(s);
+          const summary = getPaymentSummary(invoice);
+          const tone = INVOICE_STATUS_STYLE[getInvoiceStatus(invoice)];
+          // Straight to the document. This opened the invoices list and left
+          // you to find the one you had just tapped.
+          return (
+            <Pressable key={s.id} style={styles.row} onPress={() => navigation.navigate('Document', { shipmentId: s.id, kind: 'invoice' })}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.number}>{invoice.invoiceNumber || '—'}</Text>
+                <Text style={styles.customer} numberOfLines={1}>{senderName(s)}</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                <Text style={styles.amount}>{invoiceSymbol(invoice.currency)}{summary.total.toFixed(2)}</Text>
+                <View style={[styles.badge, { backgroundColor: tone.bg }]}>
+                  <Text style={{ color: tone.fg, fontSize: 9, fontWeight: '900' }}>{tone.label.toUpperCase()}</Text>
+                </View>
+              </View>
+            </Pressable>
+          );
+        })}
       </ScrollView>
 
-      {/* Transaction detail */}
-      <Modal visible={Boolean(transaction)} transparent animationType="slide" onRequestClose={() => setTransaction(null)}>
-        <View style={styles.modalShade}>
-          <View style={styles.modalCard}>
-            <ScrollView>
-              {transaction ? (
-                <>
-                  <Text style={styles.modalTitle}>{money(Number(transaction.amount) || 0, transaction.currency === 'EUR' ? '€' : '£')}</Text>
-                  <Text style={styles.muted}>{transaction.customer} · {transaction.reference || 'No reference'} · {transaction.method || 'Unknown method'}</Text>
-                  <Text style={styles.muted}>{new Date(transaction.createdAt).toLocaleString()}</Text>
-                  {proofUri ? (
-                    <>
-                      <Text style={styles.blockLabel}>PROOF OF PAYMENT</Text>
-                      <Image source={{ uri: proofUri }} style={styles.proofImage} resizeMode="cover" />
-                      <View style={styles.modalRow}>
-                        <Pressable style={[styles.modalPrimary, busy && { opacity: 0.5 }]} disabled={busy} onPress={() => reviewProof(true)}>
-                          <Text style={styles.modalPrimaryText}>Approve proof</Text>
-                        </Pressable>
-                        <Pressable style={[styles.modalDangerOutline, busy && { opacity: 0.5 }]} disabled={busy} onPress={() => reviewProof(false)}>
-                          <Text style={styles.modalDangerText}>Reject</Text>
-                        </Pressable>
+      <Modal visible={Boolean(openProof)} transparent animationType="slide" onRequestClose={() => setOpenProof(null)}>
+        <View style={styles.shade}>
+          <View style={styles.sheet}>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {openProof ? (() => {
+                const symbol = String(openProof.currency || 'GBP').toUpperCase() === 'EUR' ? '\u20ac' : '\u00a3';
+                const tone = PROOF_TONE[openProof.status] || PROOF_TONE.pending;
+                return (
+                  <>
+                    <Text style={styles.sheetTitle}>{openProof.customer}</Text>
+                    <Text style={styles.proofMeta}>
+                      {openProof.contact || 'No contact on file'} · {openProof.reference}
+                    </Text>
+                    <View style={styles.sheetAmountRow}>
+                      <Text style={styles.sheetAmount}>
+                        {openProof.amount != null ? `${symbol}${Number(openProof.amount).toFixed(2)}` : 'Amount not stated'}
+                      </Text>
+                      <View style={[styles.badge, { backgroundColor: tone.bg }]}>
+                        <Text style={{ color: tone.fg, fontSize: 9, fontWeight: '900' }}>{tone.label.toUpperCase()}</Text>
                       </View>
-                    </>
-                  ) : transaction.proofId ? <Text style={styles.muted}>Loading proof…</Text> : <Text style={styles.muted}>No proof of payment attached.</Text>}
-                  {!transaction.reconciled ? (
-                    <Pressable style={[styles.modalPrimary, busy && { opacity: 0.5 }]} disabled={busy} onPress={reconcile}>
-                      <Text style={styles.modalPrimaryText}>Mark reconciled</Text>
-                    </Pressable>
-                  ) : null}
-                  <View style={styles.modalRow}>
-                    <Pressable style={styles.modalSecondary} onPress={() => { setTransaction(null); navigation.navigate('Invoices'); }}>
-                      <Text style={styles.modalSecondaryText}>View invoices</Text>
-                    </Pressable>
-                    {dashboardRole === 'admin' ? (
-                      <Pressable style={styles.modalSecondary} onPress={() => { setTransaction(null); navigation.navigate('Customers'); }}>
-                        <Text style={styles.modalSecondaryText}>View customer</Text>
-                      </Pressable>
+                    </View>
+                    <Text style={styles.proofMeta}>
+                      Uploaded {new Date(openProof.created_at).toLocaleString('en-GB')}
+                    </Text>
+                    {openProof.customer_notes ? (
+                      <><Text style={styles.blockLabel}>WHAT THE CUSTOMER SAID</Text><Text style={styles.body}>{openProof.customer_notes}</Text></>
                     ) : null}
-                  </View>
-                </>
-              ) : null}
-              <Pressable style={styles.modalCancel} onPress={() => setTransaction(null)}><Text style={styles.modalCancelText}>Close</Text></Pressable>
+
+                    <Text style={styles.blockLabel}>THE SLIP</Text>
+                    {proofUri ? (
+                      <Image source={{ uri: proofUri }} style={styles.proofImage} resizeMode="contain" />
+                    ) : (
+                      <View style={styles.proofImagePlaceholder}><ActivityIndicator color={colors.primary} /></View>
+                    )}
+
+                    {openProof.status === 'pending' ? (
+                      <>
+                        <Text style={styles.blockLabel}>NOTE (REQUIRED TO REJECT)</Text>
+                        <TextInput
+                          style={styles.input}
+                          value={reviewNote}
+                          onChangeText={setReviewNote}
+                          multiline
+                          placeholder="What you checked, or what was wrong with it"
+                          placeholderTextColor={colors.textFaint}
+                        />
+                        <View style={styles.sheetActions}>
+                          <Pressable style={[styles.approve, reviewing && { opacity: 0.5 }]} disabled={reviewing} onPress={() => review(true)}>
+                            {reviewing ? <ActivityIndicator color={colors.white} /> : <Text style={styles.approveText}>Approve</Text>}
+                          </Pressable>
+                          <Pressable style={[styles.reject, reviewing && { opacity: 0.5 }]} disabled={reviewing} onPress={() => review(false)}>
+                            <Text style={styles.rejectText}>Reject</Text>
+                          </Pressable>
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={styles.blockLabel}>REVIEWED</Text>
+                        <Text style={styles.body}>
+                          {openProof.reviewed_at ? new Date(openProof.reviewed_at).toLocaleString('en-GB') : 'Already reviewed'}
+                          {openProof.finance_notes ? ` \u2014 ${openProof.finance_notes}` : ''}
+                        </Text>
+                      </>
+                    )}
+                    <Pressable style={styles.close} onPress={() => setOpenProof(null)}>
+                      <Text style={styles.closeText}>Close</Text>
+                    </Pressable>
+                  </>
+                );
+              })() : null}
             </ScrollView>
           </View>
         </View>
@@ -329,60 +425,56 @@ export default function FinanceOverviewScreen() {
   );
 }
 
-function SummaryRow({ label, value, tone }: { label: string; value: string; tone?: string }) {
-  return (
-    <View style={styles.summaryRow}>
-      <Text style={styles.summaryLabel}>{label}</Text>
-      <Text style={[styles.summaryValue, tone ? { color: tone } : null]} numberOfLines={2}>{value}</Text>
-    </View>
-  );
-}
-
-function QuickAction({icon,label,onPress}:{icon:keyof typeof Ionicons.glyphMap;label:string;onPress:()=>void}){return <Pressable accessibilityRole="button" style={styles.quickAction} onPress={onPress}><View style={styles.quickIcon}><Ionicons name={icon} size={18} color={colors.primaryDark}/></View><Text style={styles.quickText}>{label}</Text></Pressable>}
-
 const styles = StyleSheet.create({
+  proofHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  pendingPill: { backgroundColor: colors.amberSoft, borderWidth: 1, borderColor: colors.amberBorder, borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 3, marginTop: spacing.md },
+  pendingPillText: { fontSize: 10, fontWeight: '900', color: colors.amber },
+  proofIcon: { width: 38, height: 38, borderRadius: 10, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md },
+  proofMeta: { fontSize: 11.5, color: colors.textMuted, marginTop: 3, lineHeight: 16 },
+  shade: { flex: 1, backgroundColor: 'rgba(15,23,42,.55)', justifyContent: 'flex-end' },
+  sheet: { maxHeight: '92%', backgroundColor: colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: spacing.lg },
+  sheetTitle: { fontSize: 19, fontWeight: '900', color: colors.text },
+  sheetAmountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm },
+  sheetAmount: { fontSize: 24, fontWeight: '900', color: colors.text },
+  blockLabel: { fontSize: 9.5, fontWeight: '900', color: colors.textMuted, letterSpacing: 0.6, marginTop: spacing.md, marginBottom: 5 },
+  body: { fontSize: 13, color: colors.text, lineHeight: 19 },
+  proofImage: { width: '100%', height: 300, borderRadius: radius.md, backgroundColor: colors.bg },
+  proofImagePlaceholder: { width: '100%', height: 160, borderRadius: radius.md, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+  input: { minHeight: 72, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, padding: 11, fontSize: 13, color: colors.text, backgroundColor: colors.bg, textAlignVertical: 'top' },
+  sheetActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  approve: { flex: 1, minHeight: 48, borderRadius: radius.sm, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  approveText: { color: colors.white, fontWeight: '900', fontSize: 13 },
+  reject: { flex: 1, minHeight: 48, borderRadius: radius.sm, borderWidth: 1.5, borderColor: colors.danger, alignItems: 'center', justifyContent: 'center' },
+  rejectText: { color: colors.danger, fontWeight: '900', fontSize: 13 },
+  close: { alignItems: 'center', paddingVertical: 14, marginTop: spacing.sm },
+  closeText: { color: colors.textMuted, fontWeight: '700', fontSize: 13 },
   safe: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: spacing.lg, paddingBottom: 56, gap: spacing.sm },
-  quickRow:{flexDirection:'row',gap:7,marginBottom:4},quickAction:{flex:1,minWidth:0,alignItems:'center',gap:5,paddingVertical:10,borderRadius:12,backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border},quickIcon:{width:31,height:31,borderRadius:9,alignItems:'center',justifyContent:'center',backgroundColor:colors.primarySoft},quickText:{fontSize:9.5,fontWeight:'800',color:colors.text},
-  cashCard: { backgroundColor: colors.primaryDark, borderRadius: radius.lg, padding: spacing.lg, gap: 6 },
-  cashLabel: { fontSize: 9.5, fontWeight: '800', color: '#C9F0DF', letterSpacing: 0.6 },
-  cashValue: { fontSize: 26, fontWeight: '900', color: colors.white },
-  cashTrendRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  cashCompare: { fontSize: 10.5, color: '#C9F0DF' },
-  pendingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  pendingTitle: { fontSize: 14, fontWeight: '800', color: colors.amber },
-  pendingText: { fontSize: 11, color: colors.amber, marginTop: 2, lineHeight: 15 },
-  metricRow: { flexDirection: 'row', gap: spacing.sm },
-  metricLabel: { fontSize: 8.5, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.4 },
-  metricValue: { fontSize: 16, fontWeight: '900', color: colors.text, marginTop: 3 },
-  muted: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
-  cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
-  cardTitle: { fontSize: 14, fontWeight: '800', color: colors.text },
-  periodRow: { flexDirection: 'row', gap: 6 },
-  periodChip: { borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 11, paddingVertical: 5 },
-  periodChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  periodText: { fontSize: 11, fontWeight: '800', color: colors.textMuted },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md, paddingVertical: 7, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  summaryLabel: { fontSize: 12.5, color: colors.textMuted, fontWeight: '600' },
-  summaryValue: { fontSize: 12.5, fontWeight: '800', color: colors.text, flexShrink: 1, textAlign: 'right' },
-  txRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
-  txIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
-  txCustomer: { fontSize: 13.5, fontWeight: '800', color: colors.text },
-  txAmount: { fontSize: 14, fontWeight: '900', color: colors.text },
-  reportsButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary, borderRadius: radius.sm, paddingVertical: 13, marginTop: spacing.sm },
-  reportsText: { color: colors.white, fontWeight: '800', fontSize: 13 },
-  modalShade: { flex: 1, backgroundColor: 'rgba(15,23,42,.55)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: colors.surface, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.lg, maxHeight: '88%' },
-  modalTitle: { fontSize: 22, fontWeight: '900', color: colors.text },
-  blockLabel: { fontSize: 9.5, fontWeight: '800', color: colors.textMuted, letterSpacing: 0.5, marginTop: spacing.md, marginBottom: 6 },
-  proofImage: { width: '100%', height: 190, borderRadius: radius.sm, backgroundColor: colors.bg },
-  modalRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
-  modalPrimary: { flex: 1, backgroundColor: colors.primary, borderRadius: radius.sm, paddingVertical: 12, alignItems: 'center', marginTop: spacing.sm },
-  modalPrimaryText: { color: colors.white, fontWeight: '800', fontSize: 12.5 },
-  modalDangerOutline: { flex: 1, borderWidth: 1.5, borderColor: colors.danger, borderRadius: radius.sm, paddingVertical: 12, alignItems: 'center', marginTop: spacing.sm },
-  modalDangerText: { color: colors.danger, fontWeight: '800', fontSize: 12.5 },
-  modalSecondary: { flex: 1, borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.sm, paddingVertical: 11, alignItems: 'center' },
-  modalSecondaryText: { fontSize: 12.5, fontWeight: '800', color: colors.textMuted },
-  modalCancel: { alignItems: 'center', paddingVertical: 12 },
-  modalCancelText: { color: colors.textMuted, fontWeight: '700', fontSize: 13 },
+  content: { padding: spacing.lg, paddingBottom: 60, gap: spacing.sm },
+  action: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 76,
+    padding: spacing.md, borderRadius: radius.md,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+  },
+  actionPrimary: { backgroundColor: colors.primary, borderColor: colors.primary },
+  actionIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  actionIconPrimary: { backgroundColor: 'rgba(255,255,255,0.18)' },
+  actionTitle: { fontSize: 15, fontWeight: '800', color: colors.text },
+  actionTitlePrimary: { color: colors.white },
+  actionText: { fontSize: 12, color: colors.textMuted, marginTop: 2, lineHeight: 17 },
+  actionTextPrimary: { color: '#D6F2E5' },
+  sectionLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 0.8, color: colors.textMuted, marginTop: spacing.md },
+  totalRow: { flexDirection: 'row', gap: spacing.sm },
+  totalCard: { flex: 1, minHeight: 106, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.primarySoft, borderWidth: 1, borderColor: colors.border },
+  totalValue: { fontSize: 18, fontWeight: '900', color: colors.text, marginTop: 9 },
+  totalLabel: { fontSize: 11, fontWeight: '700', color: colors.textMuted, marginTop: 4 },
+  row: {
+    flexDirection: 'row', alignItems: 'center', minHeight: 68, padding: spacing.md,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
+  },
+  number: { fontSize: 13.5, fontWeight: '900', color: colors.primaryDark },
+  customer: { fontSize: 12.5, fontWeight: '700', color: colors.text, marginTop: 3 },
+  amount: { fontSize: 14, fontWeight: '900', color: colors.text },
+  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill },
+  empty: { alignItems: 'center', gap: 8, padding: spacing.xl, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
+  emptyText: { fontSize: 12.5, color: colors.textMuted, textAlign: 'center' },
 });

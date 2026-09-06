@@ -11,7 +11,7 @@ import { Shipment, JOURNEY_STAGES, journeyIndex, itemsSummary, invoiceOf, sender
 import { buildInvoiceHtml, buildDeliveryNoteHtml, sharePdf } from '../lib/documents';
 import { money } from '../lib/format';
 import { CollectionSlot, effectiveWindow, loadSlot, slotState } from '../lib/collectionSlots';
-import { useAppTheme } from '../context/ThemeContext';
+import { useAppTheme, useThemedStyles } from '../context/ThemeContext';
 import { IMG } from '../img';
 import { useBusinessConfig } from '../lib/businessConfig';
 
@@ -24,12 +24,13 @@ export default function ShipmentDetailScreen() {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [slot, setSlot] = useState<CollectionSlot | null>(null);
   const {palette}=useAppTheme();
+  const styles = useThemedStyles(baseStyles);
   const { config: business } = useBusinessConfig();
 
   useEffect(() => {
     supabase
       .from('shipments')
-      .select('id, tracking_number, customer_reference, status, origin, destination, qr_token, collection_code, delivery_code, driver_status, goods_description, driver_description_correction, created_at, metadata')
+      .select('id, tracking_number, customer_reference, status, origin, destination, qr_token, collection_code, delivery_code, driver_status, goods_description, driver_description_correction, created_at, can_modify, metadata')
       .eq('id', id)
       .maybeSingle()
       .then(({ data }) => { setShipment(data as Shipment | null); setLoading(false); });
@@ -274,7 +275,13 @@ export default function ShipmentDetailScreen() {
         )}
 
         <Button title="Need help? Ask Zimmy" variant="outline" onPress={() => navigation.navigate('Tabs', { screen: 'Zimmy', params: { prefill: `I need help with my shipment ${shipment.tracking_number}` } })} />
-        {stage === 0 && <Button title="Edit booking details" variant="outline" onPress={() => navigation.navigate('EditShipment', { id: shipment.id })} style={{marginTop:spacing.sm}} />}
+        {stage === 0 && (shipment.metadata?.confirmation?.confirmedAt ? (
+          <Text style={[styles.metaText, { marginTop: spacing.sm }]}>
+            Our team has confirmed this booking with you, so the details are now locked in. Message us if anything still needs changing.
+          </Text>
+        ) : (
+          <Button title="Edit booking details" variant="outline" onPress={() => navigation.navigate('EditShipment', { id: shipment.id })} style={{marginTop:spacing.sm}} />
+        ))}
         <Button title="Invoices & payment proof" variant="outline" onPress={()=>navigation.navigate('Billing')} style={{marginTop:spacing.sm}}/>
         {stage>=1?<Button title="Rate driver and service" variant="outline" onPress={()=>navigation.navigate('Feedback')} style={{marginTop:spacing.sm}}/>:null}
       </ScrollView>
@@ -282,7 +289,7 @@ export default function ShipmentDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', padding: spacing.lg, gap: spacing.md },

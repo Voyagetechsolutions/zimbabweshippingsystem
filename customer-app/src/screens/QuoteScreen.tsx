@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
 import { KeyboardAwareScroll } from '../components/KeyboardAwareScroll';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../theme';
@@ -10,7 +10,7 @@ import { Country } from '../lib/catalogue';
 import { DESCRIPTION_GUIDANCE } from '../lib/booking';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { useAppTheme } from '../context/ThemeContext';
+import { useAppTheme, useThemedStyles } from '../context/ThemeContext';
 
 // Custom quote request: the admin team prices it in the staff app, the
 // customer gets notified and can book directly from the approved quote.
@@ -19,6 +19,10 @@ export default function QuoteScreen() {
   const route = useRoute<any>();
   const { session, profile } = useAuth();
   const { palette } = useAppTheme();
+  const styles = useThemedStyles(baseStyles);
+  // The pinned footer would otherwise sit under Android's gesture/navigation
+  // bar on an edge-to-edge window, putting "Request quote" out of reach.
+  const insets = useSafeAreaInsets();
   const [country, setCountry] = useState<Country>(profile?.country === 'Ireland' ? 'Ireland' : 'United Kingdom');
   const returningResident = route.params?.type === 'returning_resident';
   const [items, setItems] = useState(['']);
@@ -130,7 +134,7 @@ export default function QuoteScreen() {
           </Text>
         </KeyboardAwareScroll>
 
-        <View style={[styles.footer, { backgroundColor: palette.surface, borderTopColor: palette.border }]}>
+        <View style={[styles.footer, { backgroundColor: palette.surface, borderTopColor: palette.border, paddingBottom: spacing.lg + insets.bottom }]}>
           <Button title="REQUEST QUOTE" onPress={submit} busy={busy} />
         </View>
       </View>
@@ -138,7 +142,7 @@ export default function QuoteScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   safe: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', padding: spacing.lg, gap: spacing.md },
   headerTitle: { flex: 1, fontSize: 17, fontWeight: '800', textAlign: 'center' },

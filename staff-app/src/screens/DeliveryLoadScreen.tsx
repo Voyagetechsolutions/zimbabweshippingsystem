@@ -8,6 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { BackButton } from '../components/adminui';
 import { colors, radius, shadow, spacing } from '../theme';
 import { todayLabel } from '../lib/format';
 import {
@@ -187,6 +188,7 @@ export default function DeliveryLoadScreen() {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={colors.primary} />}>
         <View>
+          <BackButton style={{ marginBottom: 10 }} />
           <Text style={styles.title}>Load the vehicle</Text>
           <Text style={styles.subtitle}>{todayLabel()} · {items.length} consignment{items.length === 1 ? '' : 's'} on board</Text>
         </View>

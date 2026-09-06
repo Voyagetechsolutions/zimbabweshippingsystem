@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { useFieldArray, useForm } from 'react-hook-form';
 import * as z from 'zod';
 import BusinessContactValue from '@/components/BusinessContactValue';
 import { Button } from '@/components/ui/button';
@@ -16,12 +16,19 @@ import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import WhatsAppButton from '@/components/WhatsAppButton';
-import { Package, Phone, Clock, Check, ArrowRight } from 'lucide-react';
+import { Package, Phone, Clock, Check, ArrowRight, Plus, Trash2 } from 'lucide-react';
 import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
+// One row per item, described separately. The team prices the request item by
+// item — that breakdown is what the invoice lines and the delivery note are
+// built from, and it cannot be recovered from one lump of prose.
 const formSchema = z.object({
   itemCategory: z.string().min(1, 'Please select a category'),
-  itemDescription: z.string().min(10, 'Please provide a detailed description (minimum 10 characters)'),
+  items: z
+    .array(z.object({
+      description: z.string().trim().min(5, 'Describe this item — quantity, size or material, and condition'),
+    }))
+    .min(1, 'Add at least one item'),
   phoneNumber: z.string().min(10, 'Please enter a valid phone number'),
 });
 
@@ -38,10 +45,12 @@ const CustomQuoteRequest = () => {
     resolver: zodResolver(formSchema),
     defaultValues: {
       itemCategory: '',
-      itemDescription: '',
+      items: [{ description: '' }],
       phoneNumber: '',
     },
   });
+
+  const itemFields = useFieldArray({ control: form.control, name: 'items' });
 
   const itemCategories = [
     'Furniture',
@@ -62,15 +71,23 @@ const CustomQuoteRequest = () => {
     setIsSubmitting(true);
 
     try {
+      const items = values.items.map((item) => item.description.trim()).filter(Boolean);
       const { error } = await supabase
         .from('custom_quotes')
         .insert({
           user_id: user?.id || null,
           phone_number: values.phoneNumber,
-          description: values.itemDescription,
+          // Same two shapes the customer app writes: the numbered prose for
+          // anyone reading the request, and the structured list the staff app
+          // prices one row at a time.
+          description: items.map((item, index) => `Item ${index + 1}: ${item}`).join('\n'),
+          quote_items: items.map((item, index) => ({ item: index + 1, description: item, amount: null })),
           category: values.itemCategory,
           status: 'pending',
-        });
+          // `quote_items` is live in the database and read by the staff app, but
+          // the generated types in this repo predate it. Cast rather than hand-
+          // edit a generated file that the next `supabase gen types` overwrites.
+        } as never);
 
       if (error) throw error;
 
@@ -154,23 +171,58 @@ const CustomQuoteRequest = () => {
                           )}
                         />
 
-                        <FormField
-                          control={form.control}
-                          name="itemDescription"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-base font-semibold">Description</FormLabel>
-                              <FormControl>
-                                <Textarea
-                                  placeholder="Include dimensions, weight, and any special requirements..."
-                                  className="min-h-[140px] bg-white dark:bg-gray-700 dark:border-gray-600 resize-none"
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                        <div className="space-y-3">
+                          <div>
+                            <FormLabel className="text-base font-semibold">Your items</FormLabel>
+                            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                              List each item separately — we price them one by one, and that breakdown
+                              becomes the lines on your invoice and delivery note.
+                            </p>
+                          </div>
+
+                          {itemFields.fields.map((row, index) => (
+                            <FormField
+                              key={row.id}
+                              control={form.control}
+                              name={`items.${index}.description` as const}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <div className="flex items-start gap-2">
+                                    <FormControl>
+                                      <Textarea
+                                        placeholder={`Item ${index + 1} — quantity, size or material, contents and condition`}
+                                        className="min-h-[76px] bg-white dark:bg-gray-700 dark:border-gray-600 resize-none"
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    {itemFields.fields.length > 1 && (
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        aria-label={`Remove item ${index + 1}`}
+                                        className="mt-1 shrink-0 text-red-600 hover:text-red-700"
+                                        onClick={() => itemFields.remove(index)}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          ))}
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => itemFields.append({ description: '' })}
+                          >
+                            <Plus className="mr-2 h-4 w-4" /> Add another item
+                          </Button>
+                        </div>
 
                         <FormField
                           control={form.control}

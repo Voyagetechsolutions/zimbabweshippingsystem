@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAwareScroll } from '../components/KeyboardAwareScroll';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
@@ -15,6 +15,8 @@ export default function EditShipmentScreen() {
   const navigation = useNavigation<any>();
   const { id } = useRoute<any>().params || {};
   const { palette } = useAppTheme();
+  // Keep "Save changes" clear of Android's system navigation bar.
+  const insets = useSafeAreaInsets();
   const { config: business } = useBusinessConfig();
   const payments = [...business.payments.methods.filter((m) => m.id !== 'other_payment').map((m) => m.label), ...business.payments.otherProviders.map((m) => m.label)];
   const [busy, setBusy] = useState(true);
@@ -51,7 +53,7 @@ export default function EditShipmentScreen() {
 
   return <SafeAreaView style={[styles.safe,{backgroundColor:palette.bg}]} edges={['top']}><FlagStripe />
     <View style={styles.header}><Pressable onPress={() => navigation.goBack()}><Ionicons name="arrow-back" size={22} color={palette.text} /></Pressable><Text style={[styles.title,{color:palette.text}]}>Edit booking</Text><View style={{width:22}} /></View>
-    <KeyboardAwareScroll contentContainerStyle={styles.body}>
+    <KeyboardAwareScroll contentContainerStyle={[styles.body, { paddingBottom: 48 + insets.bottom }]}>
       <SectionTitle text="Collection contact" />
       <Field label="Collection address" value={sender.address || ''} onChangeText={(address) => setSender({...sender,address})} />
       <Field label="Town / city" value={sender.city || ''} onChangeText={(city) => setSender({...sender,city})} />

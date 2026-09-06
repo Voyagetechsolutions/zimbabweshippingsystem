@@ -84,21 +84,6 @@ export default function AccountScreen() {
           </View>
         </View>
 
-        <SectionTitle text="Company profile" />
-        <View style={styles.card}>
-          <DetailRow icon="business-outline" label="Company name" value={COMPANY.name} />
-          <Pressable onPress={() => Linking.openURL(COMPANY.websiteUrl)}>
-            <DetailRow icon="globe-outline" label="Website" value={COMPANY.websiteLabel} />
-          </Pressable>
-          <DetailRow icon="mail-outline" label="Contact email" value={COMPANY.supportEmail} />
-          <DetailRow icon="logo-whatsapp" label="Contact number" value={COMPANY.supportPhone} last />
-        </View>
-
-        <SectionTitle text="Payment methods" />
-        <View style={styles.card}>
-          {(business?.payments.methods||[]).map((method,index)=><PaymentRow key={method.id} icon={method.id==='cash_on_collection'?'cash-outline':method.id==='pay_on_arrival'?'airplane-outline':'wallet-outline'} title={method.label} description={method.note||''} last={index===(business?.payments.methods.length||0)-1}/>) }
-        </View>
-
         <SectionTitle text="Profile settings" />
         <View style={styles.settingsCard}>
           <Text style={styles.fieldLabel}>Display name</Text>
@@ -111,25 +96,6 @@ export default function AccountScreen() {
           </View>
           <Pressable style={styles.primary} onPress={saveProfile} disabled={saving}>
             {saving ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryText}>Save Profile Settings</Text>}
-          </Pressable>
-        </View>
-
-        <SectionTitle text="Help & support" />
-        <View style={styles.card}>
-          <Pressable style={styles.supportRow} onPress={() => Linking.openURL(`mailto:${COMPANY.supportEmail}`)}>
-            <Ionicons name="mail-outline" size={20} color={colors.primary} />
-            <View style={{ flex: 1 }}><Text style={styles.rowTitle}>Email support</Text><Text style={styles.muted}>{COMPANY.supportEmail}</Text></View>
-            <Ionicons name="open-outline" size={17} color={colors.textFaint} />
-          </Pressable>
-          <Pressable style={[styles.supportRow, styles.lastRow]} onPress={() => Linking.openURL(COMPANY_WHATSAPP_URL)}>
-            <Ionicons name="logo-whatsapp" size={20} color={colors.primary} />
-            <View style={{ flex: 1 }}><Text style={styles.rowTitle}>WhatsApp support</Text><Text style={styles.muted}>{COMPANY.supportPhone}</Text></View>
-            <Ionicons name="open-outline" size={17} color={colors.textFaint} />
-          </Pressable>
-          <Pressable style={[styles.supportRow, styles.lastRow]} onPress={() => Linking.openURL(`${COMPANY.websiteUrl}/privacy-policy`)}>
-            <Ionicons name="shield-checkmark-outline" size={20} color={colors.primary} />
-            <View style={{ flex: 1 }}><Text style={styles.rowTitle}>Staff privacy notice</Text><Text style={styles.muted}>Work accounts, job evidence, audit logs and active-job location</Text></View>
-            <Ionicons name="open-outline" size={17} color={colors.textFaint} />
           </Pressable>
         </View>
 

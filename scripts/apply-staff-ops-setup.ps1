@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
-  Runs the staff-ops "setup" action, which applies the embedded schema DDL to
-  the live Supabase database.
+  Runs the schema "setup" action, which applies the embedded schema DDL to the
+  live Supabase database.
 
 .DESCRIPTION
   Schema changes on this project are NOT applied with `supabase db push` - the
@@ -27,6 +27,9 @@
 
 .EXAMPLE
   .\scripts\apply-staff-ops-setup.ps1 -AccessToken "eyJhbGci..." -Action verify
+
+.EXAMPLE
+  .\scripts\apply-staff-ops-setup.ps1 -Function staff-ops -Action verify
 #>
 [CmdletBinding()]
 param(
@@ -37,6 +40,9 @@ param(
   # first, and a good way to confirm the token works before changing anything.
   [ValidateSet('setup', 'verify')]
   [string]$Action = 'setup',
+
+  # The edge function holding SETUP_SQL.
+  [string]$Function = 'app-schema-setup',
 
   [string]$EnvFile = '.env'
 )
@@ -71,7 +77,7 @@ $AccessToken = $AccessToken.Trim()
 if (-not $AccessToken) { throw "No access token supplied." }
 
 # --- Call the function -------------------------------------------------------
-$endpoint = "$url/functions/v1/staff-ops"
+$endpoint = "$url/functions/v1/$Function"
 Write-Host "POST $endpoint  ->  {""action"":""$Action""}"
 
 $headers = @{
