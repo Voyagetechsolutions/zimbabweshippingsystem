@@ -10,7 +10,7 @@ module.exports = {
     name: 'Zimbabwe Shipping Staff',
     slug: 'zimbabwe-shipping-staff',
     description: 'Secure operations, finance and driver tools for Zimbabwe Shipping staff.',
-    version: '1.1.0',
+    version: '1.1.1',
     orientation: 'portrait',
     icon: './assets/staff-icon-v2.png',
     userInterfaceStyle: 'light',
