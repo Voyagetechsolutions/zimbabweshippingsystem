@@ -33,5 +33,6 @@ export default function FinanceWorkspaceStack(){return <Stack.Navigator screenOp
   <Stack.Screen name="PaymentDetails" component={PaymentDetailsScreen}/>
   <Stack.Screen name="Reconciliation" component={ReconciliationScreen}/>
   <Stack.Screen name="Invoices" component={InvoicesScreen}/>
-<Stack.Screen name="Document" component={DocumentScreen} options={{headerShown:false}}/>  <Stack.Screen name="PaymentProofs" component={PaymentProofsScreen}/>
+  <Stack.Screen name="Document" component={DocumentScreen} options={{headerShown:false}}/>
+  <Stack.Screen name="PaymentProofs" component={PaymentProofsScreen}/>
 </Stack.Navigator>}
