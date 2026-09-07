@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
+import { confirmDelete } from '../lib/records';
 import { BackButton } from '../components/adminui';
 import { colors, radius, spacing } from '../theme';
 import { money, shortDate } from '../lib/format';
@@ -26,7 +27,7 @@ export default function FinanceBooksScreen() {
     await supabase.rpc('refresh_finance_anomalies');
     const [p,e,n,a]=await Promise.all([
       supabase.from('payments').select('id,amount,currency,payment_status,created_at').order('created_at',{ascending:false}),
-      supabase.from('finance_expenses').select('id,amount,currency,category,description,expense_date,status').order('expense_date',{ascending:false}),
+      supabase.from('finance_expenses').select('id,amount,currency,category,description,expense_date,status').is('deleted_at', null).order('expense_date',{ascending:false}),
       supabase.from('delivery_notes').select('id,note_number,delivered_at,delivery_address,status,shipment_id').order('created_at',{ascending:false}).limit(30),
       supabase.from('finance_anomalies').select('id,severity,title,description,status,amount,detected_at').in('status',['open','reviewing']).order('detected_at',{ascending:false}),
     ]);
@@ -68,7 +69,7 @@ export default function FinanceBooksScreen() {
     </Section>
 
     <Section title={`Recent expenses · ${expenses.length}`} icon="receipt-outline">
-      {expenses.length===0?<Empty text="No expenses recorded."/>:expenses.slice(0,10).map(e=><Pressable key={e.id} style={styles.note} onPress={()=>navigation.navigate('ExpenseDetails',{expenseId:e.id})}><View><Text style={styles.noteNo}>{e.category}</Text><Text style={styles.noteAddress} numberOfLines={1}>{e.description}</Text></View><View style={{alignItems:'flex-end'}}><Text style={styles.expense}>{money(e.amount,e.currency==='EUR'?'€':'£')}</Text><Text style={styles.noteDate}>{shortDate(e.expense_date)}</Text></View></Pressable>)}
+      {expenses.length===0?<Empty text="No expenses recorded."/>:expenses.slice(0,10).map(e=><Pressable key={e.id} style={styles.note} onPress={()=>navigation.navigate('ExpenseDetails',{expenseId:e.id})} onLongPress={()=>confirmDelete({table:'finance_expenses',ids:[e.id],noun:'expense',onDone:load})}><View><Text style={styles.noteNo}>{e.category}</Text><Text style={styles.noteAddress} numberOfLines={1}>{e.description}</Text></View><View style={{alignItems:'flex-end'}}><Text style={styles.expense}>{money(e.amount,e.currency==='EUR'?'€':'£')}</Text><Text style={styles.noteDate}>{shortDate(e.expense_date)}</Text></View></Pressable>)}
     </Section>
 
     <Pressable style={styles.zimmyButton} onPress={()=>navigation.navigate('Zimmy')}><Ionicons name="sparkles" size={18} color={colors.white}/><Text style={styles.primaryText}>Open Zimmy AI</Text></Pressable>

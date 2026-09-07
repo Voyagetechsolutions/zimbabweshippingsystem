@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { supabase } from '../../lib/supabase';
+import { confirmDelete } from '../../lib/records';
 import { colors, radius, spacing } from '../../theme';
 import { money, shortDate } from '../../lib/format';
 import { ScreenHeader, SearchBar, Segmented, Badge, BADGE, Avatar, SkeletonList, EmptyState, ErrorState } from '../../components/adminui';
@@ -133,7 +134,17 @@ export default function CustomersScreen({ navigation }: Props) {
           : error ? null
           : <EmptyState icon="people-outline" title="No customers found" text="Adjust the search or filter to see more records." />}
         renderItem={({ item }) => (
-          <Pressable style={styles.row} onPress={() => navigation.navigate('CustomerDetail', { record: item })}>
+          <Pressable
+            style={styles.row}
+            onPress={() => navigation.navigate('CustomerDetail', { record: item })}
+            onLongPress={() => {
+              // Only a customer that exists as a record can be deleted. On the
+              // fallback path there is no row behind the name — it is
+              // reconstructed from bookings — so there is nothing to delete.
+              if (!item.customerId) return;
+              confirmDelete({ table: 'customers', ids: [item.customerId], noun: 'customer', onDone: load });
+            }}
+          >
             <Avatar name={item.fullName || item.email} size={42} />
             <View style={{ flex: 1 }}>
               <View style={styles.nameRow}>

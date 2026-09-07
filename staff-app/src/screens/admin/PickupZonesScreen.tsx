@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { supabase } from '../../lib/supabase';
+import { confirmDelete } from '../../lib/records';
 import { colors, radius, spacing } from '../../theme';
 import { parseCollectionDate } from '../../lib/format';
 import { ScreenHeader, Badge, BADGE, SkeletonList, EmptyState, ErrorState, SectionLabel } from '../../components/adminui';
@@ -45,7 +46,7 @@ export default function PickupZonesScreen({ navigation }: Props) {
   const load = useCallback(async () => {
     setError(null);
     const [zoneResult, statResult, scheduleResult] = await Promise.all([
-      supabase.from('pickup_zones').select('*').order('name'),
+      supabase.from('pickup_zones').select('*').is('deleted_at', null).order('name'),
       supabase.rpc('admin_zone_stats'),
       supabase.from('collection_schedules').select('route').limit(200),
     ]);
@@ -153,7 +154,14 @@ export default function PickupZonesScreen({ navigation }: Props) {
               const zoneStats = stats[zone.id];
               const next = nextCollection(zone);
               return (
-                <Pressable key={zone.id} style={styles.zoneCard} onPress={() => setDetail(zone)}>
+                <Pressable
+                  key={zone.id}
+                  style={styles.zoneCard}
+                  onPress={() => setDetail(zone)}
+                  onLongPress={() => confirmDelete({
+                    table: 'pickup_zones', ids: [zone.id], noun: 'pickup zone', onDone: load,
+                  })}
+                >
                   <View style={[styles.zoneDot, { backgroundColor: zone.active ? zone.color : '#94a3b8' }]} />
                   <View style={{ flex: 1 }}>
                     <View style={styles.rowTop}>

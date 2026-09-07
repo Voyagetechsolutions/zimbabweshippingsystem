@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { supabase } from '../../lib/supabase';
+import { confirmDelete } from '../../lib/records';
 import { colors, radius, spacing } from '../../theme';
 import { money, shortDate } from '../../lib/format';
 import { ScreenHeader, SearchBar, Segmented, Badge, BADGE, SkeletonList, EmptyState, ErrorState, Card } from '../../components/adminui';
@@ -72,6 +73,7 @@ export default function CustomQuotesScreen({ navigation }: Props) {
     const { data, error: loadError } = await supabase
       .from('custom_quotes')
       .select('id, user_id, name, phone_number, email, description, category, specific_item, image_urls, status, quoted_amount, currency, valid_until, admin_notes, booked_shipment_id, created_at, quote_items, request_type')
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .limit(200);
     if (loadError) { setError(loadError.message); return; }
@@ -215,7 +217,13 @@ export default function CustomQuotesScreen({ navigation }: Props) {
         renderItem={({ item }) => {
           const badge = quoteBadge(item);
           return (
-            <Pressable style={styles.card} onPress={() => setDetail(item)}>
+            <Pressable
+              style={styles.card}
+              onPress={() => setDetail(item)}
+              onLongPress={() => confirmDelete({
+                table: 'custom_quotes', ids: [item.id], noun: 'quote', onDone: load,
+              })}
+            >
               <View style={styles.top}>
                 <Text style={styles.name}>{item.name || item.phone_number || 'Customer'}</Text>
                 <Badge text={badge.label} tone={badge.tone} />
