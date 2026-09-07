@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, shadow, spacing } from '../theme';
-import { loadRouteDay, type RouteCollection } from '../lib/collections';
+import { isPlaceholderRoute, loadRouteDay, routeKey, type RouteCollection } from '../lib/collections';
 import { moveStop } from '../lib/routeOptimiser';
 import { multiStopGoogleMapsUrl, navigationOptions } from '../lib/navigationLinks';
 import {
@@ -54,8 +54,22 @@ export default function DriverRouteScreen() {
         loadRun(date).catch(() => null),
       ]);
 
-      const forRoute = (day.collections || []).filter((c) =>
-        !routeName || String(c.route || '').trim().toUpperCase() === routeName.trim().toUpperCase());
+      // Match on the normalised key, not the raw string: the published
+      // schedule says "NORTHAMPTON ROUTE" and the bookings on it say
+      // "NORTHAMPTON", so comparing them literally finds nothing at all.
+      const wanted = routeKey(routeName);
+      const dayRoutes = (day.routes || []).map((r: any) => (typeof r === 'string' ? r : r?.route)).filter(Boolean);
+      const onlyOneRoute = dayRoutes.filter((r) => !isPlaceholderRoute(r)).length <= 1;
+
+      const forRoute = (day.collections || []).filter((c) => {
+        if (!wanted) return true;
+        if (routeKey(c.route) === wanted) return true;
+        // A booking nobody has assigned a route to yet still has to be
+        // collected. On a day running a single route it plainly belongs to it;
+        // where the day runs several, guessing would put it on the wrong van,
+        // so it is left for the office to assign.
+        return onlyOneRoute && isPlaceholderRoute(c.route);
+      });
 
       setCollections(forRoute);
       setRun(existing);

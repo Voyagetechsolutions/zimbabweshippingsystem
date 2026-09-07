@@ -105,8 +105,45 @@ const sameDay = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
 /** Route names are stored with and without the " ROUTE" suffix. */
-const routeKey = (name: string | null | undefined) =>
-  String(name || '').toUpperCase().replace(/\s+ROUTE$/, '').trim();
+// Trim first. Stripping the trailing "ROUTE" is anchored on the end of the
+// string, so trailing whitespace — which live rows carry, "Ireland " and
+// friends — made the anchor miss and left "BELFAST ROUTE" unmatched against
+// "BELFAST".
+export const routeKey = (name: string | null | undefined) =>
+  String(name || '').trim().toUpperCase().replace(/\s+ROUTE$/, '').trim();
+
+/**
+ * A route name that is not a route name.
+ *
+ * Bookings carry a placeholder until someone names the real route, and those
+ * strings are real values in the database rather than nulls — "To be assigned"
+ * is what a live booking holds today. Showing one as a route offers the driver
+ * a day's work that does not exist.
+ */
+export const isPlaceholderRoute = (name: string | null | undefined) => {
+  const text = String(name ?? '').trim();
+  return !text || /^(to be (confirmed|assigned)|not (set|assigned)|tbc|n\/?a|none|unknown|-|—)$/i.test(text);
+};
+
+/**
+ * Record a route against a day, once, under its best name.
+ *
+ * The same route reaches us spelled two ways: the published schedule calls it
+ * "NORTHAMPTON ROUTE" and the bookings on it carry "NORTHAMPTON". Deduplicating
+ * on the raw string kept both, which listed one route twice — and, with a
+ * button per route, offered the driver three ways into the same day's work.
+ * Matching on routeKey collapses them, and the longer name wins because that is
+ * the published one staff recognise.
+ */
+export function addRouteName(day: { routes: string[] }, name: string | null | undefined): void {
+  if (isPlaceholderRoute(name)) return;
+  const label = String(name).trim();
+  const key = routeKey(label);
+  if (!key) return;
+  const at = day.routes.findIndex((existing) => routeKey(existing) === key);
+  if (at === -1) { day.routes.push(label); return; }
+  if (label.length > day.routes[at].length) day.routes[at] = label;
+}
 
 /**
  * Build the day from plain table reads.
@@ -511,7 +548,7 @@ export async function loadCollectionsAhead(days = 21): Promise<ScheduledDay[]> {
   };
   for (const row of scheduled) {
     const day = dayFor(iso(row.parsed as Date));
-    if (row.route && !day.routes.includes(row.route)) day.routes.push(row.route);
+    addRouteName(day, row.route);
   }
 
   const scheduleDate = new Map<string, string>();
@@ -544,7 +581,7 @@ export async function loadCollectionsAhead(days = 21): Promise<ScheduledDay[]> {
 
     const day = dayFor(date);
     const route = s.metadata?.collection?.route || null;
-    if (route && !day.routes.includes(route)) day.routes.push(route);
+    addRouteName(day, route);
     day.collections.push({
       shipmentId: s.id,
       trackingNumber: s.tracking_number,
