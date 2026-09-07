@@ -286,8 +286,16 @@ serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const target: 'shipments' | 'stops' = body?.target === 'stops' ? 'stops' : 'shipments';
     const runId: string | null = body?.runId ?? null;
+    // New callers say which target they mean. Older ones cannot: builds already
+    // on drivers' phones ask for `{ runId }` and nothing else, and they mean
+    // stops. Treating a bare runId as "stops" keeps every installed app doing
+    // exactly what it did before, while anything newer defaults to shipments —
+    // which is the target that matters now that runs are built on the phone.
+    const target: 'shipments' | 'stops' = body?.target === 'stops' ? 'stops'
+      : body?.target === 'shipments' ? 'shipments'
+      : runId ? 'stops'
+      : 'shipments';
     const shipmentIds: string[] | null = Array.isArray(body?.shipmentIds) && body.shipmentIds.length
       ? body.shipmentIds.map(String)
       : null;
