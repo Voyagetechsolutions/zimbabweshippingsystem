@@ -13,6 +13,10 @@ import SignaturePad from '../components/SignaturePad';
 import { getDriverLocation } from '../lib/driverLocation';
 import { getStaffBusinessConfig } from '../lib/businessConfig';
 import { calculateTotals, invoiceSymbol } from '../lib/invoice';
+import {
+  deliveryAddress, pickupAddress, receiverName, receiverPhone,
+  senderName, senderPhone, shippedItems, type Shipment,
+} from '../lib/shipment';
 import { enqueue, isMissingBackend, isNetworkError } from '../lib/offlineQueue';
 import { flushPhotoQueue, queuePhoto } from '../lib/photoQueue';
 
@@ -52,6 +56,9 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
   // flat phone, or one who left the parcels with a neighbour and read the code
   // out, must not be an uncollectable job.
   const [codeVerified, setCodeVerified] = useState(false);
+  // The whole shipment, so the driver can check the address, the receiver and
+  // the items against what is actually in front of them.
+  const [shipmentRow, setShipmentRow] = useState<Shipment | null>(null);
   const [openCode, setOpenCode] = useState('');
   const unlocked = qrVerified || codeVerified;
   // Once the driver confirms, the invoice is theirs no longer.
@@ -99,12 +106,13 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
       supabase.from('driver_invoices').select('id,currency,line_items,discount,tax,notes').eq('stop_id', stop.id).maybeSingle(),
       supabase.from('driver_proofs').select('id,proof_type,storage_path').eq('stop_id', stop.id).is('deleted_at', null).order('captured_at'),
       supabase.from('driver_run_stops').select('qr_verified_at,code_verified_at').eq('id',stop.id).maybeSingle(),
-      supabase.from('shipments').select('goods_description,driver_description_correction,seals_requested,metadata').eq('id', stop.shipmentId).maybeSingle(),
+      supabase.from('shipments').select('id,tracking_number,customer_reference,origin,destination,status,created_at,goods_description,driver_description_correction,seals_requested,metadata').eq('id', stop.shipmentId).maybeSingle(),
       supabase.from('shipment_seals').select('*').eq('shipment_id', stop.shipmentId).maybeSingle(),
       supabase.from('driver_signatures').select('recipient_name').eq('stop_id', stop.id).maybeSingle(),
     ]);
 
     const shipment: any = shipmentResult.data || {};
+    setShipmentRow(shipmentResult.data ? (shipmentResult.data as Shipment) : null);
     const metaInvoice = shipment.metadata?.invoice;
     const metaItems = Array.isArray(metaInvoice?.items) ? metaInvoice.items : [];
     setGoodsDescription(shipment.goods_description || shipment.metadata?.shipment?.description || '');
@@ -437,6 +445,40 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
 
       {!unlocked ? <View style={styles.lockedCard}><Ionicons name="lock-closed-outline" size={24} color={colors.textMuted}/><View style={{flex:1}}><Text style={styles.lockedTitle}>Shipment details are locked</Text><Text style={styles.lockedText}>Scan the customer's shipment QR above, or enter their six-digit code. The goods, invoice, seals and photos will then open.</Text></View></View> : <>
 
+      {/* Everything the driver has to check against what is in front of them:
+          where they are, who it is going to, and what is being shipped. */}
+      {shipmentRow ? <View style={styles.card}>
+        <View style={styles.sectionHead}><Ionicons name="cube-outline" size={21} color={colors.primary} /><View style={{flex:1}}><Text style={styles.stepEyebrow}>SHIPMENT DETAILS</Text><Text style={styles.sectionTitle}>Check these with the customer</Text></View></View>
+
+        <View style={styles.detailBlock}>
+          <Text style={styles.detailLabel}>COLLECTING FROM</Text>
+          <Text style={styles.detailName}>{senderName(shipmentRow)}</Text>
+          <Text style={styles.detailText}>{pickupAddress(shipmentRow)}</Text>
+          {senderPhone(shipmentRow) !== 'No Phone' ? <Text style={styles.detailText}>{senderPhone(shipmentRow)}</Text> : null}
+        </View>
+
+        <View style={styles.detailBlock}>
+          <Text style={styles.detailLabel}>DELIVERING TO</Text>
+          <Text style={styles.detailName}>{receiverName(shipmentRow)}</Text>
+          <Text style={styles.detailText}>{deliveryAddress(shipmentRow)}</Text>
+          {receiverPhone(shipmentRow) !== 'No Phone' ? <Text style={styles.detailText}>{receiverPhone(shipmentRow)}</Text> : null}
+        </View>
+
+        {shippedItems(shipmentRow).length ? (
+          <View style={styles.detailBlock}>
+            <Text style={styles.detailLabel}>ITEMS BEING SHIPPED</Text>
+            {shippedItems(shipmentRow).map((item, index) => (
+              <View key={`${item.label}-${index}`} style={styles.detailItemRow}>
+                <Text style={styles.detailText}>
+                  {item.quantity ? `${item.quantity} × ` : ''}{item.label}
+                </Text>
+                {item.detail ? <Text style={styles.detailFaint}>{item.detail}</Text> : null}
+              </View>
+            ))}
+          </View>
+        ) : null}
+      </View> : null}
+
       {pickup ? <View style={styles.card}>
         <View style={styles.sectionHead}><Ionicons name="document-text-outline" size={21} color={colors.primary}/><View style={{flex:1}}><Text style={styles.stepEyebrow}>STEP 2 · CHECK GOODS</Text><Text style={styles.sectionTitle}>Customer's goods description</Text></View></View>
         <Text style={styles.help}>Check the goods against what the customer declared. The original description stays on record — add a correction if anything differs.</Text>
@@ -574,6 +616,12 @@ const styles = StyleSheet.create({
   safe:{flex:1,backgroundColor:colors.bg},content:{padding:spacing.lg,gap:spacing.md,paddingBottom:48},hero:{paddingBottom:spacing.sm},stepEyebrow:{fontSize:9.5,fontWeight:'900',color:colors.primary,letterSpacing:.8,marginBottom:3},title:{fontSize:22,fontWeight:'800',color:colors.text},customer:{fontSize:16,fontWeight:'700',color:colors.text,marginTop:4},ref:{fontSize:12,fontWeight:'700',color:colors.primary,marginTop:2},draftNote:{fontSize:10.5,color:colors.textMuted,marginTop:5},card:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:radius.lg,padding:spacing.lg,gap:spacing.sm},lockedCard:{backgroundColor:'#F4F6F8',borderWidth:1,borderColor:colors.border,borderRadius:radius.lg,padding:spacing.lg,flexDirection:'row',alignItems:'center',gap:spacing.md},lockedTitle:{fontSize:14,fontWeight:'800',color:colors.text},lockedText:{fontSize:11.5,lineHeight:17,color:colors.textMuted,marginTop:3},sectionHead:{flexDirection:'row',alignItems:'center',gap:spacing.sm},sectionTitle:{fontSize:16,fontWeight:'800',color:colors.text},help:{fontSize:12,lineHeight:17,color:colors.textMuted,marginBottom:4},helpStrong:{fontSize:12,lineHeight:17,color:colors.amber,fontWeight:'800',marginBottom:4},orText:{fontSize:9.5,fontWeight:'900',letterSpacing:.7,color:colors.textMuted,textAlign:'center',marginTop:4},label:{fontSize:11,fontWeight:'700',color:colors.textMuted,marginTop:4},input:{borderWidth:1,borderColor:colors.border,borderRadius:radius.sm,backgroundColor:colors.bg,paddingHorizontal:12,paddingVertical:10,color:colors.text,fontSize:14},row:{flexDirection:'row',gap:spacing.sm},flex:{flex:1},primary:{backgroundColor:colors.primary,borderRadius:radius.sm,paddingVertical:13,alignItems:'center',marginTop:4},primaryText:{color:colors.white,fontWeight:'800',fontSize:13},outline:{borderWidth:1.5,borderColor:colors.primary,borderRadius:radius.sm,paddingVertical:11,alignItems:'center',marginTop:4},outlineText:{color:colors.primary,fontWeight:'800',fontSize:13},saved:{textAlign:'center',color:colors.primary,fontWeight:'700',fontSize:12},proofPreview:{height:190,borderRadius:radius.md,overflow:'hidden',position:'relative'},proofImage:{width:'100%',height:'100%'},cameraBadge:{position:'absolute',right:10,bottom:10,width:38,height:38,borderRadius:19,backgroundColor:'rgba(15,23,42,.72)',alignItems:'center',justifyContent:'center'},photoGrid:{flexDirection:'row',gap:spacing.sm},photoButton:{flex:1,minHeight:120,borderWidth:1,borderStyle:'dashed',borderColor:colors.border,borderRadius:radius.md,alignItems:'center',justifyContent:'center',padding:spacing.sm,overflow:'hidden'},photoDone:{borderColor:colors.primary,backgroundColor:colors.primarySoft},thumbnail:{width:'100%',height:72,borderRadius:radius.sm,marginBottom:5},photoLabel:{fontSize:11,fontWeight:'700',color:colors.textMuted,textAlign:'center'},code:{fontSize:26,fontWeight:'800',letterSpacing:8,textAlign:'center'},notes:{minHeight:68,textAlignVertical:'top'},disabled:{opacity:.55},confirmRow:{flexDirection:'row',alignItems:'flex-start',gap:8,paddingVertical:6},confirmText:{flex:1,color:colors.text,fontSize:12,lineHeight:17,fontWeight:'600'},
   lineItem:{borderWidth:1,borderColor:colors.border,borderRadius:radius.md,padding:spacing.sm,gap:4},lineHead:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},lineTitle:{fontSize:11,fontWeight:'800',color:colors.textMuted},addItem:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6,paddingVertical:8},addItemText:{fontSize:12,fontWeight:'800',color:colors.primary},
   lockedPrice:{fontSize:12,fontWeight:'800',color:colors.text},lockedRow:{flexDirection:'row',alignItems:'center',gap:6,marginTop:2},lockedNote:{flex:1,fontSize:11,color:colors.textMuted,lineHeight:15},
+  detailBlock:{borderTopWidth:StyleSheet.hairlineWidth,borderTopColor:colors.border,paddingTop:spacing.sm,gap:2},
+  detailLabel:{fontSize:10,fontWeight:'800',color:colors.textMuted,letterSpacing:0.6},
+  detailName:{fontSize:15,fontWeight:'800',color:colors.text},
+  detailText:{fontSize:13,color:colors.text,lineHeight:18},
+  detailFaint:{fontSize:11,color:colors.textMuted,lineHeight:15},
+  detailItemRow:{paddingVertical:2},
   totalsBox:{borderTopWidth:StyleSheet.hairlineWidth,borderTopColor:colors.border,paddingTop:spacing.sm,gap:4,marginTop:spacing.xs},
   totalsRow:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},
   totalsLabel:{fontSize:12,color:colors.textMuted},

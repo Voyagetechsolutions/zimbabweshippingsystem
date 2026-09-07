@@ -223,6 +223,98 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
     return metadata;
   };
 
+  // ── Address verification ────────────────────────────────────────────────
+  const [editAddress, setEditAddress] = useState(false);
+  const [pinText, setPinText] = useState('');
+  const [addrBusy, setAddrBusy] = useState(false);
+  const pickupVerified = Boolean((shipment as any)?.pickup_address_verified);
+  const pickupPrecision = (shipment as any)?.pickup_geocode_precision as string | null;
+
+  const applyAddressResult = (result: any) => {
+    setShipment((current) => ({
+      ...current,
+      pickup_address_verified: result?.verified ?? true,
+      pickup_latitude: result?.latitude ?? (current as any).pickup_latitude,
+      pickup_longitude: result?.longitude ?? (current as any).pickup_longitude,
+      pickup_geocode_precision: result?.precision ?? (current as any).pickup_geocode_precision,
+    }) as typeof current);
+  };
+
+  /** Record that a human has checked this address against the geocoded point. */
+  const markVerified = async () => {
+    setAddrBusy(true);
+    try {
+      const { data, error } = await supabase.rpc('set_shipment_address_verification', {
+        p_shipment_id: shipment.id, p_which: 'pickup', p_verified: true,
+      });
+      if (error) throw error;
+      applyAddressResult(data);
+      Alert.alert('Address verified', 'Drivers will no longer see a warning on this stop.');
+    } catch (e: any) {
+      Alert.alert('Could not verify', e?.message || 'Try again.');
+    } finally { setAddrBusy(false); }
+  };
+
+  /**
+   * Place the pin by hand.
+   *
+   * This is the answer for the addresses no geocoder will ever resolve — an
+   * Irish street with no Eircode, a farm, a unit on an industrial estate.
+   * Saving a pin marks the address verified in the same step, because someone
+   * has just looked the place up to find it.
+   */
+  const saveAddressPin = async () => {
+    const match = pinText.trim().match(/^\s*(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)\s*$/);
+    if (!match) {
+      Alert.alert('Check the coordinates', 'Paste them as two numbers, latitude first — for example 53.4808, -2.2426.');
+      return;
+    }
+    const latitude = Number(match[1]);
+    const longitude = Number(match[2]);
+    setAddrBusy(true);
+    try {
+      const { data, error } = await supabase.rpc('set_shipment_address_verification', {
+        p_shipment_id: shipment.id, p_which: 'pickup', p_verified: true,
+        p_latitude: latitude, p_longitude: longitude,
+      });
+      if (error) throw error;
+      applyAddressResult(data);
+      setEditAddress(false);
+      setPinText('');
+      Alert.alert('Pin saved', 'Drivers will navigate to this exact point.');
+    } catch (e: any) {
+      Alert.alert('Could not save the pin', e?.message || 'Check the numbers and try again.');
+    } finally { setAddrBusy(false); }
+  };
+
+  /** Ask the geocoder to have another go at this one address. */
+  const findOnMap = async () => {
+    setAddrBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('geocode-stops', {
+        body: { target: 'shipments', shipmentIds: [shipment.id], force: true, limit: 1 },
+      });
+      if (error) throw error;
+      const result = data as { resolved?: number; approximate?: number } | null;
+      if (!result?.resolved) {
+        Alert.alert(
+          'Nothing found',
+          'No map service could place this address. Look it up yourself and use "Place pin".',
+        );
+        return;
+      }
+      await load();
+      Alert.alert(
+        'Location found',
+        result.approximate
+          ? 'Only the town could be matched, which is not precise enough to drive to. Place a pin if you can.'
+          : 'The address was placed on the map. Check it looks right, then mark it verified.',
+      );
+    } catch (e: any) {
+      Alert.alert('Could not look it up', e?.message || 'Try again, or place the pin by hand.');
+    } finally { setAddrBusy(false); }
+  };
+
   const saveDetails = async () => {
     if (!form.senderPhone.trim() || !form.senderAddress.trim()) {
       Alert.alert('Missing details', 'A collection address and a sender phone number are required.');
@@ -459,6 +551,82 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
               </Pressable>
             ) : null}
           </View>
+        </View>
+
+        {/* ── Address verification ──
+            Geocoding cannot place every address: only about 40% of bookings
+            carry a postcode and Irish addresses carry no Eircode at all, so a
+            good share land on a town centroid or nowhere. This is where a
+            human settles it, and until someone does the driver sees a warning
+            on the stop. */}
+        <View style={styles.card}>
+          <Text style={styles.sectionHeading}>Pickup address</Text>
+          <Text style={styles.blockText}>{pickupAddress(shipment)}</Text>
+          <View style={styles.contactRow}>
+            <Ionicons
+              name={pickupVerified ? 'checkmark-circle' : 'alert-circle-outline'}
+              size={16}
+              color={pickupVerified ? colors.primary : colors.amber}
+            />
+            <Text style={styles.itemDetail}>
+              {pickupVerified ? 'Verified' : 'Not verified'}
+              {' · '}
+              {pickupPrecision === 'manual' ? 'pin placed by hand'
+                : pickupPrecision === 'exact' ? 'exact location'
+                : pickupPrecision === 'approximate' ? 'town centre only — not a door'
+                : 'no location found'}
+            </Text>
+          </View>
+
+          {editAddress ? (
+            <>
+              <Text style={styles.itemDetail}>
+                Paste coordinates from Google Maps (right-click the spot, then click the numbers to copy).
+              </Text>
+              <TextInput
+                style={styles.fieldInput}
+                value={pinText}
+                onChangeText={setPinText}
+                placeholder="53.480800, -2.242600"
+                placeholderTextColor={colors.textFaint}
+                keyboardType="numbers-and-punctuation"
+              />
+              <View style={styles.actionRow}>
+                <Pressable style={[styles.btn, styles.btnOutline]} onPress={() => { setEditAddress(false); setPinText(''); }}>
+                  <Text style={styles.btnOutlineText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.btn, styles.btnPrimary, addrBusy && { opacity: 0.5 }]}
+                  disabled={addrBusy}
+                  onPress={() => saveAddressPin()}
+                >
+                  <Text style={styles.btnPrimaryText}>Save pin & verify</Text>
+                </Pressable>
+              </View>
+            </>
+          ) : (
+            <View style={styles.actionRow}>
+              <Pressable
+                style={[styles.btn, styles.btnOutline, addrBusy && { opacity: 0.5 }]}
+                disabled={addrBusy}
+                onPress={() => findOnMap()}
+              >
+                <Text style={styles.btnOutlineText}>Find on map</Text>
+              </Pressable>
+              <Pressable style={[styles.btn, styles.btnOutline]} onPress={() => setEditAddress(true)}>
+                <Text style={styles.btnOutlineText}>Place pin</Text>
+              </Pressable>
+              {!pickupVerified ? (
+                <Pressable
+                  style={[styles.btn, styles.btnPrimary, addrBusy && { opacity: 0.5 }]}
+                  disabled={addrBusy}
+                  onPress={() => markVerified()}
+                >
+                  <Text style={styles.btnPrimaryText}>Mark verified</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          )}
         </View>
 
         {/* ── Details ── */}

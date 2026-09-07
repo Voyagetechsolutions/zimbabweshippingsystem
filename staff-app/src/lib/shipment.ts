@@ -22,6 +22,23 @@ export interface Shipment {
   goods_description?: string | null;
   driver_description_correction?: string | null;
   seals_requested?: number | null;
+  /**
+   * Where the pickup is, and how much that is worth trusting.
+   *
+   * `pickup_geocode_precision` is 'exact' | 'approximate' | 'manual' | null:
+   * a town centroid ('approximate') is good enough to group a day's work on a
+   * map and not good enough to drive to, and null means no geocoder ever
+   * placed it. `pickup_address_verified` is the separate human claim that the
+   * address itself is right. Drivers are warned on either, never blocked.
+   */
+  pickup_latitude?: number | null;
+  pickup_longitude?: number | null;
+  pickup_address_verified?: boolean | null;
+  pickup_geocode_precision?: 'exact' | 'approximate' | 'manual' | null;
+  delivery_latitude?: number | null;
+  delivery_longitude?: number | null;
+  delivery_address_verified?: boolean | null;
+  delivery_geocode_precision?: 'exact' | 'approximate' | 'manual' | null;
 }
 
 export const STATUS_OPTIONS:string[]=[];
