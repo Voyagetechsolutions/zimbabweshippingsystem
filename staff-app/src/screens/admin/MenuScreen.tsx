@@ -48,7 +48,7 @@ const SECTIONS: { title: string; data: Item[] }[] = [
     title: 'Finance',
     data: [
       { label: 'Finance Overview', icon: 'wallet-outline', to: 'FinanceOverview', finance: true },
-      { label: 'Invoices', icon: 'receipt-outline', to: 'Invoices', finance: true },
+      { label: 'Invoices', icon: 'receipt-outline', to: 'Periods', params: { mode: 'invoices' }, finance: true },
       { label: 'Payments', icon: 'card-outline', to: 'Payments', finance: true },
       { label: 'Reports', icon: 'stats-chart-outline', to: 'Reports' },
       { label: 'Analytics', icon: 'analytics-outline', to: 'Analytics' },

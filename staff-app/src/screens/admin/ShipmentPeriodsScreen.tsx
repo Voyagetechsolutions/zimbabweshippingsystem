@@ -3,7 +3,7 @@ import {
   ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { colors, radius, shadow, spacing } from '../../theme';
@@ -45,8 +45,17 @@ export type PeriodSummary = {
 
 const symbolFor = (currency: string) => (currency === 'EUR' ? '€' : '£');
 
+/**
+ * The same cards serve shipments and invoices.
+ *
+ * A period's numbers are the same question either way — what it is worth, what
+ * has been paid, what is still out — so only the title and where a tap goes
+ * differ. Two copies of this would drift apart within a month.
+ */
 export default function ShipmentPeriodsScreen() {
   const navigation = useNavigation<any>();
+  const mode = ((useRoute().params || {}) as { mode?: 'shipments' | 'invoices' }).mode ?? 'shipments';
+  const target = mode === 'invoices' ? 'PeriodInvoices' : 'PeriodShipments';
   const [periods, setPeriods] = useState<PeriodSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -89,7 +98,7 @@ export default function ShipmentPeriodsScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Shipments</Text>
+        <Text style={styles.title}>{mode === 'invoices' ? 'Invoices' : 'Shipments'}</Text>
         <Text style={styles.subtitle}>
           {live.length} collection period{live.length === 1 ? '' : 's'} with bookings
         </Text>
@@ -107,7 +116,7 @@ export default function ShipmentPeriodsScreen() {
             <Pressable
               key={period.periodId}
               style={styles.card}
-              onPress={() => navigation.navigate('PeriodShipments', {
+              onPress={() => navigation.navigate(target, {
                 periodId: period.periodId,
                 name: period.name || `${period.month || ''} ${period.year || ''}`.trim(),
               })}
@@ -125,7 +134,7 @@ export default function ShipmentPeriodsScreen() {
                 </View>
                 <View style={styles.countPill}>
                   <Text style={styles.countValue}>{period.shipments}</Text>
-                  <Text style={styles.countLabel}>SHIPMENTS</Text>
+                  <Text style={styles.countLabel}>{mode === 'invoices' ? 'INVOICES' : 'SHIPMENTS'}</Text>
                 </View>
               </View>
 
@@ -169,7 +178,7 @@ export default function ShipmentPeriodsScreen() {
               <Pressable
                 key={period.periodId}
                 style={[styles.card, styles.cardQuiet]}
-                onPress={() => navigation.navigate('PeriodShipments', {
+                onPress={() => navigation.navigate(target, {
                   periodId: period.periodId,
                   name: period.name || '',
                 })}

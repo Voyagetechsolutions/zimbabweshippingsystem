@@ -47,11 +47,18 @@ export default function CustomerDetailScreen({ route, navigation }: Props) {
 
   const load = useCallback(async () => {
     const digits = (record.phone || '').replace(/[^0-9]/g, '');
-    const shipmentQuery = record.profileId
-      ? supabase.from('shipments').select('id,user_id,tracking_number,customer_reference,status,created_at,metadata').eq('user_id', record.profileId)
-      : record.email
-        ? supabase.from('shipments').select('id,user_id,tracking_number,customer_reference,status,created_at,metadata').ilike('metadata->sender->>email', record.email)
-        : supabase.from('shipments').select('id,user_id,tracking_number,customer_reference,status,created_at,metadata').ilike('metadata->>whatsappNumber', `%${digits.slice(-9)}%`);
+    const columns = 'id,user_id,customer_id,tracking_number,customer_reference,status,created_at,metadata,goods_description';
+    // Once a customer is a stored record, everything hangs off its id. The
+    // guesswork below it — match on profile, then email, then the tail of a
+    // phone number — is what produced fifty-eight customers from sixty
+    // shipments, and only runs for a record the customers table does not have.
+    const shipmentQuery = record.customerId
+      ? supabase.from('shipments').select(columns).eq('customer_id', record.customerId)
+      : record.profileId
+        ? supabase.from('shipments').select(columns).eq('user_id', record.profileId)
+        : record.email
+          ? supabase.from('shipments').select(columns).ilike('metadata->sender->>email', record.email)
+          : supabase.from('shipments').select(columns).ilike('metadata->>whatsappNumber', `%${digits.slice(-9)}%`);
 
     const [profileResult, shipmentResult] = await Promise.all([
       record.profileId
@@ -67,7 +74,9 @@ export default function CustomerDetailScreen({ route, navigation }: Props) {
     const shipmentIds = ships.map((s) => s.id);
     const [addressResult, quoteResult, invoiceResult, paymentResult, proofResult, notificationResult] = await Promise.all([
       record.profileId ? supabase.from('customer_addresses').select('*').eq('user_id', record.profileId) : Promise.resolve({ data: [] } as any),
-      record.profileId
+      record.customerId
+        ? supabase.from('custom_quotes').select('id,status,description,quoted_amount,currency,created_at').eq('customer_id', record.customerId).order('created_at', { ascending: false }).limit(20)
+        : record.profileId
         ? supabase.from('custom_quotes').select('id,status,description,quoted_amount,currency,created_at').eq('user_id', record.profileId).order('created_at', { ascending: false }).limit(20)
         : digits
           ? supabase.from('custom_quotes').select('id,status,description,quoted_amount,currency,created_at').ilike('phone_number', `%${digits.slice(-9)}%`).order('created_at', { ascending: false }).limit(20)
@@ -244,7 +253,15 @@ export default function CustomerDetailScreen({ route, navigation }: Props) {
     const latest = shipments[0];
     const sender = latest?.metadata?.sender || latest?.metadata?.senderDetails || {};
     const recipient = latest?.metadata?.recipient || latest?.metadata?.recipientDetails || {};
-    const home = addresses.find((a: any) => a.is_default) || addresses[0] || {};
+    // customer_addresses holds both halves of the journey, told apart by
+    // address_type — 60 pickup rows in the UK and Ireland, 18 delivery rows in
+    // Zimbabwe. Picking on is_default alone selects a *pickup* row (every one
+    // of them is flagged default, none of the delivery rows are) and would
+    // have prefilled the destination with the sender's own house.
+    const pickupRows = addresses.filter((a: any) => String(a.address_type || '').toLowerCase() !== 'delivery');
+    const deliveryRows = addresses.filter((a: any) => String(a.address_type || '').toLowerCase() === 'delivery');
+    const savedPickup = pickupRows.find((a: any) => a.is_default) || pickupRows[0] || {};
+    const savedDelivery = deliveryRows.find((a: any) => a.is_default) || deliveryRows[0] || {};
 
     (navigation as any).navigate('ManualBooking', {
       prefill: {
@@ -253,13 +270,17 @@ export default function CustomerDetailScreen({ route, navigation }: Props) {
         senderEmail: email || '',
         senderPhone: phone || '',
         senderCountry: record.country || sender.country || '',
-        senderAddress: home.address_line1 || sender.address || profile?.pickup_address || '',
-        senderCity: home.city || sender.city || profile?.pickup_city || '',
-        senderPostcode: home.postcode || sender.postcode || sender.postalCode || '',
-        recipientName: recipient.name || '',
-        recipientPhone: recipient.phone || '',
-        recipientAddress: recipient.address || '',
-        recipientCity: recipient.city || '',
+        // Where we collect from: their saved pickup address, else the last booking.
+        senderAddress: savedPickup.address_line1 || sender.address || profile?.pickup_address || '',
+        senderCity: savedPickup.city || sender.city || profile?.pickup_city || '',
+        senderPostcode: savedPickup.postal_code || sender.postcode || sender.postalCode || '',
+        // Where it goes: their default saved address, else the last booking.
+        // Every one of these stays editable — the sender is usually the same
+        // person but the recipient often is not.
+        recipientName: savedDelivery.recipient_name || recipient.name || '',
+        recipientPhone: savedDelivery.recipient_phone || recipient.phone || '',
+        recipientAddress: savedDelivery.address_line1 || recipient.address || '',
+        recipientCity: savedDelivery.city || recipient.city || '',
         items: Array.isArray(latest?.metadata?.invoice?.items) ? latest.metadata.invoice.items : [],
         goodsDescription: latest?.goods_description || '',
       },
@@ -288,6 +309,10 @@ export default function CustomerDetailScreen({ route, navigation }: Props) {
           {phone ? <ActionButton icon="logo-whatsapp" label="WhatsApp" onPress={() => openContact(`https://wa.me/${phone.replace(/\D/g, '')}`, 'WhatsApp')} /> : null}
           {email ? <ActionButton icon="mail-outline" label="Email" onPress={() => openContact(`mailto:${email}`, 'Email')} /> : null}
           <ActionButton icon="cloud-upload-outline" label={uploadingProof ? 'Uploading\u2026' : 'Upload proof'} onPress={uploadingProof ? () => {} : uploadProof} />
+          {/* Booking for someone already on file is the common case, and the
+              one that used to mean typing their details in again \u2014 which is
+              how the same person ended up on record twice. */}
+          <ActionButton icon="add-circle-outline" label="Add booking" onPress={startBooking} />
         </View>
       </Card>
 

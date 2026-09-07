@@ -243,6 +243,10 @@ as $$
                                                     then s2.metadata->'invoice'->'payments' else '[]'::jsonb end) pay), 0)) as pd
               from public.shipments s2
               where s2.collection_period_id = p.id and s2.deleted_at is null
+                -- A deleted invoice is not money owed. The screens filter it
+                -- out, so a period total that still counted it disagreed with
+                -- the list underneath it.
+                and s2.metadata->'invoice'->>'deletedAt' is null
               group by 1
               having sum(coalesce((select sum(coalesce((i->>'quantity')::numeric,0) * coalesce((i->>'unitPrice')::numeric,0))
                      from jsonb_array_elements(case when jsonb_typeof(s2.metadata->'invoice'->'items')='array'
@@ -261,13 +265,15 @@ as $$
           on s.collection_period_id = p.id and s.deleted_at is null
         left join lateral (
           select
-            coalesce((select sum(coalesce((i->>'quantity')::numeric,0) * coalesce((i->>'unitPrice')::numeric,0))
-                      from jsonb_array_elements(case when jsonb_typeof(s.metadata->'invoice'->'items')='array'
-                                                     then s.metadata->'invoice'->'items' else '[]'::jsonb end) i), 0)
-            - coalesce((s.metadata->'invoice'->>'discount')::numeric, 0) as total,
-            coalesce((select sum(coalesce((pay->>'amount')::numeric,0))
-                      from jsonb_array_elements(case when jsonb_typeof(s.metadata->'invoice'->'payments')='array'
-                                                     then s.metadata->'invoice'->'payments' else '[]'::jsonb end) pay), 0) as paid,
+            case when s.metadata->'invoice'->>'deletedAt' is not null then 0 else
+              coalesce((select sum(coalesce((i->>'quantity')::numeric,0) * coalesce((i->>'unitPrice')::numeric,0))
+                        from jsonb_array_elements(case when jsonb_typeof(s.metadata->'invoice'->'items')='array'
+                                                       then s.metadata->'invoice'->'items' else '[]'::jsonb end) i), 0)
+              - coalesce((s.metadata->'invoice'->>'discount')::numeric, 0) end as total,
+            case when s.metadata->'invoice'->>'deletedAt' is not null then 0 else
+              coalesce((select sum(coalesce((pay->>'amount')::numeric,0))
+                        from jsonb_array_elements(case when jsonb_typeof(s.metadata->'invoice'->'payments')='array'
+                                                       then s.metadata->'invoice'->'payments' else '[]'::jsonb end) pay), 0) end as paid,
             s.metadata->'invoice'->>'currency' as currency
         ) inv on true
         where p.deleted_at is null
