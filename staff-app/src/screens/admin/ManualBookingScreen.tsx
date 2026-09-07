@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, Alert, Switch } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { colors, radius, spacing } from '../../theme';
+import { useRoute } from '@react-navigation/native';
 import { loadStaffBusinessConfig, type StaffBusinessConfig } from '../../lib/businessConfig';
 
 // Mirrors the website's booking submit: shipments + payments + receipts rows
@@ -14,7 +15,23 @@ function trackingNumber() {
   return r;
 }
 
+/**
+ * Details carried over when booking for a customer already on file.
+ *
+ * Everything is optional: the screen is still opened cold from the More menu
+ * for a genuinely new customer.
+ */
+export type BookingPrefill = {
+  customerId?: string | null;
+  senderName?: string; senderEmail?: string; senderPhone?: string; senderCountry?: string;
+  senderAddress?: string; senderCity?: string; senderPostcode?: string;
+  recipientName?: string; recipientPhone?: string; recipientAddress?: string; recipientCity?: string;
+  items?: Array<{ description?: string; quantity?: number; unitPrice?: number }>;
+  goodsDescription?: string;
+};
+
 export default function ManualBookingScreen() {
+  const prefill = ((useRoute().params || {}) as { prefill?: BookingPrefill }).prefill;
   const [business, setBusiness] = useState<StaffBusinessConfig | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const [country, setCountry] = useState<'England' | 'Ireland'>('England');
@@ -45,6 +62,42 @@ export default function ManualBookingScreen() {
    * is not, and every one of these needs its own description.
    */
   const [otherItems, setOtherItems] = useState<Array<{ description: string; quantity: string; unitPrice: string }>>([]);
+
+  /**
+   * Fill in what we already know about a returning customer.
+   *
+   * Runs once. Anything the admin then changes is theirs — re-applying on
+   * every render would fight the person typing.
+   */
+  useEffect(() => {
+    if (!prefill) return;
+    const [first, ...rest] = String(prefill.senderName || '').trim().split(' ');
+    if (first) setFirstName(first);
+    if (rest.length) setLastName(rest.join(' '));
+    if (prefill.senderEmail) setEmail(prefill.senderEmail);
+    if (prefill.senderPhone) setPhone(prefill.senderPhone);
+    if (prefill.senderAddress) setAddress(prefill.senderAddress);
+    if (prefill.senderCity) setCity(prefill.senderCity);
+    if (prefill.senderPostcode) setPostcode(prefill.senderPostcode);
+    if (/ireland/i.test(String(prefill.senderCountry || ''))) setCountry('Ireland');
+    if (prefill.recipientName) setRxName(prefill.recipientName);
+    if (prefill.recipientPhone) setRxPhone(prefill.recipientPhone);
+    if (prefill.recipientAddress) setRxAddress(prefill.recipientAddress);
+    if (prefill.recipientCity) setRxCity(prefill.recipientCity);
+    // Last time's items are a starting point, not a repeat order: they are
+    // filled in so the admin edits rather than retypes, and priced blank so
+    // nobody accidentally re-charges an old price.
+    if (prefill.items?.length) {
+      setOtherItems(prefill.items
+        .filter((item) => String(item.description || '').trim())
+        .map((item) => ({
+          description: String(item.description || ''),
+          quantity: String(item.quantity ?? 1),
+          unitPrice: '',
+        })));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [payment, setPayment] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -162,6 +215,11 @@ export default function ManualBookingScreen() {
         .insert({
           tracking_number: tn,
           user_id: null,
+          // Booking for someone already on file attaches straight to them.
+          // The trigger would resolve it from the phone anyway, but this is
+          // the case where we know the answer, and an admin correcting a typo
+          // in the number should not fork the customer.
+          ...(prefill?.customerId ? { customer_id: prefill.customerId } : {}),
           origin: `${city.trim()}, ${country}`,
           destination: `${rxCity.trim()}, Zimbabwe`,
           status: hasPriced ? 'Pending' : 'Awaiting Quote',

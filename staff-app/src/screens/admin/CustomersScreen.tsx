@@ -7,16 +7,27 @@ import { supabase } from '../../lib/supabase';
 import { colors, radius, spacing } from '../../theme';
 import { money, shortDate } from '../../lib/format';
 import { ScreenHeader, SearchBar, Segmented, Badge, BADGE, Avatar, SkeletonList, EmptyState, ErrorState } from '../../components/adminui';
+import { isMissingBackend } from '../../lib/offlineQueue';
 import type { MenuStackParams } from '../../navigation/types';
 
-// Unified customer records from admin_customer_records: app + website
-// registrations, past bookings, quote requesters and manual bookings — deduped
-// by user id, then normalised email/phone.
+// One row per customer, from the customers table.
+//
+// This used to come from admin_customer_records, which reconstructed customers
+// from booking details on every call — and produced fifty-eight customers from
+// sixty shipments, because a guest booking with no email keyed on phone while
+// the same person's next booking keyed on email. Identity is stored now.
+//
+// The old routine is kept as a fallback: an installed app outlives any single
+// schema version, and a build that shipped before the customers migration is
+// applied must still show a customer list rather than an error.
 
 type Props = NativeStackScreenProps<MenuStackParams, 'Customers'>;
 
 export interface CustomerRecord {
   key: string;
+  /** Set once the customers table exists; absent on the fallback path. */
+  customerId?: string | null;
+  customerCode?: string | null;
   profileId: string | null;
   fullName: string;
   email: string | null;
@@ -46,7 +57,10 @@ export default function CustomersScreen({ navigation }: Props) {
   const [trackingMatches, setTrackingMatches] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
-    const { data, error: rpcError } = await supabase.rpc('admin_customer_records');
+    let { data, error: rpcError } = await supabase.rpc('admin_customer_list');
+    if (rpcError && isMissingBackend(rpcError)) {
+      ({ data, error: rpcError } = await supabase.rpc('admin_customer_records'));
+    }
     if (rpcError) { setError(rpcError.message); return; }
     setError(null);
     setCustomers(((data || []) as CustomerRecord[]).filter((c) => c.fullName || c.email || c.phone));

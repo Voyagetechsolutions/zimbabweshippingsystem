@@ -42,6 +42,8 @@ export default function CustomerDetailScreen({ route, navigation }: Props) {
   const [pendingProof, setPendingProof] = useState<any>(null);
   const [uploadingProof, setUploadingProof] = useState(false);
   const [proofPreviewUri, setProofPreviewUri] = useState<string | null>(null);
+  const [statement, setStatement] = useState<any[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     const digits = (record.phone || '').replace(/[^0-9]/g, '');
@@ -80,6 +82,17 @@ export default function CustomerDetailScreen({ route, navigation }: Props) {
     ]);
     setAddresses(addressResult.data || []);
     setQuotes(quoteResult.data || []);
+
+    // The statement is one call, and only once the customers table exists.
+    // Before that there is no stable customer to run it for, so the section is
+    // simply absent rather than showing a wrong or partial balance.
+    if (record.customerId) {
+      const { data: statementRows, error: statementError } =
+        await supabase.rpc('customer_statement', { p_customer_id: record.customerId });
+      setStatement(!statementError && Array.isArray(statementRows) ? statementRows : []);
+    } else {
+      setStatement([]);
+    }
     // One row per shipment that carries an invoice, priced from its own lines.
     setInvoices(ships
       .filter((shipment) => hasInvoice(shipment) && !getInvoice(shipment).deletedAt)
@@ -97,6 +110,14 @@ export default function CustomerDetailScreen({ route, navigation }: Props) {
         };
       }));
     setPayments(paymentResult.data || []);
+    // "Payment methods" is what this customer has actually paid with, taken
+    // from their recorded payments. There is no stored card or mandate to
+    // list — invoicing here is offline by design.
+    setPaymentMethods(Array.from(new Set(
+      ((paymentResult.data || []) as any[])
+        .map((p) => String(p.payment_method || '').trim())
+        .filter(Boolean),
+    )));
     // Proofs are attached to both the signed-in customer and the shipment. The
     // shipment lookup also keeps a guest/legacy customer's proof in their file.
     const shipmentProofResult = shipmentIds.length
@@ -207,6 +228,40 @@ export default function CustomerDetailScreen({ route, navigation }: Props) {
     }
   };
 
+  /**
+   * Book for someone already on file.
+   *
+   * Everything known is handed to the booking form: who they are, where we
+   * collect from, and — from their last shipment — who receives it and what
+   * they sent. Re-typing all of that for a returning customer is how the same
+   * person ends up on record twice with two spellings of one address.
+   */
+  const startBooking = () => {
+    const latest = shipments[0];
+    const sender = latest?.metadata?.sender || latest?.metadata?.senderDetails || {};
+    const recipient = latest?.metadata?.recipient || latest?.metadata?.recipientDetails || {};
+    const home = addresses.find((a: any) => a.is_default) || addresses[0] || {};
+
+    (navigation as any).navigate('ManualBooking', {
+      prefill: {
+        customerId: record.customerId ?? null,
+        senderName: record.fullName || profile?.full_name || '',
+        senderEmail: email || '',
+        senderPhone: phone || '',
+        senderCountry: record.country || sender.country || '',
+        senderAddress: home.address_line1 || sender.address || profile?.pickup_address || '',
+        senderCity: home.city || sender.city || profile?.pickup_city || '',
+        senderPostcode: home.postcode || sender.postcode || sender.postalCode || '',
+        recipientName: recipient.name || '',
+        recipientPhone: recipient.phone || '',
+        recipientAddress: recipient.address || '',
+        recipientCity: recipient.city || '',
+        items: Array.isArray(latest?.metadata?.invoice?.items) ? latest.metadata.invoice.items : [],
+        goodsDescription: latest?.goods_description || '',
+      },
+    });
+  };
+
   if (loading) return <Loading />;
 
   const outstandingInvoices = invoices.filter((i) => ['sent', 'partial', 'overdue', 'draft'].includes(i.status));
@@ -238,6 +293,43 @@ export default function CustomerDetailScreen({ route, navigation }: Props) {
         <Summary label="Lifetime" value={money(record.lifetimeValue, record.currency === 'EUR' ? '€' : '£')} />
         <Summary label="Outstanding" value={money(record.outstanding, record.currency === 'EUR' ? '€' : '£')} tone={record.outstanding > 0 ? colors.danger : colors.primaryDark} />
       </View>
+
+      {record.customerId && statement.length > 0 ? (
+        <>
+          <SectionLabel text="Statement" />
+          <Card>
+            {statement.map((line: any, index: number) => {
+              const symbol = line.currency === 'EUR' ? '€' : '£';
+              const charge = line.kind === 'charge';
+              return (
+                <View key={`${line.shipmentId}-${index}`} style={styles.statementRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.statementRef}>{line.reference || '—'}</Text>
+                    <Text style={styles.meta}>
+                      {shortDate(line.at)}{charge ? ' · Invoice' : ` · Paid${line.method ? ` (${line.method})` : ''}`}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={[styles.statementAmount, { color: charge ? colors.text : colors.primaryDark }]}>
+                      {charge ? '' : '−'}{money(Math.abs(Number(line.amount) || 0), symbol)}
+                    </Text>
+                    <Text style={styles.meta}>Balance {money(Number(line.balance) || 0, symbol)}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </Card>
+        </>
+      ) : null}
+
+      {paymentMethods.length > 0 ? (
+        <>
+          <SectionLabel text="Payment methods used" />
+          <Card>
+            <Text style={styles.meta}>{paymentMethods.join(' · ')}</Text>
+          </Card>
+        </>
+      ) : null}
 
       <SectionLabel text={`Quotes (${quotes.length})`} />
       {quotes.length === 0 ? <Card><Text style={styles.meta}>No quote requests.</Text></Card> : (
@@ -364,6 +456,9 @@ function Summary({ label, value, tone }: { label: string; value: string; tone?: 
 }
 
 const styles = StyleSheet.create({
+  statementRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 8 },
+  statementRef: { fontSize: 13, fontWeight: '700', color: colors.text },
+  statementAmount: { fontSize: 14, fontWeight: '800' },
   safe: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg, paddingBottom: 56, gap: spacing.sm },
   identityRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },

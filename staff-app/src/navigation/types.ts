@@ -80,7 +80,9 @@ export type RunsStackParams = {
 // Sections menu — mirrors the website admin sidebar.
 export type MenuStackParams = {
   MenuHome: undefined;
-  ManualBooking: undefined;
+  // Optionally opened for a customer already on file, with their
+  // details, addresses and last consignment carried over.
+  ManualBooking: { prefill?: Record<string, unknown> } | undefined;
   Customers: undefined;
   CustomerDetail: { record: any; shipmentId?: string };
   // Registered here as well as in ShipmentsStack so that opening a shipment

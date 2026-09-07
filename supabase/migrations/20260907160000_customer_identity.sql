@@ -383,6 +383,8 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_customer uuid;
 begin
   -- Staff are not customers.
   if coalesce(new.is_admin, false)
@@ -390,9 +392,25 @@ begin
     return new;
   end if;
 
-  perform public.resolve_customer(
+  v_customer := public.resolve_customer(
     new.full_name, new.email, new.phone_number, new.country,
     new.pickup_address, new.pickup_city, null, new.id);
+
+  -- Hand them the bookings they made before they had an account.
+  --
+  -- Setting user_id, rather than only linking the customer, is deliberate:
+  -- every screen in the app and on the website already asks "shipments where
+  -- user_id is me". Claiming the rows here makes all of them correct at once,
+  -- instead of a dozen queries each needing to learn about customers and one
+  -- of them being missed. Only unclaimed rows are touched, so a shipment that
+  -- already belongs to somebody is never reassigned.
+  if v_customer is not null then
+    update public.shipments
+       set user_id = new.id
+     where customer_id = v_customer
+       and user_id is null
+       and deleted_at is null;
+  end if;
 
   return new;
 end $$;
@@ -402,3 +420,141 @@ create trigger profiles_link_customer
   after insert or update of email, phone_number on public.profiles
   for each row
   execute function public.link_profile_customer();
+
+-- ---------------------------------------------------------------------------
+-- F. What the admin screens read
+-- ---------------------------------------------------------------------------
+
+/**
+ * The customer list: one row per customer, with the totals staff scan for.
+ *
+ * This replaces admin_customer_records, whose job was to *reconstruct* customers
+ * from scattered booking details every time it ran. That reconstruction is what
+ * produced fifty-eight customers from sixty shipments. Identity is a stored
+ * fact now, so this only has to add up what hangs off it.
+ */
+create or replace function public.admin_customer_list()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case when not (public.is_operations_admin() or public.is_finance_staff())
+    then jsonb_build_object('error', 'Admin or finance access required')
+    else coalesce((
+      select jsonb_agg(row order by row->>'lastActivity' desc nulls last)
+      from (
+        select jsonb_build_object(
+          'key', c.id,
+          'customerId', c.id,
+          'profileId', c.profile_id,
+          'customerCode', c.customer_code,
+          'fullName', coalesce(c.full_name, 'Unknown customer'),
+          'email', c.email,
+          'phone', c.phone,
+          'country', c.country,
+          'pickupAddress', nullif(trim(concat_ws(', ', c.pickup_address, c.pickup_city)), ''),
+          'shipmentCount', count(distinct s.id),
+          'quoteCount', 0,
+          'lifetimeValue', coalesce(sum(inv.total), 0),
+          'outstanding', coalesce(sum(inv.total), 0) - coalesce(sum(inv.paid), 0),
+          'currency', coalesce(max(inv.currency), 'GBP'),
+          'lastBooking', max(s.created_at),
+          'lastActivity', greatest(coalesce(max(s.created_at), c.created_at), c.created_at),
+          'active', true
+        ) as row
+        from public.customers c
+        left join public.shipments s
+          on s.customer_id = c.id and s.deleted_at is null
+        left join lateral (
+          select
+            coalesce((select sum(coalesce((i->>'quantity')::numeric,0) * coalesce((i->>'unitPrice')::numeric,0))
+                      from jsonb_array_elements(case when jsonb_typeof(s.metadata->'invoice'->'items')='array'
+                                                     then s.metadata->'invoice'->'items' else '[]'::jsonb end) i), 0)
+            - coalesce((s.metadata->'invoice'->>'discount')::numeric, 0) as total,
+            coalesce((select sum(coalesce((p->>'amount')::numeric,0))
+                      from jsonb_array_elements(case when jsonb_typeof(s.metadata->'invoice'->'payments')='array'
+                                                     then s.metadata->'invoice'->'payments' else '[]'::jsonb end) p), 0) as paid,
+            s.metadata->'invoice'->>'currency' as currency
+        ) inv on true
+        group by c.id, c.profile_id, c.customer_code, c.full_name, c.email, c.phone,
+                 c.country, c.pickup_address, c.pickup_city, c.created_at
+      ) grouped
+    ), '[]'::jsonb)
+  end;
+$$;
+
+revoke all on function public.admin_customer_list() from public, anon;
+grant execute on function public.admin_customer_list() to authenticated;
+
+/**
+ * A customer's statement: every charge and every payment, oldest first, with a
+ * running balance.
+ *
+ * Built from the same metadata.invoice the invoice, the app and the website all
+ * read, so the statement cannot disagree with the documents it summarises.
+ */
+create or replace function public.customer_statement(p_customer_id uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_rows jsonb;
+  v_allowed boolean;
+begin
+  select public.is_operations_admin() or public.is_finance_staff()
+         or exists (select 1 from public.customers c
+                     where c.id = p_customer_id and c.profile_id = auth.uid())
+    into v_allowed;
+  if not v_allowed then
+    raise exception 'Not your statement' using errcode = '42501';
+  end if;
+
+  with charges as (
+    select s.id as shipment_id, s.created_at as at,
+           coalesce(s.metadata->'invoice'->>'invoiceNumber',
+                    'INV-' || coalesce(s.customer_reference, s.tracking_number, '')) as ref,
+           'charge' as kind,
+           coalesce((select sum(coalesce((i->>'quantity')::numeric,0) * coalesce((i->>'unitPrice')::numeric,0))
+                     from jsonb_array_elements(case when jsonb_typeof(s.metadata->'invoice'->'items')='array'
+                                                    then s.metadata->'invoice'->'items' else '[]'::jsonb end) i), 0)
+           - coalesce((s.metadata->'invoice'->>'discount')::numeric, 0) as amount,
+           coalesce(s.metadata->'invoice'->>'currency', 'GBP') as currency,
+           null::text as method
+      from public.shipments s
+     where s.customer_id = p_customer_id and s.deleted_at is null
+       and s.metadata->'invoice' is not null
+  ),
+  credits as (
+    select s.id as shipment_id,
+           coalesce((p->>'date')::timestamptz, s.created_at) as at,
+           coalesce(s.metadata->'invoice'->>'invoiceNumber', s.tracking_number) as ref,
+           'payment' as kind,
+           -coalesce((p->>'amount')::numeric, 0) as amount,
+           coalesce(s.metadata->'invoice'->>'currency', 'GBP') as currency,
+           p->>'method' as method
+      from public.shipments s
+      cross join lateral jsonb_array_elements(
+        case when jsonb_typeof(s.metadata->'invoice'->'payments')='array'
+             then s.metadata->'invoice'->'payments' else '[]'::jsonb end) p
+     where s.customer_id = p_customer_id and s.deleted_at is null
+  ),
+  ordered as (
+    select *, sum(amount) over (order by at, kind desc rows between unbounded preceding and current row) as balance
+      from (select * from charges union all select * from credits) both_sides
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'shipmentId', shipment_id, 'at', at, 'reference', ref, 'kind', kind,
+           'amount', amount, 'currency', currency, 'method', method, 'balance', balance
+         ) order by at), '[]'::jsonb)
+    into v_rows from ordered;
+
+  return v_rows;
+end $$;
+
+revoke all on function public.customer_statement(uuid) from public, anon;
+grant execute on function public.customer_statement(uuid) to authenticated;
