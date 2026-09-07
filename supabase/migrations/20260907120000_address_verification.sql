@@ -10,6 +10,7 @@
 --   exact       — a UK postcode centroid or a street-level match
 --   approximate — a town centroid; the driver sees a warning
 --   manual      — placed or corrected by admin; always treated as exact
+--   failed      — every lookup missed; needs a human to place the pin
 --   null        — never geocoded
 --
 -- Verification is separate from precision: an admin confirming the address is
@@ -37,7 +38,12 @@ begin
   ) then
     alter table public.shipments add constraint shipments_pickup_geocode_precision_check
       check (pickup_geocode_precision is null
-             or pickup_geocode_precision in ('exact', 'approximate', 'manual'));
+             -- 'failed' is what stops a bulk run looping for ever. A row with
+             -- no coordinates is selected by every pass, so an address no
+             -- geocoder can place would be retried until the end of time and
+             -- the rows behind it never reached. Recording the failure both
+             -- ends the loop and tells admin which addresses need a pin.
+             or pickup_geocode_precision in ('exact', 'approximate', 'manual', 'failed'));
   end if;
   if not exists (
     select 1 from pg_constraint where conname = 'shipments_delivery_geocode_precision_check'

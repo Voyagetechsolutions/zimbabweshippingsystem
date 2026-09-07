@@ -382,7 +382,14 @@ serve(async (req) => {
         .is('deleted_at', null)
         .not('status', 'in', '("Delivered","Cancelled","cancelled")')
         .limit(limit);
-      if (!force) query = query.is('pickup_latitude', null);
+      if (!force) {
+        query = query.is('pickup_latitude', null);
+        // Skip the ones already proved unresolvable. Without this a bulk run
+        // never finishes: a row with no coordinates is picked by every pass,
+        // so an address no geocoder can place is retried for ever and the
+        // rows behind it are never reached.
+        if (hasPrecision) query = query.or('pickup_geocode_precision.is.null,pickup_geocode_precision.neq.failed');
+      }
       // A pin a human placed outranks anything a geocoder can find, so even a
       // forced pass leaves it alone.
       if (force && hasPrecision) {
@@ -413,6 +420,13 @@ serve(async (req) => {
         if (!result.coords) {
           failed++;
           misses.push({ id: row.id, reference, tried: result.tried });
+          // Remember the miss so the next pass moves past it. Admin sees these
+          // as "needs a pin" rather than the run silently stalling on them.
+          if (hasPrecision) {
+            await admin.from('shipments')
+              .update({ pickup_geocode_precision: 'failed' })
+              .eq('id', row.id);
+          }
           continue;
         }
 

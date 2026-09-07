@@ -23,6 +23,7 @@ import FeedbackScreen from '../screens/admin/FeedbackScreen';
 import PlaceholderScreen from '../screens/admin/PlaceholderScreen';
 import StaffRecordsScreen from '../screens/admin/StaffRecordsScreen';
 import VehiclesScreen from '../screens/admin/VehiclesScreen';
+import MapLocationsScreen from '../screens/admin/MapLocationsScreen';
 import AccountScreen from '../screens/AccountScreen';
 import { PaymentDetailsScreen, ReconciliationScreen } from '../screens/FinanceExperienceScreens';
 import DocumentScreen from '../screens/admin/DocumentScreen';
@@ -63,6 +64,7 @@ export default function MenuStack() {
       <Stack.Screen name="FinanceOverview" component={FinanceOverviewScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Feedback" component={FeedbackScreen} options={{ title: 'Feedback' }} />
       <Stack.Screen name="StaffRecords" component={StaffRecordsScreen} options={{ title: '', headerShadowVisible: false }} />
+      <Stack.Screen name="MapLocations" component={MapLocationsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Vehicles" component={VehiclesScreen} options={{ title: '', headerShadowVisible: false }} />
       <Stack.Screen name="Account" component={AccountScreen} options={{ title: 'Account' }} />
       <Stack.Screen name="Placeholder" component={PlaceholderScreen} options={{ title: '' }} />

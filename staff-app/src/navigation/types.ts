@@ -111,6 +111,8 @@ export type MenuStackParams = {
   FinanceOverview: undefined;
   Feedback: undefined;
   StaffRecords: { filter?: 'all' | 'drivers' | 'dispatchers' | 'finance' | 'admins' } | undefined;
+  // Coverage of pickup coordinates, and the bulk geocode that fills them.
+  MapLocations: undefined;
   Vehicles: undefined;
   Account: undefined;
   Placeholder: { title: string };

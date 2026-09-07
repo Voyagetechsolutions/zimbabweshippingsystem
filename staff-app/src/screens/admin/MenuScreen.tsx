@@ -34,6 +34,7 @@ const SECTIONS: { title: string; data: Item[] }[] = [
       // come from.
       { label: 'All Shipments', icon: 'cube-outline', to: 'Periods' },
       { label: 'Pickup Zones', icon: 'location-outline', to: 'PickupZones' },
+      { label: 'Map Locations', icon: 'map-outline', to: 'MapLocations' },
     ],
   },
   {
