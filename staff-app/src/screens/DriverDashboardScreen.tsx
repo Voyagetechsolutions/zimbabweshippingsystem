@@ -233,7 +233,7 @@ export default function DriverDashboardScreen({ navigation }: Props) {
   const fillMissingCoordinates = useCallback(async (runId: string, silent: boolean) => {
     setGeocoding(true);
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('geocode-stops', { body: { runId } });
+      const { data, error: fnError } = await supabase.functions.invoke('geocode-stops', { body: { target: 'stops', runId } });
       if (fnError) throw fnError;
       if ((data as any)?.error) throw new Error((data as any).error);
       if (Number((data as any)?.resolved) > 0) await load();

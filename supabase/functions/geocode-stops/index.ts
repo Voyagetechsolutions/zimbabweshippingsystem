@@ -1,7 +1,21 @@
-// Fills in driver_run_stops.latitude / longitude so the driver map has pins.
+// Fills in coordinates so the driver map has pins.
+//
+// Two targets, chosen with `target` in the request body:
+//   * "shipments" (default) — shipments.pickup_latitude / pickup_longitude.
+//     This is the one that matters day to day: a driver plans a route straight
+//     off the day's collections, so a shipment without a point is a stop that
+//     cannot be mapped, ordered or navigated to.
+//   * "stops" — driver_run_stops.latitude / longitude, for a run already built.
 //
 // The columns have existed since the phase-one driver migration but nothing ever
 // wrote to them, which is why the run map almost never rendered.
+//
+// Coverage will never be total, and the caller is told exactly which rows
+// missed so a human can finish the job: only about 40% of live bookings carry a
+// postcode, and Irish addresses carry no Eircode at all ("Irish Bar Church
+// Street Tullow, Cork"). Those fall to a free-text search and then to the town
+// centroid, which is good enough to group a day's work but not to drive to —
+// hence the admin verification step that lets someone place the pin by hand.
 //
 // Two free geocoders, no API key:
 //   * UK collections — postcodes.io. A postcode gives an exact centroid, and the
@@ -93,6 +107,146 @@ async function lookupNominatim(query: string, countryCodes: string): Promise<Coo
   }
 }
 
+type Attempt = { kind: string; query: string };
+
+/**
+ * The ordered lookups to try for one address, best first.
+ *
+ * A second, looser attempt always follows the precise one: a postcode that is
+ * missing or wrong still leaves a street and a town worth searching, and a
+ * street Nominatim has never heard of still leaves a town centroid. Callers
+ * treat the last attempt as approximate — see `approximate` below.
+ */
+function buildAttempts(
+  kind: 'collection' | 'delivery',
+  address: unknown,
+  sender: Record<string, any>,
+  recipient: Record<string, any>,
+): Attempt[] {
+  const clean = (parts: unknown[]) => parts
+    .filter(Boolean)
+    .map(String)
+    .map((part) => part.trim())
+    .filter((part) => part && !/^n\/?a$/i.test(part))
+    .join(', ');
+
+  let first: string;
+  let second: string;
+  let firstKind: string;
+  let secondKind: string;
+
+  const senderPostcode = sender.postcode || sender.postalCode;
+
+  if (kind === 'collection' && isIrish(sender.country, senderPostcode)) {
+    // Ireland has no free postcode-to-point service, so go straight to a
+    // free-text search and fall back to the town.
+    firstKind = 'ie-address';
+    first = clean([address || sender.address, sender.city, senderPostcode, 'Ireland']);
+    secondKind = 'ie-city';
+    second = clean([sender.city, 'Ireland']);
+  } else if (kind === 'collection') {
+    firstKind = 'uk-postcode';
+    first = String(senderPostcode || '').trim();
+    secondKind = 'gb-address';
+    second = clean([address || sender.address, sender.city]);
+  } else {
+    firstKind = 'zw-address';
+    first = clean([address || recipient.address, recipient.city, 'Zimbabwe']);
+    secondKind = 'zw-city';
+    second = clean([recipient.city, 'Zimbabwe']);
+  }
+
+  const attempts: Attempt[] = [];
+  if (first && first.length >= 3) attempts.push({ kind: firstKind, query: first });
+  if (second && second.length >= 3 && second !== first) attempts.push({ kind: secondKind, query: second });
+  return attempts;
+}
+
+/** A town-centroid hit is fine for grouping a day's work but not for driving to. */
+const APPROXIMATE_KINDS = new Set(['ie-city', 'zw-city']);
+
+type ResolveResult = {
+  coords: Coords | null;
+  approximate: boolean;
+  tried: string | null;
+  cacheHits: number;
+  networkCalls: number;
+};
+
+/** Runs the attempts in order, using and filling geocode_cache. */
+async function resolveCoords(admin: any, attempts: Attempt[]): Promise<ResolveResult> {
+  let cacheHits = 0;
+  let networkCalls = 0;
+
+  for (const attempt of attempts) {
+    const key = cacheKey(attempt.kind, attempt.query);
+
+    const { data: cached } = await admin
+      .from('geocode_cache')
+      .select('latitude, longitude, resolved, source')
+      .eq('lookup_key', key)
+      .maybeSingle();
+
+    if (cached) {
+      cacheHits++;
+      if (cached.resolved && cached.latitude != null && cached.longitude != null) {
+        return {
+          coords: { latitude: cached.latitude, longitude: cached.longitude, source: cached.source },
+          approximate: APPROXIMATE_KINDS.has(attempt.kind),
+          tried: attempt.query,
+          cacheHits,
+          networkCalls,
+        };
+      }
+      // A previous miss is remembered so we don't hammer the service again.
+      continue;
+    }
+
+    let coords: Coords | null;
+    if (attempt.kind === 'uk-postcode') {
+      coords = await lookupUkPostcode(attempt.query);
+    } else if (attempt.kind === 'gb-address') {
+      coords = await lookupNominatim(attempt.query, 'gb');
+      await sleep(1100); // Nominatim: max 1 request/second.
+    } else if (attempt.kind === 'ie-address' || attempt.kind === 'ie-city') {
+      coords = await lookupNominatim(attempt.query, 'ie');
+      await sleep(1100);
+    } else {
+      coords = await lookupNominatim(attempt.query, 'zw');
+      await sleep(1100);
+    }
+    networkCalls++;
+
+    await admin.from('geocode_cache').upsert({
+      lookup_key: key,
+      query: attempt.query,
+      latitude: coords?.latitude ?? null,
+      longitude: coords?.longitude ?? null,
+      source: coords?.source ?? attempt.kind,
+      resolved: Boolean(coords),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'lookup_key' });
+
+    if (coords) {
+      return {
+        coords,
+        approximate: APPROXIMATE_KINDS.has(attempt.kind),
+        tried: attempt.query,
+        cacheHits,
+        networkCalls,
+      };
+    }
+  }
+
+  return {
+    coords: null,
+    approximate: false,
+    tried: attempts.length ? attempts[0].query : null,
+    cacheHits,
+    networkCalls,
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') {
@@ -132,129 +286,166 @@ serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
+    const target: 'shipments' | 'stops' = body?.target === 'stops' ? 'stops' : 'shipments';
     const runId: string | null = body?.runId ?? null;
+    const shipmentIds: string[] | null = Array.isArray(body?.shipmentIds) && body.shipmentIds.length
+      ? body.shipmentIds.map(String)
+      : null;
+    // `force` re-geocodes rows that already have a point, for when an address
+    // has been corrected. Without it only the gaps are filled.
+    const force = Boolean(body?.force);
     const limit = Math.min(Number(body?.limit) || 60, 200);
-
-    // Only stops that still have no coordinates.
-    let query = admin
-      .from('driver_run_stops')
-      .select('id, run_id, stop_type, address, latitude, longitude, shipment:shipments(metadata)')
-      .is('latitude', null)
-      .limit(limit);
-    if (runId) query = query.eq('run_id', runId);
-
-    const { data: stops, error: stopsError } = await query;
-    if (stopsError) throw stopsError;
 
     let resolved = 0;
     let failed = 0;
+    let approximateCount = 0;
     let cacheHits = 0;
     let networkCalls = 0;
+    // Named so a human can act on the misses rather than guess at them.
+    const misses: Array<{ id: string; reference: string | null; tried: string | null }> = [];
+    const approximate: Array<{ id: string; reference: string | null; tried: string | null }> = [];
+    let considered = 0;
 
-    for (const stop of (stops || []) as any[]) {
-      const metadata = stop.shipment?.metadata || {};
-      const sender = metadata.sender || metadata.senderDetails || {};
-      const recipient = metadata.recipient || metadata.recipientDetails || {};
+    if (target === 'stops') {
+      let query = admin
+        .from('driver_run_stops')
+        .select('id, run_id, stop_type, address, latitude, longitude, shipment:shipments(metadata)')
+        .limit(limit);
+      if (!force) query = query.is('latitude', null);
+      if (runId) query = query.eq('run_id', runId);
 
-      // Build the best query available for this kind of stop.
-      let kind: string;
-      let query1: string;
-      let fallback: string | null = null;
-      if (stop.stop_type === 'collection' && isIrish(sender.country, sender.postcode || sender.postalCode)) {
-        // Ireland has no free postcode-to-point service, so go straight to a
-        // free-text search and fall back to the town, which is still accurate
-        // enough to group a day's stops.
-        kind = 'ie-address';
-        query1 = [stop.address || sender.address, sender.city, sender.postcode || sender.postalCode, 'Ireland']
-          .filter(Boolean).map(String).filter((part) => !/^n\/?a$/i.test(part.trim())).join(', ');
-        fallback = [sender.city, 'Ireland'].filter(Boolean).join(', ');
-      } else if (stop.stop_type === 'collection') {
-        kind = 'uk-postcode';
-        query1 = String(sender.postcode || sender.postalCode || '').trim();
-        // Without a postcode, try the street address in GB.
-        fallback = [stop.address || sender.address, sender.city].filter(Boolean).join(', ');
-      } else {
-        kind = 'zw-address';
-        query1 = [stop.address || recipient.address, recipient.city, 'Zimbabwe'].filter(Boolean).join(', ');
-        fallback = [recipient.city, 'Zimbabwe'].filter(Boolean).join(', ');
-      }
+      const { data: stops, error: stopsError } = await query;
+      if (stopsError) throw stopsError;
+      considered = (stops || []).length;
 
-      const attempts: Array<{ kind: string; query: string }> = [];
-      if (query1 && query1.length >= 3) attempts.push({ kind, query: query1 });
-      if (fallback && fallback.length >= 3 && fallback !== query1) {
-        const fallbackKind = kind === 'uk-postcode' ? 'gb-address'
-          : kind === 'ie-address' ? 'ie-city'
-          : 'zw-city';
-        attempts.push({ kind: fallbackKind, query: fallback });
-      }
+      for (const stop of (stops || []) as any[]) {
+        const metadata = stop.shipment?.metadata || {};
+        const sender = metadata.sender || metadata.senderDetails || {};
+        const recipient = metadata.recipient || metadata.recipientDetails || {};
 
-      let coords: Coords | null = null;
+        const result = await resolveCoords(
+          admin,
+          buildAttempts(stop.stop_type === 'collection' ? 'collection' : 'delivery', stop.address, sender, recipient),
+        );
+        cacheHits += result.cacheHits;
+        networkCalls += result.networkCalls;
 
-      for (const attempt of attempts) {
-        const key = cacheKey(attempt.kind, attempt.query);
-
-        const { data: cached } = await admin
-          .from('geocode_cache')
-          .select('latitude, longitude, resolved, source')
-          .eq('lookup_key', key)
-          .maybeSingle();
-
-        if (cached) {
-          cacheHits++;
-          if (cached.resolved && cached.latitude != null && cached.longitude != null) {
-            coords = { latitude: cached.latitude, longitude: cached.longitude, source: cached.source };
-            break;
-          }
-          // A previous miss is remembered so we don't hammer the service again.
+        if (!result.coords) {
+          failed++;
+          misses.push({ id: stop.id, reference: null, tried: result.tried });
           continue;
         }
 
-        if (attempt.kind === 'uk-postcode') {
-          coords = await lookupUkPostcode(attempt.query);
-        } else if (attempt.kind === 'gb-address') {
-          coords = await lookupNominatim(attempt.query, 'gb');
-          await sleep(1100); // Nominatim: max 1 request/second.
-        } else if (attempt.kind === 'ie-address' || attempt.kind === 'ie-city') {
-          coords = await lookupNominatim(attempt.query, 'ie');
-          await sleep(1100);
-        } else {
-          coords = await lookupNominatim(attempt.query, 'zw');
-          await sleep(1100);
-        }
-        networkCalls++;
-
-        await admin.from('geocode_cache').upsert({
-          lookup_key: key,
-          query: attempt.query,
-          latitude: coords?.latitude ?? null,
-          longitude: coords?.longitude ?? null,
-          source: coords?.source ?? attempt.kind,
-          resolved: Boolean(coords),
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'lookup_key' });
-
-        if (coords) break;
-      }
-
-      if (coords) {
         const { error: updateError } = await admin
           .from('driver_run_stops')
-          .update({ latitude: coords.latitude, longitude: coords.longitude, updated_at: new Date().toISOString() })
+          .update({
+            latitude: result.coords.latitude,
+            longitude: result.coords.longitude,
+            updated_at: new Date().toISOString(),
+          })
           .eq('id', stop.id);
-        if (updateError) failed++;
-        else resolved++;
-      } else {
-        failed++;
+        if (updateError) {
+          failed++;
+          misses.push({ id: stop.id, reference: null, tried: result.tried });
+        } else {
+          resolved++;
+          if (result.approximate) {
+            approximateCount++;
+            approximate.push({ id: stop.id, reference: null, tried: result.tried });
+          }
+        }
+      }
+    } else {
+      // The precision column arrives with the address-verification migration,
+      // which is applied by hand here and so may lag a deploy of this function.
+      // Probe for it once rather than failing every row: without it the
+      // geocoder still fills coordinates, it just cannot record how good they
+      // are or protect a hand-placed pin.
+      const probe = await admin.from('shipments').select('pickup_geocode_precision').limit(1);
+      const hasPrecision = !probe.error;
+
+      // Collections only: a shipment's pickup point is what the driver routes
+      // to. Cancelled and already-delivered work is not worth a lookup.
+      const columns = ['id', 'customer_reference', 'tracking_number', 'origin', 'metadata', 'pickup_latitude']
+        .concat(hasPrecision ? ['pickup_geocode_precision'] : []);
+      let query = admin
+        .from('shipments')
+        .select(columns.join(', '))
+        .is('deleted_at', null)
+        .not('status', 'in', '("Delivered","Cancelled","cancelled")')
+        .limit(limit);
+      if (!force) query = query.is('pickup_latitude', null);
+      // A pin a human placed outranks anything a geocoder can find, so even a
+      // forced pass leaves it alone.
+      if (force && hasPrecision) {
+        query = query.or('pickup_geocode_precision.is.null,pickup_geocode_precision.neq.manual');
+      }
+      if (shipmentIds) query = query.in('id', shipmentIds);
+
+      const { data: rows, error: rowsError } = await query;
+      if (rowsError) throw rowsError;
+      considered = (rows || []).length;
+
+      for (const row of (rows || []) as any[]) {
+        const metadata = row.metadata || {};
+        const sender = metadata.sender || metadata.senderDetails || metadata.sender_details || {};
+        const reference = row.customer_reference || row.tracking_number || null;
+
+        // `origin` carries the country when the sender block does not — live
+        // rows hold values like "Ireland " with a trailing space.
+        const senderWithCountry = { ...sender, country: sender.country || row.origin };
+
+        const result = await resolveCoords(
+          admin,
+          buildAttempts('collection', sender.address, senderWithCountry, {}),
+        );
+        cacheHits += result.cacheHits;
+        networkCalls += result.networkCalls;
+
+        if (!result.coords) {
+          failed++;
+          misses.push({ id: row.id, reference, tried: result.tried });
+          continue;
+        }
+
+        // updated_at is deliberately left alone: this is a system backfill, and
+        // bumping it would make every shipment look freshly edited in the
+        // admin lists that sort by it.
+        const patch: Record<string, unknown> = {
+          pickup_latitude: result.coords.latitude,
+          pickup_longitude: result.coords.longitude,
+        };
+        if (hasPrecision) patch.pickup_geocode_precision = result.approximate ? 'approximate' : 'exact';
+
+        const { error: updateError } = await admin
+          .from('shipments')
+          .update(patch)
+          .eq('id', row.id);
+        if (updateError) {
+          failed++;
+          misses.push({ id: row.id, reference, tried: result.tried });
+        } else {
+          resolved++;
+          if (result.approximate) {
+            approximateCount++;
+            approximate.push({ id: row.id, reference, tried: result.tried });
+          }
+        }
       }
     }
 
     return new Response(JSON.stringify({
       ok: true,
-      considered: (stops || []).length,
+      target,
+      considered,
       resolved,
       failed,
+      approximate: approximateCount,
       cacheHits,
       networkCalls,
+      // Capped so a large backfill cannot return a huge payload.
+      misses: misses.slice(0, 50),
+      approximateRows: approximate.slice(0, 50),
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (err) {
     console.error('geocode-stops error:', err);

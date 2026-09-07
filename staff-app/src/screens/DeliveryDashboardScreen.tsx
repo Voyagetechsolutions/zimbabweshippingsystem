@@ -110,7 +110,7 @@ export default function DeliveryDashboardScreen({ navigation }: Props) {
   const fillCoordinates = useCallback(async (runId: string, silent: boolean) => {
     setGeocoding(true);
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('geocode-stops', { body: { runId } });
+      const { data, error: fnError } = await supabase.functions.invoke('geocode-stops', { body: { target: 'stops', runId } });
       if (fnError) throw fnError;
       if (Number((data as any)?.resolved) > 0) await load();
       else if (!silent) Alert.alert('No coordinates found', 'These addresses could not be placed on a map. Navigate still works from each drop.');
