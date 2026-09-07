@@ -126,6 +126,13 @@ export default function CollectionsAheadScreen() {
           </View>
         ) : null}
 
+        {/* Search sits above the days on purpose: the thing a driver most
+            often needs that a day list cannot answer is "where is this one?" */}
+        <Pressable style={styles.findButton} onPress={() => navigation.navigate('FindShipment')}>
+          <Ionicons name="search" size={17} color={colors.primary} />
+          <Text style={styles.findText}>FIND A SHIPMENT BY REFERENCE</Text>
+        </Pressable>
+
         {!error && days.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}><Ionicons name="calendar-outline" size={30} color={colors.primary} /></View>
@@ -245,6 +252,8 @@ const styles = StyleSheet.create({
   planText: { color: colors.white, fontSize: 11.5, fontWeight: '900' },
   workButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginHorizontal: spacing.md, marginBottom: spacing.sm, minHeight: 44, borderRadius: radius.sm, backgroundColor: colors.primarySoft },
   workText: { color: colors.primary, fontSize: 11.5, fontWeight: '900' },
+  findButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, minHeight: 46, borderRadius: radius.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.sm },
+  findText: { color: colors.primary, fontSize: 11.5, fontWeight: '900' },
   stopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: 11, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   order: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
   orderText: { fontSize: 11.5, fontWeight: '800', color: colors.textMuted },

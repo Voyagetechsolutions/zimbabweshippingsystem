@@ -211,6 +211,10 @@ export default function DriverRouteScreen() {
               : `${collections.length} collection${collections.length === 1 ? '' : 's'}`}
           </Text>
         </View>
+        {/* A parcel that is not on today's list still has to be findable. */}
+        <Pressable onPress={() => navigation.navigate('FindShipment')} hitSlop={10} style={styles.mapAll}>
+          <Ionicons name="search" size={20} color={colors.primary} />
+        </Pressable>
         {(started ? outstanding.length : collections.length) > 1 && (
           <Pressable onPress={openWholeRoute} hitSlop={10} style={styles.mapAll}>
             <Ionicons name="map-outline" size={20} color={colors.primary} />

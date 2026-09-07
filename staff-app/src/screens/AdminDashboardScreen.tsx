@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+import { matchesShipmentQuery } from '../lib/shipmentSearch';
 import { useAuth } from '../context/AuthContext';
 import { Card, SectionTitle, StatusBadge, CountryChips } from '../components/ui';
 import { colors, radius, spacing, shadow, type as typeScale } from '../theme';
@@ -22,17 +23,11 @@ interface Shipment {
 
 // One search box that answers "where is...?" — matches name, phone, tracking
 // number, customer reference/code, city or destination.
-function matchesQuery(shipment: Shipment, needle: string): boolean {
-  const meta = shipment.metadata || {};
-  const sender = meta.sender || meta.senderDetails || {};
-  const recipient = meta.recipient || meta.recipientDetails || {};
-  const haystack = [
-    shipment.tracking_number, shipment.customer_reference, meta.customerReference,
-    sender.name, `${sender.firstName || ''} ${sender.lastName || ''}`, sender.phone, sender.email, sender.city, sender.postalCode,
-    recipient.name, recipient.phone, recipient.city, recipient.address,
-  ].map((value) => String(value || '').toLowerCase()).join(' | ');
-  return needle.split(/\s+/).every((word) => haystack.includes(word));
-}
+// Shared with the driver's search so both find a shipment by the same things —
+// including the *computed* customer reference, which is what almost every
+// shipment actually displays: only one live row in sixty carries a stored one,
+// so matching the column alone missed the reference on screen.
+const matchesQuery = matchesShipmentQuery;
 
 const PENDING = ['Booking Confirmed', 'Ready for Pickup', 'pending'];
 const ACTIVE = ['Processing in UK Warehouse', 'Customs Clearance', 'Processing in ZW Warehouse', 'Out for Delivery'];

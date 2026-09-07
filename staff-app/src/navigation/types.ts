@@ -45,6 +45,8 @@ export type DriverRunStackParams = {
   CollectionsAhead: undefined;
   // One route in driving order: plan it, reorder it, start it, navigate it.
   RoutePlan: { routeName?: string | null; date?: string | null } | undefined;
+  // Any shipment by reference or name, whatever day it was booked for.
+  FindShipment: undefined;
   RouteMap: undefined;
   RunSummary: undefined;
   DepotHandover: undefined;
