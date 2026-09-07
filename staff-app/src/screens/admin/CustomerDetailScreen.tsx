@@ -113,11 +113,15 @@ export default function CustomerDetailScreen({ route, navigation }: Props) {
     // "Payment methods" is what this customer has actually paid with, taken
     // from their recorded payments. There is no stored card or mandate to
     // list — invoicing here is offline by design.
-    setPaymentMethods(Array.from(new Set(
-      ((paymentResult.data || []) as any[])
-        .map((p) => String(p.payment_method || '').trim())
-        .filter(Boolean),
-    )));
+    // Taken from the invoices, not the payments table: money recorded against
+    // an invoice lives on metadata.invoice.payments, and the payments table is
+    // empty for customers who have only ever paid on collection — which is
+    // most of them, invoicing here being offline.
+    setPaymentMethods(Array.from(new Set([
+      ...((paymentResult.data || []) as any[]).map((p) => String(p.payment_method || '').trim()),
+      ...ships.flatMap((shipment: any) =>
+        (getInvoice(shipment).payments || []).map((p: any) => String(p.method || '').trim())),
+    ].filter(Boolean))));
     // Proofs are attached to both the signed-in customer and the shipment. The
     // shipment lookup also keeps a guest/legacy customer's proof in their file.
     const shipmentProofResult = shipmentIds.length

@@ -555,13 +555,20 @@ begin
      where s.customer_id = p_customer_id and s.deleted_at is null
   ),
   ordered as (
-    select *, sum(amount) over (order by at, kind desc rows between unbounded preceding and current row) as balance
+    -- Order by the calendar day, then charge before payment.
+    --
+    -- Not by timestamp: a payment carries a plain date, which is midnight,
+    -- while the invoice it settles carries the booking's real time of day. Any
+    -- payment therefore sorts ahead of the invoice it pays, and the statement
+    -- opens hundreds in credit before the first bill is raised.
+    select *, sum(amount) over (order by at::date, kind, at
+                                rows between unbounded preceding and current row) as balance
       from (select * from charges union all select * from credits) both_sides
   )
   select coalesce(jsonb_agg(jsonb_build_object(
            'shipmentId', shipment_id, 'at', at, 'reference', ref, 'kind', kind,
            'amount', amount, 'currency', currency, 'method', method, 'balance', balance
-         ) order by at), '[]'::jsonb)
+         ) order by at::date, kind, at), '[]'::jsonb)
     into v_rows from ordered;
 
   return v_rows;
