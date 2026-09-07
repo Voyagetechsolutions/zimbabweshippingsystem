@@ -12,6 +12,9 @@ import type { DriverStackParams } from '../navigation/types';
 import SignaturePad from '../components/SignaturePad';
 import { getDriverLocation } from '../lib/driverLocation';
 import { getStaffBusinessConfig } from '../lib/businessConfig';
+import { calculateTotals, invoiceSymbol } from '../lib/invoice';
+import { enqueue, isMissingBackend, isNetworkError } from '../lib/offlineQueue';
+import { flushPhotoQueue, queuePhoto } from '../lib/photoQueue';
 
 // React Native bundles local images as numeric module references.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -45,6 +48,16 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
   const [proofs, setProofs] = useState<Proof[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [qrVerified,setQrVerified]=useState(false);const[manualQr,setManualQr]=useState('');const[permission,requestPermission]=useCameraPermissions();
+  // The shipment opens on the scan OR on the six-digit code. A customer with a
+  // flat phone, or one who left the parcels with a neighbour and read the code
+  // out, must not be an uncollectable job.
+  const [codeVerified, setCodeVerified] = useState(false);
+  const [openCode, setOpenCode] = useState('');
+  const unlocked = qrVerified || codeVerified;
+  // Once the driver confirms, the invoice is theirs no longer.
+  const [invoiceLocked, setInvoiceLocked] = useState(false);
+  const [amountPaid, setAmountPaid] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('Cash on collection');
   // Booked shipments carry a server-priced invoice — the driver can correct
   // wording only; quantities, prices, tax and totals are locked.
   const [serverPriced, setServerPriced] = useState(false);
@@ -67,11 +80,25 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
 
   useEffect(() => { navigation.setOptions({ title: pickup ? 'Proof of Collection' : 'Proof of Delivery' }); }, [navigation, pickup]);
 
+  // Anything photographed in a dead zone goes up as soon as this screen opens
+  // with signal. Best effort on purpose — a driver mid-collection should never
+  // be interrupted by an old photo failing to upload.
+  useEffect(() => {
+    let cancelled = false;
+    flushPhotoQueue()
+      .then((result) => { if (!cancelled && result.uploaded > 0) void load(); })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+    // load is stable enough here; re-running on every load identity change
+    // would retry the queue on each refresh for no benefit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const load = useCallback(async () => {
     const [invoiceResult, proofResult, stopResult, shipmentResult, sealResult, signatureResult] = await Promise.all([
       supabase.from('driver_invoices').select('id,currency,line_items,discount,tax,notes').eq('stop_id', stop.id).maybeSingle(),
       supabase.from('driver_proofs').select('id,proof_type,storage_path').eq('stop_id', stop.id).is('deleted_at', null).order('captured_at'),
-      supabase.from('driver_run_stops').select('qr_verified_at').eq('id',stop.id).maybeSingle(),
+      supabase.from('driver_run_stops').select('qr_verified_at,code_verified_at').eq('id',stop.id).maybeSingle(),
       supabase.from('shipments').select('goods_description,driver_description_correction,seals_requested,metadata').eq('id', stop.shipmentId).maybeSingle(),
       supabase.from('shipment_seals').select('*').eq('shipment_id', stop.shipmentId).maybeSingle(),
       supabase.from('driver_signatures').select('recipient_name').eq('stop_id', stop.id).maybeSingle(),
@@ -117,8 +144,29 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
     }));
     setProofs(withUrls);
     setQrVerified(Boolean((stopResult.data as any)?.qr_verified_at));
+    setCodeVerified(Boolean((stopResult.data as any)?.code_verified_at));
+    setInvoiceLocked(Boolean(metaInvoice?.driverConfirmedAt));
     if (signatureResult.data) { setRecipientName((signatureResult.data as any).recipient_name || stop.customerName); setSignatureSaved(true); setSignatureAccepted(true); }
   }, [stop.id, stop.shipmentId]);
+
+  /** Open the shipment with the customer's six-digit code instead of the scan. */
+  const verifyCode = async (value: string) => {
+    const digits = value.trim();
+    if (digits.length !== 6) {
+      Alert.alert('Six digits needed', 'Ask the customer for the six-digit code shown on this shipment in their app.');
+      return;
+    }
+    setBusy('code');
+    try {
+      const { error } = await supabase.rpc('verify_driver_stop_code', { p_stop_id: stop.id, p_code: digits });
+      if (error) throw error;
+      setCodeVerified(true);
+      setCode(digits);
+      Alert.alert('Shipment opened', 'The code matches this shipment. Carry on with the handover.');
+    } catch (e: any) {
+      Alert.alert('Code did not match', e?.message || 'Check the code on the customer’s shipment and try again.');
+    } finally { setBusy(null); }
+  };
 
   const verifyQr=async(value:string)=>{if(!value.trim())return;setBusy('qr');try{const{error}=await supabase.rpc('verify_driver_stop_qr',{p_stop_id:stop.id,p_qr_token:qrToken(value)});if(error)throw error;setQrVerified(true);Alert.alert('Customer signature verified','The shipment QR matches this assigned stop.');}catch(e:any){Alert.alert('QR verification failed',e?.message||'Scan the customer shipment QR code again.');}finally{setBusy(null);}};
 
@@ -179,26 +227,75 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
       if (error) throw error;
       setSealsSaved(true);
       Alert.alert('Seals recorded', sealsUsed ? `${codes.length} seal code(s) saved to the shipment, invoice and delivery note.` : 'Recorded: no seals used.');
-    } catch (e: any) { Alert.alert('Could not record seals', e?.message || 'Try again.'); }
+    } catch (e: any) {
+      if (isNetworkError(e) || isMissingBackend(e)) {
+        await enqueue({
+          fn: 'record_shipment_seals',
+          stopId: stop.id,
+          args: {
+            p_stop_id: stop.id, p_seals_used: sealsUsed, p_seal_count: codes.length,
+            p_seal_codes: codes, p_condition: sealCondition, p_notes: sealNotes.trim() || null,
+            p_photo_path: proofs.find((p) => p.proof_type === 'seal')?.storage_path || null,
+          },
+        });
+        // Treated as saved: the codes are on the drums either way, and blocking
+        // the collection would strand the driver at the door over signal.
+        setSealsSaved(true);
+        Alert.alert('Seals saved on this phone', 'No signal — the codes will sync by themselves once you are back in coverage.');
+      } else {
+        Alert.alert('Could not record seals', e?.message || 'Try again.');
+      }
+    }
     finally { setBusy(null); }
   };
 
-  const saveInvoice = async () => {
+  const saveInvoice = async (confirm = false) => {
     const lineItems = items.map((item) => ({ description:item.description.trim(), quantity:Number(item.quantity), unitPrice:Number(item.unitPrice) }));
     if (lineItems.some((item) => !item.description)) { Alert.alert('Invoice details required', 'Every line needs a description.'); return; }
-    if (!serverPriced && lineItems.some((item) => !Number.isFinite(item.quantity) || item.quantity <= 0 || !Number.isFinite(item.unitPrice) || item.unitPrice < 0)) { Alert.alert('Invoice details required', 'Every line needs a description, quantity and valid unit price.'); return; }
-    setBusy('invoice');
-    try {
-      const { data, error } = await supabase.rpc('create_driver_invoice', {
-        p_stop_id: stop.id,
-        p_line_items: lineItems,
-        p_discount: Number(discount || 0), p_tax_rate: Number(taxRate || 0), p_currency: currency, p_notes: notes.trim() || null,
-      });
-      if (error) throw error;
-      setInvoiceId((data as any)?.id || 'saved');
-      Alert.alert('Invoice saved', 'Admin and Finance can now see this invoice.');
-    } catch (e: any) { Alert.alert('Invoice failed', e?.message || 'Please try again.'); }
-    finally { setBusy(null); }
+    if (lineItems.some((item) => !Number.isFinite(item.quantity) || item.quantity <= 0 || !Number.isFinite(item.unitPrice) || item.unitPrice < 0)) { Alert.alert('Invoice details required', 'Every line needs a description, quantity and valid unit price.'); return; }
+
+    const paid = Number(amountPaid || 0);
+    if (amountPaid.trim() && (!Number.isFinite(paid) || paid < 0)) {
+      Alert.alert('Check the amount paid', 'Enter what the customer handed over, or leave it blank if they paid nothing.');
+      return;
+    }
+
+    const send = async () => {
+      setBusy('invoice');
+      try {
+        const { data, error } = await supabase.rpc('create_driver_invoice', {
+          p_stop_id: stop.id,
+          p_line_items: lineItems,
+          p_discount: Number(discount || 0), p_tax_rate: Number(taxRate || 0),
+          p_currency: currency, p_notes: notes.trim() || null,
+          p_amount_paid: paid > 0 ? paid : null,
+          p_payment_method: paid > 0 ? paymentMethod.trim() || null : null,
+          p_confirm: confirm,
+        });
+        if (error) throw error;
+        setInvoiceId((data as any)?.id || 'saved');
+        if (confirm) setInvoiceLocked(true);
+        // Payment is on the invoice now; clearing the box stops a second tap
+        // recording the same money twice.
+        setAmountPaid('');
+        Alert.alert(
+          confirm ? 'Invoice confirmed' : 'Invoice saved',
+          confirm
+            ? 'It has gone to the office and the customer. You can no longer change it here.'
+            : 'Saved as a draft. Confirm it when you and the customer agree.',
+        );
+      } catch (e: any) { Alert.alert('Invoice failed', e?.message || 'Please try again.'); }
+      finally { setBusy(null); }
+    };
+
+    if (!confirm) { await send(); return; }
+
+    // Confirming is one-way for the driver, so it gets a deliberate second tap.
+    Alert.alert(
+      'Confirm this invoice?',
+      `${invoiceSymbol(currency)}${total.toFixed(2)} total${paid > 0 ? `, ${invoiceSymbol(currency)}${paid.toFixed(2)} paid now` : ', nothing paid yet'}.\n\nOnce confirmed you cannot change it — only the office can.`,
+      [{ text: 'Not yet', style: 'cancel' }, { text: 'Confirm', onPress: () => { void send(); } }],
+    );
   };
 
   const takePhoto = async (proofType: ProofType) => {
@@ -207,6 +304,8 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
     const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.65, base64: true, exif: false });
     if (result.canceled || !result.assets[0]?.base64 || !session?.user.id) return;
     setBusy(proofType);
+    // Held outside the try so the offline path can still queue the file.
+    const lastUri = result.assets[0]?.uri || null;
     try {
       const asset = result.assets[0];
       const encoded = asset.base64;
@@ -217,12 +316,31 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
       const { error: rowError } = await supabase.from('driver_proofs').insert({ shipment_id: stop.shipmentId, stop_id: stop.id, driver_id: session.user.id, proof_type: proofType, storage_path: path });
       if (rowError) throw rowError;
       await load();
-    } catch (e: any) { Alert.alert('Photo upload failed', e?.message || 'Keep the app open and try again.'); }
+    } catch (e: any) {
+      // A dead zone is the normal case here, not a failure worth losing the
+      // photo over: keep the file and upload it when there is signal.
+      if ((isNetworkError(e) || isMissingBackend(e)) && lastUri && session?.user.id) {
+        await queuePhoto({
+          uri: lastUri, proofType, stopId: stop.id,
+          shipmentId: stop.shipmentId, driverId: session.user.id,
+        });
+        Alert.alert('Photo saved on this phone', 'No signal — it will upload by itself once you are back in coverage.');
+      } else {
+        Alert.alert('Photo upload failed', e?.message || 'Keep the app open and try again.');
+      }
+    }
     finally { setBusy(null); }
   };
 
   const complete = async () => {
-    if (code.trim().length !== 6) { Alert.alert('Customer code required', 'Ask the customer for the six-digit code shown in their app.'); return; }
+    // Scanning the QR already proved which shipment this is, so the six digits
+    // are only asked for when nothing was scanned and no code was checked when
+    // the shipment was opened.
+    if (!unlocked && code.trim().length !== 6) {
+      Alert.alert('Customer code required', 'Scan the customer QR code, or ask them for the six-digit code shown in their app.');
+      return;
+    }
+    if (pickup && !invoiceLocked) { Alert.alert('Confirm the invoice first', 'Check the items and what was paid, then confirm the invoice. Once confirmed it is sent to the office and cannot be changed here.'); return; }
     if (pickup && sealsRequested > 0 && !sealsSaved) { Alert.alert('Record the seals first', `The customer paid for ${sealsRequested} metal coded seal(s) — fit them and record every code before completing.`); return; }
     if (!pickup && !signatureSaved) { Alert.alert('Recipient signature required', 'Ask the recipient to sign and save the signature before completing this delivery.'); return; }
     setBusy('complete');
@@ -257,6 +375,20 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
     } finally { setBusy(null); }
   };
 
+  // Totals computed with the same helper the website, admin and customer use,
+  // so the figure the driver reads out at the door is the figure on every
+  // other screen rather than a fourth opinion.
+  const { subtotal, tax, total } = calculateTotals({
+    items: items.map((i) => ({
+      description: i.description,
+      quantity: Number(i.quantity) || 0,
+      unitPrice: Number(i.unitPrice) || 0,
+    })),
+    discount: Number(discount) || 0,
+    taxRate: Number(taxRate) || 0,
+    currency,
+  });
+
   const photoButtons: Array<[ProofType, string]> = pickup
     ? [['pickup_departure', 'Goods leaving pickup'], ['depot_arrival', 'Goods arriving at depot']]
     : [['depot_departure', 'Goods leaving depot'], ['delivery_arrival', 'Goods at drop-off']];
@@ -269,16 +401,41 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
 
       <View style={styles.card}>
         <View style={styles.sectionHead}><Ionicons name="qr-code-outline" size={21} color={colors.primary}/><View style={{flex:1}}><Text style={styles.stepEyebrow}>STEP 1 · OPEN SHIPMENT</Text><Text style={styles.sectionTitle}>Verify the customer shipment QR</Text></View></View>
-        {qrVerified ? <View style={styles.verified}><Ionicons name="shield-checkmark" size={24} color={colors.primary}/><Text style={styles.saved}>Correct shipment opened — continue with the handover details below</Text></View> : <>
+        {unlocked ? <View style={styles.verified}><Ionicons name="shield-checkmark" size={24} color={colors.primary}/><Text style={styles.saved}>{qrVerified ? 'Correct shipment opened by QR — continue with the handover details below' : 'Shipment opened with the customer code — continue with the handover details below'}</Text></View> : <>
           <Text style={styles.help}>Ask the customer to open this shipment in their app and show its QR code. Scan it before handling or recording the goods.</Text>
           {permission?.granted ? <View style={styles.qrCamera}><CameraView style={StyleSheet.absoluteFill} barcodeScannerSettings={{barcodeTypes:['qr']}} onBarcodeScanned={({data})=>busy!=='qr'&&verifyQr(data)}/><View style={styles.qrFrame}/></View> : <Pressable accessibilityRole="button" accessibilityLabel="Allow camera to scan customer QR" style={styles.outline} onPress={requestPermission}><Text style={styles.outlineText}>Allow camera to scan QR</Text></Pressable>}
           <Text style={styles.orText}>OR ENTER THE QR TOKEN MANUALLY</Text>
           <TextInput style={styles.input} value={manualQr} onChangeText={setManualQr} placeholder="Customer shipment QR token"/>
           <Pressable accessibilityRole="button" accessibilityLabel="Verify customer shipment QR" style={[styles.primary, (!manualQr.trim() || busy==='qr') && styles.disabled]} onPress={()=>verifyQr(manualQr)} disabled={!manualQr.trim() || busy==='qr'}>{busy==='qr'?<ActivityIndicator color={colors.white}/>:<Text style={styles.primaryText}>Verify and open shipment</Text>}</Pressable>
+
+          {/* Starting the collection by hand needs the code instead of the
+              scan. Scanning already proves which shipment this is, so a driver
+              who scanned is never asked for the code as well. */}
+          <Text style={styles.orText}>OR START WITH THE CUSTOMER'S SIX-DIGIT CODE</Text>
+          <TextInput
+            style={styles.input}
+            value={openCode}
+            onChangeText={(v) => setOpenCode(v.replace(/\D/g, '').slice(0, 6))}
+            placeholder="000000"
+            placeholderTextColor={colors.textFaint}
+            keyboardType="number-pad"
+            maxLength={6}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Start collection with the customer code"
+            style={[styles.outline, (openCode.length !== 6 || busy === 'code') && styles.disabled]}
+            onPress={() => verifyCode(openCode)}
+            disabled={openCode.length !== 6 || busy === 'code'}
+          >
+            {busy === 'code'
+              ? <ActivityIndicator color={colors.primary} />
+              : <Text style={styles.outlineText}>Start collection with code</Text>}
+          </Pressable>
         </>}
       </View>
 
-      {!qrVerified ? <View style={styles.lockedCard}><Ionicons name="lock-closed-outline" size={24} color={colors.textMuted}/><View style={{flex:1}}><Text style={styles.lockedTitle}>Shipment details are locked</Text><Text style={styles.lockedText}>Verify the customer's shipment QR above. The goods, invoice, seals, photos and final six-digit handover code will then open.</Text></View></View> : <>
+      {!unlocked ? <View style={styles.lockedCard}><Ionicons name="lock-closed-outline" size={24} color={colors.textMuted}/><View style={{flex:1}}><Text style={styles.lockedTitle}>Shipment details are locked</Text><Text style={styles.lockedText}>Scan the customer's shipment QR above, or enter their six-digit code. The goods, invoice, seals and photos will then open.</Text></View></View> : <>
 
       {pickup ? <View style={styles.card}>
         <View style={styles.sectionHead}><Ionicons name="document-text-outline" size={21} color={colors.primary}/><View style={{flex:1}}><Text style={styles.stepEyebrow}>STEP 2 · CHECK GOODS</Text><Text style={styles.sectionTitle}>Customer's goods description</Text></View></View>
@@ -292,32 +449,51 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
 
       {pickup ? <View style={styles.card}>
         <View style={styles.sectionHead}><Ionicons name="receipt-outline" size={21} color={colors.primary} /><Text style={styles.sectionTitle}>Collection invoice</Text></View>
-        {serverPriced ? (
-          <>
-            <Text style={styles.help}>Prices come from the customer's booking and are locked. You can correct the wording of each line so it matches the actual goods.</Text>
-            {items.map((item, index) => (
-              <View key={index} style={styles.lineItem}>
-                <View style={styles.lineHead}><Text style={styles.lineTitle}>Item {index + 1}</Text><Text style={styles.lockedPrice}>{item.quantity} × {currency === 'EUR' ? '€' : '£'}{item.unitPrice}</Text></View>
-                <Label text="Description (editable)" />
-                <TextInput style={styles.input} value={item.description} onChangeText={(value)=>setItems((current)=>current.map((row,i)=>i===index?{...row,description:value}:row))} multiline />
-              </View>
-            ))}
-            <View style={styles.lockedRow}><Ionicons name="lock-closed-outline" size={13} color={colors.textMuted} /><Text style={styles.lockedNote}>Quantity, price, discount, tax and payment details are locked to the booking.</Text></View>
-          </>
+        {invoiceLocked ? (
+          <View style={styles.verified}>
+            <Ionicons name="lock-closed" size={22} color={colors.primary} />
+            <Text style={styles.saved}>
+              Invoice confirmed and sent — {invoiceSymbol(currency)}{total.toFixed(2)}. Only admin or finance can change it now.
+            </Text>
+          </View>
         ) : (
           <>
-            <Text style={styles.help}>Manual booking — build the invoice with the office-confirmed prices. The collection cannot be completed until this invoice is saved.</Text>
+            <Text style={styles.help}>
+              {serverPriced
+                ? 'Prices came from the customer’s booking. Correct anything that does not match what you are actually collecting, then record what they paid.'
+                : 'Build the invoice from what you are actually collecting, then record what the customer paid.'}
+            </Text>
+
             {items.map((item,index) => <View key={index} style={styles.lineItem}>
-              <View style={styles.lineHead}><Text style={styles.lineTitle}>Item {index+1}</Text>{items.length>1?<Pressable onPress={() => setItems((current)=>current.filter((_,i)=>i!==index))}><Ionicons name="trash-outline" size={18} color={colors.danger}/></Pressable>:null}</View>
-              <Label text="Service description" /><TextInput style={styles.input} value={item.description} onChangeText={(value)=>setItems((current)=>current.map((row,i)=>i===index?{...row,description:value}:row))} />
+              <View style={styles.lineHead}><Text style={styles.lineTitle}>Item {index+1}</Text>{items.length>1?<Pressable accessibilityLabel={`Remove item ${index+1}`} onPress={() => setItems((current)=>current.filter((_,i)=>i!==index))}><Ionicons name="trash-outline" size={18} color={colors.danger}/></Pressable>:null}</View>
+              <Label text="Description" /><TextInput style={styles.input} value={item.description} onChangeText={(value)=>setItems((current)=>current.map((row,i)=>i===index?{...row,description:value}:row))} multiline />
               <View style={styles.row}><View style={styles.flex}><Label text="Quantity" /><TextInput style={styles.input} value={item.quantity} onChangeText={(value)=>setItems((current)=>current.map((row,i)=>i===index?{...row,quantity:value}:row))} keyboardType="decimal-pad" /></View><View style={styles.flex}><Label text="Unit price" /><TextInput style={styles.input} value={item.unitPrice} onChangeText={(value)=>setItems((current)=>current.map((row,i)=>i===index?{...row,unitPrice:value}:row))} keyboardType="decimal-pad" placeholder="0.00" /></View></View>
             </View>)}
+
             <Pressable style={styles.addItem} onPress={()=>setItems((current)=>[...current,{description:'',quantity:'1',unitPrice:''}])}><Ionicons name="add-circle-outline" size={18} color={colors.primary}/><Text style={styles.addItemText}>Add invoice item</Text></Pressable>
+
             <View style={styles.row}><View style={styles.flex}><Label text="Discount" /><TextInput style={styles.input} value={discount} onChangeText={setDiscount} keyboardType="decimal-pad" /></View><View style={styles.flex}><Label text="Tax %" /><TextInput style={styles.input} value={taxRate} onChangeText={setTaxRate} keyboardType="decimal-pad" /></View><View style={styles.flex}><Label text="Currency" /><TextInput style={styles.input} value={currency} onChangeText={setCurrency} autoCapitalize="characters" /></View></View>
+
+            <View style={styles.totalsBox}>
+              <View style={styles.totalsRow}><Text style={styles.totalsLabel}>Subtotal</Text><Text style={styles.totalsValue}>{invoiceSymbol(currency)}{subtotal.toFixed(2)}</Text></View>
+              {Number(discount) > 0 ? <View style={styles.totalsRow}><Text style={styles.totalsLabel}>Discount</Text><Text style={styles.totalsValue}>-{invoiceSymbol(currency)}{Number(discount).toFixed(2)}</Text></View> : null}
+              {tax > 0 ? <View style={styles.totalsRow}><Text style={styles.totalsLabel}>Tax</Text><Text style={styles.totalsValue}>{invoiceSymbol(currency)}{tax.toFixed(2)}</Text></View> : null}
+              <View style={styles.totalsRow}><Text style={styles.totalsTotal}>Total</Text><Text style={styles.totalsTotal}>{invoiceSymbol(currency)}{total.toFixed(2)}</Text></View>
+            </View>
+
+            {/* Money at the door. Left blank when nothing was paid — the
+                customer settles later from their own app, and the invoice
+                simply stays unpaid. */}
+            <View style={styles.row}>
+              <View style={styles.flex}><Label text="Paid now (leave blank if nothing)" /><TextInput style={styles.input} value={amountPaid} onChangeText={setAmountPaid} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={colors.textFaint} /></View>
+              <View style={styles.flex}><Label text="How they paid" /><TextInput style={styles.input} value={paymentMethod} onChangeText={setPaymentMethod} placeholder="Cash on collection" placeholderTextColor={colors.textFaint} /></View>
+            </View>
+
+            <Pressable style={styles.outline} onPress={() => saveInvoice(false)} disabled={busy === 'invoice'}>{busy === 'invoice' ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.outlineText}>{invoiceId ? 'Save changes' : 'Save draft'}</Text>}</Pressable>
+            <Pressable style={[styles.primary, busy === 'invoice' && styles.disabled]} onPress={() => saveInvoice(true)} disabled={busy === 'invoice'}><Text style={styles.primaryText}>Confirm invoice</Text></Pressable>
+            <Text style={styles.lockedNote}>Confirming sends the invoice to the office and the customer, and closes it to you.</Text>
           </>
         )}
-        <Pressable style={styles.primary} onPress={saveInvoice} disabled={busy === 'invoice'}>{busy === 'invoice' ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryText}>{invoiceId ? 'Update invoice' : serverPriced ? 'Confirm invoice' : 'Save invoice'}</Text>}</Pressable>
-        {invoiceId ? <Text style={styles.saved}>Invoice saved and shared</Text> : null}
       </View> : null}
 
       {pickup ? <View style={styles.card}>
@@ -398,6 +574,11 @@ const styles = StyleSheet.create({
   safe:{flex:1,backgroundColor:colors.bg},content:{padding:spacing.lg,gap:spacing.md,paddingBottom:48},hero:{paddingBottom:spacing.sm},stepEyebrow:{fontSize:9.5,fontWeight:'900',color:colors.primary,letterSpacing:.8,marginBottom:3},title:{fontSize:22,fontWeight:'800',color:colors.text},customer:{fontSize:16,fontWeight:'700',color:colors.text,marginTop:4},ref:{fontSize:12,fontWeight:'700',color:colors.primary,marginTop:2},draftNote:{fontSize:10.5,color:colors.textMuted,marginTop:5},card:{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:radius.lg,padding:spacing.lg,gap:spacing.sm},lockedCard:{backgroundColor:'#F4F6F8',borderWidth:1,borderColor:colors.border,borderRadius:radius.lg,padding:spacing.lg,flexDirection:'row',alignItems:'center',gap:spacing.md},lockedTitle:{fontSize:14,fontWeight:'800',color:colors.text},lockedText:{fontSize:11.5,lineHeight:17,color:colors.textMuted,marginTop:3},sectionHead:{flexDirection:'row',alignItems:'center',gap:spacing.sm},sectionTitle:{fontSize:16,fontWeight:'800',color:colors.text},help:{fontSize:12,lineHeight:17,color:colors.textMuted,marginBottom:4},helpStrong:{fontSize:12,lineHeight:17,color:colors.amber,fontWeight:'800',marginBottom:4},orText:{fontSize:9.5,fontWeight:'900',letterSpacing:.7,color:colors.textMuted,textAlign:'center',marginTop:4},label:{fontSize:11,fontWeight:'700',color:colors.textMuted,marginTop:4},input:{borderWidth:1,borderColor:colors.border,borderRadius:radius.sm,backgroundColor:colors.bg,paddingHorizontal:12,paddingVertical:10,color:colors.text,fontSize:14},row:{flexDirection:'row',gap:spacing.sm},flex:{flex:1},primary:{backgroundColor:colors.primary,borderRadius:radius.sm,paddingVertical:13,alignItems:'center',marginTop:4},primaryText:{color:colors.white,fontWeight:'800',fontSize:13},outline:{borderWidth:1.5,borderColor:colors.primary,borderRadius:radius.sm,paddingVertical:11,alignItems:'center',marginTop:4},outlineText:{color:colors.primary,fontWeight:'800',fontSize:13},saved:{textAlign:'center',color:colors.primary,fontWeight:'700',fontSize:12},proofPreview:{height:190,borderRadius:radius.md,overflow:'hidden',position:'relative'},proofImage:{width:'100%',height:'100%'},cameraBadge:{position:'absolute',right:10,bottom:10,width:38,height:38,borderRadius:19,backgroundColor:'rgba(15,23,42,.72)',alignItems:'center',justifyContent:'center'},photoGrid:{flexDirection:'row',gap:spacing.sm},photoButton:{flex:1,minHeight:120,borderWidth:1,borderStyle:'dashed',borderColor:colors.border,borderRadius:radius.md,alignItems:'center',justifyContent:'center',padding:spacing.sm,overflow:'hidden'},photoDone:{borderColor:colors.primary,backgroundColor:colors.primarySoft},thumbnail:{width:'100%',height:72,borderRadius:radius.sm,marginBottom:5},photoLabel:{fontSize:11,fontWeight:'700',color:colors.textMuted,textAlign:'center'},code:{fontSize:26,fontWeight:'800',letterSpacing:8,textAlign:'center'},notes:{minHeight:68,textAlignVertical:'top'},disabled:{opacity:.55},confirmRow:{flexDirection:'row',alignItems:'flex-start',gap:8,paddingVertical:6},confirmText:{flex:1,color:colors.text,fontSize:12,lineHeight:17,fontWeight:'600'},
   lineItem:{borderWidth:1,borderColor:colors.border,borderRadius:radius.md,padding:spacing.sm,gap:4},lineHead:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},lineTitle:{fontSize:11,fontWeight:'800',color:colors.textMuted},addItem:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6,paddingVertical:8},addItemText:{fontSize:12,fontWeight:'800',color:colors.primary},
   lockedPrice:{fontSize:12,fontWeight:'800',color:colors.text},lockedRow:{flexDirection:'row',alignItems:'center',gap:6,marginTop:2},lockedNote:{flex:1,fontSize:11,color:colors.textMuted,lineHeight:15},
+  totalsBox:{borderTopWidth:StyleSheet.hairlineWidth,borderTopColor:colors.border,paddingTop:spacing.sm,gap:4,marginTop:spacing.xs},
+  totalsRow:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},
+  totalsLabel:{fontSize:12,color:colors.textMuted},
+  totalsValue:{fontSize:12,color:colors.text,fontWeight:'600'},
+  totalsTotal:{fontSize:15,color:colors.text,fontWeight:'800'},
   descriptionBox:{backgroundColor:colors.bg,borderWidth:1,borderColor:colors.border,borderRadius:radius.md,padding:spacing.md},descriptionText:{fontSize:13,lineHeight:19,color:colors.text},correctionBox:{backgroundColor:'#fffbeb',borderWidth:1,borderColor:'#fcd34d',borderRadius:radius.md,padding:spacing.md},correctionLabel:{fontSize:9.5,fontWeight:'800',color:'#b45309',letterSpacing:.5,marginBottom:3},
   switchRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:spacing.md},switchLabel:{fontSize:13,fontWeight:'700',color:colors.text},removeSeal:{alignSelf:'flex-end',padding:10},chipRow:{flexDirection:'row',gap:spacing.sm,flexWrap:'wrap'},chip:{borderWidth:1,borderColor:colors.border,borderRadius:radius.pill,paddingHorizontal:13,paddingVertical:7,backgroundColor:colors.bg},chipActive:{backgroundColor:colors.primary,borderColor:colors.primary},chipText:{fontSize:12,fontWeight:'700',color:colors.textMuted,textTransform:'capitalize'},chipTextActive:{color:colors.white},
   qrCamera:{height:220,borderRadius:radius.md,overflow:'hidden',backgroundColor:'#000'},qrFrame:{position:'absolute',width:150,height:150,borderWidth:3,borderColor:'#fff',borderRadius:radius.md,alignSelf:'center',top:35},verified:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,padding:spacing.md},

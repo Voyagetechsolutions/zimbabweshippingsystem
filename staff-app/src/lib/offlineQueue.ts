@@ -15,7 +15,10 @@ export type QueuedCall = {
     | 'scan_driver_package_for_country'
     | 'set_driver_presence'
     | 'set_driver_break'
-    | 'request_driver_reschedule';
+    | 'request_driver_reschedule'
+    // Seal codes are the one piece of collection paperwork a driver cannot
+    // reconstruct later: the seals are on the drums and the van has gone.
+    | 'record_shipment_seals';
   args: Record<string, unknown>;
   stopId: string | null;
   queuedAt: string;

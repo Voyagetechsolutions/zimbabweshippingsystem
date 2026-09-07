@@ -20,6 +20,8 @@ const sqlPaths = [
   path.join(root, 'supabase/migrations/20260906150000_website_customer_reference.sql'),
   path.join(root, 'supabase/migrations/20260907120000_address_verification.sql'),
   path.join(root, 'supabase/migrations/20260907130000_driver_self_planned_routes.sql'),
+  path.join(root, 'supabase/migrations/20260907140000_driver_collection_handover.sql'),
+  path.join(root, 'supabase/migrations/20260907150000_collection_status_sweeps.sql'),
 ];
 
 // The constant is always exactly one line, because JSON.stringify never emits a
