@@ -7,6 +7,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, shadow, spacing } from '../theme';
 import { customerRef, senderName, pickupAddress, collectionInfo, type Shipment } from '../lib/shipment';
+import { collectionDateText } from '../lib/collectionSchedule';
 import { searchShipments } from '../lib/shipmentSearch';
 import { startRoute } from '../lib/routePlan';
 import { isNetworkError } from '../lib/offlineQueue';
@@ -146,7 +147,7 @@ export default function DriverSearchScreen() {
                 <Text style={styles.meta}>
                   {shipment.status || 'No status'}
                   {collection.route ? ` · ${collection.route}` : ''}
-                  {collection.date ? ` · ${collection.date}` : ' · no collection date'}
+                  {collectionDateText(collection.date) ? ` · ${collectionDateText(collection.date)}` : ' · no collection date'}
                 </Text>
               </View>
               <Pressable

@@ -9,6 +9,7 @@ import { BACKEND_PENDING_MESSAGE, enqueue, flushQueue, isMissingBackend, isNetwo
 import { colors, radius, shadow, spacing } from '../theme';
 import { searchShipments } from '../lib/shipmentSearch';
 import { collectionInfo, customerRef, pickupAddress, senderName, senderPhone, type Shipment } from '../lib/shipment';
+import { collectionDateText } from '../lib/collectionSchedule';
 import { useDriverCountry } from '../context/DriverCountryContext';
 
 export default function DriverScanScreen() {
@@ -162,7 +163,7 @@ export default function DriverScanScreen() {
                   <Text style={styles.resultAddress}>{senderPhone(item)}</Text>
                   <Text style={styles.resultAddress}>
                     {collection.route || 'Route not set'}
-                    {collection.date ? ` · ${collection.date}` : ' · no collection date'}
+                    {collectionDateText(collection.date) ? ` · ${collectionDateText(collection.date)}` : ' · no collection date'}
                   </Text>
                   <Text style={styles.resultAddress}>{item.goods_description || 'No goods description'}</Text>
                 </View>

@@ -163,3 +163,35 @@ export function collectionDateLabel(date: Date | null): string {
     ? date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })
     : 'Not published yet';
 }
+
+/**
+ * A stored collection date, only when it is worth showing someone.
+ *
+ * Bookings hold this as free text — "September 24th, 2026" — and the live data
+ * is not uniformly that: one row holds just "24th", with no month and no year.
+ *
+ * `new Date` cannot be trusted to reject the leftovers. It is deliberately
+ * lenient and engine-dependent: "sometime in 2026" parses happily to 1 January
+ * 2026, and a bare "24" is invalid in Node but has historically been read as a
+ * year elsewhere. Either way the failure is the dangerous kind — a confident
+ * wrong date on a driver's screen rather than a visible gap.
+ *
+ * So the string has to look like a date before it is parsed at all: an ISO
+ * date, or a month name together with a four-digit year. Anything else is
+ * treated as no date, which is honest — the real one is resolved from the
+ * published schedule anyway (see resolveCollection).
+ */
+const MONTH_NAME = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}/;
+
+export function collectionDateText(value: unknown): string | null {
+  const text = realValue(value);
+  if (!text) return null;
+
+  const looksLikeADate = ISO_DATE.test(text) || (MONTH_NAME.test(text) && /\b\d{4}\b/.test(text));
+  if (!looksLikeADate) return null;
+
+  const parsed = new Date(text.replace(/(\d+)(st|nd|rd|th)/gi, '$1'));
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+}
