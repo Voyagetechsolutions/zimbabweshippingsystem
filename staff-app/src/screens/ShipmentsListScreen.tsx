@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, TextInput, FlatList, Pressable, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { BackButton } from '../components/adminui';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -139,7 +140,14 @@ export default function ShipmentsListScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Shipments</Text>
+        {/* This screen is the root of the Shipments tab and is also pushed
+            from More. BackButton renders nothing when there is nowhere to go,
+            so it appears only on the pushed route — without it, opening this
+            from More would strand the user with no way out. */}
+        <View style={styles.titleRow}>
+          <BackButton />
+          <Text style={styles.title}>Shipments</Text>
+        </View>
         <View style={styles.searchWrap}>
           <TextInput
             style={styles.search}
@@ -198,6 +206,7 @@ function Stat({ label, value }: { label: string; value: number }) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   header: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, gap: spacing.sm },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   title: { fontSize: typeScale.heading, fontWeight: '800', color: colors.text },
   searchWrap: {},
   search: {

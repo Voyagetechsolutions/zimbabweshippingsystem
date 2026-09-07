@@ -29,7 +29,10 @@ const SECTIONS: { title: string; data: Item[] }[] = [
     title: 'Operations',
     data: [
       { label: 'Manual Booking', icon: 'add-circle-outline', to: 'ManualBooking' },
-      { label: 'All Shipments', icon: 'cube-outline', tab: 'Shipments' },
+      // Opens inside the More stack rather than switching to the Shipments
+      // tab: jumping tabs is what made Back land somewhere the user had not
+      // come from.
+      { label: 'All Shipments', icon: 'cube-outline', to: 'AllShipments' },
       { label: 'Pickup Zones', icon: 'location-outline', to: 'PickupZones' },
     ],
   },

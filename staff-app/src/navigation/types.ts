@@ -83,6 +83,10 @@ export type MenuStackParams = {
   ManualBooking: undefined;
   Customers: undefined;
   CustomerDetail: { record: any; shipmentId?: string };
+  // Registered here as well as in ShipmentsStack so that opening a shipment
+  // from More stays inside More, and Back returns where it was opened from.
+  AllShipments: undefined;
+  ShipmentDetail: { shipment: any };
   CustomQuotes: undefined;
   Delivery: undefined;
   DeliveryNotes: undefined;

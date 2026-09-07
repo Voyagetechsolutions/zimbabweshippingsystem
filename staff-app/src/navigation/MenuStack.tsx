@@ -5,6 +5,8 @@ import MenuScreen from '../screens/admin/MenuScreen';
 import ManualBookingScreen from '../screens/admin/ManualBookingScreen';
 import CustomersScreen from '../screens/admin/CustomersScreen';
 import CustomerDetailScreen from '../screens/admin/CustomerDetailScreen';
+import ShipmentsListScreen from '../screens/ShipmentsListScreen';
+import ShipmentDetailScreen from '../screens/ShipmentDetailScreen';
 import CustomQuotesScreen from '../screens/admin/CustomQuotesScreen';
 import DeliveryScreen from '../screens/admin/DeliveryScreen';
 import DeliveryNotesScreen from '../screens/admin/DeliveryNotesScreen';
@@ -40,6 +42,9 @@ export default function MenuStack() {
       <Stack.Screen name="ManualBooking" component={ManualBookingScreen} options={{ title: 'Manual Booking' }} />
       <Stack.Screen name="Customers" component={CustomersScreen} options={{ title: '' , headerShadowVisible: false }} />
       <Stack.Screen name="CustomerDetail" component={CustomerDetailScreen} options={{ title: 'Customer' }} />
+      {/* Typed against ShipmentsStackParams, and identical in either stack. */}
+      <Stack.Screen name="AllShipments" component={ShipmentsListScreen as any} options={{ headerShown: false }} />
+      <Stack.Screen name="ShipmentDetail" component={ShipmentDetailScreen} options={{ title: 'Shipment Details' }} />
       <Stack.Screen name="CustomQuotes" component={CustomQuotesScreen} options={{ title: '', headerShadowVisible: false }} />
       <Stack.Screen name="Delivery" component={DeliveryScreen} options={{ title: 'Delivery' }} />
       <Stack.Screen name="DeliveryNotes" component={DeliveryNotesScreen} options={{ title: '', headerShadowVisible: false }} />
