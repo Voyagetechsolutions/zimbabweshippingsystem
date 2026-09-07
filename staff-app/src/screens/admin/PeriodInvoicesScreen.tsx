@@ -129,6 +129,16 @@ export default function PeriodInvoicesScreen() {
             {invoiced.length} invoice{invoiced.length === 1 ? '' : 's'}
           </Text>
         </View>
+        {/* Creating an invoice still belongs to the invoice list, which owns
+            that form — this is the way through to it, so nothing is lost by
+            entering invoices through a period. */}
+        <Pressable
+          style={styles.create}
+          onPress={() => navigation.navigate('Invoices', { create: true })}
+        >
+          <Ionicons name="add" size={17} color="#fff" />
+          <Text style={styles.createText}>Create</Text>
+        </Pressable>
       </View>
 
       <ScrollView
@@ -233,6 +243,8 @@ const styles = StyleSheet.create({
   back: { padding: 4 },
   title: { fontSize: 19, fontWeight: '800', color: colors.text },
   subtitle: { fontSize: 12, color: colors.textMuted, marginTop: 1 },
+  create: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, height: 38, borderRadius: radius.sm, backgroundColor: colors.primary },
+  createText: { color: '#fff', fontWeight: '800', fontSize: 12.5 },
   body: { padding: spacing.md, gap: spacing.sm, paddingBottom: spacing.xl },
   notice: { backgroundColor: colors.amberSoft, borderRadius: radius.md, padding: spacing.sm },
   noticeText: { color: colors.amber, fontSize: 13 },

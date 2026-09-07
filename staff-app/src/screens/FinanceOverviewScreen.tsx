@@ -219,7 +219,9 @@ export default function FinanceOverviewScreen() {
       icon: 'receipt-outline',
       title: 'Invoices',
       text: 'Open, edit or delete any invoice',
-      onPress: () => navigation.navigate('Invoices'),
+      // Matches the admin side: grouped by collection period. Creating an
+      // invoice still goes to the invoice list, which owns that form.
+      onPress: () => navigation.navigate('Periods', { mode: 'invoices' }),
     },
     {
       icon: 'card-outline',
