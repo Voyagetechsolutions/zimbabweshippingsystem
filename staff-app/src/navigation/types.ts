@@ -1,6 +1,10 @@
 import type { Shipment } from '../lib/shipment';
 
 export type ShipmentsStackParams = {
+  // Shipments are entered through their collection period — bookings open,
+  // they fill, the container goes — rather than as one endless list.
+  Periods: undefined;
+  PeriodShipments: { periodId: string; name?: string };
   ShipmentsList: undefined;
   ShipmentDetail: { shipment: Shipment };
   // The invoice and the delivery note, viewable and editable rather than
@@ -88,6 +92,8 @@ export type MenuStackParams = {
   // Registered here as well as in ShipmentsStack so that opening a shipment
   // from More stays inside More, and Back returns where it was opened from.
   AllShipments: undefined;
+  Periods: undefined;
+  PeriodShipments: { periodId: string; name?: string };
   ShipmentDetail: { shipment: any };
   CustomQuotes: undefined;
   Delivery: undefined;

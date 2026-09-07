@@ -32,7 +32,7 @@ const SECTIONS: { title: string; data: Item[] }[] = [
       // Opens inside the More stack rather than switching to the Shipments
       // tab: jumping tabs is what made Back land somewhere the user had not
       // come from.
-      { label: 'All Shipments', icon: 'cube-outline', to: 'AllShipments' },
+      { label: 'All Shipments', icon: 'cube-outline', to: 'Periods' },
       { label: 'Pickup Zones', icon: 'location-outline', to: 'PickupZones' },
     ],
   },
