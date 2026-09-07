@@ -49,7 +49,7 @@ const groups: Array<{ title: string; disabled?: boolean; note?: string; entries:
 export function FinanceWorkspaceScreen() {
   const navigation = useNavigation<any>();
   const open = (target: string) => {
-    if (target === 'payments') return navigation.navigate('Payments');
+    if (target === 'payments') return navigation.navigate('Periods', { mode: 'payments' });
     // The same view admin gets: invoices grouped by the collection period
     // they belong to, rather than one flat list of every invoice ever raised.
     if (target === 'invoices') return navigation.navigate('Periods', { mode: 'invoices' });

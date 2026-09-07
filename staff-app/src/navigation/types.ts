@@ -3,9 +3,10 @@ import type { Shipment } from '../lib/shipment';
 export type ShipmentsStackParams = {
   // Shipments are entered through their collection period — bookings open,
   // they fill, the container goes — rather than as one endless list.
-  Periods: { mode?: 'shipments' | 'invoices' } | undefined;
+  Periods: { mode?: 'shipments' | 'invoices' | 'payments' } | undefined;
   PeriodShipments: { periodId: string; name?: string };
   PeriodInvoices: { periodId: string; name?: string };
+  PeriodPayments: { periodId: string; name?: string };
   ShipmentsList: undefined;
   ShipmentDetail: { shipment: Shipment };
   // The invoice and the delivery note, viewable and editable rather than
@@ -95,9 +96,10 @@ export type MenuStackParams = {
   AllShipments: undefined;
   // The same period cards front both shipments and invoices; `mode` decides
   // the title and where a tap goes.
-  Periods: { mode?: 'shipments' | 'invoices' } | undefined;
+  Periods: { mode?: 'shipments' | 'invoices' | 'payments' } | undefined;
   PeriodShipments: { periodId: string; name?: string };
   PeriodInvoices: { periodId: string; name?: string };
+  PeriodPayments: { periodId: string; name?: string };
   ShipmentDetail: { shipment: any };
   CustomQuotes: undefined;
   Delivery: undefined;

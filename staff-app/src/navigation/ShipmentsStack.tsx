@@ -4,6 +4,7 @@ import ShipmentsListScreen from '../screens/ShipmentsListScreen';
 import ShipmentPeriodsScreen from '../screens/admin/ShipmentPeriodsScreen';
 import PeriodShipmentsScreen from '../screens/admin/PeriodShipmentsScreen';
 import PeriodInvoicesScreen from '../screens/admin/PeriodInvoicesScreen';
+import PeriodPaymentsScreen from '../screens/admin/PeriodPaymentsScreen';
 import ShipmentDetailScreen from '../screens/ShipmentDetailScreen';
 import DocumentScreen from '../screens/admin/DocumentScreen';
 import type { ShipmentsStackParams } from './types';
@@ -25,7 +26,7 @@ export default function ShipmentsStack() {
           search and the driver's screens still push to it. */}
       <Stack.Screen name="Periods" component={ShipmentPeriodsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="PeriodShipments" component={PeriodShipmentsScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="PeriodInvoices" component={PeriodInvoicesScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="PeriodInvoices" component={PeriodInvoicesScreen} options={{ headerShown: false }} /><Stack.Screen name="PeriodPayments" component={PeriodPaymentsScreen} options={{headerShown:false}}/>
       <Stack.Screen name="ShipmentsList" component={ShipmentsListScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ShipmentDetail" component={ShipmentDetailScreen} options={{ title: 'Shipment Details' }} />
           <Stack.Screen name="Document" component={DocumentScreen} options={{ headerShown: false }} />

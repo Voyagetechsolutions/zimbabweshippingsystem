@@ -18,6 +18,7 @@ import ManualBookingScreen from '../screens/admin/ManualBookingScreen';
 import ShipmentDetailScreen from '../screens/ShipmentDetailScreen';
 import ShipmentPeriodsScreen from '../screens/admin/ShipmentPeriodsScreen';
 import PeriodInvoicesScreen from '../screens/admin/PeriodInvoicesScreen';
+import PeriodPaymentsScreen from '../screens/admin/PeriodPaymentsScreen';
 import PeriodShipmentsScreen from '../screens/admin/PeriodShipmentsScreen';
 const Stack=createNativeStackNavigator();
 export default function FinanceWorkspaceStack(){return <Stack.Navigator screenOptions={{headerShown:false}}>
@@ -37,7 +38,7 @@ export default function FinanceWorkspaceStack(){return <Stack.Navigator screenOp
   <Stack.Screen name="Reconciliation" component={ReconciliationScreen}/>
   <Stack.Screen name="Invoices" component={InvoicesScreen}/>
   <Stack.Screen name="Periods" component={ShipmentPeriodsScreen}/>
-  <Stack.Screen name="PeriodInvoices" component={PeriodInvoicesScreen}/>
+  <Stack.Screen name="PeriodInvoices" component={PeriodInvoicesScreen}/><Stack.Screen name="PeriodPayments" component={PeriodPaymentsScreen} options={{headerShown:false}}/>
   <Stack.Screen name="PeriodShipments" component={PeriodShipmentsScreen}/>
   <Stack.Screen name="Document" component={DocumentScreen} options={{headerShown:false}}/>
   <Stack.Screen name="PaymentProofs" component={PaymentProofsScreen}/>

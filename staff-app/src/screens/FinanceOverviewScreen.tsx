@@ -227,7 +227,8 @@ export default function FinanceOverviewScreen() {
       icon: 'card-outline',
       title: 'Payments',
       text: 'Verification and allocation',
-      onPress: () => navigation.navigate('Payments'),
+      // Grouped by collection period, the same as shipments and invoices.
+      onPress: () => navigation.navigate('Periods', { mode: 'payments' }),
     },
     {
       icon: 'bar-chart-outline',

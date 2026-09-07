@@ -54,8 +54,11 @@ const symbolFor = (currency: string) => (currency === 'EUR' ? '€' : '£');
  */
 export default function ShipmentPeriodsScreen() {
   const navigation = useNavigation<any>();
-  const mode = ((useRoute().params || {}) as { mode?: 'shipments' | 'invoices' }).mode ?? 'shipments';
-  const target = mode === 'invoices' ? 'PeriodInvoices' : 'PeriodShipments';
+  const mode = ((useRoute().params || {}) as { mode?: 'shipments' | 'invoices' | 'payments' }).mode ?? 'shipments';
+  const target = mode === 'invoices' ? 'PeriodInvoices'
+    : mode === 'payments' ? 'PeriodPayments'
+    : 'PeriodShipments';
+  const heading = mode === 'invoices' ? 'Invoices' : mode === 'payments' ? 'Payments' : 'Shipments';
   const [periods, setPeriods] = useState<PeriodSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -98,7 +101,7 @@ export default function ShipmentPeriodsScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>{mode === 'invoices' ? 'Invoices' : 'Shipments'}</Text>
+        <Text style={styles.title}>{heading}</Text>
         <Text style={styles.subtitle}>
           {live.length} collection period{live.length === 1 ? '' : 's'} with bookings
         </Text>
@@ -134,7 +137,7 @@ export default function ShipmentPeriodsScreen() {
                 </View>
                 <View style={styles.countPill}>
                   <Text style={styles.countValue}>{period.shipments}</Text>
-                  <Text style={styles.countLabel}>{mode === 'invoices' ? 'INVOICES' : 'SHIPMENTS'}</Text>
+                  <Text style={styles.countLabel}>{heading.toUpperCase()}</Text>
                 </View>
               </View>
 
