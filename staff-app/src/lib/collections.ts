@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { distanceKm } from './routeOptimiser';
 
 /**
  * Today's active collection route, for every driver on shift.
@@ -51,18 +52,10 @@ export type ActiveRoute = {
 export type RouteDay = { date: string; routes: ActiveRoute[]; collections: RouteCollection[] };
 
 /** Great-circle distance in km. Good enough to order a day's drops. */
-export function distanceKm(
-  a: { latitude: number; longitude: number },
-  b: { latitude: number; longitude: number },
-): number {
-  const R = 6371;
-  const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
-  const dLon = ((b.longitude - a.longitude) * Math.PI) / 180;
-  const lat1 = (a.latitude * Math.PI) / 180;
-  const lat2 = (b.latitude * Math.PI) / 180;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
-}
+// One haversine for the whole app. It lives in routeOptimiser because the
+// route ordering leans on it hardest, and is re-exported here so callers of
+// this module keep the import they already had.
+export { distanceKm };
 
 const normalise = (postcode: string) => postcode.toUpperCase().replace(/[^A-Z0-9]/g, '');
 

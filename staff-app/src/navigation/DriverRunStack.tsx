@@ -4,6 +4,7 @@ import CollectionScannerScreen from '../screens/CollectionScannerScreen';
 import DriverDepotHandoverScreen from '../screens/DriverDepotHandoverScreen';
 import { DriverReportIssueScreen, DriverRouteMapScreen, DriverRunOverviewScreen, DriverRunSummaryScreen, DriverStopDetailsScreen } from '../screens/DriverExperienceScreens';
 import CollectionsAheadScreen from '../screens/CollectionsAheadScreen';
+import DriverRouteScreen from '../screens/DriverRouteScreen';
 import type { DriverRunStackParams } from './types';
 import { colors } from '../theme';
 
@@ -17,6 +18,7 @@ export default function DriverRunStack() {
     <Stack.Screen name="DepotHandover" component={DriverDepotHandoverScreen} options={{ headerShown: false }} />
     <Stack.Screen name="StopDetails" component={DriverStopDetailsScreen} options={{ headerShown: false }} />
     <Stack.Screen name="CollectionsAhead" component={CollectionsAheadScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="RoutePlan" component={DriverRouteScreen} options={{ headerShown: false }} />
     <Stack.Screen name="ReportIssue" component={DriverReportIssueScreen} options={{ headerShown: false }} />
     <Stack.Screen name="StopWorkflow" component={CollectionScannerScreen as any} options={{ title: 'Proof of Collection' }} />
   </Stack.Navigator>;

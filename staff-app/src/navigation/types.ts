@@ -43,6 +43,8 @@ export type DriverRunStackParams = {
   // The forward view that replaced the dispatch board: what is booked onto
   // each published date, so a driver can plan their own route.
   CollectionsAhead: undefined;
+  // One route in driving order: plan it, reorder it, start it, navigate it.
+  RoutePlan: { routeName?: string | null; date?: string | null } | undefined;
   RouteMap: undefined;
   RunSummary: undefined;
   DepotHandover: undefined;

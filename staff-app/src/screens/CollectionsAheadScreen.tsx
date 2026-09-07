@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, shadow, spacing } from '../theme';
 import { loadCollectionsAhead, sortByProximity, type RouteCollection, type ScheduledDay } from '../lib/collections';
 import { getDriverLocation, type Point } from '../lib/driverLocation';
+import { multiStopGoogleMapsUrl } from '../lib/navigationLinks';
 import { isNetworkError } from '../lib/offlineQueue';
 
 /**
@@ -36,17 +37,12 @@ function daysAway(iso: string): number {
 
 /** One map link for a whole day, with every stop as a waypoint. */
 function planDayUrl(collections: RouteCollection[]): string | null {
-  const points = collections
-    .map((c) => (c.latitude != null && c.longitude != null
-      ? `${c.latitude},${c.longitude}`
-      : [c.address, c.city, c.postcode].filter(Boolean).join(', ')))
-    .filter(Boolean)
-    .slice(0, 10);
-  if (!points.length) return null;
-  const destination = encodeURIComponent(points[points.length - 1]);
-  const waypoints = points.slice(0, -1).map(encodeURIComponent).join('%7C');
-  return `https://www.google.com/maps/dir/?api=1&destination=${destination}` +
-    (waypoints ? `&waypoints=${waypoints}` : '') + '&travelmode=driving';
+  const link = multiStopGoogleMapsUrl(null, collections.map((c) => ({
+    latitude: c.latitude,
+    longitude: c.longitude,
+    address: [c.address, c.city, c.postcode].filter(Boolean).join(', '),
+  })));
+  return link?.url ?? null;
 }
 
 export default function CollectionsAheadScreen() {
@@ -164,6 +160,22 @@ export default function CollectionsAheadScreen() {
 
               {open ? (
                 <>
+                  {/* Working a route orders it, starts a run and drives it.
+                      The map link below is still here for a driver who only
+                      wants a look at the day without committing to it. */}
+                  {(day.routes.length ? day.routes : [null]).map((name) => (
+                    <Pressable
+                      key={name ?? 'unnamed'}
+                      style={styles.workButton}
+                      onPress={() => navigation.navigate('RoutePlan', { routeName: name, date: day.date })}
+                    >
+                      <Ionicons name="git-branch-outline" size={17} color={colors.primary} />
+                      <Text style={styles.workText}>
+                        {name ? `WORK ${name}` : 'WORK THIS DAY'}
+                      </Text>
+                      <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+                    </Pressable>
+                  ))}
                   {mapUrl ? (
                     <Pressable style={styles.planButton} onPress={() => openMap(mapUrl)}>
                       <Ionicons name="navigate-outline" size={17} color={colors.white} />
@@ -231,6 +243,8 @@ const styles = StyleSheet.create({
   dayMeta: { fontSize: 11.5, color: colors.textMuted, marginTop: 2, lineHeight: 16 },
   planButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginHorizontal: spacing.md, marginBottom: spacing.sm, minHeight: 44, borderRadius: radius.sm, backgroundColor: colors.primary },
   planText: { color: colors.white, fontSize: 11.5, fontWeight: '900' },
+  workButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginHorizontal: spacing.md, marginBottom: spacing.sm, minHeight: 44, borderRadius: radius.sm, backgroundColor: colors.primarySoft },
+  workText: { color: colors.primary, fontSize: 11.5, fontWeight: '900' },
   stopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: 11, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   order: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
   orderText: { fontSize: 11.5, fontWeight: '800', color: colors.textMuted },

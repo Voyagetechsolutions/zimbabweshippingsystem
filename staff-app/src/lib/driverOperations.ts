@@ -4,6 +4,7 @@ import { supabase } from './supabase';
 import { isIrishAddress, loadRouteDay, type RouteCollection } from './collections';
 import { loadDeliveryDay } from './deliveries';
 import { getDriverLocation, type Point } from './driverLocation';
+import { navigationOptions } from './navigationLinks';
 import { isMissingBackend, isNetworkError } from './offlineQueue';
 
 export type DriverMode = 'pickup' | 'delivery' | 'both';
@@ -356,19 +357,19 @@ export async function setPresence(
   return 'updated';
 }
 
-export function navigationUrls(job: DriverJob) {
-  const destination = job.latitude != null && job.longitude != null
-    ? `${job.latitude},${job.longitude}` : job.address;
-  const encoded = encodeURIComponent(destination);
-  return Platform.select({
-    ios: [
-      { label: 'Apple Maps', url: `http://maps.apple.com/?daddr=${encoded}&dirflg=d` },
-      { label: 'Google Maps', url: `comgooglemaps://?daddr=${encoded}&directionsmode=driving` },
-      { label: 'Waze', url: `waze://?q=${encoded}&navigate=yes` },
-    ],
-    default: [
-      { label: 'Google Maps', url: `https://www.google.com/maps/dir/?api=1&destination=${encoded}&travelmode=driving` },
-      { label: 'Waze', url: `https://waze.com/ul?q=${encoded}&navigate=yes` },
-    ],
-  }) || [];
+/**
+ * Navigation choices for a stop.
+ *
+ * Delegates to navigationLinks so there is one set of deep links in the app.
+ * The previous version handed iOS `comgooglemaps://` and `waze://`, which do
+ * nothing at all when that app is not installed — a dead button on a driver's
+ * phone with no way to tell why. The https:// forms fall through to the web,
+ * and a stop with no usable location now yields no options rather than a link
+ * to nowhere.
+ */
+export function navigationUrls(job: DriverJob): Array<{ label: string; url: string }> {
+  return navigationOptions(
+    { latitude: job.latitude, longitude: job.longitude, address: job.address },
+    Platform.OS,
+  ).map(({ label, url }) => ({ label, url }));
 }
