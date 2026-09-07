@@ -7,6 +7,8 @@ import { supabase } from '../lib/supabase';
 import { getDriverLocation } from '../lib/driverLocation';
 import { BACKEND_PENDING_MESSAGE, enqueue, flushQueue, isMissingBackend, isNetworkError, queueCount } from '../lib/offlineQueue';
 import { colors, radius, shadow, spacing } from '../theme';
+import { searchShipments } from '../lib/shipmentSearch';
+import { collectionInfo, customerRef, pickupAddress, senderName, senderPhone, type Shipment } from '../lib/shipment';
 import { useDriverCountry } from '../context/DriverCountryContext';
 
 export default function DriverScanScreen() {
@@ -19,7 +21,8 @@ export default function DriverScanScreen() {
   const [finder, setFinder] = useState('');
   const [finding, setFinding] = useState(false);
   const [searched, setSearched] = useState(false);
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<Shipment[]>([]);
+  const [openId, setOpenId] = useState<string | null>(null);
   const [pending, setPending] = useState(0);
 
   useEffect(() => { void queueCount().then(setPending); }, []);
@@ -33,22 +36,36 @@ export default function DriverScanScreen() {
     } finally { setFinding(false); }
   };
 
+  /**
+   * Find a shipment, whatever route it is on.
+   *
+   * This used to call search_driver_packages_for_country, which searches
+   * shipment_packages restricted to the driver's own assigned work. Two things
+   * were wrong with that. shipment_packages has never had a row in it - nothing
+   * in the app or the database creates one - so the search could not succeed
+   * for anybody. And scoping to assigned work is the opposite of what this is
+   * for: a driver looking a shipment up is usually asking about one that is
+   * *not* in front of them.
+   *
+   * It searches shipments now, by tracking number, customer reference (the
+   * computed one included), name, phone or address, with no route, date or
+   * assignment filter.
+   */
   const findPackages = async () => {
     const query = finder.trim();
     if (query.length < 2) return;
     setFinding(true); setSearched(true); setResults([]);
     try {
-      if(!country){Alert.alert('Choose a country','Open Home and choose the country for this shift before searching packages.');return;}
-      const { data, error } = await supabase.rpc('search_driver_packages_for_country', { p_query: query, p_limit: 20, p_country: country });
-      if (error) throw error;
-      setResults(Array.isArray(data) ? data : []);
+      const found = await searchShipments(query, 20);
+      setResults(found.shipments);
     } catch (e: any) {
       Alert.alert(
         'Search unavailable',
-        isMissingBackend(e) ? BACKEND_PENDING_MESSAGE
-          : 'We couldn’t search assigned packages. Check your connection and try again.',
+        isNetworkError(e)
+          ? 'No signal - search needs a connection.'
+          : 'We could not search shipments. Check your connection and try again.',
       );
-      console.warn('Driver package finder failed', e?.message || e);
+      console.warn('Shipment finder failed', e?.message || e);
     } finally { setFinding(false); }
   };
 
@@ -89,11 +106,80 @@ export default function DriverScanScreen() {
     {!permission?.granted ? <View style={styles.permission}><View style={styles.permissionIcon}><Ionicons name="camera-outline" size={36} color={colors.primary} /></View><Text style={styles.permissionTitle}>Camera access required</Text><Text style={styles.permissionText}>Allow camera access to scan QR codes and barcodes on shipment labels.</Text><Pressable style={styles.primary} onPress={requestPermission}><Text style={styles.primaryText}>ALLOW CAMERA</Text></Pressable></View> : <View style={styles.cameraCard}><CameraView style={styles.camera} barcodeScannerSettings={{ barcodeTypes: ['qr', 'code128', 'code39', 'ean13', 'ean8', 'upc_a', 'upc_e'] }} onBarcodeScanned={({ data }) => scan(data)}><View style={styles.overlay}><View style={styles.scanFrame}><View style={[styles.corner, styles.tl]} /><View style={[styles.corner, styles.tr]} /><View style={[styles.corner, styles.bl]} /><View style={[styles.corner, styles.br]} /></View><Text style={styles.cameraHint}>{busy ? 'VERIFYING PACKAGE…' : 'ALIGN LABEL INSIDE FRAME'}</Text></View></CameraView></View>}
     <View style={styles.manualCard}><Text style={styles.label}>ENTER PACKAGE ID MANUALLY</Text><View style={styles.manualRow}><TextInput style={styles.input} value={manual} onChangeText={setManual} autoCapitalize="characters" placeholder="e.g. ZS-0826-28382-01" placeholderTextColor={colors.textFaint} onSubmitEditing={() => scan(manual)} /><Pressable style={[styles.verify, (!manual.trim() || busy) && styles.disabled]} disabled={!manual.trim() || busy} onPress={() => scan(manual)}>{busy ? <ActivityIndicator color={colors.white} /> : <Ionicons name="arrow-forward" size={22} color={colors.white} />}</Pressable></View></View>
     {last ? <View style={styles.success}><View style={styles.successIcon}><Ionicons name={last.queued ? 'cloud-offline-outline' : 'checkmark'} size={28} color={colors.white} /></View><Text style={styles.successTitle}>{last.queued ? 'Scan saved on device' : 'Package verified'}</Text><Text style={styles.packageCode}>{last.packageCode}</Text><Text style={styles.successMeta}>Status: {String(last.status || 'loaded').replace('_', ' ')}</Text>{last.bay || last.shelf ? <View style={styles.location}><Ionicons name="file-tray-stacked-outline" size={18} color={colors.primaryDark} /><Text style={styles.locationText}>{[last.bay && `Bay ${last.bay}`, last.shelf && `Shelf ${last.shelf}`].filter(Boolean).join(' · ')}</Text></View> : null}<Pressable style={styles.scanAnother} onPress={() => { setLast(null); setLocked(false); }}><Text style={styles.scanAnotherText}>SCAN ANOTHER</Text></Pressable></View> : null}
-    <View style={styles.finderCard}><View style={styles.finderHead}><View><Text style={styles.label}>PACKAGE FINDER</Text><Text style={styles.helpText}>Search your assigned route only.</Text></View><Ionicons name="search" size={20} color={colors.primary} /></View><View style={styles.manualRow}><TextInput style={styles.input} value={finder} onChangeText={(value) => { setFinder(value); setSearched(false); }} placeholder="Customer, booking, tracking, package or address" placeholderTextColor={colors.textFaint} returnKeyType="search" onSubmitEditing={findPackages} /><Pressable style={[styles.verify, (finder.trim().length < 2 || finding) && styles.disabled]} disabled={finder.trim().length < 2 || finding} onPress={findPackages}>{finding ? <ActivityIndicator color={colors.white} /> : <Ionicons name="search" size={20} color={colors.white} />}</Pressable></View>{searched && !finding && results.length === 0 ? <Text style={styles.emptyText}>No assigned packages match this search.</Text> : results.map((item) => <Pressable key={item.packageId} style={styles.result} onPress={() => { setManual(item.packageCode); setResults([]); }}><View style={styles.resultIcon}><Ionicons name="cube-outline" size={20} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={styles.resultCode}>{item.packageCode}</Text><Text style={styles.resultMeta}>{item.customerName} · {item.reference}</Text><Text style={styles.resultAddress} numberOfLines={1}>{item.address || 'Address unavailable'}</Text></View><View style={styles.position}><Text style={styles.positionText}>{[item.bay && `BAY ${item.bay}`, item.shelf && `SHELF ${item.shelf}`].filter(Boolean).join('\n') || String(item.status || 'expected').toUpperCase()}</Text></View></Pressable>)}</View>
+    <View style={styles.finderCard}>
+      <View style={styles.finderHead}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.label}>FIND A SHIPMENT</Text>
+          <Text style={styles.helpText}>Any shipment, on your route or not.</Text>
+        </View>
+        <Ionicons name="search" size={20} color={colors.primary} />
+      </View>
+
+      <View style={styles.manualRow}>
+        <TextInput
+          style={styles.input}
+          value={finder}
+          onChangeText={(value) => { setFinder(value); setSearched(false); }}
+          placeholder="Reference, tracking number, name or phone"
+          placeholderTextColor={colors.textFaint}
+          autoCorrect={false}
+          returnKeyType="search"
+          onSubmitEditing={findPackages}
+        />
+        <Pressable
+          style={[styles.verify, (finder.trim().length < 2 || finding) && styles.disabled]}
+          disabled={finder.trim().length < 2 || finding}
+          onPress={findPackages}
+        >
+          {finding ? <ActivityIndicator color={colors.white} /> : <Ionicons name="search" size={20} color={colors.white} />}
+        </Pressable>
+      </View>
+
+      {searched && !finding && results.length === 0 ? (
+        <Text style={styles.emptyText}>
+          Nothing matches &ldquo;{finder.trim()}&rdquo; anywhere - not just on your route. Check the
+          reference, or try the customer&rsquo;s surname or phone number.
+        </Text>
+      ) : results.map((item) => {
+        const open = openId === item.id;
+        const collection = collectionInfo(item);
+        return (
+          <Pressable
+            key={item.id}
+            style={styles.result}
+            onPress={() => setOpenId(open ? null : item.id)}
+          >
+            <View style={styles.resultIcon}>
+              <Ionicons name={open ? 'chevron-down' : 'cube-outline'} size={20} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.resultCode}>{item.customer_reference || customerRef(item)}</Text>
+              <Text style={styles.resultMeta}>{senderName(item)} · {item.tracking_number || 'no tracking number'}</Text>
+              <Text style={styles.resultAddress} numberOfLines={open ? 4 : 1}>{pickupAddress(item)}</Text>
+
+              {open ? (
+                <View style={styles.resultDetail}>
+                  <Text style={styles.resultAddress}>{senderPhone(item)}</Text>
+                  <Text style={styles.resultAddress}>
+                    {collection.route || 'Route not set'}
+                    {collection.date ? ` · ${collection.date}` : ' · no collection date'}
+                  </Text>
+                  <Text style={styles.resultAddress}>{item.goods_description || 'No goods description'}</Text>
+                </View>
+              ) : null}
+            </View>
+            <View style={styles.position}>
+              <Text style={styles.positionText}>{String(item.status || 'pending').toUpperCase()}</Text>
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
   </ScrollView></SafeAreaView>;
 }
 
 const styles = StyleSheet.create({
+  resultDetail: { marginTop: 4, gap: 2 },
   safe: { flex: 1, backgroundColor: colors.bg }, content: { padding: spacing.lg, paddingBottom: 100, gap: spacing.md }, header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, eyebrow: { color: colors.primary, fontSize: 10, fontWeight: '900', letterSpacing: 1.2 }, title: { color: colors.text, fontSize: 27, fontWeight: '900', marginTop: 2 }, subtitle: { color: colors.textMuted, fontSize: 12, marginTop: 3 }, headerIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }, statusCard: { flexDirection: 'row', gap: 8, alignItems: 'center', backgroundColor: colors.primarySoft, padding: spacing.md, borderRadius: radius.md }, statusText: { flex: 1, color: colors.primaryDark, fontSize: 11.5, fontWeight: '700' },
   offlineCard: { flexDirection: 'row', alignItems: 'center', gap: 9, backgroundColor: colors.amberSoft, borderWidth: 1, borderColor: '#F5D48A', borderRadius: radius.md, padding: spacing.md }, offlineTitle: { color: colors.amber, fontWeight: '900', fontSize: 10 }, offlineText: { color: colors.textMuted, fontSize: 10.5, marginTop: 2 },
   cameraCard: { height: 340, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: '#081722', ...shadow }, camera: { flex: 1 }, overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,.18)' }, scanFrame: { width: 260, height: 150, position: 'relative' }, corner: { position: 'absolute', width: 30, height: 30, borderColor: colors.white }, tl: { left: 0, top: 0, borderLeftWidth: 4, borderTopWidth: 4 }, tr: { right: 0, top: 0, borderRightWidth: 4, borderTopWidth: 4 }, bl: { left: 0, bottom: 0, borderLeftWidth: 4, borderBottomWidth: 4 }, br: { right: 0, bottom: 0, borderRightWidth: 4, borderBottomWidth: 4 }, cameraHint: { color: colors.white, fontSize: 10, fontWeight: '900', letterSpacing: 1, marginTop: spacing.lg, backgroundColor: 'rgba(0,0,0,.55)', paddingVertical: 7, paddingHorizontal: 12, borderRadius: radius.pill },
