@@ -80,7 +80,11 @@ create unique index if not exists customers_phone_key_idx
   on public.customers (phone_key) where phone_key is not null;
 create unique index if not exists customers_email_key_idx
   on public.customers (email_key) where email_key is not null;
-create unique index if not exists customers_profile_idx
+-- Deliberately NOT unique. One account books for several people — a customer
+-- ordering for their mother and for themselves is two customers on one login —
+-- so a profile may be attached to more than one customer record.
+drop index if exists public.customers_profile_idx;
+create index if not exists customers_profile_idx
   on public.customers (profile_id) where profile_id is not null;
 
 alter table public.shipments
@@ -125,7 +129,8 @@ $$;
 /**
  * Find the customer these details belong to, or create them.
  *
- * Phone wins, then email, then a signed-in profile. Details that arrive fuller
+ * Phone wins, then email. A signed-in profile is attached to whoever is found
+ * but never used to identify them — see below. Details that arrive fuller
  * than what is on file fill the gaps — a second booking that carries an email
  * where the first did not should complete the record rather than fork it — but
  * never blank out something already known.
@@ -148,6 +153,12 @@ declare
   v_phone_key text := public.phone_identity_key(p_phone);
   v_email_key text := public.email_identity_key(p_email);
   v_id uuid;
+  -- Not every user_id on a shipment has a profiles row behind it: live data
+  -- carries ids for users whose profile was never created or has since gone.
+  -- Passing one straight through fails the foreign key and takes the whole
+  -- backfill with it, so an id that does not resolve is treated as no id —
+  -- the customer is still created, just without a profile attached.
+  v_profile_id uuid := (select p.id from public.profiles p where p.id = p_profile_id);
 begin
   if v_phone_key is not null then
     select id into v_id from public.customers where phone_key = v_phone_key limit 1;
@@ -155,9 +166,10 @@ begin
   if v_id is null and v_email_key is not null then
     select id into v_id from public.customers where email_key = v_email_key limit 1;
   end if;
-  if v_id is null and p_profile_id is not null then
-    select id into v_id from public.customers where profile_id = p_profile_id limit 1;
-  end if;
+  -- Deliberately no fallback to the profile. Matching on "same login" merged
+  -- an account holder's own booking with one they made for somebody else —
+  -- two different names, two different phone numbers, one customer. The login
+  -- says who placed the booking, not who the customer is.
 
   if v_id is null then
     -- Two bookings by one customer landing at once would both reach here.
@@ -171,13 +183,12 @@ begin
               nullif(trim(coalesce(p_email, '')), ''), nullif(trim(coalesce(p_phone, '')), ''),
               nullif(trim(coalesce(p_country, '')), ''), nullif(trim(coalesce(p_address, '')), ''),
               nullif(trim(coalesce(p_city, '')), ''), nullif(trim(coalesce(p_postcode, '')), ''),
-              p_profile_id)
+              v_profile_id)
       returning id into v_id;
     exception when unique_violation then
       select id into v_id from public.customers
        where (v_phone_key is not null and phone_key = v_phone_key)
           or (v_email_key is not null and email_key = v_email_key)
-          or (p_profile_id is not null and profile_id = p_profile_id)
        limit 1;
       if v_id is null then raise; end if;
     end;
@@ -190,7 +201,7 @@ begin
       pickup_address = coalesce(pickup_address, nullif(trim(coalesce(p_address, '')), '')),
       pickup_city = coalesce(pickup_city, nullif(trim(coalesce(p_city, '')), '')),
       pickup_postcode = coalesce(pickup_postcode, nullif(trim(coalesce(p_postcode, '')), '')),
-      profile_id = coalesce(profile_id, p_profile_id),
+      profile_id = coalesce(profile_id, v_profile_id),
       updated_at = now()
     where id = v_id;
   end if;
@@ -404,13 +415,13 @@ begin
   -- instead of a dozen queries each needing to learn about customers and one
   -- of them being missed. Only unclaimed rows are touched, so a shipment that
   -- already belongs to somebody is never reassigned.
-  if v_customer is not null then
-    update public.shipments
-       set user_id = new.id
-     where customer_id = v_customer
-       and user_id is null
-       and deleted_at is null;
-  end if;
+  update public.shipments
+     set user_id = new.id
+   where user_id is null
+     and deleted_at is null
+     and customer_id is not null
+     and (customer_id = v_customer
+          or customer_id in (select id from public.customers where profile_id = new.id));
 
   return new;
 end $$;
