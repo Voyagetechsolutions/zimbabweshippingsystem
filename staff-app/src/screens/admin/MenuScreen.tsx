@@ -54,6 +54,10 @@ const SECTIONS: { title: string; data: Item[] }[] = [
       { label: 'Invoices', icon: 'receipt-outline', to: 'Periods', params: { mode: 'invoices' }, finance: true },
       { label: 'Payments', icon: 'card-outline', to: 'Periods', params: { mode: 'payments' }, finance: true },
       { label: 'Reports', icon: 'stats-chart-outline', to: 'Reports' },
+      // Revenue by route and by consignment, and what each customer is worth.
+      // Both read the same database functions the website reads.
+      { label: 'Revenue Reports', icon: 'bar-chart-outline', to: 'RevenueReport' },
+      { label: 'Customer Accounts', icon: 'wallet-outline', to: 'CustomerAccounts' },
       { label: 'Analytics', icon: 'analytics-outline', to: 'Analytics' },
     ],
   },

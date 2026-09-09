@@ -115,6 +115,9 @@ export type MenuStackParams = {
   Invoices: { create?: boolean; open?: string } | undefined;
   Document: { shipmentId: string; kind: 'invoice' | 'delivery_note' };
   Reports: { range?: 'today' | 'week' | 'month' | 'last30' | 'custom' } | undefined;
+  // Revenue by route and consignment, and what each customer is worth.
+  RevenueReport: undefined;
+  CustomerAccounts: undefined;
   Analytics: undefined;
   FinanceOverview: undefined;
   Feedback: undefined;

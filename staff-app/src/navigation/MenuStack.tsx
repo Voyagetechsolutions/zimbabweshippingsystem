@@ -33,6 +33,8 @@ import DocumentScreen from '../screens/admin/DocumentScreen';
 import type { MenuStackParams } from './types';
 import { colors } from '../theme';
 
+import RevenueReportScreen from '../screens/admin/RevenueReportScreen';
+import CustomerAccountsScreen from '../screens/admin/CustomerAccountsScreen';
 const Stack = createNativeStackNavigator<MenuStackParams>();
 
 export default function MenuStack() {
@@ -70,6 +72,8 @@ export default function MenuStack() {
       <Stack.Screen name="Feedback" component={FeedbackScreen} options={{ title: 'Feedback' }} />
       <Stack.Screen name="StaffRecords" component={StaffRecordsScreen} options={{ title: '', headerShadowVisible: false }} />
       <Stack.Screen name="MapLocations" component={MapLocationsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="RevenueReport" component={RevenueReportScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="CustomerAccounts" component={CustomerAccountsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Vehicles" component={VehiclesScreen} options={{ title: '', headerShadowVisible: false }} />
       <Stack.Screen name="Account" component={AccountScreen} options={{ title: 'Account' }} />
       <Stack.Screen name="Placeholder" component={PlaceholderScreen} options={{ title: '' }} />

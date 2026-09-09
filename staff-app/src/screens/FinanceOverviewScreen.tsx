@@ -231,10 +231,30 @@ export default function FinanceOverviewScreen() {
       onPress: () => navigation.navigate('Periods', { mode: 'payments' }),
     },
     {
+      icon: 'cube-outline',
+      title: 'Shipments',
+      // Invoices are raised by hand from a booking, so finance has to be able
+      // to open one. Without this they were billing something they could not see.
+      text: 'Every booking, grouped by collection period',
+      onPress: () => navigation.navigate('Periods', { mode: 'shipments' }),
+    },
+    {
       icon: 'bar-chart-outline',
       title: 'Monthly report',
       text: 'This month’s numbers, with PDF and CSV export',
       onPress: () => navigation.navigate('Reports', { range: 'month' }),
+    },
+    {
+      icon: 'trending-up-outline',
+      title: 'Revenue reports',
+      text: 'By route and consignment, and what people ship',
+      onPress: () => navigation.navigate('RevenueReport'),
+    },
+    {
+      icon: 'wallet-outline',
+      title: 'Customer accounts',
+      text: 'What each customer has spent and still owes',
+      onPress: () => navigation.navigate('CustomerAccounts'),
     },
   ];
 
