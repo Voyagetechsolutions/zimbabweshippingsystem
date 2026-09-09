@@ -1,10 +1,19 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { useToast } from '@/hooks/use-toast';
 import { Loader2, Search, AlertCircle, ChevronRight, ArrowLeft } from 'lucide-react';
 
 /**
@@ -48,7 +57,19 @@ type StatementLine = {
   amount: number;
   currency: string;
   method: string | null;
+  /** Null on entries written before payments carried ids; those cannot be edited. */
+  paymentId: string | null;
+  note: string | null;
   balance: number;
+};
+
+type PaymentDraft = {
+  shipmentId: string;
+  id?: string;
+  amount: string;
+  method: string;
+  date: string;
+  reference: string;
 };
 
 type AccountShipment = {
@@ -83,6 +104,12 @@ export const CustomerAccounts: React.FC = () => {
   const [shipments, setShipments] = useState<AccountShipment[]>([]);
   const [statement, setStatement] = useState<StatementLine[]>([]);
   const [itemsLoading, setItemsLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const { toast } = useToast();
+  /** The customer-details form, open only while editing. */
+  const [editing, setEditing] = useState<Record<string, string> | null>(null);
+  const [payment, setPayment] = useState<PaymentDraft | null>(null);
+  const [removing, setRemoving] = useState<StatementLine | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,6 +147,70 @@ export const CustomerAccounts: React.FC = () => {
     })();
     return () => { cancelled = true; };
   }, [openId]);
+
+  const reloadOpen = useCallback(async () => {
+    if (!openId) return;
+    const [{ data }, { data: lines }] = await Promise.all([
+      supabase.rpc('customer_accounts', { p_customer_id: openId }),
+      supabase.rpc('customer_statement', { p_customer_id: openId }),
+    ]);
+    setItems(((data as any)?.items || []) as ItemRow[]);
+    setShipments(((data as any)?.shipments || []) as AccountShipment[]);
+    setStatement(Array.isArray(lines) ? (lines as StatementLine[]) : []);
+    const { data: all } = await supabase.rpc('customer_accounts', { p_customer_id: null });
+    setAccounts(((all as any)?.customers || []) as Account[]);
+  }, [openId]);
+
+  const saveDetails = useCallback(async () => {
+    if (!openId || !editing) return;
+    setBusy(true);
+    const { error } = await supabase.rpc('update_customer_record', {
+      p_customer_id: openId, p: editing as any,
+    });
+    setBusy(false);
+    if (error) { toast({ title: 'Could not save', description: error.message, variant: 'destructive' }); return; }
+    setEditing(null);
+    await reloadOpen();
+    toast({ title: 'Customer updated' });
+  }, [openId, editing, reloadOpen, toast]);
+
+  const savePayment = useCallback(async () => {
+    if (!payment) return;
+    const amount = Number(payment.amount);
+    if (!(amount > 0)) {
+      toast({ title: 'Enter an amount', description: 'A payment must be more than zero.', variant: 'destructive' });
+      return;
+    }
+    setBusy(true);
+    const { error } = await supabase.rpc('record_invoice_payment', {
+      p_shipment_id: payment.shipmentId,
+      p: {
+        id: payment.id, amount, method: payment.method,
+        date: payment.date, reference: payment.reference,
+      } as any,
+    });
+    setBusy(false);
+    if (error) {
+      toast({ title: 'Could not record the payment', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setPayment(null);
+    await reloadOpen();
+    toast({ title: 'Payment recorded' });
+  }, [payment, reloadOpen, toast]);
+
+  const removePayment = useCallback(async () => {
+    if (!removing?.paymentId) return;
+    setBusy(true);
+    const { error } = await supabase.rpc('delete_invoice_payment', {
+      p_shipment_id: removing.shipmentId, p_payment_id: removing.paymentId,
+    });
+    setBusy(false);
+    setRemoving(null);
+    if (error) { toast({ title: 'Could not remove it', description: error.message, variant: 'destructive' }); return; }
+    await reloadOpen();
+    toast({ title: 'Payment removed' });
+  }, [removing, reloadOpen, toast]);
 
   const visible = useMemo(() => {
     const text = query.trim().toLowerCase();
@@ -205,8 +296,23 @@ export const CustomerAccounts: React.FC = () => {
 
           <TabsContent value="details" className="space-y-4">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex-row items-center justify-between space-y-0">
                 <CardTitle>Customer details</CardTitle>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setEditing({
+                    fullName: open.full_name || '',
+                    phone: open.phone || '',
+                    email: open.email || '',
+                    country: open.country || '',
+                    pickupAddress: open.pickup_address || '',
+                    pickupCity: open.pickup_city || '',
+                    pickupPostcode: open.pickup_postcode || '',
+                  })}
+                >
+                  Edit
+                </Button>
               </CardHeader>
               <CardContent>
                 <dl className="divide-y text-sm">
@@ -264,11 +370,26 @@ export const CustomerAccounts: React.FC = () => {
 
           <TabsContent value="statement">
             <Card>
-              <CardHeader>
-                <CardTitle>Statement</CardTitle>
-                <CardDescription>
-                  Every invoice raised and every payment received, oldest first, with a running balance.
-                </CardDescription>
+              <CardHeader className="flex-row items-start justify-between space-y-0">
+                <div>
+                  <CardTitle>Statement</CardTitle>
+                  <CardDescription>
+                    Every invoice raised and every payment received, oldest first, with a running balance.
+                  </CardDescription>
+                </div>
+                <Button
+                  size="sm"
+                  disabled={shipments.length === 0}
+                  onClick={() => setPayment({
+                    shipmentId: shipments[0]?.shipmentId || '',
+                    amount: '',
+                    method: '',
+                    date: new Date().toISOString().slice(0, 10),
+                    reference: '',
+                  })}
+                >
+                  Record payment
+                </Button>
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 {itemsLoading ? (
@@ -284,6 +405,7 @@ export const CustomerAccounts: React.FC = () => {
                         <th className="pb-2">Detail</th>
                         <th className="pb-2 text-right">Amount</th>
                         <th className="pb-2 text-right">Balance</th>
+                        <th className="pb-2" />
                       </tr>
                     </thead>
                     <tbody>
@@ -301,6 +423,31 @@ export const CustomerAccounts: React.FC = () => {
                             </td>
                             <td className="py-2 text-right font-semibold">
                               {money(line.balance, line.currency)}
+                            </td>
+                            <td className="py-2 text-right whitespace-nowrap">
+                              {/* A charge is edited on its own invoice; only the
+                                  credit side is editable from the statement. */}
+                              {!charge && line.paymentId ? (
+                                <>
+                                  <Button
+                                    size="sm" variant="ghost"
+                                    onClick={() => setPayment({
+                                      shipmentId: line.shipmentId,
+                                      id: line.paymentId as string,
+                                      amount: String(Math.abs(line.amount)),
+                                      method: line.method || '',
+                                      date: String(line.at).slice(0, 10),
+                                      reference: line.note || '',
+                                    })}
+                                  >
+                                    Edit
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="text-red-700"
+                                    onClick={() => setRemoving(line)}>
+                                    Remove
+                                  </Button>
+                                </>
+                              ) : null}
                             </td>
                           </tr>
                         );
@@ -348,6 +495,110 @@ export const CustomerAccounts: React.FC = () => {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* ── Edit the customer ── */}
+        <Dialog open={Boolean(editing)} onOpenChange={(o) => { if (!o) setEditing(null); }}>
+          <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Edit customer</DialogTitle>
+              <DialogDescription>
+                Their own details. The identity we match bookings on is maintained automatically.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              {([
+                ['fullName', 'Name'], ['phone', 'Phone'], ['email', 'Email'],
+                ['country', 'Country'], ['pickupAddress', 'Collection address'],
+                ['pickupCity', 'Town / city'], ['pickupPostcode', 'Postcode'],
+              ] as const).map(([key, label]) => (
+                <div key={key} className="space-y-1.5">
+                  <Label htmlFor={`cust-${key}`}>{label}</Label>
+                  <Input
+                    id={`cust-${key}`}
+                    value={editing?.[key] || ''}
+                    onChange={(e) => setEditing((c) => ({ ...(c || {}), [key]: e.target.value }))}
+                  />
+                </div>
+              ))}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditing(null)} disabled={busy}>Cancel</Button>
+              <Button onClick={saveDetails} disabled={busy}>
+                {busy ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…</> : 'Save'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ── Record or correct a payment ── */}
+        <Dialog open={Boolean(payment)} onOpenChange={(o) => { if (!o) setPayment(null); }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{payment?.id ? 'Correct payment' : 'Record payment'}</DialogTitle>
+              <DialogDescription>Money received against an issued invoice.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="pay-invoice">Against which invoice</Label>
+                <select
+                  id="pay-invoice"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={payment?.shipmentId || ''}
+                  onChange={(e) => setPayment((c) => (c ? { ...c, shipmentId: e.target.value } : c))}
+                  disabled={Boolean(payment?.id)}
+                >
+                  {shipments.map((row) => (
+                    <option key={row.shipmentId} value={row.shipmentId}>
+                      {row.invoiceNumber || row.reference} — {money(row.invoiced, row.currency)}
+                      {row.balance > 0.005 ? ` (${money(row.balance, row.currency)} out)` : ' (paid)'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="pay-amount">Amount</Label>
+                <Input id="pay-amount" inputMode="decimal" value={payment?.amount || ''}
+                  onChange={(e) => setPayment((c) => (c ? { ...c, amount: e.target.value } : c))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="pay-method">Method</Label>
+                <Input id="pay-method" placeholder="Bank transfer, cash…" value={payment?.method || ''}
+                  onChange={(e) => setPayment((c) => (c ? { ...c, method: e.target.value } : c))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="pay-date">Date</Label>
+                <Input id="pay-date" type="date" value={payment?.date || ''}
+                  onChange={(e) => setPayment((c) => (c ? { ...c, date: e.target.value } : c))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="pay-ref">Bank reference</Label>
+                <Input id="pay-ref" value={payment?.reference || ''}
+                  onChange={(e) => setPayment((c) => (c ? { ...c, reference: e.target.value } : c))} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPayment(null)} disabled={busy}>Cancel</Button>
+              <Button onClick={savePayment} disabled={busy}>
+                {busy ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…</> : 'Save'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={Boolean(removing)} onOpenChange={(o) => { if (!o) setRemoving(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove this payment?</AlertDialogTitle>
+              <AlertDialogDescription>
+                The balance goes back up by this amount. What happened is kept in the shipment's history.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={removePayment} disabled={busy}>Remove</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     );
   }

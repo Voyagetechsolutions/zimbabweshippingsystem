@@ -54,7 +54,31 @@ export type StatementLine = {
   amount: number;
   currency: string;
   method: string | null;
+  /** Null on entries written before payments carried ids; those cannot be edited. */
+  paymentId: string | null;
+  note: string | null;
   balance: number;
+};
+
+export type CustomerEdit = {
+  fullName?: string;
+  phone?: string;
+  email?: string;
+  country?: string;
+  pickupAddress?: string;
+  pickupCity?: string;
+  pickupPostcode?: string;
+  notes?: string;
+};
+
+export type PaymentEdit = {
+  /** Present when correcting an existing payment; absent adds a new one. */
+  id?: string;
+  amount: number;
+  method?: string;
+  date?: string;
+  reference?: string;
+  note?: string;
 };
 
 export type AccountShipment = {
@@ -144,6 +168,49 @@ export async function fetchReportPeriods(): Promise<PeriodOption[]> {
   const { data, error } = await supabase.rpc('report_periods');
   if (error || !Array.isArray(data)) return [];
   return data as PeriodOption[];
+}
+
+/** Correct a customer's own details. Identity keys are the database's to keep. */
+export async function updateCustomerRecord(
+  customerId: string,
+  edit: CustomerEdit,
+): Promise<Fetched<null>> {
+  const { error } = await supabase.rpc('update_customer_record', {
+    p_customer_id: customerId,
+    p: edit as any,
+  });
+  return error ? { ok: false, message: error.message } : { ok: true, data: null };
+}
+
+/**
+ * Add a payment to an invoice, or correct one already on it.
+ *
+ * Passing `id` replaces that entry in place; omitting it appends. The id
+ * matters because payments used to be addressed by position, and a position
+ * shifts the moment somebody else records one from another device — which is
+ * how the wrong receipt gets edited.
+ */
+export async function recordInvoicePayment(
+  shipmentId: string,
+  payment: PaymentEdit,
+): Promise<Fetched<null>> {
+  const { error } = await supabase.rpc('record_invoice_payment', {
+    p_shipment_id: shipmentId,
+    p: payment as any,
+  });
+  return error ? { ok: false, message: error.message } : { ok: true, data: null };
+}
+
+/** Take a payment back off an invoice. The removal is kept in shipment_events. */
+export async function deleteInvoicePayment(
+  shipmentId: string,
+  paymentId: string,
+): Promise<Fetched<null>> {
+  const { error } = await supabase.rpc('delete_invoice_payment', {
+    p_shipment_id: shipmentId,
+    p_payment_id: paymentId,
+  });
+  return error ? { ok: false, message: error.message } : { ok: true, data: null };
 }
 
 export const symbolFor = (currency: string) =>

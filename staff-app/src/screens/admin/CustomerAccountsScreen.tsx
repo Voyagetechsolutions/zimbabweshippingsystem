@@ -1,16 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, Pressable, RefreshControl, ScrollView,
+  ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView,
   StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../../lib/supabase';
 import { colors, radius, shadow, spacing } from '../../theme';
 import {
-  fetchCustomerAccounts, fetchCustomerStatement, symbolFor,
+  deleteInvoicePayment, fetchCustomerAccounts, fetchCustomerStatement,
+  recordInvoicePayment, symbolFor, updateCustomerRecord,
   type AccountShipment, type CustomerAccount, type ItemRow, type StatementLine,
 } from '../../lib/operationsReport';
+import { confirmDelete } from '../../lib/records';
+import { ConfirmSheet, OptionSheet } from '../../components/OptionSheet';
 
 /**
  * What each customer is worth and what they still owe.
@@ -42,6 +46,20 @@ export default function CustomerAccountsScreen() {
   const [itemsLoading, setItemsLoading] = useState(false);
   /** Which section of the open customer is showing. */
   const [tab, setTab] = useState<'details' | 'statement' | 'shipments'>('details');
+  const [busy, setBusy] = useState(false);
+  /** The customer-details form, open only while editing. */
+  const [editing, setEditing] = useState<null | Record<string, string>>(null);
+  /**
+   * The payment being added or corrected.
+   *
+   * `shipmentId` says which invoice it belongs to; `id` present means this is a
+   * correction to an entry that already exists rather than a new receipt.
+   */
+  const [payment, setPayment] = useState<null | {
+    shipmentId: string; id?: string; amount: string; method: string; date: string; reference: string;
+  }>(null);
+  const [pickingInvoice, setPickingInvoice] = useState(false);
+  const [removingPayment, setRemovingPayment] = useState<StatementLine | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -74,6 +92,55 @@ export default function CustomerAccountsScreen() {
     return () => { cancelled = true; };
   }, [openId]);
 
+  const reloadOpen = useCallback(async () => {
+    if (!openId) return;
+    const [result, lines] = await Promise.all([
+      fetchCustomerAccounts(openId),
+      fetchCustomerStatement(openId),
+    ]);
+    if (result.ok) { setItems(result.data.items); setShipments(result.data.shipments); }
+    setStatement(lines);
+    await load();
+  }, [openId, load]);
+
+  const saveDetails = useCallback(async () => {
+    if (!openId || !editing) return;
+    setBusy(true);
+    const result = await updateCustomerRecord(openId, editing as any);
+    setBusy(false);
+    if (!result.ok) { Alert.alert('Could not save', result.message); return; }
+    setEditing(null);
+    await reloadOpen();
+  }, [openId, editing, reloadOpen]);
+
+  const savePayment = useCallback(async () => {
+    if (!payment) return;
+    const amount = Number(payment.amount);
+    if (!(amount > 0)) { Alert.alert('Enter an amount', 'A payment must be more than zero.'); return; }
+    setBusy(true);
+    const result = await recordInvoicePayment(payment.shipmentId, {
+      id: payment.id,
+      amount,
+      method: payment.method,
+      date: payment.date,
+      reference: payment.reference,
+    });
+    setBusy(false);
+    if (!result.ok) { Alert.alert('Could not record the payment', result.message); return; }
+    setPayment(null);
+    await reloadOpen();
+  }, [payment, reloadOpen]);
+
+  const removePayment = useCallback(async () => {
+    if (!removingPayment?.paymentId) return;
+    setBusy(true);
+    const result = await deleteInvoicePayment(removingPayment.shipmentId, removingPayment.paymentId);
+    setBusy(false);
+    setRemovingPayment(null);
+    if (!result.ok) { Alert.alert('Could not remove it', result.message); return; }
+    await reloadOpen();
+  }, [removingPayment, reloadOpen]);
+
   const visible = useMemo(() => {
     const text = query.trim().toLowerCase();
     if (!text) return accounts;
@@ -92,6 +159,11 @@ export default function CustomerAccountsScreen() {
     () => accounts.find((a) => a.customer_id === openId) || null,
     [accounts, openId],
   );
+
+  const openShipment = useCallback(async (shipmentId: string) => {
+    const { data } = await supabase.from('shipments').select('*').eq('id', shipmentId).maybeSingle();
+    if (data) navigation.navigate('ShipmentDetail', { shipment: data });
+  }, [navigation]);
 
   if (loading) {
     return (
@@ -152,7 +224,23 @@ export default function CustomerAccountsScreen() {
 
           {tab === 'details' ? (
             <>
-              <Text style={styles.sectionHeading}>Customer details</Text>
+              <View style={styles.headingRow}>
+                <Text style={styles.sectionHeading}>Customer details</Text>
+                <Pressable
+                  onPress={() => setEditing({
+                    fullName: open.full_name || '',
+                    phone: open.phone || '',
+                    email: open.email || '',
+                    country: open.country || '',
+                    pickupAddress: open.pickup_address || '',
+                    pickupCity: open.pickup_city || '',
+                    pickupPostcode: open.pickup_postcode || '',
+                  })}
+                  hitSlop={8}
+                >
+                  <Text style={styles.action}>Edit</Text>
+                </Pressable>
+              </View>
               <View style={styles.card}>
                 <Detail k="Name" v={open.full_name} />
                 <Detail k="Reference" v={open.customer_reference} />
@@ -200,7 +288,12 @@ export default function CustomerAccountsScreen() {
 
           {tab === 'statement' ? (
             <>
-              <Text style={styles.sectionHeading}>Statement</Text>
+              <View style={styles.headingRow}>
+                <Text style={styles.sectionHeading}>Statement</Text>
+                <Pressable onPress={() => setPickingInvoice(true)} hitSlop={8}>
+                  <Text style={styles.action}>Record payment</Text>
+                </Pressable>
+              </View>
               <View style={styles.card}>
                 {itemsLoading ? (
                   <ActivityIndicator color={colors.primary} style={{ paddingVertical: spacing.lg }} />
@@ -208,13 +301,29 @@ export default function CustomerAccountsScreen() {
                   <Text style={styles.empty}>Nothing invoiced or paid yet.</Text>
                 ) : statement.map((line, index) => {
                   const charge = line.kind === 'charge';
+                  const editable = !charge && Boolean(line.paymentId);
                   return (
-                    <View key={`${line.shipmentId}-${index}`} style={styles.itemRow}>
+                    <Pressable
+                      key={`${line.shipmentId}-${index}`}
+                      style={styles.itemRow}
+                      // A charge is edited on its own invoice; only the credit
+                      // side is editable from the statement.
+                      onPress={() => (editable ? setPayment({
+                        shipmentId: line.shipmentId,
+                        id: line.paymentId as string,
+                        amount: String(Math.abs(line.amount)),
+                        method: line.method || '',
+                        date: String(line.at).slice(0, 10),
+                        reference: line.note || '',
+                      }) : undefined)}
+                      onLongPress={() => (editable ? setRemovingPayment(line) : undefined)}
+                    >
                       <View style={{ flex: 1 }}>
                         <Text style={styles.itemName} numberOfLines={1}>{line.reference || '-'}</Text>
                         <Text style={styles.meta}>
                           {new Date(line.at).toLocaleDateString()} ·{' '}
                           {charge ? 'Invoice' : `Payment${line.method ? ` · ${line.method}` : ''}`}
+                          {editable ? ' · tap to edit' : ''}
                         </Text>
                       </View>
                       <View style={{ alignItems: 'flex-end' }}>
@@ -225,7 +334,7 @@ export default function CustomerAccountsScreen() {
                             rather than a list of transactions. */}
                         <Text style={styles.meta}>bal {money(line.balance, line.currency)}</Text>
                       </View>
-                    </View>
+                    </Pressable>
                   );
                 })}
               </View>
@@ -241,7 +350,17 @@ export default function CustomerAccountsScreen() {
                 ) : shipments.length === 0 ? (
                   <Text style={styles.empty}>No invoiced shipment yet.</Text>
                 ) : shipments.map((row) => (
-                  <View key={row.shipmentId} style={styles.itemRow}>
+                  <Pressable
+                    key={row.shipmentId}
+                    style={styles.itemRow}
+                    onPress={() => openShipment(row.shipmentId)}
+                    onLongPress={() => confirmDelete({
+                      table: 'shipments',
+                      ids: [row.shipmentId],
+                      noun: 'shipment',
+                      onDone: reloadOpen,
+                    })}
+                  >
                     <View style={{ flex: 1 }}>
                       <Text style={styles.itemName} numberOfLines={1}>{row.reference || '-'}</Text>
                       <Text style={styles.meta} numberOfLines={1}>
@@ -258,12 +377,144 @@ export default function CustomerAccountsScreen() {
                         {row.balance > 0.005 ? `${money(row.balance, row.currency)} left` : 'paid'}
                       </Text>
                     </View>
-                  </View>
+                  </Pressable>
                 ))}
               </View>
             </>
           ) : null}
         </ScrollView>
+
+        {/* ── Edit the customer ── */}
+        <Modal visible={Boolean(editing)} transparent animationType="slide"
+          onRequestClose={() => setEditing(null)}>
+          <Pressable style={styles.backdrop} onPress={() => (busy ? undefined : setEditing(null))} />
+          <View style={styles.sheet}>
+            <Text style={styles.sheetTitle}>Edit customer</Text>
+            <ScrollView contentContainerStyle={{ gap: spacing.sm, paddingBottom: spacing.md }}>
+              {([
+                ['fullName', 'Name'], ['phone', 'Phone'], ['email', 'Email'],
+                ['country', 'Country'], ['pickupAddress', 'Collection address'],
+                ['pickupCity', 'Town / city'], ['pickupPostcode', 'Postcode'],
+              ] as const).map(([key, label]) => (
+                <View key={key}>
+                  <Text style={styles.fieldLabel}>{label}</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editing?.[key] || ''}
+                    onChangeText={(v) => setEditing((current) => ({ ...(current || {}), [key]: v }))}
+                    autoCapitalize={key === 'email' ? 'none' : key === 'pickupPostcode' ? 'characters' : 'sentences'}
+                  />
+                </View>
+              ))}
+            </ScrollView>
+            <View style={styles.sheetActions}>
+              <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => setEditing(null)} disabled={busy}>
+                <Text style={styles.btnGhostText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={[styles.btn, styles.btnPrimary]} onPress={saveDetails} disabled={busy}>
+                {busy ? <ActivityIndicator color={colors.white} />
+                      : <Text style={styles.btnPrimaryText}>Save</Text>}
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+
+        {/* ── Record or correct a payment ── */}
+        <Modal visible={Boolean(payment)} transparent animationType="slide"
+          onRequestClose={() => setPayment(null)}>
+          <Pressable style={styles.backdrop} onPress={() => (busy ? undefined : setPayment(null))} />
+          <View style={styles.sheet}>
+            <Text style={styles.sheetTitle}>
+              {payment?.id ? 'Correct payment' : 'Record payment'}
+            </Text>
+            <ScrollView contentContainerStyle={{ gap: spacing.sm, paddingBottom: spacing.md }}>
+              <View>
+                <Text style={styles.fieldLabel}>Amount</Text>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="decimal-pad"
+                  value={payment?.amount || ''}
+                  onChangeText={(v) => setPayment((c) => (c ? { ...c, amount: v } : c))}
+                />
+              </View>
+              <View>
+                <Text style={styles.fieldLabel}>Method</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Bank transfer, cash…"
+                  placeholderTextColor={colors.textFaint}
+                  value={payment?.method || ''}
+                  onChangeText={(v) => setPayment((c) => (c ? { ...c, method: v } : c))}
+                />
+              </View>
+              <View>
+                <Text style={styles.fieldLabel}>Date</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={colors.textFaint}
+                  value={payment?.date || ''}
+                  onChangeText={(v) => setPayment((c) => (c ? { ...c, date: v } : c))}
+                />
+              </View>
+              <View>
+                <Text style={styles.fieldLabel}>Bank reference</Text>
+                <TextInput
+                  style={styles.input}
+                  value={payment?.reference || ''}
+                  onChangeText={(v) => setPayment((c) => (c ? { ...c, reference: v } : c))}
+                />
+              </View>
+            </ScrollView>
+            <View style={styles.sheetActions}>
+              <Pressable style={[styles.btn, styles.btnGhost]} onPress={() => setPayment(null)} disabled={busy}>
+                <Text style={styles.btnGhostText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={[styles.btn, styles.btnPrimary]} onPress={savePayment} disabled={busy}>
+                {busy ? <ActivityIndicator color={colors.white} />
+                      : <Text style={styles.btnPrimaryText}>Save</Text>}
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Which invoice is the money against? Only issued ones can take one. */}
+        <OptionSheet
+          visible={pickingInvoice}
+          title="Payment against which invoice?"
+          subtitle={open.full_name || undefined}
+          busy={busy}
+          emptyText="This customer has no issued invoice to pay."
+          options={shipments.map((row) => ({
+            key: row.shipmentId,
+            label: row.invoiceNumber || row.reference || 'Invoice',
+            detail: `${money(row.invoiced, row.currency)}${row.balance > 0.005
+              ? ` · ${money(row.balance, row.currency)} outstanding` : ' · paid'}`,
+            icon: 'receipt-outline' as const,
+          }))}
+          onSelect={(shipmentId) => {
+            setPickingInvoice(false);
+            setPayment({
+              shipmentId,
+              amount: '',
+              method: '',
+              date: new Date().toISOString().slice(0, 10),
+              reference: '',
+            });
+          }}
+          onClose={() => setPickingInvoice(false)}
+        />
+
+        <ConfirmSheet
+          visible={Boolean(removingPayment)}
+          title="Remove this payment?"
+          message="The balance goes back up by this amount. What happened is kept in the shipment's history."
+          confirmLabel="Remove"
+          destructive
+          busy={busy}
+          onConfirm={removePayment}
+          onClose={() => setRemovingPayment(null)}
+        />
       </SafeAreaView>
     );
   }
@@ -390,6 +641,26 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
   },
   searchInput: { flex: 1, fontSize: 14, color: colors.text },
+  headingRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  action: { fontSize: 12.5, fontWeight: '900', color: colors.primary, marginTop: spacing.md },
+  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.4)' },
+  sheet: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '85%',
+    backgroundColor: colors.surface, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg,
+    padding: spacing.lg, gap: spacing.sm,
+  },
+  sheetTitle: { fontSize: 17, fontWeight: '800', color: colors.text },
+  sheetActions: { flexDirection: 'row', gap: spacing.sm },
+  fieldLabel: { fontSize: 11, fontWeight: '800', color: colors.textMuted, marginBottom: 4 },
+  input: {
+    borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, borderRadius: radius.sm,
+    paddingHorizontal: spacing.md, height: 44, fontSize: 14, color: colors.text, backgroundColor: colors.bg,
+  },
+  btn: { flex: 1, height: 46, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  btnGhost: { backgroundColor: colors.bg },
+  btnGhostText: { fontSize: 14.5, fontWeight: '800', color: colors.textMuted },
+  btnPrimary: { backgroundColor: colors.primary },
+  btnPrimaryText: { fontSize: 14.5, fontWeight: '800', color: colors.white },
   tabRow: { flexDirection: 'row', gap: 6, paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
   tab: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: radius.sm, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   tabOn: { backgroundColor: colors.primary, borderColor: colors.primary },
