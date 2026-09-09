@@ -17,6 +17,8 @@ export interface Shipment {
   collection_schedule_id?: string | null;
   customer_reference?: string | null;
   driver_status?: string | null;
+  /** Set the moment the goods leave the customer; the delivery note waits on it. */
+  collected_at?: string | null;
   assigned_driver_id?: string | null;
   user_id?: string | null;
   goods_description?: string | null;
@@ -44,6 +46,56 @@ export interface Shipment {
 export const STATUS_OPTIONS:string[]=[];
 export const STATUS_STEPS:string[]=[];
 export function configureShipmentStatuses(options:string[],steps:string[]){STATUS_OPTIONS.splice(0,STATUS_OPTIONS.length,...options);STATUS_STEPS.splice(0,STATUS_STEPS.length,...steps);}
+
+/**
+ * The journey, in the order it happens.
+ *
+ * `STATUS_OPTIONS` comes from `app_configuration` and has drifted from what
+ * the business actually uses: it does not contain "Booking Confirmed" (44 live
+ * shipments), "At Warehouse" or "Enroute to Zimbabwe" — the last two being the
+ * statuses the nightly sweeps set. A picker built from configuration alone
+ * cannot offer the stage a shipment is already in, which is how staff end up
+ * unable to move work forward.
+ */
+const STATUS_PIPELINE = [
+  'Pending',
+  'Awaiting Quote',
+  'Booking Confirmed',
+  'Confirmed',
+  'Collected',
+  'At Warehouse',
+  'Enroute to Zimbabwe',
+  'In Transit',
+  'Zim Warehouse',
+  'Out for Delivery',
+  'Delivered',
+  'Cancelled',
+];
+
+/**
+ * Every status a shipment could reasonably be moved to, in journey order.
+ *
+ * The pipeline first, then anything configuration adds, then anything the rows
+ * in front of the user are actually set to. Nothing is invented and nothing
+ * real is left out — a status already in use is always offered, whatever the
+ * configuration says.
+ */
+export function statusChoices(present: Array<string | null | undefined> = []): string[] {
+  const seen = new Set<string>();
+  const list: string[] = [];
+  const add = (value: string | null | undefined) => {
+    const text = String(value ?? '').trim();
+    if (!text) return;
+    const key = text.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    list.push(text);
+  };
+  STATUS_PIPELINE.forEach(add);
+  STATUS_OPTIONS.forEach(add);
+  present.forEach(add);
+  return list;
+}
 
 const STEP_MAP: Record<string, number> = {
   pending: 0, confirmed: 1, collected: 2,

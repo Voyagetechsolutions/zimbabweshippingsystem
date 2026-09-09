@@ -121,6 +121,15 @@ export type BulkUpdate = {
   status?: string | null;
   collectionScheduleId?: string | null;
   collectionPeriodId?: string | null;
+  /**
+   * Take the shipments off whatever route they are on.
+   *
+   * A separate flag because null already means "leave this field alone" on the
+   * server. Without it, "take off its route" was a call that reported success
+   * and changed nothing, and moving a shipment to another month left it
+   * attached to the previous month's collection round.
+   */
+  clearSchedule?: boolean;
 };
 
 /**
@@ -139,6 +148,7 @@ export async function bulkUpdateShipments(ids: string[], patch: BulkUpdate): Pro
     p_status: patch.status ?? null,
     p_collection_schedule_id: patch.collectionScheduleId ?? null,
     p_collection_period_id: patch.collectionPeriodId ?? null,
+    p_clear_schedule: patch.clearSchedule ?? false,
   });
 
   if (error) {

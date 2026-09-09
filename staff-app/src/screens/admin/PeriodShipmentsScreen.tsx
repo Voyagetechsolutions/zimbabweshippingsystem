@@ -9,10 +9,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { colors, radius, shadow, spacing } from '../../theme';
 import { money } from '../../lib/format';
-import { customerRef, senderName, type Shipment } from '../../lib/shipment';
-import { getInvoice, getPaymentSummary, invoiceSymbol } from '../../lib/invoice';
-import { routeKey } from '../../lib/collections';
-import { bulkUpdateShipments, confirmDelete, setRecordsDeleted } from '../../lib/records';
+import { customerRef, senderName, statusChoices, type Shipment } from '../../lib/shipment';
+import { getInvoice, getPaymentSummary, invoiceSymbol, isIssued } from '../../lib/invoice';
+import { isPlaceholderRoute } from '../../lib/collections';
+import { bulkUpdateShipments, setRecordsDeleted } from '../../lib/records';
+import { ConfirmSheet, OptionSheet, type SheetOption } from '../../components/OptionSheet';
 
 /**
  * One collection period: what is in it, grouped by the route that collects it.
@@ -43,6 +44,12 @@ export default function PeriodShipmentsScreen() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
+  /** Which picker is open. Sheets, not alerts — see components/OptionSheet. */
+  const [sheet, setSheet] = useState<null | 'status' | 'route' | 'period'>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  /** Ids of the last delete, so it can be taken back without hunting for it. */
+  const [undo, setUndo] = useState<{ ids: string[]; label: string } | null>(null);
+  const [periods, setPeriods] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     setError(null);
@@ -53,7 +60,7 @@ export default function PeriodShipmentsScreen() {
         .eq('collection_period_id', periodId)
         .order('created_at', { ascending: false });
 
-      const [shipmentResult, scheduleResult] = await Promise.all([
+      const [shipmentResult, scheduleResult, periodResult] = await Promise.all([
         showDeleted ? shipmentQuery : shipmentQuery.is('deleted_at', null),
         // Schedules are looked up by the period's month and year rather than
         // its id: live data has two "September 2026" periods differing only by
@@ -61,10 +68,18 @@ export default function PeriodShipmentsScreen() {
         // Matching on the id alone leaves a full period with no routes to
         // assign work to.
         supabase.rpc('period_schedules', { p_period_id: periodId }),
+        // Every other period, so a shipment can be pushed to the next month.
+        supabase
+          .from('collection_periods')
+          .select('id,name,month,year,status')
+          .is('deleted_at', null)
+          .order('year', { ascending: false })
+          .order('name'),
       ]);
       if (shipmentResult.error) throw shipmentResult.error;
       setShipments((shipmentResult.data || []) as Shipment[]);
       setSchedules(scheduleResult.data || []);
+      setPeriods(periodResult.data || []);
     } catch (err: any) {
       setError(err?.message || 'Could not load this period.');
     } finally {
@@ -90,11 +105,14 @@ export default function PeriodShipmentsScreen() {
    */
   const report = useMemo(() => {
     const totals = new Map<string, { invoiced: number; paid: number }>();
-    let cleared = 0; let unpaid = 0; let partPaid = 0;
+    let cleared = 0; let unpaid = 0; let partPaid = 0; let awaiting = 0;
 
     for (const shipment of shipments) {
       if (shipment.deleted_at) continue;
       const invoice = getInvoice(shipment);
+      // Priced by the booking is not invoiced. Counting it here would make this
+      // report disagree with the period card that led the user to it.
+      if (!isIssued(invoice)) { awaiting += 1; continue; }
       const { total, paidAmount } = getPaymentSummary(invoice);
       const currency = invoice.currency || 'GBP';
       const bucket = totals.get(currency) || { invoiced: 0, paid: 0 };
@@ -113,6 +131,7 @@ export default function PeriodShipmentsScreen() {
       cleared,
       unpaid,
       partPaid,
+      awaiting,
       byCurrency: [...totals.entries()]
         .filter(([, v]) => v.invoiced > 0 || v.paid > 0)
         .map(([currency, v]) => ({
@@ -126,7 +145,15 @@ export default function PeriodShipmentsScreen() {
     };
   }, [shipments]);
 
-  /** Grouped by the route that collects them; unrouted work is shown, never hidden. */
+  /**
+   * Grouped by the route that collects them; unrouted work is shown, never hidden.
+   *
+   * A booking that nobody has routed yet carries the literal string
+   * "To be assigned" — 23 of the 44 September 2026 shipments do. That is a
+   * placeholder, not a route, and listing it as one invents a collection round
+   * that does not exist. `isPlaceholderRoute` already knows every spelling of
+   * it; this screen simply was not asking.
+   */
   const groups = useMemo(() => {
     const map = new Map<string, Shipment[]>();
     for (const shipment of shipments) {
@@ -134,7 +161,11 @@ export default function PeriodShipmentsScreen() {
         ? scheduleRoute.get(shipment.collection_schedule_id)
         : null;
       const fromBooking = (shipment.metadata as any)?.collection?.route;
-      const label = fromSchedule || (fromBooking && routeKey(fromBooking) ? String(fromBooking) : UNROUTED);
+      const label = !isPlaceholderRoute(fromSchedule)
+        ? String(fromSchedule)
+        : !isPlaceholderRoute(fromBooking)
+          ? String(fromBooking).trim()
+          : UNROUTED;
       (map.get(label) || map.set(label, []).get(label)!).push(shipment);
     }
     return [...map.entries()].sort((a, b) =>
@@ -156,45 +187,84 @@ export default function PeriodShipmentsScreen() {
   });
 
   const ids = useMemo(() => [...selected], [selected]);
+  const countLabel = `${ids.length} shipment${ids.length === 1 ? '' : 's'}`;
 
-  const doBulkStatus = () => {
-    const options = ['Booking Confirmed', 'Collected', 'At Warehouse', 'Enroute to Zimbabwe', 'Delivered'];
-    Alert.alert('Move to status', `${ids.length} shipment${ids.length === 1 ? '' : 's'}`, [
-      ...options.map((status) => ({
-        text: status,
-        onPress: async () => {
-          setBusy(true);
-          const result = await bulkUpdateShipments(ids, { status });
-          setBusy(false);
-          if (!result.ok) { Alert.alert('Could not update', result.message); return; }
-          setSelected(new Set());
-          await load();
-        },
-      })),
-      { text: 'Cancel', style: 'cancel' as const },
-    ]);
-  };
+  /** Run one bulk change, then clear the selection and reload. */
+  const applyBulk = useCallback(async (patch: Parameters<typeof bulkUpdateShipments>[1]) => {
+    setBusy(true);
+    const result = await bulkUpdateShipments(ids, patch);
+    setBusy(false);
+    setSheet(null);
+    if (!result.ok) { setError(result.message); return; }
+    setSelected(new Set());
+    await load();
+  }, [ids, load]);
 
-  const doBulkRoute = () => {
-    if (!schedules.length) {
-      Alert.alert('No routes in this period', 'Publish a collection schedule first.');
-      return;
-    }
-    Alert.alert('Move to route', `${ids.length} shipment${ids.length === 1 ? '' : 's'}`, [
-      ...schedules.slice(0, 8).map((schedule: any) => ({
-        text: `${schedule.route}${schedule.pickup_on ? ` · ${schedule.pickup_on}` : ''}`,
-        onPress: async () => {
-          setBusy(true);
-          const result = await bulkUpdateShipments(ids, { collectionScheduleId: schedule.id });
-          setBusy(false);
-          if (!result.ok) { Alert.alert('Could not update', result.message); return; }
-          setSelected(new Set());
-          await load();
-        },
+  /** Every stage, including the one these shipments are already in. */
+  const statusOptions = useMemo<SheetOption[]>(
+    () => statusChoices(shipments.map((s) => s.status)).map((status) => ({
+      key: status,
+      label: status,
+      icon: 'ellipse-outline',
+    })),
+    [shipments],
+  );
+
+  /**
+   * Every published route in the period, and the way back off one.
+   *
+   * Previously capped at eight and then cut to three by Android's alert. All of
+   * them are listed now — September 2026 publishes ten.
+   */
+  const routeOptions = useMemo<SheetOption[]>(() => [
+    ...schedules.map((schedule: any) => ({
+      key: String(schedule.id),
+      label: String(schedule.route || 'Unnamed route'),
+      detail: schedule.pickup_on ? `Collecting ${schedule.pickup_on}` : undefined,
+      icon: 'git-branch-outline' as const,
+    })),
+    { key: 'none', label: 'Take off its route', detail: 'Back to “No route yet”', icon: 'close-circle-outline' },
+  ], [schedules]);
+
+  /**
+   * The other periods, so work can be pushed to the following month.
+   *
+   * Moving period clears the route as well: routes are published per period, so
+   * a September round means nothing on an October shipment.
+   */
+  const periodOptions = useMemo<SheetOption[]>(
+    () => periods
+      .filter((p: any) => p.id !== periodId)
+      .map((p: any) => ({
+        key: String(p.id),
+        label: String(p.name || `${p.month || ''} ${p.year || ''}`.trim() || 'Unnamed period'),
+        detail: p.status ? String(p.status) : undefined,
+        icon: 'calendar-outline' as const,
       })),
-      { text: 'Cancel', style: 'cancel' as const },
-    ]);
-  };
+    [periods, periodId],
+  );
+
+  const doDelete = useCallback(async () => {
+    const label = ids.length === 1 ? 'shipment' : `${ids.length} shipments`;
+    setBusy(true);
+    const result = await setRecordsDeleted('shipments', ids, true);
+    setBusy(false);
+    setConfirmingDelete(false);
+    if (!result.ok) { setError(result.message); return; }
+    setUndo({ ids, label });
+    setSelected(new Set());
+    await load();
+  }, [ids, load]);
+
+  const doUndo = useCallback(async () => {
+    if (!undo) return;
+    setBusy(true);
+    const result = await setRecordsDeleted('shipments', undo.ids, false);
+    setBusy(false);
+    if (!result.ok) { setError(result.message); return; }
+    setUndo(null);
+    await load();
+  }, [undo, load]);
 
   if (loading) {
     return (
@@ -256,6 +326,11 @@ export default function PeriodShipmentsScreen() {
           <Text style={styles.reportMeta}>
             {report.cleared} paid in full · {report.unpaid} not paid at all · {report.partPaid} part paid
           </Text>
+          {report.awaiting > 0 ? (
+            <Text style={styles.reportWaiting}>
+              {report.awaiting} priced but not invoiced yet — open one and press Create invoice
+            </Text>
+          ) : null}
         </View>
 
         {groups.map(([route, rows]) => (
@@ -269,20 +344,33 @@ export default function PeriodShipmentsScreen() {
               const invoice = getInvoice(shipment);
               const { total, paidAmount } = getPaymentSummary(invoice);
               const symbol = invoiceSymbol(invoice.currency);
+              const issued = isIssued(invoice);
               const on = selected.has(shipment.id);
               const gone = Boolean(shipment.deleted_at);
               return (
                 <Pressable
                   key={shipment.id}
                   style={[styles.row, on && styles.rowOn, gone && styles.rowGone]}
-                  onPress={() => (gone ? undefined : toggle(shipment.id))}
-                  onLongPress={() => navigation.navigate('ShipmentDetail', { shipment })}
+                  // Tapping a shipment opens it. Selecting is the checkbox, or
+                  // a long press — the reverse of what this screen used to do,
+                  // where the only way in was a long press nobody discovered.
+                  onPress={() => (gone ? undefined : navigation.navigate('ShipmentDetail', { shipment }))}
+                  onLongPress={() => (gone ? undefined : toggle(shipment.id))}
                 >
-                  <Ionicons
-                    name={gone ? 'trash-outline' : on ? 'checkbox' : 'square-outline'}
-                    size={20}
-                    color={gone ? colors.textFaint : on ? colors.primary : colors.textMuted}
-                  />
+                  <Pressable
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: on }}
+                    accessibilityLabel={`Select ${senderName(shipment)}`}
+                    hitSlop={10}
+                    style={styles.tick}
+                    onPress={() => (gone ? undefined : toggle(shipment.id))}
+                  >
+                    <Ionicons
+                      name={gone ? 'trash-outline' : on ? 'checkbox' : 'square-outline'}
+                      size={20}
+                      color={gone ? colors.textFaint : on ? colors.primary : colors.textMuted}
+                    />
+                  </Pressable>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.rowName} numberOfLines={1}>{senderName(shipment)}</Text>
                     <Text style={styles.rowMeta} numberOfLines={1}>
@@ -291,8 +379,20 @@ export default function PeriodShipmentsScreen() {
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text style={styles.rowAmount}>{money(total, symbol)}</Text>
-                    <Text style={[styles.rowMeta, paidAmount >= total - 0.005 && total > 0 ? { color: colors.primaryDark } : null]}>
-                      {total <= 0 ? 'no invoice' : paidAmount <= 0.005 ? 'unpaid' : paidAmount >= total - 0.005 ? 'paid' : `${money(total - paidAmount, symbol)} left`}
+                    {/* The amount is what the booking priced; the label says
+                        whether anyone has actually billed it. Calling a
+                        priced-but-unraised booking "unpaid" contradicts the
+                        report directly above it. */}
+                    <Text style={[
+                      styles.rowMeta,
+                      !issued ? { color: colors.amber, fontWeight: '700' } : null,
+                      issued && paidAmount >= total - 0.005 && total > 0 ? { color: colors.primaryDark } : null,
+                    ]}>
+                      {!issued ? 'not invoiced'
+                        : total <= 0 ? 'no invoice'
+                        : paidAmount <= 0.005 ? 'unpaid'
+                        : paidAmount >= total - 0.005 ? 'paid'
+                        : `${money(total - paidAmount, symbol)} left`}
                     </Text>
                   </View>
                   {gone ? (
@@ -321,32 +421,91 @@ export default function PeriodShipmentsScreen() {
         ) : null}
       </ScrollView>
 
+      {undo && ids.length === 0 ? (
+        <View style={styles.undoBar}>
+          <Text style={styles.undoText}>Deleted {undo.label}</Text>
+          <Pressable onPress={doUndo} disabled={busy} hitSlop={8}>
+            <Text style={styles.undoAction}>Undo</Text>
+          </Pressable>
+          <Pressable onPress={() => setUndo(null)} hitSlop={8}>
+            <Ionicons name="close" size={17} color={colors.textMuted} />
+          </Pressable>
+        </View>
+      ) : null}
+
       {ids.length > 0 ? (
         <View style={styles.actionBar}>
-          <Text style={styles.actionCount}>{ids.length} selected</Text>
-          <Pressable style={styles.action} onPress={doBulkStatus} disabled={busy}>
+          <Pressable onPress={() => setSelected(new Set())} hitSlop={8} style={{ flex: 1 }}>
+            <Text style={styles.actionCount}>{ids.length} selected</Text>
+            <Text style={styles.actionClear}>Tap to clear</Text>
+          </Pressable>
+          <Pressable style={styles.action} onPress={() => setSheet('status')} disabled={busy}>
             <Ionicons name="swap-horizontal" size={17} color={colors.primary} />
             <Text style={styles.actionText}>Status</Text>
           </Pressable>
-          <Pressable style={styles.action} onPress={doBulkRoute} disabled={busy}>
+          <Pressable style={styles.action} onPress={() => setSheet('route')} disabled={busy}>
             <Ionicons name="git-branch-outline" size={17} color={colors.primary} />
             <Text style={styles.actionText}>Route</Text>
+          </Pressable>
+          <Pressable style={styles.action} onPress={() => setSheet('period')} disabled={busy}>
+            <Ionicons name="calendar-outline" size={17} color={colors.primary} />
+            <Text style={styles.actionText}>Period</Text>
           </Pressable>
           <Pressable
             style={[styles.action, styles.actionDanger]}
             disabled={busy}
-            onPress={() => confirmDelete({
-              table: 'shipments',
-              ids,
-              noun: 'shipment',
-              onDone: async () => { setSelected(new Set()); await load(); },
-            })}
+            onPress={() => setConfirmingDelete(true)}
           >
             <Ionicons name="trash-outline" size={17} color={colors.danger} />
             <Text style={[styles.actionText, { color: colors.danger }]}>Delete</Text>
           </Pressable>
         </View>
       ) : null}
+
+      <OptionSheet
+        visible={sheet === 'status'}
+        title="Move to status"
+        subtitle={countLabel}
+        options={statusOptions}
+        busy={busy}
+        onSelect={(status) => applyBulk({ status })}
+        onClose={() => setSheet(null)}
+      />
+
+      <OptionSheet
+        visible={sheet === 'route'}
+        title="Move to route"
+        subtitle={countLabel}
+        options={routeOptions}
+        busy={busy}
+        emptyText="No collection routes are published for this period yet."
+        onSelect={(id) => (id === 'none'
+          ? applyBulk({ clearSchedule: true })
+          : applyBulk({ collectionScheduleId: id }))}
+        onClose={() => setSheet(null)}
+      />
+
+      <OptionSheet
+        visible={sheet === 'period'}
+        title="Move to another period"
+        subtitle={`${countLabel} · this also takes them off their route`}
+        options={periodOptions}
+        busy={busy}
+        emptyText="There is no other collection period to move these to."
+        onSelect={(id) => applyBulk({ collectionPeriodId: id, clearSchedule: true })}
+        onClose={() => setSheet(null)}
+      />
+
+      <ConfirmSheet
+        visible={confirmingDelete}
+        title={`Delete ${ids.length === 1 ? 'this shipment' : `${ids.length} shipments`}?`}
+        message="They will be hidden from the app and from the customer. You can undo this straight away, or restore them later with the eye button."
+        confirmLabel="Delete"
+        destructive
+        busy={busy}
+        onConfirm={doDelete}
+        onClose={() => setConfirmingDelete(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -378,6 +537,7 @@ const styles = StyleSheet.create({
   figureValue: { fontSize: 16, fontWeight: '800', color: colors.text, marginTop: 1 },
   currencyLabel: { fontSize: 10, fontWeight: '900', color: colors.primary, letterSpacing: 0.6, marginTop: 6 },
   reportMeta: { fontSize: 12, color: colors.textMuted },
+  reportWaiting: { fontSize: 12, fontWeight: '700', color: colors.amber },
   group: { gap: 4, marginTop: spacing.sm },
   groupHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 },
   groupTitle: { fontSize: 11, fontWeight: '900', color: colors.textMuted, letterSpacing: 0.6 },
@@ -396,7 +556,16 @@ const styles = StyleSheet.create({
     padding: spacing.md, backgroundColor: colors.surface,
     borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border,
   },
-  actionCount: { flex: 1, fontSize: 12.5, fontWeight: '800', color: colors.text },
+  actionCount: { fontSize: 12.5, fontWeight: '800', color: colors.text },
+  actionClear: { fontSize: 10.5, color: colors.textMuted, marginTop: 1 },
+  tick: { paddingVertical: 2, paddingRight: 2 },
+  undoBar: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    padding: spacing.md, backgroundColor: colors.surface,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border,
+  },
+  undoText: { flex: 1, fontSize: 13, fontWeight: '700', color: colors.text },
+  undoAction: { fontSize: 13, fontWeight: '900', color: colors.primary, letterSpacing: 0.3 },
   action: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, height: 42, borderRadius: radius.sm, backgroundColor: colors.primarySoft },
   actionDanger: { backgroundColor: colors.redSoft },
   actionText: { fontSize: 12.5, fontWeight: '800', color: colors.primary },
