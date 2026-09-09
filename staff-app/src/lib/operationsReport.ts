@@ -46,6 +46,30 @@ export type OperationsReport = {
 
 export type Balance = { currency: string; spent: number; paid: number; owed: number; shipments: number };
 
+export type StatementLine = {
+  shipmentId: string;
+  at: string;
+  reference: string | null;
+  kind: 'charge' | 'payment';
+  amount: number;
+  currency: string;
+  method: string | null;
+  balance: number;
+};
+
+export type AccountShipment = {
+  shipmentId: string;
+  reference: string | null;
+  invoiceNumber: string | null;
+  status: string | null;
+  route: string | null;
+  bookedOn: string;
+  currency: string;
+  invoiced: number;
+  paid: number;
+  balance: number;
+};
+
 export type CustomerAccount = {
   customer_id: string;
   full_name: string | null;
@@ -57,6 +81,10 @@ export type CustomerAccount = {
   phone: string | null;
   email: string | null;
   country: string | null;
+  pickup_address: string | null;
+  pickup_city: string | null;
+  pickup_postcode: string | null;
+  customer_since: string | null;
   shipments: number;
   last_booked: string | null;
   balances: Balance[];
@@ -81,7 +109,7 @@ export async function fetchOperationsReport(
 
 export async function fetchCustomerAccounts(
   customerId?: string | null,
-): Promise<Fetched<{ customers: CustomerAccount[]; items: ItemRow[] }>> {
+): Promise<Fetched<{ customers: CustomerAccount[]; items: ItemRow[]; shipments: AccountShipment[] }>> {
   const { data, error } = await supabase.rpc('customer_accounts', {
     p_customer_id: customerId ?? null,
   });
@@ -92,8 +120,23 @@ export async function fetchCustomerAccounts(
     data: {
       customers: ((data as any)?.customers || []) as CustomerAccount[],
       items: ((data as any)?.items || []) as ItemRow[],
+      shipments: ((data as any)?.shipments || []) as AccountShipment[],
     },
   };
+}
+
+/**
+ * The customer's ledger: every invoice raised and every payment received,
+ * oldest first, with a running balance per currency.
+ *
+ * `customer_statement` owns the ordering rule, which is not obvious — a payment
+ * carries a plain date (midnight) while the invoice it settles carries the
+ * booking's real time, so ordering by timestamp opens the statement in credit.
+ */
+export async function fetchCustomerStatement(customerId: string): Promise<StatementLine[]> {
+  const { data, error } = await supabase.rpc('customer_statement', { p_customer_id: customerId });
+  if (error || !Array.isArray(data)) return [];
+  return data as StatementLine[];
 }
 
 /** The collection periods worth offering: those holding an issued invoice. */

@@ -8,8 +8,8 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, shadow, spacing } from '../../theme';
 import {
-  fetchCustomerAccounts, symbolFor,
-  type CustomerAccount, type ItemRow,
+  fetchCustomerAccounts, fetchCustomerStatement, symbolFor,
+  type AccountShipment, type CustomerAccount, type ItemRow, type StatementLine,
 } from '../../lib/operationsReport';
 
 /**
@@ -37,7 +37,11 @@ export default function CustomerAccountsScreen() {
   const [query, setQuery] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
   const [items, setItems] = useState<ItemRow[]>([]);
+  const [shipments, setShipments] = useState<AccountShipment[]>([]);
+  const [statement, setStatement] = useState<StatementLine[]>([]);
   const [itemsLoading, setItemsLoading] = useState(false);
+  /** Which section of the open customer is showing. */
+  const [tab, setTab] = useState<'details' | 'statement' | 'shipments'>('details');
 
   const load = useCallback(async () => {
     setError(null);
@@ -53,13 +57,18 @@ export default function CustomerAccountsScreen() {
   // Fetched only for the customer being opened — loading every customer's line
   // items would be a lot of rows nobody is looking at.
   useEffect(() => {
-    if (!openId) { setItems([]); return; }
+    if (!openId) { setItems([]); setShipments([]); setStatement([]); return; }
     let cancelled = false;
     setItemsLoading(true);
+    setTab('details');
     (async () => {
-      const result = await fetchCustomerAccounts(openId);
+      const [result, lines] = await Promise.all([
+        fetchCustomerAccounts(openId),
+        fetchCustomerStatement(openId),
+      ]);
       if (cancelled) return;
-      if (result.ok) setItems(result.data.items);
+      if (result.ok) { setItems(result.data.items); setShipments(result.data.shipments); }
+      setStatement(lines);
       setItemsLoading(false);
     })();
     return () => { cancelled = true; };
@@ -108,6 +117,20 @@ export default function CustomerAccountsScreen() {
           </View>
         </View>
 
+        <View style={styles.tabRow}>
+          {(['details', 'statement', 'shipments'] as const).map((key) => (
+            <Pressable
+              key={key}
+              onPress={() => setTab(key)}
+              style={[styles.tab, tab === key && styles.tabOn]}
+            >
+              <Text style={[styles.tabText, tab === key && { color: colors.white }]}>
+                {key === 'details' ? 'Details' : key === 'statement' ? 'Statement' : 'Shipments'}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
         <ScrollView contentContainerStyle={styles.body}>
           {open.balances?.map((b) => (
             <View key={b.currency} style={styles.card}>
@@ -127,30 +150,119 @@ export default function CustomerAccountsScreen() {
             </View>
           ))}
 
-          {(open.customer_references || []).length > 1 ? (
-            <Text style={styles.meta}>
-              References: {(open.customer_references || []).join(', ')}
-            </Text>
+          {tab === 'details' ? (
+            <>
+              <Text style={styles.sectionHeading}>Customer details</Text>
+              <View style={styles.card}>
+                <Detail k="Name" v={open.full_name} />
+                <Detail k="Reference" v={open.customer_reference} />
+                {(open.customer_references || []).length > 1 ? (
+                  <Detail k="All references" v={(open.customer_references || []).join(', ')} />
+                ) : null}
+                <Detail k="Account code" v={open.customer_code} />
+                <Detail k="Phone" v={open.phone} />
+                <Detail k="Email" v={open.email} />
+                <Detail k="Country" v={open.country} />
+                <Detail
+                  k="Collection address"
+                  v={[open.pickup_address, open.pickup_city, open.pickup_postcode].filter(Boolean).join(', ')}
+                />
+                <Detail
+                  k="Customer since"
+                  v={open.customer_since ? new Date(open.customer_since).toLocaleDateString() : null}
+                />
+                <Detail
+                  k="Last booked"
+                  v={open.last_booked ? new Date(open.last_booked).toLocaleDateString() : null}
+                />
+              </View>
+
+              <Text style={styles.sectionHeading}>What they ship</Text>
+              <View style={styles.card}>
+                {itemsLoading ? (
+                  <ActivityIndicator color={colors.primary} style={{ paddingVertical: spacing.lg }} />
+                ) : items.length === 0 ? (
+                  <Text style={styles.empty}>Nothing invoiced yet.</Text>
+                ) : items.map((row) => (
+                  <View key={`${row.item}-${row.currency}`} style={styles.itemRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.itemName} numberOfLines={1}>{row.item}</Text>
+                      <Text style={styles.meta}>
+                        ×{row.quantity} over {row.shipments} shipment{row.shipments === 1 ? '' : 's'}
+                      </Text>
+                    </View>
+                    <Text style={styles.itemMoney}>{money(row.revenue, row.currency)}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
           ) : null}
 
-          <Text style={styles.sectionHeading}>What they ship</Text>
-          <View style={styles.card}>
-            {itemsLoading ? (
-              <ActivityIndicator color={colors.primary} style={{ paddingVertical: spacing.lg }} />
-            ) : items.length === 0 ? (
-              <Text style={styles.empty}>Nothing invoiced yet.</Text>
-            ) : items.map((row) => (
-              <View key={`${row.item}-${row.currency}`} style={styles.itemRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.itemName} numberOfLines={1}>{row.item}</Text>
-                  <Text style={styles.meta}>
-                    ×{row.quantity} over {row.shipments} shipment{row.shipments === 1 ? '' : 's'}
-                  </Text>
-                </View>
-                <Text style={styles.itemMoney}>{money(row.revenue, row.currency)}</Text>
+          {tab === 'statement' ? (
+            <>
+              <Text style={styles.sectionHeading}>Statement</Text>
+              <View style={styles.card}>
+                {itemsLoading ? (
+                  <ActivityIndicator color={colors.primary} style={{ paddingVertical: spacing.lg }} />
+                ) : statement.length === 0 ? (
+                  <Text style={styles.empty}>Nothing invoiced or paid yet.</Text>
+                ) : statement.map((line, index) => {
+                  const charge = line.kind === 'charge';
+                  return (
+                    <View key={`${line.shipmentId}-${index}`} style={styles.itemRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.itemName} numberOfLines={1}>{line.reference || '-'}</Text>
+                        <Text style={styles.meta}>
+                          {new Date(line.at).toLocaleDateString()} ·{' '}
+                          {charge ? 'Invoice' : `Payment${line.method ? ` · ${line.method}` : ''}`}
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={[styles.itemMoney, { color: charge ? colors.text : colors.primaryDark }]}>
+                          {charge ? '' : '-'}{money(Math.abs(line.amount), line.currency)}
+                        </Text>
+                        {/* The running balance is what makes this a statement
+                            rather than a list of transactions. */}
+                        <Text style={styles.meta}>bal {money(line.balance, line.currency)}</Text>
+                      </View>
+                    </View>
+                  );
+                })}
               </View>
-            ))}
-          </View>
+            </>
+          ) : null}
+
+          {tab === 'shipments' ? (
+            <>
+              <Text style={styles.sectionHeading}>Invoiced shipments</Text>
+              <View style={styles.card}>
+                {itemsLoading ? (
+                  <ActivityIndicator color={colors.primary} style={{ paddingVertical: spacing.lg }} />
+                ) : shipments.length === 0 ? (
+                  <Text style={styles.empty}>No invoiced shipment yet.</Text>
+                ) : shipments.map((row) => (
+                  <View key={row.shipmentId} style={styles.itemRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.itemName} numberOfLines={1}>{row.reference || '-'}</Text>
+                      <Text style={styles.meta} numberOfLines={1}>
+                        {new Date(row.bookedOn).toLocaleDateString()} · {row.status || 'No status'}
+                        {row.route ? ` · ${row.route}` : ''}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={styles.itemMoney}>{money(row.invoiced, row.currency)}</Text>
+                      <Text style={[
+                        styles.meta,
+                        row.balance > 0.005 ? { color: colors.danger } : { color: colors.primaryDark },
+                      ]}>
+                        {row.balance > 0.005 ? `${money(row.balance, row.currency)} left` : 'paid'}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </>
+          ) : null}
         </ScrollView>
       </SafeAreaView>
     );
@@ -241,6 +353,17 @@ export default function CustomerAccountsScreen() {
   );
 }
 
+function Detail({ k, v }: { k: string; v: string | null | undefined }) {
+  return (
+    <View style={styles.detailRow}>
+      <Text style={styles.detailKey}>{k}</Text>
+      <Text style={styles.detailValue} numberOfLines={2}>
+        {v && String(v).trim() ? v : '-'}
+      </Text>
+    </View>
+  );
+}
+
 function Figure({ label, value, tone }: { label: string; value: string; tone?: string }) {
   return (
     <View style={{ flex: 1 }}>
@@ -267,6 +390,13 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
   },
   searchInput: { flex: 1, fontSize: 14, color: colors.text },
+  tabRow: { flexDirection: 'row', gap: 6, paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
+  tab: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: radius.sm, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  tabOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+  tabText: { fontSize: 12.5, fontWeight: '800', color: colors.textMuted },
+  detailRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, paddingVertical: 7 },
+  detailKey: { width: 120, fontSize: 12, fontWeight: '700', color: colors.textMuted },
+  detailValue: { flex: 1, fontSize: 13.5, color: colors.text },
   body: { padding: spacing.md, gap: spacing.sm, paddingBottom: 60 },
   notice: { backgroundColor: colors.amberSoft, borderRadius: radius.md, padding: spacing.sm },
   noticeText: { color: colors.amber, fontSize: 12.5 },
