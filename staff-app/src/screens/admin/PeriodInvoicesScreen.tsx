@@ -11,7 +11,7 @@ import { money } from '../../lib/format';
 import { senderName, type Shipment } from '../../lib/shipment';
 import {
   INVOICE_STATUS_STYLE, getInvoice, getInvoiceStatus, getPaymentSummary,
-  hasInvoice, invoiceSymbol,
+  hasIssuedInvoice, invoiceSymbol,
 } from '../../lib/invoice';
 
 /**
@@ -62,7 +62,7 @@ export default function PeriodInvoicesScreen() {
 
   /** Only shipments that actually carry a live invoice. */
   const invoiced = useMemo(
-    () => shipments.filter((s) => hasInvoice(s) && !getInvoice(s).deletedAt),
+    () => shipments.filter((s) => hasIssuedInvoice(s)),
     [shipments],
   );
 

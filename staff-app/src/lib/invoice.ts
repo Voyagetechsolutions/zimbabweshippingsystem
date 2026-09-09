@@ -32,6 +32,52 @@ export function getInvoice(s: Shipment): InvoiceData {
   return (((s?.metadata as any) || {}).invoice || {}) as InvoiceData;
 }
 
+/**
+ * Has anybody actually raised this invoice?
+ *
+ * The booking prices a shipment the moment it is made — those line items are
+ * what the driver's goods list, the delivery note and the reporting views all
+ * read, so they have to be there from the start. What they are *not* is an
+ * invoice; an invoice is a document a member of staff decides to issue after
+ * the confirmation call, once the contents and the price are known to be right.
+ *
+ * The invoice number is what separates the two. Nothing else assigns one, and
+ * every invoice raised before this distinction existed already carries one, so
+ * no invoice already with a customer changes meaning.
+ */
+export function isIssued(inv: InvoiceData | null | undefined): boolean {
+  if (!inv || inv.deletedAt) return false;
+  return String(inv.invoiceNumber ?? '').trim().length > 0;
+}
+
+/** The shipment has an invoice a customer could be shown. */
+export function hasIssuedInvoice(s: Shipment): boolean {
+  return isIssued(getInvoice(s));
+}
+
+/**
+ * The lines a new invoice should start from.
+ *
+ * Everything the booking priced, so "Create invoice" opens filled in rather
+ * than blank. Staff correct it there; nothing is charged that nobody checked.
+ */
+export function invoicePrefill(s: Shipment): InvoiceData {
+  const existing = getInvoice(s);
+  const metadata = ((s?.metadata as any) || {});
+  const currency = existing.currency
+    || metadata.pricing?.currency
+    || (String(metadata.sender?.country || '').toLowerCase().includes('ireland') ? 'EUR' : 'GBP');
+  return {
+    ...existing,
+    currency,
+    items: Array.isArray(existing.items) ? existing.items : [],
+    discount: Number(existing.discount) || 0,
+    taxRate: Number(existing.taxRate) || 0,
+    payments: Array.isArray(existing.payments) ? existing.payments : [],
+    paymentTerms: existing.paymentTerms || metadata.pricing?.paymentMethod || '',
+  };
+}
+
 export function calculateTotals(inv: InvoiceData) {
   const items = inv.items || [];
   const subtotal = items.reduce((sum, it) => sum + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0), 0);

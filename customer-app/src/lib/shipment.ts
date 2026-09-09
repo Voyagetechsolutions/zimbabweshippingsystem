@@ -61,6 +61,11 @@ export function itemsSummary(s: Shipment): string {
 export function invoiceOf(s: Shipment) {
   const invoice = s.metadata?.invoice;
   if (!invoice) return null;
+  // A booking prices itself the moment it is made, but that is an estimate,
+  // not a bill. The office raises the invoice after the confirmation call, and
+  // an invoice number is what says they have. Showing "Payment due" for a
+  // document nobody has issued asks a customer to pay against nothing.
+  if (!String((invoice as any).invoiceNumber ?? '').trim()) return null;
   const view = issuedInvoiceView(invoice);
   return {
     currency: view.currency,

@@ -12,6 +12,7 @@ import {
   collectionInfo, paymentAmount, shipmentType, shippedItems,
 } from '../lib/shipment';
 import { buildInvoiceHtml, buildDeliveryNoteHtml, sharePdf } from '../lib/documents';
+import { invoicePrefill, isIssued } from '../lib/invoice';
 import {
   collectionDateLabel, loadSchedules, resolveCollection,
   type ResolvedCollection, type ScheduleRow,
@@ -101,6 +102,9 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
   const [seals, setSeals] = useState<any>(null);
   const [invoiceRow, setInvoiceRow] = useState<any>(null);
   const [deliveryNote, setDeliveryNote] = useState<any>(null);
+  /** The office delivery note, from the register — not the driver's door record. */
+  const [noteRecord, setNoteRecord] = useState<any>(null);
+  const [raising, setRaising] = useState<null | 'invoice' | 'note'>(null);
   const [photos, setPhotos] = useState<ProofPhoto[]>([]);
   const [deletedPhotoCount, setDeletedPhotoCount] = useState(0);
   const [paymentProof, setPaymentProof] = useState<any>(null);
@@ -117,18 +121,20 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
     setShipment(s);
     setSelected((cur) => cur || s.status);
 
-    const [sealResult, invoiceResult, noteResult, proofResult, paymentProofResult, stopResult] = await Promise.all([
+    const [sealResult, invoiceResult, noteResult, proofResult, paymentProofResult, stopResult, noteRecordResult] = await Promise.all([
       supabase.from('shipment_seals').select('*').eq('shipment_id', s.id).maybeSingle(),
       supabase.from('driver_invoices').select('*').eq('shipment_id', s.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('delivery_notes').select('*').eq('shipment_id', s.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('driver_proofs').select('id,proof_type,captured_at,storage_path,deleted_at').eq('shipment_id', s.id).order('captured_at'),
       supabase.from('payment_proofs').select('*').eq('shipment_id', s.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('driver_run_stops').select('status,run:driver_runs(status,driver_id)').eq('shipment_id', s.id).neq('status', 'failed').order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('delivery_note_records').select('*').eq('shipment_id', s.id).is('voided_at', null).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     ]);
 
     setSeals(sealResult.data || null);
     setInvoiceRow(invoiceResult.data || null);
     setDeliveryNote(noteResult.data || null);
+    setNoteRecord(noteRecordResult.data || null);
     setPaymentProof(paymentProofResult.data || null);
 
     const stop: any = stopResult.data;
@@ -159,6 +165,33 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
   // date. Loaded once so every shipment can be shown against it.
   useEffect(() => { loadSchedules().then(setSchedules); }, []);
 
+  /**
+   * Always give this screen a way back.
+   *
+   * It relied entirely on the navigator inferring a back button from the stack,
+   * and staff report arriving here with no way out. Setting `headerLeft`
+   * explicitly replaces the inferred control rather than adding a second one,
+   * so the button is there whichever screen pushed this one.
+   */
+  useEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+          hitSlop={12}
+          style={{ paddingHorizontal: 6, paddingVertical: 4 }}
+          onPress={() => {
+            if (navigation.canGoBack()) navigation.goBack();
+            else navigation.getParent()?.goBack();
+          }}
+        >
+          <Ionicons name="chevron-back" size={26} color={colors.text} />
+        </Pressable>
+      ),
+    });
+  }, [navigation]);
+
   const st = statusStyle(shipment.status);
   const ci = collectionInfo(shipment);
   const collection: ResolvedCollection = resolveCollection(shipment, schedules);
@@ -172,6 +205,14 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
   const terminal = shipment.status === 'Delivered' || shipment.status === 'Cancelled';
   const meta: any = shipment.metadata || {};
   const invoice = meta.invoice || {};
+  /** Priced by the booking is not the same as raised by the office. */
+  const invoiceIssued = isIssued(invoice);
+  const invoiceDeleted = Boolean(invoice.deletedAt);
+  const invoiceLineCount = Array.isArray(invoice.items) ? invoice.items.length : 0;
+  const collectedYet = Boolean(shipment.collected_at) || [
+    'collected', 'at warehouse', 'enroute to zimbabwe', 'in transit',
+    'zim warehouse', 'out for delivery', 'delivered',
+  ].includes(String(shipment.status || '').toLowerCase());
   const goodsDescription = shipment.goods_description || meta.shipment?.description || '—';
   const contents = shippedItems(shipment);
   const correction = shipment.driver_description_correction || meta.driverDescriptionCorrection?.text;
@@ -471,6 +512,44 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
     try { await sharePdf(buildDeliveryNoteHtml(shipment, { deliveryNote, proofSummary: { count: photos.length }, collection }), `${deliveryNote?.note_number || 'delivery-note'}.pdf`); }
     catch (e: any) { Alert.alert('Could not create PDF', e?.message || 'Try again.'); }
     finally { setDownloading(null); }
+  };
+
+  /**
+   * Raise the invoice from what the booking priced.
+   *
+   * The number, the dates and who issued it are set by the database, so two
+   * people pressing Create at the same time cannot mint the same number and
+   * "who raised this" is not something the phone asserts about itself.
+   */
+  const createInvoice = async () => {
+    setRaising('invoice');
+    const { data, error } = await supabase.rpc('issue_shipment_invoice', {
+      p_shipment_id: shipment.id,
+      p_invoice: invoicePrefill(shipment) as any,
+    });
+    setRaising(null);
+    if (error) { Alert.alert('Could not create the invoice', error.message); return; }
+    await load();
+    Alert.alert(
+      `Invoice ${(data as any)?.invoiceNumber || 'created'}`,
+      'It is on the customer\'s account and in the period totals. Open it to check or change anything.',
+    );
+  };
+
+  const createNote = async () => {
+    setRaising('note');
+    const { data, error } = await supabase.rpc('create_shipment_delivery_note', {
+      p_shipment_id: shipment.id,
+    });
+    setRaising(null);
+    if (error) { Alert.alert('Could not create the delivery note', error.message); return; }
+    await load();
+    Alert.alert(
+      `Delivery note ${(data as any)?.reference || 'created'}`,
+      (data as any)?.created === false
+        ? 'This shipment already had one, so it was opened rather than duplicated.'
+        : 'It is filed under this collection period.',
+    );
   };
 
   const confirmDelete = () => {
@@ -831,6 +910,58 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
         {/* ── Documents ── */}
         <Text style={styles.sectionHeading}>Documents</Text>
         <View style={styles.card}>
+          {/* A booking is not an invoice. The booking prices the shipment, and
+              a member of staff raises the invoice from those prices after the
+              confirmation call — so until somebody presses Create there is a
+              priced shipment here and no document. */}
+          {!invoiceIssued ? (
+            <View style={styles.raiseBlock}>
+              <Text style={styles.raiseTitle}>
+                {invoiceDeleted ? 'Invoice deleted' : 'No invoice yet'}
+              </Text>
+              <Text style={styles.raiseText}>
+                {invoiceDeleted
+                  ? `${invoice.invoiceNumber || 'It'} was deleted on ${new Date(invoice.deletedAt).toLocaleDateString()}. Raising it again brings back the same number, so any payment already made against it still matches.`
+                  : invoiceLineCount > 0
+                    ? `The booking priced ${invoiceLineCount} line${invoiceLineCount === 1 ? '' : 's'}. Creating the invoice fills it in from those, ready to check.`
+                    : 'Add the items on this shipment first — edit the shipment above — then create the invoice.'}
+              </Text>
+              <Pressable
+                style={[styles.btn, styles.btnPrimary, raising === 'invoice' && { opacity: 0.5 }]}
+                disabled={raising !== null || invoiceLineCount === 0}
+                onPress={createInvoice}
+              >
+                {raising === 'invoice'
+                  ? <ActivityIndicator color={colors.white} />
+                  : <Text style={styles.btnPrimaryText}>{invoiceDeleted ? 'Raise it again' : 'Create invoice'}</Text>}
+              </Pressable>
+            </View>
+          ) : null}
+
+          {invoiceIssued && !noteRecord ? (
+            <View style={styles.raiseBlock}>
+              <Text style={styles.raiseTitle}>No delivery note yet</Text>
+              <Text style={styles.raiseText}>
+                {collectedYet
+                  ? 'The goods are with us, so the note can be raised. It is filled in from the invoice and stored under this collection period.'
+                  : 'The delivery note is raised once the goods have been collected — until then there is nothing to sign for.'}
+              </Text>
+              <Pressable
+                style={[styles.btn, collectedYet ? styles.btnPrimary : styles.btnOutline, raising === 'note' && { opacity: 0.5 }]}
+                disabled={raising !== null || !collectedYet}
+                onPress={createNote}
+              >
+                {raising === 'note'
+                  ? <ActivityIndicator color={colors.primary} />
+                  : (
+                    <Text style={collectedYet ? styles.btnPrimaryText : styles.btnOutlineText}>
+                      {collectedYet ? 'Create delivery note' : 'Waiting on collection'}
+                    </Text>
+                  )}
+              </Pressable>
+            </View>
+          ) : null}
+
           {/* Open rather than export. Both documents are readable and editable
               on their own screen, with the download alongside — they used to be
               download-only, so a wrong address meant a trip to the website. */}
@@ -856,8 +987,14 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
               {downloading === 'note' ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.btnOutlineText}>Download delivery note</Text>}
             </Pressable>
           </View>
-          {invoiceRow ? <Row k="Invoice" v={`${invoiceRow.invoice_number} · ${invoiceRow.status}`} /> : <Row k="Invoice" v={invoice.invoiceNumber ? `${invoice.invoiceNumber} (booking)` : 'Not created yet'} />}
-          {deliveryNote ? <Row k="Delivery note" v={`${deliveryNote.note_number} · ${deliveryNote.status}`} /> : null}
+          {invoiceRow
+            ? <Row k="Invoice" v={`${invoiceRow.invoice_number} · ${invoiceRow.status}`} />
+            : <Row k="Invoice" v={
+                invoiceDeleted ? `${invoice.invoiceNumber || 'Invoice'} · deleted`
+                  : invoiceIssued ? String(invoice.invoiceNumber)
+                  : 'Not created yet'} />}
+          {noteRecord ? <Row k="Delivery note" v={`${noteRecord.reference}${noteRecord.note_date ? ` · ${noteRecord.note_date}` : ''}`} /> : null}
+          {deliveryNote ? <Row k="Proof of delivery" v={`${deliveryNote.note_number} · ${deliveryNote.status}`} /> : null}
           <Text style={styles.blockLabel}>DRIVER PHOTOGRAPHS</Text>
           {photos.length ? (
             <View style={styles.photoGrid}>
@@ -967,6 +1104,13 @@ function Row({ k, v, multiline }: { k: string; v: string; multiline?: boolean })
 }
 
 const styles = StyleSheet.create({
+  raiseBlock: {
+    gap: 8, padding: spacing.md, marginBottom: spacing.sm,
+    borderRadius: radius.md, backgroundColor: colors.amberSoft,
+    borderWidth: 1, borderColor: colors.amberBorder,
+  },
+  raiseTitle: { fontSize: 14.5, fontWeight: '800', color: colors.amber },
+  raiseText: { fontSize: 12.5, color: colors.text, lineHeight: 18 },
   safe: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg, gap: spacing.sm, paddingBottom: 48 },
   statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

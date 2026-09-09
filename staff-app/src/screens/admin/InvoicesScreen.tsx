@@ -8,7 +8,7 @@ import * as Sharing from 'expo-sharing';
 import { supabase } from '../../lib/supabase';
 import { colors, radius, spacing } from '../../theme';
 import { type Shipment, senderEmail, senderName, senderPhone } from '../../lib/shipment';
-import { calculateTotals, getInvoice, getInvoiceStatus, getPaymentSummary, hasInvoice, INVOICE_STATUS_STYLE, invoiceSymbol, type InvoiceData, type InvoiceLineItem } from '../../lib/invoice';
+import { calculateTotals, getInvoice, getInvoiceStatus, getPaymentSummary, hasIssuedInvoice, INVOICE_STATUS_STYLE, invoiceSymbol, type InvoiceData, type InvoiceLineItem } from '../../lib/invoice';
 import { useAuth } from '../../context/AuthContext';
 import { COMPANY } from '../../config/company';
 
@@ -19,7 +19,7 @@ const blank=():InvoiceData=>({invoiceNumber:'',issueDate:today(),dueDate:due14()
 
 export default function InvoicesScreen(){
  const navigation=useNavigation<any>(); const route=useRoute<any>(); const {session}=useAuth(); const [shipments,setShipments]=useState<Shipment[]>([]); const [loading,setLoading]=useState(true); const [query,setQuery]=useState(''); const [filter,setFilter]=useState<Filter>('all'); const [detail,setDetail]=useState<Shipment|null>(null); const [mode,setMode]=useState<'create'|'edit'|null>(null); const [target,setTarget]=useState<Shipment|null>(null); const [draft,setDraft]=useState<InvoiceData>(blank()); const [customer,setCustomer]=useState({name:'',email:'',phone:'',origin:'UK',destination:'Zimbabwe'}); const [busy,setBusy]=useState(false);
- const load=useCallback(async()=>{const result=await supabase.from('shipments').select('*').is('deleted_at',null).order('updated_at',{ascending:false}).limit(500); if(result.error)Alert.alert('Could not load invoices','Finance data is unavailable. Check your access and try again.'); else setShipments(((result.data as Shipment[])||[]).filter(s=>hasInvoice(s)&&!getInvoice(s).deletedAt)); setLoading(false);},[]);
+ const load=useCallback(async()=>{const result=await supabase.from('shipments').select('*').is('deleted_at',null).order('updated_at',{ascending:false}).limit(500); if(result.error)Alert.alert('Could not load invoices','Finance data is unavailable. Check your access and try again.'); else setShipments(((result.data as Shipment[])||[]).filter(s=>hasIssuedInvoice(s))); setLoading(false);},[]);
  useFocusEffect(useCallback(()=>{setLoading(true);void load();},[load]));
  // Arriving from the finance screen with an intent: raise a new invoice, or
  // open one directly. Consumed once so going back does not reopen the sheet.

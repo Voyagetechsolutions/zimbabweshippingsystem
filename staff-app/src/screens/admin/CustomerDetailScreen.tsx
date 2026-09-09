@@ -4,7 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../../lib/supabase';
-import { getInvoice, getInvoiceStatus, getPaymentSummary, hasInvoice } from '../../lib/invoice';
+import { getInvoice, getInvoiceStatus, getPaymentSummary, hasIssuedInvoice } from '../../lib/invoice';
 import { useAuth } from '../../context/AuthContext';
 import { colors, radius, spacing, stageTone } from '../../theme';
 import { money, shortDate } from '../../lib/format';
@@ -104,7 +104,7 @@ export default function CustomerDetailScreen({ route, navigation }: Props) {
     }
     // One row per shipment that carries an invoice, priced from its own lines.
     setInvoices(ships
-      .filter((shipment) => hasInvoice(shipment) && !getInvoice(shipment).deletedAt)
+      .filter((shipment) => hasIssuedInvoice(shipment))
       .map((shipment) => {
         const invoice = getInvoice(shipment);
         const { total } = getPaymentSummary(invoice);

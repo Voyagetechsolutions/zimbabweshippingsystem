@@ -33,6 +33,8 @@ export type PeriodSummary = {
   lastCollection: string | null;
   shipments: number;
   collected: number;
+  /** Priced by the booking but not yet raised by anybody. */
+  awaitingInvoice?: number;
   invoiced: number;
   paid: number;
   outstanding: number;
@@ -54,11 +56,15 @@ const symbolFor = (currency: string) => (currency === 'EUR' ? '€' : '£');
  */
 export default function ShipmentPeriodsScreen() {
   const navigation = useNavigation<any>();
-  const mode = ((useRoute().params || {}) as { mode?: 'shipments' | 'invoices' | 'payments' }).mode ?? 'shipments';
+  const mode = ((useRoute().params || {}) as { mode?: 'shipments' | 'invoices' | 'payments' | 'notes' }).mode ?? 'shipments';
   const target = mode === 'invoices' ? 'PeriodInvoices'
     : mode === 'payments' ? 'PeriodPayments'
+    : mode === 'notes' ? 'PeriodDeliveryNotes'
     : 'PeriodShipments';
-  const heading = mode === 'invoices' ? 'Invoices' : mode === 'payments' ? 'Payments' : 'Shipments';
+  const heading = mode === 'invoices' ? 'Invoices'
+    : mode === 'payments' ? 'Payments'
+    : mode === 'notes' ? 'Delivery notes'
+    : 'Shipments';
   const [periods, setPeriods] = useState<PeriodSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -170,6 +176,13 @@ export default function ShipmentPeriodsScreen() {
               <Text style={styles.cardMeta}>
                 {period.cleared} paid in full · {period.unpaid} not paid at all · {period.collected} collected
               </Text>
+              {/* Bookings the office has priced but not yet invoiced. Without
+                  this the totals simply look small, with no clue why. */}
+              {period.awaitingInvoice ? (
+                <Text style={styles.cardWaiting}>
+                  {period.awaitingInvoice} waiting for an invoice
+                </Text>
+              ) : null}
             </Pressable>
           );
         })}
@@ -229,6 +242,7 @@ const styles = StyleSheet.create({
   cardHead: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   cardTitle: { fontSize: 16.5, fontWeight: '800', color: colors.text },
   cardMeta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  cardWaiting: { fontSize: 12, fontWeight: '700', color: colors.amber, marginTop: 2 },
   countPill: { alignItems: 'center', backgroundColor: colors.primarySoft, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 6 },
   countValue: { fontSize: 19, fontWeight: '900', color: colors.primary },
   countLabel: { fontSize: 8.5, fontWeight: '800', color: colors.primary, letterSpacing: 0.5 },

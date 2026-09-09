@@ -33,6 +33,9 @@ const SECTIONS: { title: string; data: Item[] }[] = [
       // tab: jumping tabs is what made Back land somewhere the user had not
       // come from.
       { label: 'All Shipments', icon: 'cube-outline', to: 'Periods' },
+      // The office delivery notes, filed under the period that collected them,
+      // exactly like the shipments and the invoices.
+      { label: 'Delivery Notes', icon: 'document-text-outline', to: 'Periods', params: { mode: 'notes' } },
       { label: 'Pickup Zones', icon: 'location-outline', to: 'PickupZones' },
       { label: 'Map Locations', icon: 'map-outline', to: 'MapLocations' },
     ],
