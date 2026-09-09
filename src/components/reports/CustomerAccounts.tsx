@@ -1,0 +1,252 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Loader2, Search, AlertCircle, ChevronRight, ArrowLeft } from 'lucide-react';
+
+/**
+ * What each customer is worth, and what they still owe.
+ *
+ * The numbers come from `customer_accounts`, the same database function the
+ * staff app calls, so a balance quoted on the phone matches the one on screen.
+ *
+ * Balances are per currency and never blended. A customer who has shipped from
+ * both Ireland and the UK owes two amounts, and adding them would produce a
+ * figure that reconciles against neither bank account.
+ */
+
+type Balance = { currency: string; spent: number; paid: number; owed: number; shipments: number };
+
+type Account = {
+  customer_id: string;
+  full_name: string | null;
+  customer_code: string | null;
+  phone: string | null;
+  email: string | null;
+  country: string | null;
+  shipments: number;
+  last_booked: string | null;
+  balances: Balance[];
+};
+
+type ItemRow = { item: string; quantity: number; shipments: number; currency: string; revenue: number };
+
+const symbolFor = (currency: string) => (currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : `${currency} `);
+
+const money = (value: number, currency: string) =>
+  `${symbolFor(currency)}${Number(value || 0).toLocaleString(undefined, {
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
+  })}`;
+
+export const CustomerAccounts: React.FC = () => {
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [items, setItems] = useState<ItemRow[]>([]);
+  const [itemsLoading, setItemsLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error: rpcError } = await supabase.rpc('customer_accounts', { p_customer_id: null });
+      if (cancelled) return;
+      if (rpcError) setError(rpcError.message);
+      else if ((data as any)?.error) setError(String((data as any).error));
+      else setAccounts(((data as any)?.customers || []) as Account[]);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // The item breakdown is fetched only for the customer being opened; loading
+  // it for all 140 would be a lot of line items nobody is looking at.
+  useEffect(() => {
+    if (!openId) { setItems([]); return; }
+    let cancelled = false;
+    setItemsLoading(true);
+    (async () => {
+      const { data } = await supabase.rpc('customer_accounts', { p_customer_id: openId });
+      if (cancelled) return;
+      setItems(((data as any)?.items || []) as ItemRow[]);
+      setItemsLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [openId]);
+
+  const visible = useMemo(() => {
+    const text = query.trim().toLowerCase();
+    if (!text) return accounts;
+    return accounts.filter((a) =>
+      [a.full_name, a.customer_code, a.phone, a.email]
+        .some((field) => String(field || '').toLowerCase().includes(text)));
+  }, [accounts, query]);
+
+  /** Owing customers first — that is the reason to open this screen. */
+  const owing = useMemo(
+    () => accounts.filter((a) => a.balances?.some((b) => b.owed > 0.005)).length,
+    [accounts],
+  );
+
+  const open = useMemo(() => accounts.find((a) => a.customer_id === openId) || null, [accounts, openId]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[240px] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-zim-green" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="flex items-center gap-3 p-6 text-sm text-amber-900">
+          <AlertCircle className="h-5 w-5" /> {error}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (open) {
+    return (
+      <div className="space-y-4">
+        <Button variant="ghost" size="sm" onClick={() => setOpenId(null)}>
+          <ArrowLeft className="mr-1 h-4 w-4" /> All customers
+        </Button>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{open.full_name || 'Unnamed customer'}</CardTitle>
+            <CardDescription>
+              {[open.customer_code, open.phone, open.email, open.country].filter(Boolean).join(' · ')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              {open.balances?.map((b) => (
+                <React.Fragment key={b.currency}>
+                  <Stat label={`Spent (${b.currency})`} value={money(b.spent, b.currency)} />
+                  <Stat label="Paid" value={money(b.paid, b.currency)} tone="text-green-700" />
+                  <Stat
+                    label="Owes"
+                    value={money(b.owed, b.currency)}
+                    tone={b.owed > 0.005 ? 'text-red-700' : 'text-green-700'}
+                  />
+                </React.Fragment>
+              ))}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {open.shipments} invoiced shipment{open.shipments === 1 ? '' : 's'}
+              {open.last_booked ? ` · last booked ${new Date(open.last_booked).toLocaleDateString()}` : ''}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>What they ship</CardTitle>
+            <CardDescription>Every line they have been invoiced for, most shipped first.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {itemsLoading ? (
+              <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin" /></div>
+            ) : items.length === 0 ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">Nothing invoiced yet.</p>
+            ) : (
+              <ul className="divide-y">
+                {items.map((row) => (
+                  <li key={`${row.item}-${row.currency}`} className="flex items-center gap-3 py-2.5">
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{row.item}</span>
+                    <span className="text-sm text-muted-foreground">
+                      ×{row.quantity} over {row.shipments} shipment{row.shipments === 1 ? '' : 's'}
+                    </span>
+                    <span className="text-sm font-semibold">{money(row.revenue, row.currency)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-bold">Customer accounts</h2>
+          <p className="text-sm text-muted-foreground">
+            {accounts.length} customer{accounts.length === 1 ? '' : 's'} with invoiced shipments
+            {owing > 0 ? ` · ${owing} still owing` : ''}
+          </p>
+        </div>
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-9"
+            placeholder="Name, reference, phone or email"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {visible.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center text-sm text-muted-foreground">
+            {query ? `No customer matches “${query.trim()}”.` : 'No customer has an invoiced shipment yet.'}
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {visible.map((account) => {
+            const owed = account.balances?.filter((b) => b.owed > 0.005) || [];
+            return (
+              <button
+                key={account.customer_id}
+                type="button"
+                onClick={() => setOpenId(account.customer_id)}
+                className="flex w-full items-center gap-3 rounded-lg border bg-white p-3 text-left transition-colors hover:bg-gray-50"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{account.full_name || 'Unnamed customer'}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {[account.customer_code, account.phone].filter(Boolean).join(' · ')} ·{' '}
+                    {account.shipments} shipment{account.shipments === 1 ? '' : 's'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  {account.balances?.map((b) => (
+                    <p key={b.currency} className="text-sm font-semibold">{money(b.spent, b.currency)}</p>
+                  ))}
+                  {owed.length > 0 ? (
+                    <Badge variant="outline" className="mt-1 border-red-200 text-red-700">
+                      {owed.map((b) => money(b.owed, b.currency)).join(' + ')} owed
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="mt-1 border-green-200 text-green-700">Settled</Badge>
+                  )}
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const Stat: React.FC<{ label: string; value: string; tone?: string }> = ({ label, value, tone }) => (
+  <div className="rounded-lg border p-3">
+    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+    <p className={`mt-1 text-xl font-bold ${tone || ''}`}>{value}</p>
+  </div>
+);
+
+export default CustomerAccounts;

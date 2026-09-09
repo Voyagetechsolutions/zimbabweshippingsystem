@@ -49,6 +49,8 @@ import PickupZonesManagementTab from '@/components/admin/tabs/PickupZonesManagem
 import DeliveryManagementTab from '@/components/admin/tabs/DeliveryManagementTab';
 import PaymentsInvoicingTab from '@/components/admin/tabs/PaymentsInvoicingTab';
 import ReportsAnalyticsTab from '@/components/admin/tabs/ReportsAnalyticsTab';
+import OperationsReport from '@/components/reports/OperationsReport';
+import CustomerAccounts from '@/components/reports/CustomerAccounts';
 import CollectionScheduleCalendarTab from '@/components/admin/tabs/CollectionScheduleCalendarTab';
 import RouteManagementTab from '@/components/admin/tabs/RouteManagementTab';
 import CustomQuoteManagement from '@/components/admin/CustomQuoteManagement';
@@ -193,6 +195,10 @@ const AdminDashboardInner = () => {
         { value: 'payments', label: 'Payments', icon: CreditCard },
         { value: 'paymentSchedule', label: '30-Day Payments', icon: CalendarDays },
         { value: 'reports', label: 'Reports', icon: BarChart3 },
+        // Revenue by route and by consignment, and what each customer is worth.
+        // Both read one database function, so finance and admin cannot disagree.
+        { value: 'operationsReport', label: 'Revenue Reports', icon: BarChart3 },
+        { value: 'customerAccounts', label: 'Customer Accounts', icon: Users },
       ],
     },
     {
@@ -551,6 +557,8 @@ const AdminDashboardInner = () => {
       case 'payments': return <PaymentsInvoicingTab />;
       case 'paymentSchedule': return <PaymentScheduleManagement />;
       case 'reports': return <ReportsAnalyticsTab />;
+      case 'operationsReport': return <OperationsReport title="Revenue reports" />;
+      case 'customerAccounts': return <CustomerAccounts />;
       case 'schedule': return <CollectionScheduleCalendarTab />;
       case 'routes': return <RouteManagementTab />;
       case 'contentManagement': return <ContentManagement />;

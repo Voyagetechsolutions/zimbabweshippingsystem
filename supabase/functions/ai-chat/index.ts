@@ -344,6 +344,141 @@ function extractShipmentReference(text: string): string | null {
   return null;
 }
 
+/**
+ * The signed-in customer's own account, for Zimmy to answer from.
+ *
+ * Everything here is the caller's own data and nothing else. The user id comes
+ * from verifying the request's JWT with Supabase, never from anything the
+ * browser claims about itself, so a customer cannot ask about somebody else's
+ * shipments by editing a request. A signed-out visitor gets no account block at
+ * all and Zimmy falls back to answering from a quoted reference.
+ *
+ * Without this, "where is my parcel" was unanswerable unless the customer
+ * happened to quote a reference — the assistant knew the business but had no
+ * idea who it was speaking to.
+ */
+/**
+ * The business's own rules, spelled out.
+ *
+ * The configuration is already in the prompt, but as raw JSON: a key called
+ * `depositThreshold` set to 1000 does not tell a model what the business
+ * actually does when a booking crosses it, and a model asked to infer a payment
+ * policy from key names will eventually infer one that is wrong. These are the
+ * same values, stated as sentences, derived from live configuration so they
+ * cannot drift from what the booking form charges.
+ */
+function businessRulesBlock(configuration: Record<string, any>): string {
+  const fees = configuration.booking_fees || {};
+  const number = (value: unknown, fallback: number) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+  };
+  const premium = number(fees.payOnArrivalPremiumPercent, 20);
+  const threshold = number(fees.depositThreshold, 1000);
+  const deposit = number(fees.depositPercent, 50);
+  const doorDelivery = number(fees.doorDeliveryPerAddress, 25);
+  const doorCollection = number(fees.doorCollection, 25);
+
+  return [
+    "HOW THIS BUSINESS WORKS (authoritative; state these exactly, do not reword the numbers):",
+    `- Paying on arrival costs ${premium}% more than the standard price.`,
+    `- A booking under ${threshold} (in the booking's own currency, so 1000 pounds in the UK or 1000 euros in Ireland) is paid in full.`,
+    `- At ${threshold} or above on the standard method, the customer pays ${deposit}% upfront and the balance when the goods are collected. Cash on collection and pay on arrival are never split this way.`,
+    `- Door delivery in Zimbabwe costs ${doorDelivery} per delivery address. Self-collection from a depot is free.`,
+    `- Door collection from the customer costs ${doorCollection} where it applies.`,
+    "- An invoice is NOT created automatically when somebody books. The office raises it after confirming the booking with the customer, so a recent booking may correctly have no invoice yet. Never tell a customer they owe money on a booking that has not been invoiced.",
+    "- A delivery note is raised once the goods have been collected, not at booking.",
+    "- We collect in the UK and Ireland only, on published routes. If a postcode or town is not on a route, we do not collect there.",
+    "- Prices, fees and routes must come from DATABASE BUSINESS DATA above. Never quote a figure that is not in it.",
+  ].join("\n");
+}
+
+async function getCustomerContext(req: Request): Promise<string | null> {
+  const header = req.headers.get("Authorization") || "";
+  const jwt = header.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : "";
+  if (!jwt) return null;
+
+  const supabase = getAdminClient();
+  const { data: userData, error: userError } = await supabase.auth.getUser(jwt);
+  const user = userData?.user;
+  // An anon-key call also carries a JWT, and it resolves to no user. That is a
+  // signed-out visitor, not an error worth logging.
+  if (userError || !user?.id) return null;
+
+  const [{ data: profile }, { data: customer }] = await Promise.all([
+    supabase.from("profiles").select("full_name,email,phone_number,country").eq("id", user.id).maybeSingle(),
+    supabase.from("customers").select("id,customer_code,full_name,phone,country,pickup_city,pickup_postcode")
+      .eq("profile_id", user.id).is("deleted_at", null).maybeSingle(),
+  ]);
+
+  // Matched by the account AND by the customer record, because a booking made
+  // before the customer signed up is linked by customer_id alone.
+  let query = supabase
+    .from("shipments")
+    .select("tracking_number,customer_reference,status,origin,destination,created_at,collected_at,metadata")
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(12);
+  query = customer?.id
+    ? query.or(`user_id.eq.${user.id},customer_id.eq.${customer.id}`)
+    : query.eq("user_id", user.id);
+  const { data: shipments } = await query;
+
+  const rows = (shipments || []) as Array<Record<string, any>>;
+  if (!rows.length && !customer && !profile) return null;
+
+  const shipmentLines = rows.map((row) => {
+    const invoice = row.metadata?.invoice || {};
+    const items = Array.isArray(invoice.items) ? invoice.items : [];
+    const invoiced = items.reduce(
+      (sum: number, i: any) => sum + (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), 0,
+    ) - (Number(invoice.discount) || 0);
+    const paid = (Array.isArray(invoice.payments) ? invoice.payments : [])
+      .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
+    // An invoice exists only once it has a number. Telling a customer they owe
+    // money for a booking nobody has invoiced would be asking for payment
+    // against a document that does not exist.
+    const issued = String(invoice.invoiceNumber || "").trim().length > 0;
+    return {
+      reference: row.customer_reference || row.tracking_number,
+      trackingNumber: row.tracking_number,
+      status: row.status,
+      bookedOn: row.created_at,
+      collectedOn: row.collected_at,
+      from: row.origin,
+      to: row.destination,
+      collectionRoute: row.metadata?.collection?.route || null,
+      invoice: issued
+        ? {
+            number: invoice.invoiceNumber,
+            currency: invoice.currency || "GBP",
+            total: Math.round(invoiced * 100) / 100,
+            paid: Math.round(paid * 100) / 100,
+            balance: Math.round(Math.max(0, invoiced - paid) * 100) / 100,
+          }
+        : "not yet invoiced",
+      items: items.map((i: any) => `${i.quantity} x ${i.description || i.item}`),
+    };
+  });
+
+  return [
+    "SIGNED-IN CUSTOMER (this is who you are talking to; their own data only):",
+    JSON.stringify({
+      name: customer?.full_name || profile?.full_name || null,
+      customerCode: customer?.customer_code || null,
+      email: profile?.email || null,
+      phone: customer?.phone || profile?.phone_number || null,
+      country: customer?.country || profile?.country || null,
+      collectionCity: customer?.pickup_city || null,
+      collectionPostcode: customer?.pickup_postcode || null,
+      shipments: shipmentLines,
+    }),
+    'Answer "my shipment", "my invoice" and "what do I owe" from this block.',
+    "It is already scoped to this customer, so never ask them to prove who they are.",
+    "If it is empty, they have no bookings on this account yet.",
+  ].join("\n");
+}
+
 async function getLiveOperationsContext(history: ChatMessage[]): Promise<LiveOperations> {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return {
@@ -388,6 +523,7 @@ async function getLiveOperationsContext(history: ChatMessage[]): Promise<LiveOpe
     .slice(0, 30);
   const context = [
     "DATABASE BUSINESS DATA (authoritative; do not invent values):",
+    businessRulesBlock(businessConfiguration),
     `Configuration: ${JSON.stringify(businessConfiguration)}`,
     `Catalogue: ${JSON.stringify(catalogue || [])}`,
     "LIVE OPERATIONS DATA (authoritative; do not invent values):",
@@ -662,6 +798,7 @@ serve(async (req) => {
     }
 
     const liveOperations = await getLiveOperationsContext(history);
+    const customerContext = await getCustomerContext(req);
     const latestRequest = [...history].reverse().find((message) => message.role === "user")?.content || "";
     const directScheduleReply = getDirectScheduleReply(latestRequest, liveOperations.schedules);
 
@@ -697,6 +834,7 @@ serve(async (req) => {
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "system", content: liveOperations.context },
+          ...(customerContext ? [{ role: "system", content: customerContext }] : []),
           ...history,
         ],
       }),
