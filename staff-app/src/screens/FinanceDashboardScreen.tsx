@@ -11,6 +11,7 @@ import { getInvoice, getInvoiceStatus, getPaymentSummary, hasInvoice, invoiceSym
 import type { Shipment } from '../lib/shipment';
 import { COMPANY } from '../config/company';
 
+import { BackButton } from '../components/adminui';
 interface Payment {
   id: string;
   amount: number | null;
@@ -286,6 +287,7 @@ export default function FinanceDashboardScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
+        <BackButton />
         <View>
           <Text style={styles.title}>Finance Overview</Text>
           <Text style={styles.date}>{todayLabel()} · {greeting().toLowerCase()}</Text>

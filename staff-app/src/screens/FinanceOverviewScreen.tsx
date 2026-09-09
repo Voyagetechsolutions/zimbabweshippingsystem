@@ -12,7 +12,7 @@ import { hasBeenCollected, type Shipment, senderName } from '../lib/shipment';
 import {
   getInvoice, getInvoiceStatus, getPaymentSummary, hasInvoice, INVOICE_STATUS_STYLE, invoiceSymbol,
 } from '../lib/invoice';
-import { ScreenHeader, Avatar, SkeletonList, ErrorState } from '../components/adminui';
+import { ScreenHeader, Avatar, SkeletonList, ErrorState, BackButton } from '../components/adminui';
 
 const RECEIVED_PAYMENT_STATUSES = new Set(['completed', 'paid', 'success', 'succeeded', 'verified']);
 
@@ -244,6 +244,9 @@ export default function FinanceOverviewScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} tintColor={colors.primary} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
       >
+        {/* Reached as a tab root (nothing to go back to, renders nothing) and
+            pushed from the More menu, where it previously had no way out. */}
+        <BackButton />
         <ScreenHeader
           title="Finance"
           subtitle={new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}

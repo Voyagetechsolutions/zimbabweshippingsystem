@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export type WebBusinessConfiguration = {
   catalogue: Array<{ id: string; label: string; priceUK: number | null; priceIE: number | null; note?: string; description?: string }>;
-  fees: { doorDeliveryPerAddress: number; doorCollection: number; referralDiscount: number; payOnArrivalPremiumPercent: number; metalDrumPurchase?: number; plasticDrumPurchase?: number; quoteValidityDays?: number };
+  fees: { doorDeliveryPerAddress: number; doorCollection: number; referralDiscount: number; payOnArrivalPremiumPercent: number; metalDrumPurchase?: number; plasticDrumPurchase?: number; quoteValidityDays?: number; /** Total at or above which the standard method is split. */ depositThreshold?: number; /** Percentage payable upfront above that threshold. */ depositPercent?: number };
   payments: { methods: Array<{ id: string; label: string; note?: string }>; otherProviders: Array<{ id: string; label: string }>; otherPaymentInstructions?: { sendTo?: string; reference?: string } };
   company: Record<string, string>;
   routeCoverage: { restrictedPrefixes: string[]; routes: Array<{ route: string; prefixes: string[]; areas: string[] }> };
@@ -13,7 +13,7 @@ export type WebBusinessConfiguration = {
 };
 
 const EMPTY: WebBusinessConfiguration = {
-  catalogue: [], fees: { doorDeliveryPerAddress: 0, doorCollection: 0, referralDiscount: 0, payOnArrivalPremiumPercent: 0, metalDrumPurchase: 0, plasticDrumPurchase: 0 },
+  catalogue: [], fees: { doorDeliveryPerAddress: 0, doorCollection: 0, referralDiscount: 0, payOnArrivalPremiumPercent: 0, metalDrumPurchase: 0, plasticDrumPurchase: 0, depositThreshold: 1000, depositPercent: 50 },
   payments: { methods: [], otherProviders: [] }, company: {}, routeCoverage: { restrictedPrefixes: [], routes: [] }, coveredZimbabwePlaces: [], routeTemplates: { england: [], ireland: [] }, operations: { failedStopReasons: [] },
 };
 

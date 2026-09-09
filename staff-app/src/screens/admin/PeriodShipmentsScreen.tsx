@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView,
-  StyleSheet, Text, View,
+  StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
@@ -13,6 +13,7 @@ import { customerRef, senderName, statusChoices, type Shipment } from '../../lib
 import { getInvoice, getPaymentSummary, invoiceSymbol, isIssued } from '../../lib/invoice';
 import { isPlaceholderRoute } from '../../lib/collections';
 import { bulkUpdateShipments, setRecordsDeleted } from '../../lib/records';
+import { matchesShipmentQuery } from '../../lib/shipmentSearch';
 import { ConfirmSheet, OptionSheet, type SheetOption } from '../../components/OptionSheet';
 
 /**
@@ -50,6 +51,7 @@ export default function PeriodShipmentsScreen() {
   /** Ids of the last delete, so it can be taken back without hunting for it. */
   const [undo, setUndo] = useState<{ ids: string[]; label: string } | null>(null);
   const [periods, setPeriods] = useState<any[]>([]);
+  const [query, setQuery] = useState('');
 
   const load = useCallback(async () => {
     setError(null);
@@ -146,6 +148,21 @@ export default function PeriodShipmentsScreen() {
   }, [shipments]);
 
   /**
+   * The list narrowed to what was typed.
+   *
+   * `matchesShipmentQuery` is the same matcher the driver's search uses, so a
+   * customer is found by the reference printed on the screen — which for all
+   * but one shipment in sixty is *computed* from their name, month and phone,
+   * not stored in `customer_reference`. Matching the column alone would find
+   * almost nobody.
+   */
+  const visible = useMemo(() => {
+    const text = query.trim();
+    if (!text) return shipments;
+    return shipments.filter((shipment) => matchesShipmentQuery(shipment as any, text));
+  }, [shipments, query]);
+
+  /**
    * Grouped by the route that collects them; unrouted work is shown, never hidden.
    *
    * A booking that nobody has routed yet carries the literal string
@@ -156,7 +173,7 @@ export default function PeriodShipmentsScreen() {
    */
   const groups = useMemo(() => {
     const map = new Map<string, Shipment[]>();
-    for (const shipment of shipments) {
+    for (const shipment of visible) {
       const fromSchedule = shipment.collection_schedule_id
         ? scheduleRoute.get(shipment.collection_schedule_id)
         : null;
@@ -170,7 +187,7 @@ export default function PeriodShipmentsScreen() {
     }
     return [...map.entries()].sort((a, b) =>
       a[0] === UNROUTED ? 1 : b[0] === UNROUTED ? -1 : a[0].localeCompare(b[0]));
-  }, [shipments, scheduleRoute]);
+  }, [visible, scheduleRoute]);
 
   const toggle = (id: string) => setSelected((current) => {
     const next = new Set(current);
@@ -297,7 +314,27 @@ export default function PeriodShipmentsScreen() {
         </Pressable>
       </View>
 
+      <View style={styles.search}>
+        <Ionicons name="search" size={17} color={colors.textMuted} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Customer, reference, phone or tracking"
+          placeholderTextColor={colors.textFaint}
+          value={query}
+          onChangeText={setQuery}
+          autoCorrect={false}
+          autoCapitalize="none"
+          returnKeyType="search"
+        />
+        {query ? (
+          <Pressable onPress={() => setQuery('')} hitSlop={10}>
+            <Ionicons name="close-circle" size={17} color={colors.textMuted} />
+          </Pressable>
+        ) : null}
+      </View>
+
       <ScrollView
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.body}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
       >
@@ -413,10 +450,14 @@ export default function PeriodShipmentsScreen() {
           </View>
         ))}
 
-        {shipments.length === 0 ? (
+        {visible.length === 0 ? (
           <View style={styles.empty}>
-            <Ionicons name="cube-outline" size={38} color={colors.textMuted} />
-            <Text style={styles.emptyText}>Nothing booked into this period yet.</Text>
+            <Ionicons name={query ? 'search-outline' : 'cube-outline'} size={38} color={colors.textMuted} />
+            <Text style={styles.emptyText}>
+              {query
+                ? `No shipment in this period matches “${query.trim()}”.`
+                : 'Nothing booked into this period yet.'}
+            </Text>
           </View>
         ) : null}
       </ScrollView>
@@ -527,6 +568,14 @@ const styles = StyleSheet.create({
   iconButton: { padding: 6 },
   title: { fontSize: 19, fontWeight: '800', color: colors.text },
   subtitle: { fontSize: 12, color: colors.textMuted, marginTop: 1 },
+  search: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    marginHorizontal: spacing.md, marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md, height: 44,
+    backgroundColor: colors.surface, borderRadius: radius.sm,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
+  },
+  searchInput: { flex: 1, fontSize: 14, color: colors.text },
   body: { padding: spacing.md, gap: spacing.sm, paddingBottom: 120 },
   notice: { backgroundColor: colors.amberSoft, borderRadius: radius.md, padding: spacing.sm },
   noticeText: { color: colors.amber, fontSize: 13 },

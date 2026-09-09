@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import BookingReceipt from '@/components/BookingReceipt';
 import { getRouteForPostalCode, getIrelandRouteForCity, irelandCities, initializeRouteCache } from '@/utils/postalCodeUtils';
+import { paymentBreakdown, policyFromConfig } from '@/utils/paymentTerms';
 import { useAuth } from '@/contexts/AuthContext';
 import PostcodeField from '@/components/address/PostcodeField';
 import AddressSearchField from '@/components/address/AddressSearchField';
@@ -741,15 +742,21 @@ export const SimplifiedBookingForm = () => {
     return total;
   };
 
-  const calculateFinalTotal = () => {
-    const baseTotal = calculateBaseTotal();
+  /**
+   * What the customer owes, and when.
+   *
+   * Both the premium and the deposit split come from `paymentTerms`, which the
+   * customer app and the staff app read too — the company announced one rule,
+   * so there is one place that states it.
+   */
+  const terms = () => paymentBreakdown(
+    calculateBaseTotal(),
+    formData.paymentMethod,
+    isIrelandBooking ? '€' : '£',
+    policyFromConfig(business.fees),
+  );
 
-    // Apply payment method adjustments
-    if (formData.paymentMethod === 'payOnArrival') {
-      return baseTotal * (1 + business.fees.payOnArrivalPremiumPercent / 100);
-    }
-    return baseTotal;
-  };
+  const calculateFinalTotal = () => terms().total;
 
   // Helper to get drum price based on country
   const getCurrentDrumPrice = (quantity: number) => {
@@ -902,7 +909,17 @@ export const SimplifiedBookingForm = () => {
           baseAmount: calculateBaseTotal(),
           finalAmount: finalAmount,
           paymentMethod: formData.paymentMethod,
-          currency: isIrelandBooking ? 'EUR' : 'GBP'
+          currency: isIrelandBooking ? 'EUR' : 'GBP',
+          // The deposit split as it was quoted. Written down rather than
+          // recomputed later, so a change to the policy never silently
+          // restates what an existing customer was told they owed.
+          ...(() => { const t = terms(); return {
+            payOnArrivalPremium: t.premium,
+            depositRequired: t.isSplit,
+            amountDueNow: t.dueNow,
+            amountDueOnCollection: t.dueOnCollection,
+            paymentTermsSummary: t.summary,
+          }; })(),
         },
         collection: {
           route: collectionRoute,
@@ -2421,6 +2438,26 @@ export const SimplifiedBookingForm = () => {
                 <span>Total to Pay:</span>
                 <span className="text-zim-green">{cs}{calculateFinalTotal().toFixed(2)}</span>
               </div>
+
+              {/* Above the threshold the standard method is paid half now and
+                  half at the door. Shown here rather than sprung on the
+                  customer at the payment step. */}
+              {terms().isSplit && (
+                <div className="rounded-md border border-zim-green/30 bg-zim-green/5 p-3 space-y-1">
+                  <div className="flex justify-between font-semibold">
+                    <span>Pay now ({business.fees.depositPercent ?? 50}% deposit):</span>
+                    <span className="text-zim-green">{cs}{terms().dueNow.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Balance on collection:</span>
+                    <span>{cs}{terms().dueOnCollection.toFixed(2)}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Bookings of {cs}{(business.fees.depositThreshold ?? 1000).toFixed(0)} or more are paid half
+                    upfront, with the balance collected when we pick the goods up.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </CardContent>

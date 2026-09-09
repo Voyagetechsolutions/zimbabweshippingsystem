@@ -194,9 +194,11 @@ export default function ManualBookingScreen() {
         },
         // A manual booking now carries invoice lines like every other booking,
         // so its invoice and delivery note itemise instead of showing one total.
+        // Priced, not invoiced. A manual booking is still a booking: a member
+        // of staff raises the invoice from the shipment afterwards, the same as
+        // every other route in. Stamping a number here was why a freshly
+        // created shipment opened with no Create invoice button.
         invoice: {
-          invoiceNumber: `INV-${tn}`,
-          issueDate: new Date(ts).toISOString().slice(0, 10),
           currency,
           items: [
             ...(totals.dQty > 0 ? [{ item: 'Drums', description: 'Plastic shipping drum (200-220L)', quantity: totals.dQty, unitPrice: totals.dUnit }] : []),

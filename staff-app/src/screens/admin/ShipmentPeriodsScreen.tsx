@@ -7,6 +7,7 @@ import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/nativ
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { colors, radius, shadow, spacing } from '../../theme';
+import { BackButton } from '../../components/adminui';
 import { money } from '../../lib/format';
 import { isMissingBackend } from '../../lib/offlineQueue';
 
@@ -106,8 +107,15 @@ export default function ShipmentPeriodsScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
+      {/* This screen is the root of the Shipments tab but is *pushed* from the
+          More menu and from Finance, where it had no way back at all.
+          BackButton renders nothing when there is nowhere to go, so it is
+          correct in both places. */}
       <View style={styles.header}>
-        <Text style={styles.title}>{heading}</Text>
+        <View style={styles.headerRow}>
+          <BackButton style={styles.headerBack} />
+          <Text style={styles.title}>{heading}</Text>
+        </View>
         <Text style={styles.subtitle}>
           {live.length} collection period{live.length === 1 ? '' : 's'} with bookings
         </Text>
@@ -232,6 +240,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.sm },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  headerBack: { marginLeft: -4 },
   title: { fontSize: 26, fontWeight: '900', color: colors.text },
   subtitle: { fontSize: 12.5, color: colors.textMuted, marginTop: 2 },
   body: { padding: spacing.md, gap: spacing.sm, paddingBottom: spacing.xl },

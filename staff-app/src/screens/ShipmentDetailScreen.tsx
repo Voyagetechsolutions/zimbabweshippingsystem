@@ -12,7 +12,9 @@ import {
   collectionInfo, paymentAmount, shipmentType, shippedItems,
 } from '../lib/shipment';
 import { buildInvoiceHtml, buildDeliveryNoteHtml, sharePdf } from '../lib/documents';
-import { invoicePrefill, isIssued } from '../lib/invoice';
+import { routeKey } from '../lib/collections';
+import { invoicePrefill, isIssued, prefillLineCount } from '../lib/invoice';
+import { loadRouteCoverage, routeForAddress, type RouteMatch } from '../lib/postcodeRoutes';
 import {
   collectionDateLabel, loadSchedules, resolveCollection,
   type ResolvedCollection, type ScheduleRow,
@@ -114,6 +116,8 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
   const [editDetails, setEditDetails] = useState(false);
   const [form, setForm] = useState<DetailsForm>(blankForm());
+  /** The route the postcode maps to, and whether the typed route disagrees. */
+  const [suggestedRoute, setSuggestedRoute] = useState<RouteMatch | null>(null);
 
   const load = useCallback(async () => {
     const { data: fresh } = await supabase.from('shipments').select('*').eq('id', route.params.shipment.id).maybeSingle();
@@ -164,6 +168,27 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
   // The published schedule is what actually decides a booking's route and
   // date. Loaded once so every shipment can be shown against it.
   useEffect(() => { loadSchedules().then(setSchedules); }, []);
+  // The same postcode-to-route table the website books against.
+  useEffect(() => { loadRouteCoverage().catch(() => {}); }, []);
+
+  /**
+   * Keep the route in step with the address being typed.
+   *
+   * The website picks a booking's route from the pickup postcode. Correcting
+   * that postcode here used to leave the original route in place, so a customer
+   * moved from NN to B stayed on the Northampton round and the Birmingham
+   * driver never saw them. The suggestion is offered rather than forced —
+   * dispatch overrides a round on purpose often enough that silently rewriting
+   * their choice would be worse than the stale route.
+   */
+  useEffect(() => {
+    if (!editDetails) { setSuggestedRoute(null); return; }
+    setSuggestedRoute(routeForAddress({
+      postcode: form.senderPostcode,
+      city: form.senderCity,
+      country: form.senderCountry,
+    }));
+  }, [editDetails, form.senderPostcode, form.senderCity, form.senderCountry]);
 
   /**
    * Always give this screen a way back.
@@ -208,7 +233,9 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
   /** Priced by the booking is not the same as raised by the office. */
   const invoiceIssued = isIssued(invoice);
   const invoiceDeleted = Boolean(invoice.deletedAt);
-  const invoiceLineCount = Array.isArray(invoice.items) ? invoice.items.length : 0;
+  // Counts the lines Create would actually start with — a website booking has
+  // none on the invoice but plenty on the booking itself.
+  const invoiceLineCount = prefillLineCount(shipment);
   const collectedYet = Boolean(shipment.collected_at) || [
     'collected', 'at warehouse', 'enroute to zimbabwe', 'in transit',
     'zim warehouse', 'out for delivery', 'delivered',
@@ -747,6 +774,23 @@ export default function ShipmentDetailScreen({ route, navigation }: Props) {
             <FormField label="Postcode / Eircode" value={form.senderPostcode} onChange={(v) => setForm({ ...form, senderPostcode: v })} autoCapitalize="characters" />
             <FormField label="Country" value={form.senderCountry} onChange={(v) => setForm({ ...form, senderCountry: v })} />
             <FormField label="Collection route" value={form.collectionRoute} onChange={(v) => setForm({ ...form, collectionRoute: v })} />
+            {suggestedRoute && routeKey(suggestedRoute.route) !== routeKey(form.collectionRoute) ? (
+              <Pressable
+                style={styles.routeHint}
+                onPress={() => setForm({ ...form, collectionRoute: suggestedRoute.route })}
+              >
+                <Ionicons name="git-branch-outline" size={16} color={colors.blue} />
+                <Text style={styles.routeHintText}>
+                  {form.senderPostcode.trim() || form.senderCity.trim()} is on{' '}
+                  <Text style={{ fontWeight: '800' }}>{suggestedRoute.route}</Text> — tap to use it
+                </Text>
+              </Pressable>
+            ) : null}
+            {!suggestedRoute && form.senderPostcode.trim() ? (
+              <Text style={styles.routeWarn}>
+                No collection route covers {form.senderPostcode.trim()}. Check the postcode, or set the route by hand.
+              </Text>
+            ) : null}
             <FormField label="Collection date" value={form.collectionDate} onChange={(v) => setForm({ ...form, collectionDate: v })} />
             <Text style={styles.blockLabel}>RECEIVER IN ZIMBABWE</Text>
             <FormField label="Full name" value={form.receiverName} onChange={(v) => setForm({ ...form, receiverName: v })} />
@@ -1104,6 +1148,13 @@ function Row({ k, v, multiline }: { k: string; v: string; multiline?: boolean })
 }
 
 const styles = StyleSheet.create({
+  routeHint: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: colors.blueSoft, borderRadius: radius.sm,
+    paddingHorizontal: 10, paddingVertical: 9, marginTop: -4, marginBottom: 4,
+  },
+  routeHintText: { flex: 1, fontSize: 12.5, color: colors.text },
+  routeWarn: { fontSize: 12, color: colors.amber, marginTop: -4, marginBottom: 4 },
   raiseBlock: {
     gap: 8, padding: spacing.md, marginBottom: spacing.sm,
     borderRadius: radius.md, backgroundColor: colors.amberSoft,

@@ -56,6 +56,67 @@ export function hasIssuedInvoice(s: Shipment): boolean {
 }
 
 /**
+ * Rebuild the priced lines from the booking itself.
+ *
+ * Website bookings write no `metadata.invoice` at all — `SimplifiedBookingForm`
+ * inserts straight into `shipments` and records what was ordered under
+ * `metadata.items` and `metadata.purchasedDrums` instead. Without this, "Create
+ * invoice" on a website booking opened empty and the button sat disabled
+ * telling staff to go and add the items by hand, which is exactly the typing
+ * the prefill exists to avoid.
+ *
+ * Only what the customer actually ordered becomes a line. Nothing is invented,
+ * and a booking that genuinely priced nothing still yields nothing.
+ */
+function linesFromBooking(metadata: any): InvoiceLineItem[] {
+  const lines: InvoiceLineItem[] = [];
+  const items = metadata?.items || {};
+  const add = (description: string, quantity: number, unitPrice: number) => {
+    if (!(quantity > 0) || !(unitPrice > 0)) return;
+    lines.push({ item: description, description, quantity, unitPrice });
+  };
+
+  if (items.drums?.quantity) {
+    add('Shipping drum (200-220L)', Number(items.drums.quantity), Number(items.drums.pricePerDrum));
+  }
+  if (items.trunks?.quantity) {
+    add('Trunk / storage box', Number(items.trunks.quantity), Number(items.trunks.pricePerTrunk));
+  }
+  for (const line of Array.isArray(items.otherItems) ? items.otherItems : []) {
+    add(
+      String(line.description || 'Other item'),
+      Number(line.quantity ?? 1),
+      Number(line.unitPrice ?? line.price ?? 0),
+    );
+  }
+
+  const addOns = items.addOns || {};
+  if (addOns.metalSeal && Number(addOns.metalSealQuantity) > 0) {
+    add('Metal coded seal', Number(addOns.metalSealQuantity), Number(addOns.metalSealPrice));
+  }
+  if (addOns.doorToDoor && Number(addOns.doorToDoorAddressCount) > 0) {
+    const count = Number(addOns.doorToDoorAddressCount);
+    const totalPrice = Number(addOns.doorToDoorPrice) || 0;
+    add(
+      `Zimbabwe door delivery (${count} address${count > 1 ? 'es' : ''})`,
+      count,
+      count > 0 ? totalPrice / count : 0,
+    );
+  }
+
+  const purchased = metadata?.purchasedDrums;
+  if (purchased && Number(purchased.quantity) > 0) {
+    add(
+      purchased.type === 'metal' ? 'Metal drum purchased from us' : 'Plastic barrel purchased from us',
+      Number(purchased.quantity),
+      Number(purchased.priceEach),
+    );
+  }
+
+  return lines;
+}
+
+/**
  * The lines a new invoice should start from.
  *
  * Everything the booking priced, so "Create invoice" opens filled in rather
@@ -67,15 +128,29 @@ export function invoicePrefill(s: Shipment): InvoiceData {
   const currency = existing.currency
     || metadata.pricing?.currency
     || (String(metadata.sender?.country || '').toLowerCase().includes('ireland') ? 'EUR' : 'GBP');
+
+  // Whatever the booking already itemised wins; a website booking has nothing
+  // there and is rebuilt from what was ordered.
+  const existingItems = Array.isArray(existing.items) ? existing.items : [];
+  const items = existingItems.length ? existingItems : linesFromBooking(metadata);
+
   return {
     ...existing,
     currency,
-    items: Array.isArray(existing.items) ? existing.items : [],
+    items,
     discount: Number(existing.discount) || 0,
     taxRate: Number(existing.taxRate) || 0,
     payments: Array.isArray(existing.payments) ? existing.payments : [],
-    paymentTerms: existing.paymentTerms || metadata.pricing?.paymentMethod || '',
+    paymentTerms: existing.paymentTerms
+      || metadata.pricing?.paymentTermsSummary
+      || metadata.pricing?.paymentMethod
+      || '',
   };
+}
+
+/** How many lines "Create invoice" would start with, booking included. */
+export function prefillLineCount(s: Shipment): number {
+  return invoicePrefill(s).items?.length || 0;
 }
 
 export function calculateTotals(inv: InvoiceData) {
