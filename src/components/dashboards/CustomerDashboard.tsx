@@ -15,6 +15,8 @@ import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/EmptyState';
 import html2pdf from 'html2pdf.js';
 import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
+import { PaymentProofUpload } from './PaymentProofUpload';
+import { EditBookingDialog } from './EditBookingDialog';
 
 import { 
   PackageCheck, 
@@ -27,7 +29,8 @@ import {
   Phone,
   Mail,
   FileText,
-  CreditCard
+  CreditCard,
+  Upload
 } from 'lucide-react';
 
 interface CustomQuote {
@@ -47,6 +50,9 @@ interface CustomQuote {
 }
 
 const CustomerDashboard: React.FC = () => {
+  // Which booking the customer is correcting, if any. The app has let them do
+  // this all along; the website sent them to WhatsApp instead.
+  const [editingShipmentId, setEditingShipmentId] = useState<string | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('shipments');
@@ -145,7 +151,7 @@ const CustomerDashboard: React.FC = () => {
     }
   };
 
-  const { data: shipments, isLoading: isLoadingShipments } = useQuery({
+  const { data: shipments, isLoading: isLoadingShipments, refetch: refetchShipments } = useQuery({
     queryKey: ['customerShipments', user?.id],
     queryFn: fetchShipments,
     enabled: !!user?.id
@@ -383,6 +389,10 @@ const CustomerDashboard: React.FC = () => {
               <Badge className="ml-1 bg-amber-100 text-amber-800 hover:bg-amber-100">{unpaidInvoiceCount}</Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="payments" className="flex items-center gap-2">
+            <Upload className="h-4 w-4" />
+            Payments
+          </TabsTrigger>
           <TabsTrigger value="customQuotes" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             <span>Custom Quotes</span>
@@ -410,10 +420,19 @@ const CustomerDashboard: React.FC = () => {
                           <h4 className="text-lg font-medium">Tracking #: {shipment.tracking_number}</h4>
                           {getStatusBadge(shipment.status)}
                         </div>
-                        <Link to={`/shipment/${shipment.id}`} className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center">
-                          View Details
-                          <ChevronRight className="h-4 w-4" />
-                        </Link>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setEditingShipmentId(shipment.id)}
+                            className="text-sm font-medium text-gray-600 hover:text-gray-900"
+                          >
+                            Edit
+                          </button>
+                          <Link to={`/shipment/${shipment.id}`} className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center">
+                            View Details
+                            <ChevronRight className="h-4 w-4" />
+                          </Link>
+                        </div>
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div>
@@ -583,6 +602,12 @@ const CustomerDashboard: React.FC = () => {
           </Card>
         </TabsContent>
 
+        <TabsContent value="payments" className="space-y-4">
+
+          <PaymentProofUpload />
+
+        </TabsContent>
+
         <TabsContent value="customQuotes" className="space-y-4">
           <Card>
             <CardHeader>
@@ -667,6 +692,13 @@ const CustomerDashboard: React.FC = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <EditBookingDialog
+        shipmentId={editingShipmentId}
+        open={Boolean(editingShipmentId)}
+        onOpenChange={(open) => { if (!open) setEditingShipmentId(null); }}
+        onSaved={() => refetchShipments?.()}
+      />
     </div>
   );
 };
