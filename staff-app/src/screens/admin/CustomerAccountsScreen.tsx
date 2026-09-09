@@ -68,8 +68,10 @@ export default function CustomerAccountsScreen() {
   const visible = useMemo(() => {
     const text = query.trim().toLowerCase();
     if (!text) return accounts;
-    return accounts.filter((a) => [a.full_name, a.customer_code, a.phone, a.email]
-      .some((field) => String(field || '').toLowerCase().includes(text)));
+    return accounts.filter((a) =>
+      [a.full_name, a.customer_code, a.customer_reference, a.phone, a.email]
+        .some((field) => String(field || '').toLowerCase().includes(text))
+      || (a.customer_references || []).some((ref) => String(ref).toLowerCase().includes(text)));
   }, [accounts, query]);
 
   const owing = useMemo(
@@ -101,7 +103,7 @@ export default function CustomerAccountsScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.title} numberOfLines={1}>{open.full_name || 'Unnamed customer'}</Text>
             <Text style={styles.subtitle} numberOfLines={1}>
-              {[open.customer_code, open.phone].filter(Boolean).join(' · ') || 'No reference'}
+              {[open.customer_reference, open.phone].filter(Boolean).join(' · ') || 'No reference'}
             </Text>
           </View>
         </View>
@@ -124,6 +126,12 @@ export default function CustomerAccountsScreen() {
               </Text>
             </View>
           ))}
+
+          {(open.customer_references || []).length > 1 ? (
+            <Text style={styles.meta}>
+              References: {(open.customer_references || []).join(', ')}
+            </Text>
+          ) : null}
 
           <Text style={styles.sectionHeading}>What they ship</Text>
           <View style={styles.card}>
@@ -201,7 +209,7 @@ export default function CustomerAccountsScreen() {
                   {account.full_name || 'Unnamed customer'}
                 </Text>
                 <Text style={styles.meta} numberOfLines={1}>
-                  {[account.customer_code, account.phone].filter(Boolean).join(' · ')} ·{' '}
+                  {[account.customer_reference, account.phone].filter(Boolean).join(' · ')} ·{' '}
                   {account.shipments} shipment{account.shipments === 1 ? '' : 's'}
                 </Text>
               </View>

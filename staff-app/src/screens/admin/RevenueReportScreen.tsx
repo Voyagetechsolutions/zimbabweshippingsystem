@@ -9,8 +9,8 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { G, Path, Circle } from 'react-native-svg';
 import { colors, radius, shadow, spacing } from '../../theme';
 import {
-  barFractions, fetchOperationsReport, pieSlices, symbolFor,
-  type OperationsReport, type RouteRow,
+  barFractions, fetchOperationsReport, fetchReportPeriods, pieSlices, symbolFor,
+  type OperationsReport, type PeriodOption, type RouteRow,
 } from '../../lib/operationsReport';
 
 /**
@@ -49,10 +49,15 @@ export default function RevenueReportScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Which collection period the report covers; '' means every period. */
+  const [periodId, setPeriodId] = useState('');
+  const [periodOptions, setPeriodOptions] = useState<PeriodOption[]>([]);
+
+  useEffect(() => { fetchReportPeriods().then(setPeriodOptions).catch(() => {}); }, []);
 
   const load = useCallback(async () => {
     setError(null);
-    const result = await fetchOperationsReport();
+    const result = await fetchOperationsReport(periodId || null);
     if (!result.ok) setError(result.message);
     else {
       setReport(result.data);
@@ -60,7 +65,7 @@ export default function RevenueReportScreen() {
     }
     setLoading(false);
     setRefreshing(false);
-  }, []);
+  }, [periodId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -112,6 +117,37 @@ export default function RevenueReportScreen() {
           ))}
         </View>
       </View>
+
+      {/* Shipments live under a collection period on every other screen, so the
+          report is scoped the same way rather than by a date range. */}
+      {periodOptions.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          // A horizontal ScrollView inside a column will otherwise stretch to
+          // fill the screen and squash the chips to a sliver.
+          style={styles.periodScroll}
+          contentContainerStyle={styles.periodRow}
+        >
+          <Pressable
+            onPress={() => setPeriodId('')}
+            style={[styles.periodChip, periodId === '' && styles.periodChipOn]}
+          >
+            <Text style={[styles.periodText, periodId === '' && { color: colors.white }]}>All periods</Text>
+          </Pressable>
+          {periodOptions.map((option) => (
+            <Pressable
+              key={option.periodId}
+              onPress={() => setPeriodId(option.periodId)}
+              style={[styles.periodChip, periodId === option.periodId && styles.periodChipOn]}
+            >
+              <Text style={[styles.periodText, periodId === option.periodId && { color: colors.white }]}>
+                {option.name} ({option.shipments})
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : null}
 
       <ScrollView
         contentContainerStyle={styles.body}
@@ -379,6 +415,11 @@ const styles = StyleSheet.create({
   currencyChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   currencyChipOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   currencyText: { fontSize: 11, fontWeight: '900', color: colors.textMuted },
+  periodScroll: { flexGrow: 0, flexShrink: 0 },
+  periodRow: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm, gap: 6, alignItems: 'center' },
+  periodChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  periodChipOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+  periodText: { fontSize: 11.5, fontWeight: '800', color: colors.textMuted },
   body: { padding: spacing.md, gap: spacing.sm, paddingBottom: 60 },
   notice: { backgroundColor: colors.amberSoft, borderRadius: radius.md, padding: spacing.sm },
   noticeText: { color: colors.amber, fontSize: 12.5 },

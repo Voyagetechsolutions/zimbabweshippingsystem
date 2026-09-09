@@ -22,7 +22,11 @@ type Balance = { currency: string; spent: number; paid: number; owed: number; sh
 type Account = {
   customer_id: string;
   full_name: string | null;
+  /** Internal identifier (ANN00079). The customer has never seen this. */
   customer_code: string | null;
+  /** The booking reference they read off their invoice (ANN09260012). */
+  customer_reference: string | null;
+  customer_references: string[] | null;
   phone: string | null;
   email: string | null;
   country: string | null;
@@ -81,8 +85,9 @@ export const CustomerAccounts: React.FC = () => {
     const text = query.trim().toLowerCase();
     if (!text) return accounts;
     return accounts.filter((a) =>
-      [a.full_name, a.customer_code, a.phone, a.email]
-        .some((field) => String(field || '').toLowerCase().includes(text)));
+      [a.full_name, a.customer_code, a.customer_reference, a.phone, a.email]
+        .some((field) => String(field || '').toLowerCase().includes(text))
+      || (a.customer_references || []).some((ref) => String(ref).toLowerCase().includes(text)));
   }, [accounts, query]);
 
   /** Owing customers first — that is the reason to open this screen. */
@@ -122,7 +127,7 @@ export const CustomerAccounts: React.FC = () => {
           <CardHeader>
             <CardTitle>{open.full_name || 'Unnamed customer'}</CardTitle>
             <CardDescription>
-              {[open.customer_code, open.phone, open.email, open.country].filter(Boolean).join(' · ')}
+              {[open.customer_reference, open.phone, open.email, open.country].filter(Boolean).join(' · ')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -139,6 +144,11 @@ export const CustomerAccounts: React.FC = () => {
                 </React.Fragment>
               ))}
             </div>
+            {(open.customer_references || []).length > 1 ? (
+              <p className="text-xs text-muted-foreground">
+                References: {(open.customer_references || []).join(', ')}
+              </p>
+            ) : null}
             <p className="text-sm text-muted-foreground">
               {open.shipments} invoiced shipment{open.shipments === 1 ? '' : 's'}
               {open.last_booked ? ` · last booked ${new Date(open.last_booked).toLocaleDateString()}` : ''}
@@ -216,7 +226,7 @@ export const CustomerAccounts: React.FC = () => {
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{account.full_name || 'Unnamed customer'}</p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {[account.customer_code, account.phone].filter(Boolean).join(' · ')} ·{' '}
+                    {[account.customer_reference, account.phone].filter(Boolean).join(' · ')} ·{' '}
                     {account.shipments} shipment{account.shipments === 1 ? '' : 's'}
                   </p>
                 </div>

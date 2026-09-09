@@ -20,13 +20,24 @@ export type CurrencyTotal = {
 
 export type RouteRow = CurrencyTotal & { route: string };
 export type ItemRow = { item: string; quantity: number; shipments: number; currency: string; revenue: number };
-export type MonthRow = { month: string; currency: string; shipments: number; invoiced: number; paid: number };
+export type PeriodRow = {
+  period_id: string;
+  period: string;
+  currency: string;
+  shipments: number;
+  invoiced: number;
+  paid: number;
+  outstanding: number;
+  last_collection: string | null;
+};
+
+export type PeriodOption = { periodId: string; name: string; shipments: number; lastCollection: string | null };
 
 export type OperationsReport = {
   totals: CurrencyTotal[];
   routes: RouteRow[];
   items: ItemRow[];
-  months: MonthRow[];
+  periods: PeriodRow[];
   statuses: Array<{ status: string; shipments: number }>;
   bestRoute: RouteRow | null;
   worstRoute: RouteRow | null;
@@ -38,7 +49,11 @@ export type Balance = { currency: string; spent: number; paid: number; owed: num
 export type CustomerAccount = {
   customer_id: string;
   full_name: string | null;
+  /** Internal identifier (ANN00079); the customer has never seen it. */
   customer_code: string | null;
+  /** The booking reference printed on their invoice (ANN09260012). */
+  customer_reference: string | null;
+  customer_references: string[] | null;
   phone: string | null;
   email: string | null;
   country: string | null;
@@ -50,12 +65,14 @@ export type CustomerAccount = {
 export type Fetched<T> = { ok: true; data: T } | { ok: false; message: string };
 
 export async function fetchOperationsReport(
-  from?: string | null,
-  to?: string | null,
+  periodId?: string | null,
 ): Promise<Fetched<OperationsReport>> {
   const { data, error } = await supabase.rpc('operations_report', {
-    p_from: from ?? null,
-    p_to: to ?? null,
+    p_from: null,
+    p_to: null,
+    // Shipments are filed under a collection period everywhere else, so the
+    // report is scoped that way rather than by a date range.
+    p_period_id: periodId ?? null,
   });
   if (error) return { ok: false, message: error.message };
   if ((data as any)?.error) return { ok: false, message: String((data as any).error) };
@@ -77,6 +94,13 @@ export async function fetchCustomerAccounts(
       items: ((data as any)?.items || []) as ItemRow[],
     },
   };
+}
+
+/** The collection periods worth offering: those holding an issued invoice. */
+export async function fetchReportPeriods(): Promise<PeriodOption[]> {
+  const { data, error } = await supabase.rpc('report_periods');
+  if (error || !Array.isArray(data)) return [];
+  return data as PeriodOption[];
 }
 
 export const symbolFor = (currency: string) =>

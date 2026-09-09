@@ -41,14 +41,24 @@ type CurrencyTotal = {
 
 type RouteRow = CurrencyTotal & { route: string };
 type ItemRow = { item: string; quantity: number; shipments: number; currency: string; revenue: number };
-type MonthRow = { month: string; currency: string; shipments: number; invoiced: number; paid: number };
+type PeriodRow = {
+  period_id: string;
+  period: string;
+  currency: string;
+  shipments: number;
+  invoiced: number;
+  paid: number;
+  outstanding: number;
+  last_collection: string | null;
+};
+type PeriodOption = { periodId: string; name: string; shipments: number; lastCollection: string | null };
 type StatusRow = { status: string; shipments: number };
 
 type Report = {
   totals: CurrencyTotal[];
   routes: RouteRow[];
   items: ItemRow[];
-  months: MonthRow[];
+  periods: PeriodRow[];
   statuses: StatusRow[];
   bestRoute: RouteRow | null;
   worstRoute: RouteRow | null;
@@ -69,25 +79,31 @@ const money = (value: number, currency: string) =>
     minimumFractionDigits: 2, maximumFractionDigits: 2,
   })}`;
 
-const monthLabel = (month: string) => {
-  const parsed = new Date(`${month}-01T12:00:00`);
-  return Number.isNaN(parsed.getTime())
-    ? month
-    : parsed.toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
-};
-
 export const OperationsReport: React.FC<{ title?: string }> = ({ title = 'Reports' }) => {
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currency, setCurrency] = useState<string>('');
+  /** Which collection period the report covers; '' means every period. */
+  const [periodId, setPeriodId] = useState<string>('');
+  const [periodOptions, setPeriodOptions] = useState<PeriodOption[]>([]);
+
+  // The periods worth offering: those that actually hold an invoice.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.rpc('report_periods');
+      if (!cancelled && Array.isArray(data)) setPeriodOptions(data as PeriodOption[]);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       const { data, error: rpcError } = await supabase.rpc('operations_report', {
-        p_from: null, p_to: null,
+        p_from: null, p_to: null, p_period_id: periodId || null,
       });
       if (cancelled) return;
       if (rpcError) setError(rpcError.message);
@@ -102,7 +118,7 @@ export const OperationsReport: React.FC<{ title?: string }> = ({ title = 'Report
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [periodId]);
 
   const totals = useMemo(
     () => report?.totals?.find((t) => t.currency === currency) || null,
@@ -119,8 +135,8 @@ export const OperationsReport: React.FC<{ title?: string }> = ({ title = 'Report
     [report, currency],
   );
 
-  const months = useMemo(
-    () => (report?.months || []).filter((m) => m.currency === currency),
+  const periods = useMemo(
+    () => (report?.periods || []).filter((p) => p.currency === currency),
     [report, currency],
   );
 
@@ -173,7 +189,22 @@ export const OperationsReport: React.FC<{ title?: string }> = ({ title = 'Report
             Issued invoices only — a booking that has not been invoiced is not revenue.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Shipments are filed under a collection period everywhere else, so
+              the report is scoped the same way rather than by a date range. */}
+          <select
+            className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+            value={periodId}
+            onChange={(e) => setPeriodId(e.target.value)}
+            aria-label="Collection period"
+          >
+            <option value="">All collection periods</option>
+            {periodOptions.map((p) => (
+              <option key={p.periodId} value={p.periodId}>
+                {p.name} ({p.shipments})
+              </option>
+            ))}
+          </select>
           {report.totals.map((t) => (
             <Button
               key={t.currency}
@@ -313,30 +344,32 @@ export const OperationsReport: React.FC<{ title?: string }> = ({ title = 'Report
           </CardContent>
         </Card>
 
-        {/* ── Month by month ── */}
+        {/* ── By collection period ── */}
         <Card>
           <CardHeader>
-            <CardTitle>Month by month</CardTitle>
-            <CardDescription>Invoiced against paid, by the month the booking was made.</CardDescription>
+            <CardTitle>By collection period</CardTitle>
+            <CardDescription>
+              Invoiced against paid, per period — the unit the business actually ships in.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            {months.length === 0 ? (
+            {periods.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">Nothing invoiced in {currency} yet.</p>
             ) : (
               <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={months} margin={{ left: 8, right: 16 }}>
+                <LineChart data={periods} margin={{ left: 8, right: 16 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" tickFormatter={monthLabel} fontSize={11} />
+                  <XAxis dataKey="period" fontSize={11} />
                   <YAxis tickFormatter={(v) => money(v, currency)} fontSize={11} width={80} />
-                  <Tooltip formatter={(v: number) => money(v, currency)} labelFormatter={monthLabel} />
+                  <Tooltip formatter={(v: number) => money(v, currency)} />
                   <Legend />
                   <Line
                     type="monotone" dataKey="invoiced" name="Invoiced"
-                    stroke="#009B68" strokeWidth={2.5} dot={{ r: 3 }} animationDuration={1000}
+                    stroke="#009B68" strokeWidth={2.5} dot={{ r: 4 }} animationDuration={1000}
                   />
                   <Line
                     type="monotone" dataKey="paid" name="Paid"
-                    stroke="#1d4ed8" strokeWidth={2.5} dot={{ r: 3 }} animationDuration={1300}
+                    stroke="#1d4ed8" strokeWidth={2.5} dot={{ r: 4 }} animationDuration={1300}
                   />
                 </LineChart>
               </ResponsiveContainer>
