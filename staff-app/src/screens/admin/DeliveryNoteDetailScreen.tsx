@@ -291,7 +291,7 @@ export default function DeliveryNoteDetailScreen({ route, navigation }: Props) {
       ) : null}
 
       <View style={styles.secondaryRow}>
-        {shipment ? <Pressable style={styles.secondaryButton} onPress={() => (navigation as any).getParent()?.navigate('Shipments', { screen: 'ShipmentDetail', params: { shipment } })}>
+        {shipment ? <Pressable style={styles.secondaryButton} onPress={() => (navigation as any).getParent()?.navigate('Shipments', { screen: 'ShipmentDetail', params: { shipment }, initial: false })}>
           <Text style={styles.secondaryText}>View shipment</Text>
         </Pressable> : null}
         <Pressable style={styles.secondaryButton} onPress={() => navigation.navigate('Customers')}>

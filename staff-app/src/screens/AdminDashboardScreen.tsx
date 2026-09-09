@@ -115,7 +115,7 @@ export default function AdminDashboardScreen() {
 
   const openShipment = (shipment: Shipment) => {
     setQuery('');
-    navigation.navigate('Shipments', { screen: 'ShipmentDetail', params: { shipment } });
+    navigation.navigate('Shipments', { screen: 'ShipmentDetail', params: { shipment }, initial: false });
   };
 
   const stats = useMemo(() => ({
@@ -129,11 +129,11 @@ export default function AdminDashboardScreen() {
   const recent = useMemo(() => filtered.slice(0, 6), [filtered]);
 
   const quickActions = [
-    { icon: 'add-circle' as const, label: 'Booking', onPress: () => navigation.navigate('Menu', { screen: 'ManualBooking' }) },
+    { icon: 'add-circle' as const, label: 'Booking', onPress: () => navigation.navigate('Menu', { screen: 'ManualBooking', initial: false }) },
     { icon: 'cube' as const, label: 'Shipments', onPress: () => navigation.navigate('Shipments') },
     { icon: 'car' as const, label: 'Driver Run', onPress: () => navigation.navigate('Runs') },
-    { icon: 'person' as const, label: 'Customer', onPress: () => navigation.navigate('Menu', { screen: 'Customers' }) },
-    { icon: 'cash' as const, label: 'Payment', onPress: () => navigation.navigate('Menu', { screen: 'Payments' }) },
+    { icon: 'person' as const, label: 'Customer', onPress: () => navigation.navigate('Menu', { screen: 'Customers', initial: false }) },
+    { icon: 'cash' as const, label: 'Payment', onPress: () => navigation.navigate('Menu', { screen: 'Payments', initial: false }) },
   ];
 
   if (loading) {

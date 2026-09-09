@@ -343,7 +343,7 @@ export default function FinanceDashboardScreen() {
           <Pressable style={styles.quickAction} onPress={() => navigation.navigate('Reports')}><Ionicons name="bar-chart-outline" size={19} color={colors.primary} /><Text style={styles.quickText}>Reports</Text></Pressable>
           <Pressable style={styles.quickAction} onPress={() => navigation.navigate('CashFlow')}><Ionicons name="trending-up-outline" size={19} color={colors.primary} /><Text style={styles.quickText}>Cash Flow</Text></Pressable>
           <Pressable style={styles.quickAction} onPress={() => navigation.navigate('Zimmy')}><Ionicons name="sparkles-outline" size={19} color={colors.purple} /><Text style={styles.quickText}>Zimmy AI</Text></Pressable>
-          <Pressable style={styles.quickAction} onPress={() => navigation.getParent()?.navigate('Payments', { screen: 'Reconciliation' })}><Ionicons name="git-compare-outline" size={19} color={colors.orange} /><Text style={styles.quickText}>Reconcile</Text></Pressable>
+          <Pressable style={styles.quickAction} onPress={() => navigation.getParent()?.navigate('Payments', { screen: 'Reconciliation', initial: false })}><Ionicons name="git-compare-outline" size={19} color={colors.orange} /><Text style={styles.quickText}>Reconcile</Text></Pressable>
         </View>
 
         <View>

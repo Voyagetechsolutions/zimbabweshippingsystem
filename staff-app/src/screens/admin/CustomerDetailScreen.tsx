@@ -222,7 +222,7 @@ export default function CustomerDetailScreen({ route, navigation }: Props) {
   const openShipment = (shipment: any) => {
     const routes = (navigation.getState()?.routeNames || []) as string[];
     if (routes.includes('ShipmentDetail')) (navigation as any).navigate('ShipmentDetail', { shipment });
-    else (navigation as any).getParent()?.navigate('Shipments', { screen: 'ShipmentDetail', params: { shipment } });
+    else (navigation as any).getParent()?.navigate('Shipments', { screen: 'ShipmentDetail', params: { shipment }, initial: false });
   };
 
   const goToDocument = (shipmentId: string) =>

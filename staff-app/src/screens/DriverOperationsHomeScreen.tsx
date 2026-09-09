@@ -259,6 +259,8 @@ export default function DriverOperationsHomeScreen() {
   const openShipment = (job: DriverJob) => {
     navigation.navigate('Route', {
       screen: 'StopDetails',
+      // Keep the run screen underneath, or Back from a stop has nowhere to go.
+      initial: false,
       params: {
         stop: {
           id: job.id,
@@ -326,7 +328,7 @@ export default function DriverOperationsHomeScreen() {
       
 
       <Text style={styles.sectionTitle}>Quick actions</Text>
-      <View style={styles.quickGrid}><Quick icon="map-outline" label="View route" onPress={() => quickAction('Route')} />{selectedCountry === 'Zimbabwe' ? null : <Quick icon="calendar-outline" label="Collections ahead" onPress={() => navigation.navigate('Route', { screen: 'CollectionsAhead' })} />}<Quick icon="alert-circle-outline" label="Report issue" onPress={() => quickAction('Messages')} danger /><Quick icon="headset-outline" label="Contact dispatch" onPress={() => quickAction('dispatch')} /></View>
+      <View style={styles.quickGrid}><Quick icon="map-outline" label="View route" onPress={() => quickAction('Route')} />{selectedCountry === 'Zimbabwe' ? null : <Quick icon="calendar-outline" label="Collections ahead" onPress={() => navigation.navigate('Route', { screen: 'CollectionsAhead', initial: false })} />}<Quick icon="alert-circle-outline" label="Report issue" onPress={() => quickAction('Messages')} danger /><Quick icon="headset-outline" label="Contact dispatch" onPress={() => quickAction('dispatch')} /></View>
     </ScrollView>
   </SafeAreaView>;
 }
