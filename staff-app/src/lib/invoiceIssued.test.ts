@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasIssuedInvoice, invoicePrefill, isIssued } from './invoice';
+import { hasIssuedInvoice, invoicePrefill, isIssued, prefillLineCount } from './invoice';
 import { statusChoices } from './shipment';
 
 const shipment = (invoice: any, extra: any = {}) =>
@@ -102,5 +102,67 @@ describe('statusChoices', () => {
 
   it('ignores blanks', () => {
     expect(statusChoices([null, undefined, '', '   '])).not.toContain('');
+  });
+});
+
+describe('invoicePrefill from a website booking', () => {
+  // A website booking writes no metadata.invoice at all; everything ordered
+  // lives under metadata.items. This is the shape SimplifiedBookingForm writes.
+  const websiteBooking = (extra: any = {}) => ({
+    id: 'w',
+    metadata: {
+      sender: { country: 'England' },
+      items: {
+        drums: { quantity: 1, pricePerDrum: 280 },
+        addOns: { doorToDoor: true, doorToDoorAddressCount: 1, doorToDoorPrice: 25, metalSeal: false },
+      },
+      pricing: { baseAmount: 305, finalAmount: 305, currency: 'GBP', paymentMethod: 'payOnArrival' },
+      ...extra,
+    },
+  } as any);
+
+  it('rebuilds the lines a website booking never wrote', () => {
+    const items = invoicePrefill(websiteBooking()).items!;
+    expect(items).toHaveLength(2);
+    const total = items.reduce((sum, i) => sum + (i.quantity! * i.unitPrice!), 0);
+    expect(total).toBe(305);
+  });
+
+  it('is no longer blocked as an empty invoice', () => {
+    // This is the bug: the button was disabled telling staff to add items by
+    // hand, on a booking that had already itemised everything.
+    expect(prefillLineCount(websiteBooking())).toBe(2);
+  });
+
+  it('carries the pay-on-arrival premium as its own line', () => {
+    const s = websiteBooking({
+      pricing: { baseAmount: 305, finalAmount: 366, currency: 'GBP', paymentMethod: 'payOnArrival', payOnArrivalPremium: 61 },
+    });
+    const items = invoicePrefill(s).items!;
+    expect(items.map((i) => i.description)).toContain('Pay on arrival premium');
+    const total = items.reduce((sum, i) => sum + (i.quantity! * i.unitPrice!), 0);
+    expect(total).toBe(366);
+  });
+
+  it('prices per address when several delivery addresses were booked', () => {
+    const s = websiteBooking({
+      items: {
+        drums: { quantity: 2, pricePerDrum: 280 },
+        addOns: { doorToDoor: true, doorToDoorAddressCount: 2, doorToDoorPrice: 50 },
+      },
+    });
+    const line = invoicePrefill(s).items!.find((i) => /door delivery/.test(String(i.description)))!;
+    expect(line.quantity).toBe(2);
+    expect(line.unitPrice).toBe(25);
+  });
+
+  it('leaves an already itemised invoice alone', () => {
+    const s = websiteBooking({ invoice: { items: [{ description: 'Agreed price', quantity: 1, unitPrice: 500 }] } });
+    expect(invoicePrefill(s).items).toHaveLength(1);
+    expect(invoicePrefill(s).items![0].unitPrice).toBe(500);
+  });
+
+  it('invents nothing when the booking priced nothing', () => {
+    expect(prefillLineCount({ id: 'x', metadata: { items: {} } } as any)).toBe(0);
   });
 });

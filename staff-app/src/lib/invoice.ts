@@ -113,6 +113,13 @@ function linesFromBooking(metadata: any): InvoiceLineItem[] {
     );
   }
 
+  // The pay-on-arrival premium is money the customer agreed to at booking, so
+  // it belongs on the invoice as its own line. Taken from what was recorded
+  // rather than recalculated: a booking quoted before the rate changed must be
+  // invoiced at the rate it was quoted at, not today's.
+  const premium = Number(metadata?.pricing?.payOnArrivalPremium) || 0;
+  if (premium > 0) add('Pay on arrival premium', 1, premium);
+
   return lines;
 }
 
