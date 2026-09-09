@@ -41,7 +41,18 @@ type Proof = {
   created_at: string;
 };
 
-const MAX_BYTES = 8 * 1024 * 1024;
+/**
+ * Exactly what the `payment-proofs` bucket accepts.
+ *
+ * Storage rejects anything else, and it does so with a message no customer can
+ * act on. HEIC is the trap: it is what an iPhone camera produces by default, it
+ * satisfies a naive `image/*` check, and it is not on this list — so the most
+ * likely file a customer picks would have failed at the last step.
+ */
+const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+const ACCEPT_ATTR = ACCEPTED.join(',');
+/** The bucket's own ceiling; refusing earlier just wastes the customer's time. */
+const MAX_BYTES = 10 * 1024 * 1024;
 
 /** The last twelve months, newest first — the app offers the same list. */
 const recentMonths = () =>
@@ -102,12 +113,16 @@ export const PaymentProofUpload: React.FC = () => {
 
   const choose = (chosen: File | null) => {
     if (!chosen) return;
-    if (!chosen.type.startsWith('image/') && chosen.type !== 'application/pdf') {
-      toast({ title: 'Use an image or PDF', description: 'A screenshot, photo or PDF statement.', variant: 'destructive' });
+    if (!ACCEPTED.includes(chosen.type)) {
+      toast({
+        title: 'That file type will not upload',
+        description: 'Please use a JPEG, PNG, WebP or PDF. On an iPhone, Settings › Camera › Formats › Most Compatible saves photos as JPEG.',
+        variant: 'destructive',
+      });
       return;
     }
     if (chosen.size > MAX_BYTES) {
-      toast({ title: 'That file is too large', description: 'Please keep it under 8MB.', variant: 'destructive' });
+      toast({ title: 'That file is too large', description: 'Please keep it under 10MB.', variant: 'destructive' });
       return;
     }
     if (preview) URL.revokeObjectURL(preview);
@@ -250,11 +265,12 @@ export const PaymentProofUpload: React.FC = () => {
 
           <div className="space-y-2">
             <Label htmlFor="proof-file">Screenshot, photo or PDF</Label>
+            <p className="text-xs text-muted-foreground">JPEG, PNG, WebP or PDF, up to 10MB.</p>
             <Input
               id="proof-file"
               ref={fileInput}
               type="file"
-              accept="image/*,application/pdf"
+              accept={ACCEPT_ATTR}
               onChange={(e) => choose(e.target.files?.[0] || null)}
             />
             {preview ? (

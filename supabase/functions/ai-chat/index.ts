@@ -313,6 +313,37 @@ function parseCollectionDate(value: unknown): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+/**
+ * Pull a shipment identifier out of what the customer typed.
+ *
+ * The old pattern only recognised ZIMSHIP/ZSS/ZS. That missed the two forms
+ * customers most often quote:
+ *
+ *   - the customer reference, "ANN09260012" - three letters then eight digits.
+ *     54 of 114 live shipments carry one, and it is the string printed on their
+ *     invoice and shown in both apps.
+ *   - tracking numbers beginning "INVOICE-", which 29 shipments have.
+ *
+ * With neither recognised, most "where is my shipment" questions reached the
+ * model with no tracking data at all, and it answered as though the shipment
+ * did not exist.
+ *
+ * Longest form first, so "INVOICE-20260828-2228-W10Z" is not cut down to a
+ * shorter match found inside it.
+ */
+function extractShipmentReference(text: string): string | null {
+  const patterns = [
+    /\bINVOICE-[A-Z0-9-]{4,}\b/i,
+    /\b(?:ZIMSHIP|ZSS|ZSN|ZS)-?[A-Z0-9-]{4,}\b/i,
+    /\b[A-Z]{3}\d{8}\b/i,
+  ];
+  for (const pattern of patterns) {
+    const hit = text.match(pattern)?.[0];
+    if (hit) return hit.trim();
+  }
+  return null;
+}
+
 async function getLiveOperationsContext(history: ChatMessage[]): Promise<LiveOperations> {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return {
@@ -325,7 +356,7 @@ async function getLiveOperationsContext(history: ChatMessage[]): Promise<LiveOpe
 
   const supabase = getAdminClient();
   const latestUserText = [...history].reverse().find((message) => message.role === "user")?.content || "";
-  const trackingNumber = latestUserText.match(/\b(?:ZIMSHIP|ZSS|ZS)-?[A-Z0-9-]{4,}\b/i)?.[0] || null;
+  const trackingNumber = extractShipmentReference(latestUserText);
 
   const [{ data: schedules }, { data: configurationRows }, { data: catalogue }] = await Promise.all([
     supabase.from("collection_schedules").select("id,route,pickup_date,areas,country").limit(200),
