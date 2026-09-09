@@ -37,6 +37,40 @@ as $$
       or trim(p_name) ~* '^(to be (confirmed|assigned)|not (set|assigned)|tbc|n/?a|none|unknown|-|—)$';
 $$;
 
+/**
+ * The name an invoice line should be counted under.
+ *
+ * Seal lines carry their codes in the description — "Seal 058439, 058414,
+ * 058448" — so every consignment produced a uniquely named "item" and the
+ * question "what do people ship most" answered itself with a list of serial
+ * numbers instead of goods. They are all the same product, so they are counted
+ * as one.
+ *
+ * Nothing else is collapsed. Merging further would fold "Metal drum purchased
+ * from us" into "Shipping drum", and those are different things the business
+ * sells for different money.
+ */
+create or replace function public.report_item_label(p_description text)
+returns text
+language sql
+immutable
+as $$
+  select case
+    when trim(coalesce(p_description, '')) = '' then 'Unnamed item'
+    when trim(p_description) ~* '^(metal[[:space:]]+)?(coded[[:space:]]+)?seal' then 'Metal coded seal'
+    else coalesce((
+      -- Singular and plural are the same goods. "Black Plastic Barrels" and
+      -- "Black Plastic Barrel" were counted as two different things, splitting
+      -- the very total this report exists to give. A trailing "s" is dropped
+      -- from each word; words ending "ss" are left alone so "Glass" survives.
+      select string_agg(
+        case when length(w) > 3 and w ~* 's$' and w !~* 'ss$'
+             then left(w, length(w) - 1) else w end, ' ' order by ord)
+      from unnest(string_to_array(initcap(lower(trim(p_description))), ' ')) with ordinality t(w, ord)
+    ), initcap(lower(trim(p_description))))
+  end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- A. Shared shape: one issued invoice, flattened
 -- ---------------------------------------------------------------------------
@@ -156,7 +190,7 @@ begin
   -- things the business sells.
   items as (
     select
-      initcap(lower(trim(coalesce(i->>'description', i->>'item', 'Unnamed item')))) as item,
+      public.report_item_label(coalesce(i->>'description', i->>'item')) as item,
       sum(coalesce((i->>'quantity')::numeric, 0))                                   as quantity,
       count(distinct sc.shipment_id)                                                as shipments,
       sc.currency,
@@ -283,7 +317,7 @@ begin
       select jsonb_agg(x order by (x->>'quantity')::numeric desc)
       from (
         select jsonb_build_object(
-          'item', initcap(lower(trim(coalesce(i->>'description', i->>'item', 'Unnamed item')))),
+          'item', public.report_item_label(coalesce(i->>'description', i->>'item')),
           'quantity', sum(coalesce((i->>'quantity')::numeric, 0)),
           'shipments', count(distinct sc.shipment_id),
           'currency', sc.currency,
@@ -294,7 +328,7 @@ begin
         cross join lateral jsonb_array_elements(
           case when jsonb_typeof(s.metadata->'invoice'->'items') = 'array'
                then s.metadata->'invoice'->'items' else '[]'::jsonb end) i
-        group by 1 + 0, initcap(lower(trim(coalesce(i->>'description', i->>'item', 'Unnamed item')))), sc.currency
+        group by 1 + 0, public.report_item_label(coalesce(i->>'description', i->>'item')), sc.currency
       ) t), '[]'::jsonb) end
   ) into v_result;
 
