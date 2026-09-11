@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase';
 import { Button, Field, FlagStripe, SectionTitle } from '../components/ui';
 import { colors, radius, spacing } from '../theme';
 import { useAppTheme } from '../context/ThemeContext';
-import { longDate, parseCollectionDate } from '../lib/format';
+import { longDate, ordinalDate, isoDay } from '../lib/format';
 import { useBusinessConfig } from '../lib/businessConfig';
 
 export default function EditShipmentScreen() {
@@ -29,14 +29,43 @@ export default function EditShipmentScreen() {
   useEffect(() => { (async () => {
     const [{ data: shipment, error }, { data: dates }] = await Promise.all([
       supabase.from('shipments').select('id,origin,destination,status,collection_status,driver_status,metadata').eq('id', id).single(),
-      supabase.from('collection_schedules').select('id,route,pickup_date,country').limit(200),
+      // Every collection still open, not one per route: a route runs once a
+      // consignment and two or three are normally open, so moving from
+      // September to October is a real choice a customer may want to make.
+      supabase.from('route_collection_dates')
+        .select('id,pickup_on,collection_schedule:collection_schedules!inner(id,route,country)')
+        .eq('published', true)
+        .is('deleted_at', null)
+        .gte('pickup_on', isoDay(new Date()))
+        .order('pickup_on', { ascending: true })
+        .limit(400),
     ]);
     if (error || !shipment) { Alert.alert('Could not open booking', error?.message || 'Shipment not found.'); navigation.goBack(); return; }
     const meta: any = shipment.metadata || {};
     setSender(meta.sender || {}); setRecipient(meta.recipient || {}); setCollection(meta.collection || {});
     setPaymentMethod(meta.pricing?.paymentMethod || 'Bank Transfer');
     const ireland = String(meta.sender?.country || '').toLowerCase().includes('ireland');
-    setSchedules((dates || []).filter((date: any) => ireland ? String(date.country || '').toLowerCase().includes('ireland') : !String(date.country || '').toLowerCase().includes('ireland')).map((date: any) => ({ ...date, parsed: parseCollectionDate(date.pickup_date) })).filter((date: any) => date.parsed && date.parsed.getTime() >= Date.now() - 86400000).sort((a: any,b: any) => a.parsed.getTime()-b.parsed.getTime()));
+    setSchedules((dates || [])
+      .map((row: any) => {
+        const [y, m, d] = String(row.pickup_on).split('-').map(Number);
+        const parsed = new Date(y, m - 1, d);
+        return {
+          // The date row identifies the option; the schedule id is what the
+          // booking stores as its route, and two options can share one.
+          optionId: row.id,
+          scheduleId: row.collection_schedule?.id,
+          route: row.collection_schedule?.route,
+          country: row.collection_schedule?.country,
+          // Written to metadata.collection.date, which the server parses back
+          // to decide the consignment — so it must be the ordinal spelling.
+          pickup_date: ordinalDate(parsed),
+          parsed,
+        };
+      })
+      .filter((row: any) => row.scheduleId && (ireland
+        ? String(row.country || '').toLowerCase().includes('ireland')
+        : !String(row.country || '').toLowerCase().includes('ireland')))
+      .sort((a: any, b: any) => a.parsed.getTime() - b.parsed.getTime()));
     setBusy(false);
   })(); }, [id]);
 
@@ -65,7 +94,25 @@ export default function EditShipmentScreen() {
       <Field label="Delivery address" value={recipient.address || ''} onChangeText={(address) => setRecipient({...recipient,address})} multiline />
       <Field label="Town / city" value={recipient.city || ''} onChangeText={(city) => setRecipient({...recipient,city})} />
       <SectionTitle text="Upcoming collection date" />
-      {schedules.map((date) => <Pressable key={date.id} onPress={() => setCollection({route:date.route,date:date.pickup_date,scheduleId:date.id})} style={[styles.option,{backgroundColor:palette.surface,borderColor:collection.scheduleId===date.id?colors.green:palette.border}]}><View style={{flex:1}}><Text style={[styles.optionTitle,{color:palette.text}]}>{date.route}</Text><Text style={{color:palette.textMuted}}>{longDate(date.parsed)}</Text></View><Ionicons name={collection.scheduleId===date.id?'radio-button-on':'radio-button-off'} size={21} color={collection.scheduleId===date.id?colors.green:palette.textFaint}/></Pressable>)}
+      {schedules.map((date) => {
+        // The route alone no longer identifies a choice, so the stored date has
+        // to agree too — otherwise picking October would light up September as
+        // well, both being the same route.
+        const selected = collection.scheduleId === date.scheduleId && collection.date === date.pickup_date;
+        return (
+          <Pressable
+            key={date.optionId}
+            onPress={() => setCollection({ route: date.route, date: date.pickup_date, scheduleId: date.scheduleId })}
+            style={[styles.option, { backgroundColor: palette.surface, borderColor: selected ? colors.green : palette.border }]}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.optionTitle, { color: palette.text }]}>{date.route}</Text>
+              <Text style={{ color: palette.textMuted }}>{longDate(date.parsed)}</Text>
+            </View>
+            <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={21} color={selected ? colors.green : palette.textFaint} />
+          </Pressable>
+        );
+      })}
       <SectionTitle text="Payment method" />
       {payments.map((method) => <Pressable key={method} onPress={() => setPaymentMethod(method)} style={[styles.option,{backgroundColor:palette.surface,borderColor:paymentMethod===method?colors.green:palette.border}]}><Text style={[styles.optionTitle,{color:palette.text,flex:1}]}>{method}</Text><Ionicons name={paymentMethod===method?'radio-button-on':'radio-button-off'} size={21} color={paymentMethod===method?colors.green:palette.textFaint}/></Pressable>)}
       <Text style={[styles.note,{color:palette.textMuted}]}>Items and prices are locked after booking. Ask the team if those need changing.</Text>

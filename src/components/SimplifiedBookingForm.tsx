@@ -9,6 +9,12 @@ import { ChevronRight, ChevronLeft, Package, Truck, User, MapPin, CreditCard, Wa
 import { format, addDays, isAfter, isBefore, startOfDay } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  fetchCollectionOffer,
+  reconcileChoice,
+  EMPTY_OFFER,
+  type CollectionOffer,
+} from '@/utils/collectionOptions';
 import BookingReceipt from '@/components/BookingReceipt';
 import { getRouteForPostalCode, getIrelandRouteForCity, irelandCities, initializeRouteCache } from '@/utils/postalCodeUtils';
 import { paymentBreakdown, policyFromConfig } from '@/utils/paymentTerms';
@@ -344,8 +350,14 @@ export const SimplifiedBookingForm = () => {
   const [bookingComplete, setBookingComplete] = useState(false);
   const [receiptData, setReceiptData] = useState<any>(null);
   const [collectionRoute, setCollectionRoute] = useState<string | null>(null);
-  const [collectionDate, setCollectionDate] = useState<string | null>(null);
+  // Every collection this route still has open, and which one the customer
+  // picked. `collectionDate` stays the single string the rest of the form,
+  // the receipt and `metadata.collection.date` have always used.
+  const [collectionOffer, setCollectionOffer] = useState<CollectionOffer>(EMPTY_OFFER);
+  const [chosenDateId, setChosenDateId] = useState<string | null>(null);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
+  const chosenCollection = reconcileChoice(collectionOffer.options, chosenDateId);
+  const collectionDate = chosenCollection?.label ?? null;
   const { toast } = useToast();
   const navigate = useNavigate();
   // Booking stays open to guests, but a signed-in customer's booking must be
@@ -460,11 +472,20 @@ export const SimplifiedBookingForm = () => {
     return () => { cancelled = true; };
   }, [user]);
 
-  // Fetch collection schedule based on postal code or Ireland city
+  /**
+   * Which route covers this address, and which of its collections are open.
+   *
+   * The route comes from `app_configuration.uk_route_coverage` (UK postcode
+   * prefixes) or the Ireland city map — the one place that decision is made.
+   * The dates then come from a single RPC. This used to be three chained
+   * `.single()` queries guessing at the " ROUTE" suffix, and because `.single()`
+   * errors on anything but exactly one row it could only ever surface one date;
+   * the server normalises the suffix now and returns them all.
+   */
   const fetchCollectionSchedule = async (postcodeOrCity: string) => {
     if (!postcodeOrCity || postcodeOrCity.length < 2) {
       setCollectionRoute(null);
-      setCollectionDate(null);
+      setCollectionOffer(EMPTY_OFFER);
       return;
     }
 
@@ -472,77 +493,26 @@ export const SimplifiedBookingForm = () => {
 
     setLoadingSchedule(true);
     try {
-      // Detect route from postal code (UK) or city (Ireland)
       const route = isIreland
         ? getIrelandRouteForCity(formData.pickupCity)
         : getRouteForPostalCode(postcodeOrCity);
 
       if (!route) {
         setCollectionRoute(null);
-        setCollectionDate(null);
-        setLoadingSchedule(false);
+        setCollectionOffer(EMPTY_OFFER);
         return;
       }
 
-      setCollectionRoute(route);
-
-      // Try both formats: with and without " ROUTE" suffix
-      // Database might store as "LONDON" or "LONDON ROUTE"
-      const routeWithSuffix = route.includes(' ROUTE') ? route : `${route} ROUTE`;
-      const routeWithoutSuffix = route.replace(' ROUTE', '');
-
-      console.log('Fetching schedule for route:', route, '| Trying:', routeWithoutSuffix, 'and', routeWithSuffix);
-
-      // Fetch collection date from database - try without suffix first
-      let { data, error } = await supabase
-        .from('collection_schedules')
-        .select('pickup_date, route')
-        .eq('route', routeWithoutSuffix)
-        .single();
-
-      // If not found, try with suffix
-      if (error || !data) {
-        const result = await supabase
-          .from('collection_schedules')
-          .select('pickup_date, route')
-          .eq('route', routeWithSuffix)
-          .single();
-        data = result.data;
-        error = result.error;
-      }
-
-      // If still not found, try case-insensitive search
-      if (error || !data) {
-        const result = await supabase
-          .from('collection_schedules')
-          .select('pickup_date, route')
-          .ilike('route', `%${routeWithoutSuffix}%`)
-          .limit(1)
-          .single();
-        data = result.data;
-        error = result.error;
-      }
-
-      if (error) {
-        console.error('Error fetching collection schedule:', error);
-        setCollectionDate('To be confirmed');
-      } else if (data) {
-        console.log('Found schedule:', data);
-        // Only set date if it's actually set (not "Not set", "To be confirmed", or empty)
-        const pickupDate = data.pickup_date;
-        if (pickupDate && 
-            pickupDate !== 'Not set' && 
-            pickupDate !== 'To be confirmed' &&
-            pickupDate.trim() !== '') {
-          setCollectionDate(pickupDate);
-        } else {
-          setCollectionDate('To be confirmed');
-        }
-      } else {
-        setCollectionDate('To be confirmed');
-      }
+      const offer = await fetchCollectionOffer(route);
+      setCollectionRoute(offer.route || route);
+      setCollectionOffer(offer);
+      // Drop a choice the new route does not offer — keeping it would book a
+      // van that never comes to this postcode. reconcileChoice then falls back
+      // to the soonest date, so a real answer is always on screen.
+      setChosenDateId((prev) => (offer.options.some((o) => o.id === prev) ? prev : null));
     } catch (error) {
-      console.error('Error in fetchCollectionSchedule:', error);
+      console.error('Could not load the collection dates for this address:', error);
+      setCollectionOffer(EMPTY_OFFER);
     } finally {
       setLoadingSchedule(false);
     }
@@ -923,7 +893,14 @@ export const SimplifiedBookingForm = () => {
         },
         collection: {
           route: collectionRoute,
-          date: collectionDate
+          date: collectionDate,
+          // Which collection the customer actually picked. The date string
+          // alone is enough for the server to file the shipment under the
+          // right consignment, but recording the ids means a later rename or
+          // reshuffle of the schedule cannot make the booking ambiguous.
+          dateId: chosenCollection?.id ?? null,
+          periodId: chosenCollection?.periodId ?? null,
+          period: chosenCollection?.period ?? null,
         },
         paymentSchedule: formData.usePaymentSchedule ? {
           enabled: true,
@@ -962,22 +939,11 @@ export const SimplifiedBookingForm = () => {
         notes: notes.length > 0 ? notes.join(' | ') : null
       };
       
-      // Find matching collection schedule based on route and date
-      let collectionScheduleId = null;
-      try {
-        const { data: scheduleData, error: scheduleError } = await supabase
-          .from('collection_schedules')
-          .select('id')
-          .eq('route', collectionRoute)
-          .eq('pickup_date', collectionDate)
-          .maybeSingle();
-        
-        if (!scheduleError && scheduleData) {
-          collectionScheduleId = scheduleData.id;
-        }
-      } catch (err) {
-        console.warn('Could not link to collection schedule:', err);
-      }
+      // The offer already carries the route's schedule id, so there is nothing
+      // left to look up. Matching on `pickup_date` — as this did — could only
+      // ever find the one date the route currently advertises, so a booking for
+      // any other collection silently linked to no schedule at all.
+      const collectionScheduleId = collectionOffer.scheduleId;
       
       const transactionId = `TX-${timestamp.slice(-12)}`;
       const schedulePayload = formData.usePaymentSchedule
@@ -1051,7 +1017,7 @@ export const SimplifiedBookingForm = () => {
             collection_schedule_id: collectionScheduleId,
             can_modify: true,
             can_cancel: true,
-          })
+          } as never)
           .select()
           .single();
         if (shipmentError) throw shipmentError;
@@ -1088,7 +1054,7 @@ export const SimplifiedBookingForm = () => {
             payment_info: paymentInfo,
             collection_info: collectionInfo,
             payment_schedule: schedulePayload,
-          });
+          } as never);
         if (receiptError) throw receiptError;
 
         booking = {
@@ -1278,7 +1244,8 @@ export const SimplifiedBookingForm = () => {
               updateField('pickupCity', '');
               updateField('pickupPostcode', '');
               setCollectionRoute(null);
-              setCollectionDate(null);
+              setCollectionOffer(EMPTY_OFFER);
+              setChosenDateId(null);
             }}
           >
             <SelectTrigger id="country">
@@ -1336,7 +1303,8 @@ export const SimplifiedBookingForm = () => {
                   fetchCollectionSchedule(value);
                 } else {
                   setCollectionRoute(null);
-                  setCollectionDate(null);
+                  setCollectionOffer(EMPTY_OFFER);
+                  setChosenDateId(null);
                 }
               }}
             />
@@ -1398,35 +1366,76 @@ export const SimplifiedBookingForm = () => {
               <Info className="h-5 w-5 text-emerald-600 dark:text-emerald-400 mt-0.5" />
               <div className="flex-1">
                 <p className="font-semibold text-emerald-900 dark:text-emerald-300 mb-3">Collection Information</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Route */}
-                  <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-lg p-2 border border-emerald-100 dark:border-emerald-900">
-                    <div className="p-1.5 bg-emerald-500 rounded">
-                      <Truck className="h-4 w-4 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Route</p>
-                      <p className="font-semibold text-emerald-900 dark:text-emerald-100 text-sm">{collectionRoute}</p>
-                    </div>
+                <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-lg p-2 border border-emerald-100 dark:border-emerald-900 mb-3">
+                  <div className="p-1.5 bg-emerald-500 rounded">
+                    <Truck className="h-4 w-4 text-white" />
                   </div>
-                  
-                  {/* Collection Date */}
-                  <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-lg p-2 border border-emerald-100 dark:border-emerald-900">
-                    <div className="p-1.5 bg-amber-500 rounded">
-                      <CalendarClock className="h-4 w-4 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">Next Collection</p>
-                      {loadingSchedule ? (
-                        <p className="font-semibold text-gray-500 dark:text-gray-400 text-sm italic">Loading...</p>
-                      ) : (
-                        <p className="font-semibold text-amber-900 dark:text-amber-100 text-sm">
-                          {collectionDate || 'To be confirmed'}
-                        </p>
-                      )}
-                    </div>
+                  <div>
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Route</p>
+                    <p className="font-semibold text-emerald-900 dark:text-emerald-100 text-sm">{collectionRoute}</p>
                   </div>
                 </div>
+
+                {/*
+                  Which collection to join. More than one consignment is
+                  normally open at a time — in mid-September a London customer
+                  can still make the 19th, or wait for October — so this is a
+                  choice, not a notice. One option renders as a single card and
+                  needs no decision from the customer.
+                */}
+                {loadingSchedule ? (
+                  <p className="text-sm text-emerald-800 dark:text-emerald-300 italic">
+                    Checking collection dates for your area...
+                  </p>
+                ) : collectionOffer.options.length === 0 ? (
+                  <div className="flex items-start gap-2 bg-white dark:bg-gray-800 rounded-lg p-3 border border-amber-200 dark:border-amber-900">
+                    <CalendarClock className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                    <p className="text-sm text-amber-900 dark:text-amber-200">
+                      We cover <span className="font-semibold">{collectionRoute}</span>, but the next
+                      collection date has not been published yet. Book now and we will confirm your
+                      date — you will not lose your place.
+                    </p>
+                  </div>
+                ) : (
+                  <fieldset>
+                    <legend className="text-xs text-emerald-700 dark:text-emerald-400 font-medium mb-2">
+                      {collectionOffer.options.length > 1
+                        ? 'Choose your collection date'
+                        : 'Your collection date'}
+                    </legend>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {collectionOffer.options.map((option) => {
+                        const selected = chosenCollection?.id === option.id;
+                        return (
+                          <label
+                            key={option.id}
+                            className={`flex items-start gap-2 rounded-lg p-3 border-2 cursor-pointer transition-colors ${
+                              selected
+                                ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/40'
+                                : 'border-emerald-100 dark:border-emerald-900 bg-white dark:bg-gray-800 hover:border-emerald-300'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="collectionDate"
+                              className="mt-1 accent-emerald-600"
+                              checked={selected}
+                              onChange={() => setChosenDateId(option.id)}
+                            />
+                            <span className="min-w-0">
+                              <span className="block font-semibold text-emerald-900 dark:text-emerald-100 text-sm">
+                                {option.label}
+                              </span>
+                              <span className="block text-xs text-emerald-700 dark:text-emerald-400 truncate">
+                                {option.period}
+                              </span>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+                )}
               </div>
             </div>
           </div>

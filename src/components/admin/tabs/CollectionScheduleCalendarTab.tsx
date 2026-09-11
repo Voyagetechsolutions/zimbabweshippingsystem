@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import TabHeader from '../TabHeader';
 import ScheduleGenerateApprove from '../ScheduleGenerateApprove';
+import CollectionDatesEditor from '../CollectionDatesEditor';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns';
@@ -737,6 +738,10 @@ const CollectionScheduleCalendarTab = () => {
       {/* Generate the next round of dates and publish them on approval. Sits
           above the existing manual tools rather than replacing them. */}
       <ScheduleGenerateApprove onPublished={fetchData} />
+
+      {/* Many dates per route. The tools below still edit the single date each
+          route carries; this is the list customers actually choose from. */}
+      <CollectionDatesEditor />
 
       <TabHeader
         title="Collection Schedule"

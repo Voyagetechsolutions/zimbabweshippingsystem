@@ -44,6 +44,43 @@ export function parseCollectionDate(value: unknown): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+/**
+ * The calendar day a Date falls on, as "YYYY-MM-DD".
+ *
+ * `toISOString().slice(0, 10)` is the obvious way to do this and it is wrong
+ * for these dates. `parseCollectionDate` builds its ordinal form — "September
+ * 19th, 2026", the shape every published schedule uses — through the bare
+ * `Date` constructor, which lands on *local* midnight. In Ireland on summer
+ * time that is 23:00 UTC the day before, so the ISO string names the 18th and
+ * a customer confirming their collection slot is shown, and stored against,
+ * the wrong day.
+ */
+export function isoDay(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
+
+/**
+ * "September 19th, 2026" — the canonical spelling of a collection date.
+ *
+ * The JS mirror of the database's `schedule_date_text`. Every published
+ * schedule and every `metadata.collection.date` ever written is in this form,
+ * and the server reads it straight back with `parse_schedule_date` to decide
+ * which consignment a booking belongs to — so a date the app sends has to be
+ * spelled exactly this way, not merely be a readable date.
+ */
+export function ordinalDate(date: Date): string {
+  const day = date.getDate();
+  const suffix = day % 100 >= 11 && day % 100 <= 13 ? 'th'
+    : day % 10 === 1 ? 'st'
+    : day % 10 === 2 ? 'nd'
+    : day % 10 === 3 ? 'rd'
+    : 'th';
+  return `${MONTHS[date.getMonth()]} ${day}${suffix}, ${date.getFullYear()}`;
+}
+
 export function daysUntil(date: Date): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);

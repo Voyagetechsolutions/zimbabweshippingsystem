@@ -12,7 +12,7 @@ import { Country, currencyFor, priceFor } from '../lib/catalogue';
 import { useBusinessConfig } from '../lib/businessConfig';
 import { BookingDraft, EMPTY_DRAFT, QuoteCarry, SessionExpiredError, createBooking, draftLines } from '../lib/booking';
 import { CustomerAddress, listAddresses, addressSummary, pickupSummary } from '../lib/addresses';
-import { parseCollectionDate, longDate, money } from '../lib/format';
+import { parseCollectionDate, longDate, money, ordinalDate, isoDay } from '../lib/format';
 import {
   scheduleMatchesPostcode, autocompletePostcode, searchAddresses, lookupUkPostcode,
   coverageForUkPostcode, prettyPostcode, type Coverage,
@@ -26,6 +26,8 @@ const STEPS = ['Collection', 'Sender', 'Delivery', 'Shipment', 'Payment', 'Revie
 const DRAFT_KEY = 'zim-booking-draft-v2';
 
 type ScheduleRow = { id: string; route: string; pickup_date: string; country?: string | null; areas?: any };
+/** One collection a route runs. Many per route — see route_collection_dates. */
+type RouteDateRow = { id: string; schedule_id: string; pickup_on: string; collection_period_id: string };
 type DepotRow = { id: string; name: string; city: string; address_line1: string; opening_hours: string | null };
 
 export default function BookScreen() {
@@ -38,6 +40,9 @@ export default function BookScreen() {
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<BookingDraft>(EMPTY_DRAFT);
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
+  const [routeDates, setRouteDates] = useState<RouteDateRow[]>([]);
+  // Null until the customer picks; the soonest date stands in until then.
+  const [chosenDateId, setChosenDateId] = useState<string | null>(null);
   const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
   const [pickupAddresses, setPickupAddresses] = useState<CustomerAddress[]>([]);
   const [pickupAddressId, setPickupAddressId] = useState<string | null>(null);
@@ -123,6 +128,26 @@ export default function BookScreen() {
       .then(({ data }) => setSchedules((data as ScheduleRow[]) || []));
   }, []);
 
+  /**
+   * Every collection still open, for every route.
+   *
+   * `collection_schedules` carries one date per route and publishing a new
+   * month overwrote the old one, which is why this screen could only ever
+   * resolve a single date. `route_collection_dates` keeps one row per
+   * collection, so a customer in mid-September can still choose the September
+   * van or wait for October.
+   */
+  useEffect(() => {
+    supabase.from('route_collection_dates')
+      .select('id, schedule_id, pickup_on, collection_period_id')
+      .eq('published', true)
+      .is('deleted_at', null)
+      .gte('pickup_on', isoDay(new Date()))
+      .order('pickup_on', { ascending: true })
+      .limit(400)
+      .then(({ data }) => setRouteDates((data as RouteDateRow[]) || []));
+  }, []);
+
   // Zimbabwe collection points for self-collection. Absent until the depot
   // migration is applied, which the UI copes with.
   useEffect(() => {
@@ -169,19 +194,51 @@ export default function BookScreen() {
       .map((s) => ({ ...s, parsed: parseCollectionDate(s.pickup_date) }));
   }, [hasLocation, schedules, draft.country, draft.collectionPostcode, draft.collectionCity]);
 
-  const upcoming = useMemo(() => myRoutes
-    .filter((s) => s.parsed && s.parsed.getTime() >= Date.now() - 86400000)
-    .sort((a, b) => (a.parsed as Date).getTime() - (b.parsed as Date).getTime())
-    .slice(0, 12), [myRoutes]);
+  /**
+   * Every collection a covering route still has open, soonest first.
+   *
+   * One entry per *collection*, not per route: a route runs once a
+   * consignment, and two or three consignments are normally open at a time.
+   * `id` stays the schedule id because that is what the booking records as its
+   * route; `dateId` identifies which of that route's collections was chosen.
+   *
+   * `pickup_date` is rebuilt as the ordinal spelling rather than passed
+   * through as an ISO day, because it is written to
+   * `metadata.collection.date` and the server parses it back to decide which
+   * consignment the shipment belongs to.
+   */
+  const upcoming = useMemo(() => {
+    const byRoute = new Map(myRoutes.map((r) => [r.id, r]));
+    return routeDates
+      .filter((d) => byRoute.has(d.schedule_id))
+      .map((d) => {
+        const [y, m, day] = d.pickup_on.split('-').map(Number);
+        const parsed = new Date(y, m - 1, day);
+        return {
+          id: d.schedule_id,
+          dateId: d.id,
+          periodId: d.collection_period_id,
+          route: byRoute.get(d.schedule_id)!.route,
+          pickup_date: ordinalDate(parsed),
+          parsed,
+        };
+      })
+      .sort((a, b) => a.parsed.getTime() - b.parsed.getTime())
+      .slice(0, 12);
+  }, [myRoutes, routeDates]);
 
   /**
-   * The collection date, which the customer does not choose.
+   * The collection the booking will be made against.
    *
-   * The postcode decides the route and the route carries the date, so as soon
-   * as a serviceable postcode is typed the answer is already known — there is
-   * nothing to pick. The soonest published date on a covering route wins.
+   * The postcode decides the route, but the route no longer decides the date:
+   * more than one of its collections is usually open, so the customer picks.
+   * The soonest stands in until they do, which is the answer this screen gave
+   * when there was only ever one.
    */
-  const resolvedCollection = useMemo(() => upcoming[0] ?? null, [upcoming]);
+  const resolvedCollection = useMemo(
+    () => upcoming.find((u) => u.dateId === chosenDateId) ?? upcoming[0] ?? null,
+    [upcoming, chosenDateId],
+  );
 
   /**
    * Routes that cover this customer but whose published date has already gone.
@@ -191,9 +248,12 @@ export default function BookScreen() {
    * area awaiting a new date see no route at all and assume we do not come to
    * them. Naming the route and saying a new date is due is the honest version.
    */
-  const awaitingNewDate = useMemo(() => myRoutes
-    .filter((s) => !s.parsed || s.parsed.getTime() < Date.now() - 86400000)
-    .sort((a, b) => a.route.localeCompare(b.route)), [myRoutes]);
+  const awaitingNewDate = useMemo(() => {
+    const scheduled = new Set(upcoming.map((u) => u.id));
+    return myRoutes
+      .filter((s) => !scheduled.has(s.id))
+      .sort((a, b) => a.route.localeCompare(b.route));
+  }, [myRoutes, upcoming]);
 
   /**
    * The date to put in front of the customer when their own route has none.
@@ -276,6 +336,12 @@ export default function BookScreen() {
       ? d
       : { ...d, scheduleId: id, route, collectionDate: date }));
   }, [resolvedCollection, schedules.length]);
+
+  // Moving to an address a different route covers must not keep a date that
+  // route does not run — it would book a van that never comes here.
+  useEffect(() => {
+    if (chosenDateId && !upcoming.some((u) => u.dateId === chosenDateId)) setChosenDateId(null);
+  }, [upcoming, chosenDateId]);
 
   // Door delivery needs somewhere to drive to. Self-collection only needs to
   // know who is collecting and from where — there is no street address.
@@ -564,8 +630,50 @@ export default function BookScreen() {
               )}
 
               {/* The date follows the location, so it belongs after both the
-                  UK postcode and the Irish town — Ireland routes by city. */}
-              {shownCollection ? (
+                  UK postcode and the Irish town — Ireland routes by city.
+
+                  With more than one consignment open this is a choice rather
+                  than a notice: a customer in mid-September can take the
+                  September van or wait for October. A single option keeps the
+                  old card, which asks nothing of them. */}
+              {upcoming.length > 1 ? (
+                <>
+                  <Text style={[styles.pickerHeading, { color: palette.text }]}>
+                    Choose your collection date
+                  </Text>
+                  {upcoming.map((option) => {
+                    const selected = resolvedCollection?.dateId === option.dateId;
+                    return (
+                      <Pressable
+                        key={option.dateId}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected }}
+                        onPress={() => setChosenDateId(option.dateId)}
+                        style={[
+                          styles.dateOption,
+                          selected
+                            ? { backgroundColor: palette.greenSoft, borderColor: colors.green }
+                            : { backgroundColor: palette.surface, borderColor: palette.border },
+                        ]}
+                      >
+                        <Ionicons
+                          name={selected ? 'radio-button-on' : 'radio-button-off'}
+                          size={18}
+                          color={selected ? palette.greenDark : palette.textMuted}
+                        />
+                        <View style={styles.dateOptionBody}>
+                          <Text style={[styles.dateOptionDate, { color: selected ? palette.greenDark : palette.text }]}>
+                            {longDate(option.parsed)}
+                          </Text>
+                          <Text style={[styles.dateOptionRoute, { color: palette.textMuted }]}>
+                            {option.route}
+                          </Text>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </>
+              ) : shownCollection ? (
                 <View style={[
                   styles.coverage,
                   shownCollection.confirmed
@@ -989,6 +1097,23 @@ const baseStyles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   coverageText: { flex: 1, fontSize: 12.5, lineHeight: 18, fontWeight: '600' },
+
+  // The collection-date picker. Rows are tall enough to be a comfortable touch
+  // target at the bottom of a long form on a phone.
+  pickerHeading: { fontSize: 13, fontWeight: '700', marginBottom: spacing.sm },
+  dateOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1.5,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  dateOptionBody: { flex: 1 },
+  dateOptionDate: { fontSize: 14, fontWeight: '700' },
+  dateOptionRoute: { fontSize: 12, marginTop: 1 },
   methodRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
   method: {
     flex: 1,

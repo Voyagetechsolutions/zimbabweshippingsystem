@@ -33,6 +33,12 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminCountry } from '@/contexts/AdminCountryContext';
 import { getRouteForPostalCode, getIrelandRouteForCity, irelandCities, initializeRouteCache } from '@/utils/postalCodeUtils';
+import {
+  fetchCollectionOffer,
+  reconcileChoice,
+  EMPTY_OFFER,
+  type CollectionOffer,
+} from '@/utils/collectionOptions';
 import { useBusinessConfiguration } from '@/hooks/useBusinessConfiguration';
 
 interface FormData {
@@ -76,8 +82,13 @@ const ManualBookingTab: React.FC = () => {
   const { selectedCountry } = useAdminCountry();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [collectionRoute, setCollectionRoute] = useState<string | null>(null);
-  const [collectionDate, setCollectionDate] = useState<string | null>(null);
+  // Every collection this route still has open, and which one was picked.
+  // `collectionDate` stays the single string the booking payload has always used.
+  const [collectionOffer, setCollectionOffer] = useState<CollectionOffer>(EMPTY_OFFER);
+  const [chosenDateId, setChosenDateId] = useState<string | null>(null);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
+  const chosenCollection = reconcileChoice(collectionOffer.options, chosenDateId);
+  const collectionDate = chosenCollection?.label ?? null;
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [trackingNumber, setTrackingNumber] = useState('');
   const cataloguePrice=(id:string)=>{const item=business.catalogue.find((row)=>row.id===id);return Number(selectedCountry==='Ireland'?item?.priceIE:item?.priceUK)||0;};
@@ -115,11 +126,18 @@ const ManualBookingTab: React.FC = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  // Fetch collection schedule based on postal code or city
+  /**
+   * Which route covers this address, and which of its collections are open.
+   *
+   * One RPC in place of three chained `.single()` queries guessing at the
+   * " ROUTE" suffix. `.single()` errors on anything but exactly one row, so
+   * that shape could only ever surface a single date — the same reason a
+   * customer taking a phone booking could not be offered next month's van.
+   */
   const fetchCollectionSchedule = async (postcodeOrCity: string) => {
     if (!postcodeOrCity || postcodeOrCity.length < 2) {
       setCollectionRoute(null);
-      setCollectionDate(null);
+      setCollectionOffer(EMPTY_OFFER);
       return;
     }
 
@@ -133,55 +151,17 @@ const ManualBookingTab: React.FC = () => {
 
       if (!route) {
         setCollectionRoute(null);
-        setCollectionDate(null);
-        setLoadingSchedule(false);
+        setCollectionOffer(EMPTY_OFFER);
         return;
       }
 
-      setCollectionRoute(route);
-
-      // Fetch from database
-      const routeWithSuffix = route.includes(' ROUTE') ? route : `${route} ROUTE`;
-      const routeWithoutSuffix = route.replace(' ROUTE', '');
-
-      let { data, error } = await supabase
-        .from('collection_schedules')
-        .select('pickup_date, route')
-        .eq('route', routeWithoutSuffix)
-        .single();
-
-      if (error || !data) {
-        const result = await supabase
-          .from('collection_schedules')
-          .select('pickup_date, route')
-          .eq('route', routeWithSuffix)
-          .single();
-        data = result.data;
-        error = result.error;
-      }
-
-      if (error || !data) {
-        const result = await supabase
-          .from('collection_schedules')
-          .select('pickup_date, route')
-          .ilike('route', `%${routeWithoutSuffix}%`)
-          .limit(1)
-          .single();
-        data = result.data;
-      }
-
-      if (data) {
-        const pickupDate = data.pickup_date;
-        if (pickupDate && pickupDate !== 'Not set' && pickupDate !== 'To be confirmed' && pickupDate.trim() !== '') {
-          setCollectionDate(pickupDate);
-        } else {
-          setCollectionDate('To be confirmed');
-        }
-      } else {
-        setCollectionDate('To be confirmed');
-      }
+      const offer = await fetchCollectionOffer(route);
+      setCollectionRoute(offer.route || route);
+      setCollectionOffer(offer);
+      setChosenDateId((prev) => (offer.options.some((o) => o.id === prev) ? prev : null));
     } catch (error) {
-      console.error('Error in fetchCollectionSchedule:', error);
+      console.error('Could not load the collection dates for this address:', error);
+      setCollectionOffer(EMPTY_OFFER);
     } finally {
       setLoadingSchedule(false);
     }
@@ -253,7 +233,8 @@ const ManualBookingTab: React.FC = () => {
       bookingSource: 'WhatsApp',
     });
     setCollectionRoute(null);
-    setCollectionDate(null);
+    setCollectionOffer(EMPTY_OFFER);
+    setChosenDateId(null);
     setBookingSuccess(false);
     setTrackingNumber('');
   };
@@ -352,7 +333,10 @@ const ManualBookingTab: React.FC = () => {
         },
         collection: {
           route: collectionRoute,
-          date: collectionDate
+          date: collectionDate,
+          dateId: chosenCollection?.id ?? null,
+          periodId: chosenCollection?.periodId ?? null,
+          period: chosenCollection?.period ?? null,
         },
         admin: {
           manualBooking: true,
@@ -609,10 +593,46 @@ const ManualBookingTab: React.FC = () => {
                     <Truck className="h-4 w-4" />
                     <span className="font-medium">{collectionRoute}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-emerald-700 mt-1">
-                    <CalendarClock className="h-4 w-4" />
-                    <span>{loadingSchedule ? 'Loading...' : collectionDate || 'To be confirmed'}</span>
-                  </div>
+                  {/* More than one consignment is normally open, so staff
+                      taking a phone booking get the same choice the customer
+                      gets on the website. */}
+                  {loadingSchedule ? (
+                    <div className="flex items-center gap-2 text-emerald-700 mt-1">
+                      <CalendarClock className="h-4 w-4" />
+                      <span>Loading...</span>
+                    </div>
+                  ) : collectionOffer.options.length === 0 ? (
+                    <div className="flex items-center gap-2 text-amber-800 mt-1">
+                      <CalendarClock className="h-4 w-4" />
+                      <span>No collection date published for this route yet</span>
+                    </div>
+                  ) : (
+                    <div className="mt-2 space-y-1.5">
+                      {collectionOffer.options.map((option) => {
+                        const selected = chosenCollection?.id === option.id;
+                        return (
+                          <label
+                            key={option.id}
+                            className={`flex items-center gap-2 rounded-md border px-2 py-1.5 text-sm cursor-pointer ${
+                              selected
+                                ? 'border-emerald-500 bg-white font-medium text-emerald-900'
+                                : 'border-emerald-200 text-emerald-800 hover:border-emerald-400'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="manualCollectionDate"
+                              className="accent-emerald-600"
+                              checked={selected}
+                              onChange={() => setChosenDateId(option.id)}
+                            />
+                            <span>{option.label}</span>
+                            <span className="ml-auto text-xs opacity-70">{option.period}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

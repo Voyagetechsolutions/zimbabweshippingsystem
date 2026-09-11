@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase';
 import { colors, spacing, radius } from '../theme';
 import { Card, Button, FlagStripe, SectionTitle } from '../components/ui';
 import { KeyboardAwareScroll } from '../components/KeyboardAwareScroll';
-import { longDate, parseCollectionDate } from '../lib/format';
+import { longDate, parseCollectionDate, isoDay } from '../lib/format';
 import { loadNextCollection, type NextCollection } from '../lib/collectionSchedule';
 import {
   CollectionSlot, SLOT_WINDOWS, confirmSlot, effectiveWindow, hhmm, loadSlot, slotState, windowLabel,
@@ -63,7 +63,7 @@ export default function ConfirmCollectionScreen() {
     if (!current) {
       const raw = (shipment as any)?.metadata?.collection?.date;
       const parsed = parseCollectionDate(raw);
-      if (parsed) setSlot((s) => (s ? { ...s, collection_date: parsed.toISOString().slice(0, 10) } : s));
+      if (parsed) setSlot((s) => (s ? { ...s, collection_date: isoDay(parsed) } : s));
     }
     const meta = (shipment as any)?.metadata || {};
     const sender = meta.sender || meta.senderDetails || {};
