@@ -63,6 +63,20 @@
         "staff-app/dist"
       ],
       "port": 8086
+    },
+    {
+      "name": "staff-app-live",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "staff-app",
+        "run",
+        "web",
+        "--",
+        "--port",
+        "8085"
+      ],
+      "port": 8085
     }
   ]
 }

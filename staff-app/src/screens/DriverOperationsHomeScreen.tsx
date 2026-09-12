@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import RunMap from '../components/RunMap';
+import { ConfirmSheet } from '../components/OptionSheet';
 import { useAuth, type DriverType } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { colors, radius, shadow, spacing } from '../theme';
@@ -89,6 +90,12 @@ export default function DriverOperationsHomeScreen() {
   const [week, setWeek] = useState<ScheduledDay[]>([]);
   const [weekError, setWeekError] = useState<string | null>(null);
   const [period, setPeriod] = useState<'today' | 'week'>('today');
+  // The location notice shown before a shift starts. An in-app sheet rather
+  // than Alert/window.confirm: RN Web turns Alert into a no-op and a browser
+  // confirm can be suppressed or dismissed by the browser, in which case the
+  // clock-in silently did nothing and the driver was left off shift with no
+  // explanation. This cannot fail quietly.
+  const [confirmClockIn, setConfirmClockIn] = useState(false);
   const channelKey = useRef(`driver-home-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`);
 
   const load = useCallback(async () => {
@@ -222,15 +229,9 @@ export default function DriverOperationsHomeScreen() {
   };
 
   const toggleOnline = () => {
+    // Clocking out needs no notice; clocking in explains the location sharing.
     if (online) { void applyOnlineStatus(false); return; }
-    if (Platform.OS === 'web') {
-      if (window.confirm('Clock in? Your location is shared with the office while working. You can still view collections without GPS permission.')) void applyOnlineStatus(true);
-      return;
-    }
-    Alert.alert('Location while you are online', 'Zimbabwe Shipping shares your route location with dispatch while you are online and working. Tracking stops when you go offline. Your phone may ask for background location permission.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Continue', onPress: () => { void applyOnlineStatus(true); } },
-    ]);
+    setConfirmClockIn(true);
   };
 
   const startOrContinue = async () => {
@@ -365,6 +366,15 @@ export default function DriverOperationsHomeScreen() {
       <Text style={styles.assignmentNote}>Navigation opens your maps app for spoken, turn-by-turn directions. Stops without a map pin can still be opened and collected.</Text>
       <Pressable style={styles.outlineButton} onPress={()=>quickAction('dispatch')}><Ionicons name="headset-outline" size={20} color={colors.primary}/><Text style={styles.outlineButtonText}>CONTACT THE OFFICE</Text></Pressable>
     </ScrollView>
+    <ConfirmSheet
+      visible={confirmClockIn}
+      title="Start your shift"
+      message={'Your route location is shared with the office while you are clocked in, and stops when you clock out. Your phone may ask for background location permission. You can still see and collect your stops without it.'}
+      confirmLabel="Clock in"
+      busy={busy === 'presence'}
+      onConfirm={() => { setConfirmClockIn(false); void applyOnlineStatus(true); }}
+      onClose={() => setConfirmClockIn(false)}
+    />
   </SafeAreaView>;
 }
 
