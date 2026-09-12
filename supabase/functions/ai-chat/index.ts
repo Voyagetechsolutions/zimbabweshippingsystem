@@ -133,12 +133,82 @@ function hasRequiredLeadFields(lead: LeadDetails): boolean {
   return hasContact && Boolean(lead.shipment_items);
 }
 
+const BOOKING_FIELD_LABELS: Array<[keyof BookingDetails, string]> = [
+  ["name", "sender name"],
+  ["phone_number", "sender phone"],
+  ["origin_country", "collection country"],
+  ["collection_address", "collection address"],
+  ["destination", "Zimbabwe destination"],
+  ["recipient_name", "receiver name"],
+  ["recipient_phone", "receiver phone"],
+  ["shipment_items", "what is being shipped"],
+  ["payment_method", "payment method"],
+];
+
+/**
+ * Which of the nine required fields are still missing.
+ *
+ * Returned as a list rather than a boolean because the boolean was the whole
+ * problem: when it came back false the booking was skipped, and because the
+ * prompt forbids setting should_submit_lead at the same time as
+ * should_create_booking, the lead branch was skipped too. The conversation
+ * ended with nothing written anywhere. Between 14 July and 10 September that
+ * happened to 43 of the 51 booking conversations, including customers who had
+ * already answered "All correct".
+ */
+function missingBookingFields(booking: BookingDetails): string[] {
+  return BOOKING_FIELD_LABELS
+    .filter(([key]) => !booking[key])
+    .map(([, label]) => label);
+}
+
 function hasRequiredBookingFields(booking: BookingDetails): boolean {
-  return Boolean(
-    booking.name && booking.phone_number && booking.origin_country &&
-    booking.collection_address && booking.destination && booking.recipient_name &&
-    booking.recipient_phone && booking.shipment_items && booking.payment_method
-  );
+  return missingBookingFields(booking).length === 0;
+}
+
+/**
+ * An intended booking that could not be completed, handed to the office.
+ *
+ * Never silently dropped: whatever the customer did give us goes into the
+ * requests inbox with the gaps named, so somebody can finish it on one phone
+ * call. This matters more than it looks — `zimmy_chat_events` redacts phone
+ * numbers and emails out of the transcript for analytics, so a conversation
+ * that writes no request row leaves no way to contact the customer at all.
+ */
+async function saveIncompleteBooking(booking: BookingDetails, missing: string[]) {
+  const supabase = getAdminClient();
+  const contact = [
+    booking.phone_number ? `Phone: ${booking.phone_number}` : null,
+    booking.email ? `Email: ${booking.email}` : null,
+  ].filter(Boolean).join(" | ");
+
+  const details = [
+    "Zimmy had a booking confirmed by the customer but could not complete it.",
+    `Still needed: ${missing.join(", ")}.`,
+    "",
+    booking.shipment_items ? `Items: ${booking.shipment_items}` : null,
+    booking.origin_country ? `From: ${booking.origin_country}` : null,
+    booking.collection_address ? `Collection: ${booking.collection_address}` : null,
+    booking.requested_collection_date ? `Requested date: ${booking.requested_collection_date}` : null,
+    booking.route ? `Route: ${booking.route}` : null,
+    booking.destination ? `Zimbabwe destination: ${booking.destination}` : null,
+    booking.recipient_name ? `Receiver: ${booking.recipient_name}` : null,
+    booking.recipient_phone ? `Receiver phone: ${booking.recipient_phone}` : null,
+    booking.payment_method ? `Payment: ${booking.payment_method}` : null,
+    contact || null,
+  ].filter((line) => line !== null).join("\n");
+
+  const { error } = await supabase.from("customer_requests").insert({
+    customer_name: booking.name || "Zimmy booking (name not given)",
+    whatsapp_number: booking.phone_number
+      || (booking.email ? `Email only: ${booking.email}` : "No contact captured"),
+    request_type: "Booking — needs completing",
+    message: details,
+    status: "New",
+    unread: true,
+    source: "website_ai_chat",
+  });
+  if (error) throw error;
 }
 
 function conversationAlreadySubmitted(history: ChatMessage[]): boolean {
@@ -861,13 +931,12 @@ serve(async (req) => {
     let leadSubmitted = false;
     let leadId: string | null = null;
     let bookingCreated = false;
+    let bookingHandedToOffice = false;
     let bookingResult: Awaited<ReturnType<typeof createAiBooking>> | null = null;
+    const bookingWanted = structured.should_create_booking === true && !conversationAlreadyBooked(history);
+    const bookingGaps = bookingWanted ? missingBookingFields(booking) : [];
 
-    if (
-      structured.should_create_booking === true &&
-      !conversationAlreadyBooked(history) &&
-      hasRequiredBookingFields(booking)
-    ) {
+    if (bookingWanted && bookingGaps.length === 0) {
       try {
         bookingResult = await createAiBooking(booking);
         bookingCreated = true;
@@ -876,10 +945,25 @@ serve(async (req) => {
         console.error("Failed to create AI booking:", bookingError);
         reply = "I have all your booking details, but I could not create the booking right now. Please try again shortly or ask me to send the request to a representative.";
       }
+    } else if (bookingWanted) {
+      // The customer meant to book and something was missing. Hand over what
+      // we have rather than dropping it: the lead branch below cannot catch
+      // this, because the prompt forbids setting should_submit_lead alongside
+      // should_create_booking, so without this the conversation ends with
+      // nothing written anywhere.
+      try {
+        await saveIncompleteBooking(booking, bookingGaps);
+        bookingHandedToOffice = true;
+        reply = `Thanks — I have your details. I still need ${bookingGaps.join(", ")} to finish the booking, so I have passed everything to the office and someone will call you to confirm the rest.`;
+      } catch (handoverError) {
+        console.error("Failed to hand an incomplete AI booking to the office:", handoverError);
+        reply = "Thanks — I have your details, but I could not pass them to the office automatically. Please message us on WhatsApp so we can finish your booking.";
+      }
     }
 
     if (
       !bookingCreated &&
+      !bookingHandedToOffice &&
       structured.should_submit_lead === true &&
       !conversationAlreadySubmitted(history) &&
       hasRequiredLeadFields(lead)
@@ -912,6 +996,12 @@ serve(async (req) => {
         bookingCreated,
         shipmentId: bookingResult?.shipmentId || null,
         customerReference: bookingResult?.customerReference || null,
+        // Why a booking did not happen. Without these two the only evidence
+        // was an absence, which is how 43 lost conversations went unnoticed
+        // for two months.
+        bookingWanted,
+        missingBookingFields: bookingGaps,
+        bookingHandedToOffice,
       },
     });
 
@@ -921,6 +1011,7 @@ serve(async (req) => {
       leadSubmitted,
       leadId,
       bookingCreated,
+      bookingHandedToOffice,
       booking: bookingResult,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
