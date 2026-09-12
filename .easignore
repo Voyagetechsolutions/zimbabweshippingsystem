@@ -10,8 +10,9 @@
 **/node_modules/
 **/.expo/
 **/dist/
-**/dist-verify/
-**/dist-verify2/
+# Any dist-* scratch export. Named individually before, so a new one
+# (dist-driver-check, 13 MB) went into the upload unnoticed.
+**/dist-*/
 **/web-build/
 /.git/
 .git/
