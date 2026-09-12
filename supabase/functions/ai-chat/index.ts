@@ -167,48 +167,71 @@ function hasRequiredBookingFields(booking: BookingDetails): boolean {
 }
 
 /**
- * An intended booking that could not be completed, handed to the office.
+ * One request row per conversation, enriched as the conversation goes.
  *
- * Never silently dropped: whatever the customer did give us goes into the
- * requests inbox with the gaps named, so somebody can finish it on one phone
- * call. This matters more than it looks — `zimmy_chat_events` redacts phone
- * numbers and emails out of the transcript for analytics, so a conversation
- * that writes no request row leaves no way to contact the customer at all.
+ * Every outcome comes through here — booked, booked-but-incomplete, quote
+ * lead, or just an enquiry with a contact number — so the office has a single
+ * place to work from and one row per customer rather than one per message.
+ *
+ * Upserted on `conversation_id`. An existing row is refreshed rather than
+ * duplicated, and is only pushed back to unread while it is still New: once
+ * somebody has marked it Contacted or Resolved, a later message updates the
+ * details without dragging it back to the top of the pile.
  */
-async function saveIncompleteBooking(booking: BookingDetails, missing: string[]) {
+async function recordForOffice(input: {
+  conversationId: string;
+  requestType: string;
+  name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  message: string;
+  shipmentId?: string | null;
+  customerReference?: string | null;
+}) {
   const supabase = getAdminClient();
+  const contact = input.phone
+    || (input.email ? `Email only: ${input.email}` : "No contact captured");
+
+  const row: Record<string, unknown> = {
+    conversation_id: input.conversationId,
+    customer_name: input.name || "Zimmy enquiry (name not given)",
+    whatsapp_number: contact,
+    request_type: input.requestType,
+    message: input.message,
+    status: "New",
+    unread: true,
+    source: "website_ai_chat",
+  };
+  if (input.shipmentId) row.shipment_id = input.shipmentId;
+  if (input.customerReference) row.customer_reference = input.customerReference;
+
+  const { error } = await supabase
+    .from("customer_requests")
+    .upsert(row, { onConflict: "conversation_id" });
+  if (error) throw error;
+}
+
+/** Everything known about the conversation, as a note somebody can act on. */
+function officeNotes(booking: BookingDetails, lead: LeadDetails, extra: string[] = []): string {
   const contact = [
-    booking.phone_number ? `Phone: ${booking.phone_number}` : null,
-    booking.email ? `Email: ${booking.email}` : null,
+    booking.phone_number || lead.phone_number ? `Phone: ${booking.phone_number || lead.phone_number}` : null,
+    booking.email || lead.email ? `Email: ${booking.email || lead.email}` : null,
   ].filter(Boolean).join(" | ");
 
-  const details = [
-    "Zimmy had a booking confirmed by the customer but could not complete it.",
-    `Still needed: ${missing.join(", ")}.`,
-    "",
-    booking.shipment_items ? `Items: ${booking.shipment_items}` : null,
-    booking.origin_country ? `From: ${booking.origin_country}` : null,
-    booking.collection_address ? `Collection: ${booking.collection_address}` : null,
+  return [
+    ...extra,
+    booking.shipment_items || lead.shipment_items ? `Items: ${booking.shipment_items || lead.shipment_items}` : null,
+    booking.origin_country || lead.origin ? `From: ${booking.origin_country || lead.origin}` : null,
+    booking.collection_address || lead.collection_address ? `Collection: ${booking.collection_address || lead.collection_address}` : null,
     booking.requested_collection_date ? `Requested date: ${booking.requested_collection_date}` : null,
     booking.route ? `Route: ${booking.route}` : null,
-    booking.destination ? `Zimbabwe destination: ${booking.destination}` : null,
+    booking.destination || lead.destination ? `Zimbabwe destination: ${booking.destination || lead.destination}` : null,
     booking.recipient_name ? `Receiver: ${booking.recipient_name}` : null,
     booking.recipient_phone ? `Receiver phone: ${booking.recipient_phone}` : null,
     booking.payment_method ? `Payment: ${booking.payment_method}` : null,
     contact || null,
+    lead.notes ? `Notes: ${lead.notes}` : null,
   ].filter((line) => line !== null).join("\n");
-
-  const { error } = await supabase.from("customer_requests").insert({
-    customer_name: booking.name || "Zimmy booking (name not given)",
-    whatsapp_number: booking.phone_number
-      || (booking.email ? `Email only: ${booking.email}` : "No contact captured"),
-    request_type: "Booking — needs completing",
-    message: details,
-    status: "New",
-    unread: true,
-    source: "website_ai_chat",
-  });
-  if (error) throw error;
 }
 
 function conversationAlreadySubmitted(history: ChatMessage[]): boolean {
@@ -932,6 +955,7 @@ serve(async (req) => {
     let leadId: string | null = null;
     let bookingCreated = false;
     let bookingHandedToOffice = false;
+    let conversationCaptured = false;
     let bookingResult: Awaited<ReturnType<typeof createAiBooking>> | null = null;
     const bookingWanted = structured.should_create_booking === true && !conversationAlreadyBooked(history);
     const bookingGaps = bookingWanted ? missingBookingFields(booking) : [];
@@ -940,6 +964,16 @@ serve(async (req) => {
       try {
         bookingResult = await createAiBooking(booking);
         bookingCreated = true;
+        await recordForOffice({
+          conversationId,
+          requestType: "AI Booking",
+          name: booking.name,
+          phone: booking.phone_number,
+          email: booking.email,
+          message: officeNotes(booking, lead, ["Booked by Zimmy. Confirm the details with the customer."]),
+          shipmentId: bookingResult.shipmentId,
+          customerReference: bookingResult.customerReference,
+        }).catch((e) => console.error("Booking made but not mirrored to the office:", e));
         reply = `Your booking is confirmed. Customer reference: ${bookingResult.customerReference}. Tracking number: ${bookingResult.trackingNumber}. Collection: ${bookingResult.route} on ${bookingResult.collectionDate}. I have also sent the booking QR code to your WhatsApp number.`;
       } catch (bookingError) {
         console.error("Failed to create AI booking:", bookingError);
@@ -952,7 +986,18 @@ serve(async (req) => {
       // should_create_booking, so without this the conversation ends with
       // nothing written anywhere.
       try {
-        await saveIncompleteBooking(booking, bookingGaps);
+        await recordForOffice({
+          conversationId,
+          requestType: "Booking — needs completing",
+          name: booking.name,
+          phone: booking.phone_number,
+          email: booking.email,
+          message: officeNotes(booking, lead, [
+            "Zimmy could not complete this booking.",
+            `Still needed: ${bookingGaps.join(", ")}.`,
+            "",
+          ]),
+        });
         bookingHandedToOffice = true;
         reply = `Thanks — I have your details. I still need ${bookingGaps.join(", ")} to finish the booking, so I have passed everything to the office and someone will call you to confirm the rest.`;
       } catch (handoverError) {
@@ -983,6 +1028,44 @@ serve(async (req) => {
         console.error("Failed to save AI booking lead:", leadError);
         reply = "Thanks, I have the details I need. I could not submit them automatically right now, so please contact us on WhatsApp or the Contact page and a representative will confirm your booking.";
       }
+      if (leadSubmitted) {
+        await recordForOffice({
+          conversationId,
+          requestType: leadRequestType(lead.category),
+          name: lead.name,
+          phone: lead.phone_number,
+          email: lead.email,
+          message: officeNotes(booking, lead),
+        }).catch((e) => console.error("Lead saved but not mirrored to the office:", e));
+      }
+    }
+
+    // Anything else a customer told Zimmy, as long as we can ring them back.
+    //
+    // This is the catch-all the design was missing. Capture used to depend on
+    // the model choosing to set a flag, so somebody could give a name, a
+    // number and a list of goods across a dozen messages and leave no trace —
+    // 43 of 51 booking conversations, plus most of the quote and support ones.
+    // Whether the model flags it or not, a contactable customer who told us
+    // what they want is a customer the office should be able to call.
+    const anyContact = booking.phone_number || booking.email || lead.phone_number || lead.email;
+    const anySubstance = booking.shipment_items || lead.shipment_items || lead.notes
+      || booking.collection_address || lead.collection_address;
+
+    if (!bookingCreated && !bookingHandedToOffice && !leadSubmitted && anyContact && anySubstance) {
+      const captured = officeNotes(booking, lead, [
+        `Zimmy conversation about ${intent.replace(/_/g, " ")}. Not yet a booking — call the customer to confirm what they need.`,
+        "",
+      ]);
+      await recordForOffice({
+        conversationId,
+        requestType: "Zimmy enquiry — follow up",
+        name: booking.name || lead.name,
+        phone: booking.phone_number || lead.phone_number,
+        email: booking.email || lead.email,
+        message: captured,
+      }).then(() => { conversationCaptured = true; })
+        .catch((e) => console.error("Failed to record a Zimmy conversation for the office:", e));
     }
 
     await logChatEvent({
@@ -1002,6 +1085,7 @@ serve(async (req) => {
         bookingWanted,
         missingBookingFields: bookingGaps,
         bookingHandedToOffice,
+        conversationCaptured,
       },
     });
 
@@ -1012,6 +1096,7 @@ serve(async (req) => {
       leadId,
       bookingCreated,
       bookingHandedToOffice,
+      conversationCaptured,
       booking: bookingResult,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

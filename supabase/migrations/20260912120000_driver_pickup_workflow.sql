@@ -31,7 +31,8 @@ begin
       'phone',b.sender->>'phone','address',b.sender->>'address','city',coalesce(b.sender->>'city',''),
       'postcode',coalesce(b.sender->>'postcode',b.sender->>'postalCode',''),
       'country',coalesce(nullif(trim(b.sender->>'country'),''),b.schedule_country,b.metadata->'collection'->>'country'),
-      'route',b.metadata->'collection'->>'route','goodsDescription',left(b.goods_description,400),
+      'route',b.metadata->'collection'->>'route',
+      'goodsDescription',left(public.shipment_goods_summary(b.goods_description,b.metadata),400),
       'collectionStatus',b.collection_status,'latitude',b.pickup_latitude,'longitude',b.pickup_longitude,
       'stopId',case when c.driver_id = auth.uid() then c.stop_id end,
       'claimId',c.id,'claimStatus',case when c.status in ('claimed','en_route','arrived') then c.status else 'available' end,
@@ -81,7 +82,8 @@ begin
     raise exception 'This booking is not in the upcoming collection window';
   end if;
   select jsonb_build_object('id',s.id,'tracking_number',s.tracking_number,'customer_reference',s.customer_reference,
-    'goods_description',s.goods_description,'collection_status',s.collection_status,'status',s.status,
+    'goods_description',public.shipment_goods_summary(s.goods_description,s.metadata),
+    'collection_status',s.collection_status,'status',s.status,
     'metadata',jsonb_build_object('sender',coalesce(s.metadata->'sender',s.metadata->'senderDetails'),
       'recipient',coalesce(s.metadata->'recipient',s.metadata->'recipientDetails'),
       'shipment',s.metadata->'shipment','shipmentDetails',s.metadata->'shipmentDetails',

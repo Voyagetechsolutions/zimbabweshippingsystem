@@ -46,6 +46,7 @@ function functionBody(file,name) {
 }
 await db.exec(functionBody('supabase/migrations/20260810_driver_route_collections.sql','parse_schedule_date'));
 await db.exec(functionBody('supabase/migrations/20260716100001_staff_driver_runs_phase1.sql','transition_driver_stop'));
+await db.exec(functionBody('supabase/migrations/20260912160000_driver_sees_the_goods.sql','shipment_goods_summary'));
 await db.exec(fs.readFileSync('supabase/migrations/20260912120000_driver_pickup_workflow.sql','utf8'));
 await db.exec(fs.readFileSync('supabase/migrations/20260912121000_driver_claim_feed_alignment.sql','utf8'));
 const schedule=await scalar(`insert into collection_schedules(route,country,pickup_date) values('CORK ROUTE','Ireland',current_date::text) returning id as result`);
