@@ -37,6 +37,21 @@
 /tools/
 /.github/
 
+# ---------------------------------------------------------------------------
+# MEASURED 2026-09-12: the globs below did NOT shrink the archive.
+#
+# It stayed at exactly 255 MB after adding them, because the heavy directories
+# are COMMITTED TO GIT — deliverables is 143 tracked files and 171.6 MB, public
+# 89.7 MB, tmp 45.1 MB, store-assets 16.3 MB. The tracked tree is 357.7 MB,
+# which is what compresses to the 255 MB EAS reports. EAS archives tracked
+# files, so an ignore file cannot exclude them.
+#
+# The globs are kept because they are still the correct form for anything
+# untracked, but the real fix is to stop tracking that release material:
+#   git rm -r --cached deliverables tmp store-assets
+# `public/` must stay tracked — the website's Vercel build needs it.
+# ---------------------------------------------------------------------------
+
 # --- Monorepo release material, excluded RECURSIVELY ---
 #
 # These were previously listed only as root-anchored paths (/deliverables/),
