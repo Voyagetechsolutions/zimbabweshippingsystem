@@ -190,7 +190,13 @@ export default function CollectionsAheadScreen() {
                     </Pressable>
                   ) : null}
                   {ordered.map((collection, index) => (
-                    <View key={collection.shipmentId} style={styles.stopRow}>
+                    <Pressable key={collection.shipmentId} style={styles.stopRow} accessibilityRole="button"
+                      accessibilityLabel={`Open collection for ${collection.customerName}`}
+                      onPress={() => navigation.navigate('StopDetails', { stop: {
+                        id: collection.stopId || collection.shipmentId, shipmentId: collection.shipmentId,
+                        kind: 'collection', customerName: collection.customerName,
+                        trackingNumber: collection.customerReference || collection.trackingNumber || 'Collection',
+                      } })}>
                       <View style={styles.order}><Text style={styles.orderText}>{index + 1}</Text></View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.stopName}>{collection.customerName || 'Collection customer'}</Text>
@@ -207,15 +213,15 @@ export default function CollectionsAheadScreen() {
                         <Pressable
                           accessibilityLabel={`Call ${collection.customerName || 'customer'}`}
                           style={styles.rowAction}
-                          onPress={() => Linking.openURL(`tel:${collection.phone}`).catch(() => Alert.alert('Could not start call', 'Check that your device supports phone calls.'))}
+                          onPress={(event) => { event.stopPropagation(); void Linking.openURL(`tel:${collection.phone}`).catch(() => Alert.alert('Could not start call', 'Check that your device supports phone calls.')); }}
                         >
                           <Ionicons name="call-outline" size={17} color={colors.primary} />
                         </Pressable>
                       ) : null}
-                    </View>
+                    </Pressable>
                   ))}
                   <Text style={styles.note}>
-                    Claiming a collection still happens on the day, from your route. This list is for planning.
+                    Tap a customer to review the booking. Clock in and start their collection on the booked day.
                   </Text>
                 </>
               ) : null}

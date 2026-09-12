@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, RefreshControl, StyleSheet, ActivityIndicator, Pressable, Linking, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { Card, SectionTitle } from '../components/ui';
 import { colors, radius, spacing, shadow, type as typeScale } from '../theme';
@@ -122,7 +122,14 @@ export default function FinanceDashboardScreen() {
     }
   }, []);
 
-  useEffect(() => { (async () => { setLoading(true); await load(); setLoading(false); })(); }, [load]);
+  useFocusEffect(useCallback(() => {
+    void load().finally(() => setLoading(false));
+    const channel = supabase.channel(`finance-collections-${Date.now()}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shipments' }, () => void load())
+      .subscribe();
+    const timer = setInterval(() => void load(), 60000);
+    return () => { clearInterval(timer); void supabase.removeChannel(channel); };
+  }, [load]));
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
   // Unpaid invoices past their due date, oldest debt first — the chase list.

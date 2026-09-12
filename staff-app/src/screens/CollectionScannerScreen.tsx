@@ -60,7 +60,11 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
   // the items against what is actually in front of them.
   const [shipmentRow, setShipmentRow] = useState<Shipment | null>(null);
   const [openCode, setOpenCode] = useState('');
-  const unlocked = qrVerified || codeVerified;
+  const [detailsConfirmed, setDetailsConfirmed] = useState(false);
+  const [showVerification, setShowVerification] = useState(false);
+  const [showExtras, setShowExtras] = useState(false);
+  const [completionError, setCompletionError] = useState<string | null>(null);
+  const unlocked = pickup || qrVerified || codeVerified;
   // Once the driver confirms, the invoice is theirs no longer.
   const [invoiceLocked, setInvoiceLocked] = useState(false);
   const [amountPaid, setAmountPaid] = useState('');
@@ -348,16 +352,18 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
       Alert.alert('Customer code required', 'Scan the customer QR code, or ask them for the six-digit code shown in their app.');
       return;
     }
-    if (pickup && !invoiceLocked) { Alert.alert('Confirm the invoice first', 'Check the items and what was paid, then confirm the invoice. Once confirmed it is sent to the office and cannot be changed here.'); return; }
-    if (pickup && sealsRequested > 0 && !sealsSaved) { Alert.alert('Record the seals first', `The customer paid for ${sealsRequested} metal coded seal(s) — fit them and record every code before completing.`); return; }
+    if (pickup && (!shipmentRow || !detailsConfirmed)) { setCompletionError('Check the customer, pickup address and goods, then tick the confirmation below.'); return; }
     if (!pickup && !signatureSaved) { Alert.alert('Recipient signature required', 'Ask the recipient to sign and save the signature before completing this delivery.'); return; }
     setBusy('complete');
     try {
-      const { data, error } = await supabase.rpc('complete_driver_handover', { p_stop_id: stop.id, p_customer_code: code.trim(), p_notes: notes.trim() || null });
+      setCompletionError(null);
+      const { error } = pickup
+        ? await supabase.rpc('complete_driver_pickup', { p_stop_id: stop.id, p_details_confirmed: detailsConfirmed, p_notes: notes.trim() || null })
+        : await supabase.rpc('complete_driver_handover', { p_stop_id: stop.id, p_customer_code: code.trim(), p_notes: notes.trim() || null });
       if (error) throw error;
       await AsyncStorage.removeItem(draftKey);
-      Alert.alert(pickup ? 'Collection complete' : 'Delivery complete', `${stop.trackingNumber} is now ${(data as any)?.status || 'complete'}.`, [{ text: 'Done', onPress: () => navigation.goBack() }]);
-    } catch (e: any) { Alert.alert('Could not complete stop', e?.message || 'Check the required invoice, photos and customer code.'); }
+      navigation.goBack();
+    } catch (e: any) { setCompletionError(isMissingBackend(e) ? 'The office must apply the driver database update before this collection can be completed.' : e?.message || 'Could not save. Check your connection and retry.'); }
     finally { setBusy(null); }
   };
 
@@ -407,9 +413,10 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
     <ScrollView style={styles.safe} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
       <View style={styles.hero}><Text style={styles.stepEyebrow}>{pickup ? 'COLLECTION HANDOVER' : 'DELIVERY HANDOVER'}</Text><Text style={styles.customer}>{stop.customerName}</Text><Text style={styles.ref}>{stop.trackingNumber}</Text><Text style={styles.draftNote}>You are marked as arrived · Progress saves automatically on this device</Text></View>
 
-      <View style={styles.card}>
+      {pickup ? <View style={styles.card}><Text style={styles.sectionTitle}>Verify details → collect</Text><Text style={styles.help}>Check the name, pickup address and goods with the person handing them over. No customer app is required. QR, code, photos and invoice entry are optional. Collecting does not mark the shipment paid.</Text><Pressable style={styles.outline} onPress={() => setShowVerification(!showVerification)}><Text style={styles.outlineText}>{showVerification ? 'Hide optional QR / code' : 'Use QR / code (optional)'}</Text></Pressable></View> : null}
+      {!pickup || showVerification ? <View style={styles.card}>
         <View style={styles.sectionHead}><Ionicons name="qr-code-outline" size={21} color={colors.primary}/><View style={{flex:1}}><Text style={styles.stepEyebrow}>STEP 1 · OPEN SHIPMENT</Text><Text style={styles.sectionTitle}>Verify the customer shipment QR</Text></View></View>
-        {unlocked ? <View style={styles.verified}><Ionicons name="shield-checkmark" size={24} color={colors.primary}/><Text style={styles.saved}>{qrVerified ? 'Correct shipment opened by QR — continue with the handover details below' : 'Shipment opened with the customer code — continue with the handover details below'}</Text></View> : <>
+        {qrVerified || codeVerified ? <View style={styles.verified}><Ionicons name="shield-checkmark" size={24} color={colors.primary}/><Text style={styles.saved}>{qrVerified ? 'Correct shipment opened by QR — continue with the handover details below' : 'Shipment opened with the customer code — continue with the handover details below'}</Text></View> : <>
           <Text style={styles.help}>Ask the customer to open this shipment in their app and show its QR code. Scan it before handling or recording the goods.</Text>
           {permission?.granted ? <View style={styles.qrCamera}><CameraView style={StyleSheet.absoluteFill} barcodeScannerSettings={{barcodeTypes:['qr']}} onBarcodeScanned={({data})=>busy!=='qr'&&verifyQr(data)}/><View style={styles.qrFrame}/></View> : <Pressable accessibilityRole="button" accessibilityLabel="Allow camera to scan customer QR" style={styles.outline} onPress={requestPermission}><Text style={styles.outlineText}>Allow camera to scan QR</Text></Pressable>}
           <Text style={styles.orText}>OR ENTER THE QR TOKEN MANUALLY</Text>
@@ -441,7 +448,7 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
               : <Text style={styles.outlineText}>Start collection with code</Text>}
           </Pressable>
         </>}
-      </View>
+      </View> : null}
 
       {!unlocked ? <View style={styles.lockedCard}><Ionicons name="lock-closed-outline" size={24} color={colors.textMuted}/><View style={{flex:1}}><Text style={styles.lockedTitle}>Shipment details are locked</Text><Text style={styles.lockedText}>Scan the customer's shipment QR above, or enter their six-digit code. The goods, invoice, seals and photos will then open.</Text></View></View> : <>
 
@@ -489,6 +496,8 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
         <Pressable style={styles.outline} onPress={saveCorrection} disabled={busy === 'correction'}>{busy === 'correction' ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.outlineText}>Save correction</Text>}</Pressable>
       </View> : null}
 
+      {pickup ? <Pressable style={styles.outline} onPress={() => setShowExtras(!showExtras)}><Text style={styles.outlineText}>{showExtras ? 'Hide invoice, seals & photos' : 'Invoice, seals & photos (optional)'}</Text></Pressable> : null}
+      {!pickup || showExtras ? <>
       {pickup ? <View style={styles.card}>
         <View style={styles.sectionHead}><Ionicons name="receipt-outline" size={21} color={colors.primary} /><Text style={styles.sectionTitle}>Collection invoice</Text></View>
         {invoiceLocked ? (
@@ -599,14 +608,19 @@ export default function CollectionScannerScreen({ route, navigation }: Props) {
         {!signatureSaved ? <Pressable style={[styles.primary, busy === 'signature' && styles.disabled]} onPress={saveSignature} disabled={busy === 'signature'}>{busy === 'signature' ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryText}>Save recipient signature</Text>}</Pressable> : null}
       </View> : null}
 
+      </> : null}
       <View style={styles.card}>
-        <View style={styles.sectionHead}><Ionicons name="keypad-outline" size={21} color={colors.primary} /><View style={{flex:1}}><Text style={styles.stepEyebrow}>FINAL STEP · CUSTOMER HANDOVER</Text><Text style={styles.sectionTitle}>Enter the six-digit customer code</Text></View></View>
-        <Text style={styles.help}>After the goods and proof are recorded, ask the customer for the six-digit {pickup ? 'collection' : 'delivery'} code displayed in their app. This confirms the handover; it is not their account password.</Text>
-        <TextInput style={[styles.input, styles.code]} value={code} onChangeText={(value) => setCode(value.replace(/\D/g, '').slice(0, 6))} keyboardType="number-pad" maxLength={6} placeholder="000000" />
+        <Text style={styles.stepEyebrow}>FINAL STEP · HANDOVER</Text>
+        <Text style={styles.sectionTitle}>{pickup ? 'Ready to mark collected?' : 'Enter the customer code'}</Text>
+        {pickup ? <View style={styles.confirmRow}><Switch accessibilityLabel="Customer, address and goods checked" value={detailsConfirmed} onValueChange={setDetailsConfirmed}/><Text style={styles.confirmText}>I have checked the customer, pickup address and goods, and have received the goods.</Text></View> : <>
+          <Text style={styles.help}>Ask the recipient for their delivery code if it has not already been verified.</Text>
+          <TextInput style={[styles.input, styles.code]} value={code} onChangeText={(value) => setCode(value.replace(/\D/g, '').slice(0, 6))} keyboardType="number-pad" maxLength={6} placeholder="000000" />
+        </>}
+        {pickup && sealsRequested > 0 && !sealsSaved ? <Text style={styles.helpStrong}>This booking includes {sealsRequested} seals. If they cannot be fitted or recorded, explain in the driver notes for the office.</Text> : null}
         <Label text="Driver notes (optional)" /><TextInput style={[styles.input, styles.notes]} value={notes} onChangeText={setNotes} multiline />
-        <Pressable style={[styles.primary, busy === 'complete' && styles.disabled]} onPress={complete} disabled={busy === 'complete'}>{busy === 'complete' ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryText}>{pickup ? 'Verify code & mark collected' : 'Verify code & mark delivered'}</Text>}</Pressable>
-      </View>
-      </>}
+        {completionError ? <Text accessibilityRole="alert" style={styles.helpStrong}>{completionError}</Text> : null}
+        <Pressable style={[styles.primary, busy !== null && styles.disabled]} onPress={complete} disabled={busy !== null}>{busy === 'complete' ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryText}>{pickup ? 'Mark collected' : 'Verify code & mark delivered'}</Text>}</Pressable>
+      </View>  </>}
     </ScrollView>
   );
 }

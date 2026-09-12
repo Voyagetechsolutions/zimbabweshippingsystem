@@ -90,7 +90,11 @@ export default function HomeScreen() {
     }
   }, [session?.user?.id,profile?.postal_code,profile?.pickup_city,profile?.country]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    void load();
+    const timer = setInterval(() => void load(), 15000);
+    return () => clearInterval(timer);
+  }, [load]));
 
   if (!business.journeyStages.length) return <SafeAreaView style={[styles.safe,{backgroundColor:palette.bg}]}><View style={{flex:1,alignItems:'center',justifyContent:'center'}}><Text style={{color:palette.textMuted}}>Loading current shipment settings…</Text></View></SafeAreaView>;
 

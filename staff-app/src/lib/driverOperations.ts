@@ -49,16 +49,24 @@ export type DriverOperationsDay = {
   route: DriverRouteOverview;
   jobs: DriverJob[];
   point: Point | null;
+  warnings?: string[];
+  cachedAt?: string;
 };
 
-const ACTIVE_ROUTE_CACHE = 'driver-active-route-cache-v1';
+const ACTIVE_ROUTE_CACHE = 'driver-active-route-cache-v2';
+
+async function activeCacheKey() {
+  const { data } = await supabase.auth.getSession();
+  return data.session ? `${ACTIVE_ROUTE_CACHE}:${data.session.user.id}:${new Date().toISOString().slice(0,10)}` : null;
+}
 
 export async function loadCachedDriverOperationsDay(): Promise<DriverOperationsDay | null> {
-  try { const raw = await AsyncStorage.getItem(ACTIVE_ROUTE_CACHE); return raw ? JSON.parse(raw) as DriverOperationsDay : null; } catch { return null; }
+  try { const key = await activeCacheKey(); const raw = key ? await AsyncStorage.getItem(key) : null; return raw ? JSON.parse(raw) as DriverOperationsDay : null; } catch { return null; }
 }
 
 async function cacheDriverOperationsDay(day: DriverOperationsDay) {
-  await AsyncStorage.setItem(ACTIVE_ROUTE_CACHE, JSON.stringify(day)).catch(() => {});
+  const key = await activeCacheKey();
+  if (key) await AsyncStorage.setItem(key, JSON.stringify({ ...day, cachedAt: new Date().toISOString() })).catch(() => {});
 }
 
 function metadataCount(metadata: any): number {
@@ -113,13 +121,15 @@ async function loadAssignedStops(): Promise<DriverJob[]> {
 
   const runs = await supabase.from('driver_runs')
     .select('id').eq('driver_id', driverId).eq('run_date', today).neq('status', 'cancelled');
-  if (runs.error || !runs.data?.length) return [];
+  if (runs.error) throw runs.error;
+  if (!runs.data?.length) return [];
 
   const stops = await supabase.from('driver_run_stops')
     .select('id,run_id,shipment_id,stop_order,stop_type,status,address,latitude,longitude,recipient_name,time_window_start,time_window_end,special_instructions,package_count,priority,shipment:shipments(metadata,customer_reference,tracking_number,goods_description,collection_status,pickup_latitude,pickup_longitude)')
     .in('run_id', runs.data.map((r) => r.id))
     .order('stop_order');
-  if (stops.error || !stops.data) return [];
+  if (stops.error) throw stops.error;
+  if (!stops.data) return [];
 
   return (stops.data as unknown as AssignedStopRow[]).map((row) => {
     const shipment = Array.isArray(row.shipment) ? row.shipment[0] : row.shipment;
@@ -172,26 +182,27 @@ export async function loadDriverOperationsDay(mode: DriverMode): Promise<DriverO
     new Promise<{ point: Point | null }>((resolve) => setTimeout(() => resolve({ point: null }), 2500)),
   ]).catch(() => ({ point: null } as { point: Point | null }));
   let networkFailure = false;
+  const warnings: string[] = [];
   // Assigned run stops enrich the route, but they must not prevent the live
   // collection/delivery RPC from rendering when that secondary query is slow
   // or unavailable on an older deployment.
   const assignedPromise = Promise.race([
     loadAssignedStops(),
-    new Promise<DriverJob[]>((resolve) => setTimeout(() => resolve([]), 3500)),
-  ]).catch((error) => { networkFailure = networkFailure || isNetworkError(error); return [] as DriverJob[]; });
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Assigned stops timed out')), 10000)),
+  ]).catch((error) => { warnings.push('Assigned stops could not be loaded. Refresh before starting work.'); networkFailure = networkFailure || isNetworkError(error); return [] as DriverJob[]; });
   // Pickup and delivery feeds are independent. A driver who can do both must
   // still see the healthy side when one RPC is slow or unavailable.
   const collectionPromise = wantsCollections
     ? Promise.race([
       loadRouteDay(),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 8500)),
-    ]).catch((error) => { networkFailure = networkFailure || isNetworkError(error); return null; })
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Collections took too long to load. Please retry.')), 10000)),
+    ]).catch((error) => { warnings.push(error?.message || 'Collections could not be loaded.'); networkFailure = networkFailure || isNetworkError(error); return null; })
     : Promise.resolve(null);
   const deliveryPromise = wantsDeliveries
     ? Promise.race([
       loadDeliveryDay(),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 8500)),
-    ]).catch((error) => { networkFailure = networkFailure || isNetworkError(error); return null; })
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Deliveries timed out')), 10000)),
+    ]).catch((error) => { warnings.push('Deliveries could not be loaded. Please retry.'); networkFailure = networkFailure || isNetworkError(error); return null; })
     : Promise.resolve(null);
   const [collectionDay, deliveryDay, location, assigned] = await Promise.all([
     collectionPromise,
@@ -231,7 +242,10 @@ export async function loadDriverOperationsDay(mode: DriverMode): Promise<DriverO
       ? 'Ireland'
       : 'United Kingdom';
 
-  const collectionJobs: DriverJob[] = (collectionDay?.collections || []).map((c, index) => ({
+  const { data: authData } = await supabase.auth.getSession();
+  const collectionJobs: DriverJob[] = (collectionDay?.collections || [])
+    .filter(c => !c.claimedBy || c.claimedBy === authData.session?.user.id)
+    .map((c, index) => ({
     id: c.stopId || c.shipmentId,
     shipmentId: c.shipmentId,
     runId: (c as RouteCollection & { runId?: string | null }).runId || null,
@@ -283,8 +297,9 @@ export async function loadDriverOperationsDay(mode: DriverMode): Promise<DriverO
   ].map((job, index) => ({ ...job, sequence: index + 1 }));
   if (!jobs.length && networkFailure) {
     const cached = await loadCachedDriverOperationsDay();
-    if (cached) return cached;
+    if (cached) return { ...cached, warnings: ['Offline: showing a saved copy of today’s route. Reconnect before completing a collection.'] };
   }
+  if (!jobs.length && warnings.length) throw new Error(warnings.join(' '));
   const run = deliveryDay?.run;
   // A live RPC can return bookings while the schedule catalogue is empty.
   // Recover the route name from booking payloads before using the generic fallback.
@@ -298,6 +313,7 @@ export async function loadDriverOperationsDay(mode: DriverMode): Promise<DriverO
     .join('  /  ') || '';
   const routeName = scheduledRouteName || bookingRouteName || run?.route_name || 'Today’s route';
   const result: DriverOperationsDay = {
+    warnings,
     point: location.point,
     jobs,
     route: {

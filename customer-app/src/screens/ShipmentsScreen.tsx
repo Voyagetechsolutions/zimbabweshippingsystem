@@ -31,7 +31,11 @@ export default function ShipmentsScreen() {
     setShipments((data as Shipment[]) || []);
   }, [session?.user?.id]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    void load();
+    const timer = setInterval(() => void load(), 15000);
+    return () => clearInterval(timer);
+  }, [load]));
 
   // Track any shipment by number — works without an account, same as the website.
   const trackByNumber = async () => {

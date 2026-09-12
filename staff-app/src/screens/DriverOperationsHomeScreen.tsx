@@ -5,7 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import RunMap from '../components/RunMap';
 import { useAuth, type DriverType } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -14,7 +14,7 @@ import {
   loadDriverOperationsDay, loadPresence, navigationUrls, setPresence,
   type DriverJob, type DriverOperationsDay,
 } from '../lib/driverOperations';
-import { isIrishAddress } from '../lib/collections';
+import { isIrishAddress, loadCollectionsAhead, type ScheduledDay } from '../lib/collections';
 import { BACKEND_PENDING_MESSAGE, isMissingBackend } from '../lib/offlineQueue';
 import { COMPANY, COMPANY_WHATSAPP_URL } from '../config/company';
 import { startOperationalTracking, stopOperationalTracking } from '../lib/driverBackgroundLocation';
@@ -86,6 +86,9 @@ export default function DriverOperationsHomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('map');
   const [unread, setUnread] = useState(0);
+  const [week, setWeek] = useState<ScheduledDay[]>([]);
+  const [weekError, setWeekError] = useState<string | null>(null);
+  const [period, setPeriod] = useState<'today' | 'week'>('today');
   const channelKey = useRef(`driver-home-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`);
 
   const load = useCallback(async () => {
@@ -93,27 +96,38 @@ export default function DriverOperationsHomeScreen() {
     setError(null);
     try {
       const operationsRequest = loadDriverOperationsDay(driverType as DriverType);
-      const operations = await Promise.race([
+      const operationsRequestWithTimeout = Promise.race([
         operationsRequest,
         new Promise<DriverOperationsDay>((_, reject) => setTimeout(() => reject(new Error('Route lookup timed out')), 12000)),
       ]);
-      const [presence, notificationResult, attendanceResult] = await Promise.all([
-        loadPresence(session.user.id).catch(() => null),
-        supabase.from('driver_notifications').select('id', { count: 'exact', head: true }).eq('driver_id', session.user.id).is('read_at', null),
+      const [operationsResult, attendance] = await Promise.allSettled([
+        operationsRequestWithTimeout,
         supabase.from('driver_attendance').select('clocked_out_at').eq('driver_id', session.user.id)
           .eq('work_date', new Date().toISOString().slice(0, 10)).maybeSingle(),
       ]);
-      setDay(operations);
-      setOnline(presence ? presence.status !== 'offline' : Boolean(attendanceResult.data && !attendanceResult.data.clocked_out_at));
-      setUnread(notificationResult.count || 0);
+      // Attendance remains readable even if the collection feed fails.
+      if (attendance.status === 'fulfilled' && !attendance.value.error) {
+        setOnline(Boolean(attendance.value.data && !attendance.value.data.clocked_out_at));
+      } else setError('Could not verify your clock-in status. Please refresh.');
+      if (operationsResult.status === 'rejected') throw operationsResult.reason;
+      setDay(operationsResult.value);
     } catch (e: any) {
-      setDay(null);
-      setError(/timed out/i.test(e?.message || '') ? 'Route lookup took too long. You can retry now or continue when dispatch is online.' : 'We couldn’t load today’s work. Check your connection and try again.');
+      setError(e?.message || 'We couldn’t load today’s work. Check your connection and try again.');
       console.warn('Driver dashboard load failed', e?.message || e);
     }
   }, [driverType, session?.user.id]);
 
-  useEffect(() => { (async () => { await load(); setLoading(false); })(); }, [load]);
+  const loadWeek = useCallback(async () => {
+    if (driverType === 'delivery') return;
+    try { setWeek(await loadCollectionsAhead(7)); setWeekError(null); }
+    catch (e: any) { setWeekError(e?.message || 'Could not load this week.'); }
+  }, [driverType]);
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    void Promise.all([load(), loadWeek()]).finally(() => { if (active) setLoading(false); });
+    const timer = setInterval(() => { void load(); void loadWeek(); }, 60000);
+    return () => { active = false; clearInterval(timer); };
+  }, [load, loadWeek]));
   // Two subscriptions rather than one: a channel fails as a whole if any table
   // in it is missing, and presence/notifications ship in a later migration than
   // the runs they annotate. Route changes must keep arriving regardless.
@@ -184,19 +198,22 @@ export default function DriverOperationsHomeScreen() {
   const behind=delayMinutes>=10;
 
   const applyOnlineStatus = async (next: boolean) => {
-    if (!session?.user.id || !day) return;
+    if (!session?.user.id) return;
     setBusy('presence');
     try {
       // The attendance clock is what records the shift, so it is the only step
       // allowed to fail the toggle. Presence and tracking are dispatch extras.
       const { error: clockError } = await supabase.rpc('clock_driver', { p_action: next ? 'in' : 'out', p_note: 'Driver app status toggle' });
-      if (clockError && !/already|clock/i.test(clockError.message || '')) throw clockError;
-      const presence = await setPresence(next, day.point, day.route.id).catch(() => 'unavailable' as const);
-      if (presence === 'updated') {
-        if (next) await startOperationalTracking(day.route.id); else await stopOperationalTracking();
-      }
+      if (clockError) throw clockError;
       setOnline(next);
+      const presence = await setPresence(next, day?.point ?? null, day?.route.id).catch(() => 'unavailable' as const);
+      if (presence === 'updated') {
+        if (next) void startOperationalTracking(day?.route.id ?? null).catch(() => setError('Clocked in. Background location is unavailable; you can still work from the list.'));
+      }
+      if (!next) await stopOperationalTracking().catch(() => setError('Clocked out, but tracking could not be stopped. Close the app and contact the office.'));
+      await Promise.all([load(), loadWeek()]);
     } catch (e: any) {
+      setError(e?.message || 'Clock status was not changed. Please retry.');
       Alert.alert('Status not changed', next
         ? 'We couldn’t put you online. Check your connection and try again.'
         : 'We couldn’t put you offline. Make sure active work is completed and try again.');
@@ -206,6 +223,10 @@ export default function DriverOperationsHomeScreen() {
 
   const toggleOnline = () => {
     if (online) { void applyOnlineStatus(false); return; }
+    if (Platform.OS === 'web') {
+      if (window.confirm('Clock in? Your location is shared with the office while working. You can still view collections without GPS permission.')) void applyOnlineStatus(true);
+      return;
+    }
     Alert.alert('Location while you are online', 'Zimbabwe Shipping shares your route location with dispatch while you are online and working. Tracking stops when you go offline. Your phone may ask for background location permission.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Continue', onPress: () => { void applyOnlineStatus(true); } },
@@ -257,6 +278,7 @@ export default function DriverOperationsHomeScreen() {
   // stop details screen handles both forms and turns the first action into a
   // real, server-confirmed collection claim.
   const openShipment = (job: DriverJob) => {
+    if (!online) { setError('Clock in to start working through your collections.'); return; }
     navigation.navigate('Route', {
       screen: 'StopDetails',
       // Keep the run screen underneath, or Back from a stop has nowhere to go.
@@ -278,57 +300,70 @@ export default function DriverOperationsHomeScreen() {
     navigation.navigate(target);
   };
 
-  if (loading) return <SafeAreaView style={styles.safe}><View style={styles.loading}><ActivityIndicator size="large" color={colors.primary} /><Text style={styles.loadingText}>Preparing today’s route…</Text></View></SafeAreaView>;
-
-  if(!selectedCountry)return <SafeAreaView style={styles.safe} edges={['top']}><ScrollView contentContainerStyle={styles.countryContent} refreshControl={<RefreshControl refreshing={refreshing} tintColor={colors.primary} onRefresh={async()=>{setRefreshing(true);await load();setRefreshing(false);}}/>}><View style={styles.header}><View style={styles.brand}><Image source={logo} style={styles.logo}/><View><Text style={styles.company}>{COMPANY.name}</Text><Text style={styles.date}>Driver operations</Text></View></View><View style={[styles.connection,online&&styles.connectionOnline]}><View style={[styles.connectionDot,online&&styles.connectionDotOnline]}/><Text style={[styles.connectionText,online&&styles.connectionTextOnline]}>{online?'ONLINE':'OFFLINE'}</Text></View></View><View style={styles.countryHero}><Text style={styles.eyebrow}>TODAY’S ASSIGNMENT</Text><Text style={styles.countryTitle}>Choose your country</Text><Text style={styles.countrySubtitle}>Only live bookings assigned to this driver and today’s shift are shown. Choose a country to view its collections or deliveries.</Text></View>{error?<View style={styles.errorCard}><Ionicons name="cloud-offline-outline" size={22} color={colors.danger}/><View style={{flex:1}}><Text style={styles.errorTitle}>Driver dashboard unavailable</Text><Text style={styles.errorText}>{error}</Text></View><Pressable onPress={load}><Ionicons name="refresh" size={21} color={colors.primary}/></Pressable></View>:null}<View style={styles.countryList}>{countryOptions.map(option=>{const empty=option.jobs===0;return <Pressable accessibilityRole="button" key={option.country} onPress={()=>setSelectedCountry(option.country)} style={styles.countryCard}><View style={styles.flagBox}><Ionicons name={option.country==='Zimbabwe'?'home-outline':'airplane-outline'} size={24} color={colors.primaryDark}/></View><View style={{flex:1}}><Text style={styles.countryName}>{option.country}</Text><Text style={styles.countryKind}>{countryWorkLabel(option.country)} · {option.shift}</Text><Text style={[styles.countryMeta,empty&&styles.countryMetaEmpty]}>{empty?`No ${countryWorkLabel(option.country).toLowerCase()} assigned today`:`${option.jobs} live job${option.jobs===1?'':'s'} · ${option.packages} package${option.packages===1?'':'s'}`}</Text></View><Ionicons name="chevron-forward" size={20} color={colors.primary}/></Pressable>})}</View><Text style={styles.assignmentNote}>{'Today’s jobs are the ones assigned to you. Use “Collections ahead” to see what is booked on the dates coming up and plan your own route.'}</Text></ScrollView></SafeAreaView>;
+  const weekDays = week.map(item => ({ ...item, collections: item.collections.filter(c =>
+    !selectedCountry || (isIrishAddress(c.country, c.postcode) ? 'Ireland' : 'United Kingdom') === selectedCountry) }))
+    .filter(item => item.collections.length);
+  const refresh = async () => { setRefreshing(true); await Promise.all([load(), loadWeek()]); setRefreshing(false); };
+  const openAhead = (c: ScheduledDay['collections'][number]) => navigation.navigate('Route', {
+    screen: 'StopDetails', initial: false, params: { stop: {
+      id: c.stopId || c.shipmentId, shipmentId: c.shipmentId, kind: 'collection',
+      customerName: c.customerName, trackingNumber: c.customerReference || c.trackingNumber || 'Collection',
+    } },
+  });
 
   return <SafeAreaView style={styles.safe} edges={['top']}>
-    <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} tintColor={colors.primary} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}>
+    <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>}>
       <View style={styles.header}>
-        <View style={styles.brand}><Image source={logo} style={styles.logo} /><View><Text style={styles.company}>{COMPANY.name}</Text><Text style={styles.date}>{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</Text></View></View>
-        <View style={styles.headerActions}>
-          <Pressable style={styles.iconButton} onPress={() => quickAction('Messages')}><Ionicons name="notifications-outline" size={21} color={colors.text} />{unread > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{Math.min(unread, 9)}</Text></View> : null}</Pressable>
-          <Pressable style={styles.avatar} onPress={() => quickAction('Profile')}><Text style={styles.avatarText}>{firstName.charAt(0).toUpperCase()}</Text></Pressable>
+        <View><Text style={styles.eyebrow}>DRIVER WORKSPACE</Text><Text style={styles.countryTitle}>Hi, {firstName}</Text></View>
+        <View style={[styles.connection, online && styles.connectionOnline]}><View style={[styles.connectionDot, online && styles.connectionDotOnline]}/><Text style={styles.connectionText}>{online ? 'CLOCKED IN' : 'OFF SHIFT'}</Text></View>
+      </View>
+      <View style={styles.nextCard}>
+        <Text style={styles.nextName}>{online ? 'Your shift is underway' : 'Ready for your collections?'}</Text>
+        <Text style={styles.emptyText}>{online ? 'Open a customer, arrive, check the goods, then mark collected.' : 'Clock in to start. Today and the next seven days are below. GPS and customer QR codes are optional for pickups.'}</Text>
+        <Pressable accessibilityRole="button" style={styles.primaryButton} onPress={toggleOnline} disabled={busy === 'presence'}>
+          {busy === 'presence' ? <ActivityIndicator color={colors.white}/> : <><Ionicons name="time-outline" size={21} color={colors.white}/><Text style={styles.primaryButtonText}>{online ? 'CLOCK OUT' : 'CLOCK IN & START'}</Text></>}
+        </Pressable>
+      </View>
+      {error ? <View style={styles.errorCard}><Text accessibilityRole="alert" style={[styles.errorText,{flex:1}]}>{error}</Text><Pressable onPress={refresh}><Text style={styles.outlineButtonText}>RETRY</Text></Pressable></View> : null}
+      {day?.warnings?.map(warning => <Text key={warning} accessibilityRole="alert" style={styles.errorText}>{warning}</Text>)}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={{flexDirection:'row',gap:8}}>
+          {(['All',...COUNTRY_ORDER] as const).map(country => <Pressable key={country} onPress={() => country === 'All' ? clearCountry() : setSelectedCountry(country)} style={[styles.segmentButton, (country === (selectedCountry || 'All')) && styles.segmentActive]}>
+            <Text style={[styles.segmentText, country === (selectedCountry || 'All') && styles.segmentTextActive]}>{country}</Text>
+          </Pressable>)}
         </View>
+      </ScrollView>
+      <View style={styles.sectionRow}>
+        <View style={styles.segment}>{(['today','week'] as const).map(value => <Pressable key={value} style={[styles.segmentButton,period === value && styles.segmentActive]} onPress={() => setPeriod(value)}><Text style={[styles.segmentText,period === value && styles.segmentTextActive]}>{value === 'today' ? 'Today' : 'This week'}</Text></Pressable>)}</View>
+        <Pressable style={styles.segmentButton} onPress={() => navigation.navigate('Route',{screen:'FindShipment',initial:false})}><Ionicons name="search" size={18} color={colors.primary}/><Text style={styles.segmentText}>Find shipment</Text></Pressable>
       </View>
-
-      <View style={styles.welcome}><View><Text style={styles.eyebrow}>DRIVER OPERATIONS · {selectedCountry.toUpperCase()}</Text><Text style={styles.hello}>Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}, {firstName}</Text></View><View style={[styles.connection, online && styles.connectionOnline]}><View style={[styles.connectionDot, online && styles.connectionDotOnline]} /><Text style={[styles.connectionText, online && styles.connectionTextOnline]}>{online ? 'ONLINE' : 'OFFLINE'}</Text></View></View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Change country" style={styles.changeCountry} onPress={clearCountry}><Ionicons name="globe-outline" size={17} color={colors.primaryDark}/><Text style={styles.changeCountryText}>CHANGE COUNTRY · {selectedCountry}</Text><Ionicons name="chevron-down" size={16} color={colors.primaryDark}/></Pressable>
-
-      <View style={[styles.onlineCard, online && styles.onlineCardActive]}>
-        <View style={styles.onlineCopy}><View style={[styles.statusIcon, online && styles.statusIconActive]}><Ionicons name={online ? 'radio' : 'power-outline'} size={22} color={online ? colors.white : colors.primaryDark} /></View><View style={{ flex: 1 }}><Text style={[styles.onlineTitle, online && styles.onlineTitleActive]}>{online ? "YOU’RE ONLINE" : 'READY TO WORK?'}</Text><Text style={[styles.onlineSub, online && styles.onlineSubActive]}>{online ? 'Dispatch can see your availability and route progress.' : 'Go online to receive work and start today’s route.'}</Text></View></View>
-        <Pressable style={[styles.onlineButton, online && styles.onlineButtonActive]} onPress={toggleOnline} disabled={busy === 'presence'}>{busy === 'presence' ? <ActivityIndicator color={online ? colors.primary : colors.white} /> : <Text style={[styles.onlineButtonText, online && styles.onlineButtonTextActive]}>{online ? 'GO OFFLINE' : 'GO ONLINE'}</Text>}</Pressable>
-      </View>
-
-      {error ? <View style={styles.errorCard}><Ionicons name="cloud-offline-outline" size={22} color={colors.danger} /><View style={{ flex: 1 }}><Text style={styles.errorTitle}>Today’s work is unavailable</Text><Text style={styles.errorText}>{error}</Text></View><Pressable onPress={load}><Ionicons name="refresh" size={21} color={colors.primary} /></Pressable></View> : null}
-
-      <Text style={styles.sectionTitle}>Today’s work</Text>
-      <View style={styles.summaryGrid}>
-        <Metric label="TOTAL JOBS" value={jobs.length} sub={`${collections} collections · ${deliveries} deliveries`} icon="briefcase-outline" tone={colors.blue} />
-        <Metric label="COMPLETED" value={completed} sub={`${remaining} remaining`} icon="checkmark-circle-outline" tone={colors.primary} />
-        <Metric label="ISSUES" value={failed} sub={failed ? 'Dispatch notified' : 'No problems'} icon="alert-circle-outline" tone={failed ? colors.danger : colors.textMuted} />
-        <Metric label="PACKAGES" value={packages} sub="Across today’s jobs" icon="cube-outline" tone={colors.orange} />
-      </View>
-      {behind?<View style={styles.delayAdvice}><Ionicons name="warning-outline" size={21} color={colors.amber}/><View style={{flex:1}}><Text style={styles.delayTitle}>You are about {delayMinutes} minutes behind</Text><Text style={styles.delayText}>Re-optimise the remaining stops from your current location to protect time windows.</Text></View><Pressable style={styles.optimiseSmall} onPress={reoptimise} disabled={busy==='optimise'}><Text style={styles.optimiseSmallText}>RE-ROUTE</Text></Pressable></View>:null}
-
-      {!day || jobs.length === 0 ? <View style={styles.empty}><View style={styles.emptyIcon}><Ionicons name="map-outline" size={32} color={colors.primary} /></View><Text style={styles.emptyTitle}>No route assigned</Text><Text style={styles.emptyText}>You don’t currently have work assigned for today. Keep the app online or refresh when dispatch publishes a route.</Text><Pressable style={styles.outlineButton} onPress={load}><Ionicons name="refresh" size={17} color={colors.primary} /><Text style={styles.outlineButtonText}>REFRESH</Text></Pressable></View> : 
-        <View style={styles.routeCard}>
-          <View style={styles.routeTop}><View style={{ flex: 1 }}><Text style={styles.routeKicker}>{selectedCountry.toUpperCase()} · {countryWorkLabel(selectedCountry).toUpperCase()}</Text><Text style={styles.routeName}>{day.route.name}</Text><Text style={styles.routeCode}>{day.route.code} · {day.route.vehicle}</Text></View><View style={styles.progressRing}><Text style={styles.progressNumber}>{progress}%</Text></View></View>
-          <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${Math.max(progress, 2)}%` }]} /></View>
-          <View style={styles.routeFacts}><RouteFact value={`${completed}`} label="Completed" /><RouteFact value={`${remaining}`} label="Remaining" /><RouteFact value={day.route.distanceKm ? `${day.route.distanceKm} km` : '— km'} label="Distance" /><RouteFact value={day.route.estimatedFinish ? formatTime(day.route.estimatedFinish) : '—'} label="Finish" /></View>
-          <View style={styles.routeEndpoints}><Ionicons name="radio-button-on" size={14} color={colors.primary} /><Text style={styles.endpointText}>{day.route.startLocation}</Text><View style={styles.endpointLine} /><Ionicons name="location" size={15} color={colors.orange} /><Text style={styles.endpointText}>{day.route.endLocation}</Text></View>
-          <Pressable style={styles.primaryButton} onPress={startOrContinue} disabled={busy === 'route'}>{busy === 'route' ? <ActivityIndicator color={colors.white} /> : <><Ionicons name={day.route.status === 'planned' ? 'play' : 'navigate'} size={19} color={colors.white} /><Text style={styles.primaryButtonText}>{day.route.status === 'planned' ? 'START ROUTE' : 'CONTINUE ROUTE'}</Text></>}</Pressable>
-          <Pressable style={styles.optimiseButton} onPress={reoptimise} disabled={busy==='optimise'}>{busy==='optimise'?<ActivityIndicator color={colors.white}/>:<><Ionicons name="git-compare-outline" size={18} color={colors.white}/><Text style={styles.optimiseButtonText}>RE-OPTIMISE REMAINING STOPS</Text></>}</Pressable>
-        </View>}
-
-        <View style={styles.sectionRow}><Text style={styles.sectionTitle}>Today’s route</Text><View style={styles.segment}><Pressable style={[styles.segmentButton, viewMode === 'map' && styles.segmentActive]} onPress={() => setViewMode('map')}><Ionicons name="map-outline" size={15} color={viewMode === 'map' ? colors.white : colors.textMuted} /><Text style={[styles.segmentText, viewMode === 'map' && styles.segmentTextActive]}>MAP</Text></Pressable><Pressable style={[styles.segmentButton, viewMode === 'list' && styles.segmentActive]} onPress={() => setViewMode('list')}><Ionicons name="list-outline" size={16} color={viewMode === 'list' ? colors.white : colors.textMuted} /><Text style={[styles.segmentText, viewMode === 'list' && styles.segmentTextActive]}>LIST</Text></Pressable></View></View>
-        {viewMode === 'map' ? <RunMap height={330} focusStopId={current?.id || null} emptyCenter={day?.point ?? null} emptyNote={`No ${countryWorkLabel(selectedCountry).toLowerCase()} plotted in ${selectedCountry} yet — your position is shown live.`} stops={[...(day?.point ? [{ id: 'driver', latitude: day.point.latitude, longitude: day.point.longitude, title: 'Your live position', description: 'Driver location', kind: 'driver' as const, order: 'D' }] : []), ...mapped.map((job) => ({ id: job.id, latitude: Number(job.latitude), longitude: Number(job.longitude), title: `${job.sequence}. ${job.customer}`, description: job.address, kind: job.kind, order: job.sequence, done: closed(job), color: job.status === 'failed' ? colors.danger : job.status === 'en_route' || job.status === 'arrived' ? colors.blue : undefined }))]} onStopPress={(pin) => { const job = jobs.find((item) => item.id === pin.id); if (job) openShipment(job); }} /> : <View style={styles.stopList}>{jobs.map((job) => <StopRow key={job.id} job={job} current={job.id === current?.id} onPress={() => openShipment(job)} />)}</View>}
-
-      {current ? <View style={styles.nextCard}><View style={styles.nextHeader}><View style={styles.currentPill}><View style={styles.pulse} /><Text style={styles.currentPillText}>{current.status === 'arrived' ? 'AT CURRENT STOP' : 'NEXT STOP'}</Text></View><Text style={styles.nextSequence}>{current.sequence} / {jobs.length}</Text></View><Text style={styles.nextName}>{current.customer}</Text><Text style={styles.nextMeta}>{current.kind.toUpperCase()} · {current.packageCount} PACKAGE{current.packageCount === 1 ? '' : 'S'} · {current.reference}</Text><View style={styles.addressRow}><Ionicons name="location-outline" size={18} color={colors.textMuted} /><View style={{ flex: 1 }}><Text style={styles.nextAddress}>{current.address || 'Address unavailable'}</Text><Text style={styles.nextEta}>{formatTime(current.eta)}{current.priority !== 'normal' ? ` · ${current.priority.toUpperCase()} PRIORITY` : ''}</Text></View></View>{current.instructions ? <View style={styles.instructions}><Ionicons name="information-circle-outline" size={17} color={colors.amber} /><Text style={styles.instructionsText}>{current.instructions}</Text></View> : null}<Pressable style={styles.shipmentButton} onPress={() => openShipment(current)}><Ionicons name="cube-outline" size={18} color={colors.primaryDark} /><Text style={styles.shipmentButtonText}>OPEN SHIPMENT DETAILS</Text><Ionicons name="chevron-forward" size={17} color={colors.primaryDark} /></Pressable><View style={styles.nextActions}><Pressable accessibilityRole="button" accessibilityLabel="Call customer" style={styles.smallAction} onPress={() => openDriverContact('call', current.phone)}><Ionicons name="call-outline" size={19} color={colors.primary} /><Text style={styles.smallActionText}>CALL</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Message customer on WhatsApp" style={styles.smallAction} onPress={() => openDriverContact('whatsapp', current.phone)}><Ionicons name="logo-whatsapp" size={19} color={colors.primary} /><Text style={styles.smallActionText}>MESSAGE</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Navigate to customer address" style={styles.navigateButton} onPress={() => chooseNavigation(current)}><Ionicons name="navigate" size={19} color={colors.white} /><Text style={styles.navigateText}>NAVIGATE</Text></Pressable></View></View> : null}
-      
-
-      <Text style={styles.sectionTitle}>Quick actions</Text>
-      <View style={styles.quickGrid}><Quick icon="map-outline" label="View route" onPress={() => quickAction('Route')} />{selectedCountry === 'Zimbabwe' ? null : <Quick icon="calendar-outline" label="Collections ahead" onPress={() => navigation.navigate('Route', { screen: 'CollectionsAhead', initial: false })} />}<Quick icon="alert-circle-outline" label="Report issue" onPress={() => quickAction('Messages')} danger /><Quick icon="headset-outline" label="Contact dispatch" onPress={() => quickAction('dispatch')} /></View>
+      {loading ? <ActivityIndicator size="large" color={colors.primary}/> : null}
+      {period === 'week' ? <>
+        <Text style={styles.sectionTitle}>Next seven days · {weekDays.reduce((n,d) => n+d.collections.length,0)} collections</Text>
+        {weekError ? <Text accessibilityRole="alert" style={styles.errorText}>{weekError}</Text> : null}
+        {!loading && !weekError && !weekDays.length ? <Text style={styles.emptyText}>No upcoming collections in this country. Try All or refresh.</Text> : null}
+        {weekDays.map(item => <View key={item.date} style={styles.nextCard}>
+          <Text style={styles.sectionTitle}>{new Date(item.date+'T12:00:00').toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short'})}</Text>
+          {item.collections.map(c => <Pressable key={c.shipmentId} style={styles.stopRow} onPress={() => openAhead(c)}>
+            <View style={{flex:1}}><Text style={styles.stopName}>{c.customerName}</Text><Text style={styles.stopAddress}>{[c.address,c.city,c.postcode].filter(Boolean).join(', ')}</Text><Text style={styles.stopMeta}>{c.customerReference || c.trackingNumber}{c.claimedBy ? ' · Assigned' : ' · Available'}</Text></View><Ionicons name="chevron-forward" size={20} color={colors.primary}/>
+          </Pressable>)}
+        </View>)}
+      </> : <>
+        <View style={styles.sectionRow}><Text style={styles.sectionTitle}>{remaining} remaining · {completed} collected / delivered</Text><Pressable onPress={() => setViewMode(viewMode === 'map' ? 'list' : 'map')} style={styles.segmentButton}><Text style={styles.segmentText}>{viewMode === 'map' ? 'List' : 'Map'}</Text></Pressable></View>
+        {viewMode === 'map' ? <RunMap height={340} focusStopId={current?.id || null} emptyCenter={day?.point ?? null} emptyNote="No mapped stops yet. Addresses remain available in the list." stops={[
+          ...(day?.point ? [{id:'driver',latitude:day.point.latitude,longitude:day.point.longitude,title:'Your position',description:'Live location',kind:'driver' as const,order:'D'}] : []),
+          ...mapped.map(j => ({id:j.id,latitude:Number(j.latitude),longitude:Number(j.longitude),title:j.customer,description:j.address,kind:j.kind,order:j.sequence,done:closed(j)})),
+        ]} onStopPress={pin => { const job=jobs.find(j=>j.id===pin.id); if(job) openShipment(job); }}/> : null}
+        {current ? <View style={styles.nextCard}>
+          <Text style={styles.eyebrow}>{current.status === 'arrived' ? 'AT THE CUSTOMER' : 'NEXT COLLECTION / DELIVERY'}</Text><Text style={styles.nextName}>{current.customer}</Text><Text style={styles.nextMeta}>{current.reference}</Text><Text style={styles.nextAddress}>{current.address}</Text>
+          {current.instructions ? <Text style={styles.instructionsText}>{current.instructions}</Text> : null}
+          <View style={styles.nextActions}><Pressable style={styles.smallAction} onPress={()=>openDriverContact('call',current.phone)}><Ionicons name="call-outline" size={21} color={colors.primary}/><Text>Call</Text></Pressable><Pressable style={styles.navigateButton} onPress={()=>chooseNavigation(current)}><Ionicons name="navigate" size={20} color="white"/><Text style={styles.navigateText}>NAVIGATE</Text></Pressable></View>
+          <Pressable style={styles.primaryButton} onPress={()=>openShipment(current)}><Text style={styles.primaryButtonText}>{current.status === 'arrived' ? 'VERIFY & COLLECT' : 'OPEN SHIPMENT'}</Text><Ionicons name="arrow-forward" size={19} color="white"/></Pressable>
+        </View> : !loading && !error ? <View style={styles.empty}><Text style={styles.emptyTitle}>No remaining stops today</Text><Text style={styles.emptyText}>Check this week for upcoming bookings, or choose All to view other countries.</Text><Pressable style={styles.outlineButton} onPress={()=>setPeriod('week')}><Text style={styles.outlineButtonText}>SEE THIS WEEK</Text></Pressable></View> : null}
+        {jobs.length ? <View style={styles.stopList}>{jobs.map(job=><StopRow key={job.id} job={job} current={job.id===current?.id} onPress={()=>openShipment(job)}/>)}</View> : null}
+      </>}
+      <Text style={styles.assignmentNote}>Navigation opens your maps app for spoken, turn-by-turn directions. Stops without a map pin can still be opened and collected.</Text>
+      <Pressable style={styles.outlineButton} onPress={()=>quickAction('dispatch')}><Ionicons name="headset-outline" size={20} color={colors.primary}/><Text style={styles.outlineButtonText}>CONTACT THE OFFICE</Text></Pressable>
     </ScrollView>
   </SafeAreaView>;
 }

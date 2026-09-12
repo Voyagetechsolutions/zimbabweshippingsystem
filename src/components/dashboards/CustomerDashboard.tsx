@@ -154,7 +154,8 @@ const CustomerDashboard: React.FC = () => {
   const { data: shipments, isLoading: isLoadingShipments, refetch: refetchShipments } = useQuery({
     queryKey: ['customerShipments', user?.id],
     queryFn: fetchShipments,
-    enabled: !!user?.id
+    enabled: !!user?.id,
+    refetchInterval: 15000,
   });
 
   const { data: receipts, isLoading: isLoadingReceipts } = useQuery({
