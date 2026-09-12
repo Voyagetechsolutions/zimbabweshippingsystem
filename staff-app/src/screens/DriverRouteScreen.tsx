@@ -1,8 +1,9 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  ActivityIndicator, Alert, Linking, Platform, Pressable, RefreshControl,
-  ScrollView, StyleSheet, Text, View,
-} from 'react-native';
+import { ActivityIndicator, Linking, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+// Alert comes from lib/alerts, not react-native: these screens build their
+// button lists from data, and a native Android alert shows at most three
+// buttons. The 12 configured failed-stop reasons became 2 reachable ones.
+import { Alert } from '../lib/alerts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';

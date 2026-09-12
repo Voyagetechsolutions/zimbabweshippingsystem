@@ -1,4 +1,6 @@
-import { Alert } from 'react-native';
+// Alert via lib/alerts: identical to the native dialog for three buttons or
+// fewer, but visible on web and scrollable when Android would drop the rest.
+import { Alert } from './alerts';
 import { supabase } from './supabase';
 import { isMissingBackend, isNetworkError } from './offlineQueue';
 

@@ -49,6 +49,7 @@ await db.exec(functionBody('supabase/migrations/20260716100001_staff_driver_runs
 await db.exec(functionBody('supabase/migrations/20260912160000_driver_sees_the_goods.sql','shipment_goods_summary'));
 await db.exec(fs.readFileSync('supabase/migrations/20260912120000_driver_pickup_workflow.sql','utf8'));
 await db.exec(fs.readFileSync('supabase/migrations/20260912121000_driver_claim_feed_alignment.sql','utf8'));
+await db.exec(fs.readFileSync('supabase/migrations/20260912180000_start_planned_driver_pickups.sql','utf8'));
 const schedule=await scalar(`insert into collection_schedules(route,country,pickup_date) values('CORK ROUTE','Ireland',current_date::text) returning id as result`);
 const ship=async (name,country,offset=0,extra={}) => scalar(`insert into shipments(tracking_number,metadata,collection_schedule_id,collection_code)
   values($1::text,jsonb_build_object('sender',jsonb_build_object('name',$1::text,'country',$2::text,'address','Test address'),
@@ -91,8 +92,10 @@ await test('Claim is idempotent and aligned with whitespace-tolerant feed',async
 });
 await test('Cannot complete before arriving',()=>rejects('select complete_driver_pickup($1,true,null)',/Mark arrived/,[claim.stopId]));
 await test('At-location start advances planned → en route → arrived atomically, without GPS',async()=> {
+  await q(`update driver_runs set status='planned' where driver_id=$1`,[uid]);
   const started=await scalar('select begin_driver_pickup($1) as result',[today]);
   assert.equal(started.stopId,claim.stopId);
+  assert.equal((await q('select status from driver_runs where driver_id=$1',[uid]))[0].status,'active');
   assert.equal((await q('select status from driver_run_stops where id=$1',[claim.stopId]))[0].status,'arrived');
   assert.equal((await scalar('select begin_driver_pickup($1) as result',[today])).stopId,claim.stopId);
 });

@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, Alert, Switch } from 'react-native';
+import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, ActivityIndicator, Switch } from 'react-native';
+// Alert via lib/alerts: identical to the native dialog for three buttons or
+// fewer, but visible on web and scrollable when Android would drop the rest.
+import { Alert } from '../../lib/alerts';
 import { supabase } from '../../lib/supabase';
 import { colors, radius, spacing } from '../../theme';
 import { useRoute } from '@react-navigation/native';

@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, TextInput, SectionList, Pressable, StyleSheet, ActivityIndicator, Alert, RefreshControl } from 'react-native';
+import { View, Text, TextInput, SectionList, Pressable, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+// Alert via lib/alerts: identical to the native dialog for three buttons or
+// fewer, but visible on web and scrollable when Android would drop the rest.
+import { Alert } from '../../lib/alerts';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { colors, radius, spacing } from '../../theme';

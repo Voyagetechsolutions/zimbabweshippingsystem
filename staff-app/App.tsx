@@ -34,6 +34,7 @@ import DriverScanScreen from './src/screens/DriverScanScreen';
 import DriverHistoryScreen from './src/screens/DriverHistoryScreen';
 import { DriverCountryProvider, useDriverCountry } from './src/context/DriverCountryContext';
 import { loadStaffBusinessConfig } from './src/lib/businessConfig';
+import { AppAlertHost } from './src/lib/alerts';
 
 const Tab = createBottomTabNavigator();
 
@@ -172,14 +173,41 @@ function NotAuthorized() {
 function Root() {
   const { loading, session, dashboardRole, driverType, roleReady } = useAuth();
   const { viewRole, ready } = useViewRole();
-  const [configReady,setConfigReady]=useState(false);
-  useEffect(()=>{if(!session){setConfigReady(false);return;}loadStaffBusinessConfig().then(()=>setConfigReady(true)).catch(()=>setConfigReady(false));},[session?.user.id]);
+  // Three states, not two. `catch(() => setConfigReady(false))` left the app on
+  // "Loading current business settings..." for ever with no error and no way
+  // out, so a single failed config fetch — a dropped connection on a driver's
+  // phone at the depot — bricked the whole app until it was force-quit.
+  const [configState,setConfigState]=useState<'loading'|'ready'|'failed'>('loading');
+  const [configAttempt,setConfigAttempt]=useState(0);
+  useEffect(()=>{
+    if(!session){setConfigState('loading');return;}
+    let cancelled=false;
+    setConfigState('loading');
+    loadStaffBusinessConfig()
+      .then(()=>{ if(!cancelled) setConfigState('ready'); })
+      .catch(()=>{ if(!cancelled) setConfigState('failed'); });
+    return ()=>{ cancelled=true; };
+  },[session?.user.id,configAttempt]);
 
   if (loading || !ready) {
     return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
   }
   if (!session) return <LoginScreen />;
-  if (!configReady) return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /><Text style={styles.blockBody}>Loading current business settings…</Text></View>;
+  if (configState === 'failed') {
+    return (
+      <View style={styles.center}>
+        <Ionicons name="cloud-offline-outline" size={40} color={colors.textFaint} />
+        <Text style={styles.blockTitle}>Can’t load settings</Text>
+        <Text style={styles.blockBody}>
+          We could not fetch the current prices, routes and fees. Check your connection and try again.
+        </Text>
+        <Pressable style={styles.blockButton} onPress={() => setConfigAttempt((n) => n + 1)}>
+          <Text style={styles.blockButtonText}>Try again</Text>
+        </Pressable>
+      </View>
+    );
+  }
+  if (configState !== 'ready') return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /><Text style={styles.blockBody}>Loading current business settings…</Text></View>;
   // Staff created by an admin start on a temporary password that was read out to
   // them. This stands in front of everything — including the role check — until
   // they have replaced it.
@@ -218,6 +246,7 @@ export default function App() {
           <ViewRoleProvider>
             <StatusBar style="dark" />
             <Root />
+            <AppAlertHost />
           </ViewRoleProvider>
         </AuthProvider>
       </SafeAreaProvider>
