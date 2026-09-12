@@ -32,7 +32,9 @@ export default function StaffMessagesTab() {
     const db = supabase as any;
     const [messageResult, driverResult] = await Promise.all([
       db.from('staff_messages').select('id,sender_id,recipient_id,audience_role,subject,body,priority,read_at,created_at').order('created_at', { ascending: false }).limit(100),
-      db.from('profiles').select('id,full_name,email').eq('role', 'driver').order('full_name'),
+      db.from('profiles').select('id,full_name,email')
+        // Drivers carry `driver_type`, not role='driver' — see DeliveryManagementTab.
+        .or('driver_type.not.is.null,role.eq.driver').order('full_name'),
     ]);
     setLoading(false);
     if (messageResult.error) toast({ title: 'Could not load staff messages', description: messageResult.error.message, variant: 'destructive' });

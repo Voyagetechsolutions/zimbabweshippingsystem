@@ -172,7 +172,11 @@ const DeliveryManagementTab = () => {
       const { data: driverData, error: driverError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('role', 'driver');
+        // Drivers are identified by `driver_type`, not by `role`: no profile in this
+        // database has role='driver' — the drivers are role='customer' with
+        // driver_type set and is_admin true. Matching on role alone returned an
+        // empty list. The `or` keeps working if the roles are ever tidied up.
+        .or('driver_type.not.is.null,role.eq.driver');
 
       if (driverError) {
         // If there's an error fetching drivers, we can still show the delivery data

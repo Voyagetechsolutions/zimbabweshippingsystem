@@ -89,7 +89,9 @@ export default function CollectionsMapTab() {
 
       const [{ data: locations }, { data: profiles }] = await Promise.all([
         db.from('driver_live_locations').select('driver_id,latitude,longitude,accuracy_m,recorded_at').gte('recorded_at', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()),
-        db.from('profiles').select('id,full_name,email').eq('role', 'driver'),
+        db.from('profiles').select('id,full_name,email')
+          // Drivers carry `driver_type`, not role='driver'.
+          .or('driver_type.not.is.null,role.eq.driver'),
       ]);
       const profileById = new Map((profiles || []).map((profile: any) => [profile.id, profile]));
       const stopPoints: MapPoint[] = (stopResult.data || []).filter((stop: any) => Number.isFinite(Number(stop.latitude)) && Number.isFinite(Number(stop.longitude))).map((stop: any) => {
