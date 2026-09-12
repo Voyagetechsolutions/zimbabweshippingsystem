@@ -24,3 +24,27 @@
 /tools/
 /.github/
 
+# --- Monorepo release material, excluded RECURSIVELY ---
+#
+# These were previously listed only as root-anchored paths (/deliverables/),
+# but EAS evaluates the per-app .easignore from the app directory, where a
+# leading slash means the app folder and not the repo root. So none of them
+# matched and every build uploaded a 255 MB archive: deliverables is 408 MB,
+# public 90 MB, tmp 54 MB, store-assets 17 MB. That is not merely slow — a
+# 1.1.5 APK build died at 102 MB of 255 MB with write ECONNRESET, because the
+# bigger the upload the likelier it is to be reset.
+#
+# Only names that do NOT exist inside an app folder are globbed. `src`,
+# `scripts` and `assets` are deliberately absent from this list: staff-app has
+# all three, and `**/src/` would exclude the app's own source.
+**/deliverables/
+**/public/
+**/tmp/
+**/store-assets/
+**/poster-output/
+**/output/
+**/docs/
+**/tools/
+**/supabase/
+**/whatsapp-bot/
+**/old whatsapp bots/
