@@ -145,12 +145,32 @@ export async function bulkUpdateShipments(ids: string[], patch: BulkUpdate): Pro
   const clean = ids.filter(Boolean);
   if (!clean.length) return { ok: true, changed: 0 };
 
+  // A route is represented by more than collection_schedule_id. Move the
+  // collection run, metadata and planned driver work in the same transaction.
+  const changesRoute = patch.clearSchedule || Boolean(patch.collectionScheduleId);
+  if (changesRoute) {
+    const routeResult = await supabase.rpc('reassign_shipments_to_route', {
+      p_ids: clean,
+      p_collection_schedule_id: patch.clearSchedule ? null : patch.collectionScheduleId,
+    });
+    if (routeResult.error) {
+      if (isNetworkError(routeResult.error)) return { ok: false, reason: 'offline', message: 'No signal.' };
+      if (isMissingBackend(routeResult.error)) {
+        return { ok: false, reason: 'not-deployed', message: 'This app is newer than the database.' };
+      }
+      return { ok: false, reason: 'error', message: routeResult.error.message };
+    }
+    if (!patch.status && !patch.collectionPeriodId) {
+      return { ok: true, changed: Number((routeResult.data as any)?.changed || 0) };
+    }
+  }
+
   const { data, error } = await supabase.rpc('bulk_update_shipments', {
     p_ids: clean,
     p_status: patch.status ?? null,
-    p_collection_schedule_id: patch.collectionScheduleId ?? null,
+    p_collection_schedule_id: changesRoute ? null : patch.collectionScheduleId ?? null,
     p_collection_period_id: patch.collectionPeriodId ?? null,
-    p_clear_schedule: patch.clearSchedule ?? false,
+    p_clear_schedule: false,
   });
 
   if (error) {

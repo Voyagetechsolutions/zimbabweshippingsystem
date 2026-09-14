@@ -71,8 +71,16 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  Loader2
+  Loader2,
+  Route
 } from 'lucide-react';
+
+type CollectionRoute = {
+  id: string;
+  route: string;
+  country: string | null;
+  pickup_date: string | null;
+};
 
 const STATUS_OPTIONS = [
   'Pending',
@@ -121,11 +129,27 @@ const ShipmentManagementTab = () => {
   const [collectionPeriods, setCollectionPeriods] = useState<any[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [shipmentToDelete, setShipmentToDelete] = useState<string | null>(null);
+  const [collectionRoutes, setCollectionRoutes] = useState<CollectionRoute[]>([]);
+  const [editingRoute, setEditingRoute] = useState(false);
+  const [selectedRouteId, setSelectedRouteId] = useState('unassigned');
 
   useEffect(() => {
     fetchShipments();
     fetchCollectionPeriods();
+    fetchCollectionRoutes();
   }, [sortField, sortDirection]);
+
+  const fetchCollectionRoutes = async () => {
+    const { data, error } = await (supabase.from('collection_schedules') as any)
+      .select('id,route,country,pickup_date')
+      .is('deleted_at', null)
+      .order('route');
+    if (error) {
+      console.error('Error fetching collection routes:', error);
+      return;
+    }
+    setCollectionRoutes((data || []) as CollectionRoute[]);
+  };
 
   const fetchCollectionPeriods = async () => {
     try {
@@ -175,6 +199,46 @@ const ShipmentManagementTab = () => {
   const handleViewShipment = (shipment: Shipment) => {
     setViewingShipment(shipment);
     setSelectedStatus(shipment.status);
+    setSelectedRouteId(shipment.collection_schedule_id || 'unassigned');
+    setEditingRoute(false);
+  };
+
+  const handleUpdateRoute = async () => {
+    if (!viewingShipment) return;
+    const scheduleId = selectedRouteId === 'unassigned' ? null : selectedRouteId;
+    setIsUpdating(true);
+    try {
+      const { error } = await (supabase.rpc as any)('reassign_shipments_to_route', {
+        p_ids: [viewingShipment.id],
+        p_collection_schedule_id: scheduleId,
+      });
+      if (error) throw error;
+
+      const selectedRoute = collectionRoutes.find((item) => item.id === scheduleId);
+      toast({
+        title: selectedRoute ? 'Shipment moved' : 'Shipment removed from route',
+        description: selectedRoute
+          ? `${viewingShipment.tracking_number} is now on ${selectedRoute.route}.`
+          : `${viewingShipment.tracking_number} is now unassigned.`,
+      });
+
+      const { data: fresh, error: freshError } = await supabase
+        .from('shipments').select('*').eq('id', viewingShipment.id).single();
+      if (freshError) throw freshError;
+      const refreshed = { ...fresh, metadata: fresh.metadata || {} } as Shipment;
+      setShipments((current) => current.map((item) => item.id === refreshed.id ? refreshed : item));
+      setViewingShipment(refreshed);
+      setEditingRoute(false);
+    } catch (error: any) {
+      console.error('Error updating route:', error);
+      toast({
+        title: 'Route not changed',
+        description: error.message || 'Could not change this shipment route.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const handleUpdateStatus = async () => {
@@ -1017,7 +1081,10 @@ const ShipmentManagementTab = () => {
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground">Route:</span>
-                      <span className="font-medium">{getCollectionInfo(viewingShipment).route}</span>
+                      <span className="font-medium">
+                        {collectionRoutes.find((item) => item.id === viewingShipment.collection_schedule_id)?.route
+                          || getCollectionInfo(viewingShipment).route}
+                      </span>
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground">Date:</span>
@@ -1086,6 +1153,62 @@ const ShipmentManagementTab = () => {
                   )}
                 </div>
               )}
+
+              {/* Collection route assignment */}
+              <div className="pt-3 border-t">
+                {editingRoute ? (
+                  <div className="space-y-3">
+                    <div>
+                      <Label htmlFor="collection-route" className="text-xs">Move shipment to route</Label>
+                      <Select value={selectedRouteId} onValueChange={setSelectedRouteId}>
+                        <SelectTrigger id="collection-route" className="w-full mt-1 h-9 text-sm">
+                          <SelectValue placeholder="Choose a route" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unassigned">No route (unassigned)</SelectItem>
+                          {collectionRoutes.map((item) => (
+                            <SelectItem key={item.id} value={item.id}>
+                              {item.route}{item.pickup_date ? ` · ${item.pickup_date}` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        This also removes the shipment from its old driver route and collection run.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={handleUpdateRoute}
+                        disabled={isUpdating || selectedRouteId === (viewingShipment.collection_schedule_id || 'unassigned')}
+                        className="h-8 text-xs"
+                      >
+                        {isUpdating ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Route className="h-3 w-3 mr-1" />}
+                        Save Route
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => {
+                        setEditingRoute(false);
+                        setSelectedRouteId(viewingShipment.collection_schedule_id || 'unassigned');
+                      }} className="h-8 text-xs">Cancel</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Collection Route</p>
+                      <p className="text-sm font-medium">
+                        {collectionRoutes.find((item) => item.id === viewingShipment.collection_schedule_id)?.route
+                          || getCollectionInfo(viewingShipment).route}
+                      </p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => setEditingRoute(true)} className="h-8 text-xs">
+                      <Route className="h-3 w-3 mr-1" />
+                      Change Route
+                    </Button>
+                  </div>
+                )}
+              </div>
 
               {/* Status Update Section */}
               <div className="pt-3 border-t">

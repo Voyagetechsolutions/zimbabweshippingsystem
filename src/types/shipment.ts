@@ -16,6 +16,8 @@ export interface Shipment {
   collection_status?: string;
   delivery_note_status?: string;
   collected_at?: string | null;
+  collection_schedule_id?: string | null;
+  collection_run_id?: string | null;
   // Additional optional fields
   carrier?: string;
   weight?: number | string;
