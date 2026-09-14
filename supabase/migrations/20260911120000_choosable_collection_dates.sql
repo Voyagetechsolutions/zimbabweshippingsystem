@@ -156,7 +156,6 @@ evidence as (
      and coalesce(s.status, '') <> 'Cancelled'
      and public.parse_schedule_date(s.metadata->'collection'->>'date')
          between date '2026-09-01' and date '2026-09-30'
-     and public.parse_schedule_date(s.metadata->'collection'->>'date') >= current_date
    group by 1, 2
 ),
 best as (
