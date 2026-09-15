@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { runStopToCollection, type RunStopRow, type RunSummary } from './driverRunMerge';
 
 // Driver operations for the website.
 //
@@ -70,6 +71,15 @@ export type RouteCollection = {
   claimedByName: string | null;
   claimedAt: string | null;
   distanceKm?: number | null;
+  // Set on stops that sit on the driver's own run for the day (see driverRunMerge).
+  dispatched?: boolean;
+  runId?: string | null;
+  runStatus?: string | null;
+  routeName?: string | null;
+  stopStatus?: StopStatus | null;
+  stopOrder?: number | null;
+  windowStart?: string | null;
+  windowEnd?: string | null;
 };
 
 export type RouteDay = {
@@ -83,6 +93,39 @@ export async function loadRouteDay(date?: string): Promise<RouteDay> {
   if (error) rethrow(error);
   const day = data as RouteDay;
   return { date: day?.date, routes: day?.routes || [], collections: day?.collections || [] };
+}
+
+/**
+ * The collection stops on the driver's own run today, whoever put them there.
+ *
+ * Dispatch builds runs on the Runs screen; those stops are not in the shared
+ * route feed, so without this the driver would never see them.
+ */
+export async function loadMyRunStops(driverId: string, date: string = todayIso()): Promise<{
+  runs: RunSummary[];
+  stops: Array<RouteCollection & { failureReason: string | null }>;
+}> {
+  const runs = await db.from('driver_runs')
+    .select('id,status,route_name').eq('driver_id', driverId).eq('run_date', date).neq('status', 'cancelled');
+  if (runs.error) rethrow(runs.error);
+  const runRows = (runs.data as RunSummary[]) || [];
+  if (!runRows.length) return { runs: [], stops: [] };
+
+  const stops = await db.from('driver_run_stops')
+    .select('id,run_id,shipment_id,stop_order,status,address,latitude,longitude,recipient_name,time_window_start,time_window_end,special_instructions,failure_reason,'
+      + 'shipment:shipments(metadata,customer_reference,tracking_number,goods_description,collection_status,status,pickup_latitude,pickup_longitude)')
+    .in('run_id', runRows.map((r) => r.id))
+    .eq('stop_type', 'collection')
+    .order('stop_order');
+  if (stops.error) rethrow(stops.error);
+  const runById = new Map(runRows.map((r) => [r.id, r]));
+  return {
+    runs: runRows,
+    stops: ((stops.data as RunStopRow[]) || []).map((row) => ({
+      ...runStopToCollection(row, runById.get(row.run_id), driverId),
+      failureReason: row.failure_reason,
+    })),
+  };
 }
 
 export async function claimRouteCollection(shipmentId: string): Promise<{ stopId: string }> {

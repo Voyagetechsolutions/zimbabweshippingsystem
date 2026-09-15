@@ -68,6 +68,7 @@ import CollectionPointsTab from '@/components/admin/tabs/CollectionPointsTab';
 import CollectionsMapTab from '@/components/admin/tabs/CollectionsMapTab';
 import StaffMessagesTab from '@/components/admin/tabs/StaffMessagesTab';
 import DriverPerformanceTab from '@/components/admin/tabs/DriverPerformanceTab';
+import DriverRunsTab from '@/components/admin/tabs/DriverRunsTab';
 
 // Icons
 import {
@@ -99,6 +100,7 @@ import {
   ScanLine,
   Bot,
   Store,
+  Navigation,
 } from 'lucide-react';
 
 interface NavItem {
@@ -177,6 +179,9 @@ const AdminDashboardInner = () => {
       label: 'Operations',
       items: [
         { value: 'pickupZones', label: 'Pickup Zones', icon: MapPin },
+        // The staff app's Runs tab: dispatch board, runs, route builder and
+        // collection groups. Runs made here reach the driver's dashboard.
+        { value: 'runs', label: 'Runs & Dispatch', icon: Navigation },
         { value: 'collectionsMap', label: 'Collections Map', icon: MapPin },
         { value: 'delivery', label: 'Delivery', icon: Truck },
         { value: 'driverPerformance', label: 'Driver Performance', icon: BarChart3 },
@@ -551,6 +556,7 @@ const AdminDashboardInner = () => {
       case 'customQuotes': return <CustomQuoteManagement />;
       case 'customers': return <CustomerManagementTab />;
       case 'pickupZones': return <PickupZonesManagementTab />;
+      case 'runs': return <DriverRunsTab />;
       case 'collectionsMap': return <CollectionsMapTab />;
       case 'delivery': return <DeliveryManagementTab />;
       case 'driverPerformance': return <DriverPerformanceTab />;
