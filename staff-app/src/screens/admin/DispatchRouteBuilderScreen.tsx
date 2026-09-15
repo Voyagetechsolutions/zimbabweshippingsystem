@@ -197,7 +197,7 @@ export default function DispatchRouteBuilderScreen({ navigation, route }: any) {
       // One run per driver per day is a database rule, so an existing run for
       // this driver is extended rather than duplicated.
       const existing = await supabase.from('driver_runs')
-        .select('id').eq('driver_id', driverId).eq('run_date', runDate).maybeSingle();
+        .select('id,status').eq('driver_id', driverId).eq('run_date', runDate).maybeSingle();
       let driverRunId = existing.data?.id as string | undefined;
       if (!driverRunId) {
         const created = await supabase.from('driver_runs').insert({
@@ -213,7 +213,14 @@ export default function DispatchRouteBuilderScreen({ navigation, route }: any) {
         if (created.error) throw created.error;
         driverRunId = created.data.id as string;
       } else {
-        await supabase.from('driver_runs').update({ route_name: routeName.trim() }).eq('id', driverRunId);
+        // Reusing a cancelled or finished run must reopen it: the driver app
+        // skips cancelled runs, so stops added to one would never be seen.
+        const reopen = ['cancelled', 'completed'].includes(String((existing.data as any)?.status));
+        await supabase.from('driver_runs')
+          .update(reopen
+            ? { route_name: routeName.trim(), status: 'planned', completed_at: null }
+            : { route_name: routeName.trim() })
+          .eq('id', driverRunId);
       }
 
       // Tie the driver's run back to the collection group, so the groups board
