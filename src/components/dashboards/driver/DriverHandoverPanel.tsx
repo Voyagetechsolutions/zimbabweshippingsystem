@@ -252,9 +252,14 @@ export default function DriverHandoverPanel({ stop, onDone, onCancel }: {
       return;
     }
     setBusy('invoice');
+    // All nine arguments, as the staff app sends them: with only the first six
+    // the database has two create_driver_invoice functions that fit and refuses
+    // to choose (PGRST203), so this save had never worked. Confirming is what
+    // complete_driver_handover checks before a collection can be completed.
     const { data, error } = await db.rpc('create_driver_invoice', {
       p_stop_id: stop.stopId, p_line_items: lineItems, p_discount: Number(discount || 0),
       p_tax_rate: Number(taxRate || 0), p_currency: currency, p_notes: notes.trim() || null,
+      p_amount_paid: null, p_payment_method: null, p_confirm: true,
     });
     setBusy(null);
     if (error) { toast({ title: 'Invoice failed', description: error.message, variant: 'destructive' }); return; }

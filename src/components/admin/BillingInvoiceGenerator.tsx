@@ -283,8 +283,15 @@ export const BillingInvoiceTemplate = React.forwardRef<HTMLDivElement, { shipmen
           <div style={{
             position: 'absolute', top: '120px', right: '60px', transform: 'rotate(-12deg)',
             border: '4px solid #d97706', color: '#d97706', padding: '6px 18px',
-            fontSize: '28px', fontWeight: 'bold', letterSpacing: '2px', opacity: 0.8,
-          }}>PART PAID</div>
+            fontSize: '24px', fontWeight: 'bold', letterSpacing: '2px', opacity: 0.8,
+          }}>PARTIALLY PAID</div>
+        )}
+        {status !== 'paid' && status !== 'partial' && totals.total > 0 && (
+          <div style={{
+            position: 'absolute', top: '120px', right: '60px', transform: 'rotate(-12deg)',
+            border: '4px solid #dc2626', color: '#dc2626', padding: '6px 18px',
+            fontSize: '32px', fontWeight: 'bold', letterSpacing: '2px', opacity: 0.8,
+          }}>UNPAID</div>
         )}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>

@@ -90,3 +90,26 @@ export function getInvoiceStatusValue(invoice: InvoiceLike, hasBeenSent = false)
   if (overdue) return 'overdue';
   return hasBeenSent ? 'sent' : 'draft';
 }
+
+/**
+ * Whether a person has raised this invoice.
+ *
+ * The invoice number is the gate, as it is for issue_shipment_invoice and the
+ * staff app's isIssued(): a booking prices itself and writes line items long
+ * before anybody agrees them, so items alone do not make an invoice. Deleted
+ * invoices still count as raised; callers check deletedAt separately.
+ */
+export function isInvoiceRaised(shipment: { metadata?: unknown } | null | undefined): boolean {
+  const invoice = (shipment?.metadata as Record<string, unknown> | undefined)?.invoice as
+    | { invoiceNumber?: unknown }
+    | undefined;
+  return String(invoice?.invoiceNumber ?? '').trim().length > 0;
+}
+
+export type InvoicePaymentState = 'paid' | 'partial' | 'unpaid';
+
+/** Paid, partially paid or unpaid — what the stamps show. */
+export function getInvoicePaymentState(invoice: InvoiceLike): InvoicePaymentState {
+  if (isInvoiceSettled(invoice)) return 'paid';
+  return getInvoicePaymentSummary(invoice).paidAmount > 0 ? 'partial' : 'unpaid';
+}

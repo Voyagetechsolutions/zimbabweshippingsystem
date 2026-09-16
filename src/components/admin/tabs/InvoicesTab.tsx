@@ -21,15 +21,26 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  Search, Download, RefreshCw, Loader2, Eye, Pencil, Plus, Trash2, Receipt, Printer,
+  Search, Download, RefreshCw, Loader2, Eye, Pencil, Plus, Trash2, Receipt,
   Wallet, Send, CircleDollarSign, AlertTriangle, CheckCircle2, Smartphone, Mail,
+  BadgeCheck, ChevronDown, MoreHorizontal, ShieldAlert, Truck,
 } from 'lucide-react';
 import { buildRefNumber } from '@/components/admin/DeliveryNoteGenerator';
 import BillingInvoiceGenerator, {
-  InvoiceData, InvoiceLineItem, PaymentEntry, InvoiceStatus, PAYMENT_METHOD_LABELS,
+  InvoiceData, InvoiceLineItem, InvoiceStatus,
   getInvoiceData, calculateTotals, getPaymentSummary, getInvoiceStatus, BillingInvoiceTemplate,
 } from '@/components/admin/BillingInvoiceGenerator';
-import { hasStoredInvoice } from '@/utils/invoiceTotals';
+import { getInvoicePaymentState, isInvoiceRaised } from '@/utils/invoiceTotals';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import PaymentStamp from '@/components/admin/invoices/PaymentStamp';
+import InvoicePaymentDialog from '@/components/admin/invoices/InvoicePaymentDialog';
+import DriverInvoiceReviewDialog from '@/components/admin/invoices/DriverInvoiceReviewDialog';
+import {
+  loadDriverInvoices, loadStaffNames, raiseInvoice, saveRaisedInvoice, setInvoiceDeleted,
+  type DriverInvoiceInfo, type PaymentStatusChoice,
+} from '@/lib/invoiceActions';
 
 const CURRENCY_SYMBOL: Record<string, string> = { EUR: '€', GBP: '£', USD: '$' };
 
@@ -72,6 +83,11 @@ function getSenderCountry(s: Shipment): string | undefined {
 function fmtMoney(amount: number, currency: string) {
   const sym = CURRENCY_SYMBOL[currency] || `${currency} `;
   return `${sym}${(Number(amount) || 0).toFixed(2)}`;
+}
+
+/** The invoice exactly as stored, including fields InvoiceData does not model. */
+function rawInvoice(s: Shipment): Record<string, any> {
+  return ((s.metadata as Record<string, any> | undefined)?.invoice || {}) as Record<string, any>;
 }
 
 const NEW_INVOICE_PREFIX = 'new-invoice-';
@@ -129,10 +145,11 @@ const InvoicesTab = () => {
   const [deletingShipment, setDeletingShipment] = useState<Shipment | null>(null);
   const [deletingInvoice, setDeletingInvoice] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  // Record-payment dialog
-  const [payingShipment, setPayingShipment] = useState<Shipment | null>(null);
-  const [paymentDraft, setPaymentDraft] = useState<{ amount: number; date: string; method: string; reference: string; note: string } | null>(null);
-  const [savingPayment, setSavingPayment] = useState(false);
+  // Payment status and driver-invoice review
+  const [paymentFor, setPaymentFor] = useState<{ shipment: Shipment; mode: PaymentStatusChoice } | null>(null);
+  const [reviewFor, setReviewFor] = useState<Shipment | null>(null);
+  const [driverInvoices, setDriverInvoices] = useState<Map<string, DriverInvoiceInfo>>(new Map());
+  const [staffNames, setStaffNames] = useState<Map<string, string>>(new Map());
   const [busyId, setBusyId] = useState<string | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [publishingId, setPublishingId] = useState<string | null>(null);
@@ -150,7 +167,16 @@ const InvoicesTab = () => {
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      setShipments((data || []) as unknown as Shipment[]);
+      const rows = (data || []) as unknown as Shipment[];
+      setShipments(rows);
+      // Who raised and who verified. Losing these loses only the labels.
+      const drivers = await loadDriverInvoices().catch(() => new Map<string, DriverInvoiceInfo>());
+      setDriverInvoices(drivers);
+      setStaffNames(await loadStaffNames([
+        ...[...drivers.values()].map(d => d.driverId),
+        ...rows.map(s => rawInvoice(s).verifiedBy),
+        ...rows.map(s => rawInvoice(s).driverConfirmedBy),
+      ]).catch(() => new Map<string, string>()));
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Could not load shipments';
       toast({ title: 'Error', description: msg, variant: 'destructive' });
@@ -158,6 +184,10 @@ const InvoicesTab = () => {
       setLoading(false);
     }
   };
+
+  // Raised by a driver at a collection: their copy exists, or they confirmed
+  // it with the customer at the door.
+  const isFromDriver = (s: Shipment) => driverInvoices.has(s.id) || Boolean(rawInvoice(s).driverConfirmedAt);
 
   const filtered = shipments.filter(s => {
     const inv = getInvoiceData(s);
@@ -167,13 +197,16 @@ const InvoicesTab = () => {
       inv.invoiceNumber.toLowerCase().includes(q) ||
       getSenderName(s).toLowerCase().includes(q) ||
       buildRefNumber(s).toLowerCase().includes(q);
-    const raised = hasStoredInvoice(s);
+    const raised = isInvoiceRaised(s);
     const deleted = Boolean(inv.deletedAt);
     const matchStatus =
       statusFilter === 'all' ? !deleted
       : statusFilter === 'deleted' ? raised && deleted
       : statusFilter === 'not_raised' ? !raised && !deleted
       : statusFilter === 'raised' ? raised && !deleted
+      : statusFilter === 'driver' ? raised && !deleted && isFromDriver(s)
+      : statusFilter === 'driver_to_verify' ? raised && !deleted && isFromDriver(s) && !rawInvoice(s).verifiedAt
+      : statusFilter === 'unpaid' ? raised && !deleted && getInvoicePaymentState(inv) === 'unpaid'
       // A shipment with no invoice must not answer to a real invoice status.
       : raised && !deleted && getInvoiceStatus(inv) === statusFilter;
     return matchSearch && matchStatus;
@@ -188,7 +221,7 @@ const InvoicesTab = () => {
     let outstanding = 0, overdue = 0, paid = 0, raised = 0;
     const currencyCount: Record<string, number> = {};
     for (const s of shipments) {
-      if (!hasStoredInvoice(s)) continue;
+      if (!isInvoiceRaised(s)) continue;
       const inv = getInvoiceData(s);
       if (inv.deletedAt) continue;
       raised++;
@@ -200,9 +233,11 @@ const InvoicesTab = () => {
       if (status === 'overdue') overdue += balance;
     }
     const currency = Object.entries(currencyCount).sort((a, b) => b[1] - a[1])[0]?.[0] || 'EUR';
-    const deleted = shipments.filter(s => hasStoredInvoice(s) && Boolean(getInvoiceData(s).deletedAt)).length;
-    const notRaised = shipments.filter(s => !hasStoredInvoice(s)).length;
-    return { outstanding, overdue, paid, currency, raised, deleted, notRaised };
+    const deleted = shipments.filter(s => isInvoiceRaised(s) && Boolean(getInvoiceData(s).deletedAt)).length;
+    const notRaised = shipments.filter(s => !isInvoiceRaised(s)).length;
+    const driverToVerify = shipments.filter(s =>
+      isInvoiceRaised(s) && !rawInvoice(s).deletedAt && isFromDriver(s) && !rawInvoice(s).verifiedAt).length;
+    return { outstanding, overdue, paid, currency, raised, deleted, notRaised, driverToVerify };
   })();
 
   // ── Selection (for bulk actions) ────────────────────────────────────────────
@@ -215,7 +250,7 @@ const InvoicesTab = () => {
   };
   // Only real, saved invoices can participate in invoice actions. Bookings with
   // generated defaults remain available through the Create Invoice flow.
-  const selectableFiltered = filtered.filter(s => hasStoredInvoice(s) && !getInvoiceData(s).deletedAt);
+  const selectableFiltered = filtered.filter(s => isInvoiceRaised(s) && !getInvoiceData(s).deletedAt);
   const allSelected = selectableFiltered.length > 0 && selectableFiltered.every(s => selected.has(s.id));
   const someSelected = selected.size > 0 && !allSelected;
   const toggleAll = () => {
@@ -289,11 +324,24 @@ const InvoicesTab = () => {
     });
   };
 
-  // Persist an invoice onto a shipment's metadata, with optimistic update + rollback.
-  // `paid` is kept in sync with the balance so legacy reads stay correct.
+  // Put an invoice the server returned onto the list and any open dialog.
+  const applyInvoice = (shipmentId: string, invoice: Record<string, any>) => {
+    const withInvoice = (s: Shipment): Shipment => ({ ...s, metadata: { ...(s.metadata || {}), invoice } });
+    setShipments(prev => prev.map(s => (s.id === shipmentId ? withInvoice(s) : s)));
+    setPaymentFor(current => (current && current.shipment.id === shipmentId ? { ...current, shipment: withInvoice(current.shipment) } : current));
+    setReviewFor(current => (current && current.id === shipmentId ? withInvoice(current) : current));
+    const verifier = invoice.verifiedBy as string | undefined;
+    if (verifier && !staffNames.has(verifier)) {
+      loadStaffNames([verifier]).then(found => setStaffNames(prev => new Map([...prev, ...found]))).catch(() => undefined);
+    }
+  };
+
+  // Save an invoice. A brand-new standalone invoice is inserted as its own
+  // record. Raising one on a booking and editing a raised one both go through
+  // the server, which works for finance accounts as well as admins, and keeps
+  // who raised, confirmed and verified it out of the form's reach.
   const persistInvoice = async (shipment: Shipment, invoice: InvoiceData): Promise<boolean> => {
-    const synced: InvoiceData = { ...invoice, paid: getPaymentSummary(invoice).balance <= 0.005 && calculateTotals(invoice).total > 0 };
-    const newMetadata = { ...(shipment.metadata || {}), invoice: synced };
+    const newMetadata = { ...(shipment.metadata || {}), invoice: { ...invoice, paid: false } };
     const isNewStandalone = shipment.id.startsWith(NEW_INVOICE_PREFIX);
 
     if (isNewStandalone) {
@@ -320,20 +368,18 @@ const InvoicesTab = () => {
       return true;
     }
 
-    const previous = shipment;
-    setShipments(prev => prev.map(s => s.id === shipment.id ? { ...s, metadata: newMetadata } : s));
-
-    const { error } = await supabase
-      .from('shipments')
-      .update({ metadata: newMetadata as never })
-      .eq('id', shipment.id);
-
-    if (error) {
-      setShipments(prev => prev.map(s => s.id === previous.id ? previous : s));
-      toast({ title: 'Could not save', description: error.message, variant: 'destructive' });
+    try {
+      const payload = invoice as unknown as Record<string, any>;
+      const saved = isInvoiceRaised(shipment)
+        ? await saveRaisedInvoice(shipment.id, payload)
+        : await raiseInvoice(shipment.id, payload);
+      applyInvoice(shipment.id, saved);
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not save the invoice.';
+      toast({ title: 'Could not save', description: msg, variant: 'destructive' });
       return false;
     }
-    return true;
   };
 
   const saveInvoice = async () => {
@@ -355,7 +401,7 @@ const InvoicesTab = () => {
       });
       return;
     }
-    const wasRaised = !isScratch && hasStoredInvoice(editingShipment);
+    const wasRaised = !isScratch && isInvoiceRaised(editingShipment);
     setSavingInvoice(true);
     const invoiceToSave = { ...draft, discount: 0, taxRate: 0 };
     const ok = await persistInvoice(editingShipment, invoiceToSave);
@@ -413,7 +459,7 @@ const InvoicesTab = () => {
     const invoice = getInvoiceData(shipment);
     // Same guard as publishing: never email a figure that was only synthesised
     // from the booking. Bulk send silently skips these rather than billing them.
-    if (!hasStoredInvoice(shipment)) {
+    if (!isInvoiceRaised(shipment)) {
       if (!silent) toast({
         title: 'No invoice raised yet',
         description: 'Review and save the invoice for this booking before emailing it.',
@@ -488,7 +534,7 @@ const InvoicesTab = () => {
 
     // Without a raised invoice this would publish a figure synthesised from the
     // booking — the customer would receive a bill nobody agreed.
-    if (!hasStoredInvoice(shipment)) {
+    if (!isInvoiceRaised(shipment)) {
       toast({
         title: 'No invoice raised yet',
         description: 'Open this booking, review the lines and save the invoice first. Only then can it be published to the customer.',
@@ -594,65 +640,17 @@ const InvoicesTab = () => {
     }
   };
 
-  // ── Record offline payment ──────────────────────────────────────────────────
-  const openRecordPayment = (shipment: Shipment) => {
-    const invoice = getInvoiceData(shipment);
-    const { balance } = getPaymentSummary(invoice);
-    setPayingShipment(shipment);
-    setPaymentDraft({
-      amount: Number(balance.toFixed(2)),
-      date: format(new Date(), 'yyyy-MM-dd'),
-      method: 'bank_transfer',
-      reference: '',
-      note: '',
-    });
-  };
-
-  const savePayment = async () => {
-    if (!payingShipment || !paymentDraft) return;
-    if (!paymentDraft.amount || paymentDraft.amount <= 0) {
-      toast({ title: 'Enter an amount', description: 'Payment amount must be greater than zero.', variant: 'destructive' });
-      return;
-    }
-    setSavingPayment(true);
-    const invoice = getInvoiceData(payingShipment);
-    const entry: PaymentEntry = {
-      id: (globalThis.crypto?.randomUUID?.() ?? `pay-${Date.now()}`),
-      date: paymentDraft.date,
-      amount: Number(paymentDraft.amount),
-      method: paymentDraft.method,
-      reference: paymentDraft.reference.trim() || undefined,
-      note: paymentDraft.note.trim() || undefined,
-    };
-    const updated: InvoiceData = { ...invoice, payments: [...(invoice.payments || []), entry] };
-    const ok = await persistInvoice(payingShipment, updated);
-    setSavingPayment(false);
-    if (!ok) return;
-    const summary = getPaymentSummary(updated);
-    toast({
-      title: 'Payment recorded',
-      description: summary.balance <= 0.005
-        ? `${invoice.invoiceNumber} fully paid.`
-        : `${fmtMoney(summary.balance, invoice.currency)} balance remaining.`,
-    });
-    setPayingShipment(null);
-    setPaymentDraft(null);
-  };
-
-  const removePayment = async (shipment: Shipment, paymentId: string) => {
-    const invoice = getInvoiceData(shipment);
-    const updated: InvoiceData = { ...invoice, payments: (invoice.payments || []).filter(p => p.id !== paymentId) };
-    setBusyId(shipment.id);
-    const ok = await persistInvoice(shipment, updated);
-    setBusyId(null);
-    if (ok) toast({ title: 'Payment removed' });
-  };
-
   const softDeleteInvoice = async () => {
     if (!deletingShipment) return;
     setDeletingInvoice(true);
     const invoice = getInvoiceData(deletingShipment);
-    const ok = await persistInvoice(deletingShipment, { ...invoice, deletedAt: new Date().toISOString() });
+    let ok = true;
+    try {
+      applyInvoice(deletingShipment.id, await setInvoiceDeleted(deletingShipment.id, true));
+    } catch (err) {
+      ok = false;
+      toast({ title: 'Could not delete', description: err instanceof Error ? err.message : 'Try again.', variant: 'destructive' });
+    }
     setDeletingInvoice(false);
     if (!ok) return;
     toast({ title: 'Invoice deleted', description: `${invoice.invoiceNumber} can be restored from the Deleted filter.` });
@@ -667,9 +665,14 @@ const InvoicesTab = () => {
   const restoreInvoice = async (shipment: Shipment) => {
     setBusyId(shipment.id);
     const invoice = getInvoiceData(shipment);
-    const ok = await persistInvoice(shipment, { ...invoice, deletedAt: null });
-    setBusyId(null);
-    if (ok) toast({ title: 'Invoice restored', description: invoice.invoiceNumber });
+    try {
+      applyInvoice(shipment.id, await setInvoiceDeleted(shipment.id, false));
+      toast({ title: 'Invoice restored', description: invoice.invoiceNumber });
+    } catch (err) {
+      toast({ title: 'Could not restore', description: err instanceof Error ? err.message : 'Try again.', variant: 'destructive' });
+    } finally {
+      setBusyId(null);
+    }
   };
 
   // ── Download single PDF without opening preview ─────────────────────────────
@@ -722,9 +725,12 @@ const InvoicesTab = () => {
     // raise one, but they are not counted as invoices anywhere.
     { value: 'not_raised', label: 'Not raised yet' },
     { value: 'raised', label: 'Raised' },
+    { value: 'driver_to_verify', label: 'Driver invoices to verify' },
+    { value: 'driver', label: 'All driver invoices' },
+    { value: 'unpaid', label: 'Unpaid' },
     { value: 'draft', label: 'Draft' },
     { value: 'sent', label: 'Sent' },
-    { value: 'partial', label: 'Partial' },
+    { value: 'partial', label: 'Partially paid' },
     { value: 'overdue', label: 'Overdue' },
     { value: 'paid', label: 'Paid' },
     { value: 'deleted', label: 'Deleted' },
@@ -732,13 +738,12 @@ const InvoicesTab = () => {
 
   const draftTotals = draft ? calculateTotals(draft) : null;
   const draftPaymentSummary = draft ? getPaymentSummary(draft) : null;
-  const paymentSummaryForPaying = payingShipment ? getPaymentSummary(getInvoiceData(payingShipment)) : null;
 
   return (
     <div className="space-y-4">
       <TabHeader
         title="Invoices"
-        description="Customer invoices for every shipment. Edit, preview, print or download as PDF."
+        description="Every raised invoice and what has been paid. Mark invoices fully paid, partially paid or not paid, and verify the ones drivers raised at collection."
         actions={
           <>
             <Button
@@ -810,6 +815,21 @@ const InvoicesTab = () => {
         </Card>
       </div>
 
+      {summary.driverToVerify > 0 && statusFilter !== 'driver_to_verify' && (
+        <button
+          type="button"
+          onClick={() => setStatusFilter('driver_to_verify')}
+          className="flex w-full items-center gap-3 rounded-lg border-2 border-blue-200 bg-blue-50 p-3 text-left text-blue-900 hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100"
+        >
+          <Truck className="h-5 w-5 shrink-0" />
+          <span className="flex-1 text-sm">
+            <strong>{summary.driverToVerify} driver invoice{summary.driverToVerify === 1 ? '' : 's'} waiting to be verified.</strong>{' '}
+            Drivers raised these at collection — check the lines and what was paid, then verify.
+          </span>
+          <span className="text-xs font-semibold underline">Show them</span>
+        </button>
+      )}
+
       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
         <span><strong className="text-foreground">{summary.raised}</strong> invoice{summary.raised !== 1 ? 's' : ''} raised</span>
         {summary.notRaised > 0 && (
@@ -875,10 +895,15 @@ const InvoicesTab = () => {
                     const inv = getInvoiceData(shipment);
                     const { total, paidAmount, balance } = getPaymentSummary(inv);
                     const status = getInvoiceStatus(inv);
-                    const raised = hasStoredInvoice(shipment);
+                    const raised = isInvoiceRaised(shipment);
                     const deleted = Boolean(inv.deletedAt);
                     const rowBusy = busyId === shipment.id;
                     const isChecked = selected.has(shipment.id);
+                    const stored = rawInvoice(shipment);
+                    const fromDriver = isFromDriver(shipment);
+                    const verified = Boolean(stored.verifiedAt);
+                    const paymentState = getInvoicePaymentState(inv);
+                    const verifierName = stored.verifiedBy ? staffNames.get(stored.verifiedBy) : undefined;
                     return (
                       <TableRow key={shipment.id} className={isChecked ? 'bg-emerald-50/50 dark:bg-emerald-950/20' : ''}>
                         <TableCell>
@@ -889,7 +914,28 @@ const InvoicesTab = () => {
                             disabled={!raised || deleted}
                           />
                         </TableCell>
-                        <TableCell className="font-mono text-sm font-medium">{inv.invoiceNumber}</TableCell>
+                        <TableCell>
+                          <div className="font-mono text-sm font-medium">{inv.invoiceNumber}</div>
+                          {raised && !deleted && fromDriver && (verified ? (
+                            <button
+                              type="button"
+                              onClick={() => setReviewFor(shipment)}
+                              title={`Verified${verifierName ? ` by ${verifierName}` : ''}`}
+                              className="mt-1 inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
+                            >
+                              <BadgeCheck className="h-3 w-3" /> Driver · verified
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setReviewFor(shipment)}
+                              title="Raised by a driver at collection — not yet checked by the office"
+                              className="mt-1 inline-flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300"
+                            >
+                              <Truck className="h-3 w-3" /> Driver · to verify
+                            </button>
+                          ))}
+                        </TableCell>
                         <TableCell className="font-mono text-sm">{shipment.tracking_number}</TableCell>
                         <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                           {inv.issueDate}
@@ -915,7 +961,12 @@ const InvoicesTab = () => {
                           {deleted
                             ? <Badge variant="outline" className="border-red-300 bg-red-50 text-red-700">Deleted</Badge>
                             : raised
-                            ? <StatusPill status={status} />
+                            ? (
+                              <div className="flex flex-col items-start gap-1.5">
+                                <PaymentStamp state={paymentState} />
+                                {paymentState === 'unpaid' && <StatusPill status={status} />}
+                              </div>
+                            )
                             : <Badge variant="outline" className="text-muted-foreground">Not raised</Badge>}
                         </TableCell>
                         <TableCell className="text-right">
@@ -932,78 +983,80 @@ const InvoicesTab = () => {
                                 Restore
                               </Button>
                             ) : <>
-                            {raised && status !== 'paid' && (
+                            {raised && (
+                              <DropdownMenu modal={false}>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={rowBusy}
+                                    className="h-8 px-2 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50"
+                                    title="Mark as fully paid, partially paid or not paid"
+                                  >
+                                    <Wallet className="h-4 w-4 mr-1" /> Mark as <ChevronDown className="h-3 w-3 ml-0.5" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuLabel className="text-xs">Payment status</DropdownMenuLabel>
+                                  <DropdownMenuItem onSelect={() => setPaymentFor({ shipment, mode: 'paid' })}>Fully paid</DropdownMenuItem>
+                                  <DropdownMenuItem onSelect={() => setPaymentFor({ shipment, mode: 'partial' })}>Partially paid…</DropdownMenuItem>
+                                  <DropdownMenuItem onSelect={() => setPaymentFor({ shipment, mode: 'unpaid' })}>Not paid</DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+                            {raised && fromDriver && !verified && (
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => openRecordPayment(shipment)}
-                                disabled={rowBusy}
-                                className="h-8 px-2 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50"
-                                title="Record a payment"
+                                onClick={() => setReviewFor(shipment)}
+                                className="h-8 px-2 text-blue-700 hover:text-blue-800 hover:bg-blue-50"
+                                title="Check and verify the driver's invoice"
                               >
-                                <Wallet className="h-4 w-4 mr-1" /> Pay
+                                <ShieldAlert className="h-4 w-4 mr-1" /> Verify
                               </Button>
                             )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => publishInvoiceToCustomer(shipment)}
-                              disabled={!raised || publishingId === shipment.id}
-                              className="h-8 px-2 text-green-700 hover:text-green-800 hover:bg-green-50 disabled:opacity-60"
-                              title={shipment.user_id
-                                ? 'Publish to the customer’s app and web dashboard'
-                                : 'Guest booking — no account to publish to yet'}
-                            >
-                              {publishingId === shipment.id
-                                ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                : <Smartphone className="h-4 w-4 mr-1" />} To app
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => sendInvoice(shipment)}
-                              disabled={!raised || sendingId === shipment.id}
-                              className="h-8 px-2"
-                              title="Email invoice to customer"
-                            >
-                              {sendingId === shipment.id
-                                ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                : <Mail className="h-4 w-4 mr-1" />} Email
-                            </Button>
                             <Button variant="ghost" size="sm" onClick={() => openEdit(shipment)} className="h-8 px-2" title={raised ? 'Edit invoice' : 'Create invoice'}>
                               {raised ? <Pencil className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
                               {raised ? 'Edit' : 'Create'}
                             </Button>
                             {raised && (
-                              <>
-                                <Button variant="ghost" size="sm" onClick={() => setPreviewShipment(shipment)} className="h-8 px-2" title="Preview invoice">
-                                  <Eye className="h-4 w-4 mr-1" /> View
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => downloadPdf(shipment)}
-                                  disabled={downloadingId === shipment.id}
-                                  className="h-8 px-2"
-                                  title="Download PDF"
-                                >
-                                  {downloadingId === shipment.id
-                                    ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                    : <Download className="h-4 w-4 mr-1" />}
-                                  PDF
-                                </Button>
-                              </>
+                              <Button variant="ghost" size="sm" onClick={() => setPreviewShipment(shipment)} className="h-8 px-2" title="Preview invoice">
+                                <Eye className="h-4 w-4 mr-1" /> View
+                              </Button>
                             )}
                             {raised && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setDeletingShipment(shipment)}
-                                className="h-8 px-2 text-red-700 hover:text-red-800 hover:bg-red-50"
-                                title="Soft delete invoice"
-                              >
-                                <Trash2 className="h-4 w-4 mr-1" /> Delete
-                              </Button>
+                              <DropdownMenu modal={false}>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="More actions" aria-label={`More actions for ${inv.invoiceNumber}`}>
+                                    {sendingId === shipment.id || publishingId === shipment.id || downloadingId === shipment.id
+                                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                                      : <MoreHorizontal className="h-4 w-4" />}
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onSelect={() => publishInvoiceToCustomer(shipment)}
+                                    disabled={publishingId === shipment.id}
+                                  >
+                                    <Smartphone className="h-4 w-4 mr-2" /> Publish to customer app
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onSelect={() => sendInvoice(shipment)} disabled={sendingId === shipment.id}>
+                                    <Mail className="h-4 w-4 mr-2" /> Email to customer
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onSelect={() => downloadPdf(shipment)} disabled={downloadingId === shipment.id}>
+                                    <Download className="h-4 w-4 mr-2" /> Download PDF
+                                  </DropdownMenuItem>
+                                  {fromDriver && (
+                                    <DropdownMenuItem onSelect={() => setReviewFor(shipment)}>
+                                      <Truck className="h-4 w-4 mr-2" /> {verified ? 'Driver details & verification' : 'Review & verify'}
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onSelect={() => setDeletingShipment(shipment)} className="text-red-700 focus:text-red-800">
+                                    <Trash2 className="h-4 w-4 mr-2" /> Delete invoice
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             )}
                             </>}
                           </div>
@@ -1035,13 +1088,13 @@ const InvoicesTab = () => {
       >
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingShipment && !editingShipment.id.startsWith(NEW_INVOICE_PREFIX) && hasStoredInvoice(editingShipment) ? 'Edit Invoice' : 'Create Invoice'}</DialogTitle>
+            <DialogTitle>{editingShipment && !editingShipment.id.startsWith(NEW_INVOICE_PREFIX) && isInvoiceRaised(editingShipment) ? 'Edit Invoice' : 'Create Invoice'}</DialogTitle>
             <DialogDescription>
               {editingShipment && (
                 <>
                   {editingShipment.id.startsWith(NEW_INVOICE_PREFIX)
                     ? 'Enter the shipper and billing details for this new invoice.'
-                    : <>For shipment <span className="font-mono">{editingShipment.tracking_number}</span> — customer: {getSenderName(editingShipment)}.{!hasStoredInvoice(editingShipment) && ' Details have been filled from the booking; review them before creating the invoice.'}</>}
+                    : <>For shipment <span className="font-mono">{editingShipment.tracking_number}</span> — customer: {getSenderName(editingShipment)}.{!isInvoiceRaised(editingShipment) && ' Details have been filled from the booking; review them before creating the invoice.'}</>}
                 </>
               )}
             </DialogDescription>
@@ -1207,7 +1260,7 @@ const InvoicesTab = () => {
             <Button onClick={saveInvoice} disabled={savingInvoice || !draft}>
               {savingInvoice
                 ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</>
-                : editingShipment && !editingShipment.id.startsWith(NEW_INVOICE_PREFIX) && hasStoredInvoice(editingShipment) ? 'Save changes' : 'Create invoice'}
+                : editingShipment && !editingShipment.id.startsWith(NEW_INVOICE_PREFIX) && isInvoiceRaised(editingShipment) ? 'Save changes' : 'Create invoice'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1231,119 +1284,25 @@ const InvoicesTab = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Record payment dialog */}
-      <Dialog
-        open={!!payingShipment}
-        onOpenChange={(open) => { if (!open) { setPayingShipment(null); setPaymentDraft(null); } }}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Record Payment</DialogTitle>
-            <DialogDescription>
-              {payingShipment && (
-                <>Offline payment for invoice <span className="font-mono">{getInvoiceData(payingShipment).invoiceNumber}</span> — {getSenderName(payingShipment)}</>
-              )}
-            </DialogDescription>
-          </DialogHeader>
+      <InvoicePaymentDialog
+        open={Boolean(paymentFor)}
+        shipment={paymentFor?.shipment ?? null}
+        initialMode={paymentFor?.mode ?? 'paid'}
+        onOpenChange={(open) => { if (!open) setPaymentFor(null); }}
+        onSaved={applyInvoice}
+      />
 
-          {paymentDraft && payingShipment && (() => {
-            const inv = getInvoiceData(payingShipment);
-            const existing = inv.payments || [];
-            return (
-              <div className="space-y-4">
-                {paymentSummaryForPaying && (
-                  <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm flex justify-between">
-                    <span>Balance due</span>
-                    <span className="font-semibold">{fmtMoney(paymentSummaryForPaying.balance, inv.currency)}</span>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Amount ({inv.currency})</Label>
-                    <Input
-                      type="number" min={0} step={0.01}
-                      value={paymentDraft.amount}
-                      onChange={e => setPaymentDraft({ ...paymentDraft, amount: parseFloat(e.target.value) || 0 })}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Date received</Label>
-                    <Input
-                      type="date"
-                      value={paymentDraft.date}
-                      onChange={e => setPaymentDraft({ ...paymentDraft, date: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Method</Label>
-                    <Select value={paymentDraft.method} onValueChange={v => setPaymentDraft({ ...paymentDraft, method: v })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(PAYMENT_METHOD_LABELS).map(([v, label]) => (
-                          <SelectItem key={v} value={v}>{label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Reference (optional)</Label>
-                    <Input
-                      placeholder="Bank ref, receipt #…"
-                      value={paymentDraft.reference}
-                      onChange={e => setPaymentDraft({ ...paymentDraft, reference: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs">Note (optional)</Label>
-                  <Input
-                    value={paymentDraft.note}
-                    onChange={e => setPaymentDraft({ ...paymentDraft, note: e.target.value })}
-                  />
-                </div>
-
-                {existing.length > 0 && (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Payments so far</Label>
-                    <div className="rounded-md border divide-y">
-                      {existing.map(p => (
-                        <div key={p.id} className="flex items-center justify-between px-3 py-2 text-sm">
-                          <div>
-                            <span className="font-medium">{fmtMoney(Number(p.amount) || 0, inv.currency)}</span>
-                            <span className="text-muted-foreground"> · {PAYMENT_METHOD_LABELS[p.method] || p.method} · {p.date}</span>
-                            {p.reference && <span className="text-muted-foreground"> · {p.reference}</span>}
-                          </div>
-                          <Button
-                            variant="ghost" size="sm"
-                            onClick={() => removePayment(payingShipment, p.id)}
-                            title="Remove payment"
-                          >
-                            <Trash2 className="h-4 w-4 text-red-600" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setPayingShipment(null); setPaymentDraft(null); }} disabled={savingPayment}>
-              Cancel
-            </Button>
-            <Button onClick={savePayment} disabled={savingPayment || !paymentDraft} className="bg-emerald-600 hover:bg-emerald-700">
-              {savingPayment ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</> : <><Wallet className="h-4 w-4 mr-2" />Record payment</>}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DriverInvoiceReviewDialog
+        open={Boolean(reviewFor)}
+        shipment={reviewFor}
+        driverInvoice={reviewFor ? driverInvoices.get(reviewFor.id) ?? null : null}
+        names={staffNames}
+        onOpenChange={(open) => { if (!open) setReviewFor(null); }}
+        onVerified={applyInvoice}
+        onEdit={(s) => { setReviewFor(null); openEdit(s); }}
+        onMarkAs={(s) => { setReviewFor(null); setPaymentFor({ shipment: s, mode: 'paid' }); }}
+        onView={(s) => { setReviewFor(null); setPreviewShipment(s); }}
+      />
     </div>
   );
 };

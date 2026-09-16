@@ -5,6 +5,8 @@ import {
   isInvoiceSettled,
   getInvoiceStatusValue,
   hasStoredInvoice,
+  isInvoiceRaised,
+  getInvoicePaymentState,
 } from '@/utils/invoiceTotals';
 
 const items = [
@@ -119,5 +121,30 @@ describe('getInvoiceStatusValue', () => {
 
   it('does not call a fully paid invoice overdue', () => {
     expect(getInvoiceStatusValue({ items, payments: [{ amount: 565 }], dueDate: '2020-01-01' })).toBe('paid');
+  });
+});
+
+describe('isInvoiceRaised', () => {
+  it('needs an invoice number, not just priced lines', () => {
+    expect(isInvoiceRaised({ metadata: { invoice: { items } } })).toBe(false);
+    expect(isInvoiceRaised({ metadata: { invoice: { invoiceNumber: '  ', items } } })).toBe(false);
+    expect(isInvoiceRaised({ metadata: { invoice: { invoiceNumber: 'INV-LIS09260065' } } })).toBe(true);
+    expect(isInvoiceRaised({ metadata: {} })).toBe(false);
+    expect(isInvoiceRaised(null)).toBe(false);
+  });
+});
+
+describe('getInvoicePaymentState', () => {
+  it('reads the stamp from the recorded payments', () => {
+    expect(getInvoicePaymentState({ items })).toBe('unpaid');
+    expect(getInvoicePaymentState({ items, payments: [{ amount: 90 }] })).toBe('partial');
+    expect(getInvoicePaymentState({ items, payments: [{ amount: 565 }] })).toBe('paid');
+  });
+
+  it('honours the legacy paid flag only when no payment was itemised', () => {
+    expect(getInvoicePaymentState({ items, paid: true })).toBe('paid');
+    // A driver's cash at the door plus a paid tick used to read as settled
+    // nowhere; the payments decide.
+    expect(getInvoicePaymentState({ items, paid: true, payments: [{ amount: 90 }] })).toBe('partial');
   });
 });
